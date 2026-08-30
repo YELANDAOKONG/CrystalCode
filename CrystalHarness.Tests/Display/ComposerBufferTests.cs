@@ -62,6 +62,36 @@ public sealed class ComposerBufferTests
     }
 
     [Fact]
+    public void Handle_ControlBackspaceFollowsHostPlatform()
+    {
+        var buffer = new ComposerBuffer();
+        var chord = new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, true);
+        if (OperatingSystem.IsWindows())
+        {
+            buffer.Insert("hello world");
+            buffer.Handle(chord);
+            Assert.Equal("hello ", buffer.Text);
+            return;
+        }
+
+        buffer.Insert("查看其他问题");
+        buffer.Handle(chord);
+        Assert.Equal("查看其他问", buffer.Text);
+    }
+
+    [Fact]
+    public void Handle_PlainBackspaceDeletesOneCharacter()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("hello");
+        var backspace = new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false);
+
+        buffer.Handle(backspace);
+
+        Assert.Equal("hell", buffer.Text);
+    }
+
+    [Fact]
     public void Handle_HistoryRecall_CtrlP_CtrlN()
     {
         var buffer = new ComposerBuffer();

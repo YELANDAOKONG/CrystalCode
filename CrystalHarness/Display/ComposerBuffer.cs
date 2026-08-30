@@ -55,10 +55,11 @@ public sealed class ComposerBuffer
 
         switch (key.Key)
         {
-            case ConsoleKey.Backspace when isAlt || isCtrl:
+            case ConsoleKey.Backspace when ComposerKeys.IsWordDeleteLeft(key):
                 DeleteWordLeft();
                 break;
             case ConsoleKey.Backspace:
+            case ConsoleKey.H when isCtrl && !isAlt:
                 DeleteLeft();
                 break;
             case ConsoleKey.Delete when isAlt || isCtrl:
@@ -113,6 +114,12 @@ public sealed class ComposerBuffer
                 DeleteWordRight();
                 break;
             default:
+                if (key.KeyChar is '\b' or '\u007f')
+                {
+                    DeleteLeft();
+                    break;
+                }
+
                 if (!char.IsControl(key.KeyChar))
                 {
                     Insert(key.KeyChar.ToString());

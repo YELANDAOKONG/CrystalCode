@@ -283,7 +283,10 @@ two-column Title Case field grid (`Status`, `Reason`, `Risk`,
 Composer keys: Enter submits when idle and queues while a turn is
 running. Queued text stays above the composer and is sent when the
 current tool batch or turn ends. Empty Enter while working interrupts
-immediately and sends. Ctrl+J or `\`+Enter inserts a newline. Tab toggles Plan/Work or
+immediately and sends. Backspace deletes one character on every
+platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
+plain Backspace as Control; that is still one character. Ctrl+W or
+Alt/Option+Backspace deletes a word. Ctrl+J or `\`+Enter inserts a newline. Tab toggles Plan/Work or
 completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome
 labels are Plan, Work, Review, Default, AutoEdit, and Full. The status
 bar includes a queued count while follow-ups wait. Auto-pass prints a
@@ -292,8 +295,12 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`). A slash picker appears while the prompt
-is a command prefix. PageUp, PageDown, the mouse wheel, and Ctrl+Up/Down scroll the transcript.
-Up/Down arrows navigate composer history or slash picker options. Native
+is a command prefix. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
+and Up/Down when the prompt is empty scroll the transcript. Up/Down
+arrows navigate composer history or the slash picker when the prompt
+has text. The alternate screen remaps the wheel to arrows without
+mouse capture. The frame polls terminal size and repaints when the
+window is resized. Native
 mouse selection and clipboard copy are preserved. Escape sequences
 are not treated as paste. Redirected output stays sequential.
 

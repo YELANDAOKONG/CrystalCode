@@ -5,33 +5,27 @@ namespace CrystalHarness.Display;
 /// </summary>
 public static class ScreenSize
 {
-    public static int Width
-    {
-        get
-        {
-            try
-            {
-                return Math.Max(Console.WindowWidth, ShellLayout.MinWidth);
-            }
-            catch (IOException)
-            {
-                return 80;
-            }
-        }
-    }
+    public static int Width => TryRead(out var width, out _) ? width : 80;
 
-    public static int Height
+    public static int Height => TryRead(out _, out var height) ? height : 24;
+
+    public static bool TryRead(out int width, out int height)
     {
-        get
+        width = 80;
+        height = 24;
+        try
         {
-            try
-            {
-                return Math.Max(Console.WindowHeight, ShellLayout.MinHeight);
-            }
-            catch (IOException)
-            {
-                return 24;
-            }
+            width = Math.Max(Console.WindowWidth, ShellLayout.MinWidth);
+            height = Math.Max(Console.WindowHeight, ShellLayout.MinHeight);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
         }
     }
 

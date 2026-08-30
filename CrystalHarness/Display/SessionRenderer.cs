@@ -20,7 +20,7 @@ namespace CrystalHarness.Display;
 public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 {
     private const int PollMilliseconds = 40;
-    private const int EscapeHoldMilliseconds = 20;
+    private const int EscapeHoldMilliseconds = 50;
     private static readonly TimeSpan PaintBudget = TimeSpan.FromMilliseconds(33);
     private readonly object _gate = new();
     private readonly TranscriptLog _log = new();
@@ -37,6 +37,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private Stopwatch? _turnClock;
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
+    private int _paintedWidth;
+    private int _paintedHeight;
     private bool _composerPaused;
 
     public int ContextWindow { get; set; }
@@ -176,7 +178,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 "tab          Plan / Work, or complete /",
                 "shift+tab    Plan / Work",
                 "?            shortcuts when empty",
-                "pageup       scroll transcript (also ctrl+up/down)",
+                "pageup       scroll transcript (also wheel, ctrl+up/down, empty up)",
                 "up/down      history recall (or picker navigation)");
             foreach (var spec in SlashCatalog.BuiltIn)
             {
@@ -518,9 +520,16 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 {
                     _scrollBack = Math.Max(0, _scrollBack + delta);
                 }
-                else if (ScrollInput.TryComposerKey(burst, out var key))
+                else if (ScrollInput.TryComposerKeys(burst, out var keys))
                 {
-                    submitted = HandleComposerKeyUnlocked(key, togglePlan);
+                    foreach (var key in keys)
+                    {
+                        submitted = HandleComposerKeyUnlocked(key, togglePlan);
+                        if (submitted is not null)
+                        {
+                            break;
+                        }
+                    }
                 }
                 else if (ScrollInput.IsPaste(burst))
                 {
@@ -606,9 +615,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             "tab          Plan / Work, or complete /",
             "shift+tab    Plan / Work",
             "?            shortcuts when empty",
-            "pageup       scroll transcript",
-            "wheel        scroll transcript",
-            "up           scroll when the prompt is empty");
+            "pageup       scroll transcript (also wheel, ctrl+up/down, empty up)");
         foreach (var option in _slashOptions)
         {
             var aliases = option.Keys
@@ -706,13 +713,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             queue.Count);
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
+        var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;
         ScreenPainter.Paint(
             regions,
             transcript,
             overlay,
             _chrome.StatusLine(regions.Width),
             queue,
-            composerView);
+            composerView,
+            resetFrame);
+        _paintedWidth = regions.Width;
+        _paintedHeight = regions.Height;
         _lastPaint = now;
     }
 
@@ -843,6 +854,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             if (wake is { IsCompleted: true })
             {
                 return null;
+            }
+
+            lock (_gate)
+            {
+                if (ScreenSize.Width != _paintedWidth || ScreenSize.Height != _paintedHeight)
+                {
+                    PaintUnlocked(force: true);
+                }
             }
 
             await Task.Delay(PollMilliseconds, cancellationToken);

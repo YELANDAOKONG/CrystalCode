@@ -16,13 +16,15 @@ public sealed class ScrollInputTests
     }
 
     [Fact]
-    public void TryDelta_CtrlUpScrolls_PlainUpDoesNotScroll()
+    public void TryDelta_CtrlUpScrolls_EmptyUpScrolls_TypedUpDoesNot()
     {
         var plainUp = new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false);
         var ctrlUp = new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, true);
 
-        Assert.False(ScrollInput.TryDelta([plainUp], composerEmpty: true, pickerOpen: false, 10, out _));
-        Assert.True(ScrollInput.TryDelta([ctrlUp], composerEmpty: true, pickerOpen: false, 10, out var delta));
+        Assert.True(ScrollInput.TryDelta([plainUp], composerEmpty: true, pickerOpen: false, 10, out var emptyDelta));
+        Assert.Equal(ScrollInput.LineStep, emptyDelta);
+        Assert.False(ScrollInput.TryDelta([plainUp], composerEmpty: false, pickerOpen: false, 10, out _));
+        Assert.True(ScrollInput.TryDelta([ctrlUp], composerEmpty: false, pickerOpen: false, 10, out var delta));
         Assert.Equal(ScrollInput.LineStep, delta);
     }
 
@@ -64,6 +66,37 @@ public sealed class ScrollInputTests
     {
         Assert.True(ScrollInput.TryComposerKey(Csi("\u001b[A"), out var key));
         Assert.Equal(ConsoleKey.UpArrow, key.Key);
+    }
+
+    [Fact]
+    public void TryComposerKeys_RepeatsBackspace()
+    {
+        var burst = new List<ConsoleKeyInfo>
+        {
+            new('\b', ConsoleKey.Backspace, false, false, true),
+            new('\b', ConsoleKey.Backspace, false, false, true)
+        };
+
+        Assert.True(ScrollInput.TryComposerKeys(burst, out var keys));
+        Assert.Equal(2, keys.Count);
+        Assert.False(ScrollInput.IsPaste(burst));
+    }
+
+    [Fact]
+    public void TryComposerKey_MapsKittyBackspace()
+    {
+        Assert.True(ScrollInput.TryComposerKey(Csi("\u001b[127u"), out var key));
+        Assert.Equal(ConsoleKey.Backspace, key.Key);
+    }
+
+    [Fact]
+    public void TryDelta_CsiUpScrollsWhenComposerEmpty()
+    {
+        var burst = Csi("\u001b[A");
+
+        Assert.True(ScrollInput.TryDelta(burst, composerEmpty: true, pickerOpen: false, 8, out var delta));
+        Assert.Equal(ScrollInput.LineStep, delta);
+        Assert.False(ScrollInput.TryDelta(burst, composerEmpty: false, pickerOpen: false, 8, out _));
     }
 
     private static List<ConsoleKeyInfo> Csi(string text)

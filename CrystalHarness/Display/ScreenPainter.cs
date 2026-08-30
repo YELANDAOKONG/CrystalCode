@@ -13,13 +13,19 @@ public static class ScreenPainter
         IReadOnlyList<PaintLine> overlay,
         PaintLine status,
         IReadOnlyList<PaintLine> queue,
-        ComposerView composer)
+        ComposerView composer,
+        bool resetFrame = false)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(overlay);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
         AnsiConsole.Cursor.Hide();
+        if (resetFrame)
+        {
+            AnsiConsole.Write(new ControlCode("\u001b[2J\u001b[H"));
+        }
+
         // Wrap-off plus absolute rows: a full-width write must not scroll the frame.
         AnsiConsole.Write(new ControlCode("\u001b[?7l"));
         try

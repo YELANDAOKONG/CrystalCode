@@ -27,6 +27,8 @@ public sealed class AlternateScreen : IDisposable
         try
         {
             AnsiConsole.Write(new ControlCode("\u001b[?1049h"));
+            // Wheel becomes Up/Down in the alternate buffer. Not mouse capture.
+            AnsiConsole.Write(new ControlCode("\u001b[?1007h"));
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
             return new AlternateScreen(true);
@@ -47,6 +49,7 @@ public sealed class AlternateScreen : IDisposable
         try
         {
             AnsiConsole.Cursor.Show();
+            AnsiConsole.Write(new ControlCode("\u001b[?1007l"));
             AnsiConsole.Write(new ControlCode("\u001b[?1049l"));
         }
         catch (IOException)

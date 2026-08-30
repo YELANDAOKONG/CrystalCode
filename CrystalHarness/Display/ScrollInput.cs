@@ -34,6 +34,27 @@ public static class ScrollInput
         return TrySequence(burst, composerEmpty, pickerOpen, pageRows, out delta);
     }
 
+    public static bool TryComposerKeys(
+        IReadOnlyList<ConsoleKeyInfo> burst,
+        out IReadOnlyList<ConsoleKeyInfo> keys)
+    {
+        ArgumentNullException.ThrowIfNull(burst);
+        keys = [];
+        if (TryComposerKey(burst, out var key))
+        {
+            keys = [key];
+            return true;
+        }
+
+        if (AreEditRepeats(burst))
+        {
+            keys = burst;
+            return true;
+        }
+
+        return false;
+    }
+
     public static bool TryComposerKey(
         IReadOnlyList<ConsoleKeyInfo> burst,
         out ConsoleKeyInfo key)
@@ -47,13 +68,13 @@ public static class ScrollInput
         }
 
         var text = Chars(burst);
-        if (text == "\u001b[A")
+        if (text is "\u001b[A" or "\u001bOA")
         {
             key = new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false);
             return true;
         }
 
-        if (text == "\u001b[B")
+        if (text is "\u001b[B" or "\u001bOB")
         {
             key = new ConsoleKeyInfo('\0', ConsoleKey.DownArrow, false, false, false);
             return true;
@@ -89,7 +110,32 @@ public static class ScrollInput
             return true;
         }
 
+        if (text is "\u001b[127u" or "\u001b[27;1;127~" or "\u001b[27;1;8~")
+        {
+            key = new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false);
+            return true;
+        }
+
         return false;
+    }
+
+    private static bool AreEditRepeats(IReadOnlyList<ConsoleKeyInfo> burst)
+    {
+        if (burst.Count <= 1)
+        {
+            return false;
+        }
+
+        foreach (var key in burst)
+        {
+            if (key.Key is not (ConsoleKey.Backspace or ConsoleKey.Delete)
+                && key.KeyChar is not ('\b' or '\u007f'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static bool IsPaste(IReadOnlyList<ConsoleKeyInfo> burst)
@@ -149,6 +195,18 @@ public static class ScrollInput
             return true;
         }
 
+        if (key.Key == ConsoleKey.UpArrow && composerEmpty && !pickerOpen)
+        {
+            delta = LineStep;
+            return true;
+        }
+
+        if (key.Key == ConsoleKey.DownArrow && composerEmpty && !pickerOpen)
+        {
+            delta = -LineStep;
+            return true;
+        }
+
         return false;
     }
 
@@ -195,8 +253,26 @@ public static class ScrollInput
             return true;
         }
 
+        if (IsPlainUp(text) && composerEmpty && !pickerOpen)
+        {
+            delta = LineStep;
+            return true;
+        }
+
+        if (IsPlainDown(text) && composerEmpty && !pickerOpen)
+        {
+            delta = -LineStep;
+            return true;
+        }
+
         return false;
     }
+
+    private static bool IsPlainUp(string text) =>
+        text is "\u001b[A" or "\u001bOA";
+
+    private static bool IsPlainDown(string text) =>
+        text is "\u001b[B" or "\u001bOB";
 
     private static bool TryMouseWheel(string text, out int delta)
     {
