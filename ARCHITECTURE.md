@@ -155,6 +155,11 @@ fraction of the **selected model's** `contextWindow`, the host:
 3. Falls back to dropping oldest tool results if summary generation fails.
    User messages are not dropped.
 
+Sessions are written to `~/.crystal/sessions/<id>.json` after each
+completed turn. `/resume` loads the latest file for the workspace, or a
+given id. `/clear` starts a new id. The first system message is refreshed
+from the current prompts on resume.
+
 ## Home directory
 
 ```text

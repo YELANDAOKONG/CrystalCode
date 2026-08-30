@@ -113,6 +113,7 @@ public sealed class SessionRenderer : ITurnObserver
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /cd         show or set workspace[/]");
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /status     turns, tokens, mode[/]");
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /clear      new conversation[/]");
+            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /resume     latest or id[/]");
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /quit       exit[/]");
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  ctrl+c      stop turn; twice at idle exits[/]");
         }

@@ -10,6 +10,7 @@ public sealed class SessionCommandTests
     [InlineData("/help", SessionVerb.Help)]
     [InlineData("/plan", SessionVerb.Plan)]
     [InlineData("/approval review", SessionVerb.Approval)]
+    [InlineData("/resume", SessionVerb.Resume)]
     [InlineData("/quit", SessionVerb.Quit)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)
     {

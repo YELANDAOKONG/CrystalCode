@@ -132,4 +132,31 @@ public sealed class TodoList
             TodoStatus.Cancelled => "cancelled",
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
         };
+
+    internal static bool TryParseStatus(string? value, out TodoStatus status)
+    {
+        status = TodoStatus.Pending;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        switch (value.Trim().ToLowerInvariant())
+        {
+            case "pending":
+                status = TodoStatus.Pending;
+                return true;
+            case "in_progress":
+                status = TodoStatus.InProgress;
+                return true;
+            case "completed":
+                status = TodoStatus.Completed;
+                return true;
+            case "cancelled":
+                status = TodoStatus.Cancelled;
+                return true;
+            default:
+                return false;
+        }
+    }
 }

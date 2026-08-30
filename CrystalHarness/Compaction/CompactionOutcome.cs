@@ -1,0 +1,10 @@
+using Crystal.Chat;
+
+namespace CrystalHarness.Compaction;
+
+/// <summary>
+/// Transcript after an attempted compaction.
+/// </summary>
+public sealed record CompactionOutcome(
+    IReadOnlyList<ChatItem> Transcript,
+    bool Compacted);

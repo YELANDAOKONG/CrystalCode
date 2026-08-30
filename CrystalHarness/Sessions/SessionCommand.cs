@@ -25,6 +25,7 @@ public sealed record SessionCommand(SessionVerb Verb, string Argument)
             "/status" => new SessionCommand(SessionVerb.Status, argument),
             "/clear" => new SessionCommand(SessionVerb.Clear, argument),
             "/cd" => new SessionCommand(SessionVerb.Cd, argument),
+            "/resume" => new SessionCommand(SessionVerb.Resume, argument),
             "/quit" or "/exit" or "/q" => new SessionCommand(SessionVerb.Quit, argument),
             _ => new SessionCommand(SessionVerb.Unknown, trimmed)
         };

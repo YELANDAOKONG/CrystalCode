@@ -12,6 +12,7 @@ public enum SessionVerb
     Status,
     Clear,
     Cd,
+    Resume,
     Quit,
     Unknown
 }
