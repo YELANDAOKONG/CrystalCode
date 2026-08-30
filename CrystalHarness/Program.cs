@@ -1,9 +1,19 @@
-﻿namespace CrystalHarness;
+﻿using Spectre.Console.Cli;
 
-class Program
+using CrystalHarness.Commands;
+
+namespace CrystalHarness;
+
+public static class Program
 {
-    static void Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
-        Console.WriteLine("Hello, World!");
+        var app = new CommandApp<RunCommand>();
+        app.Configure(static config =>
+        {
+            config.SetApplicationName("crystal");
+        });
+
+        return await app.RunAsync(args);
     }
 }

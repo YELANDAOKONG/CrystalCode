@@ -10,8 +10,9 @@ CrystalHarness consumes the Crystal library. It does not modify Crystal.
 
 - .NET 10
 - A sibling checkout of Crystal at `../Crystal`
-- A DeepSeek or OpenAI API key in `CRYSTAL_API_KEY` / `OPENAI_API_KEY` or
-  `~/.crystal/credentials.json`
+- An API key for the selected provider: `providers.<name>.apiKey` in
+  `config.json` (literal, `{env:NAME}`, or `{file:path}`), `{NAME}_API_KEY`,
+  `CRYSTAL_API_KEY`, or `~/.crystal/credentials.json`
 
 ## Build
 
@@ -25,18 +26,23 @@ dotnet test CrystalHarness.sln
 From a workspace you want the agent to edit:
 
 ```bash
-dotnet run --project CrystalHarness
+dotnet run --project CrystalHarness -- --provider deepseek --model deepseek-v4-flash
 ```
 
-The default command opens an interactive session in the current directory.
+The default command loads `~/.crystal`, constructs the selected provider, and
+prints the workspace. Override the data directory with `CRYSTAL_HOME` or
+`--home`. Add OpenAI-compatible providers and per-model `contextWindow`,
+`temperature`, `topP`, and `maxTokens` in `config.json`. The interactive
+session loop is the next host layer.
 
 ## Modes
 
 - **Plan** inspects the workspace. It cannot edit files or run a shell.
 - **Work** can edit, write, and run commands after approval.
 
-Tab or `/plan` switches modes. `/approval` switches Default, AutoEdit, and
-Auto.
+Tab or `/plan` switches Plan and Work. `/approval` switches Default,
+AutoEdit, Review (another model checks safety and the user request), and
+Full (pass without review).
 
 ## Data
 

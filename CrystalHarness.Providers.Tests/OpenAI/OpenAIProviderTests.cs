@@ -28,7 +28,7 @@ public sealed class OpenAIProviderTests
         using var provider = new OpenAIProvider(
             new OpenAIOptions(
                 "test-key",
-                "gpt-5",
+                "gpt-5.6-sol",
                 organization: "org_test",
                 maxTokens: 256,
                 temperature: 0.2),
@@ -68,7 +68,7 @@ public sealed class OpenAIProviderTests
                 """));
         using var http = new HttpClient(handler);
         using var provider = new OpenAIProvider(
-            new OpenAIOptions("test-key", "gpt-5"),
+            new OpenAIOptions("test-key", "gpt-5.6-sol"),
             http);
 
         var exception = await Assert.ThrowsAsync<NotSupportedException>(
@@ -101,7 +101,7 @@ public sealed class OpenAIProviderTests
                 """));
         using var http = new HttpClient(handler);
         using var provider = new OpenAIProvider(
-            new OpenAIOptions("test-key", "gpt-5", replayReasoningContent: true),
+            new OpenAIOptions("test-key", "gpt-5.6-sol", replayReasoningContent: true),
             http);
 
         await provider.CompleteAsync(

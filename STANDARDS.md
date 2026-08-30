@@ -57,7 +57,8 @@
 - Workspace tools reject paths that escape the workspace root.
 - Shell classification treats `sudo`, destructive filesystem commands,
   pipe-to-shell downloads, force-push, and credential-path writes as
-  Forbidden or Privileged. Forbidden never auto-executes.
+  Forbidden or Privileged. Forbidden never fully auto-passes. Review
+  mode may deny those calls or escalate them to the operator.
 - Credential files are written with owner-only access where the OS allows it.
 - Do not log request bodies that may contain secrets.
 

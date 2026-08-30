@@ -31,6 +31,13 @@ public sealed record OpenAIOptions
     /// turns. Official OpenAI Chat Completions rejects that field; enable it
     /// only for compatible endpoints that accept it.
     /// </param>
+    /// <param name="useMaxCompletionTokens">
+    /// When true, the output cap is sent as <c>max_completion_tokens</c>.
+    /// Compatible gateways that still expect <c>max_tokens</c> set this false.
+    /// </param>
+    /// <param name="vendorName">
+    /// Name used in adapter errors. Defaults to <c>OpenAI</c>.
+    /// </param>
     /// <param name="requestTimeout">
     /// Timeout applied when this adapter creates its own <see cref="HttpClient"/>.
     /// </param>
@@ -44,6 +51,8 @@ public sealed record OpenAIOptions
         double? topP = null,
         int? maxTokens = null,
         bool replayReasoningContent = false,
+        bool useMaxCompletionTokens = true,
+        string? vendorName = null,
         TimeSpan? requestTimeout = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
@@ -96,6 +105,8 @@ public sealed record OpenAIOptions
         TopP = topP;
         MaxTokens = maxTokens;
         ReplayReasoningContent = replayReasoningContent;
+        UseMaxCompletionTokens = useMaxCompletionTokens;
+        VendorName = string.IsNullOrWhiteSpace(vendorName) ? "OpenAI" : vendorName.Trim();
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
     }
 
@@ -146,6 +157,16 @@ public sealed record OpenAIOptions
     /// Gets whether assistant reasoning content is written back on later turns.
     /// </summary>
     public bool ReplayReasoningContent { get; }
+
+    /// <summary>
+    /// Gets whether the output cap uses <c>max_completion_tokens</c>.
+    /// </summary>
+    public bool UseMaxCompletionTokens { get; }
+
+    /// <summary>
+    /// Gets the name used in adapter errors.
+    /// </summary>
+    public string VendorName { get; }
 
     /// <summary>
     /// Gets the timeout used for an adapter-owned HTTP client.

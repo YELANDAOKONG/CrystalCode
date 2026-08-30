@@ -35,7 +35,7 @@ public sealed class DeepSeekProviderTests
                 """));
         using var http = new HttpClient(handler);
         using var provider = new DeepSeekProvider(
-            new DeepSeekOptions("test-key", "deepseek-chat", maxTokens: 128),
+            new DeepSeekOptions("test-key", "deepseek-v4-flash", maxTokens: 128),
             http);
 
         var response = await provider.CompleteAsync(
@@ -52,7 +52,7 @@ public sealed class DeepSeekProviderTests
             new Uri("https://api.deepseek.com/chat/completions"),
             handler.Request.RequestUri);
         Assert.Equal("Bearer", handler.Request.Headers.Authorization?.Scheme);
-        Assert.Contains("\"model\":\"deepseek-chat\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"model\":\"deepseek-v4-flash\"", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"max_tokens\":128", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"thinking\":{\"type\":\"enabled\"}", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"reasoning_effort\":\"high\"", handler.Body, StringComparison.Ordinal);
@@ -73,7 +73,7 @@ public sealed class DeepSeekProviderTests
                 HttpStatusCode.BadRequest));
         using var http = new HttpClient(handler);
         using var provider = new DeepSeekProvider(
-            new DeepSeekOptions("test-key", "deepseek-chat"),
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
             http);
 
         var exception = await Assert.ThrowsAsync<DeepSeekException>(

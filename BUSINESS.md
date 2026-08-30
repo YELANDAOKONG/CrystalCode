@@ -21,10 +21,12 @@ The current product is an interactive terminal application that can:
 
 - stream a model turn with tool calls;
 - switch Plan (read-only) and Work (edit, write, shell);
-- approve side effects manually or automatically by risk and authority;
+- approve side effects manually, by a reviewing model, or by full
+  pass-through according to risk and authority;
 - compact conversation context when usage approaches the model window;
 - persist configuration, permissions, and sessions under `~/.crystal`;
-- use built-in DeepSeek and OpenAI chat adapters;
+- use DeepSeek and OpenAI-compatible chat adapters, including user-added
+  compatible endpoints;
 - register built-in tools and providers through an in-process plugin table.
 
 ## Current exclusions
@@ -36,7 +38,7 @@ The current product does not include:
 - MCP servers;
 - a headless CI runner;
 - an operating-system sandbox;
-- additional model-provider families beyond DeepSeek and OpenAI;
+- Chat Completions dialects other than DeepSeek and OpenAI-compatible;
 - multimodal coding (images, audio, video).
 
 Those remain later product work. Do not reserve empty public types for them.

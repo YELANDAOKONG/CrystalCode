@@ -122,17 +122,25 @@ Every side-effect tool call is classified before invocation:
 Modes:
 
 - Plan: read-only catalog. No edit, write, or bash.
-- Default: Read auto-executes. Write and shell ask.
-- AutoEdit: workspace file changes auto-execute. Shell still asks.
-- Auto: workspace-bounded, policy-allowed actions auto-execute.
-  Forbidden actions never auto-execute.
+- Default: Read auto-executes. Write and shell ask the operator.
+- AutoEdit: workspace file changes pass without review. Shell still asks.
+- Review: another model checks each remaining side-effect call for safety
+  and whether it serves the current user request (Codex-style review).
+  Allow executes. Deny becomes model-visible rejection text. Uncertain
+  and Forbidden-allow fall back to the operator. Review is not a grant
+  and is not full pass-through.
+- Full: workspace-bounded, policy-allowed actions pass without review.
+  Forbidden and Privileged never fully auto-pass.
+
+Do not name a mode `auto`. That word is ambiguous between review and
+full pass-through.
 
 Persistent grants are stored in `~/.crystal/permissions.json`.
 
 ## Compaction
 
 Crystal does not reduce context. When reported tokens cross the configured
-fraction of the model window, the host:
+fraction of the **selected model's** `contextWindow`, the host:
 
 1. Pins the current system text, workspace hints, recent turns, and open
    todos.
@@ -152,10 +160,46 @@ fraction of the model window, the host:
   plugins/
 ```
 
-`credentials.json` is created with owner-only permissions. Environment
-variables override file credentials. The `plugins` directory is reserved for
-later assembly loading; the current product only registers in-process
-contributions.
+`credentials.json` is created with owner-only permissions and is keyed by
+provider name. Environment variables override file credentials. The `plugins`
+directory is reserved for later assembly loading; the current product only
+registers in-process contributions.
+
+Provider names are open. `deepseek` and `openai` are starter entries. A user
+adds an OpenAI-compatible endpoint by inserting another `providers` object
+with `protocol` `openai`, a `baseUri`, and a `models` table. Context size
+and sampling live on each model, not on the host:
+
+```json
+{
+  "provider": "openrouter",
+  "model": "anthropic/claude-sonnet-4",
+  "providers": {
+    "openrouter": {
+      "protocol": "openai",
+      "baseUri": "https://openrouter.ai/api/v1/",
+      "replayReasoningContent": true,
+      "tokenLimit": "max_tokens",
+      "apiKey": "sk-or-...",
+      "apiKeyEnvironment": "OPENROUTER_API_KEY",
+      "models": {
+        "anthropic/claude-sonnet-4": {
+          "contextWindow": 200000,
+          "temperature": 0.2,
+          "maxTokens": 8192
+        }
+      }
+    }
+  }
+}
+```
+
+`protocol` is `deepseek` or `openai`. Models that are not listed cannot be
+selected. There is no global context window.
+
+`apiKey` may be a literal secret, `{env:NAME}`, or `{file:path}` (relative
+to `~/.crystal` or absolute, with `~` expanded). Process environment
+variables still override. `credentials.json` remains a fallback store.
 
 ## Display
 
@@ -171,5 +215,11 @@ transcript, compact one-line tool rows, an approval card, and a footer
 
 `IPlugin` contributes tools, chat-client factories, approval classifiers, or
 slash commands through `PluginContribution`. Built-in tools and the DeepSeek
-adapter register through the same table. Disk isolation with
+and OpenAI adapters register through the same table. Disk isolation with
 `AssemblyLoadContext` is later work; do not pretend it exists.
+
+Environment variables:
+
+- `CRYSTAL_HOME` overrides the data directory.
+- `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, and `CRYSTAL_API_KEY` override
+  `credentials.json`. A provider-specific variable wins over `CRYSTAL_API_KEY`.

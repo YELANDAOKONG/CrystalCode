@@ -26,14 +26,16 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
         ArgumentNullException.ThrowIfNull(options);
 
         var profile = new CompatibleProfile(
-            vendorName: "OpenAI",
+            vendorName: options.VendorName,
             chatCompletionsPath: CompatibleWire.ChatCompletionsPath,
             reasoningStateFormat: ReasoningStateFormat,
             writeReasoningContent: options.ReplayReasoningContent,
             writeThinkingObject: false,
             supportsMinimalEffort: true,
             maximumEffortValue: "xhigh",
-            tokenLimit: CompatibleTokenLimit.MaxCompletionTokens,
+            tokenLimit: options.UseMaxCompletionTokens
+                ? CompatibleTokenLimit.MaxCompletionTokens
+                : CompatibleTokenLimit.MaxTokens,
             faults: new CompatibleFaults(
                 typeof(OpenAIException),
                 static (message, statusCode, inner) =>
