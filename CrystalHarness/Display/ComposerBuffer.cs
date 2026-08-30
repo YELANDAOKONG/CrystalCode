@@ -50,18 +50,29 @@ public sealed class ComposerBuffer
             return ComposerAction.ShowHelp;
         }
 
+        var isAlt = key.Modifiers.HasFlag(ConsoleModifiers.Alt);
+        var isCtrl = key.Modifiers.HasFlag(ConsoleModifiers.Control);
+
         switch (key.Key)
         {
+            case ConsoleKey.Backspace when isAlt || isCtrl:
+                DeleteWordLeft();
+                break;
             case ConsoleKey.Backspace:
                 DeleteLeft();
+                break;
+            case ConsoleKey.Delete when isAlt || isCtrl:
+                DeleteWordRight();
                 break;
             case ConsoleKey.Delete:
                 DeleteRight();
                 break;
-            case ConsoleKey.LeftArrow when key.Modifiers.HasFlag(ConsoleModifiers.Control):
+            case ConsoleKey.B when isAlt:
+            case ConsoleKey.LeftArrow when isCtrl || isAlt:
                 _cursor = WordLeft();
                 break;
-            case ConsoleKey.RightArrow when key.Modifiers.HasFlag(ConsoleModifiers.Control):
+            case ConsoleKey.F when isAlt:
+            case ConsoleKey.RightArrow when isCtrl || isAlt:
                 _cursor = WordRight();
                 break;
             case ConsoleKey.LeftArrow:
@@ -71,30 +82,35 @@ public sealed class ComposerBuffer
                 _cursor = TextWidth.MoveRight(Text, _cursor);
                 break;
             case ConsoleKey.Home:
-            case ConsoleKey.A when key.Modifiers == ConsoleModifiers.Control:
+            case ConsoleKey.A when isCtrl:
                 _cursor = LineStart();
                 break;
             case ConsoleKey.End:
-            case ConsoleKey.E when key.Modifiers == ConsoleModifiers.Control:
+            case ConsoleKey.E when isCtrl:
                 _cursor = LineEnd();
                 break;
             case ConsoleKey.UpArrow:
+            case ConsoleKey.P when isCtrl:
                 RecallHistory(-1);
                 break;
             case ConsoleKey.DownArrow:
+            case ConsoleKey.N when isCtrl:
                 RecallHistory(1);
                 break;
             case ConsoleKey.Escape:
                 Clear();
                 break;
-            case ConsoleKey.U when key.Modifiers == ConsoleModifiers.Control:
+            case ConsoleKey.U when isCtrl:
                 DeleteToLineStart();
                 break;
-            case ConsoleKey.K when key.Modifiers == ConsoleModifiers.Control:
+            case ConsoleKey.K when isCtrl:
                 DeleteToLineEnd();
                 break;
-            case ConsoleKey.W when key.Modifiers == ConsoleModifiers.Control:
+            case ConsoleKey.W when isCtrl:
                 DeleteWordLeft();
+                break;
+            case ConsoleKey.D when isAlt:
+                DeleteWordRight();
                 break;
             default:
                 if (!char.IsControl(key.KeyChar))
@@ -169,15 +185,30 @@ public sealed class ComposerBuffer
         var (cursorRow, cursorBody) = MapCursor(text, _cursor, bodyWidth);
         var lines = new List<PaintLine>(wrapped.Count);
         var modeColor = PlanMode ? Theme.Plan : Theme.Work;
+
         for (var i = 0; i < wrapped.Count; i++)
         {
             var body = wrapped[i];
             if (i == 0)
             {
-                var plain = promptPlain + body;
-                var markup = $"[{modeColor}]{MarkupText.Escape(mode)}[/]"
-                    + $"[{Theme.Chrome}] > [/]{MarkupText.Escape(body)}";
-                lines.Add(new PaintLine(markup, plain));
+                if (string.IsNullOrEmpty(text))
+                {
+                    var placeholder = "Ask anything... (Tab: switch mode, /: commands, ?: help)";
+                    var availableWidth = Math.Max(width - promptColumns, 0);
+                    var truncatedPlaceholder = TextWidth.Truncate(placeholder, availableWidth);
+                    var plain = promptPlain;
+                    var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
+                        + $"[{Theme.Chrome}] > [/]"
+                        + $"[{Theme.Muted}]{MarkupText.Escape(truncatedPlaceholder)}[/]";
+                    lines.Add(new PaintLine(markup, plain));
+                }
+                else
+                {
+                    var plain = promptPlain + body;
+                    var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
+                        + $"[{Theme.Chrome}] > [/]{MarkupText.Escape(body)}";
+                    lines.Add(new PaintLine(markup, plain));
+                }
             }
             else
             {
@@ -251,6 +282,17 @@ public sealed class ComposerBuffer
         }
 
         var to = TextWidth.MoveRight(Text, _cursor);
+        _text.Remove(_cursor, to - _cursor);
+    }
+
+    private void DeleteWordRight()
+    {
+        if (_cursor >= _text.Length)
+        {
+            return;
+        }
+
+        var to = WordRight();
         _text.Remove(_cursor, to - _cursor);
     }
 

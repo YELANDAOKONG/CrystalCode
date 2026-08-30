@@ -38,4 +38,44 @@ public sealed class ComposerBufferTests
 
         Assert.Equal(ComposerAction.ShowHelp, buffer.Handle(key));
     }
+
+    [Fact]
+    public void Handle_WordNavigationAndDeletion()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("hello world test");
+
+        // Ctrl+W deletes word left
+        var ctrlW = new ConsoleKeyInfo('\x17', ConsoleKey.W, false, false, true);
+        buffer.Handle(ctrlW);
+        Assert.Equal("hello world ", buffer.Text);
+
+        // Alt+Backspace deletes word left
+        var altBackspace = new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, true, false);
+        buffer.Handle(altBackspace);
+        Assert.Equal("hello ", buffer.Text);
+
+        // Ctrl+U clears line before cursor
+        var ctrlU = new ConsoleKeyInfo('\x15', ConsoleKey.U, false, false, true);
+        buffer.Handle(ctrlU);
+        Assert.Equal(string.Empty, buffer.Text);
+    }
+
+    [Fact]
+    public void Handle_HistoryRecall_CtrlP_CtrlN()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("first prompt");
+        buffer.RememberAndClear();
+
+        // Now empty buffer, Ctrl+P recalls previous
+        var ctrlP = new ConsoleKeyInfo('\x10', ConsoleKey.P, false, false, true);
+        buffer.Handle(ctrlP);
+        Assert.Equal("first prompt", buffer.Text);
+
+        // Ctrl+N goes back forward to empty
+        var ctrlN = new ConsoleKeyInfo('\x0E', ConsoleKey.N, false, false, true);
+        buffer.Handle(ctrlN);
+        Assert.Equal(string.Empty, buffer.Text);
+    }
 }

@@ -27,6 +27,7 @@ public static class ToolResultText
     {
         ArgumentNullException.ThrowIfNull(text);
         var lines = new List<string>();
+        var totalNonEmptyLines = 0;
         foreach (var raw in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
             var line = raw.TrimEnd();
@@ -40,16 +41,22 @@ public static class ToolResultText
                 continue;
             }
 
-            lines.Add(line);
-            if (lines.Count == MaximumBodyLines)
+            totalNonEmptyLines++;
+            if (lines.Count < MaximumBodyLines)
             {
-                break;
+                lines.Add(line);
             }
         }
 
         if (lines.Count == 0)
         {
             return FirstContentLine(text);
+        }
+
+        if (totalNonEmptyLines > MaximumBodyLines)
+        {
+            var omitted = totalNonEmptyLines - MaximumBodyLines;
+            lines.Add($"... ({omitted} more lines)");
         }
 
         var joined = string.Join('\n', lines);

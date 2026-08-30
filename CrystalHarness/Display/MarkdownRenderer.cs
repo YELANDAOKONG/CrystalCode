@@ -3,55 +3,166 @@ using System.Text;
 namespace CrystalHarness.Display;
 
 /// <summary>
-/// Terminal markdown for assistant messages. Headings, lists, fences, inline.
+/// Lightweight Markdown parser producing PaintLines for the transcript.
+/// Supports headings, fenced code with language badges and diff highlights,
+/// lists (ordered and unordered), blockquotes, horizontal rules, and inline styling.
 /// </summary>
 public static class MarkdownRenderer
 {
     public static IReadOnlyList<PaintLine> Render(string markdown, int width)
     {
         ArgumentNullException.ThrowIfNull(markdown);
-        width = Math.Max(width, 8);
+        if (markdown.Length == 0)
+        {
+            return [];
+        }
+
         var lines = new List<PaintLine>();
-        var fenced = false;
+        var inFence = false;
+        string? fenceLang = null;
+
         foreach (var raw in markdown.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
             if (raw.StartsWith("```", StringComparison.Ordinal))
             {
-                fenced = !fenced;
+                if (!inFence)
+                {
+                    inFence = true;
+                    fenceLang = raw.Length > 3 ? raw[3..].Trim() : null;
+                    if (!string.IsNullOrEmpty(fenceLang))
+                    {
+                        var badge = $"── {fenceLang} ──";
+                        lines.Add(PaintLine.Colored(Theme.Muted, "    " + badge));
+                    }
+                }
+                else
+                {
+                    inFence = false;
+                    fenceLang = null;
+                }
+
                 continue;
             }
 
-            if (fenced)
+            if (inFence)
             {
-                AddWrapped(lines, "    " + raw, Theme.Code, width);
+                RenderFencedLine(lines, raw, fenceLang, width);
                 continue;
             }
 
-            if (raw.Length == 0)
+            if (IsHorizontalRule(raw))
+            {
+                var ruleWidth = Math.Max(Math.Min(width - 4, 40), 10);
+                var ruleText = "  " + new string('─', ruleWidth);
+                lines.Add(PaintLine.Colored(Theme.Rule, ruleText));
+                continue;
+            }
+
+            if (TryHeading(raw, out var level, out var headingText))
+            {
+                RenderHeading(lines, level, headingText, width);
+                continue;
+            }
+
+            if (TryBlockquote(raw, out var quoteText))
+            {
+                RenderBlockquote(lines, quoteText, width);
+                continue;
+            }
+
+            if (TryList(raw, out var listPrefix, out var itemText, out var isOrdered))
+            {
+                RenderListItem(lines, listPrefix, itemText, isOrdered, width);
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(raw))
             {
                 lines.Add(PaintLine.Blank);
                 continue;
             }
 
-            if (TryHeading(raw, out var title))
-            {
-                AddWrapped(lines, "  " + title, Theme.Heading, width);
-                continue;
-            }
-
-            if (TryList(raw, out var item))
-            {
-                AddWrapped(lines, "  " + item, Theme.User, width);
-                continue;
-            }
-
-            foreach (var wrapped in TextWidth.Wrap("  " + raw, width))
-            {
-                lines.Add(new PaintLine(InlineMarkup(wrapped), wrapped));
-            }
+            RenderParagraph(lines, raw, width);
         }
 
         return lines;
+    }
+
+    private static void RenderHeading(
+        List<PaintLine> lines,
+        int level,
+        string text,
+        int width)
+    {
+        var prefix = level switch
+        {
+            1 => "# ",
+            2 => "## ",
+            3 => "### ",
+            _ => "#### "
+        };
+
+        var style = level switch
+        {
+            1 => $"[{Theme.Heading} underline]",
+            2 => $"[{Theme.Heading}]",
+            _ => $"[{Theme.Accent}]"
+        };
+
+        var plain = "  " + prefix + text;
+        foreach (var wrapped in TextWidth.Wrap(plain, width))
+        {
+            var markup = style + MarkupText.Escape(wrapped) + "[/]";
+            lines.Add(new PaintLine(markup, wrapped));
+        }
+    }
+
+    private static void RenderBlockquote(
+        List<PaintLine> lines,
+        string text,
+        int width)
+    {
+        var availWidth = Math.Max(width - 6, 8);
+        var innerLines = TextWidth.Wrap(text, availWidth);
+        foreach (var inner in innerLines)
+        {
+            var plain = "  │ " + inner;
+            var markup = $"  [{Theme.Muted}]│[/] [{Theme.Chrome}]{InlineMarkup(inner)}[/]";
+            lines.Add(new PaintLine(markup, plain));
+        }
+    }
+
+    private static void RenderFencedLine(
+        List<PaintLine> lines,
+        string raw,
+        string? fenceLang,
+        int width)
+    {
+        var isDiff = fenceLang is "diff" or "patch"
+            || (raw.Length > 0 && (raw[0] is '+' or '-' or '@'));
+
+        if (isDiff && raw.Length > 0)
+        {
+            if (raw.StartsWith('+') && !raw.StartsWith("+++", StringComparison.Ordinal))
+            {
+                AddWrapped(lines, "    " + raw, Theme.DiffAdded, width);
+                return;
+            }
+
+            if (raw.StartsWith('-') && !raw.StartsWith("---", StringComparison.Ordinal))
+            {
+                AddWrapped(lines, "    " + raw, Theme.DiffRemoved, width);
+                return;
+            }
+
+            if (raw.StartsWith("@@", StringComparison.Ordinal))
+            {
+                AddWrapped(lines, "    " + raw, Theme.Accent, width);
+                return;
+            }
+        }
+
+        AddWrapped(lines, "    " + raw, Theme.Code, width);
     }
 
     private static void AddWrapped(
@@ -66,42 +177,82 @@ public static class MarkdownRenderer
         }
     }
 
-    private static bool TryHeading(string raw, out string title)
+    private static bool IsHorizontalRule(string raw)
     {
-        title = string.Empty;
-        if (raw[0] != '#')
+        var trimmed = raw.Trim();
+        if (trimmed.Length < 3)
         {
             return false;
         }
 
-        var level = 0;
-        while (level < raw.Length && raw[level] == '#' && level < 6)
+        if (trimmed.All(ch => ch == '-') || trimmed.All(ch => ch == '*') || trimmed.All(ch => ch == '_'))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryHeading(string raw, out int level, out string title)
+    {
+        level = 0;
+        title = string.Empty;
+        var trimmed = raw.TrimStart();
+        if (trimmed.Length == 0 || trimmed[0] != '#')
+        {
+            return false;
+        }
+
+        while (level < trimmed.Length && trimmed[level] == '#')
         {
             level++;
         }
 
-        if (level == 0 || level >= raw.Length || raw[level] != ' ')
+        if (level > 6 || level >= trimmed.Length || trimmed[level] != ' ')
         {
+            level = 0;
             return false;
         }
 
-        title = raw[(level + 1)..].Trim();
-        return title.Length > 0;
+        title = trimmed[(level + 1)..].Trim();
+        return true;
     }
 
-    private static bool TryList(string raw, out string item)
+    private static bool TryBlockquote(string raw, out string text)
     {
-        item = string.Empty;
+        text = string.Empty;
         var trimmed = raw.TrimStart();
-        if (trimmed.StartsWith("- ", StringComparison.Ordinal)
-            || trimmed.StartsWith("* ", StringComparison.Ordinal))
+        if (trimmed.Length > 0 && trimmed[0] == '>')
         {
-            item = "* " + trimmed[2..].Trim();
+            text = trimmed.Length > 1 && trimmed[1] == ' ' ? trimmed[2..] : trimmed[1..];
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryList(
+        string raw,
+        out string prefix,
+        out string item,
+        out bool isOrdered)
+    {
+        prefix = string.Empty;
+        item = string.Empty;
+        isOrdered = false;
+
+        var trimmed = raw.TrimStart();
+        if (trimmed.Length >= 2 && (trimmed.StartsWith("- ", StringComparison.Ordinal)
+            || trimmed.StartsWith("* ", StringComparison.Ordinal)
+            || trimmed.StartsWith("+ ", StringComparison.Ordinal)))
+        {
+            prefix = "* ";
+            item = trimmed[2..].Trim();
             return true;
         }
 
         var dot = trimmed.IndexOf(". ", StringComparison.Ordinal);
-        if (dot <= 0)
+        if (dot <= 0 || dot > 4)
         {
             return false;
         }
@@ -114,11 +265,13 @@ public static class MarkdownRenderer
             }
         }
 
-        item = trimmed;
+        prefix = trimmed[..dot] + ".";
+        item = trimmed[(dot + 2)..].Trim();
+        isOrdered = true;
         return true;
     }
 
-    private static string InlineMarkup(string plain)
+    public static string InlineMarkup(string plain)
     {
         var markup = new StringBuilder();
         var i = 0;
@@ -143,6 +296,44 @@ public static class MarkdownRenderer
                 continue;
             }
 
+            if (plain[i] == '*'
+                && (i + 1 >= plain.Length || plain[i + 1] != '*')
+                && TryTakeDelimited(plain, i, "*", out var italicStar, out var afterItalicStar))
+            {
+                markup.Append("[italic]").Append(MarkupText.Escape(italicStar)).Append("[/]");
+                i = afterItalicStar;
+                continue;
+            }
+
+            if (plain[i] == '~'
+                && i + 1 < plain.Length
+                && plain[i + 1] == '~'
+                && TryTakeDelimited(plain, i, "~~", out var strike, out var afterStrike))
+            {
+                markup.Append("[strikethrough]").Append(MarkupText.Escape(strike)).Append("[/]");
+                i = afterStrike;
+                continue;
+            }
+
+            if (plain[i] == '_'
+                && i + 1 < plain.Length
+                && plain[i + 1] == '_'
+                && TryTakeDelimited(plain, i, "__", out var underline, out var afterUnderline))
+            {
+                markup.Append("[underline]").Append(MarkupText.Escape(underline)).Append("[/]");
+                i = afterUnderline;
+                continue;
+            }
+
+            if (plain[i] == '_'
+                && (i + 1 >= plain.Length || plain[i + 1] != '_')
+                && TryTakeDelimited(plain, i, "_", out var italicUnder, out var afterItalicUnder))
+            {
+                markup.Append("[italic]").Append(MarkupText.Escape(italicUnder)).Append("[/]");
+                i = afterItalicUnder;
+                continue;
+            }
+
             var next = NextMarker(plain, i);
             markup.Append(MarkupText.Escape(plain[i..next]));
             i = next;
@@ -155,7 +346,7 @@ public static class MarkdownRenderer
     {
         for (var i = start + 1; i < plain.Length; i++)
         {
-            if (plain[i] is '`' or '*')
+            if (plain[i] is '`' or '*' or '~' or '_')
             {
                 return i;
             }
@@ -185,12 +376,52 @@ public static class MarkdownRenderer
         }
 
         inner = plain[(start + delimiter.Length)..close];
-        if (inner.Length == 0)
-        {
-            return false;
-        }
-
         after = close + delimiter.Length;
         return true;
+    }
+
+    private static void RenderListItem(
+        List<PaintLine> lines,
+        string prefix,
+        string text,
+        bool isOrdered,
+        int width)
+    {
+        var indent = isOrdered ? prefix.Length + 3 : 4;
+        var availWidth = Math.Max(width - indent, 8);
+        var bodyLines = TextWidth.Wrap(text, availWidth);
+        for (var i = 0; i < bodyLines.Count; i++)
+        {
+            var body = bodyLines[i];
+            if (i == 0)
+            {
+                var bullet = isOrdered ? prefix : "*";
+                var plain = "  " + bullet + " " + body;
+                var bulletMarkup = isOrdered
+                    ? $"[{Theme.Accent}]{bullet}[/]"
+                    : $"[{Theme.Muted}]*[/]";
+                var markup = "  " + bulletMarkup + " " + InlineMarkup(body);
+                lines.Add(new PaintLine(markup, plain));
+            }
+            else
+            {
+                var pad = new string(' ', indent);
+                var plain = pad + body;
+                var markup = pad + InlineMarkup(body);
+                lines.Add(new PaintLine(markup, plain));
+            }
+        }
+    }
+
+    private static void RenderParagraph(
+        List<PaintLine> lines,
+        string raw,
+        int width)
+    {
+        var plain = "  " + raw.Trim();
+        foreach (var wrapped in TextWidth.Wrap(plain, width))
+        {
+            lines.Add(new PaintLine(InlineMarkup(wrapped), wrapped));
+        }
     }
 }

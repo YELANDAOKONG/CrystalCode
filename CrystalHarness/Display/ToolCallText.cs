@@ -12,6 +12,7 @@ public static class ToolCallText
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(arguments);
         var title = DisplayCase.Token(name);
+
         if (ToolArguments.TryReadRequiredString(arguments, "command", out var command))
         {
             return title + "  " + OneLine(command);
@@ -27,9 +28,29 @@ public static class ToolCallText
             return title + "  " + path;
         }
 
+        if (ToolArguments.TryReadRequiredString(arguments, "filePath", out var filePath))
+        {
+            return title + "  " + filePath;
+        }
+
         if (ToolArguments.TryReadRequiredString(arguments, "pattern", out var onlyPattern))
         {
             return title + "  " + OneLine(onlyPattern);
+        }
+
+        if (ToolArguments.TryReadRequiredString(arguments, "url", out var url))
+        {
+            return title + "  " + OneLine(url);
+        }
+
+        if (ToolArguments.TryReadRequiredString(arguments, "query", out var query))
+        {
+            return title + "  \"" + OneLine(query) + "\"";
+        }
+
+        if (ToolArguments.TryReadRequiredString(arguments, "description", out var desc))
+        {
+            return title + "  " + OneLine(desc);
         }
 
         var compact = CompactFinished(arguments);

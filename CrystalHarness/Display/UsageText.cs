@@ -17,7 +17,7 @@ public static class UsageText
         var percent = contextWindow <= 0
             ? 0
             : Math.Clamp((int)(usage.TotalTokenCount * 100 / contextWindow), 0, 99);
-        return $"ctx {percent}%  ·  {usage.InputTokenCount} in / {usage.OutputTokenCount} out";
+        return $"ctx {percent}%  ·  {FormatNumber(usage.InputTokenCount)} in / {FormatNumber(usage.OutputTokenCount)} out";
     }
 
     public static string FormatElapsed(TimeSpan elapsed)
@@ -28,5 +28,20 @@ public static class UsageText
         }
 
         return $"{(int)elapsed.TotalSeconds}s";
+    }
+
+    private static string FormatNumber(long value)
+    {
+        if (value >= 1_000_000)
+        {
+            return $"{value / 1_000_000.0:0.#}M";
+        }
+
+        if (value >= 10_000)
+        {
+            return $"{value / 1_000.0:0.#}k";
+        }
+
+        return value.ToString();
     }
 }

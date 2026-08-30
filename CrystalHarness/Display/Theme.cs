@@ -10,11 +10,11 @@ public static class Theme
 
     public const string Rule = "grey27";
 
-    public const string User = "grey70";
+    public const string User = "grey84";
 
-    public const string Thinking = "grey42";
+    public const string Thinking = "grey46";
 
-    public const string Tool = "grey58";
+    public const string Tool = "grey62";
 
     public const string Ok = "darkseagreen";
 
@@ -30,5 +30,18 @@ public static class Theme
 
     public const string Heading = "bold lightsteelblue";
 
-    public const string Code = "grey58";
+    public const string Code = "grey74";
+
+    public const string CodeBg = "grey23";
+
+    public const string DiffAdded = "darkseagreen";
+
+    public const string DiffRemoved = "indianred";
+
+    public const string Warning = "tan";
+
+    public const string Muted = "grey42";
+
+    public const string Accent = "lightsteelblue";
 }
+

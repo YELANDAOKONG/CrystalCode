@@ -25,7 +25,7 @@ public static class QueueCard
         for (var i = 0; i < visible; i++)
         {
             grid.AddRow(
-                new Markup($"[{Theme.Chrome}]{i + 1}[/]"),
+                new Markup($"[{Theme.Warning}]{i + 1}.[/]"),
                 new Markup($"[{Theme.User}]{MarkupText.Escape(items[i])}[/]"));
         }
 
@@ -33,15 +33,16 @@ public static class QueueCard
         {
             var more = items.Count - MaximumVisible;
             grid.AddRow(
-                new Markup($"[{Theme.Chrome}]+[/]"),
-                new Markup($"[{Theme.Chrome}]{more} more[/]"));
+                new Markup($"[{Theme.Muted}]+[/]"),
+                new Markup($"[{Theme.Muted}]{more} more queued[/]"));
         }
 
+        var headerTitle = items.Count == 1 ? "Queued Follow-up" : $"Queued ({items.Count})";
         var panel = new Panel(grid)
         {
-            Header = new PanelHeader("Queued"),
+            Header = new PanelHeader(headerTitle),
             Border = BoxBorder.Rounded,
-            BorderStyle = Style.Parse(Theme.Chrome),
+            BorderStyle = Style.Parse(Theme.Rule),
             Padding = new Padding(1, 0, 1, 0),
             Expand = true
         };

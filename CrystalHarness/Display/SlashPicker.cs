@@ -66,16 +66,58 @@ public sealed class SlashPicker
     {
         var visible = Math.Min(_matches.Count, MaximumVisible);
         var lines = new List<PaintLine>(visible);
+
+        var maxCmdLen = 0;
+        for (var i = 0; i < visible; i++)
+        {
+            var len = _matches[i].Name.Length + 1;
+            if (len > maxCmdLen)
+            {
+                maxCmdLen = len;
+            }
+        }
+
+        maxCmdLen = Math.Max(maxCmdLen, 8);
+
         for (var i = 0; i < visible; i++)
         {
             var option = _matches[i];
-            var mark = i == _selected ? ">" : " ";
+            var isSelected = i == _selected;
+            var mark = isSelected ? ">" : " ";
+            var cmdName = "/" + option.Name;
+            var paddedCmd = cmdName.PadRight(maxCmdLen);
             var aliases = AliasesLabel(option);
+
             var plain = string.IsNullOrEmpty(aliases)
-                ? $"  {mark} /{option.Name}  {option.Help}"
-                : $"  {mark} /{option.Name}  {aliases}  {option.Help}";
-            var color = i == _selected ? Theme.Selected : Theme.Chrome;
-            lines.Add(PaintLine.Colored(color, TextWidth.Truncate(plain, width)));
+                ? $"  {mark} {paddedCmd}  {option.Help}"
+                : $"  {mark} {paddedCmd}  {aliases}  {option.Help}";
+
+            string markup;
+            if (isSelected)
+            {
+                var escapedPlain = MarkupText.Escape(plain);
+                markup = $"[{Theme.Selected}]{escapedPlain}[/]";
+            }
+            else
+            {
+                var aliasMarkup = string.IsNullOrEmpty(aliases)
+                    ? string.Empty
+                    : $"[{Theme.Muted}]{MarkupText.Escape(aliases)}  [/]";
+                markup = $"  [{Theme.Muted}]{mark}[/] "
+                    + $"[{Theme.User}]{MarkupText.Escape(paddedCmd)}[/]  "
+                    + aliasMarkup
+                    + $"[{Theme.Chrome}]{MarkupText.Escape(option.Help)}[/]";
+            }
+
+            var truncatedPlain = TextWidth.Truncate(plain, width);
+            if (truncatedPlain.Length < plain.Length)
+            {
+                markup = isSelected
+                    ? $"[{Theme.Selected}]{MarkupText.Escape(truncatedPlain)}[/]"
+                    : $"[{Theme.Chrome}]{MarkupText.Escape(truncatedPlain)}[/]";
+            }
+
+            lines.Add(new PaintLine(markup, truncatedPlain));
         }
 
         return lines;
@@ -105,6 +147,6 @@ public sealed class SlashPicker
             }
         }
 
-        return string.Join("  ", parts);
+        return parts.Count == 0 ? string.Empty : "(" + string.Join(", ", parts) + ")";
     }
 }

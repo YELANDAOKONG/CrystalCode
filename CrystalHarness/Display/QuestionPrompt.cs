@@ -74,7 +74,7 @@ public sealed class QuestionPrompt : IUserPrompt
     {
         var blocks = new List<IRenderable>
         {
-            new Markup($"[{Theme.Review}]{MarkupText.Escape(question)}[/]")
+            new Markup($"[{Theme.Review} bold]{MarkupText.Escape(question)}[/]")
         };
         if (options is { Count: > 0 })
         {
@@ -84,12 +84,12 @@ public sealed class QuestionPrompt : IUserPrompt
             for (var index = 0; index < options.Count; index++)
             {
                 grid.AddRow(
-                    new Markup($"[{Theme.Chrome}]{index + 1}[/]"),
+                    new Markup($"[{Theme.Accent}]{index + 1}.[/]"),
                     new Markup($"[{Theme.User}]{MarkupText.Escape(options[index])}[/]"));
             }
 
             blocks.Add(grid);
-            blocks.Add(new Markup($"[{Theme.Chrome}]Type a number or an answer[/]"));
+            blocks.Add(new Markup($"[{Theme.Muted}]Type a number (1-{options.Count}) or an answer[/]"));
         }
 
         var panel = new Panel(new Rows(blocks))

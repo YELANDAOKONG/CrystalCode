@@ -161,7 +161,7 @@ public static class ApprovalCard
 
         if (!string.IsNullOrWhiteSpace(footer))
         {
-            blocks.Add(Prose(footer, Theme.Chrome));
+            blocks.Add(new Markup($"[{Theme.Warning} bold]{MarkupText.Escape(footer)}[/]"));
         }
 
         var panel = new Panel(new Rows(blocks))
