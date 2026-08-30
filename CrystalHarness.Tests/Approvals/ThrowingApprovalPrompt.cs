@@ -9,6 +9,7 @@ internal sealed class ThrowingApprovalPrompt : IApprovalPrompt
     public ValueTask<ApprovalChoice> AskAsync(
         ToolCall call,
         ToolClassification classification,
+        ApprovalReviewVerdict? review = null,
         CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("Approval prompt should not be called.");
 }

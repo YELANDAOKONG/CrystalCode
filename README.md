@@ -29,11 +29,10 @@ From a workspace you want the agent to edit:
 dotnet run --project CrystalHarness -- --provider deepseek --model deepseek-v4-flash
 ```
 
-The default command loads `~/.crystal`, constructs the selected provider, and
-prints the workspace. Override the data directory with `CRYSTAL_HOME` or
-`--home`. Add OpenAI-compatible providers and per-model `contextWindow`,
-`temperature`, `topP`, and `maxTokens` in `config.json`. The interactive
-session loop is the next host layer.
+The default command opens an interactive session in the current workspace.
+Override the data directory with `CRYSTAL_HOME` or `--home`. Add
+OpenAI-compatible providers and per-model `contextWindow`, `temperature`,
+`topP`, and `maxTokens` in `config.json`.
 
 ## Modes
 
@@ -50,9 +49,19 @@ Full (pass without review).
 ~/.crystal/config.json
 ~/.crystal/credentials.json
 ~/.crystal/permissions.json
+~/.crystal/instructions.md
+~/.crystal/prompts/
 ~/.crystal/sessions/
 ~/.crystal/logs/
+<workspace>/.crystal/instructions.md
+<workspace>/.crystal/prompts/
+<workspace>/.crystal.md
 ```
+
+Work, Plan, and Review system prompts are files under `prompts/`
+(`work.md`, `plan.md`, `review.md`; `.txt` is also accepted). Project
+files override home files. `instructions.md` and `.crystal.md` append
+workspace facts to Work and Plan. Review is not given those extras.
 
 ## Documents
 

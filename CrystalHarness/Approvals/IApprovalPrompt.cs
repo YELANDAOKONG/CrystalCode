@@ -10,5 +10,6 @@ public interface IApprovalPrompt
     ValueTask<ApprovalChoice> AskAsync(
         ToolCall call,
         ToolClassification classification,
+        ApprovalReviewVerdict? review = null,
         CancellationToken cancellationToken = default);
 }

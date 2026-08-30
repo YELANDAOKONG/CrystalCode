@@ -102,6 +102,7 @@ public sealed class ApprovalPolicyTests
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
+        Assert.NotNull(prompt.LastReview);
     }
 
     [Fact]

@@ -18,13 +18,17 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
     public ValueTask<ApprovalChoice> AskAsync(
         ToolCall call,
         ToolClassification classification,
+        ApprovalReviewVerdict? review = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Count++;
         LastClassification = classification;
+        LastReview = review;
         return ValueTask.FromResult(_choice);
     }
 
     public ToolClassification? LastClassification { get; private set; }
+
+    public ApprovalReviewVerdict? LastReview { get; private set; }
 }

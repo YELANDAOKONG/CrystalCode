@@ -31,7 +31,10 @@ semantics. Do not copy its Demo UI into this product.
 - Secrets never appear in source, logs, diagnostics, or commit contents.
 - Crystal remains prompt-neutral. Every model-bound string this product sends
   is authored here: system prompts, compaction summaries, rejection text, and
-  tool exception mapping.
+  tool exception mapping. Operators may replace Work, Plan, and Review via
+  `~/.crystal/prompts` and `<workspace>/.crystal/prompts`, and append
+  instructions via `instructions.md` or `<workspace>/.crystal.md`. Do not
+  invent additional prompt file names.
 - Provider adapters implement only Crystal chat contracts. They do not own
   tools, prompts, UI, or `~/.crystal` layout.
 - Public data values are immutable. One type per file. File-scoped namespaces.

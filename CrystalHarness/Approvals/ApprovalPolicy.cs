@@ -66,18 +66,25 @@ public sealed class ApprovalPolicy
             return ToolInvocationDecision.Execute;
         }
 
+        ApprovalReviewVerdict? pendingReview = null;
         if (_mode == ApprovalMode.Review
             && _reviewer is not null
             && !string.IsNullOrWhiteSpace(_reviewContext?.CurrentUserRequest))
         {
-            var reviewed = await ReviewAsync(call, classification, cancellationToken);
-            if (reviewed is not null)
+            var reviewed = await TryReviewAsync(call, classification, cancellationToken);
+            if (reviewed.Decision is not null)
             {
-                return reviewed;
+                return reviewed.Decision;
             }
+
+            pendingReview = reviewed.Verdict;
         }
 
-        var choice = await _prompt.AskAsync(call, classification, cancellationToken);
+        var choice = await _prompt.AskAsync(
+            call,
+            classification,
+            pendingReview,
+            cancellationToken);
         if (!choice.IsAllow)
         {
             return ToolInvocationDecision.Reject(
@@ -91,7 +98,7 @@ public sealed class ApprovalPolicy
         return ToolInvocationDecision.Execute;
     }
 
-    private async ValueTask<ToolInvocationDecision?> ReviewAsync(
+    private async ValueTask<(ToolInvocationDecision? Decision, ApprovalReviewVerdict Verdict)> TryReviewAsync(
         ToolCall call,
         ToolClassification classification,
         CancellationToken cancellationToken)
@@ -103,18 +110,20 @@ public sealed class ApprovalPolicy
         var verdict = await _reviewer!.ReviewAsync(request, cancellationToken);
         if (verdict.IsDeny)
         {
-            return ToolInvocationDecision.Reject(
-                new ToolOutput(
-                    "The approval reviewer declined this action: " + verdict.Rationale,
-                    ToolResultStatus.Failure));
+            return (
+                ToolInvocationDecision.Reject(
+                    new ToolOutput(
+                        "The approval reviewer declined this action: " + verdict.Rationale,
+                        ToolResultStatus.Failure)),
+                verdict);
         }
 
         if (verdict.IsAllow && classification.Risk != Risk.Forbidden)
         {
-            return ToolInvocationDecision.Execute;
+            return (ToolInvocationDecision.Execute, verdict);
         }
 
-        return null;
+        return (null, verdict);
     }
 
     private bool CanPassWithoutReview(string toolName, ToolClassification classification)

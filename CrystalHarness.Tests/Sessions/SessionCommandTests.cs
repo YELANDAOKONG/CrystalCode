@@ -1,0 +1,36 @@
+using CrystalHarness.Sessions;
+
+using Xunit;
+
+namespace CrystalHarness.Tests.Sessions;
+
+public sealed class SessionCommandTests
+{
+    [Theory]
+    [InlineData("/help", SessionVerb.Help)]
+    [InlineData("/plan", SessionVerb.Plan)]
+    [InlineData("/approval review", SessionVerb.Approval)]
+    [InlineData("/quit", SessionVerb.Quit)]
+    public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)
+    {
+        var parsed = SessionCommand.TryParse(input, out var command);
+
+        Assert.True(parsed);
+        Assert.Equal(verb, command.Verb);
+    }
+
+    [Fact]
+    public void TryParse_ReadsApprovalArgument()
+    {
+        SessionCommand.TryParse("/approval full", out var command);
+
+        Assert.Equal(SessionVerb.Approval, command.Verb);
+        Assert.Equal("full", command.Argument);
+    }
+
+    [Fact]
+    public void TryParse_IgnoresPlainText()
+    {
+        Assert.False(SessionCommand.TryParse("fix the test", out _));
+    }
+}

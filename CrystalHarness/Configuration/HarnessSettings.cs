@@ -80,6 +80,17 @@ public sealed record HarnessSettings
             Catalog);
     }
 
+    public HarnessSettings WithApproval(ApprovalMode approval)
+    {
+        ArgumentNullException.ThrowIfNull(approval);
+        return new HarnessSettings(
+            Provider,
+            Model,
+            approval,
+            CompactionThreshold,
+            Catalog);
+    }
+
     public override string ToString() => nameof(HarnessSettings);
 
     private string ResolveModel(ProviderName provider)

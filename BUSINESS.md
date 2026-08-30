@@ -55,8 +55,9 @@ coding harness built on Crystal.
 
 ## Data
 
-User data lives in `~/.crystal`. Workspace hints may live in `.crystal.md` at
-the workspace root. The application never writes secrets into the workspace.
+User data lives in `~/.crystal`. Prompts and workspace hints may be
+customized in `~/.crystal` and in the project's `.crystal` directory or
+`.crystal.md`. The application never writes secrets into the workspace.
 
 ## Runtime language
 

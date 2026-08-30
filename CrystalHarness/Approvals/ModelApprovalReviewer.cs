@@ -14,11 +14,15 @@ namespace CrystalHarness.Approvals;
 public sealed class ModelApprovalReviewer : IApprovalReviewer
 {
     private readonly IChatClient _client;
+    private readonly string _systemText;
 
-    public ModelApprovalReviewer(IChatClient client)
+    public ModelApprovalReviewer(IChatClient client, string? systemText = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
+        _systemText = string.IsNullOrWhiteSpace(systemText)
+            ? ApprovalReviewPrompt.SystemText
+            : systemText.Trim();
     }
 
     public async ValueTask<ApprovalReviewVerdict> ReviewAsync(
@@ -40,7 +44,7 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
             response = await _client.CompleteAsync(
                 new ChatRequest(
                 [
-                    new ChatMessage(ChatRole.System, ApprovalReviewPrompt.SystemText),
+                    new ChatMessage(ChatRole.System, _systemText),
                     new ChatMessage(ChatRole.User, ApprovalReviewPrompt.UserText(request))
                 ]),
                 cancellationToken);

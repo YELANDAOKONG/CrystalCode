@@ -157,10 +157,33 @@ fraction of the **selected model's** `contextWindow`, the host:
   config.json
   credentials.json
   permissions.json
+  instructions.md
+  prompts/work.md
+  prompts/plan.md
+  prompts/review.md
   sessions/<id>.json
   logs/
   plugins/
 ```
+
+Project overlay (wins over home for named prompts):
+
+```text
+<workspace>/.crystal/
+  instructions.md
+  prompts/work.md
+  prompts/plan.md
+  prompts/review.md
+<workspace>/.crystal.md
+```
+
+Overlay is built-in default, then `~/.crystal`, then the project
+`.crystal`. Named prompt files replace the built-in Work, Plan, or
+Review system text. `instructions.md` and `.crystal.md` are appended
+under "Workspace instructions" on Work and Plan only. Review is the
+named file alone so the reviewer stays a safety check. Files may be
+`.md` or `.txt`. Empty files are treated as missing. The host never
+writes prompt files.
 
 `credentials.json` is created with owner-only permissions and is keyed by
 provider name. Environment variables override file credentials. The `plugins`

@@ -3,15 +3,16 @@ using Spectre.Console.Cli;
 
 using CrystalHarness.Configuration;
 using CrystalHarness.Home;
+using CrystalHarness.Sessions;
 
 namespace CrystalHarness.Commands;
 
 /// <summary>
-/// Loads home settings and constructs the configured chat provider.
+/// Loads home settings and runs the interactive coding session.
 /// </summary>
 public sealed class RunCommand : AsyncCommand<RunSettings>
 {
-    protected override Task<int> ExecuteAsync(
+    protected override async Task<int> ExecuteAsync(
         CommandContext context,
         RunSettings settings,
         CancellationToken cancellationToken)
@@ -31,21 +32,25 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                 out var error))
         {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(error)}[/]");
-            return Task.FromResult(1);
+            return 1;
         }
 
-        var client = ChatClientFactory.Create(harnessSettings, apiKey);
-        (client as IDisposable)?.Dispose();
-
         var workspace = ResolveWorkspace(settings.Workspace);
-        var model = harnessSettings.ActiveModel;
-        AnsiConsole.MarkupLine(
-            $"[bold]Crystal[/]  {Markup.Escape(harnessSettings.Provider.Value)}  "
-            + $"{Markup.Escape(harnessSettings.Model)}  "
-            + $"{Markup.Escape(harnessSettings.Approval.Value)}");
-        AnsiConsole.MarkupLine(
-            $"[grey]{Markup.Escape(workspace)}  ctx {model.ContextWindow}[/]");
-        return Task.FromResult(0);
+        var client = ChatClientFactory.Create(harnessSettings, apiKey);
+        try
+        {
+            var session = CodingSession.Create(
+                client,
+                harnessSettings,
+                settingsStore,
+                home,
+                workspace);
+            return await session.RunAsync(cancellationToken);
+        }
+        finally
+        {
+            (client as IDisposable)?.Dispose();
+        }
     }
 
     private static string ResolveWorkspace(string? workspace)

@@ -28,6 +28,10 @@ public sealed class CrystalHome
 
     public string PluginsDirectory => Path.Combine(Root, "plugins");
 
+    public string PromptsDirectory => Path.Combine(Root, "prompts");
+
+    public string InstructionsPath => Path.Combine(Root, "instructions.md");
+
     public static CrystalHome Resolve(string? root = null)
     {
         if (!string.IsNullOrWhiteSpace(root))
