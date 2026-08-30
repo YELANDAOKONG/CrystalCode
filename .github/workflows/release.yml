@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  publish:
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact: win64
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: linux64
+          - os: macos-latest
+            rid: osx-arm64
+            artifact: macos-arm64
+
+    steps:
+      # Sibling layout matches project references: ../../Crystal/...
+      - name: Checkout CrystalHarness
+        uses: actions/checkout@v4
+        with:
+          path: CrystalHarness
+
+      - name: Checkout Crystal
+        uses: actions/checkout@v4
+        with:
+          repository: YELANDAOKONG/Crystal
+          path: Crystal
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        working-directory: CrystalHarness
+        run: dotnet restore CrystalHarness.sln
+
+      - name: Test
+        working-directory: CrystalHarness
+        run: dotnet test CrystalHarness.sln --configuration Release --no-restore
+
+      - name: Publish
+        working-directory: CrystalHarness
+        run: >
+          dotnet publish CrystalHarness/CrystalHarness.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          --output ./publish
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrystalHarness-${{ matrix.artifact }}
+          path: CrystalHarness/publish/
+          if-no-files-found: error
