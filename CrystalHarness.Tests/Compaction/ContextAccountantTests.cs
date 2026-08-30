@@ -36,4 +36,11 @@ public sealed class ContextAccountantTests
     {
         Assert.False(ContextAccountant.ShouldCompact(new TokenUsage(10, 1), 100, 0.8));
     }
+
+    [Fact]
+    public void CompactLimit_UsesReservedOutputOnLargeWindows()
+    {
+        Assert.Equal(80, ContextAccountant.CompactLimit(100, 0.8));
+        Assert.Equal(12_000, ContextAccountant.CompactLimit(32_000, 0.8, maxTokens: 20_000));
+    }
 }

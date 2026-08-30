@@ -23,7 +23,8 @@ The current product is an interactive terminal application that can:
 - switch Plan (read-only) and Work (edit, write, shell);
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
-- compact conversation context when usage approaches the model window;
+- compact conversation context when usage approaches the model window,
+  or when the operator runs `/compact`;
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - use DeepSeek and OpenAI-compatible chat adapters, including user-added
   compatible endpoints;

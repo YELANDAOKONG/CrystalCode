@@ -14,6 +14,7 @@ public enum SessionVerb
     Clear,
     Cd,
     Resume,
+    Compact,
     Quit,
     Unknown
 }

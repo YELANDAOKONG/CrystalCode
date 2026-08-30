@@ -199,9 +199,10 @@ public sealed class CodingSession
                         await FinishTurnAsync();
                     }
 
-                    if (TryHandleCommand(input, out var busyExit))
+                    var busy = await TryHandleCommandAsync(input, promptSource.Token);
+                    if (busy.Handled)
                     {
-                        if (busyExit)
+                        if (busy.Exit)
                         {
                             return 0;
                         }
@@ -224,9 +225,10 @@ public sealed class CodingSession
                 continue;
             }
 
-            if (TryHandleCommand(input, out var exit))
+            var command = await TryHandleCommandAsync(input, promptSource.Token);
+            if (command.Handled)
             {
-                if (exit)
+                if (command.Exit)
                 {
                     return 0;
                 }
@@ -238,30 +240,43 @@ public sealed class CodingSession
         }
     }
 
-    private bool TryHandleCommand(string input, out bool exit)
+    private async Task<(bool Handled, bool Exit)> TryHandleCommandAsync(
+        string input,
+        CancellationToken cancellationToken)
     {
-        exit = false;
-        if (!SessionCommand.TryParse(input, out var command))
+        if (!SessionCommand.TryParse(input, out var parsed))
         {
-            return false;
+            return (false, false);
         }
 
+        if (parsed.Verb == SessionVerb.Compact)
+        {
+            await CompactForcedAsync(cancellationToken);
+            return (true, false);
+        }
+
+        var handled = HandleCommand(parsed);
+        return handled;
+    }
+
+    private (bool Handled, bool Exit) HandleCommand(SessionCommand command)
+    {
         switch (command.Verb)
         {
             case SessionVerb.Help:
                 _renderer.WriteHelp(_plugins.Commands);
-                return true;
+                return (true, false);
             case SessionVerb.Plan:
                 TogglePlanFromPrompt();
                 RefreshChrome();
                 _renderer.WriteNote(ModeLabel.For(_planMode));
-                return true;
+                return (true, false);
             case SessionVerb.Approval:
                 ChangeApproval(command.Argument);
-                return true;
+                return (true, false);
             case SessionVerb.Thinking:
                 ChangeThinking(command.Argument);
-                return true;
+                return (true, false);
             case SessionVerb.Status:
                 _renderer.WriteStatus(
                     _ledger,
@@ -270,32 +285,33 @@ public sealed class CodingSession
                     _approval,
                     _settings.ActiveModel.ContextWindow,
                     CurrentThinkingStatus());
-                return true;
+                return (true, false);
             case SessionVerb.Clear:
                 BeginNewSession();
                 _renderer.ClearConversation();
                 _renderer.ShowUsage(null);
                 _renderer.WriteNote("new conversation");
-                return true;
+                return (true, false);
             case SessionVerb.Cd:
                 ChangeDirectory(command.Argument);
-                return true;
+                return (true, false);
             case SessionVerb.Resume:
                 ResumeSession(command.Argument);
-                return true;
+                return (true, false);
+            case SessionVerb.Compact:
+                return (true, false);
             case SessionVerb.Quit:
-                exit = true;
-                return true;
+                return (true, true);
             case SessionVerb.Unknown:
                 if (TryExecutePluginCommand(command.Argument))
                 {
-                    return true;
+                    return (true, false);
                 }
 
                 _renderer.WriteError("unknown command  " + command.Argument);
-                return true;
+                return (true, false);
             default:
-                return false;
+                return (false, false);
         }
     }
 
@@ -412,30 +428,95 @@ public sealed class CodingSession
         }
     }
 
+    private CompactionLimits CurrentLimits() =>
+        new(
+            _settings.ActiveModel.ContextWindow,
+            _settings.ActiveModel.MaxTokens,
+            _settings.CompactionThreshold);
+
+    private async Task CompactForcedAsync(CancellationToken cancellationToken)
+    {
+        if (_turnActive)
+        {
+            _renderer.WriteError("Finish the current turn before compacting.");
+            return;
+        }
+
+        await RunCompactionAsync(_transcript, silentSkip: false, cancellationToken);
+    }
+
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
     {
         if (!ContextAccountant.ShouldCompact(
                 result.Usage ?? _ledger.Usage,
                 _settings.ActiveModel.ContextWindow,
-                _settings.CompactionThreshold))
+                _settings.CompactionThreshold,
+                _settings.ActiveModel.MaxTokens))
         {
             return;
         }
 
+        await RunCompactionAsync(_transcript, silentSkip: true, cancellationToken);
+    }
+
+    private async Task<CompactionOutcome> CompactRoundAsync(
+        IReadOnlyList<ChatItem> transcript,
+        CancellationToken cancellationToken)
+    {
+        var limits = CurrentLimits();
+        if (!ContextAccountant.ShouldCompact(
+                TokenEstimator.Items(transcript),
+                limits.ContextWindow,
+                limits.Threshold,
+                limits.MaxTokens))
+        {
+            return new CompactionOutcome(transcript, CompactionKind.Unchanged);
+        }
+
+        var outcome = await RunCompactionAsync(transcript, silentSkip: true, cancellationToken);
+        if (outcome.Kind == CompactionKind.Unchanged)
+        {
+            _renderer.WriteError("Session is too large to compact.");
+            return new CompactionOutcome(transcript, CompactionKind.Exhausted);
+        }
+
+        return outcome;
+    }
+
+    private async Task<CompactionOutcome> RunCompactionAsync(
+        IReadOnlyList<ChatItem> transcript,
+        bool silentSkip,
+        CancellationToken cancellationToken)
+    {
         _renderer.WriteNote("compacting context...");
         var outcome = await _compactor.CompactAsync(
-            _transcript,
+            transcript,
             _todos.Format(),
-            cancellationToken,
-            CurrentReasoning());
-        if (!outcome.Compacted)
+            CurrentLimits(),
+            cancellationToken);
+        if (outcome.Kind == CompactionKind.Applied)
         {
-            _renderer.WriteNote("compaction skipped");
-            return;
+            if (ReferenceEquals(transcript, _transcript))
+            {
+                _transcript = [.. outcome.Transcript];
+            }
+
+            _renderer.WriteNote("compacted context");
+            return outcome;
         }
 
-        _transcript = [.. outcome.Transcript];
-        _renderer.WriteNote("compacted context");
+        if (outcome.Kind == CompactionKind.Exhausted)
+        {
+            _renderer.WriteError("Session is too large to compact.");
+            return outcome;
+        }
+
+        if (!silentSkip)
+        {
+            _renderer.WriteNote("compaction skipped");
+        }
+
+        return outcome;
     }
 
     private void SaveSession()
@@ -752,7 +833,8 @@ public sealed class CodingSession
             _planMode ? _planExecutor : _workExecutor,
             TurnLimits.CreateDefault(),
             _renderer,
-            CurrentReasoning());
+            CurrentReasoning(),
+            CompactRoundAsync);
         return turn.RunAsync(_transcript, cancellationToken);
     }
 

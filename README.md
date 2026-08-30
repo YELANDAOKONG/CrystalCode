@@ -298,9 +298,10 @@ drop queued text.
    executor (approval first).
 4. Append exact tool results.
 5. Repeat until there are no tool calls, a limit stops the turn, or
-   you cancel.
+   you cancel. The host may compact before a model round; if compaction
+   cannot reduce further, the turn stops.
 6. After a completed turn, consider compaction from reported token
-   usage.
+   usage. `/compact` summarizes older context immediately.
 
 ## Modes
 
@@ -385,6 +386,7 @@ Type `/` to open the picker. Built-in verbs:
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
 | `/resume` | `/continue`, `/sessions` | Replay the latest session for this workspace, or `/resume <id>` |
+| `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
 | `/quit` | `/exit`, `/q` | Exit |
 
 Unknown `/` text prints `unknown command`. `/cd` with no argument
@@ -477,18 +479,20 @@ compaction still have a baseline before the next model call.
 
 ## Compaction
 
-Crystal does not reduce context. When reported tokens cross
-`compactionThreshold` of the selected model's `contextWindow`, the
+Crystal does not reduce context. When estimated or reported tokens
+cross `compactionThreshold` of the selected model's usable window, the
 host:
 
-1. Pins the current system text, workspace hints, recent turns, and
-   open todos.
-2. Replaces older tool noise with one Harness-authored summary
-   message.
-3. Falls back to dropping oldest tool results if summary generation
-   fails. User messages are not dropped.
+1. Clears old tool results outside a protected recent band, when that
+   frees enough tokens.
+2. Asks the model for a structured summary of older turns (folding any
+   previous summary) and keeps a recent tail verbatim.
+3. Stops if the summary cannot be produced and nothing else can be
+   reduced. Compaction does not loop.
 
-The transcript prints `compacting context...` while this runs.
+`/compact` (alias `/summarize`) runs this immediately. It is refused
+while a turn is running. The transcript prints `compacting context...`
+while this runs.
 
 ## Data directory
 

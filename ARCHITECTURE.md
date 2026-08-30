@@ -96,8 +96,11 @@ One user message is one turn:
    `ToolExecutor` (approval runs first).
 5. Append exact `ToolResult` values.
 6. Repeat until the candidate has no tool calls, a configured limit stops
-   the turn, or the user cancels.
+   the turn, or the user cancels. Before each model round, compact if the
+   estimated request is over budget. One failed compact while still over
+   budget stops the turn (`context_overflow`).
 7. After a completed turn, consider compaction from reported token usage.
+   `/compact` (alias `/summarize`) runs the same summarizer immediately.
 
 The composer stays open while a turn runs. Enter with text enqueues a
 follow-up (FIFO). Queued items stay in a panel above the composer until
@@ -152,14 +155,21 @@ Persistent grants are stored in `~/.crystal/permissions.json`.
 
 ## Compaction
 
-Crystal does not reduce context. When reported tokens cross the configured
-fraction of the **selected model's** `contextWindow`, the host:
+Crystal does not reduce context. When estimated or reported tokens cross
+the configured fraction of the selected model's usable window (context
+minus reserved output), the host:
 
-1. Pins the current system text, workspace hints, recent turns, and open
-   todos.
-2. Replaces older tool noise with one Harness-authored summary message.
-3. Falls back to dropping oldest tool results if summary generation fails.
-   User messages are not dropped.
+1. Clears old tool results outside a protected recent band, when enough
+   tokens would be freed.
+2. Asks the model for one structured summary of older turns, folding any
+   previous summary, and keeps a recent tail verbatim.
+3. Stops if the summary request itself cannot fit or the summarizer
+   returns nothing and prune did not help. The turn does not retry
+   compaction in a loop.
+
+`/compact` (alias `/summarize`) runs that path immediately. It is
+refused while a turn is running. User and assistant text in the folded
+head are replaced by the summary; they are not kept beside it.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, and again on an orderly exit when the transcript has a
@@ -318,7 +328,8 @@ panel with Status, Reason, Risk, Authority, and, for review, Outcome
 plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
-`/q` and `/exit` are `/quit`, `/think` is `/thinking`). A slash picker appears while the prompt
+`/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
+`/compact`). A slash picker appears while the prompt
 is a command prefix. After a verb that takes a fixed argument
 (`/thinking`, `/approval`), Tab also completes the argument. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Up/Down

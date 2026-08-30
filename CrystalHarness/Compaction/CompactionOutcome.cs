@@ -7,4 +7,7 @@ namespace CrystalHarness.Compaction;
 /// </summary>
 public sealed record CompactionOutcome(
     IReadOnlyList<ChatItem> Transcript,
-    bool Compacted);
+    CompactionKind Kind)
+{
+    public bool Compacted => Kind == CompactionKind.Applied;
+}

@@ -2,6 +2,8 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
 
+using CrystalHarness.Compaction;
+
 namespace CrystalHarness.Sessions;
 
 /// <summary>
@@ -14,13 +16,15 @@ public sealed class StreamingTurn
     private readonly TurnLimits _limits;
     private readonly ITurnObserver? _observer;
     private readonly ReasoningOptions? _reasoning;
+    private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? _compactBeforeRound;
 
     public StreamingTurn(
         IStreamingChatClient client,
         IToolExecutor executor,
         TurnLimits limits,
         ITurnObserver? observer = null,
-        ReasoningOptions? reasoning = null)
+        ReasoningOptions? reasoning = null,
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? compactBeforeRound = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(executor);
@@ -30,6 +34,7 @@ public sealed class StreamingTurn
         _limits = limits;
         _observer = observer;
         _reasoning = reasoning;
+        _compactBeforeRound = compactBeforeRound;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -51,6 +56,27 @@ public sealed class StreamingTurn
         {
             while (true)
             {
+                if (_compactBeforeRound is not null)
+                {
+                    var compacted = await _compactBeforeRound(transcript, linked.Token);
+                    if (compacted.Kind == CompactionKind.Exhausted)
+                    {
+                        _observer?.OnModelRoundClosed();
+                        return Create(
+                            TurnStopReason.ContextOverflow,
+                            modelCallCount,
+                            toolCallCount,
+                            usage,
+                            transcript);
+                    }
+
+                    if (compacted.Kind == CompactionKind.Applied)
+                    {
+                        transcript.Clear();
+                        transcript.AddRange(compacted.Transcript);
+                    }
+                }
+
                 if (modelCallCount >= _limits.MaximumModelCalls)
                 {
                     _observer?.OnModelRoundClosed();

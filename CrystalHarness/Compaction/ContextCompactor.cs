@@ -1,19 +1,15 @@
 using Crystal.Chat;
-using Crystal.Reasoning;
-using Crystal.Tools;
 
 using CrystalHarness.Prompts;
 
 namespace CrystalHarness.Compaction;
 
 /// <summary>
-/// Pins recent turns and replaces older tool noise with one summary message.
+/// Summarizes older turns into one structured message and keeps a recent tail.
 /// </summary>
 public sealed class ContextCompactor
 {
-    public const int RecentUserTurnCount = 2;
     public const string OmittedResultText = "Tool result omitted after compaction.";
-    private const int MaximumExcerptCharacters = 8_000;
 
     private readonly IChatClient _client;
 
@@ -26,22 +22,39 @@ public sealed class ContextCompactor
     public async Task<CompactionOutcome> CompactAsync(
         IReadOnlyList<ChatItem> transcript,
         string todos,
-        CancellationToken cancellationToken = default,
-        ReasoningOptions? reasoning = null)
+        CompactionLimits limits,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(todos);
+        ArgumentNullException.ThrowIfNull(limits);
         cancellationToken.ThrowIfCancellationRequested();
         if (transcript.Count == 0)
         {
-            return new CompactionOutcome(transcript, false);
+            return new CompactionOutcome(transcript, CompactionKind.Unchanged);
         }
 
-        var recentStart = FindRecentStart(transcript);
-        var excerpt = BuildExcerpt(transcript, recentStart);
-        if (excerpt.Length == 0)
+        var pruned = ToolResultPruner.Prune(transcript, OmittedResultText);
+        var prunedChanged = WasRewritten(transcript, pruned);
+        var split = CompactionSelection.Choose(pruned, limits.ResolveTailBudget());
+        if (split.Head.Count == 0)
         {
-            return DropOldestToolResults(transcript, recentStart);
+            return prunedChanged
+                ? new CompactionOutcome(pruned, CompactionKind.Applied)
+                : new CompactionOutcome(transcript, CompactionKind.Unchanged);
+        }
+
+        var conversation = CompactionText.Conversation(split.Head);
+        if (conversation.Length == 0)
+        {
+            return FinishWithoutSummary(pruned, prunedChanged);
+        }
+
+        var prompt = CompactionPrompt.UserText(conversation, todos, split.PreviousSummary);
+        var promptTokens = TokenEstimator.Text(CompactionPrompt.SystemText) + TokenEstimator.Text(prompt);
+        if (promptTokens > limits.SummaryPromptBudget())
+        {
+            return FinishWithoutSummary(pruned, prunedChanged);
         }
 
         try
@@ -50,19 +63,18 @@ public sealed class ContextCompactor
                 new ChatRequest(
                 [
                     new ChatMessage(ChatRole.System, CompactionPrompt.SystemText),
-                    new ChatMessage(ChatRole.User, CompactionPrompt.UserText(excerpt, todos))
-                ],
-                reasoning: reasoning),
+                    new ChatMessage(ChatRole.User, prompt)
+                ]),
                 cancellationToken);
             var summary = ReadAssistantText(response);
             if (string.IsNullOrWhiteSpace(summary))
             {
-                return DropOldestToolResults(transcript, recentStart);
+                return FinishWithoutSummary(pruned, prunedChanged);
             }
 
             return new CompactionOutcome(
-                Rebuild(transcript, recentStart, summary.Trim(), todos),
-                true);
+                Rebuild(pruned, split, summary.Trim(), todos),
+                CompactionKind.Applied);
         }
         catch (OperationCanceledException)
         {
@@ -70,106 +82,53 @@ public sealed class ContextCompactor
         }
         catch (Exception)
         {
-            return DropOldestToolResults(transcript, recentStart);
+            return FinishWithoutSummary(pruned, prunedChanged);
         }
     }
 
-    private static int FindRecentStart(IReadOnlyList<ChatItem> transcript)
-    {
-        var userIndexes = new List<int>();
-        for (var i = 0; i < transcript.Count; i++)
-        {
-            if (IsUser(transcript[i]))
-            {
-                userIndexes.Add(i);
-            }
-        }
-
-        if (userIndexes.Count == 0)
-        {
-            return transcript.Count;
-        }
-
-        var keepFrom = Math.Max(0, userIndexes.Count - RecentUserTurnCount);
-        return userIndexes[keepFrom];
-    }
-
-    private static string BuildExcerpt(IReadOnlyList<ChatItem> transcript, int recentStart)
-    {
-        var parts = new List<string>();
-        var length = 0;
-        for (var i = 1; i < recentStart && length < MaximumExcerptCharacters; i++)
-        {
-            var piece = transcript[i] switch
-            {
-                ToolCall call => call.Name + " " + call.Arguments,
-                ToolResult result => result.Text,
-                ChatMessage message when IsEarlierContext(message) => message.Text,
-                _ => string.Empty
-            };
-            if (piece.Length == 0)
-            {
-                continue;
-            }
-
-            parts.Add(piece);
-            length += piece.Length;
-        }
-
-        var excerpt = string.Join("\n\n", parts);
-        return excerpt.Length <= MaximumExcerptCharacters
-            ? excerpt
-            : excerpt[..MaximumExcerptCharacters];
-    }
+    private static CompactionOutcome FinishWithoutSummary(
+        IReadOnlyList<ChatItem> pruned,
+        bool prunedChanged) =>
+        prunedChanged
+            ? new CompactionOutcome(pruned, CompactionKind.Applied)
+            : new CompactionOutcome(pruned, CompactionKind.Exhausted);
 
     private static IReadOnlyList<ChatItem> Rebuild(
-        IReadOnlyList<ChatItem> transcript,
-        int recentStart,
+        IReadOnlyList<ChatItem> pruned,
+        CompactionSplit split,
         string summary,
         string todos)
     {
-        var kept = new List<ChatItem> { transcript[0] };
+        var kept = new List<ChatItem>();
+        if (pruned.Count > 0
+            && pruned[0] is ChatMessage system
+            && system.Role == ChatRole.System
+            && !CompactionSelection.IsSummary(system))
+        {
+            kept.Add(system);
+        }
+
         kept.Add(new ChatMessage(ChatRole.System, FormatSummary(summary, todos)));
-        for (var i = 1; i < recentStart; i++)
-        {
-            if (transcript[i] is ChatMessage message
-                && !IsEarlierContext(message)
-                && (message.Role == ChatRole.User || message.Role == ChatRole.Assistant))
-            {
-                kept.Add(message);
-            }
-        }
-
-        for (var i = recentStart; i < transcript.Count; i++)
-        {
-            kept.Add(transcript[i]);
-        }
-
+        kept.AddRange(split.Tail);
         return kept;
     }
 
-    private static CompactionOutcome DropOldestToolResults(
-        IReadOnlyList<ChatItem> transcript,
-        int recentStart)
+    private static bool WasRewritten(IReadOnlyList<ChatItem> original, IReadOnlyList<ChatItem> next)
     {
-        var next = new List<ChatItem>(transcript.Count);
-        var dropped = false;
-        for (var i = 0; i < transcript.Count; i++)
+        if (original.Count != next.Count)
         {
-            if (i > 0
-                && i < recentStart
-                && transcript[i] is ToolResult result
-                && result.Text != OmittedResultText)
-            {
-                next.Add(new ToolResult(result.CallId, OmittedResultText, result.Status));
-                dropped = true;
-                continue;
-            }
-
-            next.Add(transcript[i]);
+            return true;
         }
 
-        return new CompactionOutcome(next, dropped);
+        for (var i = 0; i < original.Count; i++)
+        {
+            if (!ReferenceEquals(original[i], next[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string FormatSummary(string summary, string todos)
@@ -197,11 +156,4 @@ public sealed class ContextCompactor
 
         return string.Empty;
     }
-
-    private static bool IsUser(ChatItem item) =>
-        item is ChatMessage { Role.Value: "user" };
-
-    private static bool IsEarlierContext(ChatMessage message) =>
-        message.Role == ChatRole.System
-        && message.Text.StartsWith(CompactionPrompt.Marker, StringComparison.Ordinal);
 }

@@ -17,6 +17,7 @@ public static class SlashCatalog
         new(SessionVerb.Clear, "clear", ["new"], "new conversation"),
         new(SessionVerb.Cd, "cd", [], "show or set workspace"),
         new(SessionVerb.Resume, "resume", ["continue", "sessions"], "replay latest or id"),
+        new(SessionVerb.Compact, "compact", ["summarize"], "summarize older context now"),
         new(SessionVerb.Quit, "quit", ["exit", "q"], "exit")
     ];
 

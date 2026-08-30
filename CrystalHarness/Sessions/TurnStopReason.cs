@@ -15,6 +15,8 @@ public sealed record TurnStopReason
 
     public static TurnStopReason DurationLimitReached { get; } = new("duration_limit_reached");
 
+    public static TurnStopReason ContextOverflow { get; } = new("context_overflow");
+
     public TurnStopReason(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);

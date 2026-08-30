@@ -3,6 +3,7 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
 
+using CrystalHarness.Compaction;
 using CrystalHarness.Sessions;
 using CrystalHarness.Tools;
 
@@ -127,6 +128,26 @@ public sealed class StreamingTurnTests
         await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
 
         Assert.Same(reasoning, client.LastRequest?.Reasoning);
+    }
+
+    [Fact]
+    public async Task RunAsync_StopsWhenCompactionIsExhausted()
+    {
+        var client = new ScriptedStreamingClient(TextRound("done"));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            compactBeforeRound: (_, _) => Task.FromResult(
+                new CompactionOutcome([], CompactionKind.Exhausted)));
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.ContextOverflow, result.StopReason);
+        Assert.Equal(0, result.ModelCallCount);
+        Assert.Null(client.LastRequest);
     }
 
     private static StreamingTurn CreateTurn(
