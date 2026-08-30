@@ -104,7 +104,8 @@ follow-up (FIFO). Queued items stay in a panel above the composer until
 they are sent. The queue is sent when the current tool batch finishes or
 when the turn (thinking or conversation) ends. Empty Enter still
 interrupts immediately and sends. Interrupt (Ctrl+C or empty Enter) does
-not drop queued text. Two Ctrl+C presses at an idle prompt exit.
+not drop queued text. At an idle prompt, Ctrl+C clears the composer.
+Two Ctrl+C presses on an empty composer exit.
 
 ## Plan and Work
 
@@ -163,7 +164,7 @@ fraction of the **selected model's** `contextWindow`, the host:
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, and again on an orderly exit when the transcript has a
 user message. The file stores the last provider-reported token usage
-and turn counts. `/quit` and two Ctrl+C presses leave the alternate screen,
+and turn counts. `/quit` and two Ctrl+C presses on an empty composer leave the alternate screen,
 then print the session id and how to `/resume`. `/resume` loads the
 latest file for the workspace, or a given id, and replays the saved
 transcript into the viewport. It also restores the last usage snapshot
@@ -308,8 +309,9 @@ current tool batch or turn ends. Empty Enter while working interrupts
 immediately and sends. Backspace deletes one character on every
 platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
 plain Backspace as Control; that is still one character. Ctrl+W or
-Alt/Option+Backspace deletes a word. Ctrl+J or `\`+Enter inserts a newline. Tab toggles Plan/Work or
-completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome
+Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
+Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
+newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome
 labels are Plan, Work, Review, Default, AutoEdit, and Full. The status
 bar includes a queued count while follow-ups wait. Auto-pass prints a
 panel with Status, Reason, Risk, Authority, and, for review, Outcome

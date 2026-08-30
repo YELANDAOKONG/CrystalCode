@@ -134,6 +134,12 @@ public sealed class CodingSession
                 return;
             }
 
+            if (_renderer.TryClearComposer())
+            {
+                _idleCancels = 0;
+                return;
+            }
+
             _idleCancels++;
             promptSource.Cancel();
         };

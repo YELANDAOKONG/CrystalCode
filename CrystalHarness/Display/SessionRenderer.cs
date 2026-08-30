@@ -219,7 +219,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 AddHelpUnlocked($"{names,-28}{spec.Help}");
             }
 
-            AddHelpUnlocked("ctrl+c      stop turn; twice at idle exits");
+            AddHelpUnlocked("ctrl+c      stop turn; at idle clears input, twice on empty exits");
             if (extras is not null)
             {
                 foreach (var command in extras)
@@ -502,6 +502,22 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    public bool TryClearComposer()
+    {
+        lock (_gate)
+        {
+            if (_composer.IsEmpty)
+            {
+                return false;
+            }
+
+            _composer.Clear();
+            _picker = null;
+            PaintUnlocked(force: true);
+            return true;
+        }
+    }
+
     public async Task<string> ReadInputAsync(
         bool planMode,
         Func<bool> togglePlan,
@@ -674,7 +690,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             AddHelpUnlocked($"{names,-28}{option.Help}");
         }
 
-        AddHelpUnlocked("ctrl+c      stop turn; twice at idle exits");
+        AddHelpUnlocked("ctrl+c      stop turn; at idle clears input, twice on empty exits");
         PaintUnlocked(force: true);
     }
 
