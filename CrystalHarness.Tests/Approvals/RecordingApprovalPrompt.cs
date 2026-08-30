@@ -15,6 +15,10 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
 
     public int Count { get; private set; }
 
+    public int PassCount { get; private set; }
+
+    public ApprovalPassReason? LastPassReason { get; private set; }
+
     public ValueTask<ApprovalChoice> AskAsync(
         ToolCall call,
         ToolClassification classification,
@@ -26,6 +30,21 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
         LastClassification = classification;
         LastReview = review;
         return ValueTask.FromResult(_choice);
+    }
+
+    public void NotifyPassed(
+        ToolCall call,
+        ToolClassification classification,
+        ApprovalPassReason reason,
+        ApprovalReviewVerdict? review = null)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        ArgumentNullException.ThrowIfNull(classification);
+        ArgumentNullException.ThrowIfNull(reason);
+        PassCount++;
+        LastPassReason = reason;
+        LastClassification = classification;
+        LastReview = review;
     }
 
     public ToolClassification? LastClassification { get; private set; }

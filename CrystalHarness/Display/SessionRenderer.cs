@@ -74,6 +74,25 @@ public sealed class SessionRenderer : ITurnObserver
         }
     }
 
+    public void WriteApprovalPass(IReadOnlyList<string> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        lock (_gate)
+        {
+            CloseStreamUnlocked();
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                AnsiConsole.MarkupLine(
+                    $"[{Theme.Chrome}]  {MarkupText.Escape(line)}[/]");
+            }
+        }
+    }
+
     public void WriteError(string text)
     {
         lock (_gate)

@@ -15,12 +15,18 @@ public sealed class ApprovalPolicyTests
     public async Task DecideAsync_Default_AutoExecutesRead()
     {
         using var context = new ApprovalContext(ApprovalMode.Default);
-        var policy = context.CreatePolicy(new ThrowingApprovalPrompt());
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(prompt);
 
         var decision = await policy.DecideAsync(
             new ToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
+        Assert.Equal(Risk.Read, prompt.LastClassification?.Risk);
+        Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
     }
 
     [Fact]
@@ -40,36 +46,56 @@ public sealed class ApprovalPolicyTests
     public async Task DecideAsync_AutoEdit_AutoExecutesWorkspaceWrite()
     {
         using var context = new ApprovalContext(ApprovalMode.AutoEdit);
-        var policy = context.CreatePolicy(new ThrowingApprovalPrompt());
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(prompt);
 
         var decision = await policy.DecideAsync(WriteCall());
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
+        Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
+        Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
     }
 
     [Fact]
     public async Task DecideAsync_Full_AutoExecutesWorkspaceBash()
     {
         using var context = new ApprovalContext(ApprovalMode.Full);
-        var policy = context.CreatePolicy(new ThrowingApprovalPrompt());
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(prompt);
 
         var decision = await policy.DecideAsync(
             new ToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
+        Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
+        Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
     }
 
     [Fact]
     public async Task DecideAsync_Review_AllowsWriteWhenReviewerAllows()
     {
         using var context = new ApprovalContext(ApprovalMode.Review);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = context.CreatePolicy(
-            new ThrowingApprovalPrompt(),
+            prompt,
             new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("matches the request")));
 
         var decision = await policy.DecideAsync(WriteCall());
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
+        Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
+        Assert.NotNull(prompt.LastReview);
+        Assert.Equal(ReviewRiskLevel.Low, prompt.LastReview.RiskLevel);
+        Assert.Equal(ReviewAuthorization.High, prompt.LastReview.UserAuthorization);
+        Assert.Equal("matches the request", prompt.LastReview.Rationale);
     }
 
     [Fact]
@@ -189,6 +215,10 @@ public sealed class ApprovalPolicyTests
 
         Assert.Equal(ToolInvocationAction.Execute, second.Action);
         Assert.Equal(1, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Grant, prompt.LastPassReason);
+        Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
+        Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
     }
 
     private static ToolCall WriteCall() =>

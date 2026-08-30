@@ -12,4 +12,12 @@ internal sealed class ThrowingApprovalPrompt : IApprovalPrompt
         ApprovalReviewVerdict? review = null,
         CancellationToken cancellationToken = default) =>
         throw new InvalidOperationException("Approval prompt should not be called.");
+
+    public void NotifyPassed(
+        ToolCall call,
+        ToolClassification classification,
+        ApprovalPassReason reason,
+        ApprovalReviewVerdict? review = null)
+    {
+    }
 }

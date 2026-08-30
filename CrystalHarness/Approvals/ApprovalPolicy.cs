@@ -58,11 +58,13 @@ public sealed class ApprovalPolicy
         var classification = _classifier.Classify(call);
         if (CanPassWithoutReview(call.Name, classification))
         {
+            _prompt.NotifyPassed(call, classification, ApprovalPassReason.Policy);
             return ToolInvocationDecision.Execute;
         }
 
         if (_grants.Contains(_workspace.Root, call))
         {
+            _prompt.NotifyPassed(call, classification, ApprovalPassReason.Grant);
             return ToolInvocationDecision.Execute;
         }
 
@@ -120,6 +122,7 @@ public sealed class ApprovalPolicy
 
         if (verdict.IsAllow && classification.Risk != Risk.Forbidden)
         {
+            _prompt.NotifyPassed(call, classification, ApprovalPassReason.Review, verdict);
             return (ToolInvocationDecision.Execute, verdict);
         }
 

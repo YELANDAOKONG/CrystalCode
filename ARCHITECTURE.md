@@ -137,6 +137,11 @@ Modes:
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through.
 
+When a call auto-passes (policy, remembered grant, or review allow),
+the shell prints the pass reason, host risk, host authority, and the
+classifier summary. A review allow also prints `outcome`, `risk_level`,
+`user_authorization`, and `rationale`.
+
 Persistent grants are stored in `~/.crystal/permissions.json`.
 
 ## Compaction
@@ -247,7 +252,8 @@ live layout. `AnsiConsole.Live` is not the session shell: it fights the line
 editor.
 
 The shell keeps a header (model, mode, approval, workspace), a scrollback
-transcript, compact one-line tool rows, an approval card, and a footer
+transcript, compact one-line tool rows, an approval card or auto-pass
+notice (risk, authority, and review fields when present), and a footer
 (context percent, tokens, tool count, elapsed time).
 
 ## Plugins

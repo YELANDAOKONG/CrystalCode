@@ -19,6 +19,19 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         _renderer = renderer;
     }
 
+    public void NotifyPassed(
+        ToolCall call,
+        ToolClassification classification,
+        ApprovalPassReason reason,
+        ApprovalReviewVerdict? review = null)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        ArgumentNullException.ThrowIfNull(classification);
+        ArgumentNullException.ThrowIfNull(reason);
+        _renderer.WriteApprovalPass(
+            ApprovalCard.PassLines(call, classification, reason, review));
+    }
+
     public async ValueTask<ApprovalChoice> AskAsync(
         ToolCall call,
         ToolClassification classification,
