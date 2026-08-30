@@ -27,34 +27,16 @@ public static class WidgetPaint
 
             if (segment.IsLineBreak)
             {
-                lines.Add(ToLine(markup, plain));
-                markup.Clear();
-                plain.Clear();
+                FlushLine(lines, markup, plain, width);
                 continue;
             }
 
-            if (segment.Text.Length == 0)
-            {
-                continue;
-            }
-
-            plain.Append(segment.Text);
-            var token = StyleToken(segment.Style);
-            if (token.Length == 0)
-            {
-                markup.Append(MarkupText.Escape(segment.Text));
-            }
-            else
-            {
-                markup.Append('[').Append(token).Append(']')
-                    .Append(MarkupText.Escape(segment.Text))
-                    .Append("[/]");
-            }
+            AppendSegment(lines, markup, plain, segment, width);
         }
 
         if (plain.Length > 0)
         {
-            lines.Add(ToLine(markup, plain));
+            FlushLine(lines, markup, plain, width);
         }
 
         return lines;
@@ -69,6 +51,74 @@ public static class WidgetPaint
         }
 
         return lines;
+    }
+
+    private static void AppendSegment(
+        List<PaintLine> lines,
+        StringBuilder markup,
+        StringBuilder plain,
+        Segment segment,
+        int width)
+    {
+        var text = segment.Text;
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        var start = 0;
+        while (start < text.Length)
+        {
+            var newline = text.IndexOf('\n', start);
+            var end = newline < 0 ? text.Length : newline;
+            if (end > start && text[end - 1] == '\r')
+            {
+                end--;
+            }
+
+            if (end > start)
+            {
+                AppendStyled(markup, plain, text[start..end], segment.Style);
+            }
+
+            if (newline < 0)
+            {
+                return;
+            }
+
+            FlushLine(lines, markup, plain, width);
+            start = newline + 1;
+        }
+    }
+
+    private static void AppendStyled(
+        StringBuilder markup,
+        StringBuilder plain,
+        string text,
+        Style style)
+    {
+        plain.Append(text);
+        var token = StyleToken(style);
+        if (token.Length == 0)
+        {
+            markup.Append(MarkupText.Escape(text));
+            return;
+        }
+
+        markup.Append('[').Append(token).Append(']')
+            .Append(MarkupText.Escape(text))
+            .Append("[/]");
+    }
+
+    private static void FlushLine(
+        List<PaintLine> lines,
+        StringBuilder markup,
+        StringBuilder plain,
+        int width)
+    {
+        lines.Add(ToLine(markup, plain).Fit(width));
+        markup.Clear();
+        plain.Clear();
     }
 
     private static IAnsiConsole CreateConsole(int width)
@@ -89,8 +139,8 @@ public static class WidgetPaint
 
     private static PaintLine ToLine(StringBuilder markup, StringBuilder plain)
     {
-        var text = plain.ToString().TrimEnd();
-        if (text.Length == 0)
+        var text = plain.ToString();
+        if (text.TrimEnd().Length == 0)
         {
             return PaintLine.Blank;
         }

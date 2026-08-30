@@ -196,7 +196,7 @@ public sealed class ComposerBuffer
                     var placeholder = "Ask anything... (Tab: switch mode, /: commands, ?: help)";
                     var availableWidth = Math.Max(width - promptColumns, 0);
                     var truncatedPlaceholder = TextWidth.Truncate(placeholder, availableWidth);
-                    var plain = promptPlain;
+                    var plain = promptPlain + truncatedPlaceholder;
                     var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
                         + $"[{Theme.Chrome}] > [/]"
                         + $"[{Theme.Muted}]{MarkupText.Escape(truncatedPlaceholder)}[/]";

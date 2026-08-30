@@ -22,4 +22,18 @@ public sealed class QueueCardTests
     {
         Assert.Null(QueueCard.TryCreate([]));
     }
+
+    [Fact]
+    public void TryCreate_WideCjkItemFitsWidth()
+    {
+        const int width = 80;
+        var lines = WidgetPaint.Lines(QueueCard.TryCreate(["查看其他问题"])!, width);
+
+        Assert.True(lines.Count >= 3);
+        foreach (var line in lines)
+        {
+            Assert.DoesNotContain('\n', line.Plain);
+            Assert.True(TextWidth.Measure(line.Plain) <= width);
+        }
+    }
 }

@@ -78,4 +78,18 @@ public sealed class ComposerBufferTests
         buffer.Handle(ctrlN);
         Assert.Equal(string.Empty, buffer.Text);
     }
+
+    [Fact]
+    public void Project_EmptyKeepsPromptAndPlaceholderOnOneLine()
+    {
+        var buffer = new ComposerBuffer();
+        var view = buffer.Project(40, 8);
+
+        Assert.Single(view.Lines);
+        Assert.StartsWith("Work > ", view.Lines[0].Plain, StringComparison.Ordinal);
+        Assert.Contains("Ask anything", view.Lines[0].Plain, StringComparison.Ordinal);
+        Assert.True(TextWidth.Measure(view.Lines[0].Plain) <= 40);
+        Assert.Equal(0, view.CursorRow);
+        Assert.Equal(TextWidth.Measure("Work > "), view.CursorColumn);
+    }
 }

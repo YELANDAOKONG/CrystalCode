@@ -40,7 +40,8 @@ public sealed class ShellChrome
 
         if (!string.IsNullOrWhiteSpace(Activity))
         {
-            items.Add((Activity, $"[{Theme.Accent}]• {MarkupText.Escape(Activity)}[/]"));
+            var activityPlain = "• " + Activity;
+            items.Add((activityPlain, $"[{Theme.Accent}]{MarkupText.Escape(activityPlain)}[/]"));
         }
 
         if (!string.IsNullOrWhiteSpace(Model))

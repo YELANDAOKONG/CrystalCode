@@ -20,15 +20,22 @@ public static class ScreenPainter
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
         AnsiConsole.Cursor.Hide();
-        AnsiConsole.Write(new ControlCode("\u001b[H"));
-
-        var row = 0;
-        row = WriteBlock(transcript, regions.TranscriptRows, regions.Width, row, regions.Height);
-        row = WriteBlock(overlay, regions.OverlayRows, regions.Width, row, regions.Height);
-        WriteLine(status, regions.Width, row, regions.Height);
-        row++;
-        row = WriteBlock(queue, regions.QueueRows, regions.Width, row, regions.Height);
-        WriteBlock(composer.Lines, regions.ComposerRows, regions.Width, row, regions.Height);
+        // Wrap-off plus absolute rows: a full-width write must not scroll the frame.
+        AnsiConsole.Write(new ControlCode("\u001b[?7l"));
+        try
+        {
+            var row = 0;
+            row = WriteBlock(transcript, regions.TranscriptRows, regions.Width, row, regions.Height);
+            row = WriteBlock(overlay, regions.OverlayRows, regions.Width, row, regions.Height);
+            WriteLine(status, regions.Width, row, regions.Height);
+            row++;
+            row = WriteBlock(queue, regions.QueueRows, regions.Width, row, regions.Height);
+            WriteBlock(composer.Lines, regions.ComposerRows, regions.Width, row, regions.Height);
+        }
+        finally
+        {
+            AnsiConsole.Write(new ControlCode("\u001b[?7h"));
+        }
 
         var cursorLine = Math.Clamp(
             regions.ComposerTop + composer.CursorRow + 1,
@@ -58,32 +65,16 @@ public static class ScreenPainter
 
     private static void WriteLine(PaintLine line, int width, int row, int height)
     {
-        var plain = line.Plain;
-        var measured = TextWidth.Measure(plain);
-        if (measured > width)
+        if (row < 0 || row >= height)
         {
-            plain = TextWidth.Truncate(plain, width);
-            line = PaintLine.Colored(Theme.Chrome, plain);
-            measured = TextWidth.Measure(plain);
+            return;
         }
 
-        var pad = Math.Max(0, width - measured);
-        if (string.IsNullOrEmpty(line.Markup))
+        AnsiConsole.Write(new ControlCode($"\u001b[{row + 1};1H\u001b[2K"));
+        var fitted = line.Fit(width);
+        if (!string.IsNullOrEmpty(fitted.Markup))
         {
-            Console.Write(new string(' ', width));
-        }
-        else
-        {
-            AnsiConsole.Markup(line.Markup);
-            if (pad > 0)
-            {
-                Console.Write(new string(' ', pad));
-            }
-        }
-
-        if (row < height - 1)
-        {
-            Console.WriteLine();
+            AnsiConsole.Markup(fitted.Markup);
         }
     }
 }
