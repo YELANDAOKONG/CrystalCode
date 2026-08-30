@@ -17,18 +17,13 @@ public sealed record SessionCommand(SessionVerb Verb, string Argument)
         var space = trimmed.IndexOf(' ');
         var verb = space < 0 ? trimmed : trimmed[..space];
         var argument = space < 0 ? string.Empty : trimmed[(space + 1)..].Trim();
-        command = verb.ToLowerInvariant() switch
+        if (SlashCatalog.TryMatch(verb, out var matched))
         {
-            "/help" or "/h" => new SessionCommand(SessionVerb.Help, argument),
-            "/plan" => new SessionCommand(SessionVerb.Plan, argument),
-            "/approval" => new SessionCommand(SessionVerb.Approval, argument),
-            "/status" => new SessionCommand(SessionVerb.Status, argument),
-            "/clear" => new SessionCommand(SessionVerb.Clear, argument),
-            "/cd" => new SessionCommand(SessionVerb.Cd, argument),
-            "/resume" => new SessionCommand(SessionVerb.Resume, argument),
-            "/quit" or "/exit" or "/q" => new SessionCommand(SessionVerb.Quit, argument),
-            _ => new SessionCommand(SessionVerb.Unknown, trimmed)
-        };
+            command = new SessionCommand(matched, argument);
+            return true;
+        }
+
+        command = new SessionCommand(SessionVerb.Unknown, trimmed);
         return true;
     }
 }

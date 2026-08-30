@@ -253,13 +253,23 @@ variables still override. `credentials.json` remains a fallback store.
 ## Display
 
 Spectre.Console supplies markup, color, and panels. The host owns input and
-live layout. `AnsiConsole.Live` is not the session shell: it fights the line
-editor.
+the frame. `AnsiConsole.Live` is not the session shell: it fights the
+composer. The shell enters the alternate screen when the terminal is a TTY
+and paints a retained frame: transcript viewport, optional overlay, status
+bar, and multiline composer.
 
-The shell keeps a header (model, mode, approval, workspace), a scrollback
-transcript, compact one-line tool rows, an approval card or auto-pass
-notice (risk, authority, and review fields when present), and a footer
-(context percent, tokens, tool count, elapsed time).
+The status bar shows mode, approval, model, workspace, context percent,
+tokens, tool count, and elapsed time. Assistant text is rendered as
+markdown after each model round (headings, lists, fenced code, inline
+code and bold). Tool rows stay compact. Approval and questions are
+overlays; `y` / `s` / `a` / `n` map once / session / always / deny.
+
+Composer keys: Enter submits, Ctrl+J or `\`+Enter inserts a newline,
+Shift+Tab toggles Plan/Work, Tab completes a `/` command. Built-in slash
+verbs live in `SlashCatalog` and include aliases (`/new` is `/clear`,
+`/continue` and `/sessions` are `/resume`, `/q` and `/exit` are `/quit`).
+A slash picker appears while the prompt is a command prefix. PageUp and
+PageDown scroll the transcript. Redirected output stays sequential.
 
 ## Plugins
 

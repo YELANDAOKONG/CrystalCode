@@ -27,4 +27,8 @@ public static class Theme
     public const string Review = "lightsteelblue";
 
     public const string Selected = "bold lightsteelblue";
+
+    public const string Heading = "bold lightsteelblue";
+
+    public const string Code = "grey58";
 }

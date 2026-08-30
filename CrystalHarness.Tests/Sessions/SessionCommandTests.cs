@@ -12,6 +12,8 @@ public sealed class SessionCommandTests
     [InlineData("/approval review", SessionVerb.Approval)]
     [InlineData("/resume", SessionVerb.Resume)]
     [InlineData("/quit", SessionVerb.Quit)]
+    [InlineData("/new", SessionVerb.Clear)]
+    [InlineData("/continue", SessionVerb.Resume)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)
     {
         var parsed = SessionCommand.TryParse(input, out var command);

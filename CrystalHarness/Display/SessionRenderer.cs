@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Text;
 
-using Crystal;
+using Spectre.Console;
+
 using Crystal.Chat;
 using Crystal.Tools;
 
@@ -8,26 +10,70 @@ using CrystalHarness.Approvals;
 using CrystalHarness.Plugins;
 using CrystalHarness.Sessions;
 
-using Spectre.Console;
-
 namespace CrystalHarness.Display;
 
 /// <summary>
-/// Scrollback + chrome for one session. Sequential writes, no Live shell.
+/// Fullscreen session shell. Alternate buffer, not AnsiConsole.Live.
 /// </summary>
-public sealed class SessionRenderer : ITurnObserver, ISlashOutput
+public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 {
+    private const int PollMilliseconds = 40;
+    private static readonly TimeSpan PaintBudget = TimeSpan.FromMilliseconds(33);
     private readonly object _gate = new();
-    private readonly LineEditor _editor = new();
+    private readonly TranscriptLog _log = new();
+    private readonly ComposerBuffer _composer = new();
+    private readonly ShellChrome _chrome = new();
+    private readonly List<string> _modalOverlay = [];
+    private readonly List<SlashOption> _slashOptions = [];
+    private AlternateScreen? _screen;
+    private SlashPicker? _picker;
     private string? _streamKind;
     private Stopwatch? _turnClock;
+    private DateTimeOffset _lastPaint;
+    private int _scrollBack;
 
-    public void BeginTurn()
+    public IDisposable Open()
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
-            _turnClock = Stopwatch.StartNew();
+            _screen?.Dispose();
+            _screen = AlternateScreen.TryEnter();
+            PaintUnlocked(force: true);
+        }
+
+        return this;
+    }
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            _screen?.Dispose();
+            _screen = null;
+        }
+    }
+
+    public void SetSlashCommands(IReadOnlyList<ISlashCommand>? extras)
+    {
+        lock (_gate)
+        {
+            _slashOptions.Clear();
+            foreach (var spec in SlashCatalog.BuiltIn)
+            {
+                var keys = new List<string> { spec.Name };
+                keys.AddRange(spec.Aliases);
+                _slashOptions.Add(new SlashOption(spec.Name, spec.Help, keys));
+            }
+
+            if (extras is null)
+            {
+                return;
+            }
+
+            foreach (var command in extras)
+            {
+                _slashOptions.Add(new SlashOption(command.Name, command.Help, [command.Name]));
+            }
         }
     }
 
@@ -39,7 +85,18 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
+            CommitLiveUnlocked();
+            _chrome.Model = model;
+            _chrome.WorkspaceRoot = workspaceRoot;
+            _chrome.PlanMode = planMode;
+            _chrome.Approval = approval.Value;
+            _composer.PlanMode = planMode;
+            if (Framed)
+            {
+                PaintUnlocked(force: true);
+                return;
+            }
+
             var mode = planMode ? "plan" : "work";
             var modeColor = planMode ? Theme.Plan : Theme.Work;
             AnsiConsole.MarkupLine(
@@ -47,32 +104,23 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
                 + $"[{modeColor}]{mode}[/]"
                 + $"[{Theme.Chrome}]  ·  {MarkupText.Escape(approval.Value)}  ·  "
                 + $"{MarkupText.Escape(PathDisplay.Shorten(workspaceRoot))}[/]");
-            WriteRule();
             AnsiConsole.WriteLine();
         }
     }
 
     public void WriteUser(string text)
     {
-        lock (_gate)
-        {
-            CloseStreamUnlocked();
-            foreach (var line in text.Replace("\r\n", "\n").Split('\n'))
-            {
-                AnsiConsole.MarkupLine($"[{Theme.User}]  {MarkupText.Escape(line)}[/]");
-            }
-
-            AnsiConsole.WriteLine();
-        }
+        Add(TranscriptKind.User, text);
     }
 
     public void WriteNote(string text)
     {
-        lock (_gate)
-        {
-            CloseStreamUnlocked();
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  {MarkupText.Escape(text)}[/]");
-        }
+        Add(TranscriptKind.Note, text);
+    }
+
+    public void WriteError(string text)
+    {
+        Add(TranscriptKind.Error, text);
     }
 
     public void WriteApprovalPass(IReadOnlyList<string> lines)
@@ -80,7 +128,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
         ArgumentNullException.ThrowIfNull(lines);
         lock (_gate)
         {
-            CloseStreamUnlocked();
+            CommitLiveUnlocked();
             foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line))
@@ -88,18 +136,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
                     continue;
                 }
 
-                AnsiConsole.MarkupLine(
-                    $"[{Theme.Chrome}]  {MarkupText.Escape(line)}[/]");
+                _log.Add(TranscriptKind.Approval, line);
+                WriteFallback(TranscriptKind.Approval, line);
             }
-        }
-    }
 
-    public void WriteError(string text)
-    {
-        lock (_gate)
-        {
-            CloseStreamUnlocked();
-            AnsiConsole.MarkupLine($"[{Theme.Fail}]  {MarkupText.Escape(text)}[/]");
+            PaintUnlocked(force: true);
         }
     }
 
@@ -107,29 +148,39 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  tab         plan / work[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /plan       same as tab[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /approval   default | autoedit | review | full[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /cd         show or set workspace[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /status     turns, tokens, mode[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /clear      new conversation[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /resume     latest or id[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /quit       exit[/]");
-            AnsiConsole.MarkupLine($"[{Theme.Chrome}]  ctrl+c      stop turn; twice at idle exits[/]");
-            if (extras is null)
+            CommitLiveUnlocked();
+            AddHelpUnlocked(
+                "enter        submit",
+                "ctrl+j       newline",
+                "\\ enter      newline",
+                "shift+tab    plan / work",
+                "tab          complete /command",
+                "?            shortcuts when empty",
+                "pageup       scroll transcript");
+            foreach (var spec in SlashCatalog.BuiltIn)
             {
-                return;
+                var names = "/" + spec.Name;
+                if (spec.Aliases.Count > 0)
+                {
+                    names += "  " + string.Join("  ", spec.Aliases.Select(alias => "/" + alias));
+                }
+
+                AddHelpUnlocked($"{names,-28}{spec.Help}");
             }
 
-            foreach (var command in extras)
+            AddHelpUnlocked("ctrl+c      stop turn; twice at idle exits");
+            if (extras is not null)
             {
-                var help = string.IsNullOrWhiteSpace(command.Help)
-                    ? command.Name
-                    : command.Help;
-                AnsiConsole.MarkupLine(
-                    $"[{Theme.Chrome}]  /{MarkupText.Escape(command.Name),-11}{MarkupText.Escape(help)}[/]");
+                foreach (var command in extras)
+                {
+                    var help = string.IsNullOrWhiteSpace(command.Help)
+                        ? command.Name
+                        : command.Help;
+                    AddHelpUnlocked($"/{command.Name,-27}{help}");
+                }
             }
+
+            PaintUnlocked(force: true);
         }
     }
 
@@ -142,15 +193,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
-            var mode = planMode ? "plan" : "work";
-            AnsiConsole.MarkupLine(
-                $"[{Theme.Chrome}]  {mode}  ·  {approval.Value}  ·  "
-                + $"{MarkupText.Escape(PathDisplay.Shorten(workspaceRoot))}[/]");
-            AnsiConsole.MarkupLine(
-                $"[{Theme.Chrome}]  {ledger.UserTurns} turns  ·  "
-                + $"{ledger.ModelCalls} model  ·  {ledger.ToolCalls} tools  ·  "
-                + $"{FormatUsage(ledger.Usage, contextWindow)}[/]");
+            CommitLiveUnlocked();
+            _chrome.WorkspaceRoot = workspaceRoot;
+            _chrome.PlanMode = planMode;
+            _chrome.Approval = approval.Value;
+            _chrome.Usage = UsageText.Format(ledger.Usage, contextWindow);
+            var text = $"{(planMode ? "plan" : "work")}  ·  {approval.Value}  ·  "
+                + $"{ledger.UserTurns} turns  ·  {ledger.ModelCalls} model  ·  "
+                + $"{ledger.ToolCalls} tools  ·  {_chrome.Usage}";
+            _log.Add(TranscriptKind.Note, text);
+            WriteFallback(TranscriptKind.Note, text);
+            PaintUnlocked(force: true);
         }
     }
 
@@ -161,20 +214,44 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
+            CommitLiveUnlocked();
+            _chrome.Usage = UsageText.Format(result.Usage, contextWindow);
+            _chrome.ToolCount = result.ToolCallCount;
+            _chrome.Elapsed = _turnClock is null
+                ? string.Empty
+                : UsageText.FormatElapsed(_turnClock.Elapsed);
+            _chrome.Activity = string.Empty;
             if (result.StopReason != TurnStopReason.Completed)
             {
-                AnsiConsole.MarkupLine(
-                    $"[{Theme.Plan}]  {MarkupText.Escape(result.StopReason.Value)}[/]");
+                _log.Add(TranscriptKind.Note, result.StopReason.Value);
+                WriteFallback(TranscriptKind.Note, result.StopReason.Value);
             }
 
-            var elapsed = _turnClock is null
-                ? string.Empty
-                : "  ·  " + FormatElapsed(_turnClock.Elapsed);
-            AnsiConsole.MarkupLine(
-                $"[{Theme.Chrome}]  {FormatUsage(result.Usage, contextWindow)}  ·  "
-                + $"{result.ToolCallCount} tools{elapsed}[/]");
-            AnsiConsole.WriteLine();
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void ClearConversation()
+    {
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            _log.Clear();
+            _scrollBack = 0;
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void BeginTurn()
+    {
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            _turnClock = Stopwatch.StartNew();
+            _chrome.Activity = "running";
+            _chrome.ToolCount = 0;
+            _chrome.Elapsed = string.Empty;
+            PaintUnlocked(force: true);
         }
     }
 
@@ -185,26 +262,36 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
             switch (streamEvent)
             {
                 case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
-                    OpenUnlocked("thinking");
-                    AnsiConsole.Markup($"[{Theme.Thinking}]{MarkupText.Escape(reasoning.Text)}[/]");
+                    OpenLiveUnlocked(TranscriptKind.Thinking);
+                    _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
+                    _chrome.Activity = "thinking";
+                    WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
+                    PaintUnlocked(force: false);
                     break;
                 case ChatTextDelta text when text.Text.Length > 0:
-                    OpenUnlocked("assistant");
-                    AnsiConsole.Markup(MarkupText.Escape(text.Text));
+                    OpenLiveUnlocked(TranscriptKind.Assistant);
+                    _log.AppendLive(TranscriptKind.Assistant, text.Text);
+                    _chrome.Activity = "writing";
+                    WriteFallbackDelta(TranscriptKind.Assistant, text.Text);
+                    PaintUnlocked(force: false);
                     break;
                 case ChatToolCallDelta toolCall:
-                    OpenUnlocked("tool");
+                    OpenLiveUnlocked(TranscriptKind.Tool);
                     if (toolCall.NameDelta.Length > 0)
                     {
-                        AnsiConsole.Markup($"[{Theme.Tool}]{MarkupText.Escape(toolCall.NameDelta)}[/]");
+                        _log.AppendLive(TranscriptKind.Tool, toolCall.NameDelta);
+                        _chrome.Activity = "tool";
+                        WriteFallbackDelta(TranscriptKind.Tool, toolCall.NameDelta);
                     }
 
                     if (toolCall.ArgumentsDelta.Length > 0 && toolCall.ArgumentsDelta is not "{}")
                     {
-                        AnsiConsole.Markup(
-                            $"[{Theme.Chrome}] {MarkupText.Escape(ApprovalCard.CompactArguments(toolCall.ArgumentsDelta))}[/]");
+                        var compact = " " + ApprovalCard.CompactArguments(toolCall.ArgumentsDelta);
+                        _log.AppendLive(TranscriptKind.Tool, compact);
+                        WriteFallbackDelta(TranscriptKind.Tool, compact);
                     }
 
+                    PaintUnlocked(force: false);
                     break;
                 default:
                     break;
@@ -216,7 +303,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
+            CommitLiveUnlocked();
+            PaintUnlocked(force: true);
         }
     }
 
@@ -224,14 +312,19 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
+            CommitLiveUnlocked();
             foreach (var result in results)
             {
-                var color = result.Status == ToolResultStatus.Success ? Theme.Ok : Theme.Fail;
-                var first = FirstLine(result.Text);
-                AnsiConsole.MarkupLine(
-                    $"[{color}]        {MarkupText.Escape(first)}[/]");
+                var first = ToolResultText.FirstLine(result.Text);
+                var kind = result.Status == ToolResultStatus.Success
+                    ? TranscriptKind.Result
+                    : TranscriptKind.Error;
+                _log.Add(kind, first);
+                WriteFallback(kind, first);
             }
+
+            _chrome.Activity = "running";
+            PaintUnlocked(force: true);
         }
     }
 
@@ -239,105 +332,374 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
+            CommitLiveUnlocked();
+            PaintUnlocked(force: true);
         }
     }
 
-    public Task<string> ReadInputAsync(
+    public void SetOverlay(IReadOnlyList<string> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        lock (_gate)
+        {
+            _modalOverlay.Clear();
+            _modalOverlay.AddRange(lines);
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void ClearOverlay()
+    {
+        lock (_gate)
+        {
+            _modalOverlay.Clear();
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void SeedComposer(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        lock (_gate)
+        {
+            _composer.Insert(text);
+            RefreshPickerUnlocked();
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public async Task<string> ReadInputAsync(
         bool planMode,
         Func<bool> togglePlan,
         CancellationToken cancellationToken)
     {
         lock (_gate)
         {
-            CloseStreamUnlocked();
+            CommitLiveUnlocked();
+            _composer.PlanMode = planMode;
+            _chrome.PlanMode = planMode;
+            RefreshPickerUnlocked();
+            PaintUnlocked(force: true);
         }
 
-        return _editor.ReadAsync(planMode, togglePlan, cancellationToken);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var burst = await ReadAvailableKeysAsync(cancellationToken);
+            string? submitted = null;
+            lock (_gate)
+            {
+                if (burst.Count > 1)
+                {
+                    _composer.Insert(ExtractPaste(burst));
+                }
+                else
+                {
+                    submitted = HandleComposerKeyUnlocked(burst[0], togglePlan);
+                }
+
+                RefreshPickerUnlocked();
+                PaintUnlocked(force: true);
+            }
+
+            if (submitted is not null)
+            {
+                return submitted;
+            }
+        }
     }
 
-    public static void WriteRule()
+    public async Task<ConsoleKeyInfo> ReadKeyAsync(CancellationToken cancellationToken)
     {
-        var width = 80;
-        try
+        while (!Console.KeyAvailable)
         {
-            width = Math.Max(Console.WindowWidth - 1, 16);
-        }
-        catch (IOException)
-        {
+            await Task.Delay(PollMilliseconds, cancellationToken);
         }
 
-        AnsiConsole.MarkupLine($"[{Theme.Rule}]{new string('-', width)}[/]");
+        return Console.ReadKey(intercept: true);
     }
 
-    private void OpenUnlocked(string kind)
+    private string? HandleComposerKeyUnlocked(ConsoleKeyInfo key, Func<bool> togglePlan)
     {
-        if (_streamKind == kind)
+        if (key.Key == ConsoleKey.PageUp)
+        {
+            var regions = CurrentRegions();
+            _scrollBack += Math.Max(1, regions.TranscriptRows - 1);
+            return null;
+        }
+
+        if (key.Key == ConsoleKey.PageDown)
+        {
+            var regions = CurrentRegions();
+            _scrollBack = Math.Max(0, _scrollBack - Math.Max(1, regions.TranscriptRows - 1));
+            return null;
+        }
+
+        if (_picker is not null
+            && key.Key == ConsoleKey.Tab
+            && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
+        {
+            _composer.Replace(_picker.CompletedText);
+            return null;
+        }
+
+        if (_picker is not null && key.Key == ConsoleKey.UpArrow)
+        {
+            _picker = _picker.Move(-1);
+            return null;
+        }
+
+        if (_picker is not null && key.Key == ConsoleKey.DownArrow)
+        {
+            _picker = _picker.Move(1);
+            return null;
+        }
+
+        var action = _composer.Handle(key);
+        switch (action)
+        {
+            case ComposerAction.Submit:
+                var text = _composer.Text;
+                _composer.RememberAndClear();
+                _picker = null;
+                return text;
+            case ComposerAction.TogglePlan:
+                _composer.PlanMode = togglePlan();
+                _chrome.PlanMode = _composer.PlanMode;
+                break;
+            case ComposerAction.ShowHelp:
+                WriteHelpUnlocked();
+                break;
+            case ComposerAction.None:
+                break;
+            default:
+                break;
+        }
+
+        return null;
+    }
+
+    private void WriteHelpUnlocked()
+    {
+        CommitLiveUnlocked();
+        AddHelpUnlocked(
+            "enter        submit",
+            "ctrl+j       newline",
+            "\\ enter      newline",
+            "shift+tab    plan / work",
+            "tab          complete /command",
+            "?            shortcuts when empty",
+            "pageup       scroll transcript");
+        foreach (var option in _slashOptions)
+        {
+            var aliases = option.Keys
+                .Where(key => !string.Equals(key, option.Name, StringComparison.OrdinalIgnoreCase))
+                .Select(key => "/" + key);
+            var names = "/" + option.Name;
+            var extra = string.Join("  ", aliases);
+            if (extra.Length > 0)
+            {
+                names += "  " + extra;
+            }
+
+            AddHelpUnlocked($"{names,-28}{option.Help}");
+        }
+
+        AddHelpUnlocked("ctrl+c      stop turn; twice at idle exits");
+        PaintUnlocked(force: true);
+    }
+
+    private void RefreshPickerUnlocked()
+    {
+        if (_modalOverlay.Count > 0)
+        {
+            _picker = null;
+            return;
+        }
+
+        _picker = SlashPicker.Create(_composer.Text, _slashOptions);
+    }
+
+    private void Add(TranscriptKind kind, string text)
+    {
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            _log.Add(kind, text);
+            WriteFallback(kind, text);
+            PaintUnlocked(force: true);
+        }
+    }
+
+    private void AddHelpUnlocked(params string[] lines)
+    {
+        foreach (var line in lines)
+        {
+            _log.Add(TranscriptKind.Note, line);
+            WriteFallback(TranscriptKind.Note, line);
+        }
+    }
+
+    private void OpenLiveUnlocked(TranscriptKind kind)
+    {
+        if (_streamKind == kind.ToString())
         {
             return;
         }
 
-        CloseStreamUnlocked();
-        if (kind == "thinking")
-        {
-            AnsiConsole.Markup($"[{Theme.Thinking}]  [/]");
-        }
-        else if (kind == "tool")
-        {
-            AnsiConsole.Markup($"[{Theme.Tool}]  [/]");
-        }
-        else
-        {
-            Console.Write("  ");
-        }
-
-        _streamKind = kind;
+        CommitLiveUnlocked();
+        _streamKind = kind.ToString();
     }
 
-    private void CloseStreamUnlocked()
+    private void CommitLiveUnlocked()
     {
-        if (_streamKind is null)
-        {
-            return;
-        }
-
-        Console.WriteLine();
-        if (_streamKind is "thinking" or "tool")
+        if (_streamKind is not null && !Framed)
         {
             Console.WriteLine();
         }
 
+        _log.CommitLive();
         _streamKind = null;
     }
 
-    private static string FirstLine(string text)
+    private void PaintUnlocked(bool force)
     {
-        var normalized = text.Replace("\r\n", "\n");
-        var end = normalized.IndexOf('\n');
-        var line = end < 0 ? normalized : normalized[..end];
-        return line.Length <= 100 ? line : line[..97] + "...";
-    }
-
-    private static string FormatUsage(TokenUsage? usage, int contextWindow)
-    {
-        if (usage is null)
+        if (!Framed)
         {
-            return "ctx --";
+            return;
         }
 
-        var percent = contextWindow <= 0
-            ? 0
-            : Math.Clamp((int)(usage.TotalTokenCount * 100 / contextWindow), 0, 99);
-        return $"ctx {percent}%  ·  {usage.InputTokenCount} in / {usage.OutputTokenCount} out";
-    }
-
-    private static string FormatElapsed(TimeSpan elapsed)
-    {
-        if (elapsed.TotalSeconds < 10)
+        var now = DateTimeOffset.UtcNow;
+        if (!force && now - _lastPaint < PaintBudget)
         {
-            return $"{elapsed.TotalSeconds:0.0}s";
+            return;
         }
 
-        return $"{(int)elapsed.TotalSeconds}s";
+        var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
+        var overlay = OverlayLines(ScreenSize.Width);
+        var regions = ShellLayout.Measure(
+            ScreenSize.Width,
+            ScreenSize.Height,
+            composerView.Lines.Count,
+            overlay.Count);
+        _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
+        var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
+        ScreenPainter.Paint(
+            regions,
+            transcript,
+            overlay,
+            _chrome.StatusLine(regions.Width),
+            composerView);
+        _lastPaint = now;
+    }
+
+    private IReadOnlyList<PaintLine> OverlayLines(int width)
+    {
+        if (_modalOverlay.Count > 0)
+        {
+            var lines = new List<PaintLine>();
+            foreach (var line in _modalOverlay)
+            {
+                lines.Add(PaintLine.Colored(Theme.Review, TextWidth.Truncate("  " + line, width)));
+            }
+
+            return lines;
+        }
+
+        return _picker is null ? [] : _picker.Paint(width);
+    }
+
+    private ShellRegions CurrentRegions()
+    {
+        var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
+        return ShellLayout.Measure(
+            ScreenSize.Width,
+            ScreenSize.Height,
+            composerView.Lines.Count,
+            OverlayLines(ScreenSize.Width).Count);
+    }
+
+    private bool Framed => _screen is { IsActive: true };
+
+    private void WriteFallback(TranscriptKind kind, string text)
+    {
+        if (Framed)
+        {
+            return;
+        }
+
+        var color = kind switch
+        {
+            TranscriptKind.Error => Theme.Fail,
+            TranscriptKind.Result => Theme.Ok,
+            TranscriptKind.Thinking => Theme.Thinking,
+            TranscriptKind.Tool => Theme.Tool,
+            TranscriptKind.Approval => Theme.Review,
+            TranscriptKind.User => Theme.User,
+            _ => Theme.Chrome
+        };
+        foreach (var line in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            AnsiConsole.MarkupLine($"[{color}]  {MarkupText.Escape(line)}[/]");
+        }
+    }
+
+    private void WriteFallbackDelta(TranscriptKind kind, string text)
+    {
+        if (Framed)
+        {
+            return;
+        }
+
+        var color = kind switch
+        {
+            TranscriptKind.Thinking => Theme.Thinking,
+            TranscriptKind.Tool => Theme.Tool,
+            _ => Theme.User
+        };
+        if (kind is TranscriptKind.Thinking or TranscriptKind.Tool)
+        {
+            AnsiConsole.Markup($"[{color}]{MarkupText.Escape(text)}[/]");
+            return;
+        }
+
+        AnsiConsole.Markup(MarkupText.Escape(text));
+    }
+
+    private static async Task<List<ConsoleKeyInfo>> ReadAvailableKeysAsync(
+        CancellationToken cancellationToken)
+    {
+        while (!Console.KeyAvailable)
+        {
+            await Task.Delay(PollMilliseconds, cancellationToken);
+        }
+
+        var burst = new List<ConsoleKeyInfo> { Console.ReadKey(intercept: true) };
+        while (Console.KeyAvailable)
+        {
+            burst.Add(Console.ReadKey(intercept: true));
+        }
+
+        return burst;
+    }
+
+    private static string ExtractPaste(List<ConsoleKeyInfo> burst)
+    {
+        var text = new StringBuilder();
+        foreach (var key in burst)
+        {
+            if (key.Key == ConsoleKey.Enter)
+            {
+                text.Append('\n');
+                continue;
+            }
+
+            if (!char.IsControl(key.KeyChar))
+            {
+                text.Append(key.KeyChar);
+            }
+        }
+
+        return text.ToString();
     }
 }

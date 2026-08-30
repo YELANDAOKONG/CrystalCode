@@ -89,6 +89,8 @@ public sealed class CodingSession
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
+        using var screen = _renderer.Open();
+        _renderer.SetSlashCommands(_plugins.Commands);
         _renderer.WriteHeader(
             _settings.Model,
             _workspace.Root,
@@ -240,6 +242,7 @@ public sealed class CodingSession
                 return true;
             case SessionVerb.Clear:
                 BeginNewSession();
+                _renderer.ClearConversation();
                 _renderer.WriteNote("new conversation");
                 return true;
             case SessionVerb.Cd:

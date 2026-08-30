@@ -51,6 +51,87 @@ internal static class TextWidth
         return cursor + 1;
     }
 
+    public static List<string> Wrap(string text, int columnBudget)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (columnBudget < 1)
+        {
+            columnBudget = 1;
+        }
+
+        var lines = new List<string>();
+        foreach (var paragraph in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            if (paragraph.Length == 0)
+            {
+                lines.Add(string.Empty);
+                continue;
+            }
+
+            var start = 0;
+            while (start < paragraph.Length)
+            {
+                var columns = 0;
+                var end = start;
+                while (end < paragraph.Length)
+                {
+                    var next = MoveRight(paragraph, end);
+                    var width = Measure(paragraph.AsSpan(end, next - end));
+                    if (columns + width > columnBudget && end > start)
+                    {
+                        break;
+                    }
+
+                    columns += width;
+                    end = next;
+                }
+
+                lines.Add(paragraph[start..end]);
+                start = end;
+            }
+        }
+
+        return lines;
+    }
+
+    public static string Truncate(string text, int columnBudget)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (columnBudget < 1)
+        {
+            return string.Empty;
+        }
+
+        if (Measure(text) <= columnBudget)
+        {
+            return text;
+        }
+
+        const string Ellipsis = "...";
+        var budget = Math.Max(columnBudget - Measure(Ellipsis), 0);
+        if (budget == 0)
+        {
+            return Ellipsis[..Math.Min(Ellipsis.Length, columnBudget)];
+        }
+
+        var end = 0;
+        var columns = 0;
+        while (end < text.Length)
+        {
+            var next = MoveRight(text, end);
+            var width = Measure(text.AsSpan(end, next - end));
+            if (columns + width > budget)
+            {
+                break;
+            }
+
+            columns += width;
+            end = next;
+        }
+
+        return text[..end] + Ellipsis;
+    }
+
     public static (int Start, string Visible) Window(
         string text,
         int cursor,
