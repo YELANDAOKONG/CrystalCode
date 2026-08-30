@@ -13,7 +13,7 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        var store = new PromptStore(home.Home);
+        var store = CreateStore(home);
 
         var prompts = store.Load(workspace.Path);
 
@@ -30,7 +30,7 @@ public sealed class PromptStoreTests
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
         WritePrompt(home.Home.PromptsDirectory, "work.md", "home work");
-        var store = new PromptStore(home.Home);
+        var store = CreateStore(home);
 
         var prompts = store.Load(workspace.Path);
 
@@ -49,7 +49,7 @@ public sealed class PromptStoreTests
             Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "prompts"),
             "work.md",
             "project work");
-        var store = new PromptStore(home.Home);
+        var store = CreateStore(home);
 
         var prompts = store.Load(workspace.Path);
 
@@ -67,7 +67,7 @@ public sealed class PromptStoreTests
             Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "prompts"),
             "work.md",
             "   ");
-        var store = new PromptStore(home.Home);
+        var store = CreateStore(home);
 
         var prompts = store.Load(workspace.Path);
 
@@ -86,7 +86,7 @@ public sealed class PromptStoreTests
             Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "instructions.md"),
             "use the workspace tools");
         File.WriteAllText(Path.Combine(workspace.Path, ".crystal.md"), "this repo is CrystalHarness");
-        var store = new PromptStore(home.Home);
+        var store = CreateStore(home);
 
         var prompts = store.Load(workspace.Path);
 
@@ -97,6 +97,88 @@ public sealed class PromptStoreTests
         Assert.DoesNotContain("Workspace instructions", prompts.Review, StringComparison.Ordinal);
         Assert.Equal(ApprovalReviewPrompt.SystemText, prompts.Review);
     }
+
+    [Fact]
+    public void Load_AppendsAgentsFileWithoutReplacingWorkPrompt()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "run tests with dotnet test");
+        var store = CreateStore(home);
+
+        var prompts = store.Load(workspace.Path);
+
+        Assert.Equal(WorkPrompt.Text, prompts.Work);
+        Assert.Contains("run tests with dotnet test", prompts.WorkSystem, StringComparison.Ordinal);
+        Assert.Contains("Instructions from:", prompts.WorkSystem, StringComparison.Ordinal);
+        Assert.Equal(ApprovalReviewPrompt.SystemText, prompts.Review);
+    }
+
+    [Fact]
+    public void Load_UsesClaudeWhenAgentsIsAbsent()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Claude), "follow the existing CLAUDE notes");
+        var store = CreateStore(home);
+
+        var prompts = store.Load(workspace.Path);
+
+        Assert.Equal(WorkPrompt.Text, prompts.Work);
+        Assert.Contains("follow the existing CLAUDE notes", prompts.Instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_PrefersAgentsOverClaudeInTheSameDirectory()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "agents rules");
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Claude), "claude rules");
+        var store = CreateStore(home);
+
+        var prompts = store.Load(workspace.Path);
+
+        Assert.Contains("agents rules", prompts.Instructions, StringComparison.Ordinal);
+        Assert.DoesNotContain("claude rules", prompts.Instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_CombinesNestedAgentsFilesUpToGitRoot()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        Directory.CreateDirectory(Path.Combine(workspace.Path, ".git"));
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "root agents");
+        var nested = Path.Combine(workspace.Path, "src");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(nested, InstructionNames.Agents), "nested agents");
+        var store = CreateStore(home);
+
+        var prompts = store.Load(nested);
+
+        Assert.Contains("nested agents", prompts.Instructions, StringComparison.Ordinal);
+        Assert.Contains("root agents", prompts.Instructions, StringComparison.Ordinal);
+        Assert.Equal(WorkPrompt.Text, prompts.Work);
+    }
+
+    [Fact]
+    public void Load_DoesNotWalkPastWorkspaceWhenGitIsMissing()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "parent agents");
+        var nested = Path.Combine(workspace.Path, "src");
+        Directory.CreateDirectory(nested);
+        var store = CreateStore(home);
+
+        var prompts = store.Load(nested);
+
+        Assert.DoesNotContain("parent agents", prompts.Instructions, StringComparison.Ordinal);
+    }
+
+    private static PromptStore CreateStore(TemporaryHome home) =>
+        new(home.Home, InstructionDiscovery.Isolated(home.Home));
 
     private static void WritePrompt(string directory, string fileName, string text)
     {

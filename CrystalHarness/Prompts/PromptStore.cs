@@ -4,7 +4,8 @@ namespace CrystalHarness.Prompts;
 
 /// <summary>
 /// Loads custom prompts from <c>~/.crystal</c> then the project <c>.crystal</c>.
-/// Named files replace the built-in text. Instructions are appended.
+/// Named files replace the built-in text. Instructions, including
+/// OpenCode-compatible <c>AGENTS.md</c> / <c>CLAUDE.md</c>, are appended.
 /// </summary>
 public sealed class PromptStore
 {
@@ -13,11 +14,13 @@ public sealed class PromptStore
     private static readonly string[] PromptExtensions = [".md", ".txt"];
 
     private readonly CrystalHome _home;
+    private readonly InstructionDiscovery _discovery;
 
-    public PromptStore(CrystalHome home)
+    public PromptStore(CrystalHome home, InstructionDiscovery? discovery = null)
     {
         ArgumentNullException.ThrowIfNull(home);
         _home = home;
+        _discovery = discovery ?? InstructionDiscovery.Create(home);
     }
 
     public PromptSet Load(string workspaceRoot)
@@ -41,6 +44,7 @@ public sealed class PromptStore
         AddNamedFile(parts, _home.Root, "instructions");
         AddNamedFile(parts, project.Root, "instructions");
         AddIfPresent(parts, Path.Combine(workspaceRoot, ".crystal.md"));
+        parts.AddRange(_discovery.Collect(workspaceRoot));
         return string.Join("\n\n", parts);
     }
 

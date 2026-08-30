@@ -56,12 +56,21 @@ Full (pass without review).
 <workspace>/.crystal/instructions.md
 <workspace>/.crystal/prompts/
 <workspace>/.crystal.md
+<workspace>/AGENTS.md
 ```
 
 Work, Plan, and Review system prompts are files under `prompts/`
 (`work.md`, `plan.md`, `review.md`; `.txt` is also accepted). Project
 files override home files. `instructions.md` and `.crystal.md` append
 workspace facts to Work and Plan. Review is not given those extras.
+
+`AGENTS.md` and `CLAUDE.md` are extra instructions, not prompt
+replacements. OpenCode rules apply: files are combined; in one
+directory `AGENTS.md` is used instead of `CLAUDE.md`; the walk from
+the workspace to the git root keeps every `AGENTS.md` (or every
+`CLAUDE.md` when no `AGENTS.md` exists). Global fallbacks are
+`~/.crystal/AGENTS.md`, `~/.config/opencode/AGENTS.md`, and
+`~/.claude/CLAUDE.md`.
 
 ## Documents
 

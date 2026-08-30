@@ -55,9 +55,12 @@ coding harness built on Crystal.
 
 ## Data
 
-User data lives in `~/.crystal`. Prompts and workspace hints may be
-customized in `~/.crystal` and in the project's `.crystal` directory or
-`.crystal.md`. The application never writes secrets into the workspace.
+User data lives in `~/.crystal`. Prompts may be replaced in
+`~/.crystal/prompts` and the project's `.crystal/prompts`. Workspace
+hints are appended from `instructions.md`, `.crystal.md`, and
+OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
+are never prompt overlays. The application never writes secrets into
+the workspace.
 
 ## Runtime language
 

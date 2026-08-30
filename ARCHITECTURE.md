@@ -179,11 +179,25 @@ Project overlay (wins over home for named prompts):
 
 Overlay is built-in default, then `~/.crystal`, then the project
 `.crystal`. Named prompt files replace the built-in Work, Plan, or
-Review system text. `instructions.md` and `.crystal.md` are appended
-under "Workspace instructions" on Work and Plan only. Review is the
-named file alone so the reviewer stays a safety check. Files may be
-`.md` or `.txt`. Empty files are treated as missing. The host never
-writes prompt files.
+Review system text.
+
+`instructions.md` and `.crystal.md` are appended under
+"Workspace instructions" on Work and Plan only. Review is the named
+file alone so the reviewer stays a safety check. Files may be `.md`
+or `.txt`. Empty files are treated as missing. The host never writes
+prompt files.
+
+`AGENTS.md` and `CLAUDE.md` are OpenCode-compatible rule files, not
+prompt overlays. They are combined into the same instruction block
+and never replace Work, Plan, or Review.
+
+- Global: first existing file among `~/.crystal/AGENTS.md`,
+  `~/.crystal/CLAUDE.md`, `~/.config/opencode/AGENTS.md`, and
+  `~/.claude/CLAUDE.md`.
+- Project: walk from the workspace up to the git root. The first
+  matching name wins (`AGENTS.md`, then `CLAUDE.md`, then
+  `CONTEXT.md`). Every file of that name on the walk is appended.
+  `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
 
 `credentials.json` is created with owner-only permissions and is keyed by
 provider name. Environment variables override file credentials. The `plugins`
