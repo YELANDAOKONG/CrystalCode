@@ -28,6 +28,7 @@ public sealed class CodingSession
     private readonly SessionReviewContext _reviewContext = new();
     private readonly SessionLedger _ledger = new();
     private readonly TodoList _todos = new();
+    private readonly MessageQueue _queue = new();
     private readonly GrantStore _grants;
     private Workspace _workspace;
     private PromptSet _prompts;
@@ -38,6 +39,9 @@ public sealed class CodingSession
     private DateTimeOffset _sessionCreatedUtc;
     private IToolExecutor _workExecutor = null!;
     private IToolExecutor _planExecutor = null!;
+    private Task<TurnResult>? _turnTask;
+    private CancellationTokenSource? _turnSource;
+    private bool _turnActive;
     private int _idleCancels;
 
     private CodingSession(
@@ -99,15 +103,13 @@ public sealed class CodingSession
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
-        CancellationTokenSource? turnSource = null;
-        var turnActive = false;
 
         Console.CancelKeyPress += (_, args) =>
         {
             args.Cancel = true;
-            if (turnActive && turnSource is not null)
+            if (_turnActive && _turnSource is not null)
             {
-                turnSource.Cancel();
+                _turnSource.Cancel();
                 return;
             }
 
@@ -117,19 +119,23 @@ public sealed class CodingSession
 
         while (true)
         {
-            string input;
+            PromptRead read;
             try
             {
-                input = (await _renderer.ReadInputAsync(
+                read = await _renderer.ReadPromptAsync(
                     _planMode,
                     TogglePlanFromPrompt,
-                    promptSource.Token)).Trim();
+                    _turnTask,
+                    preserveStream: _turnActive,
+                    ignorePause: false,
+                    promptSource.Token);
                 _idleCancels = 0;
             }
             catch (OperationCanceledException)
             {
                 if (_idleCancels >= 2 || cancellationToken.IsCancellationRequested)
                 {
+                    await FinishTurnAsync();
                     _renderer.WriteNote("bye");
                     return 0;
                 }
@@ -142,9 +148,48 @@ public sealed class CodingSession
                 _renderer.WriteNote("ctrl+c again to exit");
                 if (!promptSource.TryReset())
                 {
+                    await FinishTurnAsync();
                     return 0;
                 }
 
+                continue;
+            }
+
+            if (read.TurnEnded)
+            {
+                await FinishTurnAsync();
+                StartTurnIfQueued();
+                continue;
+            }
+
+            var input = read.Text.Trim();
+            if (_turnActive)
+            {
+                if (input.Length > 0)
+                {
+                    if (StopsBusyTurn(input))
+                    {
+                        _turnSource?.Cancel();
+                        await FinishTurnAsync();
+                    }
+
+                    if (TryHandleCommand(input, out var busyExit))
+                    {
+                        if (busyExit)
+                        {
+                            return 0;
+                        }
+
+                        continue;
+                    }
+
+                    Enqueue(input);
+                    continue;
+                }
+
+                _turnSource?.Cancel();
+                await FinishTurnAsync();
+                StartTurnIfQueued();
                 continue;
             }
 
@@ -163,52 +208,7 @@ public sealed class CodingSession
                 continue;
             }
 
-            _renderer.WriteUser(input);
-            _reviewContext.CurrentUserRequest = input;
-            _transcript.Add(new ChatMessage(ChatRole.User, input));
-            turnSource = new CancellationTokenSource();
-            turnActive = true;
-            _renderer.BeginTurn();
-            try
-            {
-                var turn = new StreamingTurn(
-                    _client,
-                    _planMode ? _planExecutor : _workExecutor,
-                    TurnLimits.CreateDefault(),
-                    _renderer);
-                var result = await turn.RunAsync(_transcript, turnSource.Token);
-                _transcript = [.. result.Transcript];
-                if (result.ModelCallCount > 0)
-                {
-                    _ledger.Record(result);
-                }
-
-                if (result.StopReason == TurnStopReason.Interrupted)
-                {
-                    _renderer.WriteNote("interrupted");
-                }
-
-                if (result.StopReason == TurnStopReason.Completed)
-                {
-                    await CompactIfNeededAsync(result, turnSource.Token);
-                }
-
-                SaveSession();
-                _renderer.WriteTurnFooter(
-                    result,
-                    _ledger,
-                    _settings.ActiveModel.ContextWindow);
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                _renderer.WriteError(exception.Message);
-            }
-            finally
-            {
-                turnActive = false;
-                turnSource.Dispose();
-                turnSource = null;
-            }
+            StartTurn(input);
         }
     }
 
@@ -227,6 +227,7 @@ public sealed class CodingSession
                 return true;
             case SessionVerb.Plan:
                 TogglePlanFromPrompt();
+                _renderer.SetChrome(_planMode, _approval);
                 _renderer.WriteNote(ModeLabel.For(_planMode));
                 return true;
             case SessionVerb.Approval:
@@ -288,7 +289,8 @@ public sealed class CodingSession
 
         _settingsStore.Save(_settings.WithApproval(_approval));
         RebuildExecutors();
-        _renderer.WriteNote("approval  " + _approval.Value);
+        _renderer.SetChrome(_planMode, _approval);
+        _renderer.WriteNote("approval  " + ApprovalLabel.For(_approval));
     }
 
     private void ChangeDirectory(string argument)
@@ -372,6 +374,7 @@ public sealed class CodingSession
 
     private void BeginNewSession()
     {
+        DiscardQueue();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _ledger.Clear();
         _todos.Clear();
@@ -417,6 +420,7 @@ public sealed class CodingSession
         _todos.Clear();
         _todos.Replace(ReadTodos(document.Todos));
         _ledger.Clear();
+        DiscardQueue();
         _reviewContext.CurrentUserRequest = string.Empty;
         RebuildExecutors();
         _renderer.WriteNote("resumed  " + _sessionId);
@@ -523,5 +527,102 @@ public sealed class CodingSession
         }
 
         return ApprovalMode.Default;
+    }
+
+    private void DiscardQueue()
+    {
+        _queue.Clear();
+        _renderer.SetQueued(0);
+    }
+
+    private void Enqueue(string input)
+    {
+        _queue.Enqueue(input);
+        _renderer.SetQueued(_queue.Count);
+        _renderer.WriteNote("queued  " + input);
+    }
+
+    private void StartTurnIfQueued()
+    {
+        var next = _queue.Drain();
+        _renderer.SetQueued(0);
+        if (next is not null)
+        {
+            StartTurn(next);
+        }
+    }
+
+    private void StartTurn(string input)
+    {
+        _renderer.WriteUser(input);
+        _reviewContext.CurrentUserRequest = input;
+        _transcript.Add(new ChatMessage(ChatRole.User, input));
+        _turnSource = new CancellationTokenSource();
+        _turnActive = true;
+        _renderer.BeginTurn();
+        _turnTask = ExecuteTurnAsync(_turnSource.Token);
+    }
+
+    private Task<TurnResult> ExecuteTurnAsync(CancellationToken cancellationToken)
+    {
+        var turn = new StreamingTurn(
+            _client,
+            _planMode ? _planExecutor : _workExecutor,
+            TurnLimits.CreateDefault(),
+            _renderer);
+        return turn.RunAsync(_transcript, cancellationToken);
+    }
+
+    private async Task FinishTurnAsync()
+    {
+        if (_turnTask is null)
+        {
+            return;
+        }
+
+        TurnResult? result = null;
+        try
+        {
+            result = await _turnTask;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _renderer.WriteError(exception.Message);
+        }
+        finally
+        {
+            _turnActive = false;
+            _turnTask = null;
+            _turnSource?.Dispose();
+            _turnSource = null;
+        }
+
+        if (result is null)
+        {
+            return;
+        }
+
+        _transcript = [.. result.Transcript];
+        if (result.ModelCallCount > 0)
+        {
+            _ledger.Record(result);
+        }
+
+        if (result.StopReason == TurnStopReason.Completed)
+        {
+            await CompactIfNeededAsync(result, CancellationToken.None);
+        }
+
+        SaveSession();
+        _renderer.WriteTurnFooter(
+            result,
+            _ledger,
+            _settings.ActiveModel.ContextWindow);
+    }
+
+    private static bool StopsBusyTurn(string input)
+    {
+        return SessionCommand.TryParse(input, out var command)
+            && command.Verb is SessionVerb.Quit or SessionVerb.Clear or SessionVerb.Resume;
     }
 }

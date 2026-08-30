@@ -23,6 +23,7 @@ public sealed class QuestionPrompt : IUserPrompt
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentException.ThrowIfNullOrWhiteSpace(question);
         _renderer.CloseStream();
+        _renderer.PauseComposer();
         _renderer.SetOverlay(CardLines(question, options));
         try
         {
@@ -62,6 +63,7 @@ public sealed class QuestionPrompt : IUserPrompt
         finally
         {
             _renderer.ClearOverlay();
+            _renderer.ResumeComposer();
         }
     }
 

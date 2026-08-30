@@ -32,6 +32,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private Stopwatch? _turnClock;
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
+    private bool _composerPaused;
 
     public IDisposable Open()
     {
@@ -90,7 +91,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.Model = model;
             _chrome.WorkspaceRoot = workspaceRoot;
             _chrome.PlanMode = planMode;
-            _chrome.Approval = approval.Value;
+            _chrome.Approval = ApprovalLabel.For(approval);
             _composer.PlanMode = planMode;
             if (Framed)
             {
@@ -103,9 +104,20 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             AnsiConsole.MarkupLine(
                 $"[{Theme.Chrome}]{MarkupText.Escape(model)}  ·  [/]"
                 + $"[{modeColor}]{mode}[/]"
-                + $"[{Theme.Chrome}]  ·  {MarkupText.Escape(approval.Value)}  ·  "
+                + $"[{Theme.Chrome}]  ·  {MarkupText.Escape(ApprovalLabel.For(approval))}  ·  "
                 + $"{MarkupText.Escape(PathDisplay.Shorten(workspaceRoot))}[/]");
             AnsiConsole.WriteLine();
+        }
+    }
+
+    public void SetChrome(bool planMode, ApprovalMode approval)
+    {
+        lock (_gate)
+        {
+            _chrome.PlanMode = planMode;
+            _composer.PlanMode = planMode;
+            _chrome.Approval = ApprovalLabel.For(approval);
+            PaintUnlocked(force: true);
         }
     }
 
@@ -137,8 +149,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                     continue;
                 }
 
-                _log.Add(TranscriptKind.Approval, line);
-                WriteFallback(TranscriptKind.Approval, line);
+                var kind = ApprovalLineKind(lines, line);
+                _log.Add(kind, line);
+                WriteFallback(kind, line);
             }
 
             PaintUnlocked(force: true);
@@ -151,7 +164,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             CommitLiveUnlocked();
             AddHelpUnlocked(
-                "enter        submit",
+                "enter        submit; queue while working",
+                "enter        empty while working interrupts and sends",
                 "ctrl+j       newline",
                 "\\ enter      newline",
                 "tab          Plan / Work, or complete /",
@@ -197,9 +211,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             CommitLiveUnlocked();
             _chrome.WorkspaceRoot = workspaceRoot;
             _chrome.PlanMode = planMode;
-            _chrome.Approval = approval.Value;
+            _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Usage = UsageText.Format(ledger.Usage, contextWindow);
-            var text = $"{ModeLabel.For(planMode)}  ·  {approval.Value}  ·  "
+            var text = $"{ModeLabel.For(planMode)}  ·  {ApprovalLabel.For(approval)}  ·  "
                 + $"{ledger.UserTurns} turns  ·  {ledger.ModelCalls} model  ·  "
                 + $"{ledger.ToolCalls} tools  ·  {_chrome.Usage}";
             _log.Add(TranscriptKind.Note, text);
@@ -250,7 +264,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             CommitLiveUnlocked();
             _turnClock = Stopwatch.StartNew();
             _toolName = string.Empty;
-            _chrome.Activity = "running";
+            _chrome.Activity = "Running";
             _chrome.ToolCount = 0;
             _chrome.Elapsed = string.Empty;
             PaintUnlocked(force: true);
@@ -264,13 +278,16 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             switch (streamEvent)
             {
                 case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
-                    _chrome.Activity = "thinking";
+                    OpenLiveUnlocked(TranscriptKind.Thinking);
+                    _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
+                    _chrome.Activity = "Thinking";
+                    WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
                     PaintUnlocked(force: false);
                     break;
                 case ChatTextDelta text when text.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Assistant);
                     _log.AppendLive(TranscriptKind.Assistant, text.Text);
-                    _chrome.Activity = "writing";
+                    _chrome.Activity = "Writing";
                     WriteFallbackDelta(TranscriptKind.Assistant, text.Text);
                     PaintUnlocked(force: false);
                     break;
@@ -313,7 +330,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 WriteFallback(kind, first);
             }
 
-            _chrome.Activity = "running";
+            _chrome.Activity = "Running";
             PaintUnlocked(force: true);
         }
     }
@@ -347,6 +364,32 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    public void PauseComposer()
+    {
+        lock (_gate)
+        {
+            _composerPaused = true;
+        }
+    }
+
+    public void ResumeComposer()
+    {
+        lock (_gate)
+        {
+            _composerPaused = false;
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void SetQueued(int count)
+    {
+        lock (_gate)
+        {
+            _chrome.Queued = Math.Max(0, count);
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void SeedComposer(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -363,9 +406,31 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         Func<bool> togglePlan,
         CancellationToken cancellationToken)
     {
+        var read = await ReadPromptAsync(
+            planMode,
+            togglePlan,
+            wake: null,
+            preserveStream: false,
+            ignorePause: true,
+            cancellationToken);
+        return read.Text;
+    }
+
+    public async Task<PromptRead> ReadPromptAsync(
+        bool planMode,
+        Func<bool> togglePlan,
+        Task? wake,
+        bool preserveStream,
+        bool ignorePause,
+        CancellationToken cancellationToken)
+    {
         lock (_gate)
         {
-            CommitLiveUnlocked();
+            if (!preserveStream)
+            {
+                CommitLiveUnlocked();
+            }
+
             _composer.PlanMode = planMode;
             _chrome.PlanMode = planMode;
             RefreshPickerUnlocked();
@@ -375,7 +440,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var burst = await ReadAvailableKeysAsync(cancellationToken);
+            var burst = await ReadAvailableKeysAsync(
+                wake,
+                ignorePause,
+                cancellationToken);
+            if (burst is null)
+            {
+                return PromptRead.Ended;
+            }
+
             string? submitted = null;
             lock (_gate)
             {
@@ -394,7 +467,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
             if (submitted is not null)
             {
-                return submitted;
+                return PromptRead.Submitted(submitted);
             }
         }
     }
@@ -473,7 +546,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     {
         CommitLiveUnlocked();
         AddHelpUnlocked(
-            "enter        submit",
+            "enter        submit; queue while working",
+            "enter        empty while working interrupts and sends",
             "ctrl+j       newline",
             "\\ enter      newline",
             "tab          Plan / Work, or complete /",
@@ -610,6 +684,21 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             OverlayLines(ScreenSize.Width).Count);
     }
 
+    private static TranscriptKind ApprovalLineKind(IReadOnlyList<string> lines, string line)
+    {
+        if (lines.Count > 0 && string.Equals(line, lines[0], StringComparison.Ordinal))
+        {
+            return TranscriptKind.Tool;
+        }
+
+        if (line.StartsWith("Allowed", StringComparison.Ordinal))
+        {
+            return TranscriptKind.Result;
+        }
+
+        return TranscriptKind.Approval;
+    }
+
     private bool Framed => _screen is { IsActive: true };
 
     private void WriteFallback(TranscriptKind kind, string text)
@@ -657,21 +746,39 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         AnsiConsole.Markup(MarkupText.Escape(text));
     }
 
-    private static async Task<List<ConsoleKeyInfo>> ReadAvailableKeysAsync(
+    private async Task<List<ConsoleKeyInfo>?> ReadAvailableKeysAsync(
+        Task? wake,
+        bool ignorePause,
         CancellationToken cancellationToken)
     {
-        while (!Console.KeyAvailable)
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var paused = false;
+            lock (_gate)
+            {
+                paused = !ignorePause && _composerPaused;
+            }
+
+            if (!paused && Console.KeyAvailable)
+            {
+                var burst = new List<ConsoleKeyInfo> { Console.ReadKey(intercept: true) };
+                while (Console.KeyAvailable)
+                {
+                    burst.Add(Console.ReadKey(intercept: true));
+                }
+
+                return burst;
+            }
+
+            if (wake is { IsCompleted: true })
+            {
+                return null;
+            }
+
             await Task.Delay(PollMilliseconds, cancellationToken);
         }
-
-        var burst = new List<ConsoleKeyInfo> { Console.ReadKey(intercept: true) };
-        while (Console.KeyAvailable)
-        {
-            burst.Add(Console.ReadKey(intercept: true));
-        }
-
-        return burst;
     }
 
     private static string ExtractPaste(List<ConsoleKeyInfo> burst)

@@ -40,6 +40,7 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
         _renderer.CloseStream();
+        _renderer.PauseComposer();
         _renderer.SetOverlay(CardLines(call, classification, review));
         try
         {
@@ -56,6 +57,7 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         finally
         {
             _renderer.ClearOverlay();
+            _renderer.ResumeComposer();
         }
     }
 
@@ -72,14 +74,13 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         if (review is not null)
         {
             lines.Add(ApprovalCard.ReviewLine(review));
-            var rationale = review.Rationale.Replace('\r', ' ').Replace('\n', ' ').Trim();
-            if (rationale.Length > 0)
+            foreach (var line in ApprovalCard.SplitRationale(review.Rationale))
             {
-                lines.Add(TextWidth.Truncate(rationale, 80));
+                lines.Add(line);
             }
         }
 
-        lines.Add("y once  ·  s session  ·  a always  ·  n deny");
+        lines.Add("Y once  ·  S session  ·  A always  ·  N deny");
         return lines;
     }
 }

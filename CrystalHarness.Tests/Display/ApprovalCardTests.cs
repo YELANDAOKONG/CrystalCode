@@ -11,7 +11,7 @@ namespace CrystalHarness.Tests.Display;
 public sealed class ApprovalCardTests
 {
     [Fact]
-    public void ReviewLine_IsShort()
+    public void ReviewLine_KeepsOutcomeRiskAndAuth()
     {
         var verdict = new ApprovalReviewVerdict(
             "allow",
@@ -21,7 +21,7 @@ public sealed class ApprovalCardTests
 
         var line = ApprovalCard.ReviewLine(verdict);
 
-        Assert.Equal("review  allow", line);
+        Assert.Equal("Outcome  Allow  ·  Risk  Low  ·  Auth  High", line);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class ApprovalCardTests
     }
 
     [Fact]
-    public void PassLines_IsOneAllowedLine()
+    public void PassLines_IncludesHostRiskAuthorityAndReview()
     {
         var classification = new ToolClassification(
             Risk.Write,
@@ -56,6 +56,12 @@ public sealed class ApprovalCardTests
             """{"path":"src/App.cs","contents":"x"}""");
         var lines = ApprovalCard.PassLines(call, classification, ApprovalPassReason.Review, review);
 
-        Assert.Equal(["allowed  review  write  src/App.cs"], lines);
+        Assert.Equal("write  src/App.cs", lines[0]);
+        Assert.Equal(
+            "Allowed  ·  Review  ·  Risk  Write  ·  Authority  Workspace",
+            lines[1]);
+        Assert.Contains("Write workspace file", lines);
+        Assert.Contains("Outcome  Allow  ·  Risk  Low  ·  Auth  High", lines);
+        Assert.Contains("Adds the requested test.", lines);
     }
 }

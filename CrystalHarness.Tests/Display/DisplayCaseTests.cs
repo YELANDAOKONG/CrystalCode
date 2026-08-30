@@ -1,0 +1,18 @@
+using CrystalHarness.Approvals;
+using CrystalHarness.Display;
+
+using Xunit;
+
+namespace CrystalHarness.Tests.Display;
+
+public sealed class DisplayCaseTests
+{
+    [Fact]
+    public void Token_TitleCasesKnownModes()
+    {
+        Assert.Equal("Review", DisplayCase.Token("review"));
+        Assert.Equal("AutoEdit", DisplayCase.Token("autoedit"));
+        Assert.Equal("Outside Workspace", DisplayCase.Token("outside_workspace"));
+        Assert.Equal("Review", ApprovalLabel.For(ApprovalMode.Review));
+    }
+}

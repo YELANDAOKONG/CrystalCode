@@ -99,7 +99,11 @@ One user message is one turn:
    the turn, or the user cancels.
 7. After a completed turn, consider compaction from reported token usage.
 
-Ctrl+C cancels the in-flight turn. Two Ctrl+C presses at an idle prompt exit.
+The composer stays open while a turn runs. Enter with text enqueues a
+follow-up (FIFO). Empty Enter interrupts the turn and sends the queue as
+the next user message. A turn that finishes on its own also drains the
+queue. Interrupt (Ctrl+C or empty Enter) does not drop queued text. Two
+Ctrl+C presses at an idle prompt exit.
 
 ## Plan and Work
 
@@ -264,15 +268,19 @@ markdown after each model round (headings, lists, fenced code, inline
 code and bold). Tool rows stay compact. Approval and questions are
 overlays; `y` / `s` / `a` / `n` map once / session / always / deny.
 
-Composer keys: Enter submits, Ctrl+J or `\`+Enter inserts a newline,
-Tab toggles Plan/Work or completes a `/` command, Shift+Tab also
-toggles Plan/Work. Chrome uses the labels Plan and Work. Auto-pass
-prints one `allowed` line with the tool summary; reasoning stays in
-the status bar, not the transcript. Built-in slash
-verbs live in `SlashCatalog` and include aliases (`/new` is `/clear`,
-`/continue` and `/sessions` are `/resume`, `/q` and `/exit` are `/quit`).
-A slash picker appears while the prompt is a command prefix. PageUp and
-PageDown scroll the transcript. Redirected output stays sequential.
+Composer keys: Enter submits when idle and queues while a turn is
+running. Empty Enter while working interrupts the turn and sends the
+queue. Ctrl+J or `\`+Enter inserts a newline. Tab toggles Plan/Work or
+completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome
+labels are Plan, Work, Review, Default, AutoEdit, and Full. The status
+bar includes a queued count while follow-ups wait. Auto-pass prints the
+tool summary, allow reason, host risk and authority, reviewer outcome,
+risk, authorization, and rationale. Reasoning streams into the
+transcript. Built-in slash verbs live in `SlashCatalog` and include
+aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
+`/q` and `/exit` are `/quit`). A slash picker appears while the prompt
+is a command prefix. PageUp and PageDown scroll the transcript.
+Redirected output stays sequential.
 
 ## Plugins
 

@@ -21,6 +21,8 @@ public sealed class ShellChrome
 
     public string Elapsed { get; set; } = string.Empty;
 
+    public int Queued { get; set; }
+
     public PaintLine StatusLine(int width)
     {
         var plain = Format();
@@ -66,6 +68,11 @@ public sealed class ShellChrome
         if (!string.IsNullOrWhiteSpace(Elapsed))
         {
             parts.Add(Elapsed);
+        }
+
+        if (Queued > 0)
+        {
+            parts.Add("Queued " + Queued);
         }
 
         return string.Join("  ·  ", parts);

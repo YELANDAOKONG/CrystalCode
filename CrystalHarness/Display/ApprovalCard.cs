@@ -5,7 +5,7 @@ using CrystalHarness.Approvals;
 namespace CrystalHarness.Display;
 
 /// <summary>
-/// Formats an OpenCode/Codex-style permission card without Demo panels.
+/// Codex-style permission card: full risk, authority, outcome, and rationale.
 /// </summary>
 public static class ApprovalCard
 {
@@ -13,17 +13,26 @@ public static class ApprovalCard
         ToolCallText.Summary(call.Name, call.Arguments);
 
     public static string HostLine(ToolClassification classification) =>
-        classification.Risk.Value + " · " + classification.Authority.Value;
+        "Risk  "
+        + DisplayCase.Token(classification.Risk.Value)
+        + "  ·  Authority  "
+        + DisplayCase.Token(classification.Authority.Value);
 
     public static string ReviewLine(ApprovalReviewVerdict review) =>
-        "review  " + review.Outcome;
+        "Outcome  "
+        + DisplayCase.Token(review.Outcome)
+        + "  ·  Risk  "
+        + DisplayCase.Token(review.RiskLevel.Value)
+        + "  ·  Auth  "
+        + DisplayCase.Token(review.UserAuthorization.Value);
 
     public static string PassLine(
-        ToolCall call,
+        ToolClassification classification,
         ApprovalPassReason reason) =>
-        reason == ApprovalPassReason.Review
-            ? "allowed  review  " + ActionLine(call)
-            : "allowed  " + ActionLine(call);
+        "Allowed  ·  "
+        + DisplayCase.Token(reason.Value)
+        + "  ·  "
+        + HostLine(classification);
 
     public static IReadOnlyList<string> PassLines(
         ToolCall call,
@@ -34,7 +43,46 @@ public static class ApprovalCard
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
         ArgumentNullException.ThrowIfNull(reason);
-        return [PassLine(call, reason)];
+        var lines = new List<string>
+        {
+            ActionLine(call),
+            PassLine(classification, reason)
+        };
+        if (!string.IsNullOrWhiteSpace(classification.Summary))
+        {
+            lines.Add(classification.Summary);
+        }
+
+        if (review is not null)
+        {
+            lines.Add(ReviewLine(review));
+            foreach (var line in SplitRationale(review.Rationale))
+            {
+                lines.Add(line);
+            }
+        }
+
+        return lines;
+    }
+
+    public static IReadOnlyList<string> SplitRationale(string? rationale)
+    {
+        if (string.IsNullOrWhiteSpace(rationale))
+        {
+            return [];
+        }
+
+        var lines = new List<string>();
+        foreach (var line in rationale.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length > 0)
+            {
+                lines.Add(trimmed);
+            }
+        }
+
+        return lines;
     }
 
     public static string CompactArguments(string arguments)

@@ -19,7 +19,7 @@ the Crystal library they already own.
 
 The current product is an interactive terminal application that can:
 
-- stream a model turn with tool calls;
+- stream a model turn with tool calls, and queue follow-ups while it runs;
 - switch Plan (read-only) and Work (edit, write, shell);
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
