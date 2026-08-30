@@ -1,4 +1,4 @@
-namespace CrystalHarness.Plugins;
+namespace CrystalHarness.Plugins.Providers;
 
 /// <summary>
 /// Registers the DeepSeek chat-client factory.

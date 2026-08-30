@@ -2,6 +2,7 @@ using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalHarness.Configuration;
+using CrystalHarness.Plugins.Providers;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Plugins;

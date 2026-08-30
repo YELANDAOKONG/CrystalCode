@@ -1,19 +1,18 @@
 using Crystal.Chat;
-
 using CrystalHarness.Configuration;
-using CrystalHarness.Providers.OpenAI;
+using CrystalHarness.Providers.DeepSeek;
 
-namespace CrystalHarness.Plugins;
+namespace CrystalHarness.Plugins.Providers;
 
 /// <summary>
-/// Builds the built-in OpenAI-compatible streaming client.
+/// Builds the built-in DeepSeek streaming client.
 /// </summary>
-public sealed class OpenAIClientFactory : IChatClientFactory
+public sealed class DeepSeekClientFactory : IChatClientFactory
 {
     public bool CanCreate(ProviderProtocol protocol)
     {
         ArgumentNullException.ThrowIfNull(protocol);
-        return protocol == ProviderProtocol.OpenAI;
+        return protocol == ProviderProtocol.DeepSeek;
     }
 
     public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
@@ -22,18 +21,13 @@ public sealed class OpenAIClientFactory : IChatClientFactory
         ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
-        return new OpenAIProvider(
-            new OpenAIOptions(
+        return new DeepSeekProvider(
+            new DeepSeekOptions(
                 apiKey,
                 settings.Model,
                 provider.BaseUri,
-                provider.Organization,
-                provider.Project,
                 model.Temperature,
                 model.TopP,
-                model.MaxTokens,
-                provider.ReplayReasoningContent,
-                useMaxCompletionTokens: provider.TokenLimit == TokenLimitStyle.MaxCompletionTokens,
-                vendorName: provider.Name.Value));
+                model.MaxTokens));
     }
 }
