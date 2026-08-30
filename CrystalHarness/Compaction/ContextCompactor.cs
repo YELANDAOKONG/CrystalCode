@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 
 using CrystalHarness.Prompts;
@@ -25,7 +26,8 @@ public sealed class ContextCompactor
     public async Task<CompactionOutcome> CompactAsync(
         IReadOnlyList<ChatItem> transcript,
         string todos,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ReasoningOptions? reasoning = null)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(todos);
@@ -49,7 +51,8 @@ public sealed class ContextCompactor
                 [
                     new ChatMessage(ChatRole.System, CompactionPrompt.SystemText),
                     new ChatMessage(ChatRole.User, CompactionPrompt.UserText(excerpt, todos))
-                ]),
+                ],
+                reasoning: reasoning),
                 cancellationToken);
             var summary = ReadAssistantText(response);
             if (string.IsNullOrWhiteSpace(summary))

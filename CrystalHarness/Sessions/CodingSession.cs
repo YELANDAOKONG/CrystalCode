@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 
 using CrystalHarness.Approvals;
@@ -18,7 +19,7 @@ namespace CrystalHarness.Sessions;
 public sealed class CodingSession
 {
     private readonly IStreamingChatClient _client;
-    private readonly HarnessSettings _settings;
+    private HarnessSettings _settings;
     private readonly SettingsStore _settingsStore;
     private readonly PromptStore _promptStore;
     private readonly SessionStore _sessionStore;
@@ -33,6 +34,7 @@ public sealed class CodingSession
     private Workspace _workspace;
     private PromptSet _prompts;
     private ApprovalMode _approval;
+    private ThinkingSelection _thinkingEffort;
     private bool _planMode;
     private List<ChatItem> _transcript;
     private string _sessionId;
@@ -64,6 +66,7 @@ public sealed class CodingSession
         _plugins = plugins;
         _renderer = renderer;
         _approval = settings.Approval;
+        _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
         _prompts = _promptStore.Load(workspace.Root);
         _transcript = [new ChatMessage(ChatRole.System, _prompts.WorkSystem)];
@@ -246,6 +249,9 @@ public sealed class CodingSession
             case SessionVerb.Approval:
                 ChangeApproval(command.Argument);
                 return true;
+            case SessionVerb.Thinking:
+                ChangeThinking(command.Argument);
+                return true;
             case SessionVerb.Status:
                 _renderer.WriteStatus(
                     _ledger,
@@ -300,10 +306,55 @@ public sealed class CodingSession
             }
         }
 
-        _settingsStore.Save(_settings.WithApproval(_approval));
+        _settings = _settings.WithApproval(_approval);
+        _settingsStore.Save(_settings);
         RebuildExecutors();
         _renderer.SetChrome(_planMode, _approval);
         _renderer.WriteNote("approval  " + ApprovalLabel.For(_approval));
+    }
+
+    private void ChangeThinking(string argument)
+    {
+        var model = _settings.ActiveModel;
+        if (!model.Thinking)
+        {
+            _renderer.WriteError("The selected model does not support thinking.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            _thinkingEffort = ThinkingSelection.Next(_thinkingEffort, model);
+        }
+        else
+        {
+            ThinkingSelection selection;
+            try
+            {
+                selection = ThinkingSelection.Parse(argument);
+            }
+            catch (ArgumentException exception)
+            {
+                _renderer.WriteError(exception.Message);
+                return;
+            }
+
+            if (selection != ThinkingSelection.Default
+                && selection != ThinkingSelection.Off
+                && !model.AllowsEffort(selection.Value))
+            {
+                _renderer.WriteError(
+                    $"Thinking effort '{selection.Value}' is not available for this model.");
+                return;
+            }
+
+            _thinkingEffort = selection;
+        }
+
+        _settings = _settings.WithThinkingEffort(_thinkingEffort);
+        _settingsStore.Save(_settings);
+        RebuildExecutors();
+        _renderer.WriteNote("thinking  " + ThinkingLabel.For(_thinkingEffort));
     }
 
     private void ChangeDirectory(string argument)
@@ -362,7 +413,8 @@ public sealed class CodingSession
         var outcome = await _compactor.CompactAsync(
             _transcript,
             _todos.Format(),
-            cancellationToken);
+            cancellationToken,
+            CurrentReasoning());
         if (!outcome.Compacted)
         {
             _renderer.WriteNote("compaction skipped");
@@ -508,7 +560,10 @@ public sealed class CodingSession
         var renderer = _renderer;
         var approvalPrompt = new ApprovalPrompt(renderer);
         var question = new QuestionPrompt(renderer);
-        var reviewer = new ModelApprovalReviewer(_client, _prompts.Review);
+        var reviewer = new ModelApprovalReviewer(
+            _client,
+            _prompts.Review,
+            CurrentReasoning());
         var policy = new ApprovalPolicy(
             _approval,
             _workspace,
@@ -550,6 +605,9 @@ public sealed class CodingSession
         command.Execute(argument, _renderer);
         return true;
     }
+
+    private ReasoningOptions? CurrentReasoning() =>
+        _thinkingEffort.ToReasoningOptions(_settings.ActiveModel);
 
     private static ApprovalMode NextApproval(ApprovalMode current)
     {
@@ -623,7 +681,8 @@ public sealed class CodingSession
             _client,
             _planMode ? _planExecutor : _workExecutor,
             TurnLimits.CreateDefault(),
-            _renderer);
+            _renderer,
+            CurrentReasoning());
         return turn.RunAsync(_transcript, cancellationToken);
     }
 

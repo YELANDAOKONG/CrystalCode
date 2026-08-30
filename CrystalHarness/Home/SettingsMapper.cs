@@ -68,7 +68,9 @@ internal static class SettingsMapper
                     contextWindow,
                     modelEntry.Temperature,
                     modelEntry.TopP,
-                    modelEntry.MaxTokens);
+                    modelEntry.MaxTokens,
+                    modelEntry.Thinking ?? false,
+                    modelEntry.ThinkingEfforts);
             }
         }
 
@@ -97,7 +99,11 @@ internal static class SettingsMapper
                 ContextWindow = settings.ContextWindow,
                 Temperature = settings.Temperature,
                 TopP = settings.TopP,
-                MaxTokens = settings.MaxTokens
+                MaxTokens = settings.MaxTokens,
+                Thinking = settings.Thinking ? true : null,
+                ThinkingEfforts = settings.ThinkingEfforts.Count == 0
+                    ? null
+                    : [.. settings.ThinkingEfforts]
             };
         }
 

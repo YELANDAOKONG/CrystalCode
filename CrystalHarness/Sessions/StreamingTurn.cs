@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 
 namespace CrystalHarness.Sessions;
@@ -12,12 +13,14 @@ public sealed class StreamingTurn
     private readonly IToolExecutor _executor;
     private readonly TurnLimits _limits;
     private readonly ITurnObserver? _observer;
+    private readonly ReasoningOptions? _reasoning;
 
     public StreamingTurn(
         IStreamingChatClient client,
         IToolExecutor executor,
         TurnLimits limits,
-        ITurnObserver? observer = null)
+        ITurnObserver? observer = null,
+        ReasoningOptions? reasoning = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(executor);
@@ -26,6 +29,7 @@ public sealed class StreamingTurn
         _executor = executor;
         _limits = limits;
         _observer = observer;
+        _reasoning = reasoning;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -59,7 +63,7 @@ public sealed class StreamingTurn
                 }
 
                 modelCallCount++;
-                var request = new ChatRequest(transcript, _executor.Definitions);
+                var request = new ChatRequest(transcript, _executor.Definitions, _reasoning);
                 var response = await StreamModelAsync(request, linked.Token);
                 usage.Add(response.Usage);
                 _observer?.OnUsageUpdated(usage.Build() ?? response.Usage);

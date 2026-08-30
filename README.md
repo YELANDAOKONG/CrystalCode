@@ -36,7 +36,9 @@ disk.
 The default command opens an interactive session in the current workspace.
 Override the data directory with `CRYSTAL_HOME` or `--home`. Add
 OpenAI-compatible providers and per-model `contextWindow`, `temperature`,
-`topP`, and `maxTokens` in `config.json`.
+`topP`, `maxTokens`, `thinking`, and `thinkingEfforts` in
+`config.json`. The current thinking gear is host `thinkingEffort`, not
+a model field.
 
 ## Modes
 
@@ -45,7 +47,9 @@ OpenAI-compatible providers and per-model `contextWindow`, `temperature`,
 
 Tab or `/plan` switches Plan and Work. `/approval` switches Default,
 AutoEdit, Review (another model checks safety and the user request), and
-Full (pass without review). Quit prints the session id and `/resume`.
+Full (pass without review). `/thinking` (or `/think`) switches Off (`none`
+is the same), Default, and the efforts the selected model lists. Quit prints the
+session id and `/resume`.
 `/resume` loads the latest session for this workspace and replays the
 saved transcript, or `/resume <id>` a specific file under
 `~/.crystal/sessions`.

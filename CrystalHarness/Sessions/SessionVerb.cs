@@ -9,6 +9,7 @@ public enum SessionVerb
     Help,
     Plan,
     Approval,
+    Thinking,
     Status,
     Clear,
     Cd,

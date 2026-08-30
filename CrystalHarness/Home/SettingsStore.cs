@@ -48,13 +48,17 @@ public sealed class SettingsStore
         var approval = string.IsNullOrWhiteSpace(document.Approval)
             ? defaults.Approval
             : ApprovalMode.Parse(document.Approval);
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? defaults.ThinkingEffort
+            : ThinkingSelection.Parse(document.ThinkingEffort);
 
         return new HarnessSettings(
             provider,
             model,
             approval,
             document.CompactionThreshold ?? defaults.CompactionThreshold,
-            catalog);
+            catalog,
+            thinkingEffort);
     }
 
     public void Save(HarnessSettings settings)
@@ -67,6 +71,9 @@ public sealed class SettingsStore
             Provider = settings.Provider.Value,
             Model = settings.Model,
             Approval = settings.Approval.Value,
+            ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
+                ? null
+                : settings.ThinkingEffort.Value,
             CompactionThreshold = settings.CompactionThreshold,
             Providers = SettingsMapper.WriteProviders(settings.Catalog)
         };

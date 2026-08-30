@@ -1,3 +1,5 @@
+using Crystal.Reasoning;
+
 using CrystalHarness.Approvals;
 
 namespace CrystalHarness.Configuration;
@@ -14,7 +16,8 @@ public sealed record HarnessSettings
         string model,
         ApprovalMode approval,
         double compactionThreshold,
-        ProviderCatalog catalog)
+        ProviderCatalog catalog,
+        ThinkingSelection? thinkingEffort = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -36,6 +39,7 @@ public sealed record HarnessSettings
         Approval = approval;
         CompactionThreshold = compactionThreshold;
         Catalog = catalog;
+        ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
     }
 
     public ProviderName Provider { get; }
@@ -48,9 +52,14 @@ public sealed record HarnessSettings
 
     public ProviderCatalog Catalog { get; }
 
+    public ThinkingSelection ThinkingEffort { get; }
+
     public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
 
     public ModelSettings ActiveModel => Catalog.GetModel(Provider, Model);
+
+    public ReasoningOptions? ResolveReasoning() =>
+        ThinkingEffort.ToReasoningOptions(ActiveModel);
 
     public static HarnessSettings CreateDefault()
     {
@@ -77,7 +86,8 @@ public sealed record HarnessSettings
             nextModel,
             Approval,
             CompactionThreshold,
-            Catalog);
+            Catalog,
+            ThinkingEffort);
     }
 
     public HarnessSettings WithApproval(ApprovalMode approval)
@@ -88,7 +98,20 @@ public sealed record HarnessSettings
             Model,
             approval,
             CompactionThreshold,
-            Catalog);
+            Catalog,
+            ThinkingEffort);
+    }
+
+    public HarnessSettings WithThinkingEffort(ThinkingSelection thinkingEffort)
+    {
+        ArgumentNullException.ThrowIfNull(thinkingEffort);
+        return new HarnessSettings(
+            Provider,
+            Model,
+            Approval,
+            CompactionThreshold,
+            Catalog,
+            thinkingEffort);
     }
 
     public override string ToString() => nameof(HarnessSettings);

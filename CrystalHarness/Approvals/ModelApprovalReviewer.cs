@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Crystal;
 using Crystal.Chat;
+using Crystal.Reasoning;
 
 using CrystalHarness.Prompts;
 
@@ -15,14 +16,19 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
 {
     private readonly IChatClient _client;
     private readonly string _systemText;
+    private readonly ReasoningOptions? _reasoning;
 
-    public ModelApprovalReviewer(IChatClient client, string? systemText = null)
+    public ModelApprovalReviewer(
+        IChatClient client,
+        string? systemText = null,
+        ReasoningOptions? reasoning = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
         _systemText = string.IsNullOrWhiteSpace(systemText)
             ? ApprovalReviewPrompt.SystemText
             : systemText.Trim();
+        _reasoning = reasoning;
     }
 
     public async ValueTask<ApprovalReviewVerdict> ReviewAsync(
@@ -46,7 +52,8 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
                 [
                     new ChatMessage(ChatRole.System, _systemText),
                     new ChatMessage(ChatRole.User, ApprovalReviewPrompt.UserText(request))
-                ]),
+                ],
+                reasoning: _reasoning),
                 cancellationToken);
         }
         catch (OperationCanceledException)

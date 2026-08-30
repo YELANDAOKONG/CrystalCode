@@ -31,8 +31,14 @@ public sealed class ProviderCatalog
                 new Uri("https://api.deepseek.com/"),
                 new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
                 {
-                    ["deepseek-v4-flash"] = new(1_000_000),
-                    ["deepseek-v4-pro"] = new(1_000_000)
+                    ["deepseek-v4-flash"] = new(
+                        1_000_000,
+                        thinking: true,
+                        thinkingEfforts: ["low", "high", "maximum"]),
+                    ["deepseek-v4-pro"] = new(
+                        1_000_000,
+                        thinking: true,
+                        thinkingEfforts: ["low", "high", "maximum"])
                 }),
             new ProviderDefinition(
                 ProviderName.OpenAI,

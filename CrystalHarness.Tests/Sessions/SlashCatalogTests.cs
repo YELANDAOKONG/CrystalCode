@@ -12,6 +12,7 @@ public sealed class SlashCatalogTests
     [InlineData("/continue", SessionVerb.Resume)]
     [InlineData("/sessions", SessionVerb.Resume)]
     [InlineData("/h", SessionVerb.Help)]
+    [InlineData("/think", SessionVerb.Thinking)]
     [InlineData("/exit", SessionVerb.Quit)]
     public void TryParse_MapsAliases(string input, SessionVerb verb)
     {

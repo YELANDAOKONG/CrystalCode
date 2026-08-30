@@ -10,6 +10,8 @@ public sealed class SessionCommandTests
     [InlineData("/help", SessionVerb.Help)]
     [InlineData("/plan", SessionVerb.Plan)]
     [InlineData("/approval review", SessionVerb.Approval)]
+    [InlineData("/thinking high", SessionVerb.Thinking)]
+    [InlineData("/think off", SessionVerb.Thinking)]
     [InlineData("/resume", SessionVerb.Resume)]
     [InlineData("/quit", SessionVerb.Quit)]
     [InlineData("/new", SessionVerb.Clear)]

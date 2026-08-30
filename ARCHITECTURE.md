@@ -225,12 +225,14 @@ registers in-process contributions.
 Provider names are open. `deepseek` and `openai` are starter entries. A user
 adds an OpenAI-compatible endpoint by inserting another `providers` object
 with `protocol` `openai`, a `baseUri`, and a `models` table. Context size
-and sampling live on each model, not on the host:
+and sampling live on each model, not on the host. Thinking capability
+also lives on the model. The current thinking gear is a host setting.
 
 ```json
 {
   "provider": "openrouter",
   "model": "anthropic/claude-sonnet-4",
+  "thinkingEffort": "high",
   "providers": {
     "openrouter": {
       "protocol": "openai",
@@ -243,13 +245,28 @@ and sampling live on each model, not on the host:
         "anthropic/claude-sonnet-4": {
           "contextWindow": 200000,
           "temperature": 0.2,
-          "maxTokens": 8192
+          "maxTokens": 8192,
+          "thinking": true,
+          "thinkingEfforts": ["low", "medium", "high"]
         }
       }
     }
   }
 }
 ```
+
+`thinking` and `thinkingEfforts` declare whether the model supports
+thinking and which Crystal effort names it accepts (`minimal`, `low`,
+`medium`, `high`, `maximum`). `max` is accepted as `maximum`. Built-in
+DeepSeek V4 models enable thinking with `low`, `high`, and `maximum`. An empty `thinkingEfforts`
+list is on/off only.
+
+`thinkingEffort` is the operator choice: `default`, `off` (`none` is
+the same), or a Crystal effort name. It is not stored on the model. `/thinking` (alias
+`/think`) cycles the gear or sets one by name. Changing models never
+fails: if the model does not support thinking, requests omit reasoning
+hints; if the stored gear is not in that model's list, the request
+uses the provider default and the stored choice is unchanged.
 
 `protocol` is `deepseek` or `openai`. Models that are not listed cannot be
 selected. There is no global context window.
@@ -294,7 +311,7 @@ panel with Status, Reason, Risk, Authority, and, for review, Outcome
 plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
-`/q` and `/exit` are `/quit`). A slash picker appears while the prompt
+`/q` and `/exit` are `/quit`, `/think` is `/thinking`). A slash picker appears while the prompt
 is a command prefix. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Up/Down
 arrows navigate composer history or the slash picker when the prompt

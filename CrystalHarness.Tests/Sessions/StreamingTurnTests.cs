@@ -1,5 +1,6 @@
 using Crystal;
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 
 using CrystalHarness.Sessions;
@@ -108,6 +109,24 @@ public sealed class StreamingTurnTests
         Assert.True(observer.UsageUpdates.Count >= 2);
         Assert.Equal(30, observer.UsageUpdates[^1]?.InputTokenCount);
         Assert.Equal(15, observer.UsageUpdates[^1]?.OutputTokenCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_PassesResolvedReasoningToTheClient()
+    {
+        var client = new ScriptedStreamingClient(TextRound("done"));
+        var reasoning = new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.High);
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            reasoning: reasoning);
+
+        await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Same(reasoning, client.LastRequest?.Reasoning);
     }
 
     private static StreamingTurn CreateTurn(
