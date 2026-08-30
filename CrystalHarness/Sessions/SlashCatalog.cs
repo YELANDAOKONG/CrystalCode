@@ -8,7 +8,7 @@ public static class SlashCatalog
     public static IReadOnlyList<SlashSpec> BuiltIn { get; } =
     [
         new(SessionVerb.Help, "help", ["h"], "shortcuts and commands"),
-        new(SessionVerb.Plan, "plan", [], "toggle plan / work"),
+        new(SessionVerb.Plan, "plan", [], "toggle Plan / Work"),
         new(SessionVerb.Approval, "approval", [], "default | autoedit | review | full"),
         new(SessionVerb.Status, "status", [], "turns, tokens, mode"),
         new(SessionVerb.Clear, "clear", ["new"], "new conversation"),

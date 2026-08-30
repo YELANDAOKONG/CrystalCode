@@ -227,7 +227,7 @@ public sealed class CodingSession
                 return true;
             case SessionVerb.Plan:
                 TogglePlanFromPrompt();
-                _renderer.WriteNote(_planMode ? "plan" : "work");
+                _renderer.WriteNote(ModeLabel.For(_planMode));
                 return true;
             case SessionVerb.Approval:
                 ChangeApproval(command.Argument);

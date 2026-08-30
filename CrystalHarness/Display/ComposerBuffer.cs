@@ -26,9 +26,7 @@ public sealed class ComposerBuffer
     {
         if (key.Key == ConsoleKey.Tab)
         {
-            return key.Modifiers.HasFlag(ConsoleModifiers.Shift)
-                ? ComposerAction.TogglePlan
-                : ComposerAction.None;
+            return ComposerAction.TogglePlan;
         }
 
         if (IsNewline(key))
@@ -157,7 +155,8 @@ public sealed class ComposerBuffer
 
     public ComposerView Project(int width, int maxRows)
     {
-        var promptPlain = PlanMode ? "plan > " : "work > ";
+        var mode = ModeLabel.For(PlanMode);
+        var promptPlain = mode + " > ";
         var promptColumns = TextWidth.Measure(promptPlain);
         var bodyWidth = Math.Max(width - promptColumns, 8);
         var text = Text;
@@ -169,7 +168,6 @@ public sealed class ComposerBuffer
 
         var (cursorRow, cursorBody) = MapCursor(text, _cursor, bodyWidth);
         var lines = new List<PaintLine>(wrapped.Count);
-        var mode = PlanMode ? "plan" : "work";
         var modeColor = PlanMode ? Theme.Plan : Theme.Work;
         for (var i = 0; i < wrapped.Count; i++)
         {

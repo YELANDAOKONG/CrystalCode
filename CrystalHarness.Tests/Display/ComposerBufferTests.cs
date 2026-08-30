@@ -7,13 +7,13 @@ namespace CrystalHarness.Tests.Display;
 public sealed class ComposerBufferTests
 {
     [Fact]
-    public void Handle_ShiftTabTogglesPlan_TabDoesNot()
+    public void Handle_TabTogglesPlan()
     {
         var buffer = new ComposerBuffer();
         var tab = new ConsoleKeyInfo('\t', ConsoleKey.Tab, false, false, false);
         var shiftTab = new ConsoleKeyInfo('\t', ConsoleKey.Tab, true, false, false);
 
-        Assert.Equal(ComposerAction.None, buffer.Handle(tab));
+        Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(tab));
         Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(shiftTab));
     }
 

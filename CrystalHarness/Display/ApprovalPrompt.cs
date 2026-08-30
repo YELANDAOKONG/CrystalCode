@@ -72,7 +72,11 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         if (review is not null)
         {
             lines.Add(ApprovalCard.ReviewLine(review));
-            lines.Add(review.Rationale);
+            var rationale = review.Rationale.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            if (rationale.Length > 0)
+            {
+                lines.Add(TextWidth.Truncate(rationale, 80));
+            }
         }
 
         lines.Add("y once  ·  s session  ·  a always  ·  n deny");

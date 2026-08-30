@@ -11,7 +11,7 @@ namespace CrystalHarness.Tests.Display;
 public sealed class ApprovalCardTests
 {
     [Fact]
-    public void ReviewLine_MatchesCodexAssessmentOrder()
+    public void ReviewLine_IsShort()
     {
         var verdict = new ApprovalReviewVerdict(
             "allow",
@@ -21,11 +21,11 @@ public sealed class ApprovalCardTests
 
         var line = ApprovalCard.ReviewLine(verdict);
 
-        Assert.Equal("allow  risk low  auth high", line);
+        Assert.Equal("review  allow", line);
     }
 
     [Fact]
-    public void ActionLine_KeepsToolNameAndCompactsArguments()
+    public void ActionLine_UsesPathNotRawJson()
     {
         var call = new ToolCall(
             "1",
@@ -34,12 +34,11 @@ public sealed class ApprovalCardTests
 
         var line = ApprovalCard.ActionLine(call);
 
-        Assert.StartsWith("write  ", line, StringComparison.Ordinal);
-        Assert.Contains("src/App.cs", line, StringComparison.Ordinal);
+        Assert.Equal("write  src/App.cs", line);
     }
 
     [Fact]
-    public void PassLines_IncludesHostRiskAuthorityAndReview()
+    public void PassLines_IsOneAllowedLine()
     {
         var classification = new ToolClassification(
             Risk.Write,
@@ -57,10 +56,6 @@ public sealed class ApprovalCardTests
             """{"path":"src/App.cs","contents":"x"}""");
         var lines = ApprovalCard.PassLines(call, classification, ApprovalPassReason.Review, review);
 
-        Assert.StartsWith("write  ", lines[0], StringComparison.Ordinal);
-        Assert.Equal("auto  review  risk write  auth workspace", lines[1]);
-        Assert.Contains("Write workspace file", lines);
-        Assert.Contains("allow  risk low  auth high", lines);
-        Assert.Contains("Adds the requested test.", lines);
+        Assert.Equal(["allowed  review  write  src/App.cs"], lines);
     }
 }

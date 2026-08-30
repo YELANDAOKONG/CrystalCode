@@ -28,6 +28,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
     private string? _streamKind;
+    private string _toolName = string.Empty;
     private Stopwatch? _turnClock;
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
@@ -97,7 +98,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 return;
             }
 
-            var mode = planMode ? "plan" : "work";
+            var mode = ModeLabel.For(planMode);
             var modeColor = planMode ? Theme.Plan : Theme.Work;
             AnsiConsole.MarkupLine(
                 $"[{Theme.Chrome}]{MarkupText.Escape(model)}  ·  [/]"
@@ -153,8 +154,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 "enter        submit",
                 "ctrl+j       newline",
                 "\\ enter      newline",
-                "shift+tab    plan / work",
-                "tab          complete /command",
+                "tab          Plan / Work, or complete /",
+                "shift+tab    Plan / Work",
                 "?            shortcuts when empty",
                 "pageup       scroll transcript");
             foreach (var spec in SlashCatalog.BuiltIn)
@@ -198,7 +199,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.PlanMode = planMode;
             _chrome.Approval = approval.Value;
             _chrome.Usage = UsageText.Format(ledger.Usage, contextWindow);
-            var text = $"{(planMode ? "plan" : "work")}  ·  {approval.Value}  ·  "
+            var text = $"{ModeLabel.For(planMode)}  ·  {approval.Value}  ·  "
                 + $"{ledger.UserTurns} turns  ·  {ledger.ModelCalls} model  ·  "
                 + $"{ledger.ToolCalls} tools  ·  {_chrome.Usage}";
             _log.Add(TranscriptKind.Note, text);
@@ -248,6 +249,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             CommitLiveUnlocked();
             _turnClock = Stopwatch.StartNew();
+            _toolName = string.Empty;
             _chrome.Activity = "running";
             _chrome.ToolCount = 0;
             _chrome.Elapsed = string.Empty;
@@ -262,10 +264,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             switch (streamEvent)
             {
                 case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
-                    OpenLiveUnlocked(TranscriptKind.Thinking);
-                    _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
                     _chrome.Activity = "thinking";
-                    WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
                     PaintUnlocked(force: false);
                     break;
                 case ChatTextDelta text when text.Text.Length > 0:
@@ -276,19 +275,10 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                     PaintUnlocked(force: false);
                     break;
                 case ChatToolCallDelta toolCall:
-                    OpenLiveUnlocked(TranscriptKind.Tool);
                     if (toolCall.NameDelta.Length > 0)
                     {
-                        _log.AppendLive(TranscriptKind.Tool, toolCall.NameDelta);
-                        _chrome.Activity = "tool";
-                        WriteFallbackDelta(TranscriptKind.Tool, toolCall.NameDelta);
-                    }
-
-                    if (toolCall.ArgumentsDelta.Length > 0 && toolCall.ArgumentsDelta is not "{}")
-                    {
-                        var compact = " " + ApprovalCard.CompactArguments(toolCall.ArgumentsDelta);
-                        _log.AppendLive(TranscriptKind.Tool, compact);
-                        WriteFallbackDelta(TranscriptKind.Tool, compact);
+                        _toolName += toolCall.NameDelta;
+                        _chrome.Activity = _toolName;
                     }
 
                     PaintUnlocked(force: false);
@@ -315,7 +305,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             CommitLiveUnlocked();
             foreach (var result in results)
             {
-                var first = ToolResultText.FirstLine(result.Text);
+                var first = ToolResultText.Summary(result.Text);
                 var kind = result.Status == ToolResultStatus.Success
                     ? TranscriptKind.Result
                     : TranscriptKind.Error;
@@ -486,8 +476,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             "enter        submit",
             "ctrl+j       newline",
             "\\ enter      newline",
-            "shift+tab    plan / work",
-            "tab          complete /command",
+            "tab          Plan / Work, or complete /",
+            "shift+tab    Plan / Work",
             "?            shortcuts when empty",
             "pageup       scroll transcript");
         foreach (var option in _slashOptions)
@@ -560,6 +550,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
         _log.CommitLive();
         _streamKind = null;
+        _toolName = string.Empty;
     }
 
     private void PaintUnlocked(bool force)

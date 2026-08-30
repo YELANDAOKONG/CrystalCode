@@ -265,7 +265,10 @@ code and bold). Tool rows stay compact. Approval and questions are
 overlays; `y` / `s` / `a` / `n` map once / session / always / deny.
 
 Composer keys: Enter submits, Ctrl+J or `\`+Enter inserts a newline,
-Shift+Tab toggles Plan/Work, Tab completes a `/` command. Built-in slash
+Tab toggles Plan/Work or completes a `/` command, Shift+Tab also
+toggles Plan/Work. Chrome uses the labels Plan and Work. Auto-pass
+prints one `allowed` line with the tool summary; reasoning stays in
+the status bar, not the transcript. Built-in slash
 verbs live in `SlashCatalog` and include aliases (`/new` is `/clear`,
 `/continue` and `/sessions` are `/resume`, `/q` and `/exit` are `/quit`).
 A slash picker appears while the prompt is a command prefix. PageUp and

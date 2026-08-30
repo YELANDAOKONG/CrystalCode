@@ -35,7 +35,7 @@ public sealed class ShellChrome
 
     private string Format()
     {
-        var mode = PlanMode ? "plan" : "work";
+        var mode = ModeLabel.For(PlanMode);
         var parts = new List<string> { mode };
         if (!string.IsNullOrWhiteSpace(Approval))
         {

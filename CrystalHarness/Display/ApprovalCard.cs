@@ -10,27 +10,20 @@ namespace CrystalHarness.Display;
 public static class ApprovalCard
 {
     public static string ActionLine(ToolCall call) =>
-        call.Name + "  " + CompactArguments(call.Arguments);
+        ToolCallText.Summary(call.Name, call.Arguments);
 
     public static string HostLine(ToolClassification classification) =>
-        classification.Risk.Value + "  " + classification.Authority.Value;
+        classification.Risk.Value + " · " + classification.Authority.Value;
 
     public static string ReviewLine(ApprovalReviewVerdict review) =>
-        review.Outcome
-        + "  risk "
-        + review.RiskLevel.Value
-        + "  auth "
-        + review.UserAuthorization.Value;
+        "review  " + review.Outcome;
 
     public static string PassLine(
-        ToolClassification classification,
+        ToolCall call,
         ApprovalPassReason reason) =>
-        "auto  "
-        + reason.Value
-        + "  risk "
-        + classification.Risk.Value
-        + "  auth "
-        + classification.Authority.Value;
+        reason == ApprovalPassReason.Review
+            ? "allowed  review  " + ActionLine(call)
+            : "allowed  " + ActionLine(call);
 
     public static IReadOnlyList<string> PassLines(
         ToolCall call,
@@ -41,23 +34,7 @@ public static class ApprovalCard
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
         ArgumentNullException.ThrowIfNull(reason);
-        var lines = new List<string>
-        {
-            ActionLine(call),
-            PassLine(classification, reason)
-        };
-        if (!string.IsNullOrWhiteSpace(classification.Summary))
-        {
-            lines.Add(classification.Summary);
-        }
-
-        if (review is not null)
-        {
-            lines.Add(ReviewLine(review));
-            lines.Add(review.Rationale);
-        }
-
-        return lines;
+        return [PassLine(call, reason)];
     }
 
     public static string CompactArguments(string arguments)
