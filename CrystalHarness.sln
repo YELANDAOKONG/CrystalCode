@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrystalHarness", "CrystalHarness\CrystalHarness.csproj", "{BB94ACAC-BC6A-4EF9-99C9-B9C633D6EAF7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrystalHarness.Providers", "CrystalHarness.Providers\CrystalHarness.Providers.csproj", "{21FB8F12-7BB6-42B3-9DE1-C708B71A7CAE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BB94ACAC-BC6A-4EF9-99C9-B9C633D6EAF7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB94ACAC-BC6A-4EF9-99C9-B9C633D6EAF7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB94ACAC-BC6A-4EF9-99C9-B9C633D6EAF7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB94ACAC-BC6A-4EF9-99C9-B9C633D6EAF7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{21FB8F12-7BB6-42B3-9DE1-C708B71A7CAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{21FB8F12-7BB6-42B3-9DE1-C708B71A7CAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{21FB8F12-7BB6-42B3-9DE1-C708B71A7CAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{21FB8F12-7BB6-42B3-9DE1-C708B71A7CAE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
