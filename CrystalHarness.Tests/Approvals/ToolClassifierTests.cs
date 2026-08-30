@@ -1,6 +1,7 @@
 using Crystal.Tools;
 
 using CrystalHarness.Approvals;
+using CrystalHarness.Plugins;
 using CrystalHarness.Tests.Tools;
 using CrystalHarness.Tools;
 
@@ -96,5 +97,41 @@ public sealed class ToolClassifierTests
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.Network, classification.Authority);
+    }
+
+    [Fact]
+    public void Classify_UsesPluginClassifierForUnknownTool()
+    {
+        using var root = new TemporaryWorkspace();
+        var classifier = new ToolClassifier(
+            new Workspace(root.Path),
+            [new EchoClassifier()]);
+
+        var classification = classifier.Classify(new ToolCall("1", "echo", "{}"));
+
+        Assert.Equal(Risk.Read, classification.Risk);
+        Assert.Equal(Authority.Workspace, classification.Authority);
+        Assert.Equal("Echo tool", classification.Summary);
+    }
+
+    private sealed class EchoClassifier : IApprovalClassifier
+    {
+        public bool TryClassify(
+            ToolCall call,
+            Workspace workspace,
+            out ToolClassification classification)
+        {
+            if (call.Name != "echo")
+            {
+                classification = null!;
+                return false;
+            }
+
+            classification = new ToolClassification(
+                Risk.Read,
+                Authority.Workspace,
+                "Echo tool");
+            return true;
+        }
     }
 }

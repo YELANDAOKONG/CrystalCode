@@ -29,6 +29,10 @@ From a workspace you want the agent to edit:
 dotnet run --project CrystalHarness -- --provider deepseek --model deepseek-v4-flash
 ```
 
+Built-in tools and the DeepSeek / OpenAI adapters register through the
+same in-process plugin table. Third-party assemblies are not loaded from
+disk.
+
 The default command opens an interactive session in the current workspace.
 Override the data directory with `CRYSTAL_HOME` or `--home`. Add
 OpenAI-compatible providers and per-model `contextWindow`, `temperature`,

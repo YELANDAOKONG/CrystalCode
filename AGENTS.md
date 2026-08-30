@@ -43,7 +43,8 @@ semantics. Do not copy its Demo UI into this product.
 ## Change rules
 
 - Ask before adding a project, a public architectural boundary, or a new
-  provider family.
+  provider family. Extra tools and protocols go through `IPlugin` /
+  `PluginRegistry`. Do not load assemblies from disk.
 - Keep assembly ownership consistent with ARCHITECTURE.md.
 - Preserve workspace fencing for every filesystem and shell tool.
 - Approval decisions go through `Crystal.Tools.ToolInvocationPolicy`. Do not

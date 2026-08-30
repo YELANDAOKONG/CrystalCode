@@ -5,6 +5,7 @@ using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalHarness.Approvals;
+using CrystalHarness.Plugins;
 using CrystalHarness.Sessions;
 
 using Spectre.Console;
@@ -14,7 +15,7 @@ namespace CrystalHarness.Display;
 /// <summary>
 /// Scrollback + chrome for one session. Sequential writes, no Live shell.
 /// </summary>
-public sealed class SessionRenderer : ITurnObserver
+public sealed class SessionRenderer : ITurnObserver, ISlashOutput
 {
     private readonly object _gate = new();
     private readonly LineEditor _editor = new();
@@ -102,7 +103,7 @@ public sealed class SessionRenderer : ITurnObserver
         }
     }
 
-    public void WriteHelp()
+    public void WriteHelp(IReadOnlyList<ISlashCommand>? extras = null)
     {
         lock (_gate)
         {
@@ -116,6 +117,19 @@ public sealed class SessionRenderer : ITurnObserver
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /resume     latest or id[/]");
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  /quit       exit[/]");
             AnsiConsole.MarkupLine($"[{Theme.Chrome}]  ctrl+c      stop turn; twice at idle exits[/]");
+            if (extras is null)
+            {
+                return;
+            }
+
+            foreach (var command in extras)
+            {
+                var help = string.IsNullOrWhiteSpace(command.Help)
+                    ? command.Name
+                    : command.Help;
+                AnsiConsole.MarkupLine(
+                    $"[{Theme.Chrome}]  /{MarkupText.Escape(command.Name),-11}{MarkupText.Escape(help)}[/]");
+            }
         }
     }
 

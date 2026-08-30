@@ -1,5 +1,6 @@
 using Crystal.Tools;
 
+using CrystalHarness.Plugins;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Approvals;
@@ -25,7 +26,8 @@ public sealed class ApprovalPolicy
         GrantStore grants,
         IApprovalPrompt prompt,
         IApprovalReviewer? reviewer = null,
-        IApprovalReviewContext? reviewContext = null)
+        IApprovalReviewContext? reviewContext = null,
+        IReadOnlyList<IApprovalClassifier>? classifiers = null)
     {
         ArgumentNullException.ThrowIfNull(mode);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -33,7 +35,7 @@ public sealed class ApprovalPolicy
         ArgumentNullException.ThrowIfNull(prompt);
         _mode = mode;
         _workspace = workspace;
-        _classifier = new ToolClassifier(workspace);
+        _classifier = new ToolClassifier(workspace, classifiers);
         _grants = grants;
         _prompt = prompt;
         _reviewer = reviewer;

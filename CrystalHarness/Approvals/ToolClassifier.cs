@@ -1,5 +1,6 @@
 using Crystal.Tools;
 
+using CrystalHarness.Plugins;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Approvals;
@@ -10,17 +11,42 @@ namespace CrystalHarness.Approvals;
 public sealed class ToolClassifier
 {
     private readonly Workspace _workspace;
+    private readonly IReadOnlyList<IApprovalClassifier> _classifiers;
 
-    public ToolClassifier(Workspace workspace)
+    public ToolClassifier(
+        Workspace workspace,
+        IReadOnlyList<IApprovalClassifier>? classifiers = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         _workspace = workspace;
+        _classifiers = classifiers ?? [];
     }
 
     public ToolClassification Classify(ToolCall call)
     {
         ArgumentNullException.ThrowIfNull(call);
-        return call.Name switch
+        var builtIn = ClassifyBuiltIn(call);
+        if (builtIn is not null)
+        {
+            return builtIn;
+        }
+
+        foreach (var classifier in _classifiers)
+        {
+            if (classifier.TryClassify(call, _workspace, out var extra))
+            {
+                return extra;
+            }
+        }
+
+        return new ToolClassification(
+            Risk.Privileged,
+            Authority.PrivilegedEscalation,
+            "Unknown tool");
+    }
+
+    private ToolClassification? ClassifyBuiltIn(ToolCall call) =>
+        call.Name switch
         {
             ReadTool.ToolName or GlobTool.ToolName or GrepTool.ToolName
                 or TodoWriteTool.ToolName or QuestionTool.ToolName =>
@@ -28,12 +54,8 @@ public sealed class ToolClassifier
             WriteTool.ToolName => ClassifyWrite(call.Arguments),
             EditTool.ToolName => ClassifyEdit(call.Arguments),
             BashTool.ToolName => ClassifyBash(call.Arguments),
-            _ => new ToolClassification(
-                Risk.Privileged,
-                Authority.PrivilegedEscalation,
-                "Unknown tool")
+            _ => null
         };
-    }
 
     private ToolClassification ClassifyWrite(string arguments)
     {

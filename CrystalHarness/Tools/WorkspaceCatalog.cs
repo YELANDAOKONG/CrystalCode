@@ -1,5 +1,7 @@
 using Crystal.Tools;
 
+using CrystalHarness.Plugins;
+
 namespace CrystalHarness.Tools;
 
 /// <summary>
@@ -10,40 +12,28 @@ public static class WorkspaceCatalog
     public static ToolCatalog CreatePlan(
         Workspace workspace,
         TodoList todos,
-        IUserPrompt prompt)
-    {
-        ArgumentNullException.ThrowIfNull(workspace);
-        ArgumentNullException.ThrowIfNull(todos);
-        ArgumentNullException.ThrowIfNull(prompt);
-        return new ToolCatalog(PlanTools(workspace, todos, prompt));
-    }
-
-    public static ToolCatalog CreateWork(
-        Workspace workspace,
-        TodoList todos,
-        IUserPrompt prompt)
+        IUserPrompt prompt,
+        PluginRegistry? registry = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
         ArgumentNullException.ThrowIfNull(prompt);
         return new ToolCatalog(
-        [
-            .. PlanTools(workspace, todos, prompt),
-            new EditTool(workspace),
-            new WriteTool(workspace),
-            new BashTool(workspace)
-        ]);
+            (registry ?? PluginRegistry.CreateBuiltIn())
+                .CreateTools(workspace, todos, prompt, plan: true));
     }
 
-    private static ITool[] PlanTools(
+    public static ToolCatalog CreateWork(
         Workspace workspace,
         TodoList todos,
-        IUserPrompt prompt) =>
-    [
-        new ReadTool(workspace),
-        new GlobTool(workspace),
-        new GrepTool(workspace),
-        new TodoWriteTool(todos),
-        new QuestionTool(prompt)
-    ];
+        IUserPrompt prompt,
+        PluginRegistry? registry = null)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(todos);
+        ArgumentNullException.ThrowIfNull(prompt);
+        return new ToolCatalog(
+            (registry ?? PluginRegistry.CreateBuiltIn())
+                .CreateTools(workspace, todos, prompt, plan: false));
+    }
 }

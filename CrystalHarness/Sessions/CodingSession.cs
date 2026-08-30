@@ -6,6 +6,7 @@ using CrystalHarness.Compaction;
 using CrystalHarness.Configuration;
 using CrystalHarness.Display;
 using CrystalHarness.Home;
+using CrystalHarness.Plugins;
 using CrystalHarness.Prompts;
 using CrystalHarness.Tools;
 
@@ -22,6 +23,7 @@ public sealed class CodingSession
     private readonly PromptStore _promptStore;
     private readonly SessionStore _sessionStore;
     private readonly ContextCompactor _compactor;
+    private readonly PluginRegistry _plugins;
     private readonly SessionRenderer _renderer;
     private readonly SessionReviewContext _reviewContext = new();
     private readonly SessionLedger _ledger = new();
@@ -44,7 +46,8 @@ public sealed class CodingSession
         SettingsStore settingsStore,
         CrystalHome home,
         Workspace workspace,
-        SessionRenderer renderer)
+        SessionRenderer renderer,
+        PluginRegistry plugins)
     {
         _client = client;
         _settings = settings;
@@ -52,7 +55,9 @@ public sealed class CodingSession
         _promptStore = new PromptStore(home);
         _sessionStore = new SessionStore(home);
         _compactor = new ContextCompactor(client);
+        ArgumentNullException.ThrowIfNull(plugins);
         _workspace = workspace;
+        _plugins = plugins;
         _renderer = renderer;
         _approval = settings.Approval;
         _grants = new GrantStore(home);
@@ -68,7 +73,8 @@ public sealed class CodingSession
         HarnessSettings settings,
         SettingsStore settingsStore,
         CrystalHome home,
-        string workspaceRoot)
+        string workspaceRoot,
+        PluginRegistry? plugins = null)
     {
         var renderer = new SessionRenderer();
         return new CodingSession(
@@ -77,7 +83,8 @@ public sealed class CodingSession
             settingsStore,
             home,
             new Workspace(workspaceRoot),
-            renderer);
+            renderer,
+            plugins ?? PluginRegistry.CreateBuiltIn());
     }
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
@@ -214,7 +221,7 @@ public sealed class CodingSession
         switch (command.Verb)
         {
             case SessionVerb.Help:
-                _renderer.WriteHelp();
+                _renderer.WriteHelp(_plugins.Commands);
                 return true;
             case SessionVerb.Plan:
                 TogglePlanFromPrompt();
@@ -245,6 +252,11 @@ public sealed class CodingSession
                 exit = true;
                 return true;
             case SessionVerb.Unknown:
+                if (TryExecutePluginCommand(command.Argument))
+                {
+                    return true;
+                }
+
                 _renderer.WriteError("unknown command  " + command.Argument);
                 return true;
             default:
@@ -454,17 +466,40 @@ public sealed class CodingSession
             _grants,
             approvalPrompt,
             reviewer,
-            _reviewContext);
+            _reviewContext,
+            _plugins.Classifiers);
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         _workExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreateWork(_workspace, _todos, question),
+            WorkspaceCatalog.CreateWork(_workspace, _todos, question, _plugins),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
         _planExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreatePlan(_workspace, _todos, question),
+            WorkspaceCatalog.CreatePlan(_workspace, _todos, question, _plugins),
             options,
             exceptionMapper: HarnessExceptionMapper.MapAsync);
+    }
+
+    private bool TryExecutePluginCommand(string raw)
+    {
+        var trimmed = raw.Trim();
+        if (trimmed.Length == 0 || trimmed[0] != '/')
+        {
+            return false;
+        }
+
+        var body = trimmed[1..];
+        var space = body.IndexOf(' ');
+        var name = space < 0 ? body : body[..space];
+        var argument = space < 0 ? string.Empty : body[(space + 1)..].Trim();
+        var command = _plugins.FindCommand(name);
+        if (command is null)
+        {
+            return false;
+        }
+
+        command.Execute(argument, _renderer);
+        return true;
     }
 
     private static ApprovalMode NextApproval(ApprovalMode current)

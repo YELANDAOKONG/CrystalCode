@@ -3,6 +3,7 @@ using Spectre.Console.Cli;
 
 using CrystalHarness.Configuration;
 using CrystalHarness.Home;
+using CrystalHarness.Plugins;
 using CrystalHarness.Sessions;
 
 namespace CrystalHarness.Commands;
@@ -36,7 +37,8 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         }
 
         var workspace = ResolveWorkspace(settings.Workspace);
-        var client = ChatClientFactory.Create(harnessSettings, apiKey);
+        var plugins = PluginRegistry.CreateBuiltIn();
+        var client = ChatClientFactory.Create(harnessSettings, apiKey, plugins);
         try
         {
             var session = CodingSession.Create(
@@ -44,7 +46,8 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                 harnessSettings,
                 settingsStore,
                 home,
-                workspace);
+                workspace,
+                plugins);
             return await session.RunAsync(cancellationToken);
         }
         finally
