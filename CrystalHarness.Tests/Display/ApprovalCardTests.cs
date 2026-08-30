@@ -11,17 +11,11 @@ namespace CrystalHarness.Tests.Display;
 public sealed class ApprovalCardTests
 {
     [Fact]
-    public void ReviewLine_KeepsOutcomeRiskAndAuth()
+    public void Field_UsesTitleCaseLabelsAndValues()
     {
-        var verdict = new ApprovalReviewVerdict(
-            "allow",
-            ReviewRiskLevel.Low,
-            ReviewAuthorization.High,
-            "Adds the requested test.");
-
-        var line = ApprovalCard.ReviewLine(verdict);
-
-        Assert.Equal("Outcome  Allow  ·  Risk  Low  ·  Auth  High", line);
+        Assert.Equal("Outcome  Allow", ApprovalCard.Field("Outcome", "allow"));
+        Assert.Equal("Authority  High", ApprovalCard.Field("Authority", "high"));
+        Assert.Equal("Status  Allowed", ApprovalCard.Field("Status", "allowed"));
     }
 
     [Fact]
@@ -57,11 +51,47 @@ public sealed class ApprovalCardTests
         var lines = ApprovalCard.PassLines(call, classification, ApprovalPassReason.Review, review);
 
         Assert.Equal("write  src/App.cs", lines[0]);
-        Assert.Equal(
-            "Allowed  ·  Review  ·  Risk  Write  ·  Authority  Workspace",
-            lines[1]);
+        Assert.Contains("Status  Allowed", lines);
+        Assert.Contains("Reason  Review", lines);
+        Assert.Contains("Risk  Write", lines);
+        Assert.Contains("Authority  Workspace", lines);
         Assert.Contains("Write workspace file", lines);
-        Assert.Contains("Outcome  Allow  ·  Risk  Low  ·  Auth  High", lines);
+        Assert.Contains("Outcome  Allow", lines);
+        Assert.Contains("Risk  Low", lines);
+        Assert.Contains("Authority  High", lines);
         Assert.Contains("Adds the requested test.", lines);
+        Assert.DoesNotContain(lines, line => line.Contains("Auth  ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PassWidget_RendersAlignedTitleCaseFields()
+    {
+        var classification = new ToolClassification(
+            Risk.Write,
+            Authority.Workspace,
+            "Write workspace file");
+        var review = new ApprovalReviewVerdict(
+            "allow",
+            ReviewRiskLevel.Low,
+            ReviewAuthorization.High,
+            "Adds the requested test.");
+        var call = new ToolCall(
+            "1",
+            WriteTool.ToolName,
+            """{"path":"src/App.cs","contents":"x"}""");
+
+        var lines = WidgetPaint.Plain(
+            ApprovalCard.PassWidget(call, classification, ApprovalPassReason.Review, review),
+            72);
+        var text = string.Join('\n', lines);
+
+        Assert.Contains("write  src/App.cs", text, StringComparison.Ordinal);
+        Assert.Contains("Status", text, StringComparison.Ordinal);
+        Assert.Contains("Allowed", text, StringComparison.Ordinal);
+        Assert.Contains("Authority", text, StringComparison.Ordinal);
+        Assert.Contains("Workspace", text, StringComparison.Ordinal);
+        Assert.Contains("Outcome", text, StringComparison.Ordinal);
+        Assert.Contains("Allow", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Auth  ", text, StringComparison.Ordinal);
     }
 }

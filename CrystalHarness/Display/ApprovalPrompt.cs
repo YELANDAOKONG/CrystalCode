@@ -27,7 +27,7 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         ArgumentNullException.ThrowIfNull(classification);
         ArgumentNullException.ThrowIfNull(reason);
         _renderer.WriteApprovalPass(
-            ApprovalCard.PassLines(call, classification, reason, review));
+            ApprovalCard.PassWidget(call, classification, reason, review));
     }
 
     public async ValueTask<ApprovalChoice> AskAsync(
@@ -41,7 +41,7 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         ArgumentNullException.ThrowIfNull(classification);
         _renderer.CloseStream();
         _renderer.PauseComposer();
-        _renderer.SetOverlay(CardLines(call, classification, review));
+        _renderer.SetOverlay(ApprovalCard.AskWidget(call, classification, review));
         try
         {
             while (true)
@@ -59,28 +59,5 @@ public sealed class ApprovalPrompt : IApprovalPrompt
             _renderer.ClearOverlay();
             _renderer.ResumeComposer();
         }
-    }
-
-    private static List<string> CardLines(
-        ToolCall call,
-        ToolClassification classification,
-        ApprovalReviewVerdict? review)
-    {
-        var lines = new List<string>
-        {
-            ApprovalCard.ActionLine(call),
-            ApprovalCard.HostLine(classification)
-        };
-        if (review is not null)
-        {
-            lines.Add(ApprovalCard.ReviewLine(review));
-            foreach (var line in ApprovalCard.SplitRationale(review.Rationale))
-            {
-                lines.Add(line);
-            }
-        }
-
-        lines.Add("Y once  ·  S session  ·  A always  ·  N deny");
-        return lines;
     }
 }

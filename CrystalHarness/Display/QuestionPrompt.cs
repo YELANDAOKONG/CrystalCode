@@ -1,3 +1,6 @@
+using Spectre.Console;
+using Spectre.Console.Rendering;
+
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Display;
@@ -24,7 +27,7 @@ public sealed class QuestionPrompt : IUserPrompt
         ArgumentException.ThrowIfNullOrWhiteSpace(question);
         _renderer.CloseStream();
         _renderer.PauseComposer();
-        _renderer.SetOverlay(CardLines(question, options));
+        _renderer.SetOverlay(CardWidget(question, options));
         try
         {
             if (options is { Count: > 0 })
@@ -67,20 +70,37 @@ public sealed class QuestionPrompt : IUserPrompt
         }
     }
 
-    private static List<string> CardLines(string question, IReadOnlyList<string>? options)
+    private static IRenderable CardWidget(string question, IReadOnlyList<string>? options)
     {
-        var lines = new List<string> { question };
+        var blocks = new List<IRenderable>
+        {
+            new Markup($"[{Theme.Review}]{MarkupText.Escape(question)}[/]")
+        };
         if (options is { Count: > 0 })
         {
+            var grid = new Grid();
+            grid.AddColumn(new GridColumn().PadRight(2));
+            grid.AddColumn();
             for (var index = 0; index < options.Count; index++)
             {
-                lines.Add($"{index + 1}  {options[index]}");
+                grid.AddRow(
+                    new Markup($"[{Theme.Chrome}]{index + 1}[/]"),
+                    new Markup($"[{Theme.User}]{MarkupText.Escape(options[index])}[/]"));
             }
 
-            lines.Add("number or type an answer");
+            blocks.Add(grid);
+            blocks.Add(new Markup($"[{Theme.Chrome}]Type a number or an answer[/]"));
         }
 
-        return lines;
+        var panel = new Panel(new Rows(blocks))
+        {
+            Header = new PanelHeader("Question"),
+            Border = BoxBorder.Rounded,
+            BorderStyle = Style.Parse(Theme.Chrome),
+            Padding = new Padding(1, 0, 1, 0),
+            Expand = true
+        };
+        return new Padder(panel, new Padding(2, 0, 0, 0));
     }
 
     private static bool TryDigit(ConsoleKeyInfo key, int count, out int index)

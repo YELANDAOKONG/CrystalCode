@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 using Crystal.Chat;
 using Crystal.Tools;
@@ -24,6 +25,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private readonly ComposerBuffer _composer = new();
     private readonly ShellChrome _chrome = new();
     private readonly List<string> _modalOverlay = [];
+    private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
@@ -136,22 +138,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         Add(TranscriptKind.Error, text);
     }
 
-    public void WriteApprovalPass(IReadOnlyList<string> lines)
+    public void WriteApprovalPass(IRenderable card)
     {
-        ArgumentNullException.ThrowIfNull(lines);
+        ArgumentNullException.ThrowIfNull(card);
         lock (_gate)
         {
             CommitLiveUnlocked();
-            foreach (var line in lines)
+            _log.Add(TranscriptKind.Approval, string.Empty, card);
+            if (!Framed)
             {
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    continue;
-                }
-
-                var kind = ApprovalLineKind(lines, line);
-                _log.Add(kind, line);
-                WriteFallback(kind, line);
+                AnsiConsole.Write(card);
+                AnsiConsole.WriteLine();
             }
 
             PaintUnlocked(force: true);
@@ -349,8 +346,20 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         ArgumentNullException.ThrowIfNull(lines);
         lock (_gate)
         {
+            _overlayWidget = null;
             _modalOverlay.Clear();
             _modalOverlay.AddRange(lines);
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void SetOverlay(IRenderable widget)
+    {
+        ArgumentNullException.ThrowIfNull(widget);
+        lock (_gate)
+        {
+            _modalOverlay.Clear();
+            _overlayWidget = widget;
             PaintUnlocked(force: true);
         }
     }
@@ -360,6 +369,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             _modalOverlay.Clear();
+            _overlayWidget = null;
             PaintUnlocked(force: true);
         }
     }
@@ -575,7 +585,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     private void RefreshPickerUnlocked()
     {
-        if (_modalOverlay.Count > 0)
+        if (_modalOverlay.Count > 0 || _overlayWidget is not null)
         {
             _picker = null;
             return;
@@ -660,6 +670,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     private IReadOnlyList<PaintLine> OverlayLines(int width)
     {
+        if (_overlayWidget is not null)
+        {
+            return WidgetPaint.Lines(_overlayWidget, width);
+        }
+
         if (_modalOverlay.Count > 0)
         {
             var lines = new List<PaintLine>();
@@ -682,21 +697,6 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             ScreenSize.Height,
             composerView.Lines.Count,
             OverlayLines(ScreenSize.Width).Count);
-    }
-
-    private static TranscriptKind ApprovalLineKind(IReadOnlyList<string> lines, string line)
-    {
-        if (lines.Count > 0 && string.Equals(line, lines[0], StringComparison.Ordinal))
-        {
-            return TranscriptKind.Tool;
-        }
-
-        if (line.StartsWith("Allowed", StringComparison.Ordinal))
-        {
-            return TranscriptKind.Result;
-        }
-
-        return TranscriptKind.Approval;
     }
 
     private bool Framed => _screen is { IsActive: true };

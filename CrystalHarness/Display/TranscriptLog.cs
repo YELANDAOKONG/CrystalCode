@@ -1,5 +1,7 @@
 using System.Text;
 
+using Spectre.Console.Rendering;
+
 namespace CrystalHarness.Display;
 
 /// <summary>
@@ -12,16 +14,16 @@ public sealed class TranscriptLog
     private readonly StringBuilder _live = new();
     private TranscriptKind? _liveKind;
 
-    public void Add(TranscriptKind kind, string text)
+    public void Add(TranscriptKind kind, string text, IRenderable? widget = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         CommitLive();
-        if (text.Length == 0)
+        if (text.Length == 0 && widget is null)
         {
             return;
         }
 
-        _entries.Add(new TranscriptEntry(kind, text));
+        _entries.Add(new TranscriptEntry(kind, text, widget));
     }
 
     public void AppendLive(TranscriptKind kind, string text)
@@ -105,6 +107,12 @@ public sealed class TranscriptLog
             var liveAssistant = lastIsLive
                 && i == entries.Count - 1
                 && entry.Kind == TranscriptKind.Assistant;
+            if (entry.Widget is not null)
+            {
+                lines.AddRange(WidgetPaint.Lines(entry.Widget, width));
+                continue;
+            }
+
             if (entry.Kind == TranscriptKind.Assistant && !liveAssistant)
             {
                 lines.AddRange(MarkdownRenderer.Render(entry.Text, width));

@@ -142,9 +142,9 @@ Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through.
 
 When a call auto-passes (policy, remembered grant, or review allow),
-the shell prints the pass reason, host risk, host authority, and the
-classifier summary. A review allow also prints `outcome`, `risk_level`,
-`user_authorization`, and `rationale`.
+the shell prints a panel with Title Case fields: Status, Reason, Risk,
+and Authority, plus the classifier summary. A review allow also prints
+Outcome, review Risk, Authority, and rationale.
 
 Persistent grants are stored in `~/.crystal/permissions.json`.
 
@@ -256,26 +256,29 @@ variables still override. `credentials.json` remains a fallback store.
 
 ## Display
 
-Spectre.Console supplies markup, color, and panels. The host owns input and
-the frame. `AnsiConsole.Live` is not the session shell: it fights the
-composer. The shell enters the alternate screen when the terminal is a TTY
-and paints a retained frame: transcript viewport, optional overlay, status
-bar, and multiline composer.
+Spectre.Console supplies markup, color, panels, grids, rules, and padding.
+The host owns input and the frame. `AnsiConsole.Live` is not the session
+shell: it fights the composer. Widgets are rasterized into frame rows.
+The shell enters the alternate screen when the terminal is a TTY and paints
+a retained frame: transcript viewport, optional overlay, status bar, and
+multiline composer.
 
 The status bar shows mode, approval, model, workspace, context percent,
 tokens, tool count, and elapsed time. Assistant text is rendered as
 markdown after each model round (headings, lists, fenced code, inline
 code and bold). Tool rows stay compact. Approval and questions are
-overlays; `y` / `s` / `a` / `n` map once / session / always / deny.
+Spectre panels with a two-column Title Case field grid (`Status`,
+`Reason`, `Risk`, `Authority`, `Outcome`). Ask overlays use the same
+card; `Y` / `S` / `A` / `N` map Once / Session / Always / Deny.
 
 Composer keys: Enter submits when idle and queues while a turn is
 running. Empty Enter while working interrupts the turn and sends the
 queue. Ctrl+J or `\`+Enter inserts a newline. Tab toggles Plan/Work or
 completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome
 labels are Plan, Work, Review, Default, AutoEdit, and Full. The status
-bar includes a queued count while follow-ups wait. Auto-pass prints the
-tool summary, allow reason, host risk and authority, reviewer outcome,
-risk, authorization, and rationale. Reasoning streams into the
+bar includes a queued count while follow-ups wait. Auto-pass prints a
+panel with Status, Reason, Risk, Authority, and, for review, Outcome
+plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`). A slash picker appears while the prompt
