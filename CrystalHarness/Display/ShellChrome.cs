@@ -13,6 +13,8 @@ public sealed class ShellChrome
 
     public string Approval { get; set; } = string.Empty;
 
+    public string Thinking { get; set; } = string.Empty;
+
     public string Usage { get; set; } = "CTX --";
 
     public string Activity { get; set; } = string.Empty;
@@ -30,6 +32,11 @@ public sealed class ShellChrome
         if (!string.IsNullOrWhiteSpace(Approval))
         {
             items.Add((Approval, $"[{Theme.Chrome}]{MarkupText.Escape(Approval)}[/]"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Thinking))
+        {
+            items.Add((Thinking, $"[{Theme.Chrome}]{MarkupText.Escape(Thinking)}[/]"));
         }
 
         if (!string.IsNullOrWhiteSpace(Activity))

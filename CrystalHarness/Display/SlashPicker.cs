@@ -9,18 +9,26 @@ public sealed class SlashPicker
 
     private readonly IReadOnlyList<SlashOption> _matches;
     private readonly int _selected;
+    private readonly string _completedPrefix;
+    private readonly bool _arguments;
 
-    private SlashPicker(IReadOnlyList<SlashOption> matches, int selected)
+    private SlashPicker(
+        IReadOnlyList<SlashOption> matches,
+        int selected,
+        string completedPrefix,
+        bool arguments)
     {
         _matches = matches;
         _selected = selected;
+        _completedPrefix = completedPrefix;
+        _arguments = arguments;
     }
 
     public IReadOnlyList<SlashOption> Matches => _matches;
 
     public int Selected => _selected;
 
-    public string CompletedText => "/" + _matches[_selected].Name + " ";
+    public string CompletedText => _completedPrefix + _matches[_selected].Name + " ";
 
     public static SlashPicker? Create(string text, IReadOnlyList<SlashOption> options)
     {
@@ -32,9 +40,10 @@ public sealed class SlashPicker
         }
 
         var rest = text[1..];
-        if (rest.Contains(' ', StringComparison.Ordinal))
+        var space = rest.IndexOf(' ');
+        if (space >= 0)
         {
-            return null;
+            return CreateArguments(rest, space, options);
         }
 
         var prefix = rest.ToLowerInvariant();
@@ -47,7 +56,9 @@ public sealed class SlashPicker
             }
         }
 
-        return matches.Count == 0 ? null : new SlashPicker(matches, 0);
+        return matches.Count == 0
+            ? null
+            : new SlashPicker(matches, 0, "/", arguments: false);
     }
 
     public SlashPicker Move(int delta)
@@ -59,7 +70,56 @@ public sealed class SlashPicker
             next += count;
         }
 
-        return new SlashPicker(_matches, next);
+        return new SlashPicker(_matches, next, _completedPrefix, _arguments);
+    }
+
+    private static SlashPicker? CreateArguments(
+        string rest,
+        int space,
+        IReadOnlyList<SlashOption> options)
+    {
+        var verb = rest[..space];
+        var remainder = rest[(space + 1)..];
+        if (remainder.Contains(' ', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var command = FindCommand(verb, options);
+        if (command is null || command.ArgumentOptions.Count == 0)
+        {
+            return null;
+        }
+
+        var prefix = remainder.ToLowerInvariant();
+        var matches = new List<SlashOption>();
+        foreach (var option in command.ArgumentOptions)
+        {
+            if (MatchesPrefix(option, prefix))
+            {
+                matches.Add(option);
+            }
+        }
+
+        return matches.Count == 0
+            ? null
+            : new SlashPicker(matches, 0, "/" + verb + " ", arguments: true);
+    }
+
+    private static SlashOption? FindCommand(string verb, IReadOnlyList<SlashOption> options)
+    {
+        foreach (var option in options)
+        {
+            foreach (var key in option.Keys)
+            {
+                if (string.Equals(key, verb, StringComparison.OrdinalIgnoreCase))
+                {
+                    return option;
+                }
+            }
+        }
+
+        return null;
     }
 
     public IReadOnlyList<PaintLine> Paint(int width)
@@ -84,9 +144,9 @@ public sealed class SlashPicker
             var option = _matches[i];
             var isSelected = i == _selected;
             var mark = isSelected ? ">" : " ";
-            var cmdName = "/" + option.Name;
+            var cmdName = _arguments ? option.Name : "/" + option.Name;
             var paddedCmd = cmdName.PadRight(maxCmdLen);
-            var aliases = AliasesLabel(option);
+            var aliases = AliasesLabel(option, _arguments);
 
             var plain = string.IsNullOrEmpty(aliases)
                 ? $"  {mark} {paddedCmd}  {option.Help}"
@@ -136,14 +196,14 @@ public sealed class SlashPicker
         return false;
     }
 
-    private static string AliasesLabel(SlashOption option)
+    private static string AliasesLabel(SlashOption option, bool arguments)
     {
         var parts = new List<string>();
         foreach (var key in option.Keys)
         {
             if (!string.Equals(key, option.Name, StringComparison.OrdinalIgnoreCase))
             {
-                parts.Add("/" + key);
+                parts.Add(arguments ? key : "/" + key);
             }
         }
 

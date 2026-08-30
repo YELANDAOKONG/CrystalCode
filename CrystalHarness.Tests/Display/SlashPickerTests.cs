@@ -24,9 +24,50 @@ public sealed class SlashPickerTests
     }
 
     [Fact]
-    public void Create_HidesAfterSpace()
+    public void Create_HidesAfterSpaceWhenCommandHasNoArguments()
     {
         Assert.Null(SlashPicker.Create("/clear extra", Options));
+    }
+
+    [Fact]
+    public void Create_CompletesThinkingArgumentsAfterSpace()
+    {
+        var options = ThinkingOptions();
+        var picker = SlashPicker.Create("/think ", options);
+
+        Assert.NotNull(picker);
+        Assert.Equal("off", picker.Matches[0].Name);
+        Assert.Equal("/think off ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_FiltersThinkingArgumentPrefix()
+    {
+        var picker = SlashPicker.Create("/think h", ThinkingOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal("high", picker.Matches[0].Name);
+        Assert.Equal("/think high ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_HidesAfterSecondArgumentSpace()
+    {
+        Assert.Null(SlashPicker.Create("/think high extra", ThinkingOptions()));
+    }
+
+    private static SlashOption[] ThinkingOptions()
+    {
+        var thinking = new SlashOption(
+            "thinking",
+            "off | default | high",
+            ["thinking", "think"],
+            [
+                new("off", "disable thinking", ["off", "none"]),
+                new("default", "provider default", ["default"]),
+                new("high", "High", ["high"])
+            ]);
+        return [thinking, .. Options];
     }
 
     [Fact]

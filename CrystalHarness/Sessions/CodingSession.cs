@@ -1,3 +1,4 @@
+using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
@@ -111,12 +112,15 @@ public sealed class CodingSession
         using var screen = _renderer.Open();
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
-        _renderer.SetSlashCommands(_plugins.Commands);
+        _renderer.SetSlashCommands(
+            _plugins.Commands,
+            ThinkingCompletions.For(_settings.ActiveModel));
         _renderer.WriteHeader(
             _settings.Model,
             _workspace.Root,
             _planMode,
-            _approval);
+            _approval,
+            CurrentThinkingStatus());
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
@@ -243,7 +247,7 @@ public sealed class CodingSession
                 return true;
             case SessionVerb.Plan:
                 TogglePlanFromPrompt();
-                _renderer.SetChrome(_planMode, _approval);
+                RefreshChrome();
                 _renderer.WriteNote(ModeLabel.For(_planMode));
                 return true;
             case SessionVerb.Approval:
@@ -258,11 +262,13 @@ public sealed class CodingSession
                     _workspace.Root,
                     _planMode,
                     _approval,
-                    _settings.ActiveModel.ContextWindow);
+                    _settings.ActiveModel.ContextWindow,
+                    CurrentThinkingStatus());
                 return true;
             case SessionVerb.Clear:
                 BeginNewSession();
                 _renderer.ClearConversation();
+                _renderer.ShowUsage(null);
                 _renderer.WriteNote("new conversation");
                 return true;
             case SessionVerb.Cd:
@@ -309,7 +315,7 @@ public sealed class CodingSession
         _settings = _settings.WithApproval(_approval);
         _settingsStore.Save(_settings);
         RebuildExecutors();
-        _renderer.SetChrome(_planMode, _approval);
+        RefreshChrome();
         _renderer.WriteNote("approval  " + ApprovalLabel.For(_approval));
     }
 
@@ -354,6 +360,7 @@ public sealed class CodingSession
         _settings = _settings.WithThinkingEffort(_thinkingEffort);
         _settingsStore.Save(_settings);
         RebuildExecutors();
+        RefreshChrome();
         _renderer.WriteNote("thinking  " + ThinkingLabel.For(_thinkingEffort));
     }
 
@@ -402,7 +409,7 @@ public sealed class CodingSession
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
     {
         if (!ContextAccountant.ShouldCompact(
-                result.Usage,
+                result.Usage ?? _ledger.Usage,
                 _settings.ActiveModel.ContextWindow,
                 _settings.CompactionThreshold))
         {
@@ -435,7 +442,11 @@ public sealed class CodingSession
                 PlanMode = _planMode,
                 CreatedUtc = _sessionCreatedUtc,
                 Items = TranscriptCodec.Write(_transcript),
-                Todos = WriteTodos()
+                Todos = WriteTodos(),
+                UserTurns = _ledger.UserTurns,
+                ModelCalls = _ledger.ModelCalls,
+                ToolCalls = _ledger.ToolCalls,
+                Usage = WriteUsage(_ledger.Usage)
             });
     }
 
@@ -486,11 +497,16 @@ public sealed class CodingSession
 
         _todos.Clear();
         _todos.Replace(ReadTodos(document.Todos));
-        _ledger.Clear();
+        _ledger.Restore(
+            ClampCount(document.UserTurns),
+            ClampCount(document.ModelCalls),
+            ClampCount(document.ToolCalls),
+            ReadUsage(document.Usage));
         DiscardQueue();
         _reviewContext.CurrentUserRequest = string.Empty;
         RebuildExecutors();
-        _renderer.SetChrome(_planMode, _approval);
+        RefreshChrome();
+        _renderer.ShowUsage(_ledger.Usage);
         _renderer.WriteHistory(_transcript);
         _renderer.WriteNote("resumed  " + _sessionId);
     }
@@ -555,6 +571,46 @@ public sealed class CodingSession
         return items;
     }
 
+    private static SessionUsageDocument? WriteUsage(TokenUsage? usage)
+    {
+        if (usage is null)
+        {
+            return null;
+        }
+
+        return new SessionUsageDocument
+        {
+            InputTokenCount = usage.InputTokenCount,
+            OutputTokenCount = usage.OutputTokenCount,
+            ReasoningTokenCount = usage.ReasoningTokenCount
+        };
+    }
+
+    private static TokenUsage? ReadUsage(SessionUsageDocument? document)
+    {
+        if (document is null)
+        {
+            return null;
+        }
+
+        if (document.InputTokenCount < 0 || document.OutputTokenCount < 0)
+        {
+            return null;
+        }
+
+        if (document.ReasoningTokenCount is < 0)
+        {
+            return null;
+        }
+
+        return new TokenUsage(
+            document.InputTokenCount,
+            document.OutputTokenCount,
+            document.ReasoningTokenCount);
+    }
+
+    private static int ClampCount(int value) => Math.Max(0, value);
+
     private void RebuildExecutors()
     {
         var renderer = _renderer;
@@ -608,6 +664,14 @@ public sealed class CodingSession
 
     private ReasoningOptions? CurrentReasoning() =>
         _thinkingEffort.ToReasoningOptions(_settings.ActiveModel);
+
+    private string CurrentThinkingStatus() =>
+        ThinkingStatus.For(_settings.ActiveModel, _thinkingEffort);
+
+    private void RefreshChrome()
+    {
+        _renderer.SetChrome(_planMode, _approval, CurrentThinkingStatus());
+    }
 
     private static ApprovalMode NextApproval(ApprovalMode current)
     {

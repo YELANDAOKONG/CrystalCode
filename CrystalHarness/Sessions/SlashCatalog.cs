@@ -9,8 +9,10 @@ public static class SlashCatalog
     [
         new(SessionVerb.Help, "help", ["h"], "shortcuts and commands"),
         new(SessionVerb.Plan, "plan", [], "toggle Plan / Work"),
-        new(SessionVerb.Approval, "approval", [], "default | autoedit | review | full"),
-        new(SessionVerb.Thinking, "thinking", ["think"], "off | none | default | low | medium | high | maximum | max"),
+        new(SessionVerb.Approval, "approval", [], "default | autoedit | review | full",
+            ["default", "autoedit", "review", "full"]),
+        new(SessionVerb.Thinking, "thinking", ["think"], "off | none | default | low | medium | high | maximum | max",
+            ["off", "none", "default", "minimal", "low", "medium", "high", "maximum", "max"]),
         new(SessionVerb.Status, "status", [], "turns, tokens, mode"),
         new(SessionVerb.Clear, "clear", ["new"], "new conversation"),
         new(SessionVerb.Cd, "cd", [], "show or set workspace"),

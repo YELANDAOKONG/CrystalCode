@@ -62,4 +62,36 @@ public sealed class ShellChromeTests
         Assert.Contains("CTX --", line.Plain, StringComparison.Ordinal);
         Assert.DoesNotContain("Work", line.Plain, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void StatusLine_ShowsThinkingWhenConfigured()
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Default",
+            Thinking = "Think High",
+            Model = "deepseek-v4-flash",
+            Usage = "CTX --"
+        };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Contains("Think High", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Think Off", line.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_OmitsThinkingWhenEmpty()
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Default",
+            Model = "gpt-5.6-sol",
+            Usage = "CTX --"
+        };
+
+        var line = chrome.StatusLine(80);
+
+        Assert.DoesNotContain("Think", line.Plain, StringComparison.Ordinal);
+    }
 }

@@ -3,17 +3,17 @@ using Crystal;
 namespace CrystalHarness.Sessions;
 
 /// <summary>
-/// Accumulates turn counts and usage for the footer.
+/// Session turn counts and the last provider-reported usage snapshot.
 /// </summary>
 public sealed class SessionLedger
 {
-    private readonly UsageAccumulator _usage = new();
-
     public int UserTurns { get; private set; }
 
     public int ModelCalls { get; private set; }
 
     public int ToolCalls { get; private set; }
+
+    public TokenUsage? Usage { get; private set; }
 
     public void Record(TurnResult result)
     {
@@ -21,7 +21,33 @@ public sealed class SessionLedger
         UserTurns++;
         ModelCalls += result.ModelCallCount;
         ToolCalls += result.ToolCallCount;
-        _usage.Add(result.Usage);
+        if (result.Usage is not null)
+        {
+            Usage = result.Usage;
+        }
+    }
+
+    public void Restore(int userTurns, int modelCalls, int toolCalls, TokenUsage? usage)
+    {
+        if (userTurns < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(userTurns));
+        }
+
+        if (modelCalls < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(modelCalls));
+        }
+
+        if (toolCalls < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(toolCalls));
+        }
+
+        UserTurns = userTurns;
+        ModelCalls = modelCalls;
+        ToolCalls = toolCalls;
+        Usage = usage;
     }
 
     public void Clear()
@@ -29,8 +55,6 @@ public sealed class SessionLedger
         UserTurns = 0;
         ModelCalls = 0;
         ToolCalls = 0;
-        _usage.Clear();
+        Usage = null;
     }
-
-    public TokenUsage? Usage => _usage.Build();
 }

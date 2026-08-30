@@ -66,7 +66,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    public void SetSlashCommands(IReadOnlyList<ISlashCommand>? extras)
+    public void SetSlashCommands(
+        IReadOnlyList<ISlashCommand>? extras,
+        IReadOnlyList<SlashOption>? thinkingArguments = null)
     {
         lock (_gate)
         {
@@ -75,7 +77,10 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             {
                 var keys = new List<string> { spec.Name };
                 keys.AddRange(spec.Aliases);
-                _slashOptions.Add(new SlashOption(spec.Name, spec.Help, keys));
+                var arguments = spec.Verb == SessionVerb.Thinking && thinkingArguments is not null
+                    ? thinkingArguments
+                    : ToArgumentOptions(spec.Arguments);
+                _slashOptions.Add(new SlashOption(spec.Name, spec.Help, keys, arguments));
             }
 
             if (extras is null)
@@ -90,11 +95,28 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    private static IReadOnlyList<SlashOption> ToArgumentOptions(IReadOnlyList<string>? arguments)
+    {
+        if (arguments is null || arguments.Count == 0)
+        {
+            return [];
+        }
+
+        var options = new List<SlashOption>(arguments.Count);
+        foreach (var argument in arguments)
+        {
+            options.Add(new SlashOption(argument, argument, [argument]));
+        }
+
+        return options;
+    }
+
     public void WriteHeader(
         string model,
         string workspaceRoot,
         bool planMode,
-        ApprovalMode approval)
+        ApprovalMode approval,
+        string thinking = "")
     {
         lock (_gate)
         {
@@ -103,6 +125,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.WorkspaceRoot = workspaceRoot;
             _chrome.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
+            _chrome.Thinking = thinking;
             _composer.PlanMode = planMode;
             if (Framed)
             {
@@ -112,22 +135,27 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
             var mode = ModeLabel.For(planMode);
             var modeColor = planMode ? Theme.Plan : Theme.Work;
+            var thinkingText = string.IsNullOrWhiteSpace(thinking)
+                ? string.Empty
+                : $"  ·  {MarkupText.Escape(thinking)}";
             AnsiConsole.MarkupLine(
                 $"[{Theme.Chrome}]{MarkupText.Escape(model)}  ·  [/]"
                 + $"[{modeColor}]{mode}[/]"
-                + $"[{Theme.Chrome}]  ·  {MarkupText.Escape(ApprovalLabel.For(approval))}  ·  "
+                + $"[{Theme.Chrome}]  ·  {MarkupText.Escape(ApprovalLabel.For(approval))}"
+                + $"{thinkingText}  ·  "
                 + $"{MarkupText.Escape(PathDisplay.Shorten(workspaceRoot))}[/]");
             AnsiConsole.WriteLine();
         }
     }
 
-    public void SetChrome(bool planMode, ApprovalMode approval)
+    public void SetChrome(bool planMode, ApprovalMode approval, string thinking = "")
     {
         lock (_gate)
         {
             _chrome.PlanMode = planMode;
             _composer.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
+            _chrome.Thinking = thinking;
             PaintUnlocked(force: true);
         }
     }
@@ -175,7 +203,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 "queue        stays above the composer; sends after this tool or turn",
                 "ctrl+j       newline",
                 "\\ enter      newline",
-                "tab          Plan / Work, or complete /",
+                "tab          Plan / Work, or complete / and arguments",
                 "shift+tab    Plan / Work",
                 "?            shortcuts when empty",
                 "pageup       scroll transcript (also wheel, ctrl+up/down, empty up)",
@@ -212,7 +240,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         string workspaceRoot,
         bool planMode,
         ApprovalMode approval,
-        int contextWindow)
+        int contextWindow,
+        string thinking = "")
     {
         lock (_gate)
         {
@@ -220,8 +249,13 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.WorkspaceRoot = workspaceRoot;
             _chrome.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
+            _chrome.Thinking = thinking;
             _chrome.Usage = UsageText.Format(ledger.Usage, contextWindow);
-            var text = $"{ModeLabel.For(planMode)}  ·  {ApprovalLabel.For(approval)}  ·  "
+            var thinkingText = string.IsNullOrWhiteSpace(thinking)
+                ? string.Empty
+                : $"  ·  {thinking}";
+            var text = $"{ModeLabel.For(planMode)}  ·  {ApprovalLabel.For(approval)}"
+                + $"{thinkingText}  ·  "
                 + $"{ledger.UserTurns} turns  ·  {ledger.ModelCalls} model  ·  "
                 + $"{ledger.ToolCalls} tools  ·  {_chrome.Usage}";
             _log.Add(TranscriptKind.Note, text);
@@ -362,6 +396,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
 
         AfterTools?.Invoke();
+    }
+
+    public void ShowUsage(TokenUsage? usage)
+    {
+        lock (_gate)
+        {
+            _chrome.Usage = UsageText.Format(usage, ContextWindow);
+            PaintUnlocked(force: true);
+        }
     }
 
     public void OnUsageUpdated(TokenUsage? usage)
@@ -612,7 +655,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             "queue        stays above the composer; sends after this tool or turn",
             "ctrl+j       newline",
             "\\ enter      newline",
-            "tab          Plan / Work, or complete /",
+            "tab          Plan / Work, or complete / and arguments",
             "shift+tab    Plan / Work",
             "?            shortcuts when empty",
             "pageup       scroll transcript (also wheel, ctrl+up/down, empty up)");

@@ -162,10 +162,13 @@ fraction of the **selected model's** `contextWindow`, the host:
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, and again on an orderly exit when the transcript has a
-user message. `/quit` and two Ctrl+C presses leave the alternate screen,
+user message. The file stores the last provider-reported token usage
+and turn counts. `/quit` and two Ctrl+C presses leave the alternate screen,
 then print the session id and how to `/resume`. `/resume` loads the
 latest file for the workspace, or a given id, and replays the saved
-transcript into the viewport. `/clear` starts a new id. The first system
+transcript into the viewport. It also restores the last usage snapshot
+so the status bar and compaction still have a baseline before the next
+model call. `/clear` starts a new id. The first system
 message is refreshed from the current prompts on resume.
 
 ## Home directory
@@ -284,7 +287,9 @@ The shell enters the alternate screen when the terminal is a TTY and paints
 a retained frame: transcript viewport, optional overlay, status bar, and
 multiline composer.
 
-The status bar shows approval, model, workspace, context percent,
+The status bar shows approval, thinking (when the selected model
+supports it: `Think Off`, or `Think` plus the resolved gear when
+thinking is on), model, workspace, context percent,
 tokens, tool count, and elapsed time. Mode is Plan or Work on the
 composer prompt and is not repeated on the status bar. Assistant text is rendered as
 markdown after each model round (headings, lists, fenced code, inline
@@ -312,7 +317,8 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`). A slash picker appears while the prompt
-is a command prefix. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
+is a command prefix. After a verb that takes a fixed argument
+(`/thinking`, `/approval`), Tab also completes the argument. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Up/Down
 arrows navigate composer history or the slash picker when the prompt
 has text. The alternate screen enables SGR mouse for the wheel

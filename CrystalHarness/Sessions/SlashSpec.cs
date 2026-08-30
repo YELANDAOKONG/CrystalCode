@@ -7,4 +7,5 @@ public sealed record SlashSpec(
     SessionVerb Verb,
     string Name,
     IReadOnlyList<string> Aliases,
-    string Help);
+    string Help,
+    IReadOnlyList<string>? Arguments = null);

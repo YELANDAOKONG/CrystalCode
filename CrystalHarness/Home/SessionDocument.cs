@@ -18,4 +18,12 @@ public sealed class SessionDocument
     public List<SessionItemDocument> Items { get; set; } = [];
 
     public List<SessionTodoDocument> Todos { get; set; } = [];
+
+    public int UserTurns { get; set; }
+
+    public int ModelCalls { get; set; }
+
+    public int ToolCalls { get; set; }
+
+    public SessionUsageDocument? Usage { get; set; }
 }
