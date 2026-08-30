@@ -255,8 +255,7 @@ public sealed class CodingSession
             return (true, false);
         }
 
-        var handled = HandleCommand(parsed);
-        return handled;
+        return HandleCommand(parsed);
     }
 
     private (bool Handled, bool Exit) HandleCommand(SessionCommand command)
@@ -408,11 +407,7 @@ public sealed class CodingSession
     private bool TogglePlanFromPrompt()
     {
         _planMode = !_planMode;
-        if (_transcript.Count > 0 && _transcript[0] is ChatMessage { Role.Value: "system" })
-        {
-            _transcript[0] = new ChatMessage(ChatRole.System, CurrentSystemText());
-        }
-
+        ReplaceLiveSystem();
         return _planMode;
     }
 
@@ -422,10 +417,7 @@ public sealed class CodingSession
     private void ReloadPrompts()
     {
         _prompts = _promptStore.Load(_workspace.Root);
-        if (_transcript.Count > 0 && _transcript[0] is ChatMessage { Role.Value: "system" })
-        {
-            _transcript[0] = new ChatMessage(ChatRole.System, CurrentSystemText());
-        }
+        ReplaceLiveSystem();
     }
 
     private CompactionLimits CurrentLimits() =>
@@ -499,6 +491,8 @@ public sealed class CodingSession
             if (ReferenceEquals(transcript, _transcript))
             {
                 _transcript = [.. outcome.Transcript];
+                RememberCompactedUsage();
+                SaveSession();
             }
 
             _renderer.WriteNote("compacted context");
@@ -577,10 +571,7 @@ public sealed class CodingSession
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         _planMode = document.PlanMode;
         _transcript = items;
-        if (_transcript[0] is ChatMessage { Role.Value: "system" })
-        {
-            _transcript[0] = new ChatMessage(ChatRole.System, CurrentSystemText());
-        }
+        ReplaceLiveSystem();
 
         _todos.Clear();
         _todos.Replace(ReadTodos(document.Todos));
@@ -598,18 +589,29 @@ public sealed class CodingSession
         _renderer.WriteNote("resumed  " + _sessionId);
     }
 
-    private bool HasConversation()
+    private void ReplaceLiveSystem()
     {
-        foreach (var item in _transcript)
+        if (_transcript.Count == 0)
         {
-            if (item is ChatMessage { Role.Value: "user" })
-            {
-                return true;
-            }
+            return;
         }
 
-        return false;
+        if (_transcript[0] is ChatMessage system
+            && system.Role == ChatRole.System
+            && !CompactionSelection.IsSummary(system))
+        {
+            _transcript[0] = new ChatMessage(ChatRole.System, CurrentSystemText());
+        }
     }
+
+    private void RememberCompactedUsage()
+    {
+        var input = TokenEstimator.Items(_transcript);
+        _ledger.ReplaceUsage(new TokenUsage(input, 0));
+        _renderer.ShowUsage(_ledger.Usage);
+    }
+
+    private bool HasConversation() => TranscriptCodec.HasConversation(_transcript);
 
     private void WriteResumeHint()
     {

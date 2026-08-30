@@ -27,6 +27,12 @@ public sealed class SessionLedger
         }
     }
 
+    public void ReplaceUsage(TokenUsage usage)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        Usage = usage;
+    }
+
     public void Restore(int userTurns, int modelCalls, int toolCalls, TokenUsage? usage)
     {
         if (userTurns < 0)

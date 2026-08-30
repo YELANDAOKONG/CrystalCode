@@ -475,7 +475,9 @@ alternate screen, then print the session id and how to `/resume`.
 | `/clear` | Start a new id |
 
 Resume also restores the last usage snapshot so the status bar and
-compaction still have a baseline before the next model call.
+compaction still have a baseline before the next model call. A compacted
+session restores the summary and recent tail; only the live system
+prompt is refreshed.
 
 ## Compaction
 
@@ -491,7 +493,9 @@ host:
    reduced. Compaction does not loop.
 
 `/compact` (alias `/summarize`) runs this immediately. It is refused
-while a turn is running. The transcript prints `compacting context...`
+while a turn is running. A successful compact is written to the session
+file; `/resume` restores the summary and tail, and refreshes only the
+live system prompt. The transcript prints `compacting context...`
 while this runs.
 
 ## Data directory

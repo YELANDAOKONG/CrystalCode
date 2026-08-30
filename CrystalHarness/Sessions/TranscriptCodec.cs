@@ -1,6 +1,7 @@
 using Crystal.Chat;
 using Crystal.Tools;
 
+using CrystalHarness.Compaction;
 using CrystalHarness.Home;
 
 namespace CrystalHarness.Sessions;
@@ -68,6 +69,25 @@ public static class TranscriptCodec
         }
 
         return items;
+    }
+
+    public static bool HasConversation(IReadOnlyList<ChatItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        foreach (var item in items)
+        {
+            if (item is ChatMessage { Role.Value: "user" })
+            {
+                return true;
+            }
+
+            if (CompactionSelection.IsSummary(item))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryRead(SessionItemDocument document, out ChatItem item)

@@ -49,6 +49,18 @@ public sealed class SessionLedgerTests
         Assert.Equal(8, ledger.Usage?.ReasoningTokenCount);
     }
 
+    [Fact]
+    public void ReplaceUsage_KeepsCounts()
+    {
+        var ledger = new SessionLedger();
+        ledger.Restore(4, 6, 9, new TokenUsage(900, 30));
+        ledger.ReplaceUsage(new TokenUsage(40, 0));
+
+        Assert.Equal(4, ledger.UserTurns);
+        Assert.Equal(40, ledger.Usage?.InputTokenCount);
+        Assert.Equal(0, ledger.Usage?.OutputTokenCount);
+    }
+
     private static TurnResult Turn(TokenUsage? usage, int modelCalls = 1, int toolCalls = 0) =>
         new(TurnStopReason.Completed, modelCalls, toolCalls, usage, []);
 }

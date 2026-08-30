@@ -172,15 +172,14 @@ refused while a turn is running. User and assistant text in the folded
 head are replaced by the summary; they are not kept beside it.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
-completed turn, and again on an orderly exit when the transcript has a
-user message. The file stores the last provider-reported token usage
-and turn counts. `/quit` and two Ctrl+C presses on an empty composer leave the alternate screen,
-then print the session id and how to `/resume`. `/resume` loads the
-latest file for the workspace, or a given id, and replays the saved
-transcript into the viewport. It also restores the last usage snapshot
-so the status bar and compaction still have a baseline before the next
-model call. `/clear` starts a new id. The first system
-message is refreshed from the current prompts on resume.
+completed turn, after a successful `/compact`, and on an orderly exit
+when the transcript has a user message or a compaction summary. The
+file stores the compacted model transcript (live system prompt, one
+summary, recent tail) plus the last usage snapshot. `/resume` restores
+that transcript: the live system prompt is refreshed from current
+Plan/Work text; the summary and tail are kept. Usage is restored so the
+status bar and the next compact decision have a baseline. `/clear`
+starts a new id.
 
 ## Home directory
 
