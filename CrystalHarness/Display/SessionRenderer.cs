@@ -263,6 +263,24 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    public void WriteHistory(IReadOnlyList<ChatItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            _log.Clear();
+            _scrollBack = 0;
+            foreach (var line in TranscriptReplay.Lines(items))
+            {
+                _log.Add(line.Kind, line.Text);
+                WriteFallback(line.Kind, line.Text);
+            }
+
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void BeginTurn()
     {
         lock (_gate)

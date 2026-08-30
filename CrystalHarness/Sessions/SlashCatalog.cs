@@ -13,7 +13,7 @@ public static class SlashCatalog
         new(SessionVerb.Status, "status", [], "turns, tokens, mode"),
         new(SessionVerb.Clear, "clear", ["new"], "new conversation"),
         new(SessionVerb.Cd, "cd", [], "show or set workspace"),
-        new(SessionVerb.Resume, "resume", ["continue", "sessions"], "latest or id"),
+        new(SessionVerb.Resume, "resume", ["continue", "sessions"], "replay latest or id"),
         new(SessionVerb.Quit, "quit", ["exit", "q"], "exit")
     ];
 

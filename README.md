@@ -45,8 +45,10 @@ OpenAI-compatible providers and per-model `contextWindow`, `temperature`,
 
 Tab or `/plan` switches Plan and Work. `/approval` switches Default,
 AutoEdit, Review (another model checks safety and the user request), and
-Full (pass without review). `/resume` loads the latest session for this
-workspace, or `/resume <id>` a specific file under `~/.crystal/sessions`.
+Full (pass without review). Quit prints the session id and `/resume`.
+`/resume` loads the latest session for this workspace and replays the
+saved transcript, or `/resume <id>` a specific file under
+`~/.crystal/sessions`.
 
 ## Data
 

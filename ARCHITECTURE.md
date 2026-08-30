@@ -161,9 +161,12 @@ fraction of the **selected model's** `contextWindow`, the host:
    User messages are not dropped.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
-completed turn. `/resume` loads the latest file for the workspace, or a
-given id. `/clear` starts a new id. The first system message is refreshed
-from the current prompts on resume.
+completed turn, and again on an orderly exit when the transcript has a
+user message. `/quit` and two Ctrl+C presses leave the alternate screen,
+then print the session id and how to `/resume`. `/resume` loads the
+latest file for the workspace, or a given id, and replays the saved
+transcript into the viewport. `/clear` starts a new id. The first system
+message is refreshed from the current prompts on resume.
 
 ## Home directory
 

@@ -93,6 +93,18 @@ public sealed class CodingSession
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            return await RunLoopAsync(cancellationToken);
+        }
+        finally
+        {
+            WriteResumeHint();
+        }
+    }
+
+    private async Task<int> RunLoopAsync(CancellationToken cancellationToken)
+    {
         using var screen = _renderer.Open();
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
@@ -138,7 +150,6 @@ public sealed class CodingSession
                 if (_idleCancels >= 2 || cancellationToken.IsCancellationRequested)
                 {
                     await FinishTurnAsync();
-                    _renderer.WriteNote("bye");
                     return 0;
                 }
 
@@ -427,7 +438,34 @@ public sealed class CodingSession
         DiscardQueue();
         _reviewContext.CurrentUserRequest = string.Empty;
         RebuildExecutors();
+        _renderer.SetChrome(_planMode, _approval);
+        _renderer.WriteHistory(_transcript);
         _renderer.WriteNote("resumed  " + _sessionId);
+    }
+
+    private bool HasConversation()
+    {
+        foreach (var item in _transcript)
+        {
+            if (item is ChatMessage { Role.Value: "user" })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void WriteResumeHint()
+    {
+        if (HasConversation())
+        {
+            SaveSession();
+            Console.WriteLine(ResumeHint.ForSaved(_sessionId));
+            return;
+        }
+
+        Console.WriteLine(ResumeHint.ForWorkspace());
     }
 
     private List<SessionTodoDocument> WriteTodos()
