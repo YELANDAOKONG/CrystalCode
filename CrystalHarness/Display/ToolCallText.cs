@@ -11,28 +11,29 @@ public static class ToolCallText
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(arguments);
+        var title = DisplayCase.Token(name);
         if (ToolArguments.TryReadRequiredString(arguments, "command", out var command))
         {
-            return name + "  " + OneLine(command);
+            return title + "  " + OneLine(command);
         }
 
         if (ToolArguments.TryReadRequiredString(arguments, "path", out var path))
         {
             if (ToolArguments.TryReadRequiredString(arguments, "pattern", out var pattern))
             {
-                return name + "  " + path + "  " + OneLine(pattern);
+                return title + "  " + path + "  " + OneLine(pattern);
             }
 
-            return name + "  " + path;
+            return title + "  " + path;
         }
 
         if (ToolArguments.TryReadRequiredString(arguments, "pattern", out var onlyPattern))
         {
-            return name + "  " + OneLine(onlyPattern);
+            return title + "  " + OneLine(onlyPattern);
         }
 
         var compact = CompactFinished(arguments);
-        return compact.Length == 0 ? name : name + "  " + compact;
+        return compact.Length == 0 ? title : title + "  " + compact;
     }
 
     private static string CompactFinished(string arguments)

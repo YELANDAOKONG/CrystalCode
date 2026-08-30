@@ -26,6 +26,8 @@ public sealed class AlternateScreen : IDisposable
         try
         {
             AnsiConsole.Write(new ControlCode("\u001b[?1049h"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1000h"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1006h"));
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
             return new AlternateScreen(true);
@@ -46,6 +48,8 @@ public sealed class AlternateScreen : IDisposable
         try
         {
             AnsiConsole.Cursor.Show();
+            AnsiConsole.Write(new ControlCode("\u001b[?1006l"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1000l"));
             AnsiConsole.Write(new ControlCode("\u001b[?1049l"));
         }
         catch (IOException)

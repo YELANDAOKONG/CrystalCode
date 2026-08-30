@@ -7,6 +7,10 @@ public static class ToolResultText
 {
     public const int MaximumLength = 100;
 
+    public const int MaximumBodyLines = 16;
+
+    public const int MaximumBodyLength = 1200;
+
     public static string FirstLine(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -17,6 +21,41 @@ public static class ToolResultText
     {
         ArgumentNullException.ThrowIfNull(text);
         return Clip(FirstContentLine(text));
+    }
+
+    public static string Body(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var lines = new List<string>();
+        foreach (var raw in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            var line = raw.TrimEnd();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (lines.Count == 0 && line.StartsWith("exit ", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            lines.Add(line);
+            if (lines.Count == MaximumBodyLines)
+            {
+                break;
+            }
+        }
+
+        if (lines.Count == 0)
+        {
+            return FirstContentLine(text);
+        }
+
+        var joined = string.Join('\n', lines);
+        return joined.Length <= MaximumBodyLength
+            ? joined
+            : joined[..(MaximumBodyLength - 3)] + "...";
     }
 
     private static string FirstContentLine(string text)

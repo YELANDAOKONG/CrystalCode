@@ -19,4 +19,14 @@ public sealed class ToolResultTextTests
     {
         Assert.Equal("exit 1", ToolResultText.Summary("exit 1\n"));
     }
+
+    [Fact]
+    public void Body_KeepsOutputLinesAfterExit()
+    {
+        var body = ToolResultText.Body("exit 0\nLinux 7.0.0-30-generic\nID=xiyueos");
+
+        Assert.Contains("Linux 7.0.0-30-generic", body, StringComparison.Ordinal);
+        Assert.Contains("ID=xiyueos", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("exit 0", body, StringComparison.Ordinal);
+    }
 }

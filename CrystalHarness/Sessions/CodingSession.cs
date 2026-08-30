@@ -94,6 +94,7 @@ public sealed class CodingSession
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         using var screen = _renderer.Open();
+        _renderer.AfterTools = PromoteAfterTools;
         _renderer.SetSlashCommands(_plugins.Commands);
         _renderer.WriteHeader(
             _settings.Model,
@@ -529,23 +530,35 @@ public sealed class CodingSession
         return ApprovalMode.Default;
     }
 
+    private void PromoteAfterTools()
+    {
+        if (_queue.Count > 0)
+        {
+            _turnSource?.Cancel();
+        }
+    }
+
+    private void ShowQueue()
+    {
+        _renderer.SetQueue(_queue.Snapshot());
+    }
+
     private void DiscardQueue()
     {
         _queue.Clear();
-        _renderer.SetQueued(0);
+        ShowQueue();
     }
 
     private void Enqueue(string input)
     {
         _queue.Enqueue(input);
-        _renderer.SetQueued(_queue.Count);
-        _renderer.WriteNote("queued  " + input);
+        ShowQueue();
     }
 
     private void StartTurnIfQueued()
     {
         var next = _queue.Drain();
-        _renderer.SetQueued(0);
+        ShowQueue();
         if (next is not null)
         {
             StartTurn(next);

@@ -20,6 +20,17 @@ public sealed class MessageQueueTests
     }
 
     [Fact]
+    public void Snapshot_DoesNotDrain()
+    {
+        var queue = new MessageQueue();
+        queue.Enqueue("one");
+        queue.Enqueue("two");
+
+        Assert.Equal(["one", "two"], queue.Snapshot());
+        Assert.Equal(2, queue.Count);
+    }
+
+    [Fact]
     public void Clear_DropsQueuedMessages()
     {
         var queue = new MessageQueue();

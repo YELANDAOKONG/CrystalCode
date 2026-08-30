@@ -12,10 +12,12 @@ public static class ScreenPainter
         IReadOnlyList<PaintLine> transcript,
         IReadOnlyList<PaintLine> overlay,
         PaintLine status,
+        IReadOnlyList<PaintLine> queue,
         ComposerView composer)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(overlay);
+        ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
         AnsiConsole.Cursor.Hide();
         AnsiConsole.Write(new ControlCode("\u001b[H"));
@@ -25,6 +27,7 @@ public static class ScreenPainter
         row = WriteBlock(overlay, regions.OverlayRows, regions.Width, row, regions.Height);
         WriteLine(status, regions.Width, row, regions.Height);
         row++;
+        row = WriteBlock(queue, regions.QueueRows, regions.Width, row, regions.Height);
         WriteBlock(composer.Lines, regions.ComposerRows, regions.Width, row, regions.Height);
 
         var cursorLine = Math.Clamp(

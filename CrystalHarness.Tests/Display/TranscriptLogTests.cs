@@ -31,4 +31,16 @@ public sealed class TranscriptLogTests
 
         Assert.Contains(lines, line => line.Markup.Contains(Theme.Heading, StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void BuildLines_FramesUserMessage()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.User, "hello");
+
+        var text = string.Join('\n', log.BuildLines(40).Select(line => line.Plain));
+
+        Assert.Contains("You", text, StringComparison.Ordinal);
+        Assert.Contains("hello", text, StringComparison.Ordinal);
+    }
 }

@@ -28,7 +28,7 @@ public sealed class ApprovalCardTests
 
         var line = ApprovalCard.ActionLine(call);
 
-        Assert.Equal("write  src/App.cs", line);
+        Assert.Equal("Write  src/App.cs", line);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public sealed class ApprovalCardTests
             """{"path":"src/App.cs","contents":"x"}""");
         var lines = ApprovalCard.PassLines(call, classification, ApprovalPassReason.Review, review);
 
-        Assert.Equal("write  src/App.cs", lines[0]);
+        Assert.Equal("Write  src/App.cs", lines[0]);
         Assert.Contains("Status  Allowed", lines);
         Assert.Contains("Reason  Review", lines);
         Assert.Contains("Risk  Write", lines);
@@ -85,7 +85,7 @@ public sealed class ApprovalCardTests
             72);
         var text = string.Join('\n', lines);
 
-        Assert.Contains("write  src/App.cs", text, StringComparison.Ordinal);
+        Assert.Contains("Write  src/App.cs", text, StringComparison.Ordinal);
         Assert.Contains("Status", text, StringComparison.Ordinal);
         Assert.Contains("Allowed", text, StringComparison.Ordinal);
         Assert.Contains("Authority", text, StringComparison.Ordinal);

@@ -100,10 +100,11 @@ One user message is one turn:
 7. After a completed turn, consider compaction from reported token usage.
 
 The composer stays open while a turn runs. Enter with text enqueues a
-follow-up (FIFO). Empty Enter interrupts the turn and sends the queue as
-the next user message. A turn that finishes on its own also drains the
-queue. Interrupt (Ctrl+C or empty Enter) does not drop queued text. Two
-Ctrl+C presses at an idle prompt exit.
+follow-up (FIFO). Queued items stay in a panel above the composer until
+they are sent. The queue is sent when the current tool batch finishes or
+when the turn (thinking or conversation) ends. Empty Enter still
+interrupts immediately and sends. Interrupt (Ctrl+C or empty Enter) does
+not drop queued text. Two Ctrl+C presses at an idle prompt exit.
 
 ## Plan and Work
 
@@ -266,14 +267,19 @@ multiline composer.
 The status bar shows mode, approval, model, workspace, context percent,
 tokens, tool count, and elapsed time. Assistant text is rendered as
 markdown after each model round (headings, lists, fenced code, inline
-code and bold). Tool rows stay compact. Approval and questions are
-Spectre panels with a two-column Title Case field grid (`Status`,
-`Reason`, `Risk`, `Authority`, `Outcome`). Ask overlays use the same
-card; `Y` / `S` / `A` / `N` map Once / Session / Always / Deny.
+code and bold). User, thinking, tool, and result blocks are rounded
+panels. Tool names in chrome and cards are Title Case; stream name
+chunks are coalesced so a repeated snapshot does not become
+`ReadReadRead`. Approval and questions are Spectre panels with a
+two-column Title Case field grid (`Status`, `Reason`, `Risk`,
+`Authority`, `Outcome`). Ask overlays use the same card; `Y` / `S` /
+`A` / `N` map Once / Session / Always / Deny. The follow-up queue is a
+`Queued` panel above the composer.
 
 Composer keys: Enter submits when idle and queues while a turn is
-running. Empty Enter while working interrupts the turn and sends the
-queue. Ctrl+J or `\`+Enter inserts a newline. Tab toggles Plan/Work or
+running. Queued text stays above the composer and is sent when the
+current tool batch or turn ends. Empty Enter while working interrupts
+immediately and sends. Ctrl+J or `\`+Enter inserts a newline. Tab toggles Plan/Work or
 completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome
 labels are Plan, Work, Review, Default, AutoEdit, and Full. The status
 bar includes a queued count while follow-ups wait. Auto-pass prints a
@@ -282,8 +288,9 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`). A slash picker appears while the prompt
-is a command prefix. PageUp and PageDown scroll the transcript.
-Redirected output stays sequential.
+is a command prefix. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
+and Up/Down on an empty prompt scroll the transcript. Escape sequences
+are not treated as paste. Redirected output stays sequential.
 
 ## Plugins
 

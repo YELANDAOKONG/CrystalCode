@@ -9,6 +9,8 @@ public sealed class MessageQueue
 
     public int Count => _items.Count;
 
+    public IReadOnlyList<string> Snapshot() => [.. _items];
+
     public void Enqueue(string text)
     {
         ArgumentNullException.ThrowIfNull(text);

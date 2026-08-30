@@ -19,12 +19,14 @@ namespace CrystalHarness.Display;
 public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 {
     private const int PollMilliseconds = 40;
+    private const int EscapeHoldMilliseconds = 20;
     private static readonly TimeSpan PaintBudget = TimeSpan.FromMilliseconds(33);
     private readonly object _gate = new();
     private readonly TranscriptLog _log = new();
     private readonly ComposerBuffer _composer = new();
     private readonly ShellChrome _chrome = new();
     private readonly List<string> _modalOverlay = [];
+    private readonly List<string> _queueItems = [];
     private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
     private AlternateScreen? _screen;
@@ -35,6 +37,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
     private bool _composerPaused;
+
+    public Action? AfterTools { get; set; }
 
     public IDisposable Open()
     {
@@ -163,12 +167,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             AddHelpUnlocked(
                 "enter        submit; queue while working",
                 "enter        empty while working interrupts and sends",
+                "queue        stays above the composer; sends after this tool or turn",
                 "ctrl+j       newline",
                 "\\ enter      newline",
                 "tab          Plan / Work, or complete /",
                 "shift+tab    Plan / Work",
                 "?            shortcuts when empty",
-                "pageup       scroll transcript");
+                "pageup       scroll transcript",
+                "wheel        scroll transcript",
+                "up           scroll when the prompt is empty");
             foreach (var spec in SlashCatalog.BuiltIn)
             {
                 var names = "/" + spec.Name;
@@ -291,8 +298,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 case ChatToolCallDelta toolCall:
                     if (toolCall.NameDelta.Length > 0)
                     {
-                        _toolName += toolCall.NameDelta;
-                        _chrome.Activity = _toolName;
+                        _toolName = StreamName.Apply(_toolName, toolCall.NameDelta);
+                        _chrome.Activity = DisplayCase.Token(_toolName);
                     }
 
                     PaintUnlocked(force: false);
@@ -319,17 +326,19 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             CommitLiveUnlocked();
             foreach (var result in results)
             {
-                var first = ToolResultText.Summary(result.Text);
+                var body = ToolResultText.Body(result.Text);
                 var kind = result.Status == ToolResultStatus.Success
                     ? TranscriptKind.Result
                     : TranscriptKind.Error;
-                _log.Add(kind, first);
-                WriteFallback(kind, first);
+                _log.Add(kind, body);
+                WriteFallback(kind, body);
             }
 
             _chrome.Activity = "Running";
             PaintUnlocked(force: true);
         }
+
+        AfterTools?.Invoke();
     }
 
     public void CloseStream()
@@ -391,11 +400,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    public void SetQueued(int count)
+    public void SetQueue(IReadOnlyList<string> items)
     {
+        ArgumentNullException.ThrowIfNull(items);
         lock (_gate)
         {
-            _chrome.Queued = Math.Max(0, count);
+            _queueItems.Clear();
+            _queueItems.AddRange(items);
+            _chrome.Queued = _queueItems.Count;
             PaintUnlocked(force: true);
         }
     }
@@ -462,13 +474,23 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             string? submitted = null;
             lock (_gate)
             {
-                if (burst.Count > 1)
+                var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                if (ScrollInput.TryDelta(
+                    burst,
+                    _composer.IsEmpty,
+                    _picker is not null,
+                    pageRows,
+                    out var delta))
+                {
+                    _scrollBack = Math.Max(0, _scrollBack + delta);
+                }
+                else if (ScrollInput.TryComposerKey(burst, out var key))
+                {
+                    submitted = HandleComposerKeyUnlocked(key, togglePlan);
+                }
+                else if (ScrollInput.IsPaste(burst))
                 {
                     _composer.Insert(ExtractPaste(burst));
-                }
-                else
-                {
-                    submitted = HandleComposerKeyUnlocked(burst[0], togglePlan);
                 }
 
                 RefreshPickerUnlocked();
@@ -494,20 +516,6 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     private string? HandleComposerKeyUnlocked(ConsoleKeyInfo key, Func<bool> togglePlan)
     {
-        if (key.Key == ConsoleKey.PageUp)
-        {
-            var regions = CurrentRegions();
-            _scrollBack += Math.Max(1, regions.TranscriptRows - 1);
-            return null;
-        }
-
-        if (key.Key == ConsoleKey.PageDown)
-        {
-            var regions = CurrentRegions();
-            _scrollBack = Math.Max(0, _scrollBack - Math.Max(1, regions.TranscriptRows - 1));
-            return null;
-        }
-
         if (_picker is not null
             && key.Key == ConsoleKey.Tab
             && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
@@ -558,12 +566,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         AddHelpUnlocked(
             "enter        submit; queue while working",
             "enter        empty while working interrupts and sends",
+            "queue        stays above the composer; sends after this tool or turn",
             "ctrl+j       newline",
             "\\ enter      newline",
             "tab          Plan / Work, or complete /",
             "shift+tab    Plan / Work",
             "?            shortcuts when empty",
-            "pageup       scroll transcript");
+            "pageup       scroll transcript",
+            "wheel        scroll transcript",
+            "up           scroll when the prompt is empty");
         foreach (var option in _slashOptions)
         {
             var aliases = option.Keys
@@ -652,11 +663,13 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
         var overlay = OverlayLines(ScreenSize.Width);
+        var queue = QueueLines(ScreenSize.Width);
         var regions = ShellLayout.Measure(
             ScreenSize.Width,
             ScreenSize.Height,
             composerView.Lines.Count,
-            overlay.Count);
+            overlay.Count,
+            queue.Count);
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
         ScreenPainter.Paint(
@@ -664,6 +677,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             transcript,
             overlay,
             _chrome.StatusLine(regions.Width),
+            queue,
             composerView);
         _lastPaint = now;
     }
@@ -689,6 +703,12 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         return _picker is null ? [] : _picker.Paint(width);
     }
 
+    private IReadOnlyList<PaintLine> QueueLines(int width)
+    {
+        var card = QueueCard.TryCreate(_queueItems);
+        return card is null ? [] : WidgetPaint.Lines(card, width);
+    }
+
     private ShellRegions CurrentRegions()
     {
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
@@ -696,7 +716,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             ScreenSize.Width,
             ScreenSize.Height,
             composerView.Lines.Count,
-            OverlayLines(ScreenSize.Width).Count);
+            OverlayLines(ScreenSize.Width).Count,
+            QueueLines(ScreenSize.Width).Count);
     }
 
     private bool Framed => _screen is { IsActive: true };
@@ -718,6 +739,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             TranscriptKind.User => Theme.User,
             _ => Theme.Chrome
         };
+        var card = TranscriptCard.TryCreate(kind, text);
+        if (card is not null)
+        {
+            AnsiConsole.Write(card);
+            AnsiConsole.WriteLine();
+            return;
+        }
+
         foreach (var line in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
             AnsiConsole.MarkupLine($"[{color}]  {MarkupText.Escape(line)}[/]");
@@ -764,6 +793,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             if (!paused && Console.KeyAvailable)
             {
                 var burst = new List<ConsoleKeyInfo> { Console.ReadKey(intercept: true) };
+                if (burst[0].Key == ConsoleKey.Escape || burst[0].KeyChar == '\u001b')
+                {
+                    await Task.Delay(EscapeHoldMilliseconds, cancellationToken);
+                }
+
                 while (Console.KeyAvailable)
                 {
                     burst.Add(Console.ReadKey(intercept: true));

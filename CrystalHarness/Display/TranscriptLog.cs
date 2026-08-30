@@ -119,6 +119,13 @@ public sealed class TranscriptLog
                 continue;
             }
 
+            var card = TranscriptCard.TryCreate(entry.Kind, entry.Text);
+            if (card is not null)
+            {
+                lines.AddRange(WidgetPaint.Lines(card, width));
+                continue;
+            }
+
             var color = ColorFor(entry.Kind);
             foreach (var wrapped in TextWidth.Wrap(entry.Text, bodyWidth))
             {

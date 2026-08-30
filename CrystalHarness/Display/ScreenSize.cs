@@ -35,6 +35,9 @@ public static class ScreenSize
         }
     }
 
-    public static ShellRegions Current(int composerWanted, int overlayWanted) =>
-        ShellLayout.Measure(Width, Height, composerWanted, overlayWanted);
+    public static ShellRegions Current(
+        int composerWanted,
+        int overlayWanted,
+        int queueWanted = 0) =>
+        ShellLayout.Measure(Width, Height, composerWanted, overlayWanted, queueWanted);
 }

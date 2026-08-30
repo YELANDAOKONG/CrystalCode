@@ -16,6 +16,7 @@ public static class DisplayCase
         return value.ToLowerInvariant() switch
         {
             "autoedit" => "AutoEdit",
+            "todowrite" => "TodoWrite",
             "outside_workspace" => "Outside Workspace",
             "privileged_escalation" => "Privileged Escalation",
             _ => Words(value.Replace('_', ' '))

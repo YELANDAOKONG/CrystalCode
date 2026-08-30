@@ -10,5 +10,7 @@ public readonly record struct ShellRegions(
     int OverlayRows,
     int OverlayTop,
     int StatusTop,
+    int QueueRows,
+    int QueueTop,
     int ComposerRows,
     int ComposerTop);
