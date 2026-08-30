@@ -56,14 +56,21 @@ public sealed class BashTool : ITool
         using var process = new Process();
         process.StartInfo = new ProcessStartInfo
         {
-            FileName = "bash",
+            FileName = ResolveBashFileName(),
             WorkingDirectory = _workspace.Root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            UseShellExecute = false
+            UseShellExecute = false,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
         process.StartInfo.ArgumentList.Add("-lc");
         process.StartInfo.ArgumentList.Add(command);
+        if (OperatingSystem.IsWindows())
+        {
+            // Git Bash login profiles cd to HOME unless this is set.
+            process.StartInfo.Environment["CHERE_INVOKING"] = "1";
+        }
 
         try
         {
@@ -107,6 +114,68 @@ public sealed class BashTool : ITool
 
     internal static bool TryReadCommand(string arguments, out string command) =>
         ToolArguments.TryReadRequiredString(arguments, "command", out command);
+
+    private static string ResolveBashFileName()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return "bash";
+        }
+
+        foreach (var candidate in EnumerateWindowsBashCandidates())
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return "bash";
+    }
+
+    private static IEnumerable<string> EnumerateWindowsBashCandidates()
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        yield return Path.Combine(programFiles, "Git", "bin", "bash.exe");
+
+        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        if (programFilesX86.Length > 0)
+        {
+            yield return Path.Combine(programFilesX86, "Git", "bin", "bash.exe");
+        }
+
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        yield return Path.Combine(localAppData, "Programs", "Git", "bin", "bash.exe");
+
+        // System32\bash.exe is the WSL stub; it emits UTF-16 text when no distro exists.
+        var windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = directory.Trim();
+            if (trimmed.Length == 0)
+            {
+                continue;
+            }
+
+            string fullDirectory;
+            try
+            {
+                fullDirectory = Path.GetFullPath(trimmed);
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
+            {
+                continue;
+            }
+
+            if (fullDirectory.StartsWith(windowsDirectory, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            yield return Path.Combine(fullDirectory, "bash.exe");
+        }
+    }
 
     private static async Task<string> ReadBoundedOutputAsync(
         Process process,
