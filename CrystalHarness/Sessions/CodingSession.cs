@@ -94,6 +94,7 @@ public sealed class CodingSession
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
         using var screen = _renderer.Open();
+        _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
         _renderer.SetSlashCommands(_plugins.Commands);
         _renderer.WriteHeader(
@@ -346,17 +347,19 @@ public sealed class CodingSession
             return;
         }
 
+        _renderer.WriteNote("compacting context...");
         var outcome = await _compactor.CompactAsync(
             _transcript,
             _todos.Format(),
             cancellationToken);
         if (!outcome.Compacted)
         {
+            _renderer.WriteNote("compaction skipped");
             return;
         }
 
         _transcript = [.. outcome.Transcript];
-        _renderer.WriteNote("compacted");
+        _renderer.WriteNote("compacted context");
     }
 
     private void SaveSession()

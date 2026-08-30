@@ -3,6 +3,7 @@ using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalHarness.Sessions;
+using CrystalHarness.Tools;
 
 using Xunit;
 
@@ -61,6 +62,54 @@ public sealed class StreamingTurnTests
         Assert.Equal(1, result.ToolCallCount);
     }
 
+    [Fact]
+    public async Task RunAsync_InterruptedToolCall_ReconcilesCancelledToolResults()
+    {
+        using var cts = new CancellationTokenSource();
+        var client = new ScriptedStreamingClient(ToolRound("c_cancel", "cancel_tool", "{}"));
+        var cancellingTool = new CancellingTool(() => cts.Cancel());
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([cancellingTool]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)));
+
+        var result = await turn.RunAsync(
+            [new ChatMessage(ChatRole.User, "test")],
+            cts.Token);
+
+        Assert.Equal(TurnStopReason.Interrupted, result.StopReason);
+        var call = result.Transcript.OfType<ToolCall>().Single();
+        var toolResult = result.Transcript.OfType<ToolResult>().Single();
+        Assert.Equal(call.CallId, toolResult.CallId);
+        Assert.Equal(ToolResultStatus.Failure, toolResult.Status);
+        Assert.Contains("interrupted", toolResult.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReportsUsageUpdatesToObserver()
+    {
+        var observer = new TestObserver();
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "echo", "{}", new TokenUsage(10, 5, 2)),
+            TextRound("ok", new TokenUsage(20, 10, 4)));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.True(observer.UsageUpdates.Count >= 2);
+        Assert.Equal(30, observer.UsageUpdates[^1]?.InputTokenCount);
+        Assert.Equal(15, observer.UsageUpdates[^1]?.OutputTokenCount);
+    }
+
     private static StreamingTurn CreateTurn(
         IStreamingChatClient client,
         TurnLimits? limits = null) =>
@@ -71,15 +120,71 @@ public sealed class StreamingTurnTests
                 new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
             limits ?? new TurnLimits(8, 8, TimeSpan.FromSeconds(5)));
 
-    private static ChatStreamEvent[] TextRound(string text) =>
-    [
-        new ChatTextDelta(0, 0, ChatRole.Assistant, text),
-        new ChatCandidateCompleted(0, FinishReason.Stop)
-    ];
+    private static ChatStreamEvent[] TextRound(string text, TokenUsage? usage = null)
+    {
+        var events = new List<ChatStreamEvent>
+        {
+            new ChatTextDelta(0, 0, ChatRole.Assistant, text),
+            new ChatCandidateCompleted(0, FinishReason.Stop)
+        };
+        if (usage is not null)
+        {
+            events.Add(new ChatUsageReceived(usage));
+        }
 
-    private static ChatStreamEvent[] ToolRound(string callId, string name, string arguments) =>
-    [
-        new ChatToolCallDelta(0, 0, callId, name, arguments),
-        new ChatCandidateCompleted(0, FinishReason.ToolCalls)
-    ];
+        return [.. events];
+    }
+
+    private static ChatStreamEvent[] ToolRound(string callId, string name, string arguments, TokenUsage? usage = null)
+    {
+        var events = new List<ChatStreamEvent>
+        {
+            new ChatToolCallDelta(0, 0, callId, name, arguments),
+            new ChatCandidateCompleted(0, FinishReason.ToolCalls)
+        };
+        if (usage is not null)
+        {
+            events.Add(new ChatUsageReceived(usage));
+        }
+
+        return [.. events];
+    }
+
+    private sealed class CancellingTool : ITool
+    {
+        private readonly Action _onExecute;
+
+        public CancellingTool(Action onExecute)
+        {
+            _onExecute = onExecute;
+            Definition = new ToolDefinition(
+                "cancel_tool",
+                ToolSchema.Parse("""{"type":"object","properties":{}}"""),
+                "Cancels execution.");
+        }
+
+        public ToolDefinition Definition { get; }
+
+        public ValueTask<ToolOutput> InvokeAsync(
+            ToolCall call,
+            CancellationToken cancellationToken = default)
+        {
+            _onExecute();
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new OperationCanceledException(cancellationToken);
+        }
+    }
+
+    private sealed class TestObserver : ITurnObserver
+    {
+        public List<TokenUsage?> UsageUpdates { get; } = [];
+
+        public void OnStreamEvent(ChatStreamEvent streamEvent) { }
+
+        public void OnModelRoundClosed() { }
+
+        public void OnToolResults(IReadOnlyList<ToolResult> results) { }
+
+        public void OnUsageUpdated(TokenUsage? usage) => UsageUpdates.Add(usage);
+    }
 }

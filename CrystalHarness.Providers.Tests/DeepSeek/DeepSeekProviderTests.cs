@@ -63,6 +63,41 @@ public sealed class DeepSeekProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_OrphanedToolCall_FlushesSyntheticToolMessage()
+    {
+        var handler = new RecordingHandler(
+            JsonResponse.Create(
+                """
+                {
+                  "choices": [
+                    {
+                      "message": { "role": "assistant", "content": "recovered" },
+                      "finish_reason": "stop"
+                    }
+                  ]
+                }
+                """));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        // Transcript has tool call with no following tool result before next user message
+        var response = await provider.CompleteAsync(
+            new ChatRequest(
+                [
+                    new ChatMessage(ChatRole.System, "system"),
+                    new ToolCall("call_dangling", "bash", "{\"command\":\"ls\"}"),
+                    new ChatMessage(ChatRole.User, "next user message")
+                ]));
+
+        Assert.NotNull(handler.Body);
+        Assert.Contains("\"role\":\"tool\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"tool_call_id\":\"call_dangling\"", handler.Body, StringComparison.Ordinal);
+        Assert.Equal("recovered", Assert.IsType<ChatMessage>(response.Candidates[0].Items[0]).Text);
+    }
+
+    [Fact]
     public async Task CompleteAsync_MapsHttpErrorToDeepSeekException()
     {
         var handler = new RecordingHandler(

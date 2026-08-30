@@ -288,8 +288,9 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`). A slash picker appears while the prompt
-is a command prefix. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
-and Up/Down on an empty prompt scroll the transcript. Escape sequences
+is a command prefix. PageUp, PageDown, the mouse wheel, and Ctrl+Up/Down scroll the transcript.
+Up/Down arrows navigate composer history or slash picker options. Native
+mouse selection and clipboard copy are preserved. Escape sequences
 are not treated as paste. Redirected output stays sequential.
 
 ## Plugins

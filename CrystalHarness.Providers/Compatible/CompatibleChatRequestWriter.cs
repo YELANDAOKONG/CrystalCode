@@ -95,22 +95,28 @@ internal static class CompatibleChatRequestWriter
         writer.WriteStartArray();
 
         AssistantBuffer? assistant = null;
+        var pendingToolCallIds = new List<string>();
+
         foreach (var item in items)
         {
             switch (item)
             {
                 case ChatMessage message:
+                    FlushPendingToolCalls(writer, pendingToolCallIds);
                     WriteChatMessage(writer, profile, ref assistant, message);
                     break;
                 case ChatReasoningItem reasoning:
+                    FlushPendingToolCalls(writer, pendingToolCallIds);
                     AppendReasoning(writer, profile, ref assistant, reasoning);
                     break;
                 case ToolCall toolCall:
                     assistant ??= new AssistantBuffer();
                     assistant.ToolCalls.Add(toolCall);
+                    pendingToolCallIds.Add(toolCall.CallId);
                     break;
                 case ToolResult toolResult:
                     FlushAssistant(writer, ref assistant);
+                    pendingToolCallIds.Remove(toolResult.CallId);
                     WriteToolMessage(writer, toolResult);
                     break;
                 default:
@@ -120,7 +126,27 @@ internal static class CompatibleChatRequestWriter
         }
 
         FlushAssistant(writer, ref assistant);
+        FlushPendingToolCalls(writer, pendingToolCallIds);
         writer.WriteEndArray();
+    }
+
+    private static void FlushPendingToolCalls(Utf8JsonWriter writer, List<string> pendingToolCallIds)
+    {
+        if (pendingToolCallIds.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var callId in pendingToolCallIds)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("role", "tool");
+            writer.WriteString("tool_call_id", callId);
+            writer.WriteString("content", "Tool execution was cancelled.");
+            writer.WriteEndObject();
+        }
+
+        pendingToolCallIds.Clear();
     }
 
     private static void WriteChatMessage(

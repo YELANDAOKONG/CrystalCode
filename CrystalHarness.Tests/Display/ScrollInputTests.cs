@@ -16,13 +16,14 @@ public sealed class ScrollInputTests
     }
 
     [Fact]
-    public void TryDelta_EmptyPromptUpScrolls()
+    public void TryDelta_CtrlUpScrolls_PlainUpDoesNotScroll()
     {
-        var up = new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false);
+        var plainUp = new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false);
+        var ctrlUp = new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, true);
 
-        Assert.True(ScrollInput.TryDelta([up], composerEmpty: true, pickerOpen: false, 10, out var delta));
+        Assert.False(ScrollInput.TryDelta([plainUp], composerEmpty: true, pickerOpen: false, 10, out _));
+        Assert.True(ScrollInput.TryDelta([ctrlUp], composerEmpty: true, pickerOpen: false, 10, out var delta));
         Assert.Equal(ScrollInput.LineStep, delta);
-        Assert.False(ScrollInput.TryDelta([up], composerEmpty: false, pickerOpen: false, 10, out _));
     }
 
     [Fact]

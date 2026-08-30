@@ -62,6 +62,7 @@ public sealed class StreamingTurn
                 var request = new ChatRequest(transcript, _executor.Definitions);
                 var response = await StreamModelAsync(request, linked.Token);
                 usage.Add(response.Usage);
+                _observer?.OnUsageUpdated(usage.Build() ?? response.Usage);
 
                 var candidate = response.Candidates[0];
                 transcript.AddRange(candidate.Items);
@@ -94,6 +95,7 @@ public sealed class StreamingTurn
                 var toolResults = await _executor.ExecuteAsync(toolCalls, linked.Token);
                 transcript.AddRange(toolResults);
                 _observer?.OnToolResults(toolResults);
+                _observer?.OnUsageUpdated(usage.Build() ?? response.Usage);
             }
         }
         catch (OperationCanceledException) when (durationSource.IsCancellationRequested)
@@ -137,6 +139,28 @@ public sealed class StreamingTurn
         int modelCallCount,
         int toolCallCount,
         UsageAccumulator usage,
-        List<ChatItem> transcript) =>
-        new(stopReason, modelCallCount, toolCallCount, usage.Build(), transcript);
+        List<ChatItem> transcript)
+    {
+        ReconcilePendingToolCalls(transcript);
+        return new(stopReason, modelCallCount, toolCallCount, usage.Build(), transcript);
+    }
+
+    private static void ReconcilePendingToolCalls(List<ChatItem> transcript)
+    {
+        var completedToolCalls = new HashSet<string>(
+            transcript.OfType<ToolResult>().Select(r => r.CallId),
+            StringComparer.Ordinal);
+
+        var missing = new List<ToolResult>();
+        foreach (var item in transcript)
+        {
+            if (item is ToolCall call && !completedToolCalls.Contains(call.CallId))
+            {
+                missing.Add(new ToolResult(call.CallId, "Tool execution was interrupted by user.", ToolResultStatus.Failure));
+                completedToolCalls.Add(call.CallId);
+            }
+        }
+
+        transcript.AddRange(missing);
+    }
 }

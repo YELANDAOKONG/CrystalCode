@@ -4,6 +4,8 @@ namespace CrystalHarness.Display;
 
 /// <summary>
 /// Transcript scroll gestures from a key burst. CSI is not paste.
+/// Up/Down arrows are reserved for input history and slash picker navigation.
+/// Transcript scrolling uses PageUp/PageDown, Ctrl+Up/Down, and mouse wheel.
 /// </summary>
 public static class ScrollInput
 {
@@ -135,13 +137,13 @@ public static class ScrollInput
         }
 
         var control = key.Modifiers.HasFlag(ConsoleModifiers.Control);
-        if (key.Key == ConsoleKey.UpArrow && (control || (composerEmpty && !pickerOpen)))
+        if (key.Key == ConsoleKey.UpArrow && control)
         {
             delta = LineStep;
             return true;
         }
 
-        if (key.Key == ConsoleKey.DownArrow && (control || (composerEmpty && !pickerOpen)))
+        if (key.Key == ConsoleKey.DownArrow && control)
         {
             delta = -LineStep;
             return true;
@@ -188,18 +190,6 @@ public static class ScrollInput
         }
 
         if (text.Contains("[1;5B", StringComparison.Ordinal) || text.EndsWith("[5B", StringComparison.Ordinal))
-        {
-            delta = -LineStep;
-            return true;
-        }
-
-        if (composerEmpty && !pickerOpen && text.EndsWith("[A", StringComparison.Ordinal))
-        {
-            delta = LineStep;
-            return true;
-        }
-
-        if (composerEmpty && !pickerOpen && text.EndsWith("[B", StringComparison.Ordinal))
         {
             delta = -LineStep;
             return true;

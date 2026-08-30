@@ -4,6 +4,7 @@ using System.Text;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
+using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
 
@@ -37,6 +38,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
     private bool _composerPaused;
+
+    public int ContextWindow { get; set; }
 
     public Action? AfterTools { get; set; }
 
@@ -173,9 +176,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 "tab          Plan / Work, or complete /",
                 "shift+tab    Plan / Work",
                 "?            shortcuts when empty",
-                "pageup       scroll transcript",
-                "wheel        scroll transcript",
-                "up           scroll when the prompt is empty");
+                "pageup       scroll transcript (also ctrl+up/down)",
+                "up/down      history recall (or picker navigation)");
             foreach (var spec in SlashCatalog.BuiltIn)
             {
                 var names = "/" + spec.Name;
@@ -334,11 +336,25 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 WriteFallback(kind, body);
             }
 
+            _chrome.ToolCount += results.Count;
             _chrome.Activity = "Running";
             PaintUnlocked(force: true);
         }
 
         AfterTools?.Invoke();
+    }
+
+    public void OnUsageUpdated(TokenUsage? usage)
+    {
+        lock (_gate)
+        {
+            if (usage is not null && ContextWindow > 0)
+            {
+                _chrome.Usage = UsageText.Format(usage, ContextWindow);
+            }
+
+            PaintUnlocked(force: false);
+        }
     }
 
     public void CloseStream()
