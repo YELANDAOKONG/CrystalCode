@@ -277,28 +277,92 @@ public static class ScrollInput
     private static bool TryMouseWheel(string text, out int delta)
     {
         delta = 0;
-        if (!text.StartsWith("\u001b[<", StringComparison.Ordinal)
-            || (text[^1] is not 'M' and not 'm'))
+        var found = false;
+        var index = 0;
+        while (index < text.Length)
+        {
+            var sgr = text.IndexOf("[<", index, StringComparison.Ordinal);
+            var x10 = text.IndexOf("[M", index, StringComparison.Ordinal);
+            if (sgr < 0 && x10 < 0)
+            {
+                break;
+            }
+
+            if (sgr >= 0 && (x10 < 0 || sgr <= x10))
+            {
+                if (TryReadSgrWheel(text, sgr + 2, out var step, out var next))
+                {
+                    delta += step;
+                    found = true;
+                    index = next;
+                    continue;
+                }
+
+                index = sgr + 2;
+                continue;
+            }
+
+            if (TryReadX10Wheel(text, x10 + 2, out var x10Step))
+            {
+                delta += x10Step;
+                found = true;
+                index = x10 + 5;
+                continue;
+            }
+
+            index = x10 + 2;
+        }
+
+        return found;
+    }
+
+    private static bool TryReadSgrWheel(string text, int start, out int step, out int next)
+    {
+        step = 0;
+        next = start;
+        var end = start;
+        while (end < text.Length && char.IsAsciiDigit(text[end]))
+        {
+            end++;
+        }
+
+        if (end == start || !int.TryParse(text.AsSpan(start, end - start), out var button))
         {
             return false;
         }
 
-        var body = text[3..^1];
-        var split = body.IndexOf(';');
-        var button = split < 0 ? body : body[..split];
-        if (button == "64")
+        var close = text.IndexOfAny(['M', 'm'], end);
+        if (close < 0)
         {
-            delta = LineStep;
-            return true;
+            return false;
         }
 
-        if (button == "65")
+        next = close + 1;
+        if ((button & 64) == 0)
         {
-            delta = -LineStep;
-            return true;
+            return false;
         }
 
-        return false;
+        step = (button & 1) == 0 ? LineStep : -LineStep;
+        return true;
+    }
+
+    private static bool TryReadX10Wheel(string text, int start, out int step)
+    {
+        step = 0;
+        if (start + 2 >= text.Length)
+        {
+            return false;
+        }
+
+        var button = text[start] - 32;
+        if ((button & 64) == 0)
+        {
+            return false;
+        }
+
+        step = (button & 1) == 0 ? LineStep : -LineStep;
+        return true;
     }
 
     private static string Chars(IReadOnlyList<ConsoleKeyInfo> burst)
@@ -306,6 +370,17 @@ public static class ScrollInput
         var text = new StringBuilder();
         foreach (var key in burst)
         {
+            if (key.Key == ConsoleKey.Escape)
+            {
+                text.Append('\u001b');
+                if (key.KeyChar is not ('\0' or '\u001b'))
+                {
+                    text.Append(key.KeyChar);
+                }
+
+                continue;
+            }
+
             if (key.KeyChar != '\0')
             {
                 text.Append(key.KeyChar);

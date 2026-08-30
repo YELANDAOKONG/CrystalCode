@@ -298,10 +298,10 @@ aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 is a command prefix. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Up/Down
 arrows navigate composer history or the slash picker when the prompt
-has text. The alternate screen remaps the wheel to arrows without
-mouse capture. The frame polls terminal size and repaints when the
-window is resized. Native
-mouse selection and clipboard copy are preserved. Escape sequences
+has text. The alternate screen enables SGR mouse for the wheel
+(1000/1006) and alternate-scroll arrows (1007). Shift+drag still
+selects and copies. The frame polls terminal size and repaints when the
+window is resized. Escape sequences
 are not treated as paste. Redirected output stays sequential.
 
 ## Plugins

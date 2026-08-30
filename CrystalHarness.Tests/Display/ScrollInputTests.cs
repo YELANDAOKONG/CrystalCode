@@ -49,6 +49,40 @@ public sealed class ScrollInputTests
     }
 
     [Fact]
+    public void TryDelta_SgrWheelWithNullEscapeCharStillScrolls()
+    {
+        var burst = new List<ConsoleKeyInfo>
+        {
+            new('\0', ConsoleKey.Escape, false, false, false)
+        };
+        foreach (var ch in "[<64;12;8M")
+        {
+            burst.Add(new ConsoleKeyInfo(ch, ConsoleKey.None, false, false, false));
+        }
+
+        Assert.True(ScrollInput.TryDelta(burst, composerEmpty: false, pickerOpen: false, 8, out var delta));
+        Assert.Equal(ScrollInput.LineStep, delta);
+    }
+
+    [Fact]
+    public void TryDelta_SgrWheelBurstSumsClicks()
+    {
+        var burst = Csi("\u001b[<64;1;1M\u001b[<65;1;1M\u001b[<64;1;1M");
+
+        Assert.True(ScrollInput.TryDelta(burst, false, false, 8, out var delta));
+        Assert.Equal(ScrollInput.LineStep, delta);
+    }
+
+    [Fact]
+    public void TryDelta_X10WheelDownScrolls()
+    {
+        var burst = Csi("\u001b[M" + (char)(65 + 32) + "!!");
+
+        Assert.True(ScrollInput.TryDelta(burst, false, false, 8, out var delta));
+        Assert.Equal(-ScrollInput.LineStep, delta);
+    }
+
+    [Fact]
     public void IsPaste_PrintableBurst()
     {
         var burst = new List<ConsoleKeyInfo>
