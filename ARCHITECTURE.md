@@ -124,11 +124,13 @@ Modes:
 - Plan: read-only catalog. No edit, write, or bash.
 - Default: Read auto-executes. Write and shell ask the operator.
 - AutoEdit: workspace file changes pass without review. Shell still asks.
-- Review: another model checks each remaining side-effect call for safety
-  and whether it serves the current user request (Codex-style review).
-  Allow executes. Deny becomes model-visible rejection text. Uncertain
-  and Forbidden-allow fall back to the operator. Review is not a grant
-  and is not full pass-through.
+- Review: another model checks each remaining side-effect call (Codex
+  guardian-style). The current user request is attached; without it the
+  host asks the operator. The reviewer returns `outcome` (allow / deny /
+  ask), `risk_level` (low / medium / high), `user_authorization` (low /
+  medium / high), and `rationale`. Allow executes. Deny becomes
+  model-visible rejection text. Ask and Forbidden-allow fall back to the
+  operator. Review is not a grant and is not full pass-through.
 - Full: workspace-bounded, policy-allowed actions pass without review.
   Forbidden and Privileged never fully auto-pass.
 

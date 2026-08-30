@@ -9,6 +9,7 @@ namespace CrystalHarness.Approvals;
 
 /// <summary>
 /// Asks another chat model whether a tool call is safe and on-request.
+/// The user request must be attached; otherwise the reviewer does not run.
 /// </summary>
 public sealed class ModelApprovalReviewer : IApprovalReviewer
 {
@@ -58,7 +59,7 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
         if (!TryParse(text, out var verdict))
         {
             return ApprovalReviewVerdict.AskUser(
-                "The approval reviewer did not return a usable decision.");
+                "The approval reviewer did not return a usable assessment.");
         }
 
         return verdict;
@@ -90,42 +91,64 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
 
         using (document)
         {
-            if (!document.RootElement.TryGetProperty("decision", out var decision)
-                || decision.ValueKind != JsonValueKind.String)
+            if (!TryReadString(document.RootElement, ["outcome", "decision"], out var outcome)
+                || !TryReadString(document.RootElement, ["risk_level", "risk"], out var riskText)
+                || !TryReadString(
+                    document.RootElement,
+                    ["user_authorization", "authorization", "authority"],
+                    out var authorizationText)
+                || !TryReadString(document.RootElement, ["rationale", "reason"], out var rationale)
+                || !ReviewRiskLevel.TryParse(riskText, out var riskLevel)
+                || !ReviewAuthorization.TryParse(authorizationText, out var authorization))
             {
                 return false;
             }
 
-            var reason = "No reason was provided.";
-            if (document.RootElement.TryGetProperty("reason", out var reasonElement)
-                && reasonElement.ValueKind == JsonValueKind.String
-                && !string.IsNullOrWhiteSpace(reasonElement.GetString()))
+            var normalized = outcome.Trim().ToLowerInvariant();
+            if (normalized is "ask_user")
             {
-                reason = reasonElement.GetString()!;
+                normalized = "ask";
             }
 
-            var value = decision.GetString() ?? string.Empty;
-            if (value.Equals("allow", StringComparison.OrdinalIgnoreCase))
+            if (normalized is not ("allow" or "deny" or "ask"))
             {
-                verdict = ApprovalReviewVerdict.Allow(reason);
-                return true;
+                return false;
             }
 
-            if (value.Equals("deny", StringComparison.OrdinalIgnoreCase))
-            {
-                verdict = ApprovalReviewVerdict.Deny(reason);
-                return true;
-            }
-
-            if (value.Equals("ask", StringComparison.OrdinalIgnoreCase)
-                || value.Equals("ask_user", StringComparison.OrdinalIgnoreCase))
-            {
-                verdict = ApprovalReviewVerdict.AskUser(reason);
-                return true;
-            }
-
-            return false;
+            verdict = new ApprovalReviewVerdict(
+                normalized,
+                riskLevel,
+                authorization,
+                rationale);
+            return true;
         }
+    }
+
+    private static bool TryReadString(
+        JsonElement root,
+        string[] names,
+        out string value)
+    {
+        value = string.Empty;
+        foreach (var name in names)
+        {
+            if (!root.TryGetProperty(name, out var property)
+                || property.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            var text = property.GetString();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            value = text.Trim();
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryReadObject(string text, out JsonDocument document)

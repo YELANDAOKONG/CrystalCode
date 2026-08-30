@@ -12,11 +12,18 @@ namespace CrystalHarness.Tests.Approvals;
 public sealed class ModelApprovalReviewerTests
 {
     [Fact]
-    public async Task ReviewAsync_ParsesAllowDecision()
+    public async Task ReviewAsync_ParsesCodexAssessment()
     {
         using var root = new TemporaryWorkspace();
         var client = new FixedChatClient(
-            """{"decision":"allow","reason":"Adds the requested test."}""");
+            """
+            {
+              "outcome": "allow",
+              "risk_level": "low",
+              "user_authorization": "high",
+              "rationale": "Adds the requested test."
+            }
+            """);
         var reviewer = new ModelApprovalReviewer(client);
         var classification = new ToolClassifier(new Workspace(root.Path))
             .Classify(WriteCall());
@@ -25,11 +32,14 @@ public sealed class ModelApprovalReviewerTests
             new ApprovalReviewRequest(WriteCall(), classification, "Add a failing test."));
 
         Assert.True(verdict.IsAllow);
-        Assert.Equal("Adds the requested test.", verdict.Reason);
+        Assert.Equal(ReviewRiskLevel.Low, verdict.RiskLevel);
+        Assert.Equal(ReviewAuthorization.High, verdict.UserAuthorization);
+        Assert.Equal("Adds the requested test.", verdict.Rationale);
         Assert.NotNull(client.LastRequest);
         Assert.Contains(
             client.LastRequest.Items.OfType<ChatMessage>(),
             message => message.Role == ChatRole.User
+                && message.Text.Contains("## User request", StringComparison.Ordinal)
                 && message.Text.Contains("Add a failing test.", StringComparison.Ordinal));
     }
 
@@ -37,7 +47,8 @@ public sealed class ModelApprovalReviewerTests
     public async Task ReviewAsync_AsksWhenUserRequestIsMissing()
     {
         using var root = new TemporaryWorkspace();
-        var reviewer = new ModelApprovalReviewer(new FixedChatClient("unused"));
+        var client = new FixedChatClient("unused");
+        var reviewer = new ModelApprovalReviewer(client);
         var classification = new ToolClassifier(new Workspace(root.Path))
             .Classify(WriteCall());
 
@@ -46,7 +57,26 @@ public sealed class ModelApprovalReviewerTests
 
         Assert.False(verdict.IsAllow);
         Assert.False(verdict.IsDeny);
-        Assert.Equal("No user request is available to review against.", verdict.Reason);
+        Assert.Equal("No user request is available to review against.", verdict.Rationale);
+        Assert.Null(client.LastRequest);
+    }
+
+    [Fact]
+    public async Task ReviewAsync_AsksWhenAssessmentOmitsRisk()
+    {
+        using var root = new TemporaryWorkspace();
+        var reviewer = new ModelApprovalReviewer(
+            new FixedChatClient("""{"outcome":"allow","rationale":"ok"}"""));
+        var classification = new ToolClassifier(new Workspace(root.Path))
+            .Classify(WriteCall());
+
+        var verdict = await reviewer.ReviewAsync(
+            new ApprovalReviewRequest(WriteCall(), classification, "Add a failing test."));
+
+        Assert.Equal("ask", verdict.Outcome);
+        Assert.Equal(
+            "The approval reviewer did not return a usable assessment.",
+            verdict.Rationale);
     }
 
     private static ToolCall WriteCall() =>

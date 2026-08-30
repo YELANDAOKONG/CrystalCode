@@ -1,34 +1,57 @@
 namespace CrystalHarness.Approvals;
 
 /// <summary>
-/// The reviewing model's decision for one tool call.
+/// Reviewer assessment: outcome, residual risk, user authorization, rationale.
+/// Field names follow Codex <c>GuardianAssessment</c>.
 /// </summary>
 public sealed record ApprovalReviewVerdict
 {
-    public static ApprovalReviewVerdict Allow(string reason) =>
-        new("allow", reason);
-
-    public static ApprovalReviewVerdict Deny(string reason) =>
-        new("deny", reason);
-
-    public static ApprovalReviewVerdict AskUser(string reason) =>
-        new("ask", reason);
-
-    private ApprovalReviewVerdict(string action, string reason)
+    public ApprovalReviewVerdict(
+        string outcome,
+        ReviewRiskLevel riskLevel,
+        ReviewAuthorization userAuthorization,
+        string rationale)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(action);
-        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
-        Action = action;
-        Reason = reason.Trim();
+        ArgumentException.ThrowIfNullOrWhiteSpace(outcome);
+        ArgumentNullException.ThrowIfNull(riskLevel);
+        ArgumentNullException.ThrowIfNull(userAuthorization);
+        ArgumentException.ThrowIfNullOrWhiteSpace(rationale);
+
+        var normalized = outcome.Trim().ToLowerInvariant();
+        if (normalized is not ("allow" or "deny" or "ask"))
+        {
+            throw new ArgumentException(
+                "Outcome must be allow, deny, or ask.",
+                nameof(outcome));
+        }
+
+        Outcome = normalized;
+        RiskLevel = riskLevel;
+        UserAuthorization = userAuthorization;
+        Rationale = rationale.Trim();
     }
 
-    public string Action { get; }
+    public static ApprovalReviewVerdict Allow(string rationale) =>
+        new("allow", ReviewRiskLevel.Low, ReviewAuthorization.High, rationale);
 
-    public string Reason { get; }
+    public static ApprovalReviewVerdict Deny(string rationale) =>
+        new("deny", ReviewRiskLevel.High, ReviewAuthorization.Low, rationale);
 
-    public bool IsAllow => Action == "allow";
+    public static ApprovalReviewVerdict AskUser(string rationale) =>
+        new("ask", ReviewRiskLevel.Medium, ReviewAuthorization.Unknown, rationale);
 
-    public bool IsDeny => Action == "deny";
+    public string Outcome { get; }
 
-    public override string ToString() => $"{Action}: {Reason}";
+    public ReviewRiskLevel RiskLevel { get; }
+
+    public ReviewAuthorization UserAuthorization { get; }
+
+    public string Rationale { get; }
+
+    public bool IsAllow => Outcome == "allow";
+
+    public bool IsDeny => Outcome == "deny";
+
+    public override string ToString() =>
+        $"{Outcome} risk={RiskLevel.Value} auth={UserAuthorization.Value}: {Rationale}";
 }

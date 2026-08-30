@@ -66,7 +66,9 @@ public sealed class ApprovalPolicy
             return ToolInvocationDecision.Execute;
         }
 
-        if (_mode == ApprovalMode.Review && _reviewer is not null)
+        if (_mode == ApprovalMode.Review
+            && _reviewer is not null
+            && !string.IsNullOrWhiteSpace(_reviewContext?.CurrentUserRequest))
         {
             var reviewed = await ReviewAsync(call, classification, cancellationToken);
             if (reviewed is not null)
@@ -103,7 +105,7 @@ public sealed class ApprovalPolicy
         {
             return ToolInvocationDecision.Reject(
                 new ToolOutput(
-                    "The approval reviewer declined this action: " + verdict.Reason,
+                    "The approval reviewer declined this action: " + verdict.Rationale,
                     ToolResultStatus.Failure));
         }
 

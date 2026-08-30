@@ -105,6 +105,22 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
+    public async Task DecideAsync_Review_AsksUserWhenRequestMissing()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Review);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
+        var policy = context.CreatePolicy(
+            prompt,
+            new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("should not run")),
+            userRequest: "");
+
+        var decision = await policy.DecideAsync(WriteCall());
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(1, prompt.Count);
+    }
+
+    [Fact]
     public async Task DecideAsync_Review_ForbiddenAllowStillAsksUser()
     {
         using var context = new ApprovalContext(ApprovalMode.Review);
@@ -192,14 +208,15 @@ public sealed class ApprovalPolicyTests
 
         public ApprovalPolicy CreatePolicy(
             IApprovalPrompt prompt,
-            IApprovalReviewer? reviewer = null) =>
+            IApprovalReviewer? reviewer = null,
+            string userRequest = "Add a failing test.") =>
             new(
                 _mode,
                 new Workspace(_workspace.Path),
                 new GrantStore(_home.Home),
                 prompt,
                 reviewer,
-                new StaticApprovalReviewContext("Add a failing test."));
+                new StaticApprovalReviewContext(userRequest));
 
         public void Dispose()
         {
