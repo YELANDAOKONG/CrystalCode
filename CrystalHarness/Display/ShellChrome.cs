@@ -13,7 +13,7 @@ public sealed class ShellChrome
 
     public string Approval { get; set; } = string.Empty;
 
-    public string Usage { get; set; } = "ctx --";
+    public string Usage { get; set; } = "CTX --";
 
     public string Activity { get; set; } = string.Empty;
 
@@ -25,13 +25,7 @@ public sealed class ShellChrome
 
     public PaintLine StatusLine(int width)
     {
-        var mode = ModeLabel.For(PlanMode);
-        var modeColor = PlanMode ? Theme.Plan : Theme.Work;
-
-        var items = new List<(string Plain, string Markup)>
-        {
-            (mode, $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]")
-        };
+        var items = new List<(string Plain, string Markup)>();
 
         if (!string.IsNullOrWhiteSpace(Approval))
         {

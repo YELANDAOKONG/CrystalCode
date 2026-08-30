@@ -15,12 +15,13 @@ public sealed class ShellChromeTests
             Approval = "Review",
             Activity = "Bash",
             Model = "deepseek-v4-flash",
-            Usage = "ctx 3%"
+            Usage = "CTX 3%"
         };
 
         var line = chrome.StatusLine(120);
 
         Assert.Contains("• Bash", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Work", line.Plain, StringComparison.Ordinal);
         Assert.True(TextWidth.Measure(line.Plain) <= 120);
     }
 
@@ -34,7 +35,7 @@ public sealed class ShellChromeTests
             Activity = "Bash",
             Model = "deepseek-v4-flash",
             WorkspaceRoot = "/tmp/workspace/CrystalHarness",
-            Usage = "ctx 3%  ·  29.3k in / 832 out",
+            Usage = "CTX 3%  ·  29.3k in / 832 out",
             ToolCount = 6,
             Queued = 1
         };
@@ -42,5 +43,23 @@ public sealed class ShellChromeTests
         var line = chrome.StatusLine(80);
 
         Assert.True(TextWidth.Measure(line.Plain) <= 80);
+    }
+
+    [Fact]
+    public void StatusLine_DoesNotRepeatComposerMode()
+    {
+        var chrome = new ShellChrome
+        {
+            PlanMode = false,
+            Approval = "Review",
+            Model = "deepseek-v4-flash",
+            Usage = "CTX --"
+        };
+
+        var line = chrome.StatusLine(80);
+
+        Assert.StartsWith("  Review", line.Plain, StringComparison.Ordinal);
+        Assert.Contains("CTX --", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Work", line.Plain, StringComparison.Ordinal);
     }
 }

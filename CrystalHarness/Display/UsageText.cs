@@ -11,13 +11,13 @@ public static class UsageText
     {
         if (usage is null)
         {
-            return "ctx --";
+            return "CTX --";
         }
 
         var percent = contextWindow <= 0
             ? 0
             : Math.Clamp((int)(usage.TotalTokenCount * 100 / contextWindow), 0, 99);
-        return $"ctx {percent}%  ·  {FormatNumber(usage.InputTokenCount)} in / {FormatNumber(usage.OutputTokenCount)} out";
+        return $"CTX {percent}%  ·  {FormatNumber(usage.InputTokenCount)} in / {FormatNumber(usage.OutputTokenCount)} out";
     }
 
     public static string FormatElapsed(TimeSpan elapsed)

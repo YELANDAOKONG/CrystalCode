@@ -264,8 +264,9 @@ The shell enters the alternate screen when the terminal is a TTY and paints
 a retained frame: transcript viewport, optional overlay, status bar, and
 multiline composer.
 
-The status bar shows mode, approval, model, workspace, context percent,
-tokens, tool count, and elapsed time. Assistant text is rendered as
+The status bar shows approval, model, workspace, context percent,
+tokens, tool count, and elapsed time. Mode is Plan or Work on the
+composer prompt and is not repeated on the status bar. Assistant text is rendered as
 markdown after each model round (headings, lists, fenced code, inline
 code and bold). User, thinking, tool, and result blocks are rounded
 panels. Tool names in chrome and cards are Title Case; stream name
