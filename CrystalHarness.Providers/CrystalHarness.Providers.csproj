@@ -8,9 +8,9 @@
 
     <ItemGroup>
         <ProjectReference Include="../../Crystal/Crystal/Crystal.csproj" />
-        <ProjectReference Include="../../Crystal/Crystal.Tools/Crystal.Tools.csproj" />
-        <ProjectReference Include="../../Crystal/Crystal.Agents/Crystal.Agents.csproj" />
-        <ProjectReference Include="../../Crystal/Crystal.Harness/Crystal.Harness.csproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="CrystalHarness.Providers.Tests" />
     </ItemGroup>
 
     <ItemGroup>
