@@ -140,7 +140,6 @@ public sealed class ApprovalPolicy
     private bool ShouldReview(ToolClassification classification) =>
         _mode == ApprovalMode.Review
         && _reviewer is not null
-        && classification.Risk != Risk.Read
         && ReviewTranscript.HasAuthorization(_reviewContext?.Conversation);
 
     private bool CanPassWithoutReview(string toolName, ToolClassification classification)

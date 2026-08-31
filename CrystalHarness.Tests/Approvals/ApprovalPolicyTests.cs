@@ -54,14 +54,15 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Review_AsksUserForOutsideRead()
+    public async Task DecideAsync_Review_AllowsOutsideReadWhenReviewerAllows()
     {
         using var context = new ApprovalContext(ApprovalMode.Review);
         using var outside = new TemporaryWorkspace();
         var file = Path.Combine(outside.Path, "note.txt");
         File.WriteAllText(file, "hello");
-        var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
-        var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("should not run"));
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var reviewer = new FixedApprovalReviewer(
+            ApprovalReviewVerdict.Allow("outside read matches the task"));
         var policy = context.CreatePolicy(prompt, reviewer);
         var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
 
@@ -69,9 +70,10 @@ public sealed class ApprovalPolicyTests
             new ToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
-        Assert.Equal(1, prompt.Count);
-        Assert.Equal(0, prompt.PassCount);
-        Assert.Null(reviewer.LastRequest);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
+        Assert.NotNull(reviewer.LastRequest);
         Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
     }
 

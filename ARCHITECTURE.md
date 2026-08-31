@@ -190,21 +190,20 @@ Modes:
   outside-workspace reads ask the operator.
 - AutoEdit: workspace file changes pass without review. Shell and
   outside-workspace reads still ask.
-- Review: another model checks each remaining side-effect call
-  (edit, write, and bash; Codex guardian-style). Reads never go to
-  this reviewer. Outside-workspace reads ask the operator. A bounded
-  transcript excerpt is attached: the first and latest user turns as
-  authorization anchors, other user turns that fit, then recent
-  assistant and tool evidence. A compaction summary stands in for
-  folded user turns. Without that evidence the host asks the
-  operator. Later user messages refine the task; a status question
-  does not revoke earlier authorization. The reviewer returns
-  `outcome` (allow / deny / ask), `risk_level` (low / medium / high),
-  `user_authorization` (low / medium / high), and `rationale`. Allow
-  executes. Deny becomes model-visible rejection text. Ask and
-  Forbidden-allow fall back to the operator. Review is not a grant
-  and is not full pass-through. When Skills is enabled, the Skills
-  search directories are workspace reads.
+- Review: another model checks each remaining side-effect call (Codex
+  guardian-style), including reads, glob, and grep of paths outside
+  the workspace. Workspace reads and Skills search directories still
+  auto-execute. A bounded transcript excerpt is attached: the first
+  and latest user turns as authorization anchors, other user turns
+  that fit, then recent assistant and tool evidence. A compaction
+  summary stands in for folded user turns. Without that evidence the
+  host asks the operator. Later user messages refine the task; a
+  status question does not revoke earlier authorization. The reviewer
+  returns `outcome` (allow / deny / ask), `risk_level` (low / medium
+  / high), `user_authorization` (low / medium / high), and
+  `rationale`. Allow executes. Deny becomes model-visible rejection
+  text. Ask and Forbidden-allow fall back to the operator. Review is
+  not a grant and is not full pass-through.
 - Full: workspace-bounded, policy-allowed actions pass without review.
   Forbidden, Privileged, and outside-workspace paths never fully
   auto-pass.
@@ -301,8 +300,8 @@ name and description only; it does not include absolute paths. When
 Skills is enabled, `read`, glob, and grep of any path inside a Skills
 search directory (`skill` / `skills` trees, including files that are
 not `SKILL.md`) auto-execute as workspace reads. Other
-outside-workspace reads ask the operator; they do not go to the
-Review model. They never replace Work, Plan, or Review. `config.json` field `skills`
+outside-workspace reads ask the operator, or go to the Review model
+in Review mode. They never replace Work, Plan, or Review. `config.json` field `skills`
 enables or disables the feature
 (default `true`). When `false`, the tool is omitted and skill guidance
 is not appended. Later sources overwrite earlier ones with the same
