@@ -63,6 +63,7 @@ internal static class DotnetToolFactory
 
         var overlays = set.Tools.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
         var loaded = new List<(ITool Tool, ExternalToolSpec Spec)>();
+        var claimed = new HashSet<string>(StringComparer.Ordinal);
         var types = SelectTypes(exported, set.Types, set.DirectoryName, notes);
         if (types is null)
         {
@@ -71,10 +72,8 @@ internal static class DotnetToolFactory
 
         foreach (var type in types)
         {
-            if (Activator.CreateInstance(type) is not ITool tool)
+            if (!TryCreateTool(type, set.DirectoryName, notes, out var tool))
             {
-                notes.Add(
-                    $"External tool set '{set.DirectoryName}' was skipped: '{type.FullName}' is not an ITool.");
                 return false;
             }
 
@@ -87,12 +86,19 @@ internal static class DotnetToolFactory
                 continue;
             }
 
-            if (!registered.Add(name))
+            if (registered.Contains(name))
             {
                 notes.Add(
                     $"External tool '{name}' was omitted because the name is already registered.");
                 overlays.Remove(name);
                 continue;
+            }
+
+            if (!claimed.Add(name))
+            {
+                notes.Add(
+                    $"External tool set '{set.DirectoryName}' was skipped: duplicate tool '{name}'.");
+                return false;
             }
 
             ExternalToolSpec spec;
@@ -125,22 +131,46 @@ internal static class DotnetToolFactory
             return false;
         }
 
-        var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var pair in loaded)
         {
-            if (!names.Add(pair.Spec.Name))
-            {
-                notes.Add($"External tool set '{set.DirectoryName}' was skipped: duplicate tool '{pair.Spec.Name}'.");
-                return false;
-            }
-        }
-
-        foreach (var pair in loaded)
-        {
+            registered.Add(pair.Spec.Name);
             var wrapped = new FencedExternalTool(pair.Tool, workspace, pair.Spec.PathArguments);
             Add(pair.Spec, wrapped, plan, work, classifications);
         }
 
+        return true;
+    }
+
+    private static bool TryCreateTool(
+        Type type,
+        string directoryName,
+        IList<string> notes,
+        out ITool tool)
+    {
+        tool = null!;
+        object? instance;
+        try
+        {
+            instance = Activator.CreateInstance(type);
+        }
+        catch (Exception exception)
+        {
+            var detail = exception is TargetInvocationException { InnerException: { } inner }
+                ? inner.Message
+                : exception.Message;
+            notes.Add(
+                $"External tool set '{directoryName}' was skipped: '{type.FullName}' could not be created: {detail}");
+            return false;
+        }
+
+        if (instance is not ITool created)
+        {
+            notes.Add(
+                $"External tool set '{directoryName}' was skipped: '{type.FullName}' is not an ITool.");
+            return false;
+        }
+
+        tool = created;
         return true;
     }
 

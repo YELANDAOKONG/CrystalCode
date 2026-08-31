@@ -44,7 +44,115 @@ public sealed class DotnetToolFactoryTests
         Assert.Equal("alpha-ok", outputText.Text);
     }
 
-    private static void PublishFixture(string outputDirectory)
+    [Fact]
+    public void Load_DotnetOverlayMismatch_DoesNotOccupyNames()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var output = Path.Combine(workspace.Path, ".crystal", "tools", "FixtureTools");
+        PublishFixture(output);
+        File.WriteAllText(
+            Path.Combine(output, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "tools": {
+                "missing_overlay": {}
+              }
+            }
+            """);
+        WriteExecSet(workspace.Path, "alpha");
+
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+
+        Assert.Contains(
+            catalog.Notes,
+            note => note.Contains("missing_overlay", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            catalog.Notes,
+            note => note.Contains("already registered", StringComparison.Ordinal));
+        Assert.NotNull(catalog.WorkTools.FirstOrDefault(tool => tool.Definition.Name == "alpha"));
+        Assert.Null(catalog.WorkTools.FirstOrDefault(tool => tool.Definition.Name == "beta"));
+    }
+
+    [Fact]
+    public void Load_DotnetConstructorThrows_SkipsSet()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var output = Path.Combine(workspace.Path, ".crystal", "tools", "BoomTools");
+        PublishFixture(
+            output,
+            """
+            using Crystal.Tools;
+            using System.Text.Json;
+
+            namespace FixtureTools;
+
+            public sealed class BoomTool : ITool
+            {
+                public BoomTool()
+                {
+                    throw new InvalidOperationException("constructor failed");
+                }
+
+                public ToolDefinition Definition { get; } = CreateDefinition();
+
+                public ValueTask<ToolOutput> InvokeAsync(
+                    ToolCall call,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new ToolOutput("boom"));
+
+                private static ToolDefinition CreateDefinition()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                    return new ToolDefinition("boom", document.RootElement.Clone(), "Boom.");
+                }
+            }
+            """);
+        File.WriteAllText(
+            Path.Combine(output, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll"
+            }
+            """);
+
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+
+        Assert.Contains(
+            catalog.Notes,
+            note => note.Contains("could not be created", StringComparison.Ordinal)
+                && note.Contains("constructor failed", StringComparison.Ordinal));
+        Assert.Empty(catalog.WorkTools);
+        Assert.Empty(catalog.PlanTools);
+    }
+
+    private static void WriteExecSet(string workspace, string name)
+    {
+        var directory = Path.Combine(workspace, ".crystal", "tools", name);
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            """
+            {
+              "runner": "exec",
+              "description": "Exec stand-in.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["/bin/true"]
+            }
+            """);
+    }
+
+    private static void PublishFixture(string outputDirectory, string? extraTypeSource = null)
     {
         Directory.CreateDirectory(outputDirectory);
         var project = Path.Combine(outputDirectory, "src");
@@ -131,6 +239,11 @@ public sealed class DotnetToolFactoryTests
                 public static string Value => "private";
             }
             """);
+
+        if (extraTypeSource is not null)
+        {
+            File.WriteAllText(Path.Combine(project, "ExtraTool.cs"), extraTypeSource);
+        }
 
         var start = new ProcessStartInfo
         {
