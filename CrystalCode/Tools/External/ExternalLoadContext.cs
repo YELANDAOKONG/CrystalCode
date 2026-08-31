@@ -22,6 +22,7 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
         _resolver = new AssemblyDependencyResolver(assemblyPath);
         _directory = Path.GetDirectoryName(Path.GetFullPath(assemblyPath))
             ?? throw new ArgumentException("Assembly path has no directory.", nameof(assemblyPath));
+        Resolving += (_, name) => ResolveContract(name);
     }
 
     protected override Assembly? Load(AssemblyName assemblyName)
@@ -33,9 +34,10 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
             return null;
         }
 
-        if (IsContract(simple))
+        var contract = ResolveContract(assemblyName);
+        if (contract is not null)
         {
-            return Contract(simple);
+            return contract;
         }
 
         var shared = FindLoaded(simple);
@@ -75,6 +77,17 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
         }
 
         return LoadUnmanagedDllFromPath(full);
+    }
+
+    private static Assembly? ResolveContract(AssemblyName assemblyName)
+    {
+        var simple = assemblyName.Name;
+        if (string.IsNullOrEmpty(simple) || !IsContract(simple))
+        {
+            return null;
+        }
+
+        return Contract(simple);
     }
 
     private static AssemblyLoadContext HostContext =>

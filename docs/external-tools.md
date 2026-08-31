@@ -405,7 +405,7 @@ Algorithm for `Load(AssemblyName name)`:
 1. If `name` is `Crystal` or `Crystal.Tools`, return the already-loaded
    host assembly (`typeof(ChatMessage).Assembly` / `typeof(ITool).Assembly`).
    Never load it from the set directory, even if `Crystal.Tools.dll` is
-   sitting there.
+   sitting there. `Resolving` repeats this step when `Load` returned null.
 2. If `name` is a **shared** framework assembly already loaded in the
    host context, return that instance.
 3. Otherwise call `AssemblyDependencyResolver` constructed from the

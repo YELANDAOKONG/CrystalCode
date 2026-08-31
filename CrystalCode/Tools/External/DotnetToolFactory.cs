@@ -127,7 +127,11 @@ internal static class DotnetToolFactory
 
         if (loaded.Count == 0)
         {
-            notes.Add($"External tool set '{set.DirectoryName}' was skipped: no public ITool types.");
+            var listed = exported.Length == 0
+                ? "none"
+                : string.Join(", ", exported.Select(type => type.FullName ?? type.Name));
+            notes.Add(
+                $"External tool set '{set.DirectoryName}' was skipped: no public ITool types. Exported types: {listed}.");
             return false;
         }
 

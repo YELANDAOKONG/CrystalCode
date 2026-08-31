@@ -155,7 +155,8 @@ public sealed class DotnetToolFactoryTests
     private static void PublishFixture(string outputDirectory, string? extraTypeSource = null)
     {
         Directory.CreateDirectory(outputDirectory);
-        var project = Path.Combine(outputDirectory, "src");
+        using var source = new TemporaryWorkspace();
+        var project = Path.Combine(source.Path, "src");
         Directory.CreateDirectory(project);
         var crystalDll = Path.Combine(AppContext.BaseDirectory, "Crystal.dll");
         var crystalToolsDll = Path.Combine(AppContext.BaseDirectory, "Crystal.Tools.dll");
@@ -169,7 +170,7 @@ public sealed class DotnetToolFactoryTests
                 <TargetFramework>net10.0</TargetFramework>
                 <Nullable>enable</Nullable>
                 <ImplicitUsings>enable</ImplicitUsings>
-                <RestorePackagesPath>{Path.Combine(outputDirectory, "packages")}</RestorePackagesPath>
+                <RestorePackagesPath>{Path.Combine(source.Path, "packages")}</RestorePackagesPath>
               </PropertyGroup>
               <ItemGroup>
                 <Reference Include="Crystal">
@@ -265,6 +266,7 @@ public sealed class DotnetToolFactoryTests
         var stdout = process.StandardOutput.ReadToEnd();
         var stderr = process.StandardError.ReadToEnd();
         Assert.True(process.ExitCode == 0, stdout + stderr);
+        Assert.True(File.Exists(Path.Combine(outputDirectory, "FixtureTools.dll")));
         Assert.True(File.Exists(Path.Combine(outputDirectory, "Crystal.Tools.dll")));
     }
 }
