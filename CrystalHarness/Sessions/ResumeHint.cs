@@ -10,12 +10,12 @@ public static class ResumeHint
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
         return
             "Session saved  " + sessionId.Trim() + Environment.NewLine
-            + "Resume in this workspace with /resume" + Environment.NewLine
-            + "Or /resume " + sessionId.Trim();
+            + "Resume with crystal --resume " + sessionId.Trim() + Environment.NewLine
+            + "Or start, then /resume";
     }
 
     public static string ForWorkspace() =>
         "Resume the latest session in this workspace with /resume"
         + Environment.NewLine
-        + "Resume a specific id with /resume <id>";
+        + "Resume a specific id with crystal --resume <id>";
 }

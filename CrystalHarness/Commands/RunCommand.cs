@@ -22,6 +22,23 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         cancellationToken.ThrowIfCancellationRequested();
 
         var home = CrystalHome.Resolve(settings.Home);
+        var workspace = ResolveWorkspace(settings.Workspace);
+        SessionDocument? resume = null;
+        if (!string.IsNullOrWhiteSpace(settings.Resume))
+        {
+            var sessions = new SessionStore(home);
+            if (!SessionResume.TryLoad(
+                    sessions,
+                    workspace,
+                    settings.Resume,
+                    out resume,
+                    out var resumeError))
+            {
+                AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
+                return 1;
+            }
+        }
+
         var settingsStore = new SettingsStore(home);
         var harnessSettings = settingsStore
             .LoadOrCreate()
@@ -36,7 +53,6 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return 1;
         }
 
-        var workspace = ResolveWorkspace(settings.Workspace);
         var plugins = PluginRegistry.CreateBuiltIn();
         var client = ChatClientFactory.Create(harnessSettings, apiKey, plugins);
         try
@@ -47,7 +63,8 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                 settingsStore,
                 home,
                 workspace,
-                plugins);
+                plugins,
+                resume);
             return await session.RunAsync(cancellationToken);
         }
         finally

@@ -73,6 +73,7 @@ CLI options:
 | `-m`, `--model <id>` | Model id listed under that provider |
 | `-w`, `--workspace <path>` | Workspace root (default: current directory) |
 | `--home <path>` | Data directory (default: `CRYSTAL_HOME`, then `~/.crystal`) |
+| `-r`, `--resume <id>` | Replay that session file under `~/.crystal/sessions` |
 
 `--help` prints the same options.
 
@@ -466,10 +467,14 @@ a user message. The file stores the transcript, todos, last
 provider-reported token usage, and turn counts.
 
 `/quit` and two Ctrl+C presses on an empty composer leave the
-alternate screen, then print the session id and how to `/resume`.
+alternate screen, then print the session id and `crystal --resume <id>`.
+`--resume` loads that file before the alternate screen. A missing or
+empty session exits without entering the TTY. `/resume` still replays
+from inside a running session.
 
 | Command | Effect |
 | :--- | :--- |
+| `crystal --resume <id>` | Load that file under `~/.crystal/sessions` at process start |
 | `/resume` | Load the latest session for this workspace and replay the transcript |
 | `/resume <id>` | Load that file under `~/.crystal/sessions` |
 | `/clear` | Start a new id |

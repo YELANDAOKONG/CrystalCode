@@ -182,11 +182,13 @@ Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a successful `/compact`, and on an orderly exit
 when the transcript has a user message or a compaction summary. The
 file stores the compacted model transcript (live system prompt, one
-summary, recent tail) plus the last usage snapshot. `/resume` restores
-that transcript: the live system prompt is refreshed from current
-Plan/Work text; the summary and tail are kept. Usage is restored so the
-status bar and the next compact decision have a baseline. `/clear`
-starts a new id.
+summary, recent tail) plus the last usage snapshot. `crystal --resume
+<id>` (`-r`) loads that file at process start; a missing or empty
+session exits without entering the TTY. `/resume` restores the same
+transcript from inside a running session: the live system prompt is
+refreshed from current Plan/Work text; the summary and tail are kept.
+Usage is restored so the status bar and the next compact decision have
+a baseline. `/clear` starts a new id.
 
 ## Home directory
 

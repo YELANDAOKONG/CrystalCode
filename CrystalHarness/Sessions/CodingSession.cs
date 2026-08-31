@@ -35,6 +35,7 @@ public sealed class CodingSession
     private readonly TodoList _todos = new();
     private readonly MessageQueue _queue = new();
     private readonly GrantStore _grants;
+    private readonly bool _replayOnStart;
     private Workspace _workspace;
     private PromptSet _prompts;
     private ApprovalMode _approval;
@@ -57,7 +58,8 @@ public sealed class CodingSession
         CrystalHome home,
         Workspace workspace,
         SessionRenderer renderer,
-        PluginRegistry plugins)
+        PluginRegistry plugins,
+        SessionDocument? resume)
     {
         _client = client;
         _settings = settings;
@@ -76,7 +78,15 @@ public sealed class CodingSession
         _transcript = [new ChatMessage(ChatRole.System, _prompts.WorkSystem)];
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
-        RebuildExecutors();
+        _replayOnStart = resume is not null;
+        if (resume is not null)
+        {
+            ApplyDocument(resume);
+        }
+        else
+        {
+            RebuildExecutors();
+        }
     }
 
     public static CodingSession Create(
@@ -85,7 +95,8 @@ public sealed class CodingSession
         SettingsStore settingsStore,
         CrystalHome home,
         string workspaceRoot,
-        PluginRegistry? plugins = null)
+        PluginRegistry? plugins = null,
+        SessionDocument? resume = null)
     {
         var renderer = new SessionRenderer();
         return new CodingSession(
@@ -95,7 +106,8 @@ public sealed class CodingSession
             home,
             new Workspace(workspaceRoot),
             renderer,
-            plugins ?? PluginRegistry.CreateBuiltIn());
+            plugins ?? PluginRegistry.CreateBuiltIn(),
+            resume);
     }
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
@@ -124,6 +136,10 @@ public sealed class CodingSession
             _planMode,
             _approval,
             CurrentThinkingStatus());
+        if (_replayOnStart)
+        {
+            PresentResume();
+        }
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
@@ -548,28 +564,26 @@ public sealed class CodingSession
 
     private void ResumeSession(string argument)
     {
-        SessionDocument document;
-        if (string.IsNullOrWhiteSpace(argument))
+        if (!SessionResume.TryLoad(
+                _sessionStore,
+                _workspace.Root,
+                argument,
+                out var document,
+                out var error))
         {
-            if (!_sessionStore.TryLoadLatest(_workspace.Root, out document))
-            {
-                _renderer.WriteError("no session for this workspace");
-                return;
-            }
-        }
-        else if (!_sessionStore.TryLoad(argument, out document))
-        {
-            _renderer.WriteError("session not found  " + argument.Trim());
+            _renderer.WriteError(error);
             return;
         }
 
+        ApplyDocument(document);
+        DiscardQueue();
+        PresentResume();
+    }
+
+    private void ApplyDocument(SessionDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
         var items = TranscriptCodec.Read(document.Items);
-        if (items.Count == 0)
-        {
-            _renderer.WriteError("session is empty");
-            return;
-        }
-
         _sessionId = document.Id!;
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         _planMode = document.PlanMode;
@@ -583,9 +597,13 @@ public sealed class CodingSession
             Math.Max(0, document.ModelCalls),
             Math.Max(0, document.ToolCalls),
             SessionMapper.ReadUsage(document.Usage));
-        DiscardQueue();
+        _queue.Clear();
         _reviewContext.CurrentUserRequest = string.Empty;
         RebuildExecutors();
+    }
+
+    private void PresentResume()
+    {
         RefreshChrome();
         _renderer.ShowUsage(_ledger.Usage);
         _renderer.WriteHistory(_transcript);
