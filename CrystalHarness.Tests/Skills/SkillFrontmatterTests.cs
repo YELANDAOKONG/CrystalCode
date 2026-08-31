@@ -55,14 +55,78 @@ public sealed class SkillFrontmatterTests
     }
 
     [Fact]
-    public void TryRead_RejectsInvalidName()
+    public void TryRead_AcceptsDisplayTitleName()
+    {
+        var ok = SkillFrontmatter.TryRead(
+            """
+            ---
+            name: C# Clean Code
+            description: Use when writing C# code
+            ---
+            body
+            """,
+            out var frontmatter,
+            out _);
+
+        Assert.True(ok);
+        Assert.Equal("C# Clean Code", frontmatter!.Name);
+        Assert.Equal("Use when writing C# code", frontmatter.Description);
+    }
+
+    [Fact]
+    public void TryRead_ReadsFoldedDescription()
+    {
+        var ok = SkillFrontmatter.TryRead(
+            """
+            ---
+            name: csharp-clean-code
+            description: >
+              Use this skill when writing C# code. Covers
+              file-scoped namespaces and naming conventions.
+            license: MIT
+            ---
+            body
+            """,
+            out var frontmatter,
+            out var body);
+
+        Assert.True(ok);
+        Assert.Equal("csharp-clean-code", frontmatter!.Name);
+        Assert.Equal(
+            "Use this skill when writing C# code. Covers file-scoped namespaces and naming conventions.",
+            frontmatter.Description);
+        Assert.Equal("body", body);
+    }
+
+    [Fact]
+    public void TryRead_ReadsLiteralDescription()
+    {
+        var ok = SkillFrontmatter.TryRead(
+            """
+            ---
+            name: notes
+            description: |
+              First line
+              Second line
+            ---
+            body
+            """,
+            out var frontmatter,
+            out _);
+
+        Assert.True(ok);
+        Assert.Equal("First line\nSecond line", frontmatter!.Description);
+    }
+
+    [Fact]
+    public void TryRead_RejectsEmptyFoldedDescription()
     {
         Assert.False(
             SkillFrontmatter.TryRead(
                 """
                 ---
-                name: Git_Release
-                description: Invalid name
+                name: git-release
+                description: >
                 ---
                 body
                 """,

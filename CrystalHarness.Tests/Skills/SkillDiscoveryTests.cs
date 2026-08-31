@@ -144,7 +144,7 @@ public sealed class SkillDiscoveryTests
     }
 
     [Fact]
-    public void Collect_SkipsInvalidFrontmatterAndNameMismatch()
+    public void Collect_SkipsInvalidFrontmatterAndUnusableNames()
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
@@ -155,10 +155,69 @@ public sealed class SkillDiscoveryTests
         var invalid = Path.Combine(workspace.Path, ".crystal", "skills", "no-frontmatter");
         Directory.CreateDirectory(invalid);
         File.WriteAllText(Path.Combine(invalid, "SKILL.md"), "# No frontmatter\n");
-        var mismatch = Path.Combine(workspace.Path, ".crystal", "skills", "folder-name");
-        Directory.CreateDirectory(mismatch);
+        var unusable = Path.Combine(workspace.Path, ".crystal", "skills", "Bad Folder");
+        Directory.CreateDirectory(unusable);
         File.WriteAllText(
-            Path.Combine(mismatch, "SKILL.md"),
+            Path.Combine(unusable, "SKILL.md"),
+            """
+            ---
+            name: Also Bad
+            description: Neither directory nor name is a valid id.
+            ---
+            body
+            """);
+        var discovery = SkillDiscovery.Isolated(home.Home);
+
+        var catalog = discovery.Collect(workspace.Path);
+
+        Assert.Equal(1, catalog.Count);
+        Assert.NotNull(catalog.Find("good-skill"));
+        Assert.Null(catalog.Find("no-frontmatter"));
+        Assert.Null(catalog.Find("Bad Folder"));
+        Assert.Null(catalog.Find("Also Bad"));
+    }
+
+    [Fact]
+    public void Collect_UsesDirectoryNameWhenFrontmatterNameIsDisplayTitle()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".agents", "skills", "csharp-clean-code");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "SKILL.md"),
+            """
+            ---
+            name: C# Clean Code
+            description: >
+              Use this skill when writing, reviewing, refactoring, or discussing C# code. Covers
+              file-scoped namespaces and naming conventions.
+            ---
+
+            # C# Clean Code
+            """);
+        var discovery = SkillDiscovery.Isolated(home.Home);
+
+        var catalog = discovery.Collect(workspace.Path);
+
+        var skill = catalog.Find("csharp-clean-code");
+        Assert.NotNull(skill);
+        Assert.Equal("csharp-clean-code", skill.Name);
+        Assert.Equal(
+            "Use this skill when writing, reviewing, refactoring, or discussing C# code. Covers file-scoped namespaces and naming conventions.",
+            skill.Description);
+        Assert.Null(catalog.Find("C# Clean Code"));
+    }
+
+    [Fact]
+    public void Collect_UsesDirectoryNameWhenFrontmatterNameDiffers()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "skills", "folder-name");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "SKILL.md"),
             """
             ---
             name: other-name
@@ -171,10 +230,33 @@ public sealed class SkillDiscoveryTests
         var catalog = discovery.Collect(workspace.Path);
 
         Assert.Equal(1, catalog.Count);
-        Assert.NotNull(catalog.Find("good-skill"));
-        Assert.Null(catalog.Find("no-frontmatter"));
+        Assert.NotNull(catalog.Find("folder-name"));
         Assert.Null(catalog.Find("other-name"));
-        Assert.Null(catalog.Find("folder-name"));
+    }
+
+    [Fact]
+    public void Collect_UsesFrontmatterNameWhenDirectoryIsNotAValidId()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "skills", "CSharp Clean");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "SKILL.md"),
+            """
+            ---
+            name: csharp-clean-code
+            description: Directory is a display title.
+            ---
+            body
+            """);
+        var discovery = SkillDiscovery.Isolated(home.Home);
+
+        var catalog = discovery.Collect(workspace.Path);
+
+        Assert.Equal(1, catalog.Count);
+        Assert.NotNull(catalog.Find("csharp-clean-code"));
+        Assert.Null(catalog.Find("CSharp Clean"));
     }
 
     private static void WriteSkill(string root, string name, string description)

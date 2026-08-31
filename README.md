@@ -487,9 +487,12 @@ Other files outside the workspace still need approval (you, or the
 Review model in Review mode).
 
 Each skill is a directory with a `SKILL.md` that starts with YAML
-frontmatter (`name` and `description` required). `name` must match
-the directory name, be 1–64 characters, and match
-`^[a-z0-9]+(-[a-z0-9]+)*$`.
+frontmatter (`name` and `description` required). The skill id is the
+directory name when it matches `^[a-z0-9]+(-[a-z0-9]+)*$` (1–64
+characters). Frontmatter `name` may be that id or a display title
+and does not have to match the directory. If the directory name is
+not a valid id, a valid frontmatter `name` is used instead. Folded
+(`>`) and literal (`|`) YAML descriptions are accepted.
 
 Discovery follows OpenCode's global and project walk. Later sources
 overwrite earlier ones with the same name. Crystal-native paths win

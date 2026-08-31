@@ -318,8 +318,12 @@ skill name.
   paths overwrite OpenCode-compatible paths of the same name.
 
 Each `SKILL.md` needs YAML frontmatter with `name` and `description`.
-`name` must match the directory that contains the file, use lowercase
-alphanumerics with single hyphens, and be 1–64 characters.
+The skill id is the containing directory name when that name is 1–64
+characters of lowercase alphanumerics with single hyphens. Frontmatter
+`name` may be that id or a display title and does not have to match
+the directory. If the directory name is not a valid id, a valid
+frontmatter `name` is used instead. Folded (`>`) and literal (`|`)
+YAML descriptions are accepted.
 
 `AGENTS.md` and `CLAUDE.md` are OpenCode-compatible rule files, not
 prompt overlays. They are combined into the same instruction block

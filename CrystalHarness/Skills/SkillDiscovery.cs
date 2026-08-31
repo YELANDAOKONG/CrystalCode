@@ -176,14 +176,32 @@ public sealed class SkillDiscovery
             return false;
         }
 
-        var directory = Path.GetFileName(Path.GetDirectoryName(path));
-        if (!string.Equals(directory, frontmatter.Name, StringComparison.Ordinal))
+        if (!TryResolveName(path, frontmatter.Name, out var name))
         {
             return false;
         }
 
-        skill = new SkillInfo(frontmatter.Name, frontmatter.Description, path, body);
+        skill = new SkillInfo(name, frontmatter.Description, path, body);
         return true;
+    }
+
+    private static bool TryResolveName(string path, string frontmatterName, out string name)
+    {
+        name = string.Empty;
+        var directory = Path.GetFileName(Path.GetDirectoryName(path));
+        if (!string.IsNullOrEmpty(directory) && SkillFrontmatter.IsValidName(directory))
+        {
+            name = directory;
+            return true;
+        }
+
+        if (SkillFrontmatter.IsValidName(frontmatterName))
+        {
+            name = frontmatterName;
+            return true;
+        }
+
+        return false;
     }
 
     private static IReadOnlyList<string> EnumerateToGitRoot(string start)
