@@ -23,6 +23,7 @@ public sealed class SettingsStoreTests
         Assert.True(settings.ActiveModel.Thinking);
         Assert.Equal(["low", "high", "maximum"], settings.ActiveModel.ThinkingEfforts);
         Assert.Equal(ThinkingSelection.Default, settings.ThinkingEffort);
+        Assert.True(settings.Skills);
         Assert.True(File.Exists(root.Home.ConfigPath));
     }
 
@@ -104,6 +105,29 @@ public sealed class SettingsStoreTests
         Assert.True(settings.ActiveModel.Thinking);
         Assert.Equal(ReasoningMode.Enabled, settings.ResolveReasoning()?.Mode);
         Assert.Equal(ReasoningEffort.High, settings.ResolveReasoning()?.Effort);
+    }
+
+    [Fact]
+    public void Load_ReadsSkillsDisabled()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "skills": false
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.Skills);
+        store.Save(settings);
+        Assert.Contains("\"skills\": false", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
     }
 }
 

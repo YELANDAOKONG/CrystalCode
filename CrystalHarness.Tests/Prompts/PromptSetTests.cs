@@ -34,4 +34,22 @@ public sealed class PromptSetTests
         Assert.Contains("<env>", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Workspace instructions", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ComposeWork_InsertsSkillGuidanceBetweenEnvironmentAndInstructions()
+    {
+        var set = new PromptSet("work body", "plan body", "review body", "prefer tests");
+
+        var text = set.ComposeWork(
+            "<env>\n  Workspace: /tmp/demo\n</env>",
+            "Skills provide specialized instructions.");
+
+        var env = text.IndexOf("<env>", StringComparison.Ordinal);
+        var skills = text.IndexOf("Skills provide", StringComparison.Ordinal);
+        var instructions = text.IndexOf("## Workspace instructions", StringComparison.Ordinal);
+        Assert.True(env > 0);
+        Assert.True(skills > env);
+        Assert.True(instructions > skills);
+        Assert.DoesNotContain("Skills provide", set.WorkSystem, StringComparison.Ordinal);
+    }
 }

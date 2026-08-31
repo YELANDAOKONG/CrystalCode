@@ -27,6 +27,8 @@ operator surface and the only entry. It can:
 - compact conversation context when usage approaches the model window,
   or when the operator runs `/compact`;
 - persist configuration, permissions, and sessions under `~/.crystal`;
+- discover OpenCode-compatible agent skills and load them through the
+  `skill` tool when Skills is enabled;
 - use DeepSeek and OpenAI-compatible chat adapters, including user-added
   compatible endpoints;
 - register built-in tools and providers through an in-process plugin table.
@@ -61,7 +63,9 @@ User data lives in `~/.crystal`. Prompts may be replaced in
 `~/.crystal/prompts` and the project's `.crystal/prompts`. Workspace
 hints are appended from `instructions.md`, `.crystal.md`, and
 OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
-are never prompt overlays. The application never writes secrets into
+are never prompt overlays. Skills are discovered from Crystal,
+OpenCode, Claude, and Agents skill directories and loaded through the
+`skill` tool when enabled. The application never writes secrets into
 the workspace.
 
 ## Runtime language

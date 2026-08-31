@@ -150,6 +150,7 @@ Top-level fields:
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `autoedit`, `review`, or `full` |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
+| `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `providers` | Named endpoints and their model tables |
 
@@ -214,6 +215,7 @@ Do not put a secret in `apiKey`. Point at an environment variable.
   "approval": "default",
   "thinkingEffort": "high",
   "compactionThreshold": 0.8,
+  "skills": true,
   "providers": {
     "openrouter": {
       "protocol": "openai",
@@ -317,7 +319,7 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | read, glob, grep, todowrite, question | None. Cannot edit files or run a shell. |
+| **Plan** | read, glob, grep, todowrite, question, and skill when enabled | None. Cannot edit files or run a shell. |
 | **Work** | Plan tools plus edit, write, bash | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
@@ -414,6 +416,7 @@ root.
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
 | `question` | Plan, Work | Ask you a question (optional choices) and wait |
+| `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `edit` | Work | Replace one unique `old_string` in a file |
 | `write` | Work | Create or overwrite a UTF-8 text file |
 | `bash` | Work | Run one shell command after approval (`bash -lc`, 120 second timeout) |
@@ -440,7 +443,9 @@ accepted):
 
 The built-in Work and Plan assistant name is Crystal Code. A host-owned
 `<env>` block (workspace, git, platform, date, provider/model) is
-appended after the Work or Plan body and is not overlayable.
+appended after the Work or Plan body and is not overlayable. When
+Skills is enabled, available-skill guidance is appended after `<env>`
+and is also host-owned.
 
 Workspace facts are appended under "Workspace instructions" on Work
 and Plan only. Review is the named file alone so the reviewer stays
@@ -465,9 +470,42 @@ replacements. They never replace Work, Plan, or Review.
   `CONTEXT.md`). Every file of that name on the walk is appended.
   `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
 
-`/cd` and resume reload prompts from the current workspace. Resume
-refreshes the first system message from the current prompt files and
-the current `<env>` block.
+## Skills
+
+Skills are OpenCode-compatible instruction folders. They are not
+prompt overlays. The model sees a list of available skills and loads
+one with the `skill` tool. Set `"skills": false` in `config.json` to
+disable the tool and the guidance.
+
+Each skill is a directory with a `SKILL.md` that starts with YAML
+frontmatter (`name` and `description` required). `name` must match
+the directory name, be 1–64 characters, and match
+`^[a-z0-9]+(-[a-z0-9]+)*$`.
+
+Discovery follows OpenCode's global and project walk. Later sources
+overwrite earlier ones with the same name. Crystal-native paths win
+over OpenCode-compatible paths.
+
+Global:
+
+1. `~/.claude/skills/<name>/SKILL.md`
+2. `~/.agents/skills/<name>/SKILL.md`
+3. `~/.config/opencode/{skill,skills}/<name>/SKILL.md` (`XDG_CONFIG_HOME`
+   is honored)
+4. `~/.opencode/{skill,skills}/<name>/SKILL.md`
+5. `~/.crystal/{skill,skills}/<name>/SKILL.md`
+
+Project, walking from the workspace up to the git root:
+
+1. `.claude/skills/<name>/SKILL.md`
+2. `.agents/skills/<name>/SKILL.md`
+3. `.opencode/{skill,skills}/<name>/SKILL.md`
+4. `.crystal/{skill,skills}/<name>/SKILL.md`
+
+`/cd` reloads skills from the new workspace. `/cd` and resume also
+reload prompts from the current workspace. Resume refreshes the first
+system message from the current prompt files, the current `<env>`
+block, and current skill guidance.
 
 ## Sessions
 
@@ -528,12 +566,14 @@ Override with `CRYSTAL_HOME` or `--home`.
     work.md
     plan.md
     review.md
+  skill/<name>/SKILL.md
+  skills/<name>/SKILL.md
   sessions/<id>.json
   logs/
   plugins/
 ```
 
-Project overlay (named prompts win over home):
+Project overlay (named prompts and Crystal skills win over home):
 
 ```text
 <workspace>/.crystal/
@@ -542,6 +582,8 @@ Project overlay (named prompts win over home):
     work.md
     plan.md
     review.md
+  skill/<name>/SKILL.md
+  skills/<name>/SKILL.md
 <workspace>/.crystal.md
 <workspace>/AGENTS.md
 ```

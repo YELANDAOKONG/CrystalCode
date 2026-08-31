@@ -49,6 +49,11 @@ public static class ToolCallText
             return title + "  \"" + OneLine(query) + "\"";
         }
 
+        if (ToolArguments.TryReadRequiredString(arguments, "name", out var skillName))
+        {
+            return title + "  " + OneLine(skillName);
+        }
+
         if (ToolArguments.TryReadRequiredString(arguments, "description", out var desc))
         {
             return title + "  " + OneLine(desc);

@@ -49,7 +49,7 @@ public sealed class ToolClassifier
         call.Name switch
         {
             ReadTool.ToolName or GlobTool.ToolName or GrepTool.ToolName
-                or TodoWriteTool.ToolName or QuestionTool.ToolName =>
+                or TodoWriteTool.ToolName or QuestionTool.ToolName or SkillTool.ToolName =>
                 new ToolClassification(Risk.Read, Authority.Workspace, "Read-only tool"),
             WriteTool.ToolName => ClassifyWrite(call.Arguments),
             EditTool.ToolName => ClassifyEdit(call.Arguments),

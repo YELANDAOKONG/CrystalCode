@@ -11,6 +11,7 @@ public sealed class ToolCallTextTests
     {
         Assert.Equal("Bash  uname -a", ToolCallText.Summary("bash", """{"command":"uname -a"}"""));
         Assert.Equal("Write  src/App.cs", ToolCallText.Summary("write", """{"path":"src/App.cs","contents":"x"}"""));
+        Assert.Equal("Skill  git-release", ToolCallText.Summary("skill", """{"name":"git-release"}"""));
     }
 
     [Fact]

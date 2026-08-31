@@ -92,6 +92,7 @@ CrystalHarness (executable):
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
+| `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
 | `Plugins/Providers` | Built-in DeepSeek and OpenAI client factories |
@@ -153,7 +154,8 @@ Two Ctrl+C presses on an empty composer exit.
 
 These are product modes, not Crystal types.
 
-- Plan registers read, glob, grep, todowrite, and question.
+- Plan registers read, glob, grep, todowrite, and question. When
+  Skills is enabled, it also registers skill.
 - Work registers those tools plus edit, write, and bash.
 
 Switching modes replaces the first system message and the executor catalog.
@@ -161,10 +163,12 @@ The transcript is otherwise the same conversation.
 
 Live Work and Plan system text is assembled in this order: the overlayable
 Work or Plan body, a host-owned `<env>` block (workspace path, whether the
-directory is a git repo, platform, today's date, and provider/model), then
-Workspace instructions. Review is the named file alone. The env block is
-not an overlay file and is refreshed on `/cd` and when the live system
-message is replaced.
+directory is a git repo, platform, today's date, and provider/model),
+available-skill guidance when Skills is enabled, then Workspace
+instructions. Review is the named file alone. The env block is not an
+overlay file and is refreshed on `/cd` and when the live system
+message is replaced. Skill guidance is host-owned and is not an overlay
+file.
 
 ## Approval
 
@@ -245,12 +249,14 @@ a baseline. `/clear` starts a new id.
   prompts/work.md
   prompts/plan.md
   prompts/review.md
+  skill/<name>/SKILL.md
+  skills/<name>/SKILL.md
   sessions/<id>.json
   logs/
   plugins/
 ```
 
-Project overlay (wins over home for named prompts):
+Project overlay (wins over home for named prompts and Crystal skills):
 
 ```text
 <workspace>/.crystal/
@@ -258,6 +264,8 @@ Project overlay (wins over home for named prompts):
   prompts/work.md
   prompts/plan.md
   prompts/review.md
+  skill/<name>/SKILL.md
+  skills/<name>/SKILL.md
 <workspace>/.crystal.md
 ```
 
@@ -273,7 +281,29 @@ who replace those files choose their own identity.
 file alone so the reviewer stays a safety check. Files may be `.md`
 or `.txt`. Empty files are treated as missing. The host never writes
 prompt files. The host appends a non-overlayable `<env>` block between
-the Work or Plan body and those instructions.
+the Work or Plan body and those instructions. When Skills is enabled,
+available-skill guidance is appended after the env block.
+
+Skills are OpenCode-compatible `SKILL.md` folders. They are loaded
+on demand through the `skill` tool. They never replace Work, Plan, or
+Review. `config.json` field `skills` enables or disables the feature
+(default `true`). When `false`, the tool is omitted and skill guidance
+is not appended. Later sources overwrite earlier ones with the same
+skill name.
+
+- Global: `~/.claude/skills/<name>/SKILL.md`,
+  `~/.agents/skills/<name>/SKILL.md`,
+  `~/.config/opencode/{skill,skills}/<name>/SKILL.md`
+  (`XDG_CONFIG_HOME` is honored), `~/.opencode/{skill,skills}/<name>/SKILL.md`,
+  then `~/.crystal/{skill,skills}/<name>/SKILL.md`.
+- Project: walk from the workspace up to the git root. At each
+  directory, scan `.claude/skills`, `.agents/skills`,
+  `.opencode/{skill,skills}`, and `.crystal/{skill,skills}`. Crystal
+  paths overwrite OpenCode-compatible paths of the same name.
+
+Each `SKILL.md` needs YAML frontmatter with `name` and `description`.
+`name` must match the directory that contains the file, use lowercase
+alphanumerics with single hyphens, and be 1–64 characters.
 
 `AGENTS.md` and `CLAUDE.md` are OpenCode-compatible rule files, not
 prompt overlays. They are combined into the same instruction block
@@ -303,6 +333,7 @@ also lives on the model. The current thinking gear is a host setting.
   "provider": "openrouter",
   "model": "anthropic/claude-sonnet-4",
   "thinkingEffort": "high",
+  "skills": true,
   "providers": {
     "openrouter": {
       "protocol": "openai",
@@ -337,6 +368,9 @@ the same), or a Crystal effort name. It is not stored on the model. `/thinking` 
 fails: if the model does not support thinking, requests omit reasoning
 hints; if the stored gear is not in that model's list, the request
 uses the provider default and the stored choice is unchanged.
+
+`skills` enables the `skill` tool and available-skill guidance
+(default `true`). Set it to `false` to disable skill discovery.
 
 `protocol` is `deepseek` or `openai`. Models that are not listed cannot be
 selected. There is no global context window.

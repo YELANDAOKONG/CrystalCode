@@ -10,6 +10,8 @@ internal sealed class SettingsDocument
 
     public string? ThinkingEffort { get; set; }
 
+    public bool? Skills { get; set; }
+
     public double? CompactionThreshold { get; set; }
 
     public Dictionary<string, ProviderDocument>? Providers { get; set; }

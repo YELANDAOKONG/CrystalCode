@@ -11,6 +11,7 @@ using CrystalHarness.Display.Paint;
 using CrystalHarness.Home;
 using CrystalHarness.Plugins;
 using CrystalHarness.Prompts;
+using CrystalHarness.Skills;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Sessions;
@@ -33,9 +34,11 @@ public sealed class CodingSession
     private readonly TodoList _todos = new();
     private readonly MessageQueue _queue = new();
     private readonly GrantStore _grants;
+    private readonly SkillDiscovery _skillDiscovery;
     private readonly bool _replayOnStart;
     private Workspace _workspace;
     private PromptSet _prompts;
+    private SkillCatalog? _skills;
     private ApprovalMode _approval;
     private ThinkingSelection _thinkingEffort;
     private bool _planMode;
@@ -72,7 +75,9 @@ public sealed class CodingSession
         _approval = settings.Approval;
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
+        _skillDiscovery = SkillDiscovery.Create(home);
         _prompts = _promptStore.Load(workspace.Root);
+        ReloadSkills();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
@@ -413,6 +418,7 @@ public sealed class CodingSession
 
         if (_workspace.TrySetRoot(argument, out var error))
         {
+            ReloadSkills();
             ReloadPrompts();
             RebuildExecutors();
             _renderer.WriteNote("workspace  " + _workspace.Root);
@@ -435,9 +441,10 @@ public sealed class CodingSession
             _workspace.Root,
             _settings.Provider.Value,
             _settings.Model);
+        var skills = _skills is null ? string.Empty : SkillGuidance.Render(_skills);
         return _planMode
-            ? _prompts.ComposePlan(environment)
-            : _prompts.ComposeWork(environment);
+            ? _prompts.ComposePlan(environment, skills)
+            : _prompts.ComposeWork(environment, skills);
     }
 
     private void ReloadPrompts()
@@ -674,14 +681,21 @@ public sealed class CodingSession
             _plugins.Classifiers);
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         _workExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreateWork(_workspace, _todos, question, _plugins),
+            WorkspaceCatalog.CreateWork(_workspace, _todos, question, _plugins, _skills),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
         _planExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreatePlan(_workspace, _todos, question, _plugins),
+            WorkspaceCatalog.CreatePlan(_workspace, _todos, question, _plugins, _skills),
             options,
             exceptionMapper: HarnessExceptionMapper.MapAsync);
+    }
+
+    private void ReloadSkills()
+    {
+        _skills = _settings.Skills
+            ? _skillDiscovery.Collect(_workspace.Root)
+            : null;
     }
 
     private void BindReviewConversation()

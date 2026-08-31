@@ -11,13 +11,16 @@ public sealed record HarnessSettings
 {
     public const double DefaultCompactionThreshold = 0.8;
 
+    public const bool DefaultSkills = true;
+
     public HarnessSettings(
         ProviderName provider,
         string model,
         ApprovalMode approval,
         double compactionThreshold,
         ProviderCatalog catalog,
-        ThinkingSelection? thinkingEffort = null)
+        ThinkingSelection? thinkingEffort = null,
+        bool skills = DefaultSkills)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -40,6 +43,7 @@ public sealed record HarnessSettings
         CompactionThreshold = compactionThreshold;
         Catalog = catalog;
         ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
+        Skills = skills;
     }
 
     public ProviderName Provider { get; }
@@ -53,6 +57,8 @@ public sealed record HarnessSettings
     public ProviderCatalog Catalog { get; }
 
     public ThinkingSelection ThinkingEffort { get; }
+
+    public bool Skills { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
 
@@ -81,38 +87,37 @@ public sealed record HarnessSettings
             ? ResolveModel(nextProvider)
             : model.Trim();
 
-        return new HarnessSettings(
-            nextProvider,
-            nextModel,
-            Approval,
-            CompactionThreshold,
-            Catalog,
-            ThinkingEffort);
+        return Copy(provider: nextProvider, model: nextModel);
     }
 
     public HarnessSettings WithApproval(ApprovalMode approval)
     {
         ArgumentNullException.ThrowIfNull(approval);
-        return new HarnessSettings(
-            Provider,
-            Model,
-            approval,
-            CompactionThreshold,
-            Catalog,
-            ThinkingEffort);
+        return Copy(approval: approval);
     }
 
     public HarnessSettings WithThinkingEffort(ThinkingSelection thinkingEffort)
     {
         ArgumentNullException.ThrowIfNull(thinkingEffort);
-        return new HarnessSettings(
-            Provider,
-            Model,
-            Approval,
+        return Copy(thinkingEffort: thinkingEffort);
+    }
+
+    public HarnessSettings WithSkills(bool skills) => Copy(skills: skills);
+
+    private HarnessSettings Copy(
+        ProviderName? provider = null,
+        string? model = null,
+        ApprovalMode? approval = null,
+        ThinkingSelection? thinkingEffort = null,
+        bool? skills = null) =>
+        new(
+            provider ?? Provider,
+            model ?? Model,
+            approval ?? Approval,
             CompactionThreshold,
             Catalog,
-            thinkingEffort);
-    }
+            thinkingEffort ?? ThinkingEffort,
+            skills ?? Skills);
 
     public override string ToString() => nameof(HarnessSettings);
 
