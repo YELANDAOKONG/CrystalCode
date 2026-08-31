@@ -10,6 +10,7 @@ using Crystal.Tools;
 using CrystalHarness.Approvals;
 using CrystalHarness.Display.Cards;
 using CrystalHarness.Display.Composer;
+using CrystalHarness.Display.Input;
 using CrystalHarness.Display.Paint;
 using CrystalHarness.Display.Shell;
 using CrystalHarness.Display.Transcript;
@@ -34,7 +35,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
     private readonly ScreenPainter _painter = new();
-    private readonly BracketedPaste _paste = new();
+    private readonly InputDecoder _decoder = new();
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
     private string? _streamKind;
@@ -56,7 +57,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             _screen?.Dispose();
             _painter.Clear();
-            _paste.Reset();
+            _decoder.Reset();
             _screen = AlternateScreen.TryEnter();
             PaintUnlocked(force: true);
         }
@@ -71,7 +72,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _screen?.Dispose();
             _screen = null;
             _painter.Clear();
-            _paste.Reset();
+            _decoder.Reset();
         }
     }
 
@@ -600,38 +601,13 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
-                var chars = ComposerPaste.Chars(burst);
-                if (_paste.IsOpen
-                    || chars.Contains(BracketedPaste.StartMarker, StringComparison.Ordinal))
+                foreach (var item in _decoder.Push(burst))
                 {
-                    foreach (var chunk in _paste.Push(chars))
+                    submitted = DispatchUnlocked(item, pageRows, togglePlan);
+                    if (submitted is not null)
                     {
-                        _composer.Insert(chunk);
+                        break;
                     }
-                }
-                else if (ScrollInput.TryDelta(
-                    burst,
-                    _composer.IsEmpty,
-                    _picker is not null,
-                    pageRows,
-                    out var delta))
-                {
-                    _scrollBack = Math.Max(0, _scrollBack + delta);
-                }
-                else if (ScrollInput.TryComposerKeys(burst, out var keys))
-                {
-                    foreach (var key in keys)
-                    {
-                        submitted = HandleComposerKeyUnlocked(key, togglePlan);
-                        if (submitted is not null)
-                        {
-                            break;
-                        }
-                    }
-                }
-                else if (ScrollInput.IsPaste(burst))
-                {
-                    _composer.Insert(ComposerPaste.FromBurst(burst));
                 }
 
                 RefreshPickerUnlocked();
@@ -645,7 +621,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    public async Task<ConsoleKeyInfo> ReadKeyAsync(CancellationToken cancellationToken)
+    public async Task<InputKey> ReadKeyAsync(CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -659,32 +635,43 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 continue;
             }
 
-            ConsoleKeyInfo? mapped = null;
+            InputKey? mapped = null;
             lock (_gate)
             {
-                var chars = ComposerPaste.Chars(burst);
-                if (_paste.IsOpen
-                    || chars.Contains(BracketedPaste.StartMarker, StringComparison.Ordinal))
+                var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                foreach (var item in _decoder.Push(burst))
                 {
-                    _ = _paste.Push(chars);
-                    PaintUnlocked(force: true);
-                }
-                else
-                {
-                    var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
-                    if (ScrollInput.TryDelta(
-                        burst,
-                        composerEmpty: true,
-                        pickerOpen: false,
-                        pageRows,
-                        out var delta))
+                    switch (item)
                     {
-                        _scrollBack = Math.Max(0, _scrollBack + delta);
-                        PaintUnlocked(force: true);
+                        case InputPaste:
+                            PaintUnlocked(force: true);
+                            break;
+                        case InputWheel wheel:
+                            _scrollBack = Math.Max(0, _scrollBack + wheel.Delta);
+                            PaintUnlocked(force: true);
+                            break;
+                        case InputKey key:
+                            if (ScrollInput.TryKeyScroll(
+                                key,
+                                composerEmpty: true,
+                                pickerOpen: false,
+                                pageRows,
+                                out var delta))
+                            {
+                                _scrollBack = Math.Max(0, _scrollBack + delta);
+                                PaintUnlocked(force: true);
+                                break;
+                            }
+
+                            mapped = key;
+                            break;
+                        default:
+                            break;
                     }
-                    else if (ScrollInput.TryComposerKey(burst, out var key))
+
+                    if (mapped is not null)
                     {
-                        mapped = key;
+                        break;
                     }
                 }
             }
@@ -696,7 +683,35 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    private string? HandleComposerKeyUnlocked(ConsoleKeyInfo key, Func<bool> togglePlan)
+    private string? DispatchUnlocked(IInputEvent item, int pageRows, Func<bool> togglePlan)
+    {
+        switch (item)
+        {
+            case InputPaste paste:
+                _composer.Insert(paste.Text);
+                return null;
+            case InputWheel wheel:
+                _scrollBack = Math.Max(0, _scrollBack + wheel.Delta);
+                return null;
+            case InputKey key:
+                if (ScrollInput.TryKeyScroll(
+                    key,
+                    _composer.IsEmpty,
+                    _picker is not null,
+                    pageRows,
+                    out var delta))
+                {
+                    _scrollBack = Math.Max(0, _scrollBack + delta);
+                    return null;
+                }
+
+                return HandleComposerKeyUnlocked(key, togglePlan);
+            default:
+                return null;
+        }
+    }
+
+    private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> togglePlan)
     {
         if (_picker is not null
             && key.Key == ConsoleKey.Tab

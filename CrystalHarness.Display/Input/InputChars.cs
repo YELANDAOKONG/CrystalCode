@@ -1,19 +1,13 @@
 using System.Text;
 
-namespace CrystalHarness.Display.Composer;
+namespace CrystalHarness.Display.Input;
 
 /// <summary>
-/// Turns a pasted key burst into composer text.
+/// Flattens a ReadKey burst to characters. Windows VT leaves Key empty; ESC still counts.
 /// </summary>
-public static class ComposerPaste
+internal static class InputChars
 {
-    public static string FromBurst(IReadOnlyList<ConsoleKeyInfo> burst)
-    {
-        ArgumentNullException.ThrowIfNull(burst);
-        return BracketedPaste.Normalize(Chars(burst));
-    }
-
-    public static string Chars(IReadOnlyList<ConsoleKeyInfo> burst)
+    public static string From(IReadOnlyList<ConsoleKeyInfo> burst)
     {
         ArgumentNullException.ThrowIfNull(burst);
         var text = new StringBuilder();
@@ -21,11 +15,10 @@ public static class ComposerPaste
         {
             if (key.Key == ConsoleKey.Enter)
             {
-                text.Append('\n');
+                text.Append('\r');
                 continue;
             }
 
-            // Windows VT leaves Key empty; ESC must still start CSI paste markers.
             if (key.Key == ConsoleKey.Escape || key.KeyChar == '\u001b')
             {
                 text.Append('\u001b');
@@ -37,13 +30,7 @@ public static class ComposerPaste
                 continue;
             }
 
-            if (key.KeyChar is '\r' or '\n')
-            {
-                text.Append('\n');
-                continue;
-            }
-
-            if (!char.IsControl(key.KeyChar))
+            if (key.KeyChar != '\0')
             {
                 text.Append(key.KeyChar);
             }

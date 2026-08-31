@@ -54,8 +54,8 @@ that loop inside this project only.
 
 ### CrystalHarness.Display.Tests
 
-Display tests: layout, chrome, scroll input, composer, paint, transcript
-log, and queue card. Does not reference the host executable.
+Display tests: layout, chrome, input decoder, scroll policy, composer, paint,
+transcript log, and queue card. Does not reference the host executable.
 
 ### CrystalHarness.Providers
 
@@ -101,7 +101,8 @@ CrystalHarness.Display:
 
 | Folder | Owns |
 | :--- | :--- |
-| `Shell` | Alternate screen, painter, layout, key burst, scroll input, status chrome |
+| `Input` | Decode ReadKey bursts into keys, paste, and wheel events |
+| `Shell` | Alternate screen, painter, layout, key burst, scroll policy, status chrome |
 | `Composer` | Prompt buffer, keys, slash picker |
 | `Cards` | Queue overlay |
 | `Transcript` | Viewport log, role cards, sequential fallback |
@@ -423,11 +424,7 @@ running. Queued text stays above the composer and is sent when the
 current tool batch or turn ends. Empty Enter while working interrupts
 immediately and sends. Backspace deletes one character on every
 platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
-plain Backspace as Control; that is still one character. Windows VT
-input leaves `ConsoleKey` empty for Tab, Enter, letters, and Escape;
-those are recovered from `KeyChar`. A CR+LF drain is one Enter, not
-paste. Bracketed-paste CSI must keep the ESC byte even when `Key` is
-empty, or Ctrl+V on Windows is dropped. Ctrl+W or
+plain Backspace as Control; that is still one character. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
 newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, AutoEdit, and Full.
@@ -451,15 +448,19 @@ arrows (1007) and bracketed paste (2004). It does not enable SGR mouse
 tracking (1000/1006), so left-drag still selects and copies. Wheel
 reports that a terminal still sends are drained without waiting. Escape is held only
 when no further bytes are available or the sequence is still incomplete.
-Paste is the text
-between CSI `200~` and `201~`; a printable
-key burst is still treated as paste when those markers are absent.
-Windows `Console.ReadKey` with VT input does not parse those
-sequences the way Unix does: `Key` is often empty and CSI arrives as
-raw `KeyChar` bursts. Display owns that decode (composer keys, paste
-markers, 1007 wheel, arrows). The host does not. The frame polls terminal size and
-repaints when the window is resized. Escape sequences that are not a
-bracketed-paste wrap are not treated as paste. Redirected output stays
+
+`KeyBurst` collects one `ReadKey` drain. `InputDecoder` turns that burst
+into `InputKey`, `InputPaste`, or `InputWheel`. Platform differences stay
+in the decoder; the composer, scroll policy, and overlays consume events
+only. Linux and macOS usually deliver parsed `ConsoleKey` values. Windows
+VT input leaves `Key` empty, so Tab, Enter, letters, and CSI arrive as
+`KeyChar`. macOS Option-as-Meta is `ESC` plus a letter or Backspace and
+becomes Alt; a native Alt modifier on a parsed key is kept. A CR+LF drain
+is one Enter, not paste. Paste is the text between CSI `200~` and `201~`;
+a printable key burst is still treated as paste when those markers are
+absent. Escape sequences that are not a bracketed-paste wrap are not
+treated as paste. The host does not parse VT. The frame polls terminal
+size and repaints when the window is resized. Redirected output stays
 sequential.
 
 ## Plugins

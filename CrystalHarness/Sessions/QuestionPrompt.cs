@@ -1,6 +1,7 @@
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
+using CrystalHarness.Display.Input;
 using CrystalHarness.Display.Paint;
 using CrystalHarness.Tools;
 
@@ -104,7 +105,7 @@ public sealed class QuestionPrompt : IUserPrompt
         return new Padder(panel, new Padding(2, 0, 0, 0));
     }
 
-    private static bool TryDigit(ConsoleKeyInfo key, int count, out int index)
+    private static bool TryDigit(InputKey key, int count, out int index)
     {
         index = -1;
         if (key.Key is < ConsoleKey.D1 or > ConsoleKey.D9)

@@ -1,4 +1,4 @@
-using System.Text;
+using CrystalHarness.Display.Input;
 
 namespace CrystalHarness.Display.Shell;
 
@@ -74,7 +74,7 @@ public static class KeyBurst
             return false;
         }
 
-        return TrailingEscapeIsIncomplete(Chars(burst));
+        return TrailingEscapeIsIncomplete(InputChars.From(burst));
     }
 
     private static bool TrailingEscapeIsIncomplete(string text)
@@ -147,29 +147,4 @@ public static class KeyBurst
 
     private static bool IsCsiFinal(char value) =>
         value is >= CsiFinalMin and <= CsiFinalMax;
-
-    private static string Chars(IReadOnlyList<ConsoleKeyInfo> burst)
-    {
-        var text = new StringBuilder();
-        foreach (var key in burst)
-        {
-            if (key.Key == ConsoleKey.Escape)
-            {
-                text.Append(EscapeChar);
-                if (key.KeyChar is not ('\0' or EscapeChar))
-                {
-                    text.Append(key.KeyChar);
-                }
-
-                continue;
-            }
-
-            if (key.KeyChar != '\0')
-            {
-                text.Append(key.KeyChar);
-            }
-        }
-
-        return text.ToString();
-    }
 }

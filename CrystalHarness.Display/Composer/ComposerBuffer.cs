@@ -1,5 +1,6 @@
 using System.Text;
 
+using CrystalHarness.Display.Input;
 using CrystalHarness.Display.Paint;
 
 namespace CrystalHarness.Display.Composer;
@@ -24,8 +25,12 @@ public sealed class ComposerBuffer
 
     public bool IsEmpty => _text.Length == 0;
 
-    public ComposerAction Handle(ConsoleKeyInfo key)
+    public ComposerAction Handle(ConsoleKeyInfo key) =>
+        Handle(InputKey.From(key));
+
+    public ComposerAction Handle(InputKey key)
     {
+        ArgumentNullException.ThrowIfNull(key);
         if (key.Key == ConsoleKey.Tab || key.KeyChar == '\t')
         {
             return ComposerAction.TogglePlan;
@@ -238,7 +243,7 @@ public sealed class ComposerBuffer
         return new ComposerView(lines, cursorRow, promptColumns + cursorBody);
     }
 
-    private static bool IsNewline(ConsoleKeyInfo key)
+    private static bool IsNewline(InputKey key)
     {
         if (key.Key == ConsoleKey.J && key.Modifiers.HasFlag(ConsoleModifiers.Control))
         {
