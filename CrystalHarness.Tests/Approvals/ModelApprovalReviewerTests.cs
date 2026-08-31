@@ -39,12 +39,12 @@ public sealed class ModelApprovalReviewerTests
         Assert.Contains(
             client.LastRequest.Items.OfType<ChatMessage>(),
             message => message.Role == ChatRole.User
-                && message.Text.Contains("## User request", StringComparison.Ordinal)
+                && message.Text.Contains("## Conversation", StringComparison.Ordinal)
                 && message.Text.Contains("Add a failing test.", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task ReviewAsync_AsksWhenUserRequestIsMissing()
+    public async Task ReviewAsync_AsksWhenConversationIsMissing()
     {
         using var root = new TemporaryWorkspace();
         var client = new FixedChatClient("unused");
@@ -57,7 +57,7 @@ public sealed class ModelApprovalReviewerTests
 
         Assert.False(verdict.IsAllow);
         Assert.False(verdict.IsDeny);
-        Assert.Equal("No user request is available to review against.", verdict.Rationale);
+        Assert.Equal("No conversation is available to review against.", verdict.Rationale);
         Assert.Null(client.LastRequest);
     }
 

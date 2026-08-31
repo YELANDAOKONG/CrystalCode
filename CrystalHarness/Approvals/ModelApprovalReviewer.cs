@@ -11,7 +11,7 @@ namespace CrystalHarness.Approvals;
 
 /// <summary>
 /// Asks another chat model whether a tool call is safe and on-request.
-/// The user request must be attached; otherwise the reviewer does not run.
+/// Conversation evidence must be attached; otherwise the reviewer does not run.
 /// </summary>
 public sealed class ModelApprovalReviewer : IApprovalReviewer
 {
@@ -39,10 +39,10 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(request.UserRequest))
+        if (string.IsNullOrWhiteSpace(request.Conversation))
         {
             return ApprovalReviewVerdict.AskUser(
-                "No user request is available to review against.");
+                "No conversation is available to review against.");
         }
 
         ChatResponse response;

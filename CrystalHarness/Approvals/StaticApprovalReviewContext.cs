@@ -1,17 +1,35 @@
+using Crystal.Chat;
+
 using CrystalHarness.Approvals.Interfaces;
 
 namespace CrystalHarness.Approvals;
 
 /// <summary>
-/// Fixed user-request text for review-mode tests and early host wiring.
+/// Fixed conversation items for review-mode tests and early host wiring.
 /// </summary>
 public sealed class StaticApprovalReviewContext : IApprovalReviewContext
 {
     public StaticApprovalReviewContext(string userRequest)
+        : this(CreateConversation(userRequest))
     {
-        ArgumentNullException.ThrowIfNull(userRequest);
-        CurrentUserRequest = userRequest;
     }
 
-    public string CurrentUserRequest { get; }
+    public StaticApprovalReviewContext(IReadOnlyList<ChatItem> conversation)
+    {
+        ArgumentNullException.ThrowIfNull(conversation);
+        Conversation = conversation;
+    }
+
+    public IReadOnlyList<ChatItem> Conversation { get; }
+
+    private static IReadOnlyList<ChatItem> CreateConversation(string userRequest)
+    {
+        ArgumentNullException.ThrowIfNull(userRequest);
+        if (string.IsNullOrWhiteSpace(userRequest))
+        {
+            return [];
+        }
+
+        return [new ChatMessage(ChatRole.User, userRequest)];
+    }
 }

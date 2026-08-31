@@ -83,6 +83,7 @@ public sealed class CodingSession
         }
         else
         {
+            BindReviewConversation();
             RebuildExecutors();
         }
     }
@@ -480,6 +481,7 @@ public sealed class CodingSession
         IReadOnlyList<ChatItem> transcript,
         CancellationToken cancellationToken)
     {
+        _reviewContext.Conversation = transcript;
         var limits = CurrentLimits();
         if (!ContextAccountant.ShouldCompact(
                 TokenEstimator.Items(transcript),
@@ -516,6 +518,7 @@ public sealed class CodingSession
             if (ReferenceEquals(transcript, _transcript))
             {
                 _transcript = [.. outcome.Transcript];
+                BindReviewConversation();
                 RememberCompactedUsage();
                 SaveSession();
             }
@@ -562,7 +565,7 @@ public sealed class CodingSession
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _ledger.Clear();
         _todos.Clear();
-        _reviewContext.CurrentUserRequest = string.Empty;
+        BindReviewConversation();
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         SaveSession();
@@ -604,7 +607,7 @@ public sealed class CodingSession
             Math.Max(0, document.ToolCalls),
             SessionMapper.ReadUsage(document.Usage));
         _queue.Clear();
-        _reviewContext.CurrentUserRequest = string.Empty;
+        BindReviewConversation();
         RebuildExecutors();
     }
 
@@ -681,6 +684,11 @@ public sealed class CodingSession
             exceptionMapper: HarnessExceptionMapper.MapAsync);
     }
 
+    private void BindReviewConversation()
+    {
+        _reviewContext.Conversation = _transcript;
+    }
+
     private ReasoningOptions? CurrentReasoning() =>
         _thinkingEffort.ToReasoningOptions(_settings.ActiveModel);
 
@@ -730,7 +738,6 @@ public sealed class CodingSession
     private void StartTurn(string input)
     {
         _renderer.WriteUser(input);
-        _reviewContext.CurrentUserRequest = input;
         _transcript.Add(new ChatMessage(ChatRole.User, input));
         _turnSource = new CancellationTokenSource();
         _turnActive = true;
@@ -780,6 +787,7 @@ public sealed class CodingSession
         }
 
         _transcript = [.. result.Transcript];
+        BindReviewConversation();
         if (result.ModelCallCount > 0)
         {
             _ledger.Record(result);

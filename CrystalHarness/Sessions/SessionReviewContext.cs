@@ -1,12 +1,13 @@
-using CrystalHarness.Approvals;
+using Crystal.Chat;
+
 using CrystalHarness.Approvals.Interfaces;
 
 namespace CrystalHarness.Sessions;
 
 /// <summary>
-/// Holds the latest user request for review-mode approval.
+/// Holds the live conversation for review-mode approval.
 /// </summary>
 public sealed class SessionReviewContext : IApprovalReviewContext
 {
-    public string CurrentUserRequest { get; set; } = string.Empty;
+    public IReadOnlyList<ChatItem> Conversation { get; set; } = [];
 }

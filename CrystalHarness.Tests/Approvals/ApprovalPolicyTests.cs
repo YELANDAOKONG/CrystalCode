@@ -1,3 +1,4 @@
+using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalHarness.Approvals;
@@ -134,7 +135,7 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Review_AsksUserWhenRequestMissing()
+    public async Task DecideAsync_Review_AsksUserWhenConversationMissing()
     {
         using var context = new ApprovalContext(ApprovalMode.Review);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
@@ -147,6 +148,42 @@ public sealed class ApprovalPolicyTests
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Review_AttachesEarlierUserTurns()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Review);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("matches the task"));
+        var policy = context.CreatePolicy(
+            prompt,
+            reviewer,
+            conversation:
+            [
+                new ChatMessage(ChatRole.System, "You are Crystal Code."),
+                new ChatMessage(ChatRole.User, "Run the tests and fix failures."),
+                new ChatMessage(ChatRole.Assistant, "Working."),
+                new ChatMessage(ChatRole.User, "how's it going?")
+            ]);
+
+        var decision = await policy.DecideAsync(WriteCall());
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.NotNull(reviewer.LastRequest);
+        Assert.Contains(
+            "Run the tests and fix failures.",
+            reviewer.LastRequest.Conversation,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "how's it going?",
+            reviewer.LastRequest.Conversation,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "You are Crystal Code.",
+            reviewer.LastRequest.Conversation,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -242,14 +279,17 @@ public sealed class ApprovalPolicyTests
         public ApprovalPolicy CreatePolicy(
             IApprovalPrompt prompt,
             IApprovalReviewer? reviewer = null,
-            string userRequest = "Add a failing test.") =>
+            string userRequest = "Add a failing test.",
+            IReadOnlyList<ChatItem>? conversation = null) =>
             new(
                 _mode,
                 new Workspace(_workspace.Path),
                 new GrantStore(_home.Home),
                 prompt,
                 reviewer,
-                new StaticApprovalReviewContext(userRequest));
+                conversation is null
+                    ? new StaticApprovalReviewContext(userRequest)
+                    : new StaticApprovalReviewContext(conversation));
 
         public void Dispose()
         {

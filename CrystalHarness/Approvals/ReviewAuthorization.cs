@@ -1,7 +1,7 @@
 namespace CrystalHarness.Approvals;
 
 /// <summary>
-/// How strongly the user request authorizes the reviewed action.
+/// How strongly the user's authorized task permits the reviewed action.
 /// Mirrors Codex <c>GuardianUserAuthorization</c>.
 /// </summary>
 public sealed record ReviewAuthorization

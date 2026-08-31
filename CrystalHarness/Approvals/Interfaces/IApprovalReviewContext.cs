@@ -1,9 +1,11 @@
+using Crystal.Chat;
+
 namespace CrystalHarness.Approvals.Interfaces;
 
 /// <summary>
-/// Supplies the current user request to the approval reviewer.
+/// Supplies conversation evidence to the approval reviewer.
 /// </summary>
 public interface IApprovalReviewContext
 {
-    string CurrentUserRequest { get; }
+    IReadOnlyList<ChatItem> Conversation { get; }
 }

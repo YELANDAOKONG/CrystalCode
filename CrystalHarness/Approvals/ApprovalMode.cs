@@ -32,7 +32,7 @@ public sealed record ApprovalMode
         {
             throw new ArgumentException(
                 "Approval mode 'auto' is ambiguous. Use review "
-                + "(another model checks safety and the user request) "
+                + "(another model checks safety against the conversation) "
                 + "or full (pass without review).",
                 nameof(value));
         }

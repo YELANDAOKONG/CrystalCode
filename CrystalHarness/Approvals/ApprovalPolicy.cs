@@ -77,7 +77,7 @@ public sealed class ApprovalPolicy
         ApprovalReviewVerdict? pendingReview = null;
         if (_mode == ApprovalMode.Review
             && _reviewer is not null
-            && !string.IsNullOrWhiteSpace(_reviewContext?.CurrentUserRequest))
+            && ReviewTranscript.HasAuthorization(_reviewContext?.Conversation))
         {
             var reviewed = await TryReviewAsync(call, classification, cancellationToken);
             if (reviewed.Decision is not null)
@@ -114,7 +114,7 @@ public sealed class ApprovalPolicy
         var request = new ApprovalReviewRequest(
             call,
             classification,
-            _reviewContext?.CurrentUserRequest ?? string.Empty);
+            ReviewTranscript.Render(_reviewContext?.Conversation));
         var verdict = await _reviewer!.ReviewAsync(request, cancellationToken);
         if (verdict.IsDeny)
         {

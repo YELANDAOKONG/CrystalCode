@@ -87,7 +87,7 @@ CrystalHarness (executable):
 | `Configuration` | Loaded options, defaults, thinking chrome labels |
 | `Home` | `~/.crystal` paths and file I/O |
 | `Sessions` | Transcript, ledger, streaming turn, slash commands, session renderer, replay, tool-call text, usage text, question prompt |
-| `Approvals` | Risk, authority, grants, policy, approval cards and keys |
+| `Approvals` | Risk, authority, grants, policy, review transcript, approval cards and keys |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
@@ -180,12 +180,17 @@ Modes:
 - Default: Read auto-executes. Write and shell ask the operator.
 - AutoEdit: workspace file changes pass without review. Shell still asks.
 - Review: another model checks each remaining side-effect call (Codex
-  guardian-style). The current user request is attached; without it the
-  host asks the operator. The reviewer returns `outcome` (allow / deny /
-  ask), `risk_level` (low / medium / high), `user_authorization` (low /
-  medium / high), and `rationale`. Allow executes. Deny becomes
-  model-visible rejection text. Ask and Forbidden-allow fall back to the
-  operator. Review is not a grant and is not full pass-through.
+  guardian-style). A bounded transcript excerpt is attached: the first
+  and latest user turns as authorization anchors, other user turns that
+  fit, then recent assistant and tool evidence. A compaction summary
+  stands in for folded user turns. Without that evidence the host asks
+  the operator. Later user messages refine the task; a status question
+  does not revoke earlier authorization. The reviewer returns `outcome`
+  (allow / deny / ask), `risk_level` (low / medium / high),
+  `user_authorization` (low / medium / high), and `rationale`. Allow
+  executes. Deny becomes model-visible rejection text. Ask and
+  Forbidden-allow fall back to the operator. Review is not a grant and
+  is not full pass-through.
 - Full: workspace-bounded, policy-allowed actions pass without review.
   Forbidden and Privileged never fully auto-pass.
 

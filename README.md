@@ -335,7 +335,7 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Read auto-executes. Write and shell ask you. |
 | **AutoEdit** | Workspace file changes pass without review. Shell still asks. |
-| **Review** | Another model checks each remaining side-effect call. The current user request is attached; without it the host asks you. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Review** | Another model checks each remaining side-effect call. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review. Forbidden and Privileged never fully auto-pass. |
 
 Do not name a mode `auto`. That word is ambiguous between review and

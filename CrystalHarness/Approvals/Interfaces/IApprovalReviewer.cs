@@ -1,7 +1,7 @@
 namespace CrystalHarness.Approvals.Interfaces;
 
 /// <summary>
-/// Reviews a tool call for safety and whether it serves the user request.
+/// Reviews a tool call for safety and whether it serves the user's task.
 /// </summary>
 public interface IApprovalReviewer
 {
