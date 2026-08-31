@@ -4,9 +4,9 @@ param()
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$repository = "YELANDAOKONG/CrystalHarness"
+$repository = "YELANDAOKONG/CrystalCode"
 $installDirectory = Join-Path $HOME ".crystal/binaries/code"
-$binaryName = "CrystalHarness.exe"
+$binaryName = "CrystalCode.exe"
 
 function Fail([string]$message) {
     throw $message
@@ -22,13 +22,13 @@ if ($architecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
 }
 
 $asset = "windows-x64"
-$archiveName = "CrystalHarness-$asset.zip"
+$archiveName = "CrystalCode-$asset.zip"
 $downloadUrl = "https://github.com/$repository/releases/latest/download/$archiveName"
-$temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("CrystalHarness-" + [Guid]::NewGuid().ToString("N"))
+$temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("CrystalCode-" + [Guid]::NewGuid().ToString("N"))
 $archivePath = Join-Path $temporaryDirectory $archiveName
 $extractionDirectory = Join-Path $temporaryDirectory "extracted"
 $destinationPath = Join-Path $installDirectory $binaryName
-$stagedPath = Join-Path $installDirectory (".CrystalHarness-" + [Guid]::NewGuid().ToString("N") + ".exe")
+$stagedPath = Join-Path $installDirectory (".CrystalCode-" + [Guid]::NewGuid().ToString("N") + ".exe")
 
 New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
 

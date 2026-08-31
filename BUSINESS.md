@@ -2,7 +2,7 @@
 
 ## Mission
 
-CrystalHarness is a local coding agent for real repositories. A developer runs
+CrystalCode is a local coding agent for real repositories. A developer runs
 it in a workspace, talks to a model, and lets the agent inspect and change
 code under explicit Plan/Work modes and a risk-aware approval policy.
 
@@ -54,8 +54,8 @@ select a model, write a system prompt, ship a filesystem tool, compress
 context, or draw a UI.
 
 Crystal.Harness is a named-Agent composition runtime with shared budgets. It
-is not this product. This product is named CrystalHarness because it is the
-coding harness built on Crystal.
+is not this product. This product is named CrystalCode because it is the
+coding product built on Crystal.
 
 ## Data
 

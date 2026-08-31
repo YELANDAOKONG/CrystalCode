@@ -5,12 +5,12 @@ only operator surface. It runs a streaming model-and-tool loop, with
 Plan/Work modes, risk-aware approval, automatic context compaction,
 and operator data under `~/.crystal`.
 
-CrystalHarness consumes the Crystal library. It does not modify Crystal.
+CrystalCode consumes the Crystal library. It does not modify Crystal.
 It is not a Crystal demo and not a replacement for Crystal.
 
 ## What it does
 
-From a workspace you want the agent to inspect or change, CrystalHarness:
+From a workspace you want the agent to inspect or change, CrystalCode:
 
 - streams a model turn with tool calls, and queues follow-ups while a
   turn is running;
@@ -31,14 +31,14 @@ from disk.
 
 The latest self-contained release can be installed on Linux x64, Linux ARM64,
 macOS ARM64, or Windows x64. The installers download the matching standard
-release asset, `CrystalHarness-<os>-<architecture>.zip`, then replace the
+release asset, `CrystalCode-<os>-<architecture>.zip`, then replace the
 matching executable in `~/.crystal/binaries/code/`.
 
 On Linux or macOS, download and inspect the installer, then run it:
 
 ```bash
 curl --fail --location --show-error --output install.sh \
-  https://raw.githubusercontent.com/YELANDAOKONG/CrystalHarness/master/scripts/install.sh
+  https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.sh
 sh install.sh
 ```
 
@@ -46,14 +46,14 @@ On Windows PowerShell:
 
 ```powershell
 Invoke-WebRequest `
-  -Uri https://raw.githubusercontent.com/YELANDAOKONG/CrystalHarness/master/scripts/install.ps1 `
+  -Uri https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.ps1 `
   -OutFile install.ps1
 .\install.ps1
 ```
 
 The installers do not write credentials, edit shell profiles, or modify PATH.
-Run `~/.crystal/binaries/code/CrystalHarness` on Linux or macOS, or
-`~/.crystal/binaries/code/CrystalHarness.exe` on Windows. Add that directory to
+Run `~/.crystal/binaries/code/CrystalCode` on Linux or macOS, or
+`~/.crystal/binaries/code/CrystalCode.exe` on Windows. Add that directory to
 your own PATH if you want to invoke it by name.
 
 ## What it does not do
@@ -81,11 +81,11 @@ Building from source also requires:
 From the repository root:
 
 ```bash
-dotnet build CrystalHarness.sln
-dotnet test CrystalHarness.sln
+dotnet build CrystalCode.sln
+dotnet test CrystalCode.sln
 ```
 
-The executable project is `CrystalHarness`. The Spectre application
+The executable project is `CrystalCode`. The Spectre application
 name is `crystal`.
 
 ## Run
@@ -94,7 +94,7 @@ Start from the workspace the agent should edit. The current directory
 is the workspace unless `--workspace` is set.
 
 ```bash
-dotnet run --project CrystalHarness -- --provider deepseek --model deepseek-v4-flash
+dotnet run --project CrystalCode -- --provider deepseek --model deepseek-v4-flash
 ```
 
 CLI options:
@@ -120,7 +120,7 @@ If the provider has more than one model and neither `config.json` nor
 ## Credentials
 
 Do not put secrets in the workspace, in this repository, or in commit
-contents. CrystalHarness never writes secrets into the project tree.
+contents. CrystalCode never writes secrets into the project tree.
 `credentials.json` is created with owner-only permissions where the
 operating system allows it.
 
@@ -601,7 +601,7 @@ Override with `CRYSTAL_HOME` or `--home`.
 
 ```text
 ~/.crystal/
-  binaries/code/CrystalHarness (CrystalHarness.exe on Windows)
+  binaries/code/CrystalCode (CrystalCode.exe on Windows)
   config.json
   credentials.json
   permissions.json

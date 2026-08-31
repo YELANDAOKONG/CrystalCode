@@ -15,7 +15,7 @@ change. Implementation must never become the only source of truth.
 
 ## Product
 
-CrystalHarness is a production coding TUI. The terminal is the only
+CrystalCode is a production coding TUI. The terminal is the only
 operator surface. It is not a Crystal demo and not a replacement for Crystal.
 
 Crystal is a sibling library at `../Crystal`. Consume it. Do not modify it.
@@ -61,6 +61,6 @@ semantics. Do not copy its Demo UI into this product.
 While developing, run the narrowest relevant build. Before handoff:
 
 ```bash
-dotnet build CrystalHarness.sln
-dotnet test CrystalHarness.sln
+dotnet build CrystalCode.sln
+dotnet test CrystalCode.sln
 ```

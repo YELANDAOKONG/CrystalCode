@@ -2,9 +2,9 @@
 
 set -eu
 
-repository="YELANDAOKONG/CrystalHarness"
+repository="YELANDAOKONG/CrystalCode"
 install_directory="${HOME:?HOME must be set}/.crystal/binaries/code"
-binary_name="CrystalHarness"
+binary_name="CrystalCode"
 
 fail() {
     printf '%s\n' "$1" >&2
@@ -63,9 +63,9 @@ require_command unzip
 require_command mktemp
 
 asset="$(detect_asset)"
-archive_name="CrystalHarness-${asset}.zip"
+archive_name="CrystalCode-${asset}.zip"
 download_url="https://github.com/${repository}/releases/latest/download/${archive_name}"
-working_directory="$(mktemp -d "${TMPDIR:-/tmp}/crystalharness.XXXXXX")"
+working_directory="$(mktemp -d "${TMPDIR:-/tmp}/crystalcode.XXXXXX")"
 archive_path="${working_directory}/${archive_name}"
 extraction_directory="${working_directory}/extracted"
 

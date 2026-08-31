@@ -9,40 +9,40 @@ baseline.
 ## Dependency direction
 
 ```text
-CrystalHarness
+CrystalCode
     ↓
-CrystalHarness.Display
+CrystalCode.Display
     ↓
 Spectre.Console   (rasterization; Terminal.Gui is referenced, not called)
 
-CrystalHarness
+CrystalCode
     ↓
-CrystalHarness.Providers
+CrystalCode.Providers
     ↓
 Crystal
 
-CrystalHarness also references Crystal.Tools, Crystal.Agents, and
-Crystal.Harness directly. CrystalHarness.Display references Spectre.Console
+CrystalCode also references Crystal.Tools, Crystal.Agents, and
+Crystal.Harness directly. CrystalCode.Display references Spectre.Console
 and Terminal.Gui only. It does not reference Crystal, Crystal.Tools, or
-the executable host. CrystalHarness.Providers references only Crystal.
+the executable host. CrystalCode.Providers references only Crystal.
 No project in this repository modifies Crystal.
 ```
 
-CrystalHarness.Tests references CrystalHarness.
-CrystalHarness.Display.Tests references CrystalHarness.Display.
-CrystalHarness.Providers.Tests references CrystalHarness.Providers.
+CrystalCode.Tests references CrystalCode.
+CrystalCode.Display.Tests references CrystalCode.Display.
+CrystalCode.Providers.Tests references CrystalCode.Providers.
 
 ## Assembly ownership
 
-### CrystalHarness
+### CrystalCode
 
 The executable host. Owns CLI commands, session and turn execution,
 Plan/Work catalogs, approval policy, context compaction, `~/.crystal`
 storage, built-in coding tools, prompts, and in-process plugin contracts.
-It projects session state onto CrystalHarness.Display. It does not own
+It projects session state onto CrystalCode.Display. It does not own
 the frame painter, composer buffer, or transcript log.
 
-### CrystalHarness.Display
+### CrystalCode.Display
 
 The terminal UI library. Owns the alternate-screen frame, input routing,
 composer, transcript viewport, markdown paint, and queue card. Spectre
@@ -52,34 +52,34 @@ supply-chain review and is not called. The host loop stays in this
 assembly's shell types; a later migration to Terminal.Gui would replace
 that loop inside this project only.
 
-### CrystalHarness.Display.Tests
+### CrystalCode.Display.Tests
 
 Display tests: layout, chrome, input decoder, scroll policy, composer, paint,
 transcript log, and queue card. Does not reference the host executable.
 
-### CrystalHarness.Providers
+### CrystalCode.Providers
 
 Model adapters. Each adapter implements `IChatClient` and, when the provider
 can stream, `IStreamingChatClient`. Provider options, wire DTOs, and
 transport exceptions stay in this assembly. No tools, no UI, no home-directory
 layout.
 
-### CrystalHarness.Tests
+### CrystalCode.Tests
 
 Host tests: workspace fencing, approval classification, compaction
 selection, session serialization, and command behavior.
 
-### CrystalHarness.Providers.Tests
+### CrystalCode.Providers.Tests
 
 Provider adapter tests. One folder per vendor, mirroring
-`CrystalHarness.Providers`. Does not reference the host executable.
+`CrystalCode.Providers`. Does not reference the host executable.
 
 ## Namespace ownership
 
-Root identifier is `CrystalHarness`, matching the existing solution. Folder
+Root identifier is `CrystalCode`, matching the existing solution. Folder
 path under a project root equals the namespace after the project name.
 
-CrystalHarness (executable):
+CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
@@ -97,7 +97,7 @@ CrystalHarness (executable):
 | `Plugins/Interfaces` | Contribution contracts |
 | `Plugins/Providers` | Built-in DeepSeek and OpenAI client factories |
 
-CrystalHarness.Display:
+CrystalCode.Display:
 
 | Folder | Owns |
 | :--- | :--- |
@@ -108,7 +108,7 @@ CrystalHarness.Display:
 | `Transcript` | Viewport log, role cards, sequential fallback |
 | `Paint` | Markup, markdown, theme, wrapping |
 
-Provider types live under `CrystalHarness.Providers` plus one folder per
+Provider types live under `CrystalCode.Providers` plus one folder per
 vendor (`DeepSeek`, `OpenAI`). Shared OpenAI-compatible request and stream
 parsing lives in `Compatible` so neither vendor adapter reimplements the
 wire format.
@@ -251,13 +251,13 @@ a baseline. `/clear` starts a new id.
 ## Home directory
 
 Self-contained release archives are named
-`CrystalHarness-<operating-system>-<architecture>.zip`. The supported values
+`CrystalCode-<operating-system>-<architecture>.zip`. The supported values
 are `linux-x64`, `linux-arm64`, `macos-arm64`, and `windows-x64`. The platform
 installers replace only the matching executable under `binaries/code/`.
 
 ```text
 ~/.crystal/
-  binaries/code/CrystalHarness (CrystalHarness.exe on Windows)
+  binaries/code/CrystalCode (CrystalCode.exe on Windows)
   config.json
   credentials.json
   permissions.json
@@ -407,7 +407,7 @@ variables still override. `credentials.json` remains a fallback store.
 
 ## Display
 
-CrystalHarness.Display is the TUI host. Spectre.Console supplies markup,
+CrystalCode.Display is the TUI host. Spectre.Console supplies markup,
 color, panels, grids, rules, and padding as an offline rasterizer.
 `AnsiConsole.Live` is not the session shell: it fights the composer.
 Widgets are rasterized into frame rows. The shell enters the alternate
@@ -417,7 +417,7 @@ rows are left in place; a width or height change clears the buffer. The
 executable maps turns onto that frame through `SessionRenderer`; it does
 not paint rows itself.
 
-Terminal.Gui is referenced from CrystalHarness.Display with a floating
+Terminal.Gui is referenced from CrystalCode.Display with a floating
 version and is not used. Do not call `Application.Init` or mix a second
 console writer with the self-owned loop.
 

@@ -19,12 +19,12 @@
 - Folder path under the project root equals the namespace after the project
   name.
 - Using directives: System, then third-party, then Crystal, then
-  CrystalHarness, with a blank line between groups that are present.
+  CrystalCode, with a blank line between groups that are present.
 - No top-level statements.
 - Solution Explorer layout follows Visual Studio / Rider: `.sln` at the
   repository root, project folders beside it, tests as
-  `{Project}.Tests` siblings (`CrystalHarness.Tests`,
-  `CrystalHarness.Display.Tests`, `CrystalHarness.Providers.Tests`). No
+  `{Project}.Tests` siblings (`CrystalCode.Tests`,
+  `CrystalCode.Display.Tests`, `CrystalCode.Providers.Tests`). No
   `src/` or root `tests/` tree.
 
 ## C# conventions
@@ -72,29 +72,29 @@
 
 Authorized packages today:
 
-- Spectre.Console in CrystalHarness.Display (session rasterization) and
-  CrystalHarness (host cards that still build Spectre widgets).
-- Spectre.Console.Cli in CrystalHarness.
-- Terminal.Gui in CrystalHarness.Display only, with a floating version
+- Spectre.Console in CrystalCode.Display (session rasterization) and
+  CrystalCode (host cards that still build Spectre widgets).
+- Spectre.Console.Cli in CrystalCode.
+- Terminal.Gui in CrystalCode.Display only, with a floating version
   (`*`). It is parked for supply-chain review. Production and test code
   must not import `Terminal.Gui` types. Do not add a dummy `using` to
   silence unused-package warnings; document a restore suppression if
   NU1510 is raised.
 - Newtonsoft.Json, Newtonsoft.Json.Bson, and System.Text.Json where the
   Crystal sibling already requires them for project-reference consistency.
-- xUnit and Microsoft.NET.Test.Sdk in CrystalHarness.Tests,
-  CrystalHarness.Display.Tests, and CrystalHarness.Providers.Tests.
+- xUnit and Microsoft.NET.Test.Sdk in CrystalCode.Tests,
+  CrystalCode.Display.Tests, and CrystalCode.Providers.Tests.
 
 Do not add another package without asking.
 
 ## Verification
 
 ```bash
-dotnet build CrystalHarness.sln
-dotnet test CrystalHarness.sln
+dotnet build CrystalCode.sln
+dotnet test CrystalCode.sln
 ```
 
 Do not claim coverage a test project does not actually exercise. Host
-behavior is tested in CrystalHarness.Tests. Frame, composer, and paint
-behavior is tested in CrystalHarness.Display.Tests. Adapters are tested
-in CrystalHarness.Providers.Tests.
+behavior is tested in CrystalCode.Tests. Frame, composer, and paint
+behavior is tested in CrystalCode.Display.Tests. Adapters are tested
+in CrystalCode.Providers.Tests.
