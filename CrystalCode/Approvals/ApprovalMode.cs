@@ -13,6 +13,8 @@ public sealed record ApprovalMode
 
     public static ApprovalMode Review { get; } = new("review");
 
+    public static ApprovalMode FullReview { get; } = new("fullreview");
+
     public static ApprovalMode Full { get; } = new("full");
 
     public ApprovalMode(string value)
@@ -37,6 +39,11 @@ public sealed record ApprovalMode
                 nameof(value));
         }
 
+        if (mode.Value is "full-review")
+        {
+            return FullReview;
+        }
+
         if (mode.Value is "fullauto" or "yolo")
         {
             return Full;
@@ -46,13 +53,14 @@ public sealed record ApprovalMode
             || mode == Default
             || mode == AutoEdit
             || mode == Review
+            || mode == FullReview
             || mode == Full)
         {
             return mode;
         }
 
         throw new ArgumentException(
-            "Approval mode must be plan, default, autoedit, review, or full.",
+            "Approval mode must be plan, default, autoedit, review, fullreview, or full.",
             nameof(value));
     }
 
@@ -69,6 +77,11 @@ public sealed record ApprovalMode
         }
 
         if (current == Review)
+        {
+            return FullReview;
+        }
+
+        if (current == FullReview)
         {
             return Full;
         }

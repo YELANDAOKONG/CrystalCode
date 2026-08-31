@@ -7,9 +7,11 @@ namespace CrystalCode.Tests.Approvals;
 public sealed class ApprovalModeTests
 {
     [Fact]
-    public void Parse_AcceptsReviewAndFull()
+    public void Parse_AcceptsReviewFullReviewAndFull()
     {
         Assert.Equal(ApprovalMode.Review, ApprovalMode.Parse("review"));
+        Assert.Equal(ApprovalMode.FullReview, ApprovalMode.Parse("fullreview"));
+        Assert.Equal(ApprovalMode.FullReview, ApprovalMode.Parse("full-review"));
         Assert.Equal(ApprovalMode.Full, ApprovalMode.Parse("full"));
         Assert.Equal(ApprovalMode.Full, ApprovalMode.Parse("fullauto"));
     }
@@ -24,11 +26,12 @@ public sealed class ApprovalModeTests
     }
 
     [Fact]
-    public void Next_CyclesDefaultAutoEditReviewFull()
+    public void Next_CyclesDefaultAutoEditReviewFullReviewFull()
     {
         Assert.Equal(ApprovalMode.AutoEdit, ApprovalMode.Next(ApprovalMode.Default));
         Assert.Equal(ApprovalMode.Review, ApprovalMode.Next(ApprovalMode.AutoEdit));
-        Assert.Equal(ApprovalMode.Full, ApprovalMode.Next(ApprovalMode.Review));
+        Assert.Equal(ApprovalMode.FullReview, ApprovalMode.Next(ApprovalMode.Review));
+        Assert.Equal(ApprovalMode.Full, ApprovalMode.Next(ApprovalMode.FullReview));
         Assert.Equal(ApprovalMode.Default, ApprovalMode.Next(ApprovalMode.Full));
         Assert.Equal(ApprovalMode.Default, ApprovalMode.Next(ApprovalMode.Plan));
     }

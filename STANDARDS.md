@@ -57,14 +57,15 @@
 
 - Write, edit, and bash stay inside the workspace root.
 - Read, glob, and grep of paths outside the workspace require
-  approval. In Review mode the reviewing model judges them; otherwise
-  the operator is asked. When Skills is enabled, any path inside a
-  Skills search directory (`skill` / `skills` trees) auto-passes as
-  a workspace read. Credential paths stay Forbidden.
+  approval. In Review or FullReview the reviewing model judges them;
+  otherwise the operator is asked. When Skills is enabled, any path
+  inside a Skills search directory (`skill` / `skills` trees)
+  auto-passes as a workspace read. Credential paths stay Forbidden.
 - Shell classification treats `sudo`, destructive filesystem commands,
   pipe-to-shell downloads, force-push, and credential-path writes as
   Forbidden or Privileged. Forbidden never fully auto-passes. Review
-  mode may deny those calls or escalate them to the operator.
+  and FullReview may deny those calls or escalate them to the
+  operator.
 - Credential files are written with owner-only access where the OS allows it.
 - Do not log request bodies that may contain secrets.
 

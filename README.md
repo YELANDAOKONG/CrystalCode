@@ -188,7 +188,7 @@ Top-level fields:
 | :--- | :--- |
 | `provider` | Active provider name |
 | `model` | Active model id (must exist under that provider) |
-| `approval` | `default`, `autoedit`, `review`, or `full` |
+| `approval` | `default`, `autoedit`, `review`, `fullreview`, or `full` |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
@@ -384,13 +384,14 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and reads outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
 | **AutoEdit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and outside-workspace reads still ask. |
-| **Review** | Another model checks each remaining side-effect call, including reads outside the workspace and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same names as AutoEdit. Another model checks each remaining side-effect call, including bash, reads outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **FullReview** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
 
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through. `/approval` with no argument cycles Default,
-AutoEdit, Review, and Full. `/approval review` (and the other names)
-sets one mode and writes it to `config.json`.
+AutoEdit, Review, FullReview, and Full. `/approval review` (and the
+other names) sets one mode and writes it to `config.json`.
 
 When you are asked, the overlay uses a two-column field grid
 (Status, Reason, Risk, Authority, and for review also Outcome plus
@@ -411,7 +412,7 @@ plus the classifier summary.
 
 Shell classification treats `sudo`, destructive filesystem commands,
 pipe-to-shell downloads, force-push, and credential-path writes as
-Forbidden or Privileged. Forbidden never fully auto-passes. Review
+Forbidden or Privileged. Forbidden never fully auto-passes. Review and FullReview
 may deny those calls or escalate them to you. Writes under `.ssh`,
 `.gnupg`, or `~/.crystal/credentials.json` are Forbidden.
 
@@ -456,7 +457,7 @@ Type `/` to open the picker. Built-in verbs:
 | :--- | :--- | :--- |
 | `/help` | `/h` | Shortcuts and commands |
 | `/plan` | | Toggle Plan / Work |
-| `/approval` | | Cycle or set `default`, `autoedit`, `review`, `full` |
+| `/approval` | | Cycle or set `default`, `autoedit`, `review`, `fullreview`, `full` |
 | `/thinking` | `/think` | Cycle or set the thinking gear |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/status` | | Turns, tokens, mode, workspace |
@@ -475,8 +476,8 @@ that already exists.
 Filesystem and shell writes are fenced to the workspace root. Paths
 that escape the root are rejected for `edit`, `write`, and `bash`.
 `read`, `glob`, and `grep` may use an absolute path outside the
-workspace after approval (you, or the Review model in Review mode).
-Credential paths
+workspace after approval (you, or the Review model in Review or
+FullReview). Credential paths
 (`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob and grep
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
 files are rejected for read/edit (NUL probe). Shell working directory
@@ -533,7 +534,8 @@ Runners:
 
 Every external tool is at least Write + Workspace and still goes
 through `ToolInvocationPolicy`. Full auto-passes a workspace-bounded
-external write; AutoEdit does not. Details, manifest fields, and the
+external write; AutoEdit does not. Review and FullReview send it to
+the reviewing model. Details, manifest fields, and the
 dotnet publish layout are in
 [docs/external-tools.md](docs/external-tools.md).
 
@@ -592,7 +594,7 @@ trees, including scripts and other files that are not `SKILL.md`)
 auto-passes; it does not ask you. Set `"skills": false` in
 `config.json` to disable the tool, the guidance, and that auto-pass.
 Other files outside the workspace still need approval (you, or the
-Review model in Review mode).
+Review model in Review or FullReview).
 
 Each skill is a directory with a `SKILL.md` that starts with YAML
 frontmatter (`name` and `description` required). The skill id is the

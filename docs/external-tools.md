@@ -116,8 +116,8 @@ set) omit the whole set.
 ## Catalogs (Plan / Work)
 
 The product has two **tool catalogs**, Plan and Work. Approval modes
-(Default, AutoEdit, Review, Full) are not catalogs. Do not put
-`review`, `default`, or `full` in this field.
+(Default, AutoEdit, Review, FullReview, Full) are not catalogs. Do not
+put `review`, `fullreview`, `default`, or `full` in this field.
 
 Field name is `catalogs`, not `modes`.
 
@@ -259,9 +259,9 @@ name. It does not fall through to "Unknown tool" after a successful
 load.
 
 Full auto-passes workspace-bounded Write for any such tool, not only
-built-in `write` / `edit`. AutoEdit still auto-passes only those
-built-in names. Default and Review still treat external Write as a
-side effect.
+built-in `write` / `edit`. AutoEdit and Review still auto-pass only
+those built-in names. Default asks the operator for external Write.
+Review and FullReview send it to the reviewing model.
 
 Secrets never appear in `tools.json`. The host does not inject
 credentials into the child environment or into a loaded assembly.

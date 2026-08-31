@@ -76,7 +76,7 @@ public sealed class ApprovalPolicy
         }
 
         ApprovalReviewVerdict? pendingReview = null;
-        if (ShouldReview(classification))
+        if (ShouldReview())
         {
             var reviewed = await TryReviewAsync(call, classification, cancellationToken);
             if (reviewed.Decision is not null)
@@ -137,10 +137,13 @@ public sealed class ApprovalPolicy
         return (null, verdict);
     }
 
-    private bool ShouldReview(ToolClassification classification) =>
-        _mode == ApprovalMode.Review
+    private bool ShouldReview() =>
+        UsesReviewer
         && _reviewer is not null
         && ReviewTranscript.HasAuthorization(_reviewContext?.Conversation);
+
+    private bool UsesReviewer =>
+        _mode == ApprovalMode.Review || _mode == ApprovalMode.FullReview;
 
     private bool CanPassWithoutReview(string toolName, ToolClassification classification)
     {
@@ -164,7 +167,7 @@ public sealed class ApprovalPolicy
             }
 
             return toolName is WriteTool.ToolName or EditTool.ToolName
-                && _mode == ApprovalMode.AutoEdit;
+                && (_mode == ApprovalMode.AutoEdit || _mode == ApprovalMode.Review);
         }
 
         if (toolName == BashTool.ToolName)

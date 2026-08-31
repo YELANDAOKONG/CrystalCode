@@ -215,9 +215,52 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Review_AllowsWriteWhenReviewerAllows()
+    public async Task DecideAsync_Review_AutoExecutesWorkspaceWrite()
     {
         using var context = new ApprovalContext(ApprovalMode.Review);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var reviewer = new FixedApprovalReviewer(
+            ApprovalReviewVerdict.Deny("should not run"));
+        var policy = context.CreatePolicy(prompt, reviewer);
+
+        var decision = await policy.DecideAsync(WriteCall());
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(0, prompt.ReviewCount);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
+        Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
+        Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
+        Assert.Null(reviewer.LastRequest);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Review_AllowsBashWhenReviewerAllows()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Review);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(
+            prompt,
+            new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("matches the request")));
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(1, prompt.ReviewCount);
+        Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
+        Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
+        Assert.NotNull(prompt.LastReview);
+        Assert.Equal("matches the request", prompt.LastReview.Rationale);
+    }
+
+    [Fact]
+    public async Task DecideAsync_FullReview_AllowsWriteWhenReviewerAllows()
+    {
+        using var context = new ApprovalContext(ApprovalMode.FullReview);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = context.CreatePolicy(
             prompt,
@@ -238,9 +281,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Review_RejectsWhenReviewerDenies()
+    public async Task DecideAsync_FullReview_RejectsWhenReviewerDenies()
     {
-        using var context = new ApprovalContext(ApprovalMode.Review);
+        using var context = new ApprovalContext(ApprovalMode.FullReview);
         var policy = context.CreatePolicy(
             new ThrowingApprovalPrompt(),
             new FixedApprovalReviewer(
@@ -256,9 +299,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Review_AsksUserWhenReviewerIsUncertain()
+    public async Task DecideAsync_FullReview_AsksUserWhenReviewerIsUncertain()
     {
-        using var context = new ApprovalContext(ApprovalMode.Review);
+        using var context = new ApprovalContext(ApprovalMode.FullReview);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
         var policy = context.CreatePolicy(
             prompt,
@@ -272,9 +315,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Review_AsksUserWhenConversationMissing()
+    public async Task DecideAsync_FullReview_AsksUserWhenConversationMissing()
     {
-        using var context = new ApprovalContext(ApprovalMode.Review);
+        using var context = new ApprovalContext(ApprovalMode.FullReview);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
         var policy = context.CreatePolicy(
             prompt,
@@ -288,9 +331,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Review_AttachesEarlierUserTurns()
+    public async Task DecideAsync_FullReview_AttachesEarlierUserTurns()
     {
-        using var context = new ApprovalContext(ApprovalMode.Review);
+        using var context = new ApprovalContext(ApprovalMode.FullReview);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("matches the task"));
         var policy = context.CreatePolicy(
