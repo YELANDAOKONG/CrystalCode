@@ -162,18 +162,26 @@ public static class MarkdownRenderer
             }
         }
 
-        AddWrapped(lines, "    " + raw, Theme.Code, width);
+        AddWrapped(lines, "    " + raw, Theme.Code, width, onBackground: Theme.CodeBg);
     }
 
     private static void AddWrapped(
         List<PaintLine> lines,
         string plain,
         string color,
-        int width)
+        int width,
+        string? onBackground = null)
     {
         foreach (var wrapped in TextWidth.Wrap(plain, width))
         {
-            lines.Add(PaintLine.Colored(color, wrapped));
+            if (string.IsNullOrEmpty(onBackground))
+            {
+                lines.Add(PaintLine.Colored(color, wrapped));
+                continue;
+            }
+
+            var markup = $"[{color} on {onBackground}]{MarkupText.Escape(wrapped)}[/]";
+            lines.Add(new PaintLine(markup, wrapped));
         }
     }
 

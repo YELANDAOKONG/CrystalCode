@@ -34,6 +34,18 @@ public sealed class TranscriptLogTests
     }
 
     [Fact]
+    public void BuildLines_RendersLiveAssistantAsMarkdown()
+    {
+        var log = new TranscriptLog();
+        log.AppendLive(TranscriptKind.Assistant, "# Head");
+
+        var lines = log.BuildLines(40);
+
+        Assert.Contains(lines, line => line.Markup.Contains(Theme.Heading, StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("Head", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void BuildLines_FramesUserMessage()
     {
         var log = new TranscriptLog();

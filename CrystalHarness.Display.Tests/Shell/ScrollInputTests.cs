@@ -1,3 +1,4 @@
+using CrystalHarness.Display.Composer;
 using CrystalHarness.Display.Shell;
 
 using Xunit;
@@ -93,6 +94,14 @@ public sealed class ScrollInputTests
 
         Assert.True(ScrollInput.IsPaste(burst));
         Assert.False(ScrollInput.TryDelta(burst, true, false, 8, out _));
+    }
+
+    [Fact]
+    public void IsPaste_BracketedPasteMarkersAreNotHeuristicPaste()
+    {
+        var burst = Csi(BracketedPaste.StartMarker + "hi" + BracketedPaste.EndMarker);
+
+        Assert.False(ScrollInput.IsPaste(burst));
     }
 
     [Fact]

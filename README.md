@@ -253,10 +253,11 @@ and elapsed time. Mode is Plan or Work on the composer prompt, not
 repeated on the status bar. A queued-follow-up count appears while
 items wait.
 
-Assistant text is rendered as markdown after each model round
-(headings, lists, fenced code, inline code and bold). User, thinking,
-tool, and result blocks are rounded panels. Tool names in chrome are
-Title Case.
+Assistant text is rendered as markdown while it streams and after it
+commits (headings, lists, fenced code, inline code and bold). User,
+thinking, tool, and result blocks are rounded panels. Tool names in
+chrome are Title Case. Approval cards for edit and write show a short
+`+` / `-` preview of the change.
 
 ### Composer keys
 
@@ -276,10 +277,12 @@ Title Case.
 | Ctrl+C at idle | Clear the composer |
 | Ctrl+C twice on an empty composer | Exit |
 
-The alternate screen enables SGR mouse for the wheel and
-alternate-scroll arrows. Shift+drag still selects and copies. The
-frame repaints when the terminal is resized. Escape sequences are
-not treated as paste.
+The alternate screen enables SGR mouse for the wheel,
+alternate-scroll arrows, and bracketed paste. Shift+drag still selects
+and copies. The frame repaints when the terminal is resized. Escape
+sequences that are not a paste wrap are not treated as paste. Overlay
+prompts (approval and questions) keep using that same input loop, so
+scroll and resize still work while they are open.
 
 ### Follow-up queue
 

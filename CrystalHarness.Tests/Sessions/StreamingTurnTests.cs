@@ -110,6 +110,31 @@ public sealed class StreamingTurnTests
         Assert.True(observer.UsageUpdates.Count >= 2);
         Assert.Equal(30, observer.UsageUpdates[^1]?.InputTokenCount);
         Assert.Equal(15, observer.UsageUpdates[^1]?.OutputTokenCount);
+        var calls = Assert.Single(observer.ToolCallBatches);
+        Assert.Equal("c1", Assert.Single(calls).CallId);
+        Assert.Equal("echo", calls[0].Name);
+        var results = Assert.Single(observer.ToolResultBatches);
+        Assert.Equal("c1", Assert.Single(results).CallId);
+        Assert.True(observer.ToolCallsBeforeResults);
+    }
+
+    [Fact]
+    public async Task RunAsync_DoesNotNotifyToolCallsWhenTheRoundHasNone()
+    {
+        var observer = new TestObserver();
+        var client = new ScriptedStreamingClient(TextRound("done"));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
+
+        await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Empty(observer.ToolCallBatches);
+        Assert.Empty(observer.ToolResultBatches);
     }
 
     [Fact]
@@ -219,11 +244,26 @@ public sealed class StreamingTurnTests
     {
         public List<TokenUsage?> UsageUpdates { get; } = [];
 
+        public List<IReadOnlyList<ToolCall>> ToolCallBatches { get; } = [];
+
+        public List<IReadOnlyList<ToolResult>> ToolResultBatches { get; } = [];
+
+        public bool ToolCallsBeforeResults { get; private set; }
+
         public void OnStreamEvent(ChatStreamEvent streamEvent) { }
 
         public void OnModelRoundClosed() { }
 
-        public void OnToolResults(IReadOnlyList<ToolResult> results) { }
+        public void OnToolCalls(IReadOnlyList<ToolCall> calls)
+        {
+            ToolCallsBeforeResults = ToolResultBatches.Count == 0;
+            ToolCallBatches.Add(calls);
+        }
+
+        public void OnToolResults(IReadOnlyList<ToolResult> results)
+        {
+            ToolResultBatches.Add(results);
+        }
 
         public void OnUsageUpdated(TokenUsage? usage) => UsageUpdates.Add(usage);
     }

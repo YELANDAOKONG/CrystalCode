@@ -6,7 +6,7 @@ using CrystalHarness.Sessions;
 namespace CrystalHarness.Approvals;
 
 /// <summary>
-/// Permission overlay. Keys, not a Live selection widget.
+/// Permission overlay. Keys share the session frame loop; not a Live widget.
 /// </summary>
 public sealed class ApprovalPrompt : IApprovalPrompt
 {

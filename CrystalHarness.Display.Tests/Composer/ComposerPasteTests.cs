@@ -19,4 +19,19 @@ public sealed class ComposerPasteTests
 
         Assert.Equal("a\nb", ComposerPaste.FromBurst(burst));
     }
+
+    [Fact]
+    public void Chars_ReconstructsBracketedPasteMarkers()
+    {
+        var burst = new List<ConsoleKeyInfo>();
+        foreach (var ch in BracketedPaste.StartMarker + "hi" + BracketedPaste.EndMarker)
+        {
+            var key = ch == '\u001b' ? ConsoleKey.Escape : ConsoleKey.None;
+            burst.Add(new ConsoleKeyInfo(ch, key, false, false, false));
+        }
+
+        Assert.Equal(
+            BracketedPaste.StartMarker + "hi" + BracketedPaste.EndMarker,
+            ComposerPaste.Chars(burst));
+    }
 }

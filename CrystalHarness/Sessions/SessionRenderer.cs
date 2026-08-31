@@ -33,6 +33,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private readonly List<string> _queueItems = [];
     private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
+    private readonly ScreenPainter _painter = new();
+    private readonly BracketedPaste _paste = new();
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
     private string? _streamKind;
@@ -53,6 +55,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             _screen?.Dispose();
+            _painter.Clear();
+            _paste.Reset();
             _screen = AlternateScreen.TryEnter();
             PaintUnlocked(force: true);
         }
@@ -66,6 +70,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             _screen?.Dispose();
             _screen = null;
+            _painter.Clear();
+            _paste.Reset();
         }
     }
 
@@ -378,6 +384,27 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    public void OnToolCalls(IReadOnlyList<ToolCall> calls)
+    {
+        ArgumentNullException.ThrowIfNull(calls);
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            foreach (var call in calls)
+            {
+                var text = ToolCallText.Summary(call.Name, call.Arguments);
+                _log.Add(TranscriptKind.Tool, text);
+                WriteFallback(TranscriptKind.Tool, text);
+            }
+
+            if (calls.Count > 0)
+            {
+                _chrome.Activity = DisplayCase.Token(calls[^1].Name);
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
     public void OnToolResults(IReadOnlyList<ToolResult> results)
     {
         lock (_gate)
@@ -573,7 +600,16 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
-                if (ScrollInput.TryDelta(
+                var chars = ComposerPaste.Chars(burst);
+                if (_paste.IsOpen
+                    || chars.Contains(BracketedPaste.StartMarker, StringComparison.Ordinal))
+                {
+                    foreach (var chunk in _paste.Push(chars))
+                    {
+                        _composer.Insert(chunk);
+                    }
+                }
+                else if (ScrollInput.TryDelta(
                     burst,
                     _composer.IsEmpty,
                     _picker is not null,
@@ -611,12 +647,53 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     public async Task<ConsoleKeyInfo> ReadKeyAsync(CancellationToken cancellationToken)
     {
-        while (!Console.KeyAvailable)
+        while (true)
         {
-            await Task.Delay(PollMilliseconds, cancellationToken);
-        }
+            cancellationToken.ThrowIfCancellationRequested();
+            var burst = await ReadAvailableKeysAsync(
+                wake: null,
+                ignorePause: true,
+                cancellationToken);
+            if (burst is null)
+            {
+                continue;
+            }
 
-        return Console.ReadKey(intercept: true);
+            ConsoleKeyInfo? mapped = null;
+            lock (_gate)
+            {
+                var chars = ComposerPaste.Chars(burst);
+                if (_paste.IsOpen
+                    || chars.Contains(BracketedPaste.StartMarker, StringComparison.Ordinal))
+                {
+                    _ = _paste.Push(chars);
+                    PaintUnlocked(force: true);
+                }
+                else
+                {
+                    var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                    if (ScrollInput.TryDelta(
+                        burst,
+                        composerEmpty: true,
+                        pickerOpen: false,
+                        pageRows,
+                        out var delta))
+                    {
+                        _scrollBack = Math.Max(0, _scrollBack + delta);
+                        PaintUnlocked(force: true);
+                    }
+                    else if (ScrollInput.TryComposerKey(burst, out var key))
+                    {
+                        mapped = key;
+                    }
+                }
+            }
+
+            if (mapped is { } chosen)
+            {
+                return chosen;
+            }
+        }
     }
 
     private string? HandleComposerKeyUnlocked(ConsoleKeyInfo key, Func<bool> togglePlan)
@@ -776,7 +853,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
         var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;
-        ScreenPainter.Paint(
+        _painter.Paint(
             regions,
             transcript,
             overlay,

@@ -6,11 +6,19 @@ using CrystalHarness.Display.Paint;
 namespace CrystalHarness.Display.Shell;
 
 /// <summary>
-/// Paints one retained frame. Owns cursor placement, not Live.
+/// Paints one retained frame. Unchanged rows stay; a size change clears.
+/// Owns cursor placement, not Live.
 /// </summary>
-public static class ScreenPainter
+public sealed class ScreenPainter
 {
-    public static void Paint(
+    private PaintLine[]? _previous;
+
+    public void Clear()
+    {
+        _previous = null;
+    }
+
+    public void Paint(
         ShellRegions regions,
         IReadOnlyList<PaintLine> transcript,
         IReadOnlyList<PaintLine> overlay,
@@ -23,8 +31,11 @@ public static class ScreenPainter
         ArgumentNullException.ThrowIfNull(overlay);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
+        var frame = FrameRows.Assemble(regions, transcript, overlay, status, queue, composer);
+        var rewriteAll = resetFrame || _previous is null || _previous.Length != frame.Count;
+        var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame);
         AnsiConsole.Cursor.Hide();
-        if (resetFrame)
+        if (rewriteAll)
         {
             AnsiConsole.Write(new ControlCode("\u001b[2J\u001b[H"));
         }
@@ -33,13 +44,20 @@ public static class ScreenPainter
         AnsiConsole.Write(new ControlCode("\u001b[?7l"));
         try
         {
-            var row = 0;
-            row = WriteBlock(transcript, regions.TranscriptRows, regions.Width, row, regions.Height);
-            row = WriteBlock(overlay, regions.OverlayRows, regions.Width, row, regions.Height);
-            WriteLine(status, regions.Width, row, regions.Height);
-            row++;
-            row = WriteBlock(queue, regions.QueueRows, regions.Width, row, regions.Height);
-            WriteBlock(composer.Lines, regions.ComposerRows, regions.Width, row, regions.Height);
+            if (rewriteAll)
+            {
+                for (var row = 0; row < frame.Count; row++)
+                {
+                    WriteLine(frame[row], row, regions.Height);
+                }
+            }
+            else
+            {
+                foreach (var row in dirty!)
+                {
+                    WriteLine(frame[row], row, regions.Height);
+                }
+            }
         }
         finally
         {
@@ -53,26 +71,10 @@ public static class ScreenPainter
         var cursorColumn = Math.Clamp(composer.CursorColumn + 1, 1, regions.Width);
         AnsiConsole.Cursor.SetPosition(cursorColumn, cursorLine);
         AnsiConsole.Cursor.Show();
+        _previous = [.. frame];
     }
 
-    private static int WriteBlock(
-        IReadOnlyList<PaintLine> lines,
-        int rows,
-        int width,
-        int row,
-        int height)
-    {
-        for (var i = 0; i < rows; i++)
-        {
-            var line = i < lines.Count ? lines[i] : PaintLine.Blank;
-            WriteLine(line, width, row, height);
-            row++;
-        }
-
-        return row;
-    }
-
-    private static void WriteLine(PaintLine line, int width, int row, int height)
+    private static void WriteLine(PaintLine line, int row, int height)
     {
         if (row < 0 || row >= height)
         {
@@ -80,10 +82,9 @@ public static class ScreenPainter
         }
 
         AnsiConsole.Write(new ControlCode($"\u001b[{row + 1};1H\u001b[2K"));
-        var fitted = line.Fit(width);
-        if (!string.IsNullOrEmpty(fitted.Markup))
+        if (!string.IsNullOrEmpty(line.Markup))
         {
-            AnsiConsole.Markup(fitted.Markup);
+            AnsiConsole.Markup(line.Markup);
         }
     }
 }

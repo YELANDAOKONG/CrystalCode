@@ -75,6 +75,7 @@ public static class ApprovalCard
             HostRows(classification, reason),
             classification.Summary,
             review,
+            ApprovalDiff.Lines(call),
             footer: null,
             expand: false);
     }
@@ -91,6 +92,7 @@ public static class ApprovalCard
             AskRows(classification),
             classification.Summary,
             review,
+            ApprovalDiff.Lines(call),
             KeysHint,
             expand: true);
     }
@@ -135,6 +137,7 @@ public static class ApprovalCard
         IReadOnlyList<(string Label, string Value, string Color)> fields,
         string? summary,
         ApprovalReviewVerdict? review,
+        IReadOnlyList<(string Color, string Text)> preview,
         string? footer,
         bool expand)
     {
@@ -158,6 +161,11 @@ public static class ApprovalCard
             {
                 blocks.Add(Prose(line, Theme.Review));
             }
+        }
+
+        foreach (var line in preview)
+        {
+            blocks.Add(Prose(line.Text, line.Color));
         }
 
         if (!string.IsNullOrWhiteSpace(footer))

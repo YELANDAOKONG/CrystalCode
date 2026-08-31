@@ -93,5 +93,27 @@ public sealed class ApprovalCardTests
         Assert.Contains("Outcome", text, StringComparison.Ordinal);
         Assert.Contains("Allow", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Auth  ", text, StringComparison.Ordinal);
+        Assert.Contains("+x", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AskWidget_IncludesEditDiffPreview()
+    {
+        var classification = new ToolClassification(
+            Risk.Write,
+            Authority.Workspace,
+            "Edit workspace file");
+        var call = new ToolCall(
+            "1",
+            EditTool.ToolName,
+            """{"path":"src/App.cs","old_string":"a","new_string":"b"}""");
+
+        var text = string.Join(
+            '\n',
+            WidgetPaint.Plain(ApprovalCard.AskWidget(call, classification), 72));
+
+        Assert.Contains("-a", text, StringComparison.Ordinal);
+        Assert.Contains("+b", text, StringComparison.Ordinal);
+        Assert.Contains("Y Once", text, StringComparison.Ordinal);
     }
 }

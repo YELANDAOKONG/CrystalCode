@@ -114,7 +114,7 @@ public sealed class TranscriptLog
         if (_liveKind is not null && _live.Length > 0)
         {
             var liveEntry = new TranscriptEntry(_liveKind.Value, _live.ToString());
-            count += RenderEntry(liveEntry, width, isLiveAssistant: liveEntry.Kind == TranscriptKind.Assistant).Count;
+            count += RenderEntry(liveEntry, width).Count;
         }
 
         return Math.Clamp(scrollBack, 0, Math.Max(0, count - rows));
@@ -130,7 +130,7 @@ public sealed class TranscriptLog
         }
 
         var liveEntry = new TranscriptEntry(_liveKind.Value, _live.ToString());
-        var liveLines = RenderEntry(liveEntry, width, isLiveAssistant: liveEntry.Kind == TranscriptKind.Assistant);
+        var liveLines = RenderEntry(liveEntry, width);
         var combined = new List<PaintLine>(_committedLines.Count + liveLines.Count);
         combined.AddRange(_committedLines);
         combined.AddRange(liveLines);
@@ -154,8 +154,7 @@ public sealed class TranscriptLog
 
     private static IReadOnlyList<PaintLine> RenderEntry(
         TranscriptEntry entry,
-        int width,
-        bool isLiveAssistant = false)
+        int width)
     {
         var bodyWidth = Math.Max(width - IndentColumns, 1);
         var indent = new string(' ', IndentColumns);
@@ -167,7 +166,7 @@ public sealed class TranscriptLog
             return lines;
         }
 
-        if (entry.Kind == TranscriptKind.Assistant && !isLiveAssistant)
+        if (entry.Kind == TranscriptKind.Assistant)
         {
             lines.AddRange(MarkdownRenderer.Render(entry.Text, width));
             return lines;

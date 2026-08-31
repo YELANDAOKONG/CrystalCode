@@ -5,13 +5,15 @@ using Crystal.Tools;
 namespace CrystalHarness.Sessions;
 
 /// <summary>
-/// Receives stream deltas, tool results, and usage updates for display.
+/// Receives stream deltas, tool calls, tool results, and usage updates for display.
 /// </summary>
 public interface ITurnObserver
 {
     void OnStreamEvent(ChatStreamEvent streamEvent);
 
     void OnModelRoundClosed();
+
+    void OnToolCalls(IReadOnlyList<ToolCall> calls);
 
     void OnToolResults(IReadOnlyList<ToolResult> results);
 

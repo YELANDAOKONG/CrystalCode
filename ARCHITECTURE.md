@@ -347,7 +347,8 @@ color, panels, grids, rules, and padding as an offline rasterizer.
 `AnsiConsole.Live` is not the session shell: it fights the composer.
 Widgets are rasterized into frame rows. The shell enters the alternate
 screen when the terminal is a TTY and paints a retained frame: transcript
-viewport, optional overlay, status bar, and multiline composer. The
+viewport, optional overlay, status bar, and multiline composer. Unchanged
+rows are left in place; a width or height change clears the buffer. The
 executable maps turns onto that frame through `SessionRenderer`; it does
 not paint rows itself.
 
@@ -359,16 +360,22 @@ The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
 thinking is on), model, workspace, context percent,
 tokens, tool count, and elapsed time. Mode is Plan or Work on the
-composer prompt and is not repeated on the status bar. Assistant text is rendered as
-markdown after each model round (headings, lists, fenced code, inline
-code and bold). User, thinking, tool, and result blocks are rounded
-panels. Tool names in chrome and cards are Title Case; stream name
-chunks are coalesced so a repeated snapshot does not become
-`ReadReadRead`. Approval and questions are Spectre panels with a
-two-column Title Case field grid (`Status`, `Reason`, `Risk`,
-`Authority`, `Outcome`). Ask overlays use the same card; `Y` / `S` /
-`A` / `N` map Once / Session / Always / Deny. The follow-up queue is a
-`Queued` panel above the composer.
+composer prompt and is not repeated on the status bar. Assistant text is
+rendered as markdown while it streams and after it commits (headings,
+lists, fenced code with a dim code background, inline code and bold).
+User, thinking, tool, and result blocks are rounded panels. A live turn
+writes a Tool card when the model round closes with tool calls, before
+those calls execute, using the same one-line summary as session replay.
+Tool names in chrome and cards are Title Case; stream name chunks are
+coalesced so a repeated snapshot does not become `ReadReadRead`.
+Approval and questions are Spectre panels with a two-column Title Case
+field grid (`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Ask and
+auto-pass cards for `edit` and `write` show a capped `+` / `-` preview
+of `old_string` / `new_string` or `contents`. Overlay keys share the
+session frame loop, so transcript scroll and resize still work while a
+prompt is up. Ask overlays use the same card; `Y` / `S` / `A` / `N` map
+Once / Session / Always / Deny. The follow-up queue is a `Queued` panel
+above the composer.
 
 Composer keys: Enter submits when idle and queues while a turn is
 running. Queued text stays above the composer and is sent when the
@@ -392,10 +399,13 @@ is a command prefix. After a verb that takes a fixed argument
 and Up/Down when the prompt is empty scroll the transcript. Up/Down
 arrows navigate composer history or the slash picker when the prompt
 has text. The alternate screen enables SGR mouse for the wheel
-(1000/1006) and alternate-scroll arrows (1007). Shift+drag still
-selects and copies. The frame polls terminal size and repaints when the
-window is resized. Escape sequences
-are not treated as paste. Redirected output stays sequential.
+(1000/1006), alternate-scroll arrows (1007), and bracketed paste
+(2004). Paste is the text between CSI `200~` and `201~`; a printable
+key burst is still treated as paste when those markers are absent.
+Shift+drag still selects and copies. The frame polls terminal size and
+repaints when the window is resized. Escape sequences that are not a
+bracketed-paste wrap are not treated as paste. Redirected output stays
+sequential.
 
 ## Plugins
 

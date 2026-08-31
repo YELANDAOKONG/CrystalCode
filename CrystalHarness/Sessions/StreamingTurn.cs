@@ -122,6 +122,7 @@ public sealed class StreamingTurn
 
                 toolCallCount += toolCalls.Length;
                 _observer?.OnModelRoundClosed();
+                _observer?.OnToolCalls(toolCalls);
                 var toolResults = await _executor.ExecuteAsync(toolCalls, linked.Token);
                 transcript.AddRange(toolResults);
                 _observer?.OnToolResults(toolResults);
