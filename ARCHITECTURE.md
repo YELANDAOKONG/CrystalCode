@@ -513,7 +513,8 @@ User, thinking, tool, and result blocks are rounded panels. A live turn
 writes a Tool card when the model round closes with tool calls, before
 those calls execute, using the same one-line summary as session replay.
 Tool names in chrome and cards are Title Case; stream name chunks are
-coalesced so a repeated snapshot does not become `ReadReadRead`.
+coalesced per tool call so a repeated snapshot does not become
+`ReadReadRead` and sequential calls never concatenate.
 Approval and questions are Spectre panels with a two-column Title Case
 field grid (`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Ask and
 auto-pass cards for `edit` and `write` show a capped `+` / `-` preview

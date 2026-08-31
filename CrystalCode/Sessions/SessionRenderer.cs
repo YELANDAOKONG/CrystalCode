@@ -38,7 +38,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
     private string? _streamKind;
-    private string _toolName = string.Empty;
+    private readonly StreamToolNames _toolNames = new();
     private Stopwatch? _turnClock;
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
@@ -359,7 +359,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             CommitLiveUnlocked();
             _turnClock = Stopwatch.StartNew();
-            _toolName = string.Empty;
+            _toolNames.Clear();
             SetTurnActivityUnlocked("Running", ProgressText.WaitingForModel);
             _chrome.ToolCount = 0;
             _chrome.Elapsed = string.Empty;
@@ -390,10 +390,13 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 case ChatToolCallDelta toolCall:
                     if (toolCall.NameDelta.Length > 0)
                     {
-                        _toolName = StreamName.Apply(_toolName, toolCall.NameDelta);
+                        var name = _toolNames.Apply(
+                            toolCall.CandidateIndex,
+                            toolCall.ItemIndex,
+                            toolCall.NameDelta);
                         SetTurnActivityUnlocked(
-                            DisplayCase.Token(_toolName),
-                            ProgressText.Calling(_toolName));
+                            DisplayCase.Token(name),
+                            ProgressText.Calling(name));
                     }
 
                     PaintUnlocked(force: false);
@@ -898,14 +901,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
         _log.CommitLive();
         _streamKind = null;
-        _toolName = string.Empty;
+        _toolNames.Clear();
     }
 
     private void DiscardLiveUnlocked()
     {
         _log.DiscardLive();
         _streamKind = null;
-        _toolName = string.Empty;
+        _toolNames.Clear();
     }
 
     private void PaintUnlocked(bool force)
