@@ -24,7 +24,8 @@
 - Solution Explorer layout follows Visual Studio / Rider: `.sln` at the
   repository root, project folders beside it, tests as
   `{Project}.Tests` siblings (`CrystalHarness.Tests`,
-  `CrystalHarness.Providers.Tests`). No `src/` or root `tests/` tree.
+  `CrystalHarness.Display.Tests`, `CrystalHarness.Providers.Tests`). No
+  `src/` or root `tests/` tree.
 
 ## C# conventions
 
@@ -66,11 +67,18 @@
 
 Authorized packages today:
 
-- Spectre.Console and Spectre.Console.Cli in CrystalHarness.
+- Spectre.Console in CrystalHarness.Display (session rasterization) and
+  CrystalHarness (host cards that still build Spectre widgets).
+- Spectre.Console.Cli in CrystalHarness.
+- Terminal.Gui in CrystalHarness.Display only, with a floating version
+  (`*`). It is parked for supply-chain review. Production and test code
+  must not import `Terminal.Gui` types. Do not add a dummy `using` to
+  silence unused-package warnings; document a restore suppression if
+  NU1510 is raised.
 - Newtonsoft.Json, Newtonsoft.Json.Bson, and System.Text.Json where the
   Crystal sibling already requires them for project-reference consistency.
-- xUnit and Microsoft.NET.Test.Sdk in CrystalHarness.Tests and
-  CrystalHarness.Providers.Tests.
+- xUnit and Microsoft.NET.Test.Sdk in CrystalHarness.Tests,
+  CrystalHarness.Display.Tests, and CrystalHarness.Providers.Tests.
 
 Do not add another package without asking.
 
@@ -82,5 +90,6 @@ dotnet test CrystalHarness.sln
 ```
 
 Do not claim coverage a test project does not actually exercise. Host
-behavior is tested in CrystalHarness.Tests. Adapters are tested in
-CrystalHarness.Providers.Tests.
+behavior is tested in CrystalHarness.Tests. Frame, composer, and paint
+behavior is tested in CrystalHarness.Display.Tests. Adapters are tested
+in CrystalHarness.Providers.Tests.

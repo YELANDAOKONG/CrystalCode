@@ -11,26 +11,51 @@ baseline.
 ```text
 CrystalHarness
     ↓
+CrystalHarness.Display
+    ↓
+Spectre.Console   (rasterization; Terminal.Gui is referenced, not called)
+
+CrystalHarness
+    ↓
 CrystalHarness.Providers
     ↓
 Crystal
 
 CrystalHarness also references Crystal.Tools, Crystal.Agents, and
-Crystal.Harness directly. CrystalHarness.Providers references only Crystal.
+Crystal.Harness directly. CrystalHarness.Display references Spectre.Console
+and Terminal.Gui only. It does not reference Crystal, Crystal.Tools, or
+the executable host. CrystalHarness.Providers references only Crystal.
 No project in this repository modifies Crystal.
 ```
 
 CrystalHarness.Tests references CrystalHarness.
+CrystalHarness.Display.Tests references CrystalHarness.Display.
 CrystalHarness.Providers.Tests references CrystalHarness.Providers.
 
 ## Assembly ownership
 
 ### CrystalHarness
 
-The executable host. Owns CLI commands, the terminal display, session and
-turn execution, Plan/Work catalogs, approval policy, context compaction,
-`~/.crystal` storage, built-in coding tools, prompts, and in-process plugin
-contracts.
+The executable host. Owns CLI commands, session and turn execution,
+Plan/Work catalogs, approval policy, context compaction, `~/.crystal`
+storage, built-in coding tools, prompts, and in-process plugin contracts.
+It projects session state onto CrystalHarness.Display. It does not own
+the frame painter, composer buffer, or transcript log.
+
+### CrystalHarness.Display
+
+The terminal UI library. Owns the alternate-screen frame, input routing,
+composer, transcript viewport, markdown paint, and queue card. Spectre
+widgets are rasterized into frame rows. `AnsiConsole.Live` is not the
+session shell. Terminal.Gui is a parked package reference for
+supply-chain review and is not called. The host loop stays in this
+assembly's shell types; a later migration to Terminal.Gui would replace
+that loop inside this project only.
+
+### CrystalHarness.Display.Tests
+
+Display tests: layout, chrome, scroll input, composer, paint, transcript
+log, and queue card. Does not reference the host executable.
 
 ### CrystalHarness.Providers
 
@@ -54,18 +79,15 @@ Provider adapter tests. One folder per vendor, mirroring
 Root identifier is `CrystalHarness`, matching the existing solution. Folder
 path under a project root equals the namespace after the project name.
 
+CrystalHarness (executable):
+
 | Folder | Owns |
 | :--- | :--- |
 | `Commands` | Spectre.Console.Cli commands |
-| `Configuration` | Loaded options and defaults |
+| `Configuration` | Loaded options, defaults, thinking chrome labels |
 | `Home` | `~/.crystal` paths and file I/O |
-| `Display/Shell` | Fullscreen frame, painter, input, session renderer |
-| `Display/Composer` | Prompt buffer, keys, slash picker |
-| `Display/Cards` | Approval, question, and queue overlays |
-| `Display/Transcript` | Viewport log, cards, replay, sequential fallback |
-| `Display/Paint` | Markup, markdown, labels, wrapping |
-| `Sessions` | Transcript, ledger, streaming turn, slash commands |
-| `Approvals` | Risk, authority, grants, policy |
+| `Sessions` | Transcript, ledger, streaming turn, slash commands, session renderer, replay, tool-call text, usage text, question prompt |
+| `Approvals` | Risk, authority, grants, policy, approval cards and keys |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
@@ -73,6 +95,16 @@ path under a project root equals the namespace after the project name.
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
 | `Plugins/Providers` | Built-in DeepSeek and OpenAI client factories |
+
+CrystalHarness.Display:
+
+| Folder | Owns |
+| :--- | :--- |
+| `Shell` | Alternate screen, painter, layout, scroll input, status chrome |
+| `Composer` | Prompt buffer, keys, slash picker |
+| `Cards` | Queue overlay |
+| `Transcript` | Viewport log, role cards, sequential fallback |
+| `Paint` | Markup, markdown, theme, wrapping |
 
 Provider types live under `CrystalHarness.Providers` plus one folder per
 vendor (`DeepSeek`, `OpenAI`). Shared OpenAI-compatible request and stream
@@ -310,12 +342,18 @@ variables still override. `credentials.json` remains a fallback store.
 
 ## Display
 
-Spectre.Console supplies markup, color, panels, grids, rules, and padding.
-The host owns input and the frame. `AnsiConsole.Live` is not the session
-shell: it fights the composer. Widgets are rasterized into frame rows.
-The shell enters the alternate screen when the terminal is a TTY and paints
-a retained frame: transcript viewport, optional overlay, status bar, and
-multiline composer.
+CrystalHarness.Display is the TUI host. Spectre.Console supplies markup,
+color, panels, grids, rules, and padding as an offline rasterizer.
+`AnsiConsole.Live` is not the session shell: it fights the composer.
+Widgets are rasterized into frame rows. The shell enters the alternate
+screen when the terminal is a TTY and paints a retained frame: transcript
+viewport, optional overlay, status bar, and multiline composer. The
+executable maps turns onto that frame through `SessionRenderer`; it does
+not paint rows itself.
+
+Terminal.Gui is referenced from CrystalHarness.Display with a floating
+version and is not used. Do not call `Application.Init` or mix a second
+console writer with the self-owned loop.
 
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when

@@ -16,6 +16,7 @@
         <ProjectReference Include="../../Crystal/Crystal.Tools/Crystal.Tools.csproj" />
         <ProjectReference Include="../../Crystal/Crystal.Agents/Crystal.Agents.csproj" />
         <ProjectReference Include="../../Crystal/Crystal.Harness/Crystal.Harness.csproj" />
+        <ProjectReference Include="..\CrystalHarness.Display\CrystalHarness.Display.csproj" />
         <ProjectReference Include="..\CrystalHarness.Providers\CrystalHarness.Providers.csproj" />
     </ItemGroup>
 

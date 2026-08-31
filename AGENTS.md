@@ -15,8 +15,8 @@ change. Implementation must never become the only source of truth.
 
 ## Product
 
-CrystalHarness is a production coding CLI. It is not a Crystal demo and not a
-replacement for Crystal.
+CrystalHarness is a production coding TUI. The terminal is the only
+operator surface. It is not a Crystal demo and not a replacement for Crystal.
 
 Crystal is a sibling library at `../Crystal`. Consume it. Do not modify it.
 

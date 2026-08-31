@@ -1,9 +1,9 @@
 # CrystalHarness
 
-A production coding CLI for local repositories. It runs a streaming
-model-and-tool loop in the terminal, with Plan/Work modes, risk-aware
-approval, automatic context compaction, and operator data under
-`~/.crystal`.
+A production coding TUI for local repositories. The terminal is the
+only operator surface. It runs a streaming model-and-tool loop, with
+Plan/Work modes, risk-aware approval, automatic context compaction,
+and operator data under `~/.crystal`.
 
 CrystalHarness consumes the Crystal library. It does not modify Crystal.
 It is not a Crystal demo and not a replacement for Crystal.

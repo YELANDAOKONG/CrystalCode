@@ -17,7 +17,8 @@ the Crystal library they already own.
 
 ## Current product
 
-The current product is an interactive terminal application that can:
+The current product is a terminal UI application. The terminal is the only
+operator surface and the only entry. It can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
 - switch Plan (read-only) and Work (edit, write, shell);
