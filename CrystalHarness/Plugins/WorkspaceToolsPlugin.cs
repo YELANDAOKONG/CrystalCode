@@ -1,3 +1,4 @@
+using CrystalHarness.Plugins.Interfaces;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Plugins;

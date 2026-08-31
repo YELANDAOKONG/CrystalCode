@@ -1,3 +1,5 @@
+using CrystalHarness.Approvals.Interfaces;
+
 namespace CrystalHarness.Approvals;
 
 /// <summary>

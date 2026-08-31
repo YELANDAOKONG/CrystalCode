@@ -59,13 +59,20 @@ path under a project root equals the namespace after the project name.
 | `Commands` | Spectre.Console.Cli commands |
 | `Configuration` | Loaded options and defaults |
 | `Home` | `~/.crystal` paths and file I/O |
-| `Display` | Terminal chrome, editor, markdown, approval cards |
+| `Display/Shell` | Fullscreen frame, painter, input, session renderer |
+| `Display/Composer` | Prompt buffer, keys, slash picker |
+| `Display/Cards` | Approval, question, and queue overlays |
+| `Display/Transcript` | Viewport log, cards, replay, sequential fallback |
+| `Display/Paint` | Markup, markdown, labels, wrapping |
 | `Sessions` | Transcript, ledger, streaming turn, slash commands |
 | `Approvals` | Risk, authority, grants, policy |
+| `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
 | `Prompts` | Caller-owned system text |
-| `Plugins` | Contribution contracts and the in-process registry |
+| `Plugins` | In-process registry and built-in contributions |
+| `Plugins/Interfaces` | Contribution contracts |
+| `Plugins/Providers` | Built-in DeepSeek and OpenAI client factories |
 
 Provider types live under `CrystalHarness.Providers` plus one folder per
 vendor (`DeepSeek`, `OpenAI`). Shared OpenAI-compatible request and stream

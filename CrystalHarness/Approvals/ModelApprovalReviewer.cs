@@ -4,6 +4,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 
+using CrystalHarness.Approvals.Interfaces;
 using CrystalHarness.Prompts;
 
 namespace CrystalHarness.Approvals;

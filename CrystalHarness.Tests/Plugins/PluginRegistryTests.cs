@@ -1,5 +1,6 @@
 using CrystalHarness.Configuration;
 using CrystalHarness.Plugins;
+using CrystalHarness.Plugins.Interfaces;
 using CrystalHarness.Tests.Sessions;
 using CrystalHarness.Tests.Tools;
 using CrystalHarness.Tools;
@@ -69,6 +70,19 @@ public sealed class PluginRegistryTests
         command.Execute("hello", output);
 
         Assert.Equal("hello", output.LastNote);
+    }
+
+    [Fact]
+    public void TryExecute_RunsRegisteredSlashVerb()
+    {
+        var registry = new PluginRegistry();
+        registry.Add(new NotePlugin());
+        var output = new RecordingOutput();
+
+        Assert.True(registry.TryExecute("/note hello", output));
+        Assert.Equal("hello", output.LastNote);
+        Assert.False(registry.TryExecute("note", output));
+        Assert.False(registry.TryExecute("/missing", output));
     }
 
     private sealed class EchoPlugin : IPlugin

@@ -2,6 +2,7 @@ using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalHarness.Configuration;
+using CrystalHarness.Plugins.Interfaces;
 using CrystalHarness.Plugins.Providers;
 using CrystalHarness.Tools;
 
@@ -145,5 +146,28 @@ public sealed class PluginRegistry
         }
 
         return null;
+    }
+
+    public bool TryExecute(string raw, ISlashOutput output)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        var trimmed = raw.Trim();
+        if (trimmed.Length == 0 || trimmed[0] != '/')
+        {
+            return false;
+        }
+
+        var body = trimmed[1..];
+        var space = body.IndexOf(' ');
+        var name = space < 0 ? body : body[..space];
+        var argument = space < 0 ? string.Empty : body[(space + 1)..].Trim();
+        var command = FindCommand(name);
+        if (command is null)
+        {
+            return false;
+        }
+
+        command.Execute(argument, output);
+        return true;
     }
 }

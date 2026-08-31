@@ -22,4 +22,14 @@ public sealed class ApprovalModeTests
         Assert.Contains("review", exception.Message, StringComparison.Ordinal);
         Assert.Contains("full", exception.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Next_CyclesDefaultAutoEditReviewFull()
+    {
+        Assert.Equal(ApprovalMode.AutoEdit, ApprovalMode.Next(ApprovalMode.Default));
+        Assert.Equal(ApprovalMode.Review, ApprovalMode.Next(ApprovalMode.AutoEdit));
+        Assert.Equal(ApprovalMode.Full, ApprovalMode.Next(ApprovalMode.Review));
+        Assert.Equal(ApprovalMode.Default, ApprovalMode.Next(ApprovalMode.Full));
+        Assert.Equal(ApprovalMode.Default, ApprovalMode.Next(ApprovalMode.Plan));
+    }
 }

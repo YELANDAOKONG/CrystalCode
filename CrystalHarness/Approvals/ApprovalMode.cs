@@ -56,5 +56,25 @@ public sealed record ApprovalMode
             nameof(value));
     }
 
+    public static ApprovalMode Next(ApprovalMode current)
+    {
+        if (current == Default)
+        {
+            return AutoEdit;
+        }
+
+        if (current == AutoEdit)
+        {
+            return Review;
+        }
+
+        if (current == Review)
+        {
+            return Full;
+        }
+
+        return Default;
+    }
+
     public override string ToString() => Value;
 }

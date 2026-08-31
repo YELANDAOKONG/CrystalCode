@@ -1,6 +1,7 @@
 using Crystal.Tools;
 
 using CrystalHarness.Approvals;
+using CrystalHarness.Approvals.Interfaces;
 using CrystalHarness.Tests.Home;
 using CrystalHarness.Tests.Tools;
 using CrystalHarness.Tools;

@@ -1,6 +1,6 @@
 using Crystal.Tools;
 
-using CrystalHarness.Plugins;
+using CrystalHarness.Plugins.Interfaces;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Approvals;

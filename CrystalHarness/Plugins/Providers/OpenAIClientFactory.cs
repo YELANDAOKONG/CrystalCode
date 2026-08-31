@@ -1,5 +1,7 @@
 using Crystal.Chat;
+
 using CrystalHarness.Configuration;
+using CrystalHarness.Plugins.Interfaces;
 using CrystalHarness.Providers.OpenAI;
 
 namespace CrystalHarness.Plugins.Providers;

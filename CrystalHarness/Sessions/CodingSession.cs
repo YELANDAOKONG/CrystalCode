@@ -6,7 +6,10 @@ using Crystal.Tools;
 using CrystalHarness.Approvals;
 using CrystalHarness.Compaction;
 using CrystalHarness.Configuration;
-using CrystalHarness.Display;
+using CrystalHarness.Display.Cards;
+using CrystalHarness.Display.Composer;
+using CrystalHarness.Display.Paint;
+using CrystalHarness.Display.Shell;
 using CrystalHarness.Home;
 using CrystalHarness.Plugins;
 using CrystalHarness.Prompts;
@@ -302,7 +305,7 @@ public sealed class CodingSession
             case SessionVerb.Quit:
                 return (true, true);
             case SessionVerb.Unknown:
-                if (TryExecutePluginCommand(command.Argument))
+                if (_plugins.TryExecute(command.Argument, _renderer))
                 {
                     return (true, false);
                 }
@@ -318,7 +321,7 @@ public sealed class CodingSession
     {
         if (string.IsNullOrWhiteSpace(argument))
         {
-            _approval = NextApproval(_approval);
+            _approval = ApprovalMode.Next(_approval);
         }
         else
         {
@@ -523,11 +526,11 @@ public sealed class CodingSession
                 PlanMode = _planMode,
                 CreatedUtc = _sessionCreatedUtc,
                 Items = TranscriptCodec.Write(_transcript),
-                Todos = WriteTodos(),
+                Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
                 UserTurns = _ledger.UserTurns,
                 ModelCalls = _ledger.ModelCalls,
                 ToolCalls = _ledger.ToolCalls,
-                Usage = WriteUsage(_ledger.Usage)
+                Usage = SessionMapper.WriteUsage(_ledger.Usage)
             });
     }
 
@@ -574,12 +577,12 @@ public sealed class CodingSession
         ReplaceLiveSystem();
 
         _todos.Clear();
-        _todos.Replace(ReadTodos(document.Todos));
+        _todos.Replace(SessionMapper.ReadTodos(document.Todos));
         _ledger.Restore(
-            ClampCount(document.UserTurns),
-            ClampCount(document.ModelCalls),
-            ClampCount(document.ToolCalls),
-            ReadUsage(document.Usage));
+            Math.Max(0, document.UserTurns),
+            Math.Max(0, document.ModelCalls),
+            Math.Max(0, document.ToolCalls),
+            SessionMapper.ReadUsage(document.Usage));
         DiscardQueue();
         _reviewContext.CurrentUserRequest = string.Empty;
         RebuildExecutors();
@@ -625,81 +628,6 @@ public sealed class CodingSession
         Console.WriteLine(ResumeHint.ForWorkspace());
     }
 
-    private List<SessionTodoDocument> WriteTodos()
-    {
-        var documents = new List<SessionTodoDocument>();
-        foreach (var item in _todos.Snapshot())
-        {
-            documents.Add(
-                new SessionTodoDocument
-                {
-                    Id = item.Id,
-                    Content = item.Content,
-                    Status = TodoList.StatusName(item.Status)
-                });
-        }
-
-        return documents;
-    }
-
-    private static List<TodoItem> ReadTodos(IEnumerable<SessionTodoDocument> documents)
-    {
-        var items = new List<TodoItem>();
-        foreach (var document in documents)
-        {
-            if (string.IsNullOrWhiteSpace(document.Id)
-                || string.IsNullOrWhiteSpace(document.Content)
-                || !TodoList.TryParseStatus(document.Status, out var status))
-            {
-                continue;
-            }
-
-            items.Add(new TodoItem(document.Id, document.Content, status));
-        }
-
-        return items;
-    }
-
-    private static SessionUsageDocument? WriteUsage(TokenUsage? usage)
-    {
-        if (usage is null)
-        {
-            return null;
-        }
-
-        return new SessionUsageDocument
-        {
-            InputTokenCount = usage.InputTokenCount,
-            OutputTokenCount = usage.OutputTokenCount,
-            ReasoningTokenCount = usage.ReasoningTokenCount
-        };
-    }
-
-    private static TokenUsage? ReadUsage(SessionUsageDocument? document)
-    {
-        if (document is null)
-        {
-            return null;
-        }
-
-        if (document.InputTokenCount < 0 || document.OutputTokenCount < 0)
-        {
-            return null;
-        }
-
-        if (document.ReasoningTokenCount is < 0)
-        {
-            return null;
-        }
-
-        return new TokenUsage(
-            document.InputTokenCount,
-            document.OutputTokenCount,
-            document.ReasoningTokenCount);
-    }
-
-    private static int ClampCount(int value) => Math.Max(0, value);
-
     private void RebuildExecutors()
     {
         var renderer = _renderer;
@@ -729,28 +657,6 @@ public sealed class CodingSession
             exceptionMapper: HarnessExceptionMapper.MapAsync);
     }
 
-    private bool TryExecutePluginCommand(string raw)
-    {
-        var trimmed = raw.Trim();
-        if (trimmed.Length == 0 || trimmed[0] != '/')
-        {
-            return false;
-        }
-
-        var body = trimmed[1..];
-        var space = body.IndexOf(' ');
-        var name = space < 0 ? body : body[..space];
-        var argument = space < 0 ? string.Empty : body[(space + 1)..].Trim();
-        var command = _plugins.FindCommand(name);
-        if (command is null)
-        {
-            return false;
-        }
-
-        command.Execute(argument, _renderer);
-        return true;
-    }
-
     private ReasoningOptions? CurrentReasoning() =>
         _thinkingEffort.ToReasoningOptions(_settings.ActiveModel);
 
@@ -760,26 +666,6 @@ public sealed class CodingSession
     private void RefreshChrome()
     {
         _renderer.SetChrome(_planMode, _approval, CurrentThinkingStatus());
-    }
-
-    private static ApprovalMode NextApproval(ApprovalMode current)
-    {
-        if (current == ApprovalMode.Default)
-        {
-            return ApprovalMode.AutoEdit;
-        }
-
-        if (current == ApprovalMode.AutoEdit)
-        {
-            return ApprovalMode.Review;
-        }
-
-        if (current == ApprovalMode.Review)
-        {
-            return ApprovalMode.Full;
-        }
-
-        return ApprovalMode.Default;
     }
 
     private void PromoteAfterTools()
