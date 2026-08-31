@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace CrystalHarness.Display.Shell;
 
 /// <summary>
-/// Turns on VT input on Windows so SGR wheel reports reach ReadKey.
+/// Turns on VT input on Windows so CSI sequences reach ReadKey.
 /// </summary>
 internal static class WindowsConsole
 {

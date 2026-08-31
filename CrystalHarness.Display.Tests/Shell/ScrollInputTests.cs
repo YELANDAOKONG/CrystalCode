@@ -84,6 +84,16 @@ public sealed class ScrollInputTests
     }
 
     [Fact]
+    public void TryDelta_SgrLeftClickIsNotScrollOrPaste()
+    {
+        var burst = Csi("\u001b[<0;12;8M");
+
+        Assert.False(ScrollInput.TryDelta(burst, false, false, 8, out _));
+        Assert.False(ScrollInput.IsPaste(burst));
+        Assert.False(ScrollInput.TryComposerKeys(burst, out _));
+    }
+
+    [Fact]
     public void IsPaste_PrintableBurst()
     {
         var burst = new List<ConsoleKeyInfo>

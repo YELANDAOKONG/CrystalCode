@@ -4,7 +4,8 @@ namespace CrystalHarness.Display.Shell;
 
 /// <summary>
 /// Alternate buffer for the session shell. Not AnsiConsole.Live.
-/// SGR mouse is on for the wheel. Bracketed paste is on. Shift+drag still selects text.
+/// Alternate-scroll turns the wheel into arrows. Bracketed paste is on.
+/// Mouse tracking stays off so left-drag still selects text.
 /// </summary>
 public sealed class AlternateScreen : IDisposable
 {
@@ -30,8 +31,6 @@ public sealed class AlternateScreen : IDisposable
             AnsiConsole.Write(new ControlCode("\u001b[?1049h"));
             AnsiConsole.Write(new ControlCode("\u001b[?2004h"));
             AnsiConsole.Write(new ControlCode("\u001b[?1007h"));
-            AnsiConsole.Write(new ControlCode("\u001b[?1000h"));
-            AnsiConsole.Write(new ControlCode("\u001b[?1006h"));
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
             return new AlternateScreen(true);
@@ -52,8 +51,6 @@ public sealed class AlternateScreen : IDisposable
         try
         {
             AnsiConsole.Cursor.Show();
-            AnsiConsole.Write(new ControlCode("\u001b[?1006l"));
-            AnsiConsole.Write(new ControlCode("\u001b[?1000l"));
             AnsiConsole.Write(new ControlCode("\u001b[?1007l"));
             AnsiConsole.Write(new ControlCode("\u001b[?2004l"));
             AnsiConsole.Write(new ControlCode("\u001b[?1049l"));
