@@ -939,18 +939,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
             if (!paused && Console.KeyAvailable)
             {
-                var burst = new List<ConsoleKeyInfo> { Console.ReadKey(intercept: true) };
-                if (burst[0].Key == ConsoleKey.Escape || burst[0].KeyChar == '\u001b')
-                {
-                    await Task.Delay(EscapeHoldMilliseconds, cancellationToken);
-                }
-
-                while (Console.KeyAvailable)
-                {
-                    burst.Add(Console.ReadKey(intercept: true));
-                }
-
-                return burst;
+                return await KeyBurst.ReadAsync(
+                    () => Console.KeyAvailable,
+                    () => Console.ReadKey(intercept: true),
+                    token => Task.Delay(EscapeHoldMilliseconds, token),
+                    cancellationToken);
             }
 
             if (wake is { IsCompleted: true })

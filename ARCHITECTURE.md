@@ -100,7 +100,7 @@ CrystalHarness.Display:
 
 | Folder | Owns |
 | :--- | :--- |
-| `Shell` | Alternate screen, painter, layout, scroll input, status chrome |
+| `Shell` | Alternate screen, painter, layout, key burst, scroll input, status chrome |
 | `Composer` | Prompt buffer, keys, slash picker |
 | `Cards` | Queue overlay |
 | `Transcript` | Viewport log, role cards, sequential fallback |
@@ -400,7 +400,10 @@ and Up/Down when the prompt is empty scroll the transcript. Up/Down
 arrows navigate composer history or the slash picker when the prompt
 has text. The alternate screen enables SGR mouse for the wheel
 (1000/1006), alternate-scroll arrows (1007), and bracketed paste
-(2004). Paste is the text between CSI `200~` and `201~`; a printable
+(2004). A complete CSI or SGR wheel report is drained without waiting.
+Escape is held only when no further bytes are available or the sequence
+is still incomplete. Paste is the text
+between CSI `200~` and `201~`; a printable
 key burst is still treated as paste when those markers are absent.
 Shift+drag still selects and copies. The frame polls terminal size and
 repaints when the window is resized. Escape sequences that are not a

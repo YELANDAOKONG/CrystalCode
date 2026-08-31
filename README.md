@@ -278,11 +278,12 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Ctrl+C twice on an empty composer | Exit |
 
 The alternate screen enables SGR mouse for the wheel,
-alternate-scroll arrows, and bracketed paste. Shift+drag still selects
-and copies. The frame repaints when the terminal is resized. Escape
-sequences that are not a paste wrap are not treated as paste. Overlay
-prompts (approval and questions) keep using that same input loop, so
-scroll and resize still work while they are open.
+alternate-scroll arrows, and bracketed paste. A complete wheel report
+is drained without waiting. Shift+drag still selects and copies. The
+frame repaints when the terminal is resized. Escape sequences that are
+not a paste wrap are not treated as paste. Overlay prompts (approval
+and questions) keep using that same input loop, so scroll and resize
+still work while they are open.
 
 ### Follow-up queue
 
