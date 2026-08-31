@@ -14,6 +14,7 @@ From a workspace you want the agent to inspect or change, CrystalCode:
 
 - streams a model turn with tool calls, and queues follow-ups while a
   turn is running;
+- switches the configured provider and model with `/model`;
 - switches Plan (read-only) and Work (edit, write, shell);
 - approves side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
@@ -53,8 +54,9 @@ manually instead.
 
 The installers do not write credentials. On Linux and macOS, the installer adds
 a `# Crystal Code CLI (Installer)` block to the selected zsh or bash profile.
-The block adds the CrystalCode directory to PATH and defines the `crystal`
-alias. On Windows, the installer adds that directory to the user-level PATH.
+The block adds the CrystalCode directory to PATH and aliases `crystal` to
+`CrystalCode`. On Windows, the installer adds that directory to the user-level
+PATH.
 Open a new terminal after installation, then run `crystal` on Linux or macOS,
 or `CrystalCode` on Windows.
 
@@ -273,9 +275,9 @@ Do not put a secret in `apiKey`. Point at an environment variable.
 ```
 
 Then export `OPENROUTER_API_KEY` in the shell that starts the
-process. Restart after editing `config.json`. CLI `--provider` and
-`--model` override the file for that run; `/approval` and
-`/thinking` write the new values back to `config.json`.
+process. Restart after editing `config.json` to add providers. CLI
+`--provider` and `--model` override the file for that run; `/approval`,
+`/thinking`, and `/model` write the new values back to `config.json`.
 
 ## Interactive session
 
@@ -305,7 +307,7 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking` or `/approval`) |
+| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, or `/model`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
 | Up / Down | Composer history, or slash-picker navigation when the prompt has text; empty Up/Down scroll the transcript |
@@ -414,6 +416,28 @@ If the selected model does not support thinking, the command reports
 that and does nothing. The status bar shows `Think Off`, or `Think`
 plus the resolved gear when thinking is on.
 
+## Model
+
+`/model` lists configured models, or selects one for the next idle
+turn. The conversation stays in place; only the `<env>` model line,
+status bar, context window, and chat client change. The command is
+refused while a turn is running.
+
+- `/model <model>` uses the current provider. A name that is unique in
+  the catalog still works. A provider with one model can be selected
+  by provider name alone.
+- `/model <provider> <model>` switches providers. The model id is
+  everything after the first space, so ids may contain `/`.
+- Tab completes current-provider models, then a provider name, then
+  that provider's models.
+- Only models listed under `providers` can be selected. A missing API
+  key leaves the current model unchanged.
+- The new `provider` and `model` are written to `config.json`.
+
+Switching models never fails because of thinking: unsupported thinking
+is omitted, and an unsupported stored gear uses the provider default
+without changing the stored choice.
+
 ## Slash commands
 
 Type `/` to open the picker. Built-in verbs:
@@ -424,6 +448,7 @@ Type `/` to open the picker. Built-in verbs:
 | `/plan` | | Toggle Plan / Work |
 | `/approval` | | Cycle or set `default`, `autoedit`, `review`, `full` |
 | `/thinking` | `/think` | Cycle or set the thinking gear |
+| `/model` | | List catalog models, or set `model` / `provider model` |
 | `/status` | | Turns, tokens, mode, workspace |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |

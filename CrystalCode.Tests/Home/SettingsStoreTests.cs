@@ -129,5 +129,21 @@ public sealed class SettingsStoreTests
         store.Save(settings);
         Assert.Contains("\"skills\": false", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Save_WritesProviderAndModelSelection()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithSelection(
+            new ProviderName("openai"),
+            "gpt-5.6-sol");
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal("openai", loaded.Provider.Value);
+        Assert.Equal("gpt-5.6-sol", loaded.Model);
+    }
 }
 

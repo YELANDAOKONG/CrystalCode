@@ -20,12 +20,13 @@ namespace CrystalCode.Sessions;
 /// </summary>
 public sealed class CodingSession
 {
-    private readonly IStreamingChatClient _client;
+    private IStreamingChatClient _client;
     private HarnessSettings _settings;
     private readonly SettingsStore _settingsStore;
+    private readonly CredentialStore _credentials;
     private readonly PromptStore _promptStore;
     private readonly SessionStore _sessionStore;
-    private readonly ContextCompactor _compactor;
+    private ContextCompactor _compactor;
     private readonly PluginRegistry _plugins;
     private readonly SessionRenderer _renderer;
     private readonly SessionReviewContext _reviewContext = new();
@@ -52,24 +53,26 @@ public sealed class CodingSession
     private int _idleCancels;
 
     private CodingSession(
-        IStreamingChatClient client,
         HarnessSettings settings,
         SettingsStore settingsStore,
+        CredentialStore credentials,
         CrystalHome home,
         Workspace workspace,
         SessionRenderer renderer,
         PluginRegistry plugins,
         SessionDocument? resume)
     {
-        _client = client;
+        ArgumentNullException.ThrowIfNull(plugins);
+        ArgumentNullException.ThrowIfNull(credentials);
         _settings = settings;
         _settingsStore = settingsStore;
+        _credentials = credentials;
         _promptStore = new PromptStore(home);
         _sessionStore = new SessionStore(home);
-        _compactor = new ContextCompactor(client);
-        ArgumentNullException.ThrowIfNull(plugins);
         _workspace = workspace;
         _plugins = plugins;
+        _client = CreateClient(settings);
+        _compactor = new ContextCompactor(_client);
         _renderer = renderer;
         _approval = settings.Approval;
         _thinkingEffort = settings.ThinkingEffort;
@@ -93,9 +96,9 @@ public sealed class CodingSession
     }
 
     public static CodingSession Create(
-        IStreamingChatClient client,
         HarnessSettings settings,
         SettingsStore settingsStore,
+        CredentialStore credentials,
         CrystalHome home,
         string workspaceRoot,
         PluginRegistry? plugins = null,
@@ -103,9 +106,9 @@ public sealed class CodingSession
     {
         var renderer = new SessionRenderer();
         return new CodingSession(
-            client,
             settings,
             settingsStore,
+            credentials,
             home,
             new Workspace(workspaceRoot),
             renderer,
@@ -122,6 +125,7 @@ public sealed class CodingSession
         finally
         {
             WriteResumeHint();
+            DisposeClient();
         }
     }
 
@@ -130,9 +134,7 @@ public sealed class CodingSession
         using var screen = _renderer.Open();
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
-        _renderer.SetSlashCommands(
-            _plugins.Commands,
-            ThinkingCompletions.For(_settings.ActiveModel));
+        RefreshSlashCommands();
         _renderer.WriteHeader(
             _settings.Model,
             _workspace.Root,
@@ -298,6 +300,9 @@ public sealed class CodingSession
             case SessionVerb.Thinking:
                 ChangeThinking(command.Argument);
                 return (true, false);
+            case SessionVerb.Model:
+                ChangeModel(command.Argument);
+                return (true, false);
             case SessionVerb.Status:
                 _renderer.WriteStatus(
                     _ledger,
@@ -405,6 +410,95 @@ public sealed class CodingSession
         RebuildExecutors();
         RefreshChrome();
         _renderer.WriteNote("thinking  " + ThinkingLabel.For(_thinkingEffort));
+    }
+
+    private void ChangeModel(string argument)
+    {
+        if (_turnActive)
+        {
+            _renderer.WriteError("Finish the current turn before switching models.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            _renderer.WriteNote(
+                ModelSelection.FormatCatalog(
+                    _settings.Catalog,
+                    _settings.Provider,
+                    _settings.Model));
+            return;
+        }
+
+        if (!ModelSelection.TryResolve(
+                _settings.Catalog,
+                _settings.Provider,
+                argument,
+                out var selection,
+                out var resolveError)
+            || selection is null)
+        {
+            _renderer.WriteError(resolveError);
+            return;
+        }
+
+        if (selection.Provider == _settings.Provider
+            && string.Equals(selection.Model, _settings.Model, StringComparison.Ordinal))
+        {
+            _renderer.WriteNote("model  " + selection);
+            return;
+        }
+
+        var nextSettings = _settings.WithSelection(selection.Provider, selection.Model);
+        if (!_credentials.TryResolve(
+                nextSettings.ActiveProvider,
+                out var apiKey,
+                out var credentialError))
+        {
+            _renderer.WriteError(credentialError);
+            return;
+        }
+
+        IStreamingChatClient nextClient;
+        try
+        {
+            nextClient = ChatClientFactory.Create(nextSettings, apiKey, _plugins);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _renderer.WriteError(exception.Message);
+            return;
+        }
+
+        var previous = _client;
+        _client = nextClient;
+        _compactor = new ContextCompactor(nextClient);
+        _settings = nextSettings;
+        _settingsStore.Save(_settings);
+        DisposeClient(previous);
+        ReplaceLiveSystem();
+        RebuildExecutors();
+        _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
+        RefreshSlashCommands();
+        RefreshChrome();
+        _renderer.WriteNote("model  " + selection);
+    }
+
+    private IStreamingChatClient CreateClient(HarnessSettings settings)
+    {
+        if (!_credentials.TryResolve(settings.ActiveProvider, out var apiKey, out var error))
+        {
+            throw new InvalidOperationException(error);
+        }
+
+        return ChatClientFactory.Create(settings, apiKey, _plugins);
+    }
+
+    private void DisposeClient() => DisposeClient(_client);
+
+    private static void DisposeClient(IStreamingChatClient client)
+    {
+        (client as IDisposable)?.Dispose();
     }
 
     private void ChangeDirectory(string argument)
@@ -710,9 +804,21 @@ public sealed class CodingSession
     private string CurrentThinkingStatus() =>
         ThinkingStatus.For(_settings.ActiveModel, _thinkingEffort);
 
+    private void RefreshSlashCommands()
+    {
+        _renderer.SetSlashCommands(
+            _plugins.Commands,
+            ThinkingCompletions.For(_settings.ActiveModel),
+            ModelCompletions.For(_settings.Catalog, _settings.Provider));
+    }
+
     private void RefreshChrome()
     {
-        _renderer.SetChrome(_planMode, _approval, CurrentThinkingStatus());
+        _renderer.SetChrome(
+            _planMode,
+            _approval,
+            CurrentThinkingStatus(),
+            _settings.Model);
     }
 
     private void PromoteAfterTools()

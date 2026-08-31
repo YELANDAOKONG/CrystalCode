@@ -86,7 +86,7 @@ CrystalCode (executable):
 | `Commands` | Spectre.Console.Cli commands |
 | `Configuration` | Loaded options, defaults, thinking chrome labels |
 | `Home` | `~/.crystal` paths and file I/O |
-| `Sessions` | Transcript, ledger, streaming turn, slash commands, session renderer, replay, tool-call text, usage text, question prompt |
+| `Sessions` | Transcript, ledger, streaming turn, slash commands, chat client lifetime, session renderer, replay, tool-call text, usage text, question prompt |
 | `Approvals` | Risk, authority, grants, policy, review transcript, approval cards and keys |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
@@ -115,7 +115,8 @@ wire format.
 
 ## Crystal consumption
 
-The interactive turn uses `IStreamingChatClient` and `ToolExecutor`. It does
+The interactive turn uses `IStreamingChatClient` and `ToolExecutor`. The
+session owns that client and may replace it on `/model`. It does
 not use `Crystal.Agents.Agent` for the live UI: that Agent completes model
 turns without token streaming.
 
@@ -167,9 +168,35 @@ Work or Plan body, a host-owned `<env>` block (workspace path, whether the
 directory is a git repo, platform, today's date, and provider/model),
 available-skill guidance when Skills is enabled, then Workspace
 instructions. Review is the named file alone. The env block is not an
-overlay file and is refreshed on `/cd` and when the live system
+overlay file and is refreshed on `/cd`, `/model`, and when the live system
 message is replaced. Skill guidance is host-owned and is not an overlay
 file.
+
+## Model
+
+`/model` changes the configured provider and model for the next idle
+turn. Crystal `ChatRequest` has no model field; adapters bake the name
+and sampling into client options, so the session rebuilds
+`IStreamingChatClient` (and the compaction summarizer and Review
+client that share it). The transcript stays the same conversation.
+
+- `/model` lists catalog models grouped by provider and marks the
+  current selection.
+- `/model <model>` selects a model on the current provider. If that
+  provider does not list the name, a unique catalog match is used. A
+  provider name with one model selects that model.
+- `/model <provider> <model>` selects across providers. The model id
+  is the remainder after the first space and may contain `/`.
+- Models that are not listed cannot be selected. A missing API key
+  leaves the current client unchanged.
+- The command is refused while a turn is running.
+- A successful switch writes `provider` and `model` to `config.json`.
+  CLI `--provider` / `--model` still override only that process start.
+- Thinking follows the existing rule: switching models never fails.
+  Unsupported thinking is omitted; an unsupported stored gear uses the
+  provider default and is not rewritten.
+- Compaction is not run as part of the switch. The next turn uses the
+  new context window.
 
 ## Approval
 
@@ -390,8 +417,8 @@ list is on/off only.
 
 `thinkingEffort` is the operator choice: `default`, `off` (`none` is
 the same), or a Crystal effort name. It is not stored on the model. `/thinking` (alias
-`/think`) cycles the gear or sets one by name. Changing models never
-fails: if the model does not support thinking, requests omit reasoning
+`/think`) cycles the gear or sets one by name. `/model` never
+fails because of thinking: if the model does not support thinking, requests omit reasoning
 hints; if the stored gear is not in that model's list, the request
 uses the provider default and the stored choice is unchanged.
 
@@ -461,8 +488,10 @@ transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
 `/compact`). A slash picker appears while the prompt
-is a command prefix. After a verb that takes a fixed argument
-(`/thinking`, `/approval`), Tab also completes the argument. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
+is a command prefix. After a verb that takes an argument
+(`/thinking`, `/approval`, `/model`), Tab also completes the argument.
+`/model` completes current-provider models, then a provider name, then
+that provider's models. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Up/Down
 arrows navigate composer history or the slash picker when the prompt
 has text. Alternate-scroll (1007) turns the wheel into batched Up/Down

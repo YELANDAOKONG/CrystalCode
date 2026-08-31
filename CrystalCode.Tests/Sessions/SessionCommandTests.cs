@@ -17,6 +17,7 @@ public sealed class SessionCommandTests
     [InlineData("/new", SessionVerb.Clear)]
     [InlineData("/continue", SessionVerb.Resume)]
     [InlineData("/compact", SessionVerb.Compact)]
+    [InlineData("/model", SessionVerb.Model)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)
     {
         var parsed = SessionCommand.TryParse(input, out var command);
@@ -32,6 +33,17 @@ public sealed class SessionCommandTests
 
         Assert.Equal(SessionVerb.Approval, command.Verb);
         Assert.Equal("full", command.Argument);
+    }
+
+    [Fact]
+    public void TryParse_ReadsModelProviderAndSlashedId()
+    {
+        SessionCommand.TryParse(
+            "/model openrouter anthropic/claude-sonnet-4",
+            out var command);
+
+        Assert.Equal(SessionVerb.Model, command.Verb);
+        Assert.Equal("openrouter anthropic/claude-sonnet-4", command.Argument);
     }
 
     [Fact]

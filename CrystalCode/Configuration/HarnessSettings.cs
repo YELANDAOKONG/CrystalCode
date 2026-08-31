@@ -89,6 +89,13 @@ public sealed record HarnessSettings
         return Copy(provider: nextProvider, model: nextModel);
     }
 
+    public HarnessSettings WithSelection(ProviderName provider, string model)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        return Copy(provider: provider, model: model.Trim());
+    }
+
     public HarnessSettings WithApproval(ApprovalMode approval)
     {
         ArgumentNullException.ThrowIfNull(approval);

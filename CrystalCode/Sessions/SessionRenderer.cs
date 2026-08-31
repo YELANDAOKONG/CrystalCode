@@ -77,7 +77,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     public void SetSlashCommands(
         IReadOnlyList<ISlashCommand>? extras,
-        IReadOnlyList<SlashOption>? thinkingArguments = null)
+        IReadOnlyList<SlashOption>? thinkingArguments = null,
+        IReadOnlyList<SlashOption>? modelArguments = null)
     {
         lock (_gate)
         {
@@ -86,9 +87,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             {
                 var keys = new List<string> { spec.Name };
                 keys.AddRange(spec.Aliases);
-                var arguments = spec.Verb == SessionVerb.Thinking && thinkingArguments is not null
-                    ? thinkingArguments
-                    : ToArgumentOptions(spec.Arguments);
+                var arguments = ArgumentsFor(spec, thinkingArguments, modelArguments);
                 _slashOptions.Add(new SlashOption(spec.Name, spec.Help, keys, arguments));
             }
 
@@ -102,6 +101,24 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 _slashOptions.Add(new SlashOption(command.Name, command.Help, [command.Name]));
             }
         }
+    }
+
+    private static IReadOnlyList<SlashOption> ArgumentsFor(
+        SlashSpec spec,
+        IReadOnlyList<SlashOption>? thinkingArguments,
+        IReadOnlyList<SlashOption>? modelArguments)
+    {
+        if (spec.Verb == SessionVerb.Thinking && thinkingArguments is not null)
+        {
+            return thinkingArguments;
+        }
+
+        if (spec.Verb == SessionVerb.Model && modelArguments is not null)
+        {
+            return modelArguments;
+        }
+
+        return ToArgumentOptions(spec.Arguments);
     }
 
     private static IReadOnlyList<SlashOption> ToArgumentOptions(IReadOnlyList<string>? arguments)
@@ -157,7 +174,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    public void SetChrome(bool planMode, ApprovalMode approval, string thinking = "")
+    public void SetChrome(
+        bool planMode,
+        ApprovalMode approval,
+        string thinking = "",
+        string? model = null)
     {
         lock (_gate)
         {
@@ -165,6 +186,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _composer.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            if (!string.IsNullOrWhiteSpace(model))
+            {
+                _chrome.Model = model;
+            }
+
             PaintUnlocked(force: true);
         }
     }

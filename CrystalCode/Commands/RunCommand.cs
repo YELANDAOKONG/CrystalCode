@@ -1,4 +1,3 @@
-using CrystalCode.Configuration;
 using CrystalCode.Home;
 using CrystalCode.Plugins;
 using CrystalCode.Sessions;
@@ -45,7 +44,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         var credentials = new CredentialStore(home);
         if (!credentials.TryResolve(
                 harnessSettings.ActiveProvider,
-                out var apiKey,
+                out _,
                 out var error))
         {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(error)}[/]");
@@ -53,23 +52,15 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         }
 
         var plugins = PluginRegistry.CreateBuiltIn();
-        var client = ChatClientFactory.Create(harnessSettings, apiKey, plugins);
-        try
-        {
-            var session = CodingSession.Create(
-                client,
-                harnessSettings,
-                settingsStore,
-                home,
-                workspace,
-                plugins,
-                resume);
-            return await session.RunAsync(cancellationToken);
-        }
-        finally
-        {
-            (client as IDisposable)?.Dispose();
-        }
+        var session = CodingSession.Create(
+            harnessSettings,
+            settingsStore,
+            credentials,
+            home,
+            workspace,
+            plugins,
+            resume);
+        return await session.RunAsync(cancellationToken);
     }
 
     private static string ResolveWorkspace(string? workspace)

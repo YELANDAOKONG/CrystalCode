@@ -29,6 +29,24 @@ public sealed record ProviderName
 
     public static ProviderName Parse(string value) => new(value);
 
+    public static bool TryParse(string value, out ProviderName? name)
+    {
+        name = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        if (normalized.Length == 0 || !IsValid(normalized))
+        {
+            return false;
+        }
+
+        name = new ProviderName(normalized);
+        return true;
+    }
+
     public string ApiKeyEnvironmentName =>
         Value.Replace('-', '_').ToUpperInvariant() + "_API_KEY";
 

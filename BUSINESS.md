@@ -21,6 +21,7 @@ The current product is a terminal UI application. The terminal is the only
 operator surface and the only entry. It can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
+- switch the configured provider and model from `/model` without restarting;
 - switch Plan (read-only) and Work (edit, write, shell);
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;

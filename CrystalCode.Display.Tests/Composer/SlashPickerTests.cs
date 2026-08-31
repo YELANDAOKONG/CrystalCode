@@ -56,6 +56,41 @@ public sealed class SlashPickerTests
         Assert.Null(SlashPicker.Create("/think high extra", ThinkingOptions()));
     }
 
+    [Fact]
+    public void Create_CompletesNestedModelAfterProvider()
+    {
+        var picker = SlashPicker.Create("/model openai ", ModelOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal("gpt-5.6-sol", picker.Matches[0].Name);
+        Assert.Equal("/model openai gpt-5.6-sol ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_FiltersNestedModelPrefix()
+    {
+        var picker = SlashPicker.Create("/model openai gpt-5.6-t", ModelOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal("gpt-5.6-terra", picker.Matches[0].Name);
+        Assert.Equal("/model openai gpt-5.6-terra ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_HidesAfterThirdModelToken()
+    {
+        Assert.Null(SlashPicker.Create("/model openai gpt-5.6-sol extra", ModelOptions()));
+    }
+
+    [Fact]
+    public void Create_PrefersNestedProviderWhenNameMatchesAModel()
+    {
+        var picker = SlashPicker.Create("/model openai gpt", ModelOptions());
+
+        Assert.NotNull(picker);
+        Assert.All(picker.Matches, match => Assert.StartsWith("gpt-5.6-", match.Name, StringComparison.Ordinal));
+    }
+
     private static SlashOption[] ThinkingOptions()
     {
         var thinking = new SlashOption(
@@ -68,6 +103,27 @@ public sealed class SlashPickerTests
                 new("high", "High", ["high"])
             ]);
         return [thinking, .. Options];
+    }
+
+    private static SlashOption[] ModelOptions()
+    {
+        var model = new SlashOption(
+            "model",
+            "show or set provider and model",
+            ["model"],
+            [
+                new("openai", "a model named openai", ["openai"]),
+                new(
+                    "openai",
+                    "provider",
+                    ["openai"],
+                    [
+                        new("gpt-5.6-sol", "openai", ["gpt-5.6-sol"]),
+                        new("gpt-5.6-terra", "openai", ["gpt-5.6-terra"]),
+                        new("gpt-5.6-luna", "openai", ["gpt-5.6-luna"])
+                    ])
+            ]);
+        return [model, .. Options];
     }
 
     [Fact]

@@ -10,6 +10,7 @@ public enum SessionVerb
     Plan,
     Approval,
     Thinking,
+    Model,
     Status,
     Clear,
     Cd,

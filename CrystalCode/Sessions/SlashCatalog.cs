@@ -13,6 +13,7 @@ public static class SlashCatalog
             ["default", "autoedit", "review", "full"]),
         new(SessionVerb.Thinking, "thinking", ["think"], "off | none | default | low | medium | high | maximum | max",
             ["off", "none", "default", "minimal", "low", "medium", "high", "maximum", "max"]),
+        new(SessionVerb.Model, "model", [], "show or set provider and model"),
         new(SessionVerb.Status, "status", [], "turns, tokens, mode"),
         new(SessionVerb.Clear, "clear", ["new"], "new conversation"),
         new(SessionVerb.Cd, "cd", [], "show or set workspace"),

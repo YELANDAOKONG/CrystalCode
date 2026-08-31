@@ -82,20 +82,45 @@ public sealed class SlashPicker
     {
         var verb = rest[..space];
         var remainder = rest[(space + 1)..];
-        if (remainder.Contains(' ', StringComparison.Ordinal))
-        {
-            return null;
-        }
-
         var command = FindCommand(verb, options);
         if (command is null || command.ArgumentOptions.Count == 0)
         {
             return null;
         }
 
-        var prefix = remainder.ToLowerInvariant();
+        var nestedSpace = remainder.IndexOf(' ');
+        if (nestedSpace < 0)
+        {
+            return FilterArguments(command.ArgumentOptions, remainder, "/" + verb + " ");
+        }
+
+        var first = remainder[..nestedSpace];
+        var nestedRemainder = remainder[(nestedSpace + 1)..];
+        if (nestedRemainder.Contains(' ', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var nested = FindNestedCommand(first, command.ArgumentOptions);
+        if (nested is null || nested.ArgumentOptions.Count == 0)
+        {
+            return null;
+        }
+
+        return FilterArguments(
+            nested.ArgumentOptions,
+            nestedRemainder,
+            "/" + verb + " " + first + " ");
+    }
+
+    private static SlashPicker? FilterArguments(
+        IReadOnlyList<SlashOption> arguments,
+        string prefixSource,
+        string completedPrefix)
+    {
+        var prefix = prefixSource.ToLowerInvariant();
         var matches = new List<SlashOption>();
-        foreach (var option in command.ArgumentOptions)
+        foreach (var option in arguments)
         {
             if (MatchesPrefix(option, prefix))
             {
@@ -105,7 +130,31 @@ public sealed class SlashPicker
 
         return matches.Count == 0
             ? null
-            : new SlashPicker(matches, 0, "/" + verb + " ", arguments: true);
+            : new SlashPicker(matches, 0, completedPrefix, arguments: true);
+    }
+
+    private static SlashOption? FindNestedCommand(string verb, IReadOnlyList<SlashOption> options)
+    {
+        SlashOption? fallback = null;
+        foreach (var option in options)
+        {
+            foreach (var key in option.Keys)
+            {
+                if (!string.Equals(key, verb, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (option.ArgumentOptions.Count > 0)
+                {
+                    return option;
+                }
+
+                fallback ??= option;
+            }
+        }
+
+        return fallback;
     }
 
     private static SlashOption? FindCommand(string verb, IReadOnlyList<SlashOption> options)
