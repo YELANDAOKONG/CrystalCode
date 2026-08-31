@@ -44,6 +44,7 @@ public sealed class OpenAIProviderTests
             new Uri("https://api.openai.com/v1/chat/completions"),
             handler.Request.RequestUri);
         Assert.Equal("org_test", handler.Request.Headers.GetValues("OpenAI-Organization").Single());
+        Assert.Equal("Crystal Code", handler.Request.Headers.GetValues("User-Agent").Single());
         Assert.Contains("\"max_completion_tokens\":256", handler.Body, StringComparison.Ordinal);
         Assert.DoesNotContain("\"max_tokens\"", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"reasoning_effort\":\"minimal\"", handler.Body, StringComparison.Ordinal);

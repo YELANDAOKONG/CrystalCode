@@ -10,6 +10,8 @@ internal static class CompatibleWire
 {
     public const string ChatCompletionsPath = "chat/completions";
 
+    public const string UserAgent = "Crystal Code";
+
     public static OpaqueReasoningState CreateReasoningState(string format, string reasoningContent)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(format);

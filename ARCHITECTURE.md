@@ -114,7 +114,8 @@ CrystalCode.Display:
 Provider types live under `CrystalCode.Providers` plus one folder per
 vendor (`DeepSeek`, `OpenAI`). Shared OpenAI-compatible request and stream
 parsing lives in `Compatible` so neither vendor adapter reimplements the
-wire format.
+wire format. Outbound chat requests send a constant `User-Agent` of
+`Crystal Code` with no version.
 
 ## Crystal consumption
 
