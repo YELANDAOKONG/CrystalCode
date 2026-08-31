@@ -896,6 +896,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             return;
         }
 
+        _chrome.TickSpinner(now);
+
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
         var overlay = OverlayLines(ScreenSize.Width);
         var queue = QueueLines(ScreenSize.Width);
@@ -1019,7 +1021,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
             lock (_gate)
             {
-                if (ScreenSize.Width != _paintedWidth || ScreenSize.Height != _paintedHeight)
+                if (ScreenSize.Width != _paintedWidth
+                    || ScreenSize.Height != _paintedHeight
+                    || _chrome.SpinnerDue(DateTimeOffset.UtcNow))
                 {
                     PaintUnlocked(force: true);
                 }

@@ -7,6 +7,9 @@ namespace CrystalCode.Display.Shell;
 /// </summary>
 public sealed class ShellChrome
 {
+    private int _spinnerFrame;
+    private DateTimeOffset _lastSpinner;
+
     public string Model { get; set; } = string.Empty;
 
     public string WorkspaceRoot { get; set; } = string.Empty;
@@ -148,6 +151,34 @@ public sealed class ShellChrome
         return new PaintLine(fittedMarkup, fittedPlain);
     }
 
+    public bool SpinnerDue(DateTimeOffset now) =>
+        !string.IsNullOrWhiteSpace(Progress)
+        && (_lastSpinner == default || now - _lastSpinner >= ProgressSpinner.Interval);
+
+    public void TickSpinner(DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(Progress))
+        {
+            _spinnerFrame = 0;
+            _lastSpinner = default;
+            return;
+        }
+
+        if (_lastSpinner == default)
+        {
+            _lastSpinner = now;
+            return;
+        }
+
+        if (now - _lastSpinner < ProgressSpinner.Interval)
+        {
+            return;
+        }
+
+        _spinnerFrame++;
+        _lastSpinner = now;
+    }
+
     public PaintLine ProgressLine(int width)
     {
         if (string.IsNullOrWhiteSpace(Progress))
@@ -155,12 +186,25 @@ public sealed class ShellChrome
             return PaintLine.Blank;
         }
 
-        var plain = "  " + Progress;
-        if (TextWidth.Measure(plain) > width)
+        var glyph = ProgressSpinner.Frame(_spinnerFrame);
+        var prefix = "  " + glyph + "  ";
+        var prefixWidth = TextWidth.Measure(prefix);
+        if (prefixWidth >= width)
         {
-            plain = TextWidth.Truncate(plain, width);
+            return PaintLine.Colored(Theme.Accent, TextWidth.Truncate(prefix, width));
         }
 
-        return new PaintLine($"[{Theme.Accent} bold]{MarkupText.Escape(plain)}[/]", plain);
+        var caption = Progress;
+        var captionBudget = width - prefixWidth;
+        if (TextWidth.Measure(caption) > captionBudget)
+        {
+            caption = TextWidth.Truncate(caption, captionBudget);
+        }
+
+        var plain = prefix + caption;
+        var markup = "  "
+            + $"[{Theme.Accent}]{MarkupText.Escape(glyph)}[/]  "
+            + $"[{Theme.Accent} bold]{MarkupText.Escape(caption)}[/]";
+        return new PaintLine(markup, plain);
     }
 }

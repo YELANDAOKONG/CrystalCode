@@ -145,6 +145,26 @@ public sealed class ShellChromeTests
         Assert.Contains("Review", status.Plain, StringComparison.Ordinal);
         Assert.DoesNotContain("Awaiting Approval", status.Plain, StringComparison.Ordinal);
         Assert.Contains("Awaiting Approval", progress.Plain, StringComparison.Ordinal);
+        Assert.Contains(ProgressSpinner.Frame(0), progress.Plain, StringComparison.Ordinal);
         Assert.DoesNotContain("• Bash", progress.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TickSpinner_AdvancesAfterInterval()
+    {
+        var chrome = new ShellChrome { Progress = "Thinking" };
+        var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+        chrome.TickSpinner(start);
+        Assert.Contains(ProgressSpinner.Frame(0), chrome.ProgressLine(80).Plain, StringComparison.Ordinal);
+        Assert.False(chrome.SpinnerDue(start));
+
+        chrome.TickSpinner(start + (ProgressSpinner.Interval / 2));
+        Assert.Contains(ProgressSpinner.Frame(0), chrome.ProgressLine(80).Plain, StringComparison.Ordinal);
+
+        Assert.True(chrome.SpinnerDue(start + ProgressSpinner.Interval));
+        chrome.TickSpinner(start + ProgressSpinner.Interval);
+        Assert.Contains(ProgressSpinner.Frame(1), chrome.ProgressLine(80).Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain(ProgressSpinner.Frame(0), chrome.ProgressLine(80).Plain, StringComparison.Ordinal);
     }
 }
