@@ -62,7 +62,9 @@ public sealed class DotnetToolFactoryTests
               }
             }
             """);
-        WriteExecSet(workspace.Path, "alpha");
+        // ZetaStandin sorts after FixtureTools on both ordinal and Windows
+        // ignore-case overlay order, so the failed set is applied first.
+        WriteExecSet(workspace.Path, "ZetaStandin", "alpha");
 
         var catalog = ExternalCatalog.Load(
             home.Home,
@@ -136,18 +138,23 @@ public sealed class DotnetToolFactoryTests
         Assert.Empty(catalog.PlanTools);
     }
 
-    private static void WriteExecSet(string workspace, string name)
+    private static void WriteExecSet(string workspace, string directoryName, string toolName)
     {
-        var directory = Path.Combine(workspace, ".crystal", "tools", name);
+        var directory = Path.Combine(workspace, ".crystal", "tools", directoryName);
         Directory.CreateDirectory(directory);
         File.WriteAllText(
             Path.Combine(directory, ExternalFiles.FileName),
-            """
+            $$"""
             {
               "runner": "exec",
-              "description": "Exec stand-in.",
-              "schema": { "type": "object", "properties": {} },
-              "command": ["/bin/true"]
+              "command": ["/bin/true"],
+              "tools": [
+                {
+                  "name": "{{toolName}}",
+                  "description": "Exec stand-in.",
+                  "schema": { "type": "object", "properties": {} }
+                }
+              ]
             }
             """);
     }
