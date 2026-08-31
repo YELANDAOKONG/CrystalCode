@@ -36,7 +36,7 @@ configure_path() {
     fi
 
     path_export="export PATH=\"${install_directory}:\$PATH\""
-    command_alias="alias crystal=\"${install_directory}/${binary_name}\""
+    command_alias="alias crystal=${binary_name}"
     comment_exists=false
     path_exists=false
     alias_exists=false
@@ -63,17 +63,11 @@ configure_path() {
         printf '\n\n\n' >> "$profile_path"
     fi
 
-    if [ "$comment_exists" = false ]; then
-        printf '%s\n' "$profile_comment" >> "$profile_path"
-    fi
-
-    if [ "$path_exists" = false ]; then
-        printf '%s\n' "$path_export" >> "$profile_path"
-    fi
-
-    if [ "$alias_exists" = false ]; then
-        printf '%s\n' "$command_alias" >> "$profile_path"
-    fi
+    # Write a complete block when updating a partial or legacy configuration.
+    # A later alias definition intentionally supersedes the legacy absolute-path alias.
+    printf '%s\n' "$profile_comment" >> "$profile_path"
+    printf '%s\n' "$path_export" >> "$profile_path"
+    printf '%s\n' "$command_alias" >> "$profile_path"
 
     printf '\n\n' >> "$profile_path"
     printf 'Configured Crystal Code in %s.\n' "$profile_path"
