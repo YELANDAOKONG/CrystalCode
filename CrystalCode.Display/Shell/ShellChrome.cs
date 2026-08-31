@@ -9,6 +9,9 @@ public sealed class ShellChrome
 {
     private int _spinnerFrame;
     private DateTimeOffset _lastSpinner;
+    private string _progress = string.Empty;
+    private DateTimeOffset _progressStarted;
+    private string _elapsedLabel = string.Empty;
 
     public string Model { get; set; } = string.Empty;
 
@@ -24,7 +27,24 @@ public sealed class ShellChrome
 
     public string Activity { get; set; } = string.Empty;
 
-    public string Progress { get; set; } = string.Empty;
+    public string Progress
+    {
+        get => _progress;
+        set
+        {
+            var next = value ?? string.Empty;
+            if (string.Equals(_progress, next, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _progress = next;
+            _progressStarted = default;
+            _elapsedLabel = string.IsNullOrWhiteSpace(next)
+                ? string.Empty
+                : ProgressElapsed.Format(TimeSpan.Zero);
+        }
+    }
 
     public int ToolCount { get; set; }
 
@@ -161,8 +181,17 @@ public sealed class ShellChrome
         {
             _spinnerFrame = 0;
             _lastSpinner = default;
+            _progressStarted = default;
+            _elapsedLabel = string.Empty;
             return;
         }
+
+        if (_progressStarted == default)
+        {
+            _progressStarted = now;
+        }
+
+        _elapsedLabel = ProgressElapsed.Format(now - _progressStarted);
 
         if (_lastSpinner == default)
         {
@@ -188,23 +217,32 @@ public sealed class ShellChrome
 
         var glyph = ProgressSpinner.Frame(_spinnerFrame);
         var prefix = "  " + glyph + "  ";
+        var elapsed = string.IsNullOrEmpty(_elapsedLabel)
+            ? ProgressElapsed.Format(TimeSpan.Zero)
+            : _elapsedLabel;
+        var suffix = " · " + elapsed;
         var prefixWidth = TextWidth.Measure(prefix);
-        if (prefixWidth >= width)
+        var suffixWidth = TextWidth.Measure(suffix);
+        if (prefixWidth + suffixWidth >= width)
         {
-            return PaintLine.Colored(Theme.Accent, TextWidth.Truncate(prefix, width));
+            return PaintLine.Colored(
+                Theme.Accent,
+                TextWidth.Truncate(prefix + suffix, width));
         }
 
         var caption = Progress;
-        var captionBudget = width - prefixWidth;
+        var captionBudget = width - prefixWidth - suffixWidth;
         if (TextWidth.Measure(caption) > captionBudget)
         {
             caption = TextWidth.Truncate(caption, captionBudget);
         }
 
-        var plain = prefix + caption;
+        var plain = prefix + caption + suffix;
         var markup = "  "
             + $"[{Theme.Accent}]{MarkupText.Escape(glyph)}[/]  "
-            + $"[{Theme.Accent} bold]{MarkupText.Escape(caption)}[/]";
+            + $"[{Theme.Accent} bold]{MarkupText.Escape(caption)}[/]"
+            + $"[{Theme.Rule}] · [/]"
+            + $"[{Theme.Muted}]{MarkupText.Escape(elapsed)}[/]";
         return new PaintLine(markup, plain);
     }
 }

@@ -460,7 +460,9 @@ runs, a progress row sits directly above the status bar
 (`Waiting For Model`, `Thinking`, `Writing`, `Running Command`,
 `Awaiting Approval`, `Reviewing`, `Waiting For Answer`,
 `Compacting`). The caption is prefixed with a one-cell spinner
-that advances while the turn is live. It is independent of the
+that advances while the turn is live, plus the current activity
+elapsed time (`5s`, `2m18s`). Elapsed resets when the progress
+caption changes. It is independent of the
 status-bar activity bullet (`• Bash`). The row is omitted when
 idle. Assistant text is
 rendered as markdown while it streams and after it commits (headings,
