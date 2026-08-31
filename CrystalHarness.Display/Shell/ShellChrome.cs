@@ -80,7 +80,7 @@ public sealed class ShellChrome
 
         if (ToolCount > 0)
         {
-            var toolStr = ToolCount == 1 ? "1 tool" : $"{ToolCount} tools";
+            var toolStr = ToolCount == 1 ? "1 Tool" : $"{ToolCount} Tools";
             items.Add((toolStr, $"[{Theme.Chrome}]{toolStr}[/]"));
         }
 
@@ -110,7 +110,10 @@ public sealed class ShellChrome
             var dropIndex = -1;
             for (var i = items.Count - 1; i >= 0; i--)
             {
-                if (items[i].Plain == Elapsed || items[i].Plain.EndsWith("tools", StringComparison.Ordinal) || items[i].Plain == Model)
+                if (items[i].Plain == Elapsed
+                    || items[i].Plain.EndsWith(" Tool", StringComparison.Ordinal)
+                    || items[i].Plain.EndsWith(" Tools", StringComparison.Ordinal)
+                    || items[i].Plain == Model)
                 {
                     dropIndex = i;
                     break;

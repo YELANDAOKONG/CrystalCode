@@ -36,7 +36,7 @@ public sealed class ShellChromeTests
             Activity = "Bash",
             Model = "deepseek-v4-flash",
             WorkspaceRoot = "/tmp/workspace/CrystalHarness",
-            Usage = "CTX 3%  ·  29.3k in / 832 out",
+            Usage = "CTX 3%  ·  29.3k IN / 832 OUT",
             ToolCount = 6,
             Queued = 1
         };
@@ -94,5 +94,27 @@ public sealed class ShellChromeTests
         var line = chrome.StatusLine(80);
 
         Assert.DoesNotContain("Think", line.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_TitleCasesToolCount()
+    {
+        var one = new ShellChrome
+        {
+            Approval = "Review",
+            Usage = "CTX --",
+            ToolCount = 1
+        };
+        var many = new ShellChrome
+        {
+            Approval = "Review",
+            Usage = "CTX --",
+            ToolCount = 6
+        };
+
+        Assert.Contains("1 Tool", one.StatusLine(80).Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("1 tool", one.StatusLine(80).Plain, StringComparison.Ordinal);
+        Assert.Contains("6 Tools", many.StatusLine(80).Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("6 tools", many.StatusLine(80).Plain, StringComparison.Ordinal);
     }
 }

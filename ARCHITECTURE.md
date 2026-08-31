@@ -363,8 +363,10 @@ console writer with the self-owned loop.
 
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
-thinking is on), model, workspace, context percent,
-tokens, tool count, and elapsed time. Mode is Plan or Work on the
+thinking is on), model, workspace, context percent (`CTX`),
+token counts (`IN` / `OUT`), tool count (`Tool` / `Tools`), and
+elapsed time. Named chrome labels are Title Case. Short status
+abbreviations are uppercase. Mode is Plan or Work on the
 composer prompt and is not repeated on the status bar. Assistant text is
 rendered as markdown while it streams and after it commits (headings,
 lists, fenced code with a dim code background, inline code and bold).
@@ -390,8 +392,8 @@ platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
 plain Backspace as Control; that is still one character. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
-newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome
-labels are Plan, Work, Review, Default, AutoEdit, and Full. The status
+newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, AutoEdit, and Full.
+Status abbreviations are CTX, IN, and OUT. The status
 bar includes a queued count while follow-ups wait. Auto-pass prints a
 panel with Status, Reason, Risk, Authority, and, for review, Outcome
 plus rationale. Reasoning streams into the

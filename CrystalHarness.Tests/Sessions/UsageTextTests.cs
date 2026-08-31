@@ -19,8 +19,9 @@ public sealed class UsageTextTests
     {
         var text = UsageText.Format(new TokenUsage(100, 20), 1000);
 
-        Assert.StartsWith("CTX ", text, StringComparison.Ordinal);
-        Assert.Contains("%", text, StringComparison.Ordinal);
+        Assert.Equal("CTX 12%  ·  100 IN / 20 OUT", text);
         Assert.DoesNotContain("ctx", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(" in ", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(" out", text, StringComparison.Ordinal);
     }
 }

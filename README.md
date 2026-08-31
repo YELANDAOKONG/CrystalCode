@@ -248,10 +248,11 @@ TTY: transcript viewport, optional overlay, status bar, and a
 multiline composer. Redirected output stays sequential.
 
 The status bar shows approval, thinking (when the selected model
-supports it), model, workspace, context percent, tokens, tool count,
-and elapsed time. Mode is Plan or Work on the composer prompt, not
-repeated on the status bar. A queued-follow-up count appears while
-items wait.
+supports it), model, workspace, context percent (`CTX`), token counts
+(`IN` / `OUT`), tool count, and elapsed time. Named chrome labels are
+Title Case; short status abbreviations are uppercase. Mode is Plan or
+Work on the composer prompt, not repeated on the status bar. A
+queued-follow-up count appears while items wait.
 
 Assistant text is rendered as markdown while it streams and after it
 commits (headings, lists, fenced code, inline code and bold). User,
