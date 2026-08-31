@@ -17,6 +17,28 @@ require_command() {
     fi
 }
 
+print_path_guidance() {
+    profile_path="your shell profile"
+
+    case "${SHELL:-sh}" in
+        */zsh | zsh)
+            profile_path="$HOME/.zshrc"
+            ;;
+        */bash | bash)
+            profile_path="$HOME/.bashrc"
+            ;;
+    esac
+
+    printf '\nTo run %s from any directory, add this line to %s:\n' "$binary_name" "$profile_path"
+    printf '  export PATH="%s:$PATH"\n' "$install_directory"
+
+    if [ "$profile_path" != "your shell profile" ]; then
+        printf 'Then run: . %s\n' "$profile_path"
+    else
+        printf 'Then restart your terminal.\n'
+    fi
+}
+
 detect_asset() {
     operating_system="$(uname -s)"
     architecture="$(uname -m)"
@@ -96,3 +118,4 @@ chmod 755 "$staged_binary"
 mv -f "$staged_binary" "${install_directory}/${binary_name}"
 
 printf 'Installed %s to %s\n' "$archive_name" "${install_directory}/${binary_name}"
+print_path_guidance

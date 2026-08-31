@@ -61,6 +61,8 @@ try {
     }
 
     Write-Host "Installed $archiveName to $destinationPath"
+    Write-Host "To run $binaryName from any directory, add $installDirectory to your user PATH."
+    Write-Host "Restart your terminal after updating PATH."
 }
 finally {
     if (Test-Path -LiteralPath $temporaryDirectory) {

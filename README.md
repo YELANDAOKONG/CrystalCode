@@ -34,24 +34,25 @@ macOS ARM64, or Windows x64. The installers download the matching standard
 release asset, `CrystalCode-<os>-<architecture>.zip`, then replace the
 matching executable in `~/.crystal/binaries/code/`.
 
-On Linux or macOS, download and inspect the installer, then run it:
+On Linux or macOS, run:
 
 ```bash
-curl --fail --location --show-error --output install.sh \
-  https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.sh
-sh install.sh
+curl --fail --location --show-error \
+  https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.sh | sh
 ```
 
 On Windows PowerShell:
 
 ```powershell
-Invoke-WebRequest `
-  -Uri https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.ps1 `
-  -OutFile install.ps1
-.\install.ps1
+Invoke-RestMethod `
+  -Uri https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.ps1 | Invoke-Expression
 ```
 
+To inspect an installer before running it, download it to a file and run it
+manually instead.
+
 The installers do not write credentials, edit shell profiles, or modify PATH.
+They print the PATH update required to invoke CrystalCode by name.
 Run `~/.crystal/binaries/code/CrystalCode` on Linux or macOS, or
 `~/.crystal/binaries/code/CrystalCode.exe` on Windows. Add that directory to
 your own PATH if you want to invoke it by name.
