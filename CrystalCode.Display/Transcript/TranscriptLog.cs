@@ -73,6 +73,12 @@ public sealed class TranscriptLog
         _liveKind = null;
     }
 
+    public void DiscardLive()
+    {
+        _live.Clear();
+        _liveKind = null;
+    }
+
     public void Clear()
     {
         _entries.Clear();

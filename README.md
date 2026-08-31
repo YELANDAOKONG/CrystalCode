@@ -14,6 +14,8 @@ From a workspace you want the agent to inspect or change, CrystalCode:
 
 - streams a model turn with tool calls, and queues follow-ups while a
   turn is running;
+- retries a failed model round on rate limits, server errors, timeouts,
+  network faults, and incomplete streams, waiting with backoff;
 - switches the configured provider and model with `/model`;
 - switches Plan (built-in reads; no edit, write, or bash) and Work
   (edit, write, shell);

@@ -4,6 +4,7 @@ using Crystal.Reasoning;
 using Crystal.Tools;
 
 using CrystalCode.Compaction;
+using CrystalCode.Providers.DeepSeek;
 using CrystalCode.Sessions;
 using CrystalCode.Tools;
 
@@ -175,6 +176,82 @@ public sealed class StreamingTurnTests
         Assert.Null(client.LastRequest);
     }
 
+    [Fact]
+    public async Task RunAsync_RetriesRetryableModelFailureThenCompletes()
+    {
+        var observer = new TestObserver();
+        var client = new FlakyStreamingClient(
+            new DeepSeekException("slow down", statusCode: 429, retryAfter: TimeSpan.FromSeconds(8)),
+            TextRound("done"));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer,
+            retry: InstantRetry());
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(1, result.ModelCallCount);
+        Assert.Equal(2, client.RequestCount);
+        var retry = Assert.Single(observer.Retries);
+        Assert.Equal(1, retry.Attempt);
+        Assert.Equal(TimeSpan.FromSeconds(8), retry.Delay);
+        Assert.Equal("done", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    [Fact]
+    public async Task RunAsync_DoesNotRetryClientErrors()
+    {
+        var client = new FlakyStreamingClient(
+            new DeepSeekException("bad model", statusCode: 400, errorCode: "invalid_request"));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            retry: InstantRetry());
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]));
+
+        Assert.Equal(400, exception.StatusCode);
+        Assert.Equal(1, client.RequestCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_GivesUpAfterMaximumRetries()
+    {
+        var client = new FlakyStreamingClient(
+            new DeepSeekException("slow down", statusCode: 429));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            retry: InstantRetry(maximumRetries: 2));
+
+        await Assert.ThrowsAsync<DeepSeekException>(
+            () => turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]));
+
+        Assert.Equal(3, client.RequestCount);
+    }
+
+    private static SessionRetryOptions InstantRetry(int maximumRetries = 5) =>
+        new(
+            maximumRetries,
+            (_, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                return Task.CompletedTask;
+            },
+            () => 0);
+
     private static StreamingTurn CreateTurn(
         IStreamingChatClient client,
         TurnLimits? limits = null) =>
@@ -250,7 +327,11 @@ public sealed class StreamingTurnTests
 
         public bool ToolCallsBeforeResults { get; private set; }
 
+        public List<SessionRetryAttempt> Retries { get; } = [];
+
         public void OnStreamEvent(ChatStreamEvent streamEvent) { }
+
+        public void OnRetry(SessionRetryAttempt attempt) => Retries.Add(attempt);
 
         public void OnModelRoundClosed() { }
 
@@ -266,5 +347,53 @@ public sealed class StreamingTurnTests
         }
 
         public void OnUsageUpdated(TokenUsage? usage) => UsageUpdates.Add(usage);
+    }
+
+    private sealed class FlakyStreamingClient : IStreamingChatClient
+    {
+        private readonly Exception _failure;
+        private readonly IReadOnlyList<ChatStreamEvent>? _success;
+
+        public FlakyStreamingClient(Exception failure, IReadOnlyList<ChatStreamEvent>? success = null)
+        {
+            _failure = failure;
+            _success = success;
+        }
+
+        public int RequestCount { get; private set; }
+
+        public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RequestCount++;
+            if (_success is null || RequestCount == 1)
+            {
+                throw _failure;
+            }
+
+            return EnumerateAsync(_success, cancellationToken);
+        }
+
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException("StreamingTurn uses StreamAsync.");
+        }
+
+        private static async IAsyncEnumerable<ChatStreamEvent> EnumerateAsync(
+            IReadOnlyList<ChatStreamEvent> events,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            foreach (var streamEvent in events)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return streamEvent;
+                await Task.Yield();
+            }
+        }
     }
 }

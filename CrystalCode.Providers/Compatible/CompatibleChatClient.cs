@@ -183,7 +183,10 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
             var errorBody = await response.Content
                 .ReadAsStringAsync(cancellationToken)
                 .ConfigureAwait(false);
-            throw _profile.Faults.FromResponse(response.StatusCode, errorBody);
+            throw _profile.Faults.FromResponse(
+                response.StatusCode,
+                errorBody,
+                response.Headers);
         }
         catch (OperationCanceledException)
         {

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 using Crystal.Chat;
@@ -117,6 +118,32 @@ public sealed class DeepSeekProviderTests
                 new ChatRequest([new ChatMessage(ChatRole.User, "Hello.")])));
 
         Assert.Equal(400, exception.StatusCode);
+        Assert.Equal("invalid_request", exception.ErrorCode);
+        Assert.Null(exception.RetryAfter);
         Assert.Contains("bad model", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsRetryAfterAndErrorCode()
+    {
+        var response = JsonResponse.Create(
+            """
+            {"error":{"code":"rate_limit_exceeded","message":"slow down"}}
+            """,
+            HttpStatusCode.TooManyRequests);
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(8));
+        var handler = new RecordingHandler(response);
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => provider.CompleteAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hello.")])));
+
+        Assert.Equal(429, exception.StatusCode);
+        Assert.Equal("rate_limit_exceeded", exception.ErrorCode);
+        Assert.Equal(TimeSpan.FromSeconds(8), exception.RetryAfter);
     }
 }

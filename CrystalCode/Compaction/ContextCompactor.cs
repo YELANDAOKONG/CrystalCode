@@ -1,5 +1,6 @@
 using Crystal.Chat;
 using CrystalCode.Prompts;
+using CrystalCode.Sessions;
 
 namespace CrystalCode.Compaction;
 
@@ -11,11 +12,18 @@ public sealed class ContextCompactor
     public const string OmittedResultText = "Tool result omitted after compaction.";
 
     private readonly IChatClient _client;
+    private readonly SessionRetryOptions _retry;
+    private readonly Action<SessionRetryAttempt>? _onRetry;
 
-    public ContextCompactor(IChatClient client)
+    public ContextCompactor(
+        IChatClient client,
+        SessionRetryOptions? retry = null,
+        Action<SessionRetryAttempt>? onRetry = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
+        _retry = retry ?? SessionRetryOptions.Default;
+        _onRetry = onRetry;
     }
 
     public async Task<CompactionOutcome> CompactAsync(
@@ -58,12 +66,16 @@ public sealed class ContextCompactor
 
         try
         {
-            var response = await _client.CompleteAsync(
-                new ChatRequest(
-                [
-                    new ChatMessage(ChatRole.System, CompactionPrompt.SystemText),
-                    new ChatMessage(ChatRole.User, prompt)
-                ]),
+            var response = await SessionRetry.RunAsync(
+                token => _client.CompleteAsync(
+                    new ChatRequest(
+                    [
+                        new ChatMessage(ChatRole.System, CompactionPrompt.SystemText),
+                        new ChatMessage(ChatRole.User, prompt)
+                    ]),
+                    token),
+                _retry,
+                _onRetry,
                 cancellationToken);
             var summary = ReadAssistantText(response);
             if (string.IsNullOrWhiteSpace(summary))

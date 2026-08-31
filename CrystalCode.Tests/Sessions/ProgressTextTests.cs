@@ -30,6 +30,14 @@ public sealed class ProgressTextTests
     }
 
     [Fact]
+    public void Retrying_UsesElapsedCaption()
+    {
+        Assert.Equal(
+            "Retrying In 8s (Attempt 2)",
+            ProgressText.Retrying(2, TimeSpan.FromSeconds(8)));
+    }
+
+    [Fact]
     public void Running_UnknownToolKeepsToken()
     {
         Assert.Equal("Running: Custom Tool", ProgressText.Running("custom_tool"));

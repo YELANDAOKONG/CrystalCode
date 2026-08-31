@@ -75,8 +75,8 @@ public sealed class CodingSession
         _workspace = workspace;
         _plugins = plugins;
         _client = CreateClient(settings);
-        _compactor = new ContextCompactor(_client);
         _renderer = renderer;
+        _compactor = CreateCompactor(_client);
         _approval = settings.Approval;
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
@@ -480,7 +480,7 @@ public sealed class CodingSession
 
         var previous = _client;
         _client = nextClient;
-        _compactor = new ContextCompactor(nextClient);
+        _compactor = CreateCompactor(nextClient);
         _settings = nextSettings;
         _settingsStore.Save(_settings);
         DisposeClient(previous);
@@ -938,9 +938,13 @@ public sealed class CodingSession
             TurnLimits.CreateDefault(),
             _renderer,
             CurrentReasoning(),
-            CompactRoundAsync);
+            CompactRoundAsync,
+            SessionRetryOptions.Default);
         return turn.RunAsync(_transcript, cancellationToken);
     }
+
+    private ContextCompactor CreateCompactor(IChatClient client) =>
+        new(client, SessionRetryOptions.Default, _renderer.OnRetry);
 
     private async Task FinishTurnAsync()
     {

@@ -4,6 +4,8 @@ using Crystal.Tools;
 
 using CrystalCode.Compaction;
 using CrystalCode.Prompts;
+using CrystalCode.Providers.DeepSeek;
+using CrystalCode.Sessions;
 using CrystalCode.Tests.Approvals;
 
 using Xunit;
@@ -104,6 +106,29 @@ public sealed class ContextCompactorTests
         Assert.Equal(3, outcome.Transcript.OfType<ChatMessage>().Count(IsUser));
     }
 
+    [Fact]
+    public async Task CompactAsync_RetriesRetryableSummaryFailure()
+    {
+        var client = new FlakyChatClient(
+            new DeepSeekException("slow down", statusCode: 429),
+            "## Objective\n- Read then write App.cs.");
+        var retries = new List<SessionRetryAttempt>();
+        var compactor = new ContextCompactor(
+            client,
+            new SessionRetryOptions(5, (_, _) => Task.CompletedTask, () => 0),
+            retries.Add);
+
+        var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", TightLimits);
+
+        Assert.Equal(CompactionKind.Applied, outcome.Kind);
+        Assert.Equal(2, client.Calls);
+        Assert.Single(retries);
+        Assert.Contains(
+            outcome.Transcript,
+            item => item is ChatMessage message
+                && message.Text.Contains("Read then write App.cs.", StringComparison.Ordinal));
+    }
+
     private static CompactionLimits TightLimits { get; } = new(100_000, tailBudget: 8);
 
     private static List<ChatItem> LongTranscript() =>
@@ -134,5 +159,39 @@ public sealed class ContextCompactorTests
                         [new ChatMessage(ChatRole.Assistant, " ")],
                         FinishReason.Stop)
                 ]));
+    }
+
+    private sealed class FlakyChatClient : IChatClient
+    {
+        private readonly Exception _failure;
+        private readonly string _text;
+
+        public FlakyChatClient(Exception failure, string text)
+        {
+            _failure = failure;
+            _text = text;
+        }
+
+        public int Calls { get; private set; }
+
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Calls++;
+            if (Calls == 1)
+            {
+                throw _failure;
+            }
+
+            return Task.FromResult(
+                new ChatResponse(
+                [
+                    new ChatCandidate(
+                        [new ChatMessage(ChatRole.Assistant, _text)],
+                        FinishReason.Stop)
+                ]));
+        }
     }
 }

@@ -37,8 +37,8 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
                 : CompatibleTokenLimit.MaxTokens,
             faults: new CompatibleFaults(
                 typeof(OpenAIException),
-                static (message, statusCode, inner) =>
-                    new OpenAIException(message, statusCode, inner)));
+                static (message, statusCode, inner, errorCode, retryAfter) =>
+                    new OpenAIException(message, statusCode, inner, errorCode, retryAfter)));
 
         _client = new CompatibleChatClient(profile, options.ToCompatibleOptions(), httpClient);
     }

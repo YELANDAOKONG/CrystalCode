@@ -35,8 +35,8 @@ public sealed class DeepSeekProvider : IStreamingChatClient, IDisposable
             tokenLimit: CompatibleTokenLimit.MaxTokens,
             faults: new CompatibleFaults(
                 typeof(DeepSeekException),
-                static (message, statusCode, inner) =>
-                    new DeepSeekException(message, statusCode, inner)));
+                static (message, statusCode, inner, errorCode, retryAfter) =>
+                    new DeepSeekException(message, statusCode, inner, errorCode, retryAfter)));
 
         _client = new CompatibleChatClient(profile, options.ToCompatibleOptions(), httpClient);
     }

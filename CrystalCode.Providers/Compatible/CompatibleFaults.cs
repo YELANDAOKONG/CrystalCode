@@ -1,15 +1,15 @@
 using System.Net;
-using System.Text.Json;
+using System.Net.Http.Headers;
 
 namespace CrystalCode.Providers.Compatible;
 
 internal sealed class CompatibleFaults
 {
-    private readonly Func<string, int?, Exception?, Exception> _create;
+    private readonly Func<string, int?, Exception?, string?, TimeSpan?, Exception> _create;
 
     public CompatibleFaults(
         Type exceptionType,
-        Func<string, int?, Exception?, Exception> create)
+        Func<string, int?, Exception?, string?, TimeSpan?, Exception> create)
     {
         ArgumentNullException.ThrowIfNull(exceptionType);
         ArgumentNullException.ThrowIfNull(create);
@@ -29,14 +29,20 @@ internal sealed class CompatibleFaults
     public Exception Create(
         string message,
         int? statusCode = null,
-        Exception? innerException = null)
+        Exception? innerException = null,
+        string? errorCode = null,
+        TimeSpan? retryAfter = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        return _create(message, statusCode, innerException);
+        return _create(message, statusCode, innerException, errorCode, retryAfter);
     }
 
-    public Exception FromResponse(HttpStatusCode statusCode, string body)
+    public Exception FromResponse(
+        HttpStatusCode statusCode,
+        string body,
+        HttpResponseHeaders headers)
     {
+        ArgumentNullException.ThrowIfNull(headers);
         var status = (int)statusCode;
         var (code, providerMessage) = CompatibleWire.ReadError(body);
         var message = code is null
@@ -47,6 +53,10 @@ internal sealed class CompatibleFaults
             message = $"{message} {providerMessage}";
         }
 
-        return Create(message, status);
+        return Create(
+            message,
+            status,
+            errorCode: code,
+            retryAfter: CompatibleRetryAfter.Read(headers));
     }
 }

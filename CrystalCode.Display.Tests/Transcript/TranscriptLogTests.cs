@@ -46,6 +46,20 @@ public sealed class TranscriptLogTests
     }
 
     [Fact]
+    public void DiscardLive_DropsUncommittedText()
+    {
+        var log = new TranscriptLog();
+        log.AppendLive(TranscriptKind.Assistant, "partial");
+        log.DiscardLive();
+        log.Add(TranscriptKind.Note, "kept");
+
+        var text = string.Join('\n', log.BuildLines(40).Select(line => line.Plain));
+
+        Assert.DoesNotContain("partial", text, StringComparison.Ordinal);
+        Assert.Contains("kept", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildLines_FramesUserMessage()
     {
         var log = new TranscriptLog();

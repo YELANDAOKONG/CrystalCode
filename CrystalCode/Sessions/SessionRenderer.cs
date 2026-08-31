@@ -404,6 +404,24 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    public void OnRetry(SessionRetryAttempt attempt)
+    {
+        ArgumentNullException.ThrowIfNull(attempt);
+        lock (_gate)
+        {
+            DiscardLiveUnlocked();
+            SetTurnActivityUnlocked("Retrying", ProgressText.Retrying(attempt.Attempt, attempt.Delay));
+            if (!Framed)
+            {
+                WriteFallback(
+                    TranscriptKind.Note,
+                    "retrying model request  " + attempt.Message);
+            }
+
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void OnModelRoundClosed()
     {
         lock (_gate)
@@ -879,6 +897,13 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
 
         _log.CommitLive();
+        _streamKind = null;
+        _toolName = string.Empty;
+    }
+
+    private void DiscardLiveUnlocked()
+    {
+        _log.DiscardLive();
         _streamKind = null;
         _toolName = string.Empty;
     }

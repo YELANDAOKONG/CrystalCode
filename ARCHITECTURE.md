@@ -136,7 +136,16 @@ only through a Harness `ToolExceptionMapper`.
 One user message is one turn:
 
 1. Snapshot the transcript and current tool definitions.
-2. Stream one chat request. Render deltas as they arrive.
+2. Stream one chat request. Render deltas as they arrive. If that
+   round fails with a retryable provider error (HTTP 429, 404, 408,
+   5xx, timeout, network, or an incomplete stream), wait with
+   exponential backoff (2s base, factor 2, 25% jitter, 30s cap when
+   Retry-After is absent), honor Retry-After or retry-after-ms when
+   present, and repeat the same round up to five times. The progress
+   row shows `Retrying In Ns (Attempt K)` and discards live stream
+   text from the failed attempt. HTTP 401, 403, quota,
+   `invalid_prompt`, and context overflow are not retried. User
+   cancel still interrupts immediately.
 3. Select candidate zero.
 4. If the candidate has tool calls, execute the full batch through
    `ToolExecutor` (approval runs first).
@@ -267,7 +276,8 @@ minus reserved output), the host:
 1. Clears old tool results outside a protected recent band, when enough
    tokens would be freed.
 2. Asks the model for one structured summary of older turns, folding any
-   previous summary, and keeps a recent tail verbatim.
+   previous summary, and keeps a recent tail verbatim. That summary
+   request uses the same session retry policy as a model round.
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.
@@ -487,7 +497,8 @@ composer prompt and is not repeated on the status bar. While a turn
 runs, a progress row sits directly above the status bar
 (`Waiting For Model`, `Thinking`, `Writing`, `Running Command`,
 `Awaiting Approval`, `Reviewing`, `Waiting For Answer`,
-`Compacting`). The same row shows `Loading Tools` while operator tool
+`Compacting`, `Retrying In Ns (Attempt K)`). The same row shows
+`Loading Tools` while operator tool
 sets are discovered at session start and on `/cd`, after the frame is
 up, so a slow assembly load does not leave a blank terminal. The
 caption is prefixed with a one-cell spinner

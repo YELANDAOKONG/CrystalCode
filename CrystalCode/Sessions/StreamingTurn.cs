@@ -16,6 +16,7 @@ public sealed class StreamingTurn
     private readonly ITurnObserver? _observer;
     private readonly ReasoningOptions? _reasoning;
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? _compactBeforeRound;
+    private readonly SessionRetryOptions _retry;
 
     public StreamingTurn(
         IStreamingChatClient client,
@@ -23,7 +24,8 @@ public sealed class StreamingTurn
         TurnLimits limits,
         ITurnObserver? observer = null,
         ReasoningOptions? reasoning = null,
-        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? compactBeforeRound = null)
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? compactBeforeRound = null,
+        SessionRetryOptions? retry = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(executor);
@@ -34,6 +36,7 @@ public sealed class StreamingTurn
         _observer = observer;
         _reasoning = reasoning;
         _compactBeforeRound = compactBeforeRound;
+        _retry = retry ?? SessionRetryOptions.Default;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -150,7 +153,18 @@ public sealed class StreamingTurn
         }
     }
 
-    private async Task<ChatResponse> StreamModelAsync(
+    private Task<ChatResponse> StreamModelAsync(
+        ChatRequest request,
+        CancellationToken cancellationToken)
+    {
+        return SessionRetry.RunAsync(
+            token => StreamOnceAsync(request, token),
+            _retry,
+            attempt => _observer?.OnRetry(attempt),
+            cancellationToken);
+    }
+
+    private async Task<ChatResponse> StreamOnceAsync(
         ChatRequest request,
         CancellationToken cancellationToken)
     {

@@ -5,11 +5,13 @@ using Crystal.Tools;
 namespace CrystalCode.Sessions;
 
 /// <summary>
-/// Receives stream deltas, tool calls, tool results, and usage updates for display.
+    /// Receives stream deltas, retry waits, tool calls, tool results, and usage updates for display.
 /// </summary>
 public interface ITurnObserver
 {
     void OnStreamEvent(ChatStreamEvent streamEvent);
+
+    void OnRetry(SessionRetryAttempt attempt);
 
     void OnModelRoundClosed();
 

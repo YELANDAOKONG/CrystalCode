@@ -1,4 +1,5 @@
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 using CrystalCode.Tools;
 
 namespace CrystalCode.Sessions;
@@ -24,6 +25,21 @@ public static class ProgressText
     public const string Compacting = "Compacting";
 
     public const string LoadingTools = "Loading Tools";
+
+    public static string Retrying(int attempt, TimeSpan delay)
+    {
+        if (attempt <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(attempt), attempt, "Attempt must be positive.");
+        }
+
+        if (delay < TimeSpan.Zero)
+        {
+            delay = TimeSpan.Zero;
+        }
+
+        return "Retrying In " + ProgressElapsed.Format(delay) + " (Attempt " + attempt + ")";
+    }
 
     public static string Calling(string toolName)
     {
