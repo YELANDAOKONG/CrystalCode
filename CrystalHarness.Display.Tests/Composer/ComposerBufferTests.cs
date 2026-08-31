@@ -13,9 +13,11 @@ public sealed class ComposerBufferTests
         var buffer = new ComposerBuffer();
         var tab = new ConsoleKeyInfo('\t', ConsoleKey.Tab, false, false, false);
         var shiftTab = new ConsoleKeyInfo('\t', ConsoleKey.Tab, true, false, false);
+        var vtTab = new ConsoleKeyInfo('\t', default, false, false, false);
 
         Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(tab));
         Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(shiftTab));
+        Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(vtTab));
     }
 
     [Fact]
@@ -29,6 +31,10 @@ public sealed class ComposerBufferTests
         Assert.Equal(ComposerAction.None, buffer.Handle(newline));
         Assert.Contains('\n', buffer.Text);
         Assert.Equal(ComposerAction.Submit, buffer.Handle(enter));
+
+        buffer.Replace("queued");
+        var vtEnter = new ConsoleKeyInfo('\r', default, false, false, false);
+        Assert.Equal(ComposerAction.Submit, buffer.Handle(vtEnter));
     }
 
     [Fact]

@@ -4,6 +4,7 @@ namespace CrystalHarness.Display.Shell;
 
 /// <summary>
 /// Turns on VT input on Windows so CSI sequences reach ReadKey.
+/// ReadKey then reports Key empty for Tab/Enter; ScrollInput recovers them.
 /// </summary>
 internal static class WindowsConsole
 {

@@ -389,7 +389,9 @@ running. Queued text stays above the composer and is sent when the
 current tool batch or turn ends. Empty Enter while working interrupts
 immediately and sends. Backspace deletes one character on every
 platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
-plain Backspace as Control; that is still one character. Ctrl+W or
+plain Backspace as Control; that is still one character. Windows VT
+input leaves `ConsoleKey` empty for Tab, Enter, and letters; those are
+recovered from `KeyChar`. A CR+LF drain is one Enter, not paste. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
 newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, AutoEdit, and Full.

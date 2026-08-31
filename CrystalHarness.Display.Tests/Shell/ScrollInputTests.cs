@@ -143,6 +143,48 @@ public sealed class ScrollInputTests
     }
 
     [Fact]
+    public void TryComposerKey_RecoversTabAndEnterWhenKeyIsEmpty()
+    {
+        var tab = new ConsoleKeyInfo('\t', default, false, false, false);
+        var enter = new ConsoleKeyInfo('\r', default, false, false, false);
+        var letter = new ConsoleKeyInfo('y', default, false, false, false);
+
+        Assert.True(ScrollInput.TryComposerKey([tab], out var mappedTab));
+        Assert.Equal(ConsoleKey.Tab, mappedTab.Key);
+        Assert.True(ScrollInput.TryComposerKey([enter], out var mappedEnter));
+        Assert.Equal(ConsoleKey.Enter, mappedEnter.Key);
+        Assert.True(ScrollInput.TryComposerKey([letter], out var mappedLetter));
+        Assert.Equal(ConsoleKey.Y, mappedLetter.Key);
+    }
+
+    [Fact]
+    public void TryComposerKey_MapsCrLfBurstAsEnter()
+    {
+        var burst = new List<ConsoleKeyInfo>
+        {
+            new('\r', default, false, false, false),
+            new('\n', default, false, false, false)
+        };
+
+        Assert.True(ScrollInput.TryComposerKey(burst, out var key));
+        Assert.Equal(ConsoleKey.Enter, key.Key);
+        Assert.False(ScrollInput.IsPaste(burst));
+    }
+
+    [Fact]
+    public void TryComposerKey_MapsCsiTabAndShiftTab()
+    {
+        Assert.True(ScrollInput.TryComposerKey(Csi("\u001b[9u"), out var tab));
+        Assert.Equal(ConsoleKey.Tab, tab.Key);
+        Assert.False(tab.Modifiers.HasFlag(ConsoleModifiers.Shift));
+        Assert.True(ScrollInput.TryComposerKey(Csi("\u001b[Z"), out var shiftTab));
+        Assert.Equal(ConsoleKey.Tab, shiftTab.Key);
+        Assert.True(shiftTab.Modifiers.HasFlag(ConsoleModifiers.Shift));
+        Assert.True(ScrollInput.TryComposerKey(Csi("\u001b[13u"), out var enter));
+        Assert.Equal(ConsoleKey.Enter, enter.Key);
+    }
+
+    [Fact]
     public void TryDelta_CsiUpScrollsWhenComposerEmpty()
     {
         var burst = Csi("\u001b[A");

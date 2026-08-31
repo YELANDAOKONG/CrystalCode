@@ -63,7 +63,12 @@ public static class ScrollInput
         key = default;
         if (burst.Count == 1)
         {
-            key = burst[0];
+            key = Canonical(burst[0]);
+            return true;
+        }
+
+        if (TryReturnBurst(burst, out key))
+        {
             return true;
         }
 
@@ -116,8 +121,78 @@ public static class ScrollInput
             return true;
         }
 
+        if (text is "\u001b[Z" or "\u001b[9;2u")
+        {
+            key = new ConsoleKeyInfo('\t', ConsoleKey.Tab, true, false, false);
+            return true;
+        }
+
+        if (text is "\u001b[9u" or "\u001b[27;1;9~")
+        {
+            key = new ConsoleKeyInfo('\t', ConsoleKey.Tab, false, false, false);
+            return true;
+        }
+
+        if (text is "\u001b[13u" or "\u001b[27;1;13~")
+        {
+            key = new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false);
+            return true;
+        }
+
         return false;
     }
+
+    // Windows VT input leaves Key empty; Tab/Enter live in KeyChar. CR+LF is one Enter.
+    private static ConsoleKeyInfo Canonical(ConsoleKeyInfo key)
+    {
+        if (key.Key != default)
+        {
+            return key;
+        }
+
+        var mapped = key.KeyChar switch
+        {
+            '\t' => ConsoleKey.Tab,
+            '\r' => ConsoleKey.Enter,
+            '\u001b' => ConsoleKey.Escape,
+            '\b' or '\u007f' => ConsoleKey.Backspace,
+            >= 'A' and <= 'Z' => (ConsoleKey)key.KeyChar,
+            >= 'a' and <= 'z' => (ConsoleKey)char.ToUpperInvariant(key.KeyChar),
+            >= '0' and <= '9' => (ConsoleKey)key.KeyChar,
+            _ => default
+        };
+        return mapped == default ? key : WithKey(key, mapped);
+    }
+
+    private static bool TryReturnBurst(
+        IReadOnlyList<ConsoleKeyInfo> burst,
+        out ConsoleKeyInfo key)
+    {
+        key = default;
+        if (burst.Count != 2)
+        {
+            return false;
+        }
+
+        if (!IsReturn(burst[0]) || !IsReturn(burst[1]))
+        {
+            return false;
+        }
+
+        key = new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false);
+        return true;
+    }
+
+    private static bool IsReturn(ConsoleKeyInfo key) =>
+        key.Key == ConsoleKey.Enter || key.KeyChar is '\r' or '\n';
+
+    private static ConsoleKeyInfo WithKey(ConsoleKeyInfo key, ConsoleKey mapped) =>
+        new(
+            key.KeyChar,
+            mapped,
+            key.Modifiers.HasFlag(ConsoleModifiers.Shift),
+            key.Modifiers.HasFlag(ConsoleModifiers.Alt),
+            key.Modifiers.HasFlag(ConsoleModifiers.Control));
 
     private static bool AreEditRepeats(IReadOnlyList<ConsoleKeyInfo> burst)
     {

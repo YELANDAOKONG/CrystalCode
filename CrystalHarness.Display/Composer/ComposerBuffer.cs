@@ -26,7 +26,7 @@ public sealed class ComposerBuffer
 
     public ComposerAction Handle(ConsoleKeyInfo key)
     {
-        if (key.Key == ConsoleKey.Tab)
+        if (key.Key == ConsoleKey.Tab || key.KeyChar == '\t')
         {
             return ComposerAction.TogglePlan;
         }
@@ -37,7 +37,7 @@ public sealed class ComposerBuffer
             return ComposerAction.None;
         }
 
-        if (key.Key == ConsoleKey.Enter)
+        if (key.Key == ConsoleKey.Enter || key.KeyChar == '\r')
         {
             if (TryConsumeBackslashNewline())
             {
@@ -245,7 +245,8 @@ public sealed class ComposerBuffer
             return true;
         }
 
-        if (key.Key == ConsoleKey.Enter && key.Modifiers.HasFlag(ConsoleModifiers.Shift))
+        if ((key.Key == ConsoleKey.Enter || key.KeyChar == '\r')
+            && key.Modifiers.HasFlag(ConsoleModifiers.Shift))
         {
             return true;
         }
