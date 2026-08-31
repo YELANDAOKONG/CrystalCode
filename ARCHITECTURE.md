@@ -38,7 +38,8 @@ CrystalCode.Providers.Tests references CrystalCode.Providers.
 
 The executable host. Owns CLI commands, session and turn execution,
 Plan/Work catalogs, approval policy, context compaction, `~/.crystal`
-storage, built-in coding tools, prompts, and in-process plugin contracts.
+storage, built-in coding tools, operator tool sets, prompts, and
+in-process plugin contracts.
 It projects session state onto CrystalCode.Display. It does not own
 the frame painter, composer buffer, or transcript log.
 
@@ -67,7 +68,8 @@ layout.
 ### CrystalCode.Tests
 
 Host tests: workspace fencing, approval classification, compaction
-selection, session serialization, and command behavior.
+selection, session serialization, command behavior, and external tool
+sets.
 
 ### CrystalCode.Providers.Tests
 
@@ -91,6 +93,7 @@ CrystalCode (executable):
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
+| `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` loaders |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
@@ -157,8 +160,14 @@ Two Ctrl+C presses on an empty composer exit.
 These are product modes, not Crystal types.
 
 - Plan registers read, glob, grep, todowrite, and question. When
-  Skills is enabled, it also registers skill.
-- Work registers those tools plus edit, write, and bash.
+  Skills is enabled, it also registers skill. External tools whose
+  `catalogs` include `plan` are appended after the built-ins.
+- Work registers those tools plus edit, write, and bash, then external
+  tools whose `catalogs` include `work`.
+
+Built-in Plan still has no edit, write, or bash. An external Plan tool
+keeps a Write + Workspace floor, so Plan is not built-in reads only
+once such a tool is installed. Approval still runs.
 
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.
@@ -208,19 +217,21 @@ Every side-effect tool call is classified before invocation:
 
 Modes:
 
-- Plan: read-only catalog. No edit, write, or bash. Workspace reads
-  auto-execute. Reads, glob, and grep of paths outside the workspace
-  ask the operator. When Skills is enabled, any path inside a Skills
-  search directory (`skill` / `skills` trees) auto-executes as a
-  workspace read.
+- Plan: no built-in edit, write, or bash. Workspace reads auto-execute.
+  Reads, glob, and grep of paths outside the workspace ask the operator.
+  When Skills is enabled, any path inside a Skills search directory
+  (`skill` / `skills` trees) auto-executes as a workspace read. External
+  tools listed for Plan keep Write + Workspace and still go through
+  approval.
 - Default: Workspace Read auto-executes. Write, shell, and
   outside-workspace reads ask the operator.
-- AutoEdit: workspace file changes pass without review. Shell and
-  outside-workspace reads still ask.
+- AutoEdit: workspace file changes for built-in `write` and `edit`
+  pass without review. Shell, external tools, and outside-workspace
+  reads still ask.
 - Review: another model checks each remaining side-effect call (Codex
   guardian-style), including reads, glob, and grep of paths outside
-  the workspace. Workspace reads and Skills search directories still
-  auto-execute. A bounded transcript excerpt is attached: the first
+  the workspace, and external Write. Workspace reads and Skills search
+  directories still auto-execute. A bounded transcript excerpt is attached: the first
   and latest user turns as authorization anchors, other user turns
   that fit, then recent assistant and tool evidence. A compaction
   summary stands in for folded user turns. Without that evidence the
@@ -232,8 +243,9 @@ Modes:
   text. Ask and Forbidden-allow fall back to the operator. Review is
   not a grant and is not full pass-through.
 - Full: workspace-bounded, policy-allowed actions pass without review.
-  Forbidden, Privileged, and outside-workspace paths never fully
-  auto-pass.
+  That includes any loaded external tool whose classification stays
+  Write + Workspace, not only built-in `write` / `edit`. Forbidden,
+  Privileged, and outside-workspace paths never fully auto-pass.
 
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through.
@@ -294,12 +306,14 @@ installers replace the full platform release contents under `binaries/code/`.
   prompts/review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  tools/<directory>/tools.json
   sessions/<id>.json
   logs/
   plugins/
 ```
 
-Project overlay (wins over home for named prompts and Crystal skills):
+Project overlay (wins over home for named prompts, Crystal skills, and
+tool sets of the same directory name):
 
 ```text
 <workspace>/.crystal/
@@ -309,6 +323,7 @@ Project overlay (wins over home for named prompts and Crystal skills):
   prompts/review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  tools/<directory>/tools.json
 <workspace>/.crystal.md
 ```
 
@@ -371,9 +386,18 @@ and never replace Work, Plan, or Review.
   `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
 
 `credentials.json` is created with owner-only permissions and is keyed by
-provider name. Environment variables override file credentials. The `plugins`
-directory is reserved for later assembly loading; the current product only
-registers in-process contributions.
+provider name. Environment variables override file credentials.
+
+Operator tool sets live under `tools/`. A project directory of the same
+name replaces the home set as a whole. `tools.json` field `enabled`
+(default `true`) omits a set without deleting it. `config.json` field
+`externalTools` enables discovery (default `true`). See
+[docs/external-tools.md](docs/external-tools.md).
+
+The `plugins` directory is reserved. The current product does not load
+`IPlugin` assemblies from that directory. Dotnet tool sets load class
+libraries from the set directory only, in one `AssemblyLoadContext` per
+set.
 
 Provider names are open. `deepseek` and `openai` are starter entries. A user
 adds an OpenAI-compatible endpoint by inserting another `providers` object
@@ -424,6 +448,9 @@ uses the provider default and the stored choice is unchanged.
 
 `skills` enables the `skill` tool and available-skill guidance
 (default `true`). Set it to `false` to disable skill discovery.
+
+`externalTools` enables operator tool set discovery (default `true`).
+Set it to `false` to skip `tools/` manifests.
 
 `protocol` is `deepseek` or `openai`. Models that are not listed cannot be
 selected. There is no global context window.
@@ -531,8 +558,15 @@ sequential.
 
 `IPlugin` contributes tools, chat-client factories, approval classifiers, or
 slash commands through `PluginContribution`. Built-in tools and the DeepSeek
-and OpenAI adapters register through the same table. Disk isolation with
-`AssemblyLoadContext` is later work; do not pretend it exists.
+and OpenAI adapters register through the same table. `PluginRegistry` does
+not load assemblies from disk. `~/.crystal/plugins/` stays reserved.
+
+Operator tool sets are not plugins. They are discovered from `tools/` and
+wrapped by `ExternalCatalog`. A dotnet set uses one non-collectible
+`AssemblyLoadContext` for that directory only. Shared contract types
+(`Crystal`, `Crystal.Tools`, and already-loaded `System.*` /
+`Microsoft.*`) come from the default context. That loader does not
+implement `IPlugin` and does not scan `plugins/`.
 
 Environment variables:
 

@@ -5,6 +5,7 @@ using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Skills;
 using CrystalCode.Tests.Tools;
 using CrystalCode.Tools;
+using CrystalCode.Tools.External;
 
 using Xunit;
 
@@ -203,6 +204,26 @@ public sealed class ToolClassifierTests
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
         Assert.Equal("Echo tool", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ExternalTool_IsWriteInWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = new ExternalToolSpec(
+            "echojson",
+            "Echo.",
+            ToolSchema.Parse("""{"type":"object","properties":{}}"""),
+            ExternalCatalogSelection.Both);
+        var classifier = new ToolClassifier(
+            new Workspace(root.Path),
+            [new ExternalApprovalClassifier(
+                new Dictionary<string, ExternalToolSpec> { [spec.Name] = spec })]);
+
+        var classification = classifier.Classify(new ToolCall("1", "echojson", "{}"));
+
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.Workspace, classification.Authority);
     }
 
     private sealed class EchoClassifier : IApprovalClassifier

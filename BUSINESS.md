@@ -22,7 +22,9 @@ operator surface and the only entry. It can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
 - switch the configured provider and model from `/model` without restarting;
-- switch Plan (read-only) and Work (edit, write, shell);
+- switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
+  write, shell); operator tool sets may add extra catalog entries to
+  either;
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
 - compact conversation context when usage approaches the model window,
@@ -30,6 +32,9 @@ operator surface and the only entry. It can:
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - discover OpenCode-compatible agent skills and load them through the
   `skill` tool when Skills is enabled;
+- discover operator tool sets under `~/.crystal/tools` and
+  `<workspace>/.crystal/tools` and register them as extra catalog tools
+  when External Tools is enabled;
 - use DeepSeek and OpenAI-compatible chat adapters, including user-added
   compatible endpoints;
 - register built-in tools and providers through an in-process plugin table.
@@ -38,7 +43,7 @@ operator surface and the only entry. It can:
 
 The current product does not include:
 
-- loading third-party plugin assemblies from disk;
+- loading `IPlugin` assemblies from `~/.crystal/plugins/`;
 - parent/child Agents through `Crystal.Harness.AgentHarness`;
 - MCP servers;
 - a headless CI runner;
@@ -66,8 +71,10 @@ hints are appended from `instructions.md`, `.crystal.md`, and
 OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
 are never prompt overlays. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the
-`skill` tool when enabled. The application never writes secrets into
-the workspace.
+`skill` tool when enabled. Operator tool sets live under `tools/` in
+the home and project `.crystal` trees and are loaded as extra `ITool`
+entries when External Tools is enabled. The application never writes
+secrets into the workspace.
 
 ## Runtime language
 

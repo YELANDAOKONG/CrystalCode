@@ -43,8 +43,11 @@ semantics. Do not copy its Demo UI into this product.
 ## Change rules
 
 - Ask before adding a project, a public architectural boundary, or a new
-  provider family. Extra tools and protocols go through `IPlugin` /
-  `PluginRegistry`. Do not load assemblies from disk.
+  provider family. Extra first-party tools and protocols go through
+  `IPlugin` / `PluginRegistry`. Operator tools go through tool sets under
+  `~/.crystal/tools` and `<workspace>/.crystal/tools` (`ExternalCatalog`).
+  Do not load `IPlugin` assemblies from disk. Dotnet tool sets load class
+  libraries from the set directory only.
 - Keep assembly ownership consistent with ARCHITECTURE.md.
 - Write, edit, and bash stay inside the workspace. Read, glob, and
   grep of paths outside the workspace require approval (the Review

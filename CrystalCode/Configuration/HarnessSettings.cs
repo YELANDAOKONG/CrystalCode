@@ -12,6 +12,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultSkills = true;
 
+    public const bool DefaultExternalTools = true;
+
     public HarnessSettings(
         ProviderName provider,
         string model,
@@ -19,7 +21,8 @@ public sealed record HarnessSettings
         double compactionThreshold,
         ProviderCatalog catalog,
         ThinkingSelection? thinkingEffort = null,
-        bool skills = DefaultSkills)
+        bool skills = DefaultSkills,
+        bool externalTools = DefaultExternalTools)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -43,6 +46,7 @@ public sealed record HarnessSettings
         Catalog = catalog;
         ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
         Skills = skills;
+        ExternalTools = externalTools;
     }
 
     public ProviderName Provider { get; }
@@ -58,6 +62,8 @@ public sealed record HarnessSettings
     public ThinkingSelection ThinkingEffort { get; }
 
     public bool Skills { get; }
+
+    public bool ExternalTools { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
 
@@ -110,12 +116,16 @@ public sealed record HarnessSettings
 
     public HarnessSettings WithSkills(bool skills) => Copy(skills: skills);
 
+    public HarnessSettings WithExternalTools(bool externalTools) =>
+        Copy(externalTools: externalTools);
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
         ApprovalMode? approval = null,
         ThinkingSelection? thinkingEffort = null,
-        bool? skills = null) =>
+        bool? skills = null,
+        bool? externalTools = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -123,7 +133,8 @@ public sealed record HarnessSettings
             CompactionThreshold,
             Catalog,
             thinkingEffort ?? ThinkingEffort,
-            skills ?? Skills);
+            skills ?? Skills,
+            externalTools ?? ExternalTools);
 
     public override string ToString() => nameof(HarnessSettings);
 

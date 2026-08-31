@@ -58,7 +58,8 @@ public sealed class SettingsStore
             document.CompactionThreshold ?? defaults.CompactionThreshold,
             catalog,
             thinkingEffort,
-            document.Skills ?? defaults.Skills);
+            document.Skills ?? defaults.Skills,
+            document.ExternalTools ?? defaults.ExternalTools);
     }
 
     public void Save(HarnessSettings settings)
@@ -75,6 +76,7 @@ public sealed class SettingsStore
                 ? null
                 : settings.ThinkingEffort.Value,
             Skills = settings.Skills ? null : false,
+            ExternalTools = settings.ExternalTools ? null : false,
             CompactionThreshold = settings.CompactionThreshold,
             Providers = SettingsMapper.WriteProviders(settings.Catalog)
         };

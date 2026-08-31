@@ -10,6 +10,7 @@ using CrystalCode.Plugins;
 using CrystalCode.Prompts;
 using CrystalCode.Skills;
 using CrystalCode.Tools;
+using CrystalCode.Tools.External;
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Paint;
 
@@ -34,11 +35,13 @@ public sealed class CodingSession
     private readonly TodoList _todos = new();
     private readonly MessageQueue _queue = new();
     private readonly GrantStore _grants;
+    private readonly CrystalHome _home;
     private readonly SkillDiscovery _skillDiscovery;
     private readonly bool _replayOnStart;
     private Workspace _workspace;
     private PromptSet _prompts;
     private SkillCatalog? _skills;
+    private ExternalCatalog _external = ExternalCatalog.Empty;
     private ApprovalMode _approval;
     private ThinkingSelection _thinkingEffort;
     private bool _planMode;
@@ -77,9 +80,11 @@ public sealed class CodingSession
         _approval = settings.Approval;
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
+        _home = home;
         _skillDiscovery = SkillDiscovery.Create(home);
         _prompts = _promptStore.Load(workspace.Root);
         ReloadSkills();
+        ReloadExternalTools();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
@@ -145,6 +150,8 @@ public sealed class CodingSession
         {
             PresentResume();
         }
+
+        WriteExternalNotes();
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
@@ -512,8 +519,10 @@ public sealed class CodingSession
         if (_workspace.TrySetRoot(argument, out var error))
         {
             ReloadSkills();
+            ReloadExternalTools();
             ReloadPrompts();
             RebuildExecutors();
+            WriteExternalNotes();
             _renderer.WriteNote("workspace  " + _workspace.Root);
             return;
         }
@@ -780,16 +789,28 @@ public sealed class CodingSession
             approvalPrompt,
             reviewer,
             _reviewContext,
-            _plugins.Classifiers,
+            [.. _plugins.Classifiers, _external.Classifier],
             _skills);
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         _workExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreateWork(_workspace, _todos, question, _plugins, _skills),
+            WorkspaceCatalog.CreateWork(
+                _workspace,
+                _todos,
+                question,
+                _plugins,
+                _skills,
+                _external),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
         _planExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreatePlan(_workspace, _todos, question, _plugins, _skills),
+            WorkspaceCatalog.CreatePlan(
+                _workspace,
+                _todos,
+                question,
+                _plugins,
+                _skills,
+                _external),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -800,6 +821,19 @@ public sealed class CodingSession
         _skills = _settings.Skills
             ? _skillDiscovery.Collect(_workspace.Root)
             : null;
+    }
+
+    private void ReloadExternalTools()
+    {
+        _external = ExternalCatalog.Load(_home, _workspace, _settings.ExternalTools);
+    }
+
+    private void WriteExternalNotes()
+    {
+        foreach (var note in _external.Notes)
+        {
+            _renderer.WriteNote(note);
+        }
     }
 
     private void BindReviewConversation()

@@ -28,6 +28,8 @@ public sealed class CrystalHome
 
     public string PluginsDirectory => Path.Combine(Root, "plugins");
 
+    public string ToolsDirectory => Path.Combine(Root, "tools");
+
     public string PromptsDirectory => Path.Combine(Root, "prompts");
 
     public string InstructionsPath => Path.Combine(Root, "instructions.md");
@@ -61,5 +63,6 @@ public sealed class CrystalHome
         Directory.CreateDirectory(SessionsDirectory);
         Directory.CreateDirectory(LogsDirectory);
         Directory.CreateDirectory(PluginsDirectory);
+        Directory.CreateDirectory(ToolsDirectory);
     }
 }

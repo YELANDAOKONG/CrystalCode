@@ -156,14 +156,20 @@ public sealed class ApprovalPolicy
             return true;
         }
 
+        if (classification.Risk == Risk.Write)
+        {
+            if (_mode == ApprovalMode.Full)
+            {
+                return true;
+            }
+
+            return toolName is WriteTool.ToolName or EditTool.ToolName
+                && _mode == ApprovalMode.AutoEdit;
+        }
+
         if (toolName == BashTool.ToolName)
         {
             return _mode == ApprovalMode.Full;
-        }
-
-        if (toolName is WriteTool.ToolName or EditTool.ToolName)
-        {
-            return _mode == ApprovalMode.AutoEdit || _mode == ApprovalMode.Full;
         }
 
         return false;

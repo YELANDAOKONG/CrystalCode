@@ -12,6 +12,8 @@ internal sealed class SettingsDocument
 
     public bool? Skills { get; set; }
 
+    public bool? ExternalTools { get; set; }
+
     public double? CompactionThreshold { get; set; }
 
     public Dictionary<string, ProviderDocument>? Providers { get; set; }

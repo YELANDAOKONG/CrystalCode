@@ -15,7 +15,8 @@ From a workspace you want the agent to inspect or change, CrystalCode:
 - streams a model turn with tool calls, and queues follow-ups while a
   turn is running;
 - switches the configured provider and model with `/model`;
-- switches Plan (read-only) and Work (edit, write, shell);
+- switches Plan (built-in reads; no edit, write, or bash) and Work
+  (edit, write, shell);
 - approves side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
 - compact conversation context when usage approaches the selected
@@ -25,8 +26,9 @@ From a workspace you want the agent to inspect or change, CrystalCode:
   operator-added compatible providers.
 
 Built-in tools and the DeepSeek / OpenAI adapters register through the
-same in-process plugin table. Third-party assemblies are not loaded
-from disk.
+same in-process plugin table. Operators add extra catalog tools as
+tool sets under `~/.crystal/tools` and `<workspace>/.crystal/tools`.
+`IPlugin` assemblies are not loaded from `plugins/`.
 
 ## Install
 
@@ -187,6 +189,7 @@ Top-level fields:
 | `approval` | `default`, `autoedit`, `review`, or `full` |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
+| `externalTools` | Enable operator tool set discovery (default `true`) |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `providers` | Named endpoints and their model tables |
 
@@ -358,8 +361,8 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | read, glob, grep, todowrite, question, and skill when enabled | None. Cannot edit files or run a shell. |
-| **Work** | Plan tools plus edit, write, bash | After approval |
+| **Plan** | Built-in read, glob, grep, todowrite, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Work** | Built-in Plan tools plus edit, write, bash, plus external tools listed for Work | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
 
@@ -376,9 +379,9 @@ Grant: Once, Session, Persistent.
 | Mode | Behavior |
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and reads outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
-| **AutoEdit** | Workspace file changes pass without review. Shell and outside-workspace reads still ask. |
-| **Review** | Another model checks each remaining side-effect call, including reads outside the workspace. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
-| **Full** | Workspace-bounded, policy-allowed actions pass without review. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
+| **AutoEdit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and outside-workspace reads still ask. |
+| **Review** | Another model checks each remaining side-effect call, including reads outside the workspace and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
 
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through. `/approval` with no argument cycles Default,
@@ -491,6 +494,45 @@ Practical limits: read up to 1,000,000 characters or 20,000 lines;
 write up to 2 MiB; grep up to 500 matches and 8 MiB per file; glob
 up to 1,000 matches; tool output truncated at 100,000 characters.
 
+## External tools
+
+Operators add extra catalog tools as **tool sets**: one directory, one
+`tools.json`, one runner. Discovery is Crystal-owned only:
+
+```text
+~/.crystal/tools/<directory>/tools.json
+<workspace>/.crystal/tools/<directory>/tools.json
+```
+
+A project directory of the same name replaces the home set as a whole.
+`"enabled": false` in `tools.json` leaves the directory in place without
+loading that set (default `true`). Set `"externalTools": false` in
+`config.json` to skip discovery. When `true`, the field is omitted from
+the written file, same as `skills`.
+
+The set identity is the directory name (1–64 characters, start with a
+letter, then letters, digits, `_`, `.`, `-`). There is no JSON `name`
+or `id`. Each tool's model-facing name is `tools[].name` (exec) or
+`ITool.Definition.Name` (dotnet). Built-in names win. Default
+`catalogs` is Plan and Work; `"catalogs": ["work"]` is Work only.
+
+Runners:
+
+- **exec**: `ProcessStartInfo.ArgumentList`, no shell templates. Stdin
+  is the fenced arguments object (default on). An `argv` map turns
+  scalar properties into flags. Working directory is the workspace
+  root.
+- **dotnet**: a framework-dependent class library that implements
+  `Crystal.Tools.ITool`. Every public non-abstract tool is loaded in
+  one isolated load context for that set. Shared types are `Crystal`
+  and `Crystal.Tools`; other dependencies stay private to the set.
+
+Every external tool is at least Write + Workspace and still goes
+through `ToolInvocationPolicy`. Full auto-passes a workspace-bounded
+external write; AutoEdit does not. Details, manifest fields, and the
+dotnet publish layout are in
+[docs/external-tools.md](docs/external-tools.md).
+
 ## Prompts and instructions
 
 Crystal is prompt-neutral. Every model-bound string this product
@@ -576,10 +618,10 @@ Project, walking from the workspace up to the git root:
 3. `.opencode/{skill,skills}/<name>/SKILL.md`
 4. `.crystal/{skill,skills}/<name>/SKILL.md`
 
-`/cd` reloads skills from the new workspace. `/cd` and resume also
-reload prompts from the current workspace. Resume refreshes the first
-system message from the current prompt files, the current `<env>`
-block, and current skill guidance.
+`/cd` reloads skills and external tool sets from the new workspace. `/cd`
+and resume also reload prompts from the current workspace. Resume
+refreshes the first system message from the current prompt files, the
+current `<env>` block, and current skill guidance.
 
 ## Sessions
 
@@ -643,12 +685,14 @@ Override with `CRYSTAL_HOME` or `--home`.
     review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  tools/<directory>/tools.json
   sessions/<id>.json
   logs/
   plugins/
 ```
 
-Project overlay (named prompts and Crystal skills win over home):
+Project overlay (named prompts, Crystal skills, and tool sets of the
+same directory name win over home):
 
 ```text
 <workspace>/.crystal/
@@ -659,13 +703,14 @@ Project overlay (named prompts and Crystal skills win over home):
     review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  tools/<directory>/tools.json
 <workspace>/.crystal.md
 <workspace>/AGENTS.md
 ```
 
-`plugins/` is reserved. The current product only registers
-in-process contributions and does not load assemblies from that
-directory.
+`plugins/` is reserved. The current product does not load `IPlugin`
+assemblies from that directory. Dotnet tool sets load class libraries
+from the set directory only.
 
 ## Environment variables
 
@@ -698,3 +743,4 @@ lists.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — ownership and runtime
 - [STANDARDS.md](STANDARDS.md) — engineering rules
 - [AGENTS.md](AGENTS.md) — instructions for coding agents
+- [docs/external-tools.md](docs/external-tools.md) — operator tool sets
