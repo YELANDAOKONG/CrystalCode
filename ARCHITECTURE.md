@@ -250,8 +250,14 @@ a baseline. `/clear` starts a new id.
 
 ## Home directory
 
+Self-contained release archives are named
+`CrystalHarness-<operating-system>-<architecture>.zip`. The supported values
+are `linux-x64`, `linux-arm64`, `macos-arm64`, and `windows-x64`. The platform
+installers replace only the matching executable under `binaries/code/`.
+
 ```text
 ~/.crystal/
+  binaries/code/CrystalHarness (CrystalHarness.exe on Windows)
   config.json
   credentials.json
   permissions.json

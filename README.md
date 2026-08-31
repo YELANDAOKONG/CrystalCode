@@ -27,6 +27,35 @@ Built-in tools and the DeepSeek / OpenAI adapters register through the
 same in-process plugin table. Third-party assemblies are not loaded
 from disk.
 
+## Install
+
+The latest self-contained release can be installed on Linux x64, Linux ARM64,
+macOS ARM64, or Windows x64. The installers download the matching standard
+release asset, `CrystalHarness-<os>-<architecture>.zip`, then replace the
+matching executable in `~/.crystal/binaries/code/`.
+
+On Linux or macOS, download and inspect the installer, then run it:
+
+```bash
+curl --fail --location --show-error --output install.sh \
+  https://raw.githubusercontent.com/YELANDAOKONG/CrystalHarness/master/scripts/install.sh
+sh install.sh
+```
+
+On Windows PowerShell:
+
+```powershell
+Invoke-WebRequest `
+  -Uri https://raw.githubusercontent.com/YELANDAOKONG/CrystalHarness/master/scripts/install.ps1 `
+  -OutFile install.ps1
+.\install.ps1
+```
+
+The installers do not write credentials, edit shell profiles, or modify PATH.
+Run `~/.crystal/binaries/code/CrystalHarness` on Linux or macOS, or
+`~/.crystal/binaries/code/CrystalHarness.exe` on Windows. Add that directory to
+your own PATH if you want to invoke it by name.
+
 ## What it does not do
 
 The current product does not include MCP servers, a headless CI runner,
@@ -36,13 +65,16 @@ DeepSeek and OpenAI-compatible.
 
 ## Requirements
 
-- .NET 10 SDK
-- A sibling checkout of Crystal at `../Crystal` (relative to this
-  repository root)
 - An API key for the selected provider, supplied through configuration
   or the environment (see [Credentials](#credentials))
 - A TTY for the interactive alternate-screen UI
 - `bash` on the `PATH` (Git Bash is used on Windows when present)
+
+Building from source also requires:
+
+- .NET 10 SDK
+- A sibling checkout of Crystal at `../Crystal` (relative to this
+  repository root)
 
 ## Build
 
@@ -569,6 +601,7 @@ Override with `CRYSTAL_HOME` or `--home`.
 
 ```text
 ~/.crystal/
+  binaries/code/CrystalHarness (CrystalHarness.exe on Windows)
   config.json
   credentials.json
   permissions.json

@@ -15,10 +15,13 @@ jobs:
         include:
           - os: windows-latest
             rid: win-x64
-            artifact: win64
+            artifact: windows-x64
           - os: ubuntu-latest
             rid: linux-x64
-            artifact: linux64
+            artifact: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+            artifact: linux-arm64
           - os: macos-latest
             rid: osx-arm64
             artifact: macos-arm64
@@ -59,9 +62,22 @@ jobs:
           -p:PublishSingleFile=true
           --output ./publish
 
+      - name: Archive published binary
+        if: runner.os != 'Windows'
+        working-directory: CrystalHarness
+        run: >
+          zip -q -r CrystalHarness-${{ matrix.artifact }}.zip publish
+
+      - name: Archive published binary
+        if: runner.os == 'Windows'
+        working-directory: CrystalHarness
+        run: >
+          Compress-Archive -Path .\publish\* -DestinationPath
+          CrystalHarness-${{ matrix.artifact }}.zip
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: CrystalHarness-${{ matrix.artifact }}
-          path: CrystalHarness/publish/
+          path: CrystalHarness/CrystalHarness-${{ matrix.artifact }}.zip
           if-no-files-found: error
