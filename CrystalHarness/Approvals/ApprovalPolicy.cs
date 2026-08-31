@@ -77,9 +77,7 @@ public sealed class ApprovalPolicy
         }
 
         ApprovalReviewVerdict? pendingReview = null;
-        if (_mode == ApprovalMode.Review
-            && _reviewer is not null
-            && ReviewTranscript.HasAuthorization(_reviewContext?.Conversation))
+        if (ShouldReview(classification))
         {
             var reviewed = await TryReviewAsync(call, classification, cancellationToken);
             if (reviewed.Decision is not null)
@@ -138,6 +136,12 @@ public sealed class ApprovalPolicy
 
         return (null, verdict);
     }
+
+    private bool ShouldReview(ToolClassification classification) =>
+        _mode == ApprovalMode.Review
+        && _reviewer is not null
+        && classification.Risk != Risk.Read
+        && ReviewTranscript.HasAuthorization(_reviewContext?.Conversation);
 
     private bool CanPassWithoutReview(string toolName, ToolClassification classification)
     {

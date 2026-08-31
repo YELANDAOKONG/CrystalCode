@@ -338,7 +338,7 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and reads outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
 | **AutoEdit** | Workspace file changes pass without review. Shell and outside-workspace reads still ask. |
-| **Review** | Another model checks each remaining side-effect call, including reads outside the workspace (Skills search directories auto-pass when Skills is enabled). A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Review** | Another model checks remaining side-effect calls (edit, write, bash). Reads never go to this reviewer; outside-workspace reads ask you. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
 
 Do not name a mode `auto`. That word is ambiguous between review and
@@ -406,7 +406,7 @@ that already exists.
 Filesystem and shell writes are fenced to the workspace root. Paths
 that escape the root are rejected for `edit`, `write`, and `bash`.
 `read`, `glob`, and `grep` may use an absolute path outside the
-workspace after approval (including Review). Credential paths
+workspace after you approve it. Credential paths
 (`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob and grep
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
 files are rejected for read/edit (NUL probe). Shell working directory
@@ -480,10 +480,10 @@ prompt overlays. The model sees a list of available skills and loads
 one with the `skill` tool. When Skills is enabled, `read`/`glob`/`grep`
 of any path inside a Skills search directory (`skill` / `skills`
 trees, including scripts and other files that are not `SKILL.md`)
-auto-passes; it does not ask you or the Review model. Set
-`"skills": false` in `config.json` to disable the tool, the guidance,
-and that auto-pass. Other files outside the workspace still need
-approval.
+auto-passes; it does not ask you. Set `"skills": false` in
+`config.json` to disable the tool, the guidance, and that auto-pass.
+Other files outside the workspace still ask you. The Review model
+does not judge reads.
 
 Each skill is a directory with a `SKILL.md` that starts with YAML
 frontmatter (`name` and `description` required). `name` must match
