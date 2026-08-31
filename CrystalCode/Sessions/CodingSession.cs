@@ -608,11 +608,20 @@ public sealed class CodingSession
         CancellationToken cancellationToken)
     {
         _renderer.WriteNote("compacting context...");
-        var outcome = await _compactor.CompactAsync(
-            transcript,
-            _todos.Format(),
-            CurrentLimits(),
-            cancellationToken);
+        _renderer.SetProgress(ProgressText.Compacting);
+        CompactionOutcome outcome;
+        try
+        {
+            outcome = await _compactor.CompactAsync(
+                transcript,
+                _todos.Format(),
+                CurrentLimits(),
+                cancellationToken);
+        }
+        finally
+        {
+            _renderer.SetProgress(_turnActive ? ProgressText.WaitingForModel : string.Empty);
+        }
         if (outcome.Kind == CompactionKind.Applied)
         {
             if (ReferenceEquals(transcript, _transcript))

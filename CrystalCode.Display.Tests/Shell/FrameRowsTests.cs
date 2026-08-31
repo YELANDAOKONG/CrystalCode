@@ -30,6 +30,32 @@ public sealed class FrameRowsTests
     }
 
     [Fact]
+    public void Assemble_PlacesProgressImmediatelyAboveStatus()
+    {
+        var regions = ShellLayout.Measure(
+            20,
+            10,
+            composerWanted: 1,
+            overlayWanted: 0,
+            queueWanted: 0,
+            progressWanted: 1);
+        var composer = new ComposerView([PaintLine.Colored("grey50", "work")], 0, 1);
+
+        var frame = FrameRows.Assemble(
+            regions,
+            [PaintLine.Colored("grey84", "log")],
+            [],
+            PaintLine.Colored("grey50", "status"),
+            [],
+            composer,
+            PaintLine.Colored("lightsteelblue", "  Awaiting Approval"));
+
+        Assert.Equal("  Awaiting Approval", frame[regions.ProgressTop].Plain);
+        Assert.Equal("status", frame[regions.StatusTop].Plain);
+        Assert.Equal(regions.ProgressTop + 1, regions.StatusTop);
+    }
+
+    [Fact]
     public void Dirty_AllRowsWhenPreviousMissingOrSizeChanges()
     {
         var current = new[] { PaintLine.Colored("grey50", "a"), PaintLine.Blank };

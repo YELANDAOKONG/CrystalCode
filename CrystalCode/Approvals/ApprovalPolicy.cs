@@ -114,6 +114,7 @@ public sealed class ApprovalPolicy
             call,
             classification,
             ReviewTranscript.Render(_reviewContext?.Conversation));
+        _prompt.NotifyReviewing(call);
         var verdict = await _reviewer!.ReviewAsync(request, cancellationToken);
         if (verdict.IsDeny)
         {

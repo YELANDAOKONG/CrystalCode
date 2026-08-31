@@ -14,7 +14,8 @@ public static class FrameRows
         IReadOnlyList<PaintLine> overlay,
         PaintLine status,
         IReadOnlyList<PaintLine> queue,
-        ComposerView composer)
+        ComposerView composer,
+        PaintLine? progress = null)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(overlay);
@@ -24,6 +25,16 @@ public static class FrameRows
         var row = 0;
         row = CopyBlock(lines, transcript, regions.TranscriptRows, regions.Width, row, regions.Height);
         row = CopyBlock(lines, overlay, regions.OverlayRows, regions.Width, row, regions.Height);
+        if (regions.ProgressRows > 0)
+        {
+            if (row >= 0 && row < regions.Height)
+            {
+                lines[row] = (progress ?? PaintLine.Blank).Fit(regions.Width);
+            }
+
+            row++;
+        }
+
         if (row >= 0 && row < regions.Height)
         {
             lines[row] = status.Fit(regions.Width);

@@ -72,6 +72,7 @@ public sealed class ApprovalPolicyTests
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
         Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(1, prompt.ReviewCount);
         Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
         Assert.NotNull(reviewer.LastRequest);
         Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
@@ -227,6 +228,7 @@ public sealed class ApprovalPolicyTests
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
         Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(1, prompt.ReviewCount);
         Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
         Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
         Assert.NotNull(prompt.LastReview);

@@ -24,13 +24,14 @@ public sealed class ScreenPainter
         PaintLine status,
         IReadOnlyList<PaintLine> queue,
         ComposerView composer,
-        bool resetFrame = false)
+        bool resetFrame = false,
+        PaintLine? progress = null)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(overlay);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
-        var frame = FrameRows.Assemble(regions, transcript, overlay, status, queue, composer);
+        var frame = FrameRows.Assemble(regions, transcript, overlay, status, queue, composer, progress);
         var rewriteAll = resetFrame || _previous is null || _previous.Length != frame.Count;
         var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame);
         AnsiConsole.Cursor.Hide();

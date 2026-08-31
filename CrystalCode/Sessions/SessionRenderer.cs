@@ -313,6 +313,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 ? string.Empty
                 : UsageText.FormatElapsed(_turnClock.Elapsed);
             _chrome.Activity = string.Empty;
+            _chrome.Progress = string.Empty;
             if (result.StopReason != TurnStopReason.Completed)
             {
                 _log.Add(TranscriptKind.Note, result.StopReason.Value);
@@ -359,7 +360,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             CommitLiveUnlocked();
             _turnClock = Stopwatch.StartNew();
             _toolName = string.Empty;
-            _chrome.Activity = "Running";
+            SetTurnActivityUnlocked("Running", ProgressText.WaitingForModel);
             _chrome.ToolCount = 0;
             _chrome.Elapsed = string.Empty;
             PaintUnlocked(force: true);
@@ -375,14 +376,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Thinking);
                     _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
-                    _chrome.Activity = "Thinking";
+                    SetTurnActivityUnlocked("Thinking", ProgressText.Thinking);
                     WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
                     PaintUnlocked(force: false);
                     break;
                 case ChatTextDelta text when text.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Assistant);
                     _log.AppendLive(TranscriptKind.Assistant, text.Text);
-                    _chrome.Activity = "Writing";
+                    SetTurnActivityUnlocked("Writing", ProgressText.Writing);
                     WriteFallbackDelta(TranscriptKind.Assistant, text.Text);
                     PaintUnlocked(force: false);
                     break;
@@ -390,7 +391,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                     if (toolCall.NameDelta.Length > 0)
                     {
                         _toolName = StreamName.Apply(_toolName, toolCall.NameDelta);
-                        _chrome.Activity = DisplayCase.Token(_toolName);
+                        SetTurnActivityUnlocked(
+                            DisplayCase.Token(_toolName),
+                            ProgressText.Calling(_toolName));
                     }
 
                     PaintUnlocked(force: false);
@@ -425,7 +428,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
             if (calls.Count > 0)
             {
-                _chrome.Activity = DisplayCase.Token(calls[^1].Name);
+                SetTurnActivityUnlocked(
+                    DisplayCase.Token(calls[^1].Name),
+                    ProgressText.Running(calls[0].Name));
                 PaintUnlocked(force: true);
             }
         }
@@ -447,7 +452,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             }
 
             _chrome.ToolCount += results.Count;
-            _chrome.Activity = "Running";
+            SetTurnActivityUnlocked("Running", ProgressText.WaitingForModel);
             PaintUnlocked(force: true);
         }
 
@@ -514,6 +519,16 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             _modalOverlay.Clear();
             _overlayWidget = null;
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void SetProgress(string progress)
+    {
+        ArgumentNullException.ThrowIfNull(progress);
+        lock (_gate)
+        {
+            _chrome.Progress = progress;
             PaintUnlocked(force: true);
         }
     }
@@ -884,12 +899,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
         var overlay = OverlayLines(ScreenSize.Width);
         var queue = QueueLines(ScreenSize.Width);
+        var progressWanted = string.IsNullOrWhiteSpace(_chrome.Progress) ? 0 : 1;
         var regions = ShellLayout.Measure(
             ScreenSize.Width,
             ScreenSize.Height,
             composerView.Lines.Count,
             overlay.Count,
-            queue.Count);
+            queue.Count,
+            progressWanted);
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
         var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;
@@ -900,7 +917,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.StatusLine(regions.Width),
             queue,
             composerView,
-            resetFrame);
+            resetFrame,
+            progressWanted == 0 ? null : _chrome.ProgressLine(regions.Width));
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
         _lastPaint = now;
@@ -936,12 +954,20 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private ShellRegions CurrentRegions()
     {
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
+        var progressWanted = string.IsNullOrWhiteSpace(_chrome.Progress) ? 0 : 1;
         return ShellLayout.Measure(
             ScreenSize.Width,
             ScreenSize.Height,
             composerView.Lines.Count,
             OverlayLines(ScreenSize.Width).Count,
-            QueueLines(ScreenSize.Width).Count);
+            QueueLines(ScreenSize.Width).Count,
+            progressWanted);
+    }
+
+    private void SetTurnActivityUnlocked(string activity, string progress)
+    {
+        _chrome.Activity = activity;
+        _chrome.Progress = progress;
     }
 
     private bool Framed => _screen is { IsActive: true };

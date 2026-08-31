@@ -1,7 +1,7 @@
 namespace CrystalCode.Display.Shell;
 
 /// <summary>
-/// Splits the terminal into transcript, overlay, status, queue, and composer.
+/// Splits the terminal into transcript, overlay, progress, status, queue, and composer.
 /// </summary>
 public static class ShellLayout
 {
@@ -22,29 +22,33 @@ public static class ShellLayout
         int height,
         int composerWanted,
         int overlayWanted,
-        int queueWanted = 0)
+        int queueWanted = 0,
+        int progressWanted = 0)
     {
         width = Math.Max(width, MinWidth);
         height = Math.Max(height, MinHeight);
-        var floor = MinTranscriptRows + StatusRows + 1;
+        var progress = Math.Clamp(progressWanted, 0, 1);
+        var chrome = StatusRows + progress;
+        var floor = MinTranscriptRows + chrome + 1;
         var overlay = Math.Clamp(overlayWanted, 0, Math.Max(0, height - floor));
         var queue = Math.Clamp(queueWanted, 0, Math.Min(MaxQueueRows, Math.Max(0, height - floor - overlay)));
         var composer = Math.Clamp(composerWanted, 1, MaxComposerRows);
-        var transcript = height - StatusRows - overlay - queue - composer;
+        var transcript = height - chrome - overlay - queue - composer;
         if (transcript < MinTranscriptRows)
         {
-            composer = Math.Max(1, height - MinTranscriptRows - StatusRows - overlay - queue);
-            transcript = height - StatusRows - overlay - queue - composer;
+            composer = Math.Max(1, height - MinTranscriptRows - chrome - overlay - queue);
+            transcript = height - chrome - overlay - queue - composer;
             if (transcript < MinTranscriptRows)
             {
-                queue = Math.Max(0, height - MinTranscriptRows - StatusRows - overlay - 1);
-                composer = Math.Max(1, height - MinTranscriptRows - StatusRows - overlay - queue);
-                transcript = height - StatusRows - overlay - queue - composer;
+                queue = Math.Max(0, height - MinTranscriptRows - chrome - overlay - 1);
+                composer = Math.Max(1, height - MinTranscriptRows - chrome - overlay - queue);
+                transcript = height - chrome - overlay - queue - composer;
             }
         }
 
         var overlayTop = transcript;
-        var statusTop = overlayTop + overlay;
+        var progressTop = overlayTop + overlay;
+        var statusTop = progressTop + progress;
         var queueTop = statusTop + StatusRows;
         var composerTop = queueTop + queue;
         return new ShellRegions(
@@ -53,6 +57,8 @@ public static class ShellLayout
             transcript,
             overlay,
             overlayTop,
+            progress,
+            progressTop,
             statusTop,
             queue,
             queueTop,

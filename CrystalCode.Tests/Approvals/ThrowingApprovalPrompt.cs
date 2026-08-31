@@ -21,4 +21,8 @@ internal sealed class ThrowingApprovalPrompt : IApprovalPrompt
         ApprovalReviewVerdict? review = null)
     {
     }
+
+    public void NotifyReviewing(ToolCall call)
+    {
+    }
 }

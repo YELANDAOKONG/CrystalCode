@@ -18,6 +18,8 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
 
     public int PassCount { get; private set; }
 
+    public int ReviewCount { get; private set; }
+
     public ApprovalPassReason? LastPassReason { get; private set; }
 
     public ValueTask<ApprovalChoice> AskAsync(
@@ -46,6 +48,12 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
         LastPassReason = reason;
         LastClassification = classification;
         LastReview = review;
+    }
+
+    public void NotifyReviewing(ToolCall call)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        ReviewCount++;
     }
 
     public ToolClassification? LastClassification { get; private set; }

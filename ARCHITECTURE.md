@@ -102,7 +102,7 @@ CrystalCode.Display:
 | Folder | Owns |
 | :--- | :--- |
 | `Input` | Decode ReadKey bursts into keys, paste, and wheel events |
-| `Shell` | Alternate screen, painter, layout, key burst, scroll policy, status chrome |
+| `Shell` | Alternate screen, painter, layout, key burst, scroll policy, status and progress chrome |
 | `Composer` | Prompt buffer, keys, slash picker |
 | `Cards` | Queue overlay |
 | `Transcript` | Viewport log, role cards, sequential fallback |
@@ -439,7 +439,8 @@ color, panels, grids, rules, and padding as an offline rasterizer.
 `AnsiConsole.Live` is not the session shell: it fights the composer.
 Widgets are rasterized into frame rows. The shell enters the alternate
 screen when the terminal is a TTY and paints a retained frame: transcript
-viewport, optional overlay, status bar, and multiline composer. Unchanged
+viewport, optional overlay, optional progress row, status bar, and multiline
+composer. Unchanged
 rows are left in place; a width or height change clears the buffer. The
 executable maps turns onto that frame through `SessionRenderer`; it does
 not paint rows itself.
@@ -454,7 +455,12 @@ thinking is on), model, workspace, context percent (`CTX`),
 token counts (`IN` / `OUT`), tool count (`Tool` / `Tools`), and
 elapsed time. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode is Plan or Work on the
-composer prompt and is not repeated on the status bar. Assistant text is
+composer prompt and is not repeated on the status bar. While a turn
+runs, a progress row sits directly above the status bar
+(`Waiting For Model`, `Thinking`, `Writing`, `Running Command`,
+`Awaiting Approval`, `Reviewing`, `Waiting For Answer`,
+`Compacting`). It is independent of the status-bar activity bullet
+(`• Bash`). The row is omitted when idle. Assistant text is
 rendered as markdown while it streams and after it commits (headings,
 lists, fenced code with a dim code background, inline code and bold).
 User, thinking, tool, and result blocks are rounded panels. A live turn

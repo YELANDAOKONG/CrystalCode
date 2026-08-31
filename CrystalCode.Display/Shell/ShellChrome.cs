@@ -3,7 +3,7 @@ using CrystalCode.Display.Paint;
 namespace CrystalCode.Display.Shell;
 
 /// <summary>
-/// Persistent status-bar fields for one session.
+/// Persistent chrome fields for one session: status bar and progress row.
 /// </summary>
 public sealed class ShellChrome
 {
@@ -20,6 +20,8 @@ public sealed class ShellChrome
     public string Usage { get; set; } = "CTX --";
 
     public string Activity { get; set; } = string.Empty;
+
+    public string Progress { get; set; } = string.Empty;
 
     public int ToolCount { get; set; }
 
@@ -144,5 +146,21 @@ public sealed class ShellChrome
 
         var fittedMarkup = "  " + string.Join(SepMarkup, items.Select(x => x.Markup));
         return new PaintLine(fittedMarkup, fittedPlain);
+    }
+
+    public PaintLine ProgressLine(int width)
+    {
+        if (string.IsNullOrWhiteSpace(Progress))
+        {
+            return PaintLine.Blank;
+        }
+
+        var plain = "  " + Progress;
+        if (TextWidth.Measure(plain) > width)
+        {
+            plain = TextWidth.Truncate(plain, width);
+        }
+
+        return new PaintLine($"[{Theme.Accent} bold]{MarkupText.Escape(plain)}[/]", plain);
     }
 }

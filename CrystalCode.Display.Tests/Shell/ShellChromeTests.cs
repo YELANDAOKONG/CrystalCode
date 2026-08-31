@@ -117,4 +117,34 @@ public sealed class ShellChromeTests
         Assert.Contains("6 Tools", many.StatusLine(80).Plain, StringComparison.Ordinal);
         Assert.DoesNotContain("6 tools", many.StatusLine(80).Plain, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ProgressLine_EmptyWhenIdle()
+    {
+        var chrome = new ShellChrome { Progress = string.Empty };
+
+        Assert.Equal(PaintLine.Blank, chrome.ProgressLine(80));
+    }
+
+    [Fact]
+    public void ProgressLine_SitsIndependentOfStatusActivity()
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Review",
+            Activity = "Bash",
+            Progress = "Awaiting Approval",
+            Model = "deepseek-v4-flash",
+            Usage = "CTX --"
+        };
+
+        var status = chrome.StatusLine(120);
+        var progress = chrome.ProgressLine(80);
+
+        Assert.Contains("• Bash", status.Plain, StringComparison.Ordinal);
+        Assert.Contains("Review", status.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Awaiting Approval", status.Plain, StringComparison.Ordinal);
+        Assert.Contains("Awaiting Approval", progress.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("• Bash", progress.Plain, StringComparison.Ordinal);
+    }
 }

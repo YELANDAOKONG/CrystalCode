@@ -29,6 +29,7 @@ public sealed class QuestionPrompt : IUserPrompt
         ArgumentException.ThrowIfNullOrWhiteSpace(question);
         _renderer.CloseStream();
         _renderer.PauseComposer();
+        _renderer.SetProgress(ProgressText.WaitingForAnswer);
         _renderer.SetOverlay(CardWidget(question, options));
         try
         {
@@ -69,6 +70,7 @@ public sealed class QuestionPrompt : IUserPrompt
         {
             _renderer.ClearOverlay();
             _renderer.ResumeComposer();
+            _renderer.SetProgress(ProgressText.WaitingForModel);
         }
     }
 

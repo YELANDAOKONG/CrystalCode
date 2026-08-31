@@ -2,10 +2,10 @@ using Crystal.Tools;
 
 namespace CrystalCode.Approvals.Interfaces;
 
-/// <summary>
-/// Asks the operator to approve or deny one classified tool call.
-/// Auto-pass also reports through this surface so the shell can print it.
-/// </summary>
+    /// <summary>
+    /// Asks the operator to approve or deny one classified tool call.
+    /// Auto-pass also reports through this surface so the shell can print it.
+    /// </summary>
 public interface IApprovalPrompt
 {
     ValueTask<ApprovalChoice> AskAsync(
@@ -19,4 +19,9 @@ public interface IApprovalPrompt
         ToolClassification classification,
         ApprovalPassReason reason,
         ApprovalReviewVerdict? review = null);
+
+    /// <summary>
+    /// The review model is about to judge this call.
+    /// </summary>
+    void NotifyReviewing(ToolCall call);
 }
