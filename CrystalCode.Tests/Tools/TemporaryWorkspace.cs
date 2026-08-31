@@ -15,9 +15,23 @@ internal sealed class TemporaryWorkspace : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(Path))
+        if (!Directory.Exists(Path))
+        {
+            return;
+        }
+
+        try
         {
             Directory.Delete(Path, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Loaded tool assemblies stay mapped in a non-collectible
+            // AssemblyLoadContext until process exit. Recursive delete then
+            // fails (Windows access denied; Unix EBUSY or directory not empty).
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 }

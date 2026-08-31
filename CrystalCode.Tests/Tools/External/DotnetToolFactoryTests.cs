@@ -252,6 +252,8 @@ public sealed class DotnetToolFactoryTests
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        start.Environment["MSBUILDDISABLENODEREUSE"] = "1";
+        start.Environment["DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER"] = "1";
         start.ArgumentList.Add("publish");
         start.ArgumentList.Add("-c");
         start.ArgumentList.Add("Release");
