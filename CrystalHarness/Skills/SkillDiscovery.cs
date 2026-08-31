@@ -47,57 +47,79 @@ public sealed class SkillDiscovery
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var skills = new Dictionary<string, SkillInfo>(StringComparer.Ordinal);
+        var readRoots = new HashSet<string>(StringComparer.Ordinal);
         var workspace = Path.GetFullPath(workspaceRoot);
         var ancestors = EnumerateToGitRoot(workspace);
 
         if (_userProfile is not null)
         {
-            ScanExternal(skills, Path.Combine(_userProfile, SkillFiles.ClaudeDirectory));
-            ScanExternal(skills, Path.Combine(_userProfile, SkillFiles.AgentsDirectory));
+            ScanExternal(skills, readRoots, Path.Combine(_userProfile, SkillFiles.ClaudeDirectory));
+            ScanExternal(skills, readRoots, Path.Combine(_userProfile, SkillFiles.AgentsDirectory));
         }
 
         foreach (var directory in ancestors)
         {
-            ScanExternal(skills, Path.Combine(directory, SkillFiles.ClaudeDirectory));
-            ScanExternal(skills, Path.Combine(directory, SkillFiles.AgentsDirectory));
+            ScanExternal(skills, readRoots, Path.Combine(directory, SkillFiles.ClaudeDirectory));
+            ScanExternal(skills, readRoots, Path.Combine(directory, SkillFiles.AgentsDirectory));
         }
 
         if (_configDirectory is not null)
         {
-            ScanConfig(skills, Path.Combine(_configDirectory, SkillFiles.OpenCodeConfigName));
+            ScanConfig(skills, readRoots, Path.Combine(_configDirectory, SkillFiles.OpenCodeConfigName));
         }
 
         foreach (var directory in ancestors)
         {
-            ScanConfig(skills, Path.Combine(directory, SkillFiles.OpenCodeDirectory));
+            ScanConfig(skills, readRoots, Path.Combine(directory, SkillFiles.OpenCodeDirectory));
         }
 
         if (_userProfile is not null)
         {
-            ScanConfig(skills, Path.Combine(_userProfile, SkillFiles.OpenCodeDirectory));
+            ScanConfig(skills, readRoots, Path.Combine(_userProfile, SkillFiles.OpenCodeDirectory));
         }
 
-        ScanConfig(skills, _home.Root);
+        ScanConfig(skills, readRoots, _home.Root);
         foreach (var directory in ancestors)
         {
-            ScanConfig(skills, Path.Combine(directory, SkillFiles.CrystalDirectory));
+            ScanConfig(skills, readRoots, Path.Combine(directory, SkillFiles.CrystalDirectory));
         }
 
-        return new SkillCatalog(skills.Values);
+        return new SkillCatalog(skills.Values, readRoots);
     }
 
-    private static void ScanExternal(Dictionary<string, SkillInfo> skills, string root) =>
-        ScanTree(skills, Path.Combine(root, SkillFiles.DirectoryName));
+    private static void ScanExternal(
+        Dictionary<string, SkillInfo> skills,
+        HashSet<string> readRoots,
+        string root) =>
+        ScanTree(skills, readRoots, Path.Combine(root, SkillFiles.DirectoryName));
 
-    private static void ScanConfig(Dictionary<string, SkillInfo> skills, string root)
+    private static void ScanConfig(
+        Dictionary<string, SkillInfo> skills,
+        HashSet<string> readRoots,
+        string root)
     {
-        ScanTree(skills, Path.Combine(root, SkillFiles.AlternateDirectoryName));
-        ScanTree(skills, Path.Combine(root, SkillFiles.DirectoryName));
+        ScanTree(skills, readRoots, Path.Combine(root, SkillFiles.AlternateDirectoryName));
+        ScanTree(skills, readRoots, Path.Combine(root, SkillFiles.DirectoryName));
     }
 
-    private static void ScanTree(Dictionary<string, SkillInfo> skills, string root)
+    private static void ScanTree(
+        Dictionary<string, SkillInfo> skills,
+        HashSet<string> readRoots,
+        string root)
     {
-        if (!Directory.Exists(root))
+        string fullRoot;
+        try
+        {
+            fullRoot = Path.GetFullPath(root);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        {
+            return;
+        }
+
+        readRoots.Add(fullRoot);
+
+        if (!Directory.Exists(fullRoot))
         {
             return;
         }
@@ -105,7 +127,7 @@ public sealed class SkillDiscovery
         string[] files;
         try
         {
-            files = Directory.GetFiles(root, SkillFiles.FileName, SearchOption.AllDirectories);
+            files = Directory.GetFiles(fullRoot, SkillFiles.FileName, SearchOption.AllDirectories);
         }
         catch (IOException)
         {

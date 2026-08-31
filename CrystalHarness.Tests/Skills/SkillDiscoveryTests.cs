@@ -72,6 +72,32 @@ public sealed class SkillDiscoveryTests
     }
 
     [Fact]
+    public void Collect_TreatsEntireSkillsTreeAsReadable()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        var skillsRoot = Path.Combine(home.Home.Root, "profile", ".agents", "skills");
+        WriteSkill(skillsRoot, "agents-global", "Agents global skill.");
+        var loose = Path.Combine(skillsRoot, "notes.md");
+        var nested = Path.Combine(skillsRoot, "agents-global", "scripts", "setup.sh");
+        Directory.CreateDirectory(Path.GetDirectoryName(nested)!);
+        File.WriteAllText(loose, "extra");
+        File.WriteAllText(nested, "echo");
+        var outside = Path.Combine(home.Home.Root, "profile", ".agents", "other.txt");
+        File.WriteAllText(outside, "no");
+        var discovery = SkillDiscovery.Isolated(home.Home);
+
+        var catalog = discovery.Collect(workspace.Path);
+
+        Assert.True(catalog.ContainsReadablePath(skillsRoot));
+        Assert.True(catalog.ContainsReadablePath(loose));
+        Assert.True(catalog.ContainsReadablePath(nested));
+        Assert.False(catalog.ContainsReadablePath(outside));
+        Assert.False(catalog.ContainsReadablePath(Path.Combine(home.Home.Root, "profile", ".agents")));
+    }
+
+    [Fact]
     public void Collect_ProjectCrystalOverwritesGlobalAndOpenCode()
     {
         using var home = new TemporaryHome();

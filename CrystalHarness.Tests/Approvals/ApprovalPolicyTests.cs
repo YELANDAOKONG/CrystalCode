@@ -3,6 +3,7 @@ using Crystal.Tools;
 
 using CrystalHarness.Approvals;
 using CrystalHarness.Approvals.Interfaces;
+using CrystalHarness.Skills;
 using CrystalHarness.Tests.Home;
 using CrystalHarness.Tests.Tools;
 using CrystalHarness.Tools;
@@ -28,6 +29,139 @@ public sealed class ApprovalPolicyTests
         Assert.Equal(1, prompt.PassCount);
         Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
         Assert.Equal(Risk.Read, prompt.LastClassification?.Risk);
+        Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Default_AsksForOutsideRead()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Default);
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "note.txt");
+        File.WriteAllText(file, "hello");
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
+        var policy = context.CreatePolicy(prompt);
+        var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", ReadTool.ToolName, json));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(1, prompt.Count);
+        Assert.Equal(0, prompt.PassCount);
+        Assert.Equal(Risk.Read, prompt.LastClassification?.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Review_AllowsOutsideReadWhenReviewerAllows()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Review);
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "note.txt");
+        File.WriteAllText(file, "hello");
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(
+            prompt,
+            new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("skill file is in scope")));
+        var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", ReadTool.ToolName, json));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Full_StillAsksForOutsideRead()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Full);
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "note.txt");
+        File.WriteAllText(file, "hello");
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
+        var policy = context.CreatePolicy(prompt);
+        var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", ReadTool.ToolName, json));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(1, prompt.Count);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Plan_AsksForOutsideRead()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Plan);
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "note.txt");
+        File.WriteAllText(file, "hello");
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
+        var policy = context.CreatePolicy(prompt);
+        var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", ReadTool.ToolName, json));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(1, prompt.Count);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Default_AutoExecutesSkillsDirectoryRead()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Default);
+        using var outside = new TemporaryWorkspace();
+        var skillsRoot = Path.Combine(outside.Path, "skills");
+        Directory.CreateDirectory(skillsRoot);
+        var loose = Path.Combine(skillsRoot, "notes.md");
+        File.WriteAllText(loose, "extra");
+        var catalog = new SkillCatalog([], [skillsRoot]);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(prompt, skills: catalog);
+        var json = "{\"path\":\"" + loose.Replace("\\", "/") + "\"}";
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", ReadTool.ToolName, json));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
+        Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Review_AutoExecutesSkillsDirectoryRead()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Review);
+        using var outside = new TemporaryWorkspace();
+        var skillsRoot = Path.Combine(outside.Path, "skills");
+        Directory.CreateDirectory(skillsRoot);
+        var nested = Path.Combine(skillsRoot, "demo-skill", "scripts", "setup.sh");
+        Directory.CreateDirectory(Path.GetDirectoryName(nested)!);
+        File.WriteAllText(nested, "echo");
+        var catalog = new SkillCatalog([], [skillsRoot]);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(
+            prompt,
+            new FixedApprovalReviewer(ApprovalReviewVerdict.Deny("should not run")),
+            skills: catalog);
+        var json = "{\"path\":\"" + nested.Replace("\\", "/") + "\"}";
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", ReadTool.ToolName, json));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
         Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
     }
 
@@ -280,7 +414,8 @@ public sealed class ApprovalPolicyTests
             IApprovalPrompt prompt,
             IApprovalReviewer? reviewer = null,
             string userRequest = "Add a failing test.",
-            IReadOnlyList<ChatItem>? conversation = null) =>
+            IReadOnlyList<ChatItem>? conversation = null,
+            SkillCatalog? skills = null) =>
             new(
                 _mode,
                 new Workspace(_workspace.Path),
@@ -289,7 +424,8 @@ public sealed class ApprovalPolicyTests
                 reviewer,
                 conversation is null
                     ? new StaticApprovalReviewContext(userRequest)
-                    : new StaticApprovalReviewContext(conversation));
+                    : new StaticApprovalReviewContext(conversation),
+                skills: skills);
 
         public void Dispose()
         {

@@ -181,9 +181,15 @@ Every side-effect tool call is classified before invocation:
 
 Modes:
 
-- Plan: read-only catalog. No edit, write, or bash.
-- Default: Read auto-executes. Write and shell ask the operator.
-- AutoEdit: workspace file changes pass without review. Shell still asks.
+- Plan: read-only catalog. No edit, write, or bash. Workspace reads
+  auto-execute. Reads, glob, and grep of paths outside the workspace
+  go through the same approval policy as Work, including Review.
+  When Skills is enabled, any path inside a Skills search directory
+  (`skill` / `skills` trees) auto-executes as a workspace read.
+- Default: Workspace Read auto-executes. Write, shell, and
+  outside-workspace reads ask the operator.
+- AutoEdit: workspace file changes pass without review. Shell and
+  outside-workspace reads still ask.
 - Review: another model checks each remaining side-effect call (Codex
   guardian-style). A bounded transcript excerpt is attached: the first
   and latest user turns as authorization anchors, other user turns that
@@ -195,9 +201,12 @@ Modes:
   `user_authorization` (low / medium / high), and `rationale`. Allow
   executes. Deny becomes model-visible rejection text. Ask and
   Forbidden-allow fall back to the operator. Review is not a grant and
-  is not full pass-through.
+  is not full pass-through. Outside-workspace reads are remaining
+  side effects and go through this reviewer. When Skills is enabled,
+  the Skills search directories are workspace reads and skip Review.
 - Full: workspace-bounded, policy-allowed actions pass without review.
-  Forbidden and Privileged never fully auto-pass.
+  Forbidden, Privileged, and outside-workspace paths never fully
+  auto-pass.
 
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through.
@@ -286,8 +295,14 @@ the Work or Plan body and those instructions. When Skills is enabled,
 available-skill guidance is appended after the env block.
 
 Skills are OpenCode-compatible `SKILL.md` folders. They are loaded
-on demand through the `skill` tool. They never replace Work, Plan, or
-Review. `config.json` field `skills` enables or disables the feature
+on demand through the `skill` tool. Available-skill guidance lists
+name and description only; it does not include absolute paths. When
+Skills is enabled, `read`, glob, and grep of any path inside a Skills
+search directory (`skill` / `skills` trees, including files that are
+not `SKILL.md`) auto-execute as workspace reads. Other
+outside-workspace reads still go through approval, including Review.
+They never replace Work, Plan, or Review. `config.json` field `skills`
+enables or disables the feature
 (default `true`). When `false`, the tool is omitted and skill guidance
 is not appended. Later sources overwrite earlier ones with the same
 skill name.

@@ -17,7 +17,7 @@ public sealed class SkillGuidanceTests
     }
 
     [Fact]
-    public void Render_ListsNameDescriptionAndLocation()
+    public void Render_ListsNameAndDescriptionWithoutLocation()
     {
         using var temp = new TemporaryWorkspace();
         var path = Path.Combine(temp.Path, "skills", "git-release", "SKILL.md");
@@ -37,6 +37,7 @@ public sealed class SkillGuidanceTests
         Assert.Contains("<available_skills>", text, StringComparison.Ordinal);
         Assert.Contains("<name>git-release</name>", text, StringComparison.Ordinal);
         Assert.Contains("&lt;and&gt;", text, StringComparison.Ordinal);
-        Assert.Contains(Path.GetFullPath(path), text, StringComparison.Ordinal);
+        Assert.DoesNotContain("<location>", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(Path.GetFullPath(path), text, StringComparison.Ordinal);
     }
 }

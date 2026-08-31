@@ -5,14 +5,16 @@ using Crystal.Tools;
 namespace CrystalHarness.Tools;
 
 /// <summary>
-/// Reads a workspace text file, optionally from a line offset.
+/// Reads a text file in or outside the workspace. Outside paths require approval.
 /// </summary>
 public sealed class ReadTool : ITool
 {
     internal const string ToolName = "read";
 
     private const string ToolDescription =
-        "Reads a workspace text file. path is relative to the workspace root. "
+        "Reads a text file. path may be workspace-relative or absolute. "
+        + "Paths inside the workspace run without asking. "
+        + "Paths outside the workspace require approval. "
         + "Use offset (1-based) and limit for large files. Call in parallel when you need several files. "
         + "Do not read in tiny windows. Use glob when the path is uncertain.";
 
@@ -31,7 +33,7 @@ public sealed class ReadTool : ITool
                   "properties": {
                     "path": {
                       "type": "string",
-                      "description": "Workspace-relative file path."
+                      "description": "Workspace-relative or absolute file path."
                     },
                     "offset": {
                       "type": "integer",
@@ -75,9 +77,25 @@ public sealed class ReadTool : ITool
                     ToolResultStatus.Failure));
         }
 
-        if (!_workspace.TryResolveExistingFile(path, out var fullPath, out var error))
+        if (Workspace.IsCredentialPath(path))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "Reading credential paths is not allowed.",
+                    ToolResultStatus.Failure));
+        }
+
+        if (!_workspace.TryResolveReadableFile(path, out var fullPath, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
+        }
+
+        if (Workspace.IsCredentialPath(fullPath))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "Reading credential paths is not allowed.",
+                    ToolResultStatus.Failure));
         }
 
         if (Workspace.LooksBinary(fullPath))

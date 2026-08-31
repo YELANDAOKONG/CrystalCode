@@ -2,6 +2,7 @@ using Crystal.Tools;
 
 using CrystalHarness.Approvals.Interfaces;
 using CrystalHarness.Plugins.Interfaces;
+using CrystalHarness.Skills;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Approvals;
@@ -31,7 +32,8 @@ public sealed class ApprovalPolicy
         IApprovalPrompt prompt,
         IApprovalReviewer? reviewer = null,
         IApprovalReviewContext? reviewContext = null,
-        IReadOnlyList<IApprovalClassifier>? classifiers = null)
+        IReadOnlyList<IApprovalClassifier>? classifiers = null,
+        SkillCatalog? skills = null)
     {
         ArgumentNullException.ThrowIfNull(mode);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -39,7 +41,7 @@ public sealed class ApprovalPolicy
         ArgumentNullException.ThrowIfNull(prompt);
         _mode = mode;
         _workspace = workspace;
-        _classifier = new ToolClassifier(workspace, classifiers);
+        _classifier = new ToolClassifier(workspace, classifiers, skills);
         _grants = grants;
         _prompt = prompt;
         _reviewer = reviewer;

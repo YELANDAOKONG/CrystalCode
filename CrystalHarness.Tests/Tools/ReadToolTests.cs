@@ -24,16 +24,33 @@ public sealed class ReadToolTests
     }
 
     [Fact]
-    public async Task InvokeAsync_RejectsPathOutsideWorkspace()
+    public async Task InvokeAsync_ReadsPathOutsideWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "note.txt");
+        File.WriteAllText(file, "hello\n");
+        var tool = new ReadTool(new Workspace(root.Path));
+        var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", ReadTool.ToolName, json));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains("1|hello", output.Text);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RejectsCredentialPath()
     {
         using var root = new TemporaryWorkspace();
         var tool = new ReadTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"../secret.txt"}"""));
+            new ToolCall("1", ReadTool.ToolName, """{"path":"~/.ssh/id_rsa"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
-        Assert.Equal("Path is outside the workspace.", output.Text);
+        Assert.Equal("Reading credential paths is not allowed.", output.Text);
     }
 
     [Fact]

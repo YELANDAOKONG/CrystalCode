@@ -147,7 +147,13 @@ public sealed class GrepTool : ITool
             return true;
         }
 
-        if (!_workspace.TryResolveExistingLocation(relativePath, out var location, out error))
+        if (Workspace.IsCredentialPath(relativePath))
+        {
+            error = "Searching credential paths is not allowed.";
+            return false;
+        }
+
+        if (!_workspace.TryResolveReadableLocation(relativePath, out var location, out error))
         {
             return false;
         }

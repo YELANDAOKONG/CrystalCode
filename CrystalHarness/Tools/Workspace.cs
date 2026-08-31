@@ -93,45 +93,56 @@ public sealed class Workspace
     }
 
     public bool TryResolveExistingFile(string path, out string fullPath, out string error) =>
-        TryResolve(path, mustExistAsFile: true, out fullPath, out error);
+        TryResolve(path, mustExistAsFile: true, allowOutside: false, out fullPath, out error);
+
+    public bool TryResolveReadableFile(string path, out string fullPath, out string error) =>
+        TryResolve(path, mustExistAsFile: true, allowOutside: true, out fullPath, out error);
 
     public bool TryResolveWritablePath(string path, out string fullPath, out string error) =>
-        TryResolve(path, mustExistAsFile: false, out fullPath, out error);
+        TryResolve(path, mustExistAsFile: false, allowOutside: false, out fullPath, out error);
 
     public bool TryResolveExistingLocation(
         string path,
         out string fullPath,
-        out string error)
+        out string error) =>
+        TryResolveLocation(path, allowOutside: false, out fullPath, out error);
+
+    public bool TryResolveReadableLocation(
+        string path,
+        out string fullPath,
+        out string error) =>
+        TryResolveLocation(path, allowOutside: true, out fullPath, out error);
+
+    public bool TryGetFullPath(string path, out string fullPath, out string error) =>
+        TryNormalize(path, allowOutside: true, out fullPath, out error);
+
+    public bool Contains(string fullPath) => IsInsideRoot(fullPath);
+
+    public static bool IsCredentialPath(string path)
     {
-        fullPath = string.Empty;
-        error = string.Empty;
-        if (!TryNormalize(path, out var candidate, out error))
-        {
-            return false;
-        }
-
-        if (!File.Exists(candidate) && !Directory.Exists(candidate))
-        {
-            error = $"Path not found: {ToRelative(candidate)}";
-            return false;
-        }
-
-        fullPath = candidate;
-        return true;
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var expanded = Expand(path).Replace('\\', '/');
+        return expanded.Contains("/.ssh/", StringComparison.OrdinalIgnoreCase)
+            || expanded.EndsWith("/.ssh", StringComparison.OrdinalIgnoreCase)
+            || expanded.Contains("/.gnupg/", StringComparison.OrdinalIgnoreCase)
+            || expanded.EndsWith("/.gnupg", StringComparison.OrdinalIgnoreCase)
+            || expanded.Contains("/.crystal/credentials.json", StringComparison.OrdinalIgnoreCase);
     }
 
     public IEnumerable<string> EnumerateFiles(string directoryFullPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directoryFullPath);
 
+        var start = Path.GetFullPath(directoryFullPath);
+        var fence = IsInsideRoot(start) ? Root : start;
         var pending = new Stack<string>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
-        pending.Push(Path.GetFullPath(directoryFullPath));
+        pending.Push(start);
 
         while (pending.Count > 0)
         {
             var current = pending.Pop();
-            if (!visited.Add(current) || !IsInsideRoot(current))
+            if (!visited.Add(current) || !IsInside(current, fence))
             {
                 continue;
             }
@@ -212,15 +223,35 @@ public sealed class Workspace
             + $"\n[truncated to {WorkspaceLimits.ConfirmPreviewCharacters} characters]";
     }
 
+    private bool TryResolveLocation(string path, bool allowOutside, out string fullPath, out string error)
+    {
+        fullPath = string.Empty;
+        error = string.Empty;
+        if (!TryNormalize(path, allowOutside, out var candidate, out error))
+        {
+            return false;
+        }
+
+        if (!File.Exists(candidate) && !Directory.Exists(candidate))
+        {
+            error = $"Path not found: {ToRelative(candidate)}";
+            return false;
+        }
+
+        fullPath = candidate;
+        return true;
+    }
+
     private bool TryResolve(
         string path,
         bool mustExistAsFile,
+        bool allowOutside,
         out string fullPath,
         out string error)
     {
         fullPath = string.Empty;
         error = string.Empty;
-        if (!TryNormalize(path, out var candidate, out error))
+        if (!TryNormalize(path, allowOutside, out var candidate, out error))
         {
             return false;
         }
@@ -245,7 +276,7 @@ public sealed class Workspace
         return true;
     }
 
-    private bool TryNormalize(string path, out string fullPath, out string error)
+    private bool TryNormalize(string path, bool allowOutside, out string fullPath, out string error)
     {
         fullPath = string.Empty;
         error = string.Empty;
@@ -255,9 +286,10 @@ public sealed class Workspace
             return false;
         }
 
-        var combined = Path.IsPathRooted(path)
-            ? path
-            : Path.Combine(Root, path);
+        var expanded = Expand(path.Trim());
+        var combined = Path.IsPathRooted(expanded)
+            ? expanded
+            : Path.Combine(Root, expanded);
         string candidate;
         try
         {
@@ -269,7 +301,7 @@ public sealed class Workspace
             return false;
         }
 
-        if (!IsInsideRoot(candidate))
+        if (!allowOutside && !IsInsideRoot(candidate))
         {
             error = "Path is outside the workspace.";
             return false;
@@ -279,14 +311,16 @@ public sealed class Workspace
         return true;
     }
 
-    private bool IsInsideRoot(string fullPath)
+    private bool IsInsideRoot(string fullPath) => IsInside(fullPath, Root);
+
+    private static bool IsInside(string fullPath, string root)
     {
-        var root = Root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+        var prefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
         var candidate = fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
-        return candidate.StartsWith(root, StringComparison.Ordinal)
-            || string.Equals(fullPath, Root, StringComparison.Ordinal);
+        return candidate.StartsWith(prefix, StringComparison.Ordinal)
+            || string.Equals(fullPath, root, StringComparison.Ordinal);
     }
 
     private static bool IsSkippableIo(Exception exception) =>

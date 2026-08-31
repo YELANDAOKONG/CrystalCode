@@ -31,7 +31,6 @@ public static class SkillGuidance
             lines.Add("  <skill>");
             lines.Add($"    <name>{Escape(skill.Name)}</name>");
             lines.Add($"    <description>{Escape(skill.Description)}</description>");
-            lines.Add($"    <location>{Escape(skill.Location)}</location>");
             lines.Add("  </skill>");
         }
 

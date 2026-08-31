@@ -7,7 +7,23 @@ namespace CrystalHarness.Tests.Tools;
 public sealed class WorkspaceTests
 {
     [Fact]
-    public void TryResolveExistingFile_RejectsPathOutsideRoot()
+    public void TryResolveReadableFile_AcceptsPathOutsideRoot()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "note.txt");
+        File.WriteAllText(file, "hello");
+        var workspace = new Workspace(root.Path);
+
+        var found = workspace.TryResolveReadableFile(file, out var fullPath, out var error);
+
+        Assert.True(found);
+        Assert.Equal(string.Empty, error);
+        Assert.Equal(Path.GetFullPath(file), fullPath);
+    }
+
+    [Fact]
+    public void TryResolveExistingFile_StillRejectsPathOutsideRoot()
     {
         using var root = new TemporaryWorkspace();
         var workspace = new Workspace(root.Path);

@@ -70,7 +70,15 @@ public sealed class GlobTool : ITool
         var searchRoot = _workspace.Root;
         if (relativePath is not null)
         {
-            if (!_workspace.TryResolveExistingLocation(relativePath, out var location, out var error))
+            if (Workspace.IsCredentialPath(relativePath))
+            {
+                return ValueTask.FromResult(
+                    new ToolOutput(
+                        "Searching credential paths is not allowed.",
+                        ToolResultStatus.Failure));
+            }
+
+            if (!_workspace.TryResolveReadableLocation(relativePath, out var location, out var error))
             {
                 return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
             }

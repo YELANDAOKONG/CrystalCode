@@ -678,7 +678,8 @@ public sealed class CodingSession
             approvalPrompt,
             reviewer,
             _reviewContext,
-            _plugins.Classifiers);
+            _plugins.Classifiers,
+            _skills);
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         _workExecutor = new ToolExecutor(
             WorkspaceCatalog.CreateWork(_workspace, _todos, question, _plugins, _skills),
@@ -688,7 +689,8 @@ public sealed class CodingSession
         _planExecutor = new ToolExecutor(
             WorkspaceCatalog.CreatePlan(_workspace, _todos, question, _plugins, _skills),
             options,
-            exceptionMapper: HarnessExceptionMapper.MapAsync);
+            policy.DecideAsync,
+            HarnessExceptionMapper.MapAsync);
     }
 
     private void ReloadSkills()

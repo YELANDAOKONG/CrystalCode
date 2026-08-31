@@ -1,6 +1,7 @@
 using Crystal.Tools;
 
 using CrystalHarness.Plugins.Interfaces;
+using CrystalHarness.Skills;
 using CrystalHarness.Tools;
 
 namespace CrystalHarness.Approvals;
@@ -12,14 +13,17 @@ public sealed class ToolClassifier
 {
     private readonly Workspace _workspace;
     private readonly IReadOnlyList<IApprovalClassifier> _classifiers;
+    private readonly SkillCatalog? _skills;
 
     public ToolClassifier(
         Workspace workspace,
-        IReadOnlyList<IApprovalClassifier>? classifiers = null)
+        IReadOnlyList<IApprovalClassifier>? classifiers = null,
+        SkillCatalog? skills = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         _workspace = workspace;
         _classifiers = classifiers ?? [];
+        _skills = skills;
     }
 
     public ToolClassification Classify(ToolCall call)
@@ -48,14 +52,79 @@ public sealed class ToolClassifier
     private ToolClassification? ClassifyBuiltIn(ToolCall call) =>
         call.Name switch
         {
-            ReadTool.ToolName or GlobTool.ToolName or GrepTool.ToolName
-                or TodoWriteTool.ToolName or QuestionTool.ToolName or SkillTool.ToolName =>
+            ReadTool.ToolName => ClassifyRead(call.Arguments, "Read", pathRequired: true),
+            GlobTool.ToolName => ClassifyRead(call.Arguments, "Glob", pathRequired: false),
+            GrepTool.ToolName => ClassifyRead(call.Arguments, "Grep", pathRequired: false),
+            TodoWriteTool.ToolName or QuestionTool.ToolName or SkillTool.ToolName =>
                 new ToolClassification(Risk.Read, Authority.Workspace, "Read-only tool"),
             WriteTool.ToolName => ClassifyWrite(call.Arguments),
             EditTool.ToolName => ClassifyEdit(call.Arguments),
             BashTool.ToolName => ClassifyBash(call.Arguments),
             _ => null
         };
+
+    private ToolClassification ClassifyRead(string arguments, string verb, bool pathRequired)
+    {
+        if (pathRequired)
+        {
+            if (!ToolArguments.TryReadRequiredString(arguments, "path", out var requiredPath))
+            {
+                return new ToolClassification(Risk.Read, Authority.Workspace, $"{verb} workspace file");
+            }
+
+            return ClassifyReadPath(requiredPath, verb);
+        }
+
+        if (!ToolArguments.TryReadOptionalString(arguments, "path", out var optionalPath)
+            || optionalPath is null)
+        {
+            return new ToolClassification(Risk.Read, Authority.Workspace, $"{verb} workspace");
+        }
+
+        return ClassifyReadPath(optionalPath, verb);
+    }
+
+    private ToolClassification ClassifyReadPath(string path, string verb)
+    {
+        if (Workspace.IsCredentialPath(path))
+        {
+            return new ToolClassification(
+                Risk.Forbidden,
+                Authority.PrivilegedEscalation,
+                $"{verb} credential path");
+        }
+
+        if (!_workspace.TryGetFullPath(path, out var fullPath, out _))
+        {
+            return new ToolClassification(Risk.Read, Authority.Workspace, $"{verb} workspace file");
+        }
+
+        if (Workspace.IsCredentialPath(fullPath))
+        {
+            return new ToolClassification(
+                Risk.Forbidden,
+                Authority.PrivilegedEscalation,
+                $"{verb} credential path");
+        }
+
+        if (_skills is not null && _skills.ContainsReadablePath(fullPath))
+        {
+            return new ToolClassification(
+                Risk.Read,
+                Authority.Workspace,
+                $"{verb} skills path");
+        }
+
+        if (!_workspace.Contains(fullPath))
+        {
+            return new ToolClassification(
+                Risk.Read,
+                Authority.OutsideWorkspace,
+                $"{verb} outside workspace");
+        }
+
+        return new ToolClassification(Risk.Read, Authority.Workspace, $"{verb} workspace file");
+    }
 
     private ToolClassification ClassifyWrite(string arguments)
     {
@@ -85,7 +154,7 @@ public sealed class ToolClassifier
 
     private ToolClassification ClassifyFilePath(string path, string verb)
     {
-        if (IsCredentialPath(path))
+        if (Workspace.IsCredentialPath(path))
         {
             return new ToolClassification(
                 Risk.Forbidden,
@@ -120,15 +189,5 @@ public sealed class ToolClassifier
 
         var (risk, authority, summary) = ShellRisk.Classify(command);
         return new ToolClassification(risk, authority, summary);
-    }
-
-    private static bool IsCredentialPath(string path)
-    {
-        var expanded = Workspace.Expand(path).Replace('\\', '/');
-        return expanded.Contains("/.ssh/", StringComparison.OrdinalIgnoreCase)
-            || expanded.EndsWith("/.ssh", StringComparison.OrdinalIgnoreCase)
-            || expanded.Contains("/.gnupg/", StringComparison.OrdinalIgnoreCase)
-            || expanded.EndsWith("/.gnupg", StringComparison.OrdinalIgnoreCase)
-            || expanded.Contains("/.crystal/credentials.json", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -46,7 +46,11 @@ semantics. Do not copy its Demo UI into this product.
   provider family. Extra tools and protocols go through `IPlugin` /
   `PluginRegistry`. Do not load assemblies from disk.
 - Keep assembly ownership consistent with ARCHITECTURE.md.
-- Preserve workspace fencing for every filesystem and shell tool.
+- Write, edit, and bash stay inside the workspace. Read, glob, and
+  grep of paths outside the workspace require approval (including
+  Review). When Skills is enabled, any path inside a Skills search
+  directory (`skill` / `skills` trees) auto-passes. Credential paths
+  stay Forbidden.
 - Approval decisions go through `Crystal.Tools.ToolInvocationPolicy`. Do not
   invoke side-effect tools by bypassing the executor.
 - Context compaction is owned here. Crystal will not truncate or summarize.
