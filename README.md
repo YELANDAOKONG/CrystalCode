@@ -296,7 +296,9 @@ Work on the composer prompt, not repeated on the status bar. A
 queued-follow-up count appears while items wait. While a turn runs, a
 progress row sits above the status bar (`Awaiting Approval · 5s`,
 `Running Command · 2m18s`, `Thinking`), prefixed with a spinner, and is
-independent of the status-bar activity bullet.
+independent of the status-bar activity bullet. Session start and `/cd`
+show `Loading Tools` on that row while operator tool sets load, after
+the frame is already up.
 
 Assistant text is rendered as markdown while it streams and after it
 commits (headings, lists, fenced code, inline code and bold). User,

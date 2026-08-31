@@ -84,7 +84,6 @@ public sealed class CodingSession
         _skillDiscovery = SkillDiscovery.Create(home);
         _prompts = _promptStore.Load(workspace.Root);
         ReloadSkills();
-        ReloadExternalTools();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
@@ -151,6 +150,8 @@ public sealed class CodingSession
             PresentResume();
         }
 
+        ReloadExternalToolsWithProgress();
+        RebuildExecutors();
         WriteExternalNotes();
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
@@ -519,7 +520,7 @@ public sealed class CodingSession
         if (_workspace.TrySetRoot(argument, out var error))
         {
             ReloadSkills();
-            ReloadExternalTools();
+            ReloadExternalToolsWithProgress();
             ReloadPrompts();
             RebuildExecutors();
             WriteExternalNotes();
@@ -826,6 +827,26 @@ public sealed class CodingSession
     private void ReloadExternalTools()
     {
         _external = ExternalCatalog.Load(_home, _workspace, _settings.ExternalTools);
+    }
+
+    private void ReloadExternalToolsWithProgress()
+    {
+        if (_settings.ExternalTools)
+        {
+            _renderer.SetProgress(ProgressText.LoadingTools);
+        }
+
+        try
+        {
+            ReloadExternalTools();
+        }
+        finally
+        {
+            if (_settings.ExternalTools)
+            {
+                _renderer.SetProgress(string.Empty);
+            }
+        }
     }
 
     private void WriteExternalNotes()

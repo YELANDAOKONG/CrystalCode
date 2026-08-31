@@ -80,7 +80,9 @@ tools.
 ```
 
 Every immediate subdirectory that contains `tools.json` is a candidate
-set. `/cd` reloads sets from the new workspace.
+set. The session enters the terminal frame first, shows `Loading Tools`
+on the progress row, then scans and loads. `/cd` reloads the same way
+from the new workspace.
 
 `config.json` field `externalTools` enables the feature (default
 `true`), matching `skills`. When `true`, the field is omitted from the

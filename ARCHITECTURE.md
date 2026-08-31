@@ -486,7 +486,10 @@ composer prompt and is not repeated on the status bar. While a turn
 runs, a progress row sits directly above the status bar
 (`Waiting For Model`, `Thinking`, `Writing`, `Running Command`,
 `Awaiting Approval`, `Reviewing`, `Waiting For Answer`,
-`Compacting`). The caption is prefixed with a one-cell spinner
+`Compacting`). The same row shows `Loading Tools` while operator tool
+sets are discovered at session start and on `/cd`, after the frame is
+up, so a slow assembly load does not leave a blank terminal. The
+caption is prefixed with a one-cell spinner
 that advances while the turn is live, plus the current activity
 elapsed time (`5s`, `2m18s`). Elapsed resets when the progress
 caption changes. It is independent of the

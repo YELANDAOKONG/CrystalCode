@@ -23,6 +23,8 @@ public static class ProgressText
 
     public const string Compacting = "Compacting";
 
+    public const string LoadingTools = "Loading Tools";
+
     public static string Calling(string toolName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
