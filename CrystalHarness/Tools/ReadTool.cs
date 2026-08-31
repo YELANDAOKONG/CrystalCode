@@ -11,6 +11,11 @@ public sealed class ReadTool : ITool
 {
     internal const string ToolName = "read";
 
+    private const string ToolDescription =
+        "Reads a workspace text file. path is relative to the workspace root. "
+        + "Use offset (1-based) and limit for large files. Call in parallel when you need several files. "
+        + "Do not read in tiny windows. Use glob when the path is uncertain.";
+
     private readonly Workspace _workspace;
 
     public ReadTool(Workspace workspace)
@@ -40,7 +45,7 @@ public sealed class ReadTool : ITool
                   "required": ["path"]
                 }
                 """),
-            "Reads a text file from the workspace. Use offset and limit for large files.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

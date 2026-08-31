@@ -37,5 +37,17 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(catalog.Find(EditTool.ToolName));
         Assert.NotNull(catalog.Find(WriteTool.ToolName));
         Assert.NotNull(catalog.Find(BashTool.ToolName));
+        Assert.Contains(
+            "Do not use it to read, write, or search files",
+            catalog.Find(BashTool.ToolName)!.Definition.Description,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "when you are uncertain",
+            catalog.Find(QuestionTool.ToolName)!.Definition.Description,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "before multi-step work",
+            catalog.Find(TodoWriteTool.ToolName)!.Definition.Description,
+            StringComparison.Ordinal);
     }
 }

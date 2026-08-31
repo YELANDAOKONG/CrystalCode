@@ -75,7 +75,7 @@ public sealed class CodingSession
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
         _prompts = _promptStore.Load(workspace.Root);
-        _transcript = [new ChatMessage(ChatRole.System, _prompts.WorkSystem)];
+        _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _replayOnStart = resume is not null;
@@ -430,8 +430,16 @@ public sealed class CodingSession
         return _planMode;
     }
 
-    private string CurrentSystemText() =>
-        _planMode ? _prompts.PlanSystem : _prompts.WorkSystem;
+    private string CurrentSystemText()
+    {
+        var environment = PromptEnvironment.Render(
+            _workspace.Root,
+            _settings.Provider.Value,
+            _settings.Model);
+        return _planMode
+            ? _prompts.ComposePlan(environment)
+            : _prompts.ComposeWork(environment);
+    }
 
     private void ReloadPrompts()
     {

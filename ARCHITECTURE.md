@@ -69,7 +69,7 @@ path under a project root equals the namespace after the project name.
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
-| `Prompts` | Caller-owned system text |
+| `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
 | `Plugins/Providers` | Built-in DeepSeek and OpenAI client factories |
@@ -126,6 +126,13 @@ These are product modes, not Crystal types.
 
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.
+
+Live Work and Plan system text is assembled in this order: the overlayable
+Work or Plan body, a host-owned `<env>` block (workspace path, whether the
+directory is a git repo, platform, today's date, and provider/model), then
+Workspace instructions. Review is the named file alone. The env block is
+not an overlay file and is refreshed on `/cd` and when the live system
+message is replaced.
 
 ## Approval
 
@@ -221,11 +228,15 @@ Overlay is built-in default, then `~/.crystal`, then the project
 `.crystal`. Named prompt files replace the built-in Work, Plan, or
 Review system text.
 
+Built-in Work and Plan identify the assistant as Crystal Code. Operators
+who replace those files choose their own identity.
+
 `instructions.md` and `.crystal.md` are appended under
 "Workspace instructions" on Work and Plan only. Review is the named
 file alone so the reviewer stays a safety check. Files may be `.md`
 or `.txt`. Empty files are treated as missing. The host never writes
-prompt files.
+prompt files. The host appends a non-overlayable `<env>` block between
+the Work or Plan body and those instructions.
 
 `AGENTS.md` and `CLAUDE.md` are OpenCode-compatible rule files, not
 prompt overlays. They are combined into the same instruction block

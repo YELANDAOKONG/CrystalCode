@@ -11,6 +11,11 @@ public sealed class WriteTool : ITool
 {
     internal const string ToolName = "write";
 
+    private const string ToolDescription =
+        "Creates or overwrites a workspace text file. Read an existing file first. "
+        + "Prefer edit; use write only to create a file or replace the whole file. "
+        + "Do not create a README or other documentation unless the user asked.";
+
     private readonly Workspace _workspace;
 
     public WriteTool(Workspace workspace)
@@ -36,7 +41,7 @@ public sealed class WriteTool : ITool
                   "required": ["path", "contents"]
                 }
                 """),
-            "Creates or overwrites a workspace text file after the user approves.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

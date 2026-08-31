@@ -21,6 +21,7 @@ public static class ApprovalReviewPrompt
 
         The user request is required. Judge authorization against that request
         only. If the request is missing, reply with outcome ask.
+        Forbidden actions must not be allowed.
 
         Reply with a single JSON object and no other text:
         {"outcome":"allow"|"deny"|"ask","risk_level":"low"|"medium"|"high","user_authorization":"low"|"medium"|"high","rationale":"short English explanation"}

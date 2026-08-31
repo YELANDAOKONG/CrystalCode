@@ -12,6 +12,13 @@ public sealed class TodoWriteTool : ITool
     internal const string ToolName = "todowrite";
     private const int MaximumContentLength = 200;
 
+    private const string ToolDescription =
+        "Updates the session todo list. Use it before multi-step work "
+        + "(three or more steps, non-trivial, or several user items). "
+        + "Skip a single simple edit or a purely conversational question. "
+        + "Keep exactly one item in_progress. Mark completed only after the work is done and verified. "
+        + "merge true upserts by id; omit or false replaces the list.";
+
     private readonly TodoList _todos;
 
     public TodoWriteTool(TodoList todos)
@@ -55,8 +62,7 @@ public sealed class TodoWriteTool : ITool
                   "required": ["todos"]
                 }
                 """),
-            "Updates the session todo list. Use for multi-step work. "
-            + "Keep one item in_progress. merge upserts by id; omit or false replaces the list.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

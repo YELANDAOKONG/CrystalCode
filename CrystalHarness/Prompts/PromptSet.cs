@@ -26,19 +26,30 @@ public sealed record PromptSet
 
     public string Instructions { get; }
 
-    public string WorkSystem => Combine(Work, Instructions);
+    public string WorkSystem => Combine(Work, string.Empty, Instructions);
 
-    public string PlanSystem => Combine(Plan, Instructions);
+    public string PlanSystem => Combine(Plan, string.Empty, Instructions);
+
+    public string ComposeWork(string environment) => Combine(Work, environment, Instructions);
+
+    public string ComposePlan(string environment) => Combine(Plan, environment, Instructions);
 
     public override string ToString() => nameof(PromptSet);
 
-    private static string Combine(string prompt, string instructions)
+    private static string Combine(string prompt, string environment, string instructions)
     {
-        if (instructions.Length == 0)
+        ArgumentNullException.ThrowIfNull(environment);
+        var text = prompt;
+        if (environment.Trim().Length > 0)
         {
-            return prompt;
+            text += "\n\n" + environment.Trim();
         }
 
-        return prompt + "\n\n## Workspace instructions\n" + instructions;
+        if (instructions.Length > 0)
+        {
+            text += "\n\n## Workspace instructions\n" + instructions;
+        }
+
+        return text;
     }
 }

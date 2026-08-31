@@ -11,6 +11,12 @@ public sealed class EditTool : ITool
 {
     internal const string ToolName = "edit";
 
+    private const string ToolDescription =
+        "Replaces one unique old_string with new_string in an existing file. Read the file first. "
+        + "Preserve exact indentation; do not include line-number prefixes. "
+        + "The call fails if old_string is missing or appears more than once; add surrounding lines to make it unique. "
+        + "Prefer edit over rewriting the whole file with write.";
+
     private readonly Workspace _workspace;
 
     public EditTool(Workspace workspace)
@@ -40,7 +46,7 @@ public sealed class EditTool : ITool
                   "required": ["path", "old_string", "new_string"]
                 }
                 """),
-            "Replaces one unique occurrence of old_string after the user approves.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

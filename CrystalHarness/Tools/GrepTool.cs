@@ -12,6 +12,11 @@ public sealed class GrepTool : ITool
 {
     internal const string ToolName = "grep";
 
+    private const string ToolDescription =
+        "Searches workspace text files with a .NET regular expression. "
+        + "Optional path and file-name glob. Skips binary files and common build directories. "
+        + "Chain glob and grep for open-ended search. Batch independent searches in parallel.";
+
     private readonly Workspace _workspace;
 
     public GrepTool(Workspace workspace)
@@ -41,8 +46,7 @@ public sealed class GrepTool : ITool
                   "required": ["pattern"]
                 }
                 """),
-            "Searches workspace text files with a regular expression. "
-            + "Skips binary files and common build directories.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

@@ -9,6 +9,12 @@ public sealed class QuestionTool : ITool
 {
     internal const string ToolName = "question";
 
+    private const string ToolDescription =
+        "Asks the user a question and waits. Use it when you are uncertain: a missing fact, "
+        + "a choice that would change the work, or something the repository cannot tell you. "
+        + "Optional options; put a recommended choice first. "
+        + "Do not ask whether to continue or whether to run tests.";
+
     private readonly IUserPrompt _prompt;
 
     public QuestionTool(IUserPrompt prompt)
@@ -35,8 +41,7 @@ public sealed class QuestionTool : ITool
                   "required": ["question"]
                 }
                 """),
-            "Asks the user a question and waits for the answer. "
-            + "Use when a choice or missing fact would change the work.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

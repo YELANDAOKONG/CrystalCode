@@ -11,6 +11,11 @@ public sealed class GlobTool : ITool
 {
     internal const string ToolName = "glob";
 
+    private const string ToolDescription =
+        "Lists workspace files matching a glob, for example **/*.cs. "
+        + "Optional path limits the search directory. Skips bin, obj, and .git. "
+        + "Batch independent searches in parallel.";
+
     private readonly Workspace _workspace;
 
     public GlobTool(Workspace workspace)
@@ -36,7 +41,7 @@ public sealed class GlobTool : ITool
                   "required": ["pattern"]
                 }
                 """),
-            "Lists workspace files matching a glob pattern. Skips bin, obj, and .git.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

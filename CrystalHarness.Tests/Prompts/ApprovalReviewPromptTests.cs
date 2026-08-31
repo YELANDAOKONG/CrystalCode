@@ -43,4 +43,13 @@ public sealed class ApprovalReviewPromptTests
             ApprovalReviewPrompt.UserText(
                 new ApprovalReviewRequest(call, classification, " ")));
     }
+
+    [Fact]
+    public void SystemText_ForbidsAllowingForbiddenActions()
+    {
+        Assert.Contains(
+            "Forbidden actions must not be allowed.",
+            ApprovalReviewPrompt.SystemText,
+            StringComparison.Ordinal);
+    }
 }

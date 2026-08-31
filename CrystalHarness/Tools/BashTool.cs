@@ -12,6 +12,13 @@ public sealed class BashTool : ITool
 {
     internal const string ToolName = "bash";
 
+    private const string ToolDescription =
+        "Runs one shell command in the workspace root (bash -lc, 120 second timeout). "
+        + "Use it for builds, tests, git, and scripts. Do not use it to read, write, or search files; "
+        + "use read, glob, grep, edit, and write. Avoid interactive commands. "
+        + "Unless the user explicitly asked, do not commit, amend, or push, and do not change git config, "
+        + "skip hooks, use interactive git, or force-push.";
+
     private readonly Workspace _workspace;
 
     public BashTool(Workspace workspace)
@@ -33,8 +40,7 @@ public sealed class BashTool : ITool
                   "required": ["command"]
                 }
                 """),
-            "Runs one shell command after the user approves it. "
-            + "Prefer read, glob, and grep for file inspection.");
+            ToolDescription);
     }
 
     public ToolDefinition Definition { get; }

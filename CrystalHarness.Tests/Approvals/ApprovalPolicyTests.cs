@@ -112,7 +112,8 @@ public sealed class ApprovalPolicyTests
 
         Assert.Equal(ToolInvocationAction.Reject, decision.Action);
         Assert.Equal(
-            "The approval reviewer declined this action: not part of the requested work",
+            "The approval reviewer declined this action: not part of the requested work"
+            + ApprovalPolicy.RetryGuidance,
             decision.RejectionOutput?.Text);
     }
 

@@ -433,6 +433,10 @@ accepted):
 - Empty files are treated as missing.
 - The host never writes prompt files.
 
+The built-in Work and Plan assistant name is Crystal Code. A host-owned
+`<env>` block (workspace, git, platform, date, provider/model) is
+appended after the Work or Plan body and is not overlayable.
+
 Workspace facts are appended under "Workspace instructions" on Work
 and Plan only. Review is the named file alone so the reviewer stays
 a safety check.
@@ -457,7 +461,8 @@ replacements. They never replace Work, Plan, or Review.
   `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
 
 `/cd` and resume reload prompts from the current workspace. Resume
-refreshes the first system message from the current prompt files.
+refreshes the first system message from the current prompt files and
+the current `<env>` block.
 
 ## Sessions
 

@@ -11,7 +11,10 @@ namespace CrystalHarness.Approvals;
 /// </summary>
 public sealed class ApprovalPolicy
 {
-    internal const string RejectedText = "The user declined this action.";
+    internal const string RetryGuidance =
+        " Do not retry the same call. Change the approach or ask the user.";
+
+    internal const string RejectedText = "The user declined this action." + RetryGuidance;
 
     private readonly ApprovalMode _mode;
     private readonly Workspace _workspace;
@@ -118,7 +121,9 @@ public sealed class ApprovalPolicy
             return (
                 ToolInvocationDecision.Reject(
                     new ToolOutput(
-                        "The approval reviewer declined this action: " + verdict.Rationale,
+                        "The approval reviewer declined this action: "
+                        + verdict.Rationale
+                        + RetryGuidance,
                         ToolResultStatus.Failure)),
                 verdict);
         }
