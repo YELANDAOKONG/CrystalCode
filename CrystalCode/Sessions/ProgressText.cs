@@ -45,7 +45,7 @@ public static class ProgressText
             TodoWriteTool.ToolName => "Updating Todos",
             QuestionTool.ToolName => "Asking",
             SkillTool.ToolName => "Loading Skill",
-            _ => "Running " + DisplayCase.Token(toolName)
+            _ => "Running: " + DisplayCase.Token(toolName)
         };
     }
 }

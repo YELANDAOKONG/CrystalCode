@@ -46,6 +46,41 @@ public sealed class ExternalCatalogTests
     }
 
     [Fact]
+    public async Task Load_ExecStdinJson_DoesNotWriteUtf8Bom()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "echojson");
+        Directory.CreateDirectory(directory);
+        var script = WriteStdinProbeScript(directory);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            $$"""
+            {
+              "runner": "exec",
+              "description": "Capture stdin bytes.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["{{script.Replace("\\", "/")}}"]
+            }
+            """);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+
+        var output = await catalog.WorkTools[0].InvokeAsync(
+            new ToolCall("1", "echojson", """{"tag":"ok"}"""));
+
+        Assert.True(output.Status == ToolResultStatus.Success, output.Text);
+        var probe = Path.Combine(workspace.Path, "stdin.bin");
+        Assert.True(File.Exists(probe), output.Text);
+        var bytes = File.ReadAllBytes(probe);
+        Assert.NotEmpty(bytes);
+        Assert.NotEqual((byte)0xEF, bytes[0]);
+        Assert.Equal((byte)'{', bytes[0]);
+    }
+
+    [Fact]
     public async Task Load_ExecArgv_AppendsFlags()
     {
         using var home = new TemporaryHome();
@@ -181,6 +216,34 @@ public sealed class ExternalCatalogTests
 
         var path = Path.Combine(directory, "echo-argv.sh");
         File.WriteAllText(path, "#!/bin/sh\nprintf '%s\\n' \"$@\"\n");
+        File.SetUnixFileMode(
+            path,
+            UnixFileMode.UserRead
+            | UnixFileMode.UserWrite
+            | UnixFileMode.UserExecute
+            | UnixFileMode.GroupRead
+            | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead
+            | UnixFileMode.OtherExecute);
+        return path;
+    }
+
+    private static string WriteStdinProbeScript(string directory)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var script = Path.Combine(directory, "probe-stdin.cmd");
+            File.WriteAllText(
+                script,
+                """
+                @echo off
+                powershell -NoProfile -Command "$s=[Console]::OpenStandardInput(); $f=[IO.File]::Create('stdin.bin'); $s.CopyTo($f); $f.Close()"
+                """);
+            return script;
+        }
+
+        var path = Path.Combine(directory, "probe-stdin.sh");
+        File.WriteAllText(path, "#!/bin/sh\ncat > stdin.bin\n");
         File.SetUnixFileMode(
             path,
             UnixFileMode.UserRead

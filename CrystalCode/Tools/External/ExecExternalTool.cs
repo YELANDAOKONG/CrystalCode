@@ -11,6 +11,7 @@ namespace CrystalCode.Tools.External;
 /// </summary>
 internal sealed class ExecExternalTool : ITool
 {
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
     private readonly Workspace _workspace;
     private readonly ParsedToolSet _set;
     private readonly ExternalToolSpec _spec;
@@ -59,7 +60,7 @@ internal sealed class ExecExternalTool : ITool
         };
         if (_set.Stdin)
         {
-            process.StartInfo.StandardInputEncoding = Encoding.UTF8;
+            process.StartInfo.StandardInputEncoding = Utf8NoBom;
         }
         for (var index = 1; index < argv.Count; index++)
         {

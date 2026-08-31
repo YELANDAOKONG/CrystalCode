@@ -286,9 +286,9 @@ Final argv is: set `command` + this tool's `command` + mapped flags
 from this tool's `argv` map. For shorthand, there is no extra suffix.
 
 **Stdin JSON** (`stdin: true`, default): write the fenced argument
-object as UTF-8 JSON, then close stdin. Same body for a one-tool or
-many-tool set. The child already knows which subcommand it is from
-argv.
+object as UTF-8 JSON without a BOM, then close stdin. Same body for a
+one-tool or many-tool set. The child already knows which subcommand it
+is from argv.
 
 **Argv** (`argv` map): for each listed property that is present, append
 `flag`, then the scalar string form. Allowed JSON kinds: string,

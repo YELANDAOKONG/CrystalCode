@@ -32,6 +32,6 @@ public sealed class ProgressTextTests
     [Fact]
     public void Running_UnknownToolKeepsToken()
     {
-        Assert.Equal("Running Custom Tool", ProgressText.Running("custom_tool"));
+        Assert.Equal("Running: Custom Tool", ProgressText.Running("custom_tool"));
     }
 }
