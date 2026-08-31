@@ -61,6 +61,7 @@ New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
 
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Write-Host "Downloading $archiveName..."
     $webClient = [System.Net.WebClient]::new()
     try {
         $webClient.DownloadFile($downloadUrl, $archivePath)
@@ -69,6 +70,7 @@ try {
         $webClient.Dispose()
     }
 
+    Write-Host "Extracting $archiveName..."
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractionDirectory -Force
     $publishedBinary = Get-ChildItem -LiteralPath $extractionDirectory -Filter $binaryName -File -Recurse |
         Select-Object -First 1
@@ -77,6 +79,7 @@ try {
         Fail "The archive does not contain $binaryName."
     }
 
+    Write-Host "Installing $binaryName..."
     New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
     Copy-Item -LiteralPath $publishedBinary.FullName -Destination $stagedPath -Force
 
@@ -88,6 +91,7 @@ try {
     }
 
     Write-Host "Installed $archiveName to $destinationPath"
+    Write-Host "Configuring the user PATH..."
     Add-UserPath $installDirectory
 }
 finally {

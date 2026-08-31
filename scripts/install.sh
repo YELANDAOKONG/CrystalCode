@@ -108,10 +108,12 @@ cleanup() {
 
 trap cleanup EXIT HUP INT TERM
 
+printf 'Downloading %s...\n' "$archive_name"
 if ! curl --fail --location --show-error --output "$archive_path" "$download_url"; then
     fail "Could not download ${archive_name} from the latest release."
 fi
 
+printf 'Extracting %s...\n' "$archive_name"
 mkdir -p "$extraction_directory"
 if ! unzip -q "$archive_path" -d "$extraction_directory"; then
     fail "Could not extract ${archive_name}."
@@ -122,6 +124,7 @@ if [ -z "$published_binary" ]; then
     fail "The archive does not contain ${binary_name}."
 fi
 
+printf 'Installing %s...\n' "$binary_name"
 mkdir -p "$install_directory"
 staged_binary="$(mktemp "${install_directory}/.${binary_name}.XXXXXX")"
 cp "$published_binary" "$staged_binary"
@@ -129,4 +132,5 @@ chmod 755 "$staged_binary"
 mv -f "$staged_binary" "${install_directory}/${binary_name}"
 
 printf 'Installed %s to %s\n' "$archive_name" "${install_directory}/${binary_name}"
+printf 'Configuring PATH...\n'
 configure_path
