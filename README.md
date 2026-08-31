@@ -32,7 +32,7 @@ from disk.
 The latest self-contained release can be installed on Linux x64, Linux ARM64,
 macOS ARM64, or Windows x64. The installers download the matching standard
 release asset, `CrystalCode-<os>-<architecture>.zip`, then replace the
-matching executable in `~/.crystal/binaries/code/`.
+full published contents in `~/.crystal/binaries/code/`.
 
 On Linux or macOS, run:
 
@@ -51,9 +51,12 @@ Invoke-RestMethod `
 To inspect an installer before running it, download it to a file and run it
 manually instead.
 
-The installers do not write credentials. On Linux and macOS, the installer
-adds the CrystalCode directory to the selected zsh or bash profile. On Windows,
-it adds that directory to the user-level PATH. A new terminal loads the update.
+The installers do not write credentials. On Linux and macOS, the installer adds
+a `# Crystal Code CLI (Installer)` block to the selected zsh or bash profile.
+The block adds the CrystalCode directory to PATH and defines the `crystal`
+alias. On Windows, the installer adds that directory to the user-level PATH.
+Open a new terminal after installation, then run `crystal` on Linux or macOS,
+or `CrystalCode` on Windows.
 
 ## What it does not do
 

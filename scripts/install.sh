@@ -19,6 +19,7 @@ require_command() {
 
 configure_path() {
     profile_path=""
+    profile_comment="# Crystal Code CLI (Installer)"
 
     case "${SHELL:-sh}" in
         */zsh | zsh)
@@ -30,13 +31,31 @@ configure_path() {
     esac
 
     if [ -z "$profile_path" ]; then
-        printf 'Installed %s. Add %s to your shell PATH to run it from any directory.\n' "$binary_name" "$install_directory"
+        printf 'Installed %s. Start Crystal Code with: %s\n' "$binary_name" "${install_directory}/${binary_name}"
         return
     fi
 
     path_export="export PATH=\"${install_directory}:\$PATH\""
+    command_alias="alias crystal=\"${install_directory}/${binary_name}\""
+    comment_exists=false
+    path_exists=false
+    alias_exists=false
+
+    if [ -f "$profile_path" ] && grep -F -x "$profile_comment" "$profile_path" >/dev/null 2>&1; then
+        comment_exists=true
+    fi
+
     if [ -f "$profile_path" ] && grep -F -x "$path_export" "$profile_path" >/dev/null 2>&1; then
-        printf '%s is already configured in %s.\n' "$install_directory" "$profile_path"
+        path_exists=true
+    fi
+
+    if [ -f "$profile_path" ] && grep -F -x "$command_alias" "$profile_path" >/dev/null 2>&1; then
+        alias_exists=true
+    fi
+
+    if [ "$comment_exists" = true ] && [ "$path_exists" = true ] && [ "$alias_exists" = true ]; then
+        printf 'Crystal Code is already configured in %s.\n' "$profile_path"
+        printf 'Start Crystal Code with: crystal\n'
         return
     fi
 
@@ -44,9 +63,22 @@ configure_path() {
         printf '\n\n\n' >> "$profile_path"
     fi
 
-    printf '%s\n\n' "$path_export" >> "$profile_path"
-    printf 'Added %s to %s.\n' "$install_directory" "$profile_path"
+    if [ "$comment_exists" = false ]; then
+        printf '%s\n' "$profile_comment" >> "$profile_path"
+    fi
+
+    if [ "$path_exists" = false ]; then
+        printf '%s\n' "$path_export" >> "$profile_path"
+    fi
+
+    if [ "$alias_exists" = false ]; then
+        printf '%s\n' "$command_alias" >> "$profile_path"
+    fi
+
+    printf '\n\n' >> "$profile_path"
+    printf 'Configured Crystal Code in %s.\n' "$profile_path"
     printf 'Open a new terminal or run: . %s\n' "$profile_path"
+    printf 'Start Crystal Code with: crystal\n'
 }
 
 detect_asset() {
@@ -124,13 +156,12 @@ if [ -z "$published_binary" ]; then
     fail "The archive does not contain ${binary_name}."
 fi
 
-printf 'Installing %s...\n' "$binary_name"
+published_directory="$(dirname "$published_binary")"
+printf 'Installing Crystal Code files...\n'
 mkdir -p "$install_directory"
-staged_binary="$(mktemp "${install_directory}/.${binary_name}.XXXXXX")"
-cp "$published_binary" "$staged_binary"
-chmod 755 "$staged_binary"
-mv -f "$staged_binary" "${install_directory}/${binary_name}"
+cp -R "$published_directory"/. "$install_directory"/
+chmod 755 "${install_directory}/${binary_name}"
 
-printf 'Installed %s to %s\n' "$archive_name" "${install_directory}/${binary_name}"
+printf 'Installed %s to %s\n' "$archive_name" "$install_directory"
 printf 'Configuring PATH...\n'
 configure_path

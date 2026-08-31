@@ -253,7 +253,7 @@ a baseline. `/clear` starts a new id.
 Self-contained release archives are named
 `CrystalCode-<operating-system>-<architecture>.zip`. The supported values
 are `linux-x64`, `linux-arm64`, `macos-arm64`, and `windows-x64`. The platform
-installers replace only the matching executable under `binaries/code/`.
+installers replace the full platform release contents under `binaries/code/`.
 
 ```text
 ~/.crystal/

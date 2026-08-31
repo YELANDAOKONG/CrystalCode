@@ -36,7 +36,6 @@ function Add-UserPath([string]$directory) {
 
     [Environment]::SetEnvironmentVariable("Path", $updatedPath, "User")
     Write-Host "Added $directory to the user PATH."
-    Write-Host "Open a new terminal to use $binaryName from any directory."
 }
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
@@ -54,8 +53,6 @@ $downloadUrl = "https://github.com/$repository/releases/latest/download/$archive
 $temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("CrystalCode-" + [Guid]::NewGuid().ToString("N"))
 $archivePath = Join-Path $temporaryDirectory $archiveName
 $extractionDirectory = Join-Path $temporaryDirectory "extracted"
-$destinationPath = Join-Path $installDirectory $binaryName
-$stagedPath = Join-Path $installDirectory (".CrystalCode-" + [Guid]::NewGuid().ToString("N") + ".exe")
 
 New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
 
@@ -79,20 +76,16 @@ try {
         Fail "The archive does not contain $binaryName."
     }
 
-    Write-Host "Installing $binaryName..."
+    $publishedDirectory = $publishedBinary.DirectoryName
+    Write-Host "Installing Crystal Code files..."
     New-Item -ItemType Directory -Path $installDirectory -Force | Out-Null
-    Copy-Item -LiteralPath $publishedBinary.FullName -Destination $stagedPath -Force
+    Copy-Item -Path (Join-Path $publishedDirectory "*") -Destination $installDirectory -Recurse -Force
 
-    if (Test-Path -LiteralPath $destinationPath) {
-        [System.IO.File]::Replace($stagedPath, $destinationPath, $null)
-    }
-    else {
-        [System.IO.File]::Move($stagedPath, $destinationPath)
-    }
-
-    Write-Host "Installed $archiveName to $destinationPath"
+    Write-Host "Installed $archiveName to $installDirectory"
     Write-Host "Configuring the user PATH..."
     Add-UserPath $installDirectory
+    Write-Host "Open a new terminal to use CrystalCode from any directory."
+    Write-Host "Start Crystal Code with: CrystalCode"
 }
 finally {
     if (Test-Path -LiteralPath $temporaryDirectory) {
