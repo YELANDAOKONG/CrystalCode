@@ -1,4 +1,4 @@
-# CrystalHarness
+# Crystal Code
 
 A production coding TUI for local repositories. The terminal is the
 only operator surface. It runs a streaming model-and-tool loop, with
