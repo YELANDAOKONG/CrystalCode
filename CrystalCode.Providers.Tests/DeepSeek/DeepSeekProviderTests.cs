@@ -52,7 +52,7 @@ public sealed class DeepSeekProviderTests
             new Uri("https://api.deepseek.com/chat/completions"),
             handler.Request.RequestUri);
         Assert.Equal("Bearer", handler.Request.Headers.Authorization?.Scheme);
-        Assert.Equal("Crystal Code", handler.Request.Headers.GetValues("User-Agent").Single());
+        Assert.Equal("Crystal Code", handler.Request.Headers.UserAgent.ToString());
         Assert.Contains("\"model\":\"deepseek-v4-flash\"", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"max_tokens\":128", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"thinking\":{\"type\":\"enabled\"}", handler.Body, StringComparison.Ordinal);

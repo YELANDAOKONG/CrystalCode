@@ -152,8 +152,7 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
             CharSet = "utf-8"
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
-        // Product tokens cannot contain a space, so the typed User-Agent parser rejects this value.
-        request.Headers.TryAddWithoutValidation("User-Agent", CompatibleWire.UserAgent);
+        request.Headers.UserAgent.ParseAdd(CompatibleWire.UserAgent);
         request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue(stream ? "text/event-stream" : "application/json"));
         if (!string.IsNullOrWhiteSpace(_options.Organization))
