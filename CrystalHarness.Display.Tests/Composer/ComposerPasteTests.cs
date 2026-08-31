@@ -34,4 +34,18 @@ public sealed class ComposerPasteTests
             BracketedPaste.StartMarker + "hi" + BracketedPaste.EndMarker,
             ComposerPaste.Chars(burst));
     }
+
+    [Fact]
+    public void Chars_ReconstructsPasteMarkersWhenEscapeKeyIsEmpty()
+    {
+        var burst = new List<ConsoleKeyInfo>();
+        foreach (var ch in BracketedPaste.StartMarker + "hello" + BracketedPaste.EndMarker)
+        {
+            burst.Add(new ConsoleKeyInfo(ch, default, false, false, false));
+        }
+
+        Assert.Equal(
+            BracketedPaste.StartMarker + "hello" + BracketedPaste.EndMarker,
+            ComposerPaste.Chars(burst));
+    }
 }

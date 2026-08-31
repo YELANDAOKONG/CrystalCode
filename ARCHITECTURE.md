@@ -424,8 +424,10 @@ current tool batch or turn ends. Empty Enter while working interrupts
 immediately and sends. Backspace deletes one character on every
 platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
 plain Backspace as Control; that is still one character. Windows VT
-input leaves `ConsoleKey` empty for Tab, Enter, and letters; those are
-recovered from `KeyChar`. A CR+LF drain is one Enter, not paste. Ctrl+W or
+input leaves `ConsoleKey` empty for Tab, Enter, letters, and Escape;
+those are recovered from `KeyChar`. A CR+LF drain is one Enter, not
+paste. Bracketed-paste CSI must keep the ESC byte even when `Key` is
+empty, or Ctrl+V on Windows is dropped. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
 newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, AutoEdit, and Full.
@@ -452,7 +454,10 @@ when no further bytes are available or the sequence is still incomplete.
 Paste is the text
 between CSI `200~` and `201~`; a printable
 key burst is still treated as paste when those markers are absent.
-The frame polls terminal size and
+Windows `Console.ReadKey` with VT input does not parse those
+sequences the way Unix does: `Key` is often empty and CSI arrives as
+raw `KeyChar` bursts. Display owns that decode (composer keys, paste
+markers, 1007 wheel, arrows). The host does not. The frame polls terminal size and
 repaints when the window is resized. Escape sequences that are not a
 bracketed-paste wrap are not treated as paste. Redirected output stays
 sequential.

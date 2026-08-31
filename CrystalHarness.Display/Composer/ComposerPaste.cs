@@ -25,7 +25,8 @@ public static class ComposerPaste
                 continue;
             }
 
-            if (key.Key == ConsoleKey.Escape)
+            // Windows VT leaves Key empty; ESC must still start CSI paste markers.
+            if (key.Key == ConsoleKey.Escape || key.KeyChar == '\u001b')
             {
                 text.Append('\u001b');
                 if (key.KeyChar is not ('\0' or '\u001b'))
