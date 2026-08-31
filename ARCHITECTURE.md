@@ -441,10 +441,13 @@ is a command prefix. After a verb that takes a fixed argument
 (`/thinking`, `/approval`), Tab also completes the argument. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Up/Down
 arrows navigate composer history or the slash picker when the prompt
-has text. The alternate screen enables alternate-scroll arrows (1007)
-and bracketed paste (2004). It does not enable SGR mouse tracking
-(1000/1006), so left-drag still selects and copies. Wheel reports that
-a terminal still sends are drained without waiting. Escape is held only
+has text. Alternate-scroll (1007) turns the wheel into batched Up/Down
+CSI; a burst of two or more is transcript scroll even when the
+composer has text, so one Windows wheel notch is not dropped. A single
+Up/Down stays history. The alternate screen enables alternate-scroll
+arrows (1007) and bracketed paste (2004). It does not enable SGR mouse
+tracking (1000/1006), so left-drag still selects and copies. Wheel
+reports that a terminal still sends are drained without waiting. Escape is held only
 when no further bytes are available or the sequence is still incomplete.
 Paste is the text
 between CSI `200~` and `201~`; a printable

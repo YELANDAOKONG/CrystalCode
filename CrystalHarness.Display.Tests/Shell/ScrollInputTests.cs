@@ -194,6 +194,30 @@ public sealed class ScrollInputTests
         Assert.False(ScrollInput.TryDelta(burst, composerEmpty: false, pickerOpen: false, 8, out _));
     }
 
+    [Fact]
+    public void TryDelta_BatchedCsiUpScrollsEvenWhenComposerHasText()
+    {
+        var burst = Csi("\u001b[A\u001b[A\u001b[A");
+
+        Assert.True(ScrollInput.TryDelta(burst, composerEmpty: false, pickerOpen: false, 8, out var delta));
+        Assert.Equal(ScrollInput.LineStep * 3, delta);
+        Assert.False(ScrollInput.TryComposerKeys(burst, out _));
+        Assert.False(ScrollInput.IsPaste(burst));
+    }
+
+    [Fact]
+    public void TryDelta_RepeatedArrowKeysScroll()
+    {
+        var burst = new List<ConsoleKeyInfo>
+        {
+            new('\0', ConsoleKey.UpArrow, false, false, false),
+            new('\0', ConsoleKey.UpArrow, false, false, false)
+        };
+
+        Assert.True(ScrollInput.TryDelta(burst, composerEmpty: false, pickerOpen: false, 8, out var delta));
+        Assert.Equal(ScrollInput.LineStep * 2, delta);
+    }
+
     private static List<ConsoleKeyInfo> Csi(string text)
     {
         var burst = new List<ConsoleKeyInfo>();

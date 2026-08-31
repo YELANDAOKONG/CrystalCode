@@ -31,6 +31,12 @@ public static class ScrollInput
             return TrySingleKey(burst[0], composerEmpty, pickerOpen, pageRows, out delta);
         }
 
+        // 1007 wheel and Linux ReadKey both batch arrows. One Up is history.
+        if (TryRepeatedArrowKeys(burst, out delta))
+        {
+            return true;
+        }
+
         return TrySequence(burst, composerEmpty, pickerOpen, pageRows, out delta);
     }
 
@@ -328,26 +334,109 @@ public static class ScrollInput
             return true;
         }
 
-        if (IsPlainUp(text) && composerEmpty && !pickerOpen)
+        if (TryCsiArrowScroll(text, composerEmpty, pickerOpen, out delta))
         {
-            delta = LineStep;
-            return true;
-        }
-
-        if (IsPlainDown(text) && composerEmpty && !pickerOpen)
-        {
-            delta = -LineStep;
             return true;
         }
 
         return false;
     }
 
-    private static bool IsPlainUp(string text) =>
-        text is "\u001b[A" or "\u001bOA";
+    private static bool TryRepeatedArrowKeys(
+        IReadOnlyList<ConsoleKeyInfo> burst,
+        out int delta)
+    {
+        delta = 0;
+        if (burst.Count < 2)
+        {
+            return false;
+        }
 
-    private static bool IsPlainDown(string text) =>
-        text is "\u001b[B" or "\u001bOB";
+        var ups = 0;
+        var downs = 0;
+        foreach (var key in burst)
+        {
+            if (key.Key == ConsoleKey.UpArrow)
+            {
+                ups++;
+                continue;
+            }
+
+            if (key.Key == ConsoleKey.DownArrow)
+            {
+                downs++;
+                continue;
+            }
+
+            return false;
+        }
+
+        delta = (ups - downs) * LineStep;
+        return true;
+    }
+
+    private static bool TryCsiArrowScroll(
+        string text,
+        bool composerEmpty,
+        bool pickerOpen,
+        out int delta)
+    {
+        delta = 0;
+        if (!TryCountCsiArrows(text, out var ups, out var downs))
+        {
+            return false;
+        }
+
+        var ticks = ups + downs;
+        if (ticks == 1 && (!composerEmpty || pickerOpen))
+        {
+            return false;
+        }
+
+        delta = (ups - downs) * LineStep;
+        return true;
+    }
+
+    private static bool TryCountCsiArrows(string text, out int ups, out int downs)
+    {
+        ups = 0;
+        downs = 0;
+        var index = 0;
+        while (index < text.Length)
+        {
+            if (TryConsume(text, ref index, "\u001b[A") || TryConsume(text, ref index, "\u001bOA"))
+            {
+                ups++;
+                continue;
+            }
+
+            if (TryConsume(text, ref index, "\u001b[B") || TryConsume(text, ref index, "\u001bOB"))
+            {
+                downs++;
+                continue;
+            }
+
+            return false;
+        }
+
+        return ups + downs > 0;
+    }
+
+    private static bool TryConsume(string text, ref int index, string sequence)
+    {
+        if (index + sequence.Length > text.Length)
+        {
+            return false;
+        }
+
+        if (string.CompareOrdinal(text, index, sequence, 0, sequence.Length) != 0)
+        {
+            return false;
+        }
+
+        index += sequence.Length;
+        return true;
+    }
 
     private static bool TryMouseWheel(string text, out int delta)
     {
