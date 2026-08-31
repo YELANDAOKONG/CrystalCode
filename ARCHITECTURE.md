@@ -568,8 +568,9 @@ Operator tool sets are not plugins. They are discovered from `tools/` and
 wrapped by `ExternalCatalog`. A dotnet set uses one non-collectible
 `AssemblyLoadContext` for that directory only. Shared contract types
 (`Crystal`, `Crystal.Tools`, and already-loaded `System.*` /
-`Microsoft.*`) come from the default context. That loader does not
-implement `IPlugin` and does not scan `plugins/`.
+`Microsoft.*`) come from the host context that already loaded
+`Crystal.Tools`. That loader does not implement `IPlugin` and does not
+scan `plugins/`.
 
 Environment variables:
 

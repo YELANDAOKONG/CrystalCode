@@ -385,8 +385,11 @@ The release host is **self-contained single-file**
 contract types (`Crystal`, `Crystal.Tools`) live in the host bundle.
 They are not files next to `CrystalCode`. Authors compile against
 `Crystal.Tools` from source or a future pack; at runtime those
-identities must come from the **default** load context, never from a
-DLL copied into the tool folder.
+identities must come from the **host load context** that already
+loaded `Crystal.Tools` (`typeof(ITool).Assembly`), never from a DLL
+copied into the tool folder. Do not call
+`AssemblyLoadContext.Default.LoadFromAssemblyName` for those contracts:
+in testhost isolation that can load a second copy and `is ITool` fails.
 
 ### Load context
 
@@ -399,24 +402,25 @@ Do not use `Assembly.LoadFrom` / `LoadFile` on the default context.
 
 Algorithm for `Load(AssemblyName name)`:
 
-1. If `name` is a **shared** assembly, return
-   `AssemblyLoadContext.Default.LoadFromAssemblyName(name)`. Never load
-   it from the set directory, even if `Crystal.Tools.dll` is sitting
-   there.
-2. Otherwise call `AssemblyDependencyResolver` constructed from the
+1. If `name` is `Crystal` or `Crystal.Tools`, return the already-loaded
+   host assembly (`typeof(ChatMessage).Assembly` / `typeof(ITool).Assembly`).
+   Never load it from the set directory, even if `Crystal.Tools.dll` is
+   sitting there.
+2. If `name` is a **shared** framework assembly already loaded in the
+   host context, return that instance.
+3. Otherwise call `AssemblyDependencyResolver` constructed from the
    set's main DLL path (`*.deps.json` beside it). If it returns a path
    **inside the set directory**, `LoadFromAssemblyPath`.
-3. Otherwise fail the **set** load with an English message naming the
+4. Otherwise fail the **set** load with an English message naming the
    missing assembly. Do not probe the NuGet global cache, the GAC, or
    the workspace.
 
 Unmanaged probe: `ResolvingUnmanagedDll` uses
 `resolver.ResolveUnmanagedDllToPath`. Same directory fence.
 
-**Shared** means: already loaded in the default context, or one of
-`Crystal`, `Crystal.Tools`. Treat every `System.*` and `Microsoft.*`
-assembly that the default context already has as shared, plus
-`netstandard` and `mscorlib`.
+**Shared** means: `Crystal`, `Crystal.Tools`, and every `System.*` /
+`Microsoft.*` assembly already loaded in the host context that owns
+`typeof(ITool).Assembly`, plus `netstandard` and `mscorlib`.
 
 **Private** means everything else, including Newtonsoft.Json. The
 `ITool` boundary is `ToolCall` / `ToolOutput` / `JsonElement`.
@@ -426,10 +430,8 @@ the set folder, ignore that path and go to step 1.
 
 Single-file implications:
 
-- `Default.LoadFromAssemblyName("Crystal.Tools")` must succeed after
-  host startup. If a publish mode ever stops exposing bundled
-  assemblies to the default context, that mode is incompatible with
-  dotnet external tools.
+- `typeof(ITool).Assembly` must be available after host startup. Shared
+  contracts are taken from that host context, not probed from disk.
 - Do not enable trimming or Native AOT on the host while this runner
   exists.
 - The set ALC must not try to load `CrystalCode` from the single-file.

@@ -1,11 +1,14 @@
 using System.Reflection;
 using System.Runtime.Loader;
 
+using Crystal.Chat;
+using Crystal.Tools;
+
 namespace CrystalCode.Tools.External;
 
 /// <summary>
 /// Isolated load context for one tool set assembly. Shared contract types
-/// come from the default context.
+/// come from the host context that already loaded Crystal.Tools.
 /// </summary>
 internal sealed class ExternalLoadContext : AssemblyLoadContext
 {
@@ -24,9 +27,21 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         ArgumentNullException.ThrowIfNull(assemblyName);
-        if (IsShared(assemblyName))
+        var simple = assemblyName.Name;
+        if (string.IsNullOrEmpty(simple))
         {
-            return Default.LoadFromAssemblyName(assemblyName);
+            return null;
+        }
+
+        if (IsContract(simple))
+        {
+            return Contract(simple);
+        }
+
+        var shared = FindLoaded(simple);
+        if (shared is not null && IsFramework(simple))
+        {
+            return shared;
         }
 
         var path = _resolver.ResolveAssemblyToPath(assemblyName);
@@ -36,14 +51,9 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
         }
 
         var full = Path.GetFullPath(path);
-        if (!ExternalPath.IsInside(_directory, full))
+        if (!ExternalPath.IsInside(_directory, full) || IsContract(simple))
         {
             return null;
-        }
-
-        if (IsContract(assemblyName.Name))
-        {
-            return Default.LoadFromAssemblyName(assemblyName);
         }
 
         return LoadFromAssemblyPath(full);
@@ -67,37 +77,30 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
         return LoadUnmanagedDllFromPath(full);
     }
 
-    private static bool IsContract(string? name) =>
-        name is "Crystal" or "Crystal.Tools";
+    private static AssemblyLoadContext HostContext =>
+        GetLoadContext(typeof(ITool).Assembly) ?? Default;
 
-    private static bool IsShared(AssemblyName assemblyName)
+    private static Assembly Contract(string name) =>
+        name.Equals("Crystal.Tools", StringComparison.OrdinalIgnoreCase)
+            ? typeof(ITool).Assembly
+            : typeof(ChatMessage).Assembly;
+
+    private static Assembly? FindLoaded(string name)
     {
-        var simple = assemblyName.Name;
-        if (IsContract(simple))
+        foreach (var assembly in HostContext.Assemblies)
         {
-            return true;
-        }
-
-        if (simple is null)
-        {
-            return false;
-        }
-
-        if (!IsFramework(simple))
-        {
-            return false;
-        }
-
-        foreach (var loaded in Default.Assemblies)
-        {
-            if (string.Equals(loaded.GetName().Name, simple, StringComparison.Ordinal))
+            if (string.Equals(assembly.GetName().Name, name, StringComparison.OrdinalIgnoreCase))
             {
-                return true;
+                return assembly;
             }
         }
 
-        return false;
+        return null;
     }
+
+    private static bool IsContract(string name) =>
+        name.Equals("Crystal", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("Crystal.Tools", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsFramework(string name) =>
         name == "System"
