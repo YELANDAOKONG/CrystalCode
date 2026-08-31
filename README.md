@@ -51,11 +51,9 @@ Invoke-RestMethod `
 To inspect an installer before running it, download it to a file and run it
 manually instead.
 
-The installers do not write credentials, edit shell profiles, or modify PATH.
-They print the PATH update required to invoke CrystalCode by name.
-Run `~/.crystal/binaries/code/CrystalCode` on Linux or macOS, or
-`~/.crystal/binaries/code/CrystalCode.exe` on Windows. Add that directory to
-your own PATH if you want to invoke it by name.
+The installers do not write credentials. On Linux and macOS, the installer
+adds the CrystalCode directory to the selected zsh or bash profile. On Windows,
+it adds that directory to the user-level PATH. A new terminal loads the update.
 
 ## What it does not do
 

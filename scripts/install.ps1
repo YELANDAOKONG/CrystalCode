@@ -12,6 +12,33 @@ function Fail([string]$message) {
     throw $message
 }
 
+function Add-UserPath([string]$directory) {
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $pathEntries = @()
+
+    if (-not [string]::IsNullOrWhiteSpace($userPath)) {
+        $pathEntries = $userPath -split ";" | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+        }
+    }
+
+    if ($pathEntries -contains $directory) {
+        Write-Host "$directory is already configured in the user PATH."
+        return
+    }
+
+    $updatedPath = if ([string]::IsNullOrWhiteSpace($userPath)) {
+        $directory
+    }
+    else {
+        "$userPath;$directory"
+    }
+
+    [Environment]::SetEnvironmentVariable("Path", $updatedPath, "User")
+    Write-Host "Added $directory to the user PATH."
+    Write-Host "Open a new terminal to use $binaryName from any directory."
+}
+
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     Fail "This installer is for Windows."
 }
@@ -61,8 +88,7 @@ try {
     }
 
     Write-Host "Installed $archiveName to $destinationPath"
-    Write-Host "To run $binaryName from any directory, add $installDirectory to your user PATH."
-    Write-Host "Restart your terminal after updating PATH."
+    Add-UserPath $installDirectory
 }
 finally {
     if (Test-Path -LiteralPath $temporaryDirectory) {

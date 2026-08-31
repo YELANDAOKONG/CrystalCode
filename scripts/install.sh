@@ -17,8 +17,8 @@ require_command() {
     fi
 }
 
-print_path_guidance() {
-    profile_path="your shell profile"
+configure_path() {
+    profile_path=""
 
     case "${SHELL:-sh}" in
         */zsh | zsh)
@@ -29,14 +29,24 @@ print_path_guidance() {
             ;;
     esac
 
-    printf '\nTo run %s from any directory, add this line to %s:\n' "$binary_name" "$profile_path"
-    printf '  export PATH="%s:$PATH"\n' "$install_directory"
-
-    if [ "$profile_path" != "your shell profile" ]; then
-        printf 'Then run: . %s\n' "$profile_path"
-    else
-        printf 'Then restart your terminal.\n'
+    if [ -z "$profile_path" ]; then
+        printf 'Installed %s. Add %s to your shell PATH to run it from any directory.\n' "$binary_name" "$install_directory"
+        return
     fi
+
+    path_export="export PATH=\"${install_directory}:\$PATH\""
+    if [ -f "$profile_path" ] && grep -F -x "$path_export" "$profile_path" >/dev/null 2>&1; then
+        printf '%s is already configured in %s.\n' "$install_directory" "$profile_path"
+        return
+    fi
+
+    if [ "$(uname -s)" = "Linux" ]; then
+        printf '\n\n\n' >> "$profile_path"
+    fi
+
+    printf '%s\n\n' "$path_export" >> "$profile_path"
+    printf 'Added %s to %s.\n' "$install_directory" "$profile_path"
+    printf 'Open a new terminal or run: . %s\n' "$profile_path"
 }
 
 detect_asset() {
@@ -83,6 +93,7 @@ detect_asset() {
 require_command curl
 require_command unzip
 require_command mktemp
+require_command grep
 
 asset="$(detect_asset)"
 archive_name="CrystalCode-${asset}.zip"
@@ -118,4 +129,4 @@ chmod 755 "$staged_binary"
 mv -f "$staged_binary" "${install_directory}/${binary_name}"
 
 printf 'Installed %s to %s\n' "$archive_name" "${install_directory}/${binary_name}"
-print_path_guidance
+configure_path
