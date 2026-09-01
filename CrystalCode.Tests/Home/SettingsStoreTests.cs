@@ -25,6 +25,7 @@ public sealed class SettingsStoreTests
         Assert.Equal(ThinkingSelection.Default, settings.ThinkingEffort);
         Assert.True(settings.Skills);
         Assert.True(settings.ExternalTools);
+        Assert.False(settings.EstimatedTokens);
         Assert.True(File.Exists(root.Home.ConfigPath));
     }
 
@@ -153,6 +154,32 @@ public sealed class SettingsStoreTests
         store.Save(settings);
         Assert.Contains(
             "\"externalTools\": false",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_ReadsEstimatedTokensEnabled()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "estimatedTokens": true
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.True(settings.EstimatedTokens);
+        store.Save(settings);
+        Assert.Contains(
+            "\"estimatedTokens\": true",
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
     }

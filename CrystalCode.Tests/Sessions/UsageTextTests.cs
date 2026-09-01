@@ -24,4 +24,12 @@ public sealed class UsageTextTests
         Assert.DoesNotContain(" in ", text, StringComparison.Ordinal);
         Assert.DoesNotContain(" out", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void FormatEstimate_PrefixesTildeAndTitleCaseTokens()
+    {
+        Assert.Equal("~0 Tokens", UsageText.FormatEstimate(0));
+        Assert.Equal("~12 Tokens", UsageText.FormatEstimate(12));
+        Assert.Equal("~10k Tokens", UsageText.FormatEstimate(10_000));
+    }
 }

@@ -20,6 +20,16 @@ public static class UsageText
         return $"CTX {percent}%  ·  {FormatNumber(usage.InputTokenCount)} IN / {FormatNumber(usage.OutputTokenCount)} OUT";
     }
 
+    public static string FormatEstimate(int tokens)
+    {
+        if (tokens < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tokens), tokens, "Token estimate cannot be negative.");
+        }
+
+        return "~" + FormatNumber(tokens) + " Tokens";
+    }
+
     public static string FormatElapsed(TimeSpan elapsed)
     {
         if (elapsed.TotalSeconds < 10)

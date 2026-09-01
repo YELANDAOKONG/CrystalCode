@@ -192,6 +192,7 @@ Top-level fields:
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
+| `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `providers` | Named endpoints and their model tables |
 
@@ -342,8 +343,9 @@ Title Case; short status abbreviations are uppercase. Mode is Plan or
 Work on the composer prompt, not repeated on the status bar. A
 queued-follow-up count appears while items wait. While a turn runs, a
 progress row sits above the status bar (`Awaiting Approval · 5s`,
-`Running Command · 2m18s`, `Thinking`), prefixed with a spinner, and is
-independent of the status-bar activity bullet. Session start and `/cd`
+`Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`), prefixed with a spinner, and is
+independent of the status-bar activity bullet. The `~N Tokens` estimate
+appears only when `estimatedTokens` is on. Session start and `/cd`
 show `Loading Tools` on that row while operator tool sets load, after
 the frame is already up.
 
@@ -362,7 +364,7 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, or `/model`) |
+| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, `/model`, or `/tokens`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
 | Up / Down | Composer history, or slash-picker navigation when the prompt has text; empty Up/Down scroll the transcript |
@@ -504,6 +506,7 @@ Type `/` to open the picker. Built-in verbs:
 | `/plan` | | Toggle Plan / Work |
 | `/approval` | | Cycle or set `default`, `autoedit`, `review`, `fullreview`, `full` |
 | `/thinking` | `/think` | Cycle or set the thinking gear |
+| `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/status` | | Turns, tokens, mode, workspace |
 | `/clear` | `/new` | Start a new conversation (new session id) |
@@ -514,7 +517,9 @@ Type `/` to open the picker. Built-in verbs:
 
 Unknown `/` text prints `unknown command`. `/cd` with no argument
 prints the current workspace root. `/cd` only accepts a directory
-that already exists.
+that already exists. `/tokens` with no argument toggles the live
+progress-row estimate (four characters per token, prefixed with `~`).
+It is not provider-billed usage. The choice is written to `config.json`.
 
 ## Built-in tools
 

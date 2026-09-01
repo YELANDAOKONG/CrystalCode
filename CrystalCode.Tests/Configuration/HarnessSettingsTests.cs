@@ -25,4 +25,21 @@ public sealed class HarnessSettingsTests
         Assert.Equal(200000, next.ActiveModel.ContextWindow);
         Assert.Equal(ProviderName.DeepSeek, settings.Provider);
     }
+
+    [Fact]
+    public void WithEstimatedTokens_SetsHostFlag()
+    {
+        var catalog = ModelSelectionTests.Catalog();
+        var settings = new HarnessSettings(
+            ProviderName.DeepSeek,
+            "deepseek-v4-flash",
+            ApprovalMode.Default,
+            0.8,
+            catalog);
+
+        var next = settings.WithEstimatedTokens(true);
+
+        Assert.True(next.EstimatedTokens);
+        Assert.False(settings.EstimatedTokens);
+    }
 }

@@ -18,6 +18,8 @@ public sealed class SessionCommandTests
     [InlineData("/continue", SessionVerb.Resume)]
     [InlineData("/compact", SessionVerb.Compact)]
     [InlineData("/model", SessionVerb.Model)]
+    [InlineData("/tokens", SessionVerb.Tokens)]
+    [InlineData("/tokens on", SessionVerb.Tokens)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)
     {
         var parsed = SessionCommand.TryParse(input, out var command);

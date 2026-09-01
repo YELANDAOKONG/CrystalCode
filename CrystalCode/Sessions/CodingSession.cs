@@ -139,6 +139,7 @@ public sealed class CodingSession
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
         RefreshSlashCommands();
+        _renderer.ShowEstimatedTokens = _settings.EstimatedTokens;
         _renderer.WriteHeader(
             _settings.Model,
             _workspace.Root,
@@ -308,6 +309,9 @@ public sealed class CodingSession
             case SessionVerb.Thinking:
                 ChangeThinking(command.Argument);
                 return (true, false);
+            case SessionVerb.Tokens:
+                ChangeEstimatedTokens(command.Argument);
+                return (true, false);
             case SessionVerb.Model:
                 ChangeModel(command.Argument);
                 return (true, false);
@@ -418,6 +422,48 @@ public sealed class CodingSession
         RebuildExecutors();
         RefreshChrome();
         _renderer.WriteNote("thinking  " + ThinkingLabel.For(_thinkingEffort));
+    }
+
+    private void ChangeEstimatedTokens(string argument)
+    {
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            _settings = _settings.WithEstimatedTokens(!_settings.EstimatedTokens);
+        }
+        else if (TryParseToggle(argument, out var enabled))
+        {
+            _settings = _settings.WithEstimatedTokens(enabled);
+        }
+        else
+        {
+            _renderer.WriteError("Estimated tokens is on or off.");
+            return;
+        }
+
+        _settingsStore.Save(_settings);
+        _renderer.ShowEstimatedTokens = _settings.EstimatedTokens;
+        _renderer.WriteNote(
+            "estimated tokens  " + (_settings.EstimatedTokens ? "On" : "Off"));
+    }
+
+    private static bool TryParseToggle(string argument, out bool enabled)
+    {
+        enabled = false;
+        var value = argument.Trim();
+        if (value.Equals("on", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            enabled = true;
+            return true;
+        }
+
+        if (value.Equals("off", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("false", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private void ChangeModel(string argument)

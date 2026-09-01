@@ -10,6 +10,16 @@ public static class TokenEstimator
 {
     public const double CharactersPerToken = 4;
 
+    public static int Characters(int count)
+    {
+        if (count <= 0)
+        {
+            return 0;
+        }
+
+        return Math.Max(0, (int)Math.Round(count / CharactersPerToken));
+    }
+
     public static int Text(string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -17,7 +27,7 @@ public static class TokenEstimator
             return 0;
         }
 
-        return Math.Max(0, (int)Math.Round(value.Length / CharactersPerToken));
+        return Characters(value.Length);
     }
 
     public static int Items(IReadOnlyList<ChatItem> items)

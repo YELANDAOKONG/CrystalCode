@@ -7,6 +7,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
 using CrystalCode.Approvals;
+using CrystalCode.Compaction;
 using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Display.Cards;
 using CrystalCode.Display.Composer;
@@ -45,10 +46,32 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private int _paintedWidth;
     private int _paintedHeight;
     private bool _composerPaused;
+    private bool _showEstimatedTokens;
+    private int _streamedCharacters;
 
     public int ContextWindow { get; set; }
 
     public Action? AfterTools { get; set; }
+
+    public bool ShowEstimatedTokens
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _showEstimatedTokens;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _showEstimatedTokens = value;
+                RefreshTokenEstimateUnlocked();
+                PaintUnlocked(force: true);
+            }
+        }
+    }
 
     internal string ChromeWorkspaceRoot
     {
@@ -57,6 +80,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             lock (_gate)
             {
                 return _chrome.WorkspaceRoot;
+            }
+        }
+    }
+
+    internal string ChromeTokenEstimate
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _chrome.TokenEstimate;
             }
         }
     }
@@ -377,6 +411,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             CommitLiveUnlocked();
             _turnClock = Stopwatch.StartNew();
             _toolNames.Clear();
+            _streamedCharacters = 0;
             SetTurnActivityUnlocked("Running", ProgressText.WaitingForModel);
             _chrome.ToolCount = 0;
             _chrome.Elapsed = string.Empty;
@@ -393,6 +428,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Thinking);
                     _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
+                    _streamedCharacters += reasoning.Text.Length;
                     SetTurnActivityUnlocked("Thinking", ProgressText.Thinking);
                     WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
                     PaintUnlocked(force: false);
@@ -400,6 +436,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 case ChatTextDelta text when text.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Assistant);
                     _log.AppendLive(TranscriptKind.Assistant, text.Text);
+                    _streamedCharacters += text.Text.Length;
                     SetTurnActivityUnlocked("Writing", ProgressText.Writing);
                     WriteFallbackDelta(TranscriptKind.Assistant, text.Text);
                     PaintUnlocked(force: false);
@@ -430,6 +467,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             DiscardLiveUnlocked();
+            _streamedCharacters = 0;
             SetTurnActivityUnlocked("Retrying", ProgressText.Retrying(attempt.Attempt, attempt.Delay));
             if (!Framed)
             {
@@ -490,6 +528,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             }
 
             _chrome.ToolCount += results.Count;
+            _streamedCharacters = 0;
             SetTurnActivityUnlocked("Running", ProgressText.WaitingForModel);
             PaintUnlocked(force: true);
         }
@@ -1015,6 +1054,21 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     {
         _chrome.Activity = activity;
         _chrome.Progress = progress;
+        RefreshTokenEstimateUnlocked();
+    }
+
+    private void RefreshTokenEstimateUnlocked()
+    {
+        if (!_showEstimatedTokens
+            || (_chrome.Progress != ProgressText.Thinking
+                && _chrome.Progress != ProgressText.Writing))
+        {
+            _chrome.TokenEstimate = string.Empty;
+            return;
+        }
+
+        _chrome.TokenEstimate = UsageText.FormatEstimate(
+            TokenEstimator.Characters(_streamedCharacters));
     }
 
     private bool Framed => _screen is { IsActive: true };

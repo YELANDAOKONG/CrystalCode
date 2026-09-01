@@ -14,6 +14,8 @@ internal sealed class SettingsDocument
 
     public bool? ExternalTools { get; set; }
 
+    public bool? EstimatedTokens { get; set; }
+
     public double? CompactionThreshold { get; set; }
 
     public Dictionary<string, ProviderDocument>? Providers { get; set; }

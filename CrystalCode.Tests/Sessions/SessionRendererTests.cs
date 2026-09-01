@@ -1,3 +1,6 @@
+using Crystal.Chat;
+using Crystal.Reasoning;
+
 using CrystalCode.Approvals;
 using CrystalCode.Sessions;
 
@@ -19,6 +22,40 @@ public sealed class SessionRendererTests
             workspaceRoot: "/new/workspace");
 
         Assert.Equal("/new/workspace", renderer.ChromeWorkspaceRoot);
+    }
+
+    [Fact]
+    public void OnStreamEvent_EstimatesTokensWhenEnabled()
+    {
+        var renderer = new SessionRenderer { ShowEstimatedTokens = true };
+
+        renderer.OnStreamEvent(
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Trace, "abcdefgh"));
+
+        Assert.Equal("~2 Tokens", renderer.ChromeTokenEstimate);
+    }
+
+    [Fact]
+    public void OnStreamEvent_OmitsTokenEstimateWhenDisabled()
+    {
+        var renderer = new SessionRenderer();
+
+        renderer.OnStreamEvent(
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Trace, "abcdefgh"));
+
+        Assert.Equal(string.Empty, renderer.ChromeTokenEstimate);
+    }
+
+    [Fact]
+    public void ShowEstimatedTokens_ClearsEstimateWhenTurnedOff()
+    {
+        var renderer = new SessionRenderer { ShowEstimatedTokens = true };
+        renderer.OnStreamEvent(
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Trace, "abcdefgh"));
+
+        renderer.ShowEstimatedTokens = false;
+
+        Assert.Equal(string.Empty, renderer.ChromeTokenEstimate);
     }
 
     [Fact]

@@ -189,4 +189,19 @@ public sealed class ShellChromeTests
         Assert.Contains("Running Command · 0s", chrome.ProgressLine(80).Plain, StringComparison.Ordinal);
         Assert.DoesNotContain("2m18s", chrome.ProgressLine(80).Plain, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ProgressLine_AppendsTokenEstimateAfterElapsed()
+    {
+        var chrome = new ShellChrome
+        {
+            Progress = "Thinking",
+            TokenEstimate = "~12 Tokens"
+        };
+        chrome.TickSpinner(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+
+        var line = chrome.ProgressLine(80);
+
+        Assert.Contains("Thinking · 0s · ~12 Tokens", line.Plain, StringComparison.Ordinal);
+    }
 }

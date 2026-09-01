@@ -471,6 +471,12 @@ uses the provider default and the stored choice is unchanged.
 `externalTools` enables operator tool set discovery (default `true`).
 Set it to `false` to skip `tools/` manifests.
 
+`estimatedTokens` shows a live four-characters-per-token estimate on
+the progress row during Thinking and Writing (default `false`). The
+label is prefixed with `~` so it is not mistaken for provider usage.
+`/tokens` toggles it, or sets `on` / `off`. A successful change writes
+`estimatedTokens` to `config.json` (`true` when on; omitted when off).
+
 `protocol` is `deepseek` or `openai`. Models that are not listed cannot be
 selected. There is no global context window.
 
@@ -511,7 +517,9 @@ sets are discovered at session start and on `/cd`, after the frame is
 up, so a slow assembly load does not leave a blank terminal. The
 caption is prefixed with a one-cell spinner
 that advances while the turn is live, plus the current activity
-elapsed time (`5s`, `2m18s`). Elapsed resets when the progress
+elapsed time (`5s`, `2m18s`). When `estimatedTokens` is on, Thinking
+and Writing also show a live estimate (`~1.2k Tokens`) after elapsed
+time. Elapsed resets when the progress
 caption changes. It is independent of the
 status-bar activity bullet (`• Bash`). The row is omitted when
 idle. Assistant text is
@@ -550,7 +558,7 @@ aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
 `/compact`). A slash picker appears while the prompt
 is a command prefix. After a verb that takes an argument
-(`/thinking`, `/approval`, `/model`), Tab also completes the argument.
+(`/thinking`, `/approval`, `/model`, `/tokens`), Tab also completes the argument.
 `/model` completes current-provider models, then a provider name, then
 that provider's models. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Up/Down

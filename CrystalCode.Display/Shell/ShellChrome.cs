@@ -46,6 +46,8 @@ public sealed class ShellChrome
         }
     }
 
+    public string TokenEstimate { get; set; } = string.Empty;
+
     public int ToolCount { get; set; }
 
     public string Elapsed { get; set; } = string.Empty;
@@ -221,6 +223,10 @@ public sealed class ShellChrome
             ? ProgressElapsed.Format(TimeSpan.Zero)
             : _elapsedLabel;
         var suffix = " · " + elapsed;
+        if (!string.IsNullOrWhiteSpace(TokenEstimate))
+        {
+            suffix += " · " + TokenEstimate;
+        }
         var prefixWidth = TextWidth.Measure(prefix);
         var suffixWidth = TextWidth.Measure(suffix);
         if (prefixWidth + suffixWidth >= width)
@@ -243,6 +249,11 @@ public sealed class ShellChrome
             + $"[{Theme.Accent} bold]{MarkupText.Escape(caption)}[/]"
             + $"[{Theme.Rule}] · [/]"
             + $"[{Theme.Muted}]{MarkupText.Escape(elapsed)}[/]";
+        if (!string.IsNullOrWhiteSpace(TokenEstimate))
+        {
+            markup += $"[{Theme.Rule}] · [/][{Theme.Muted}]{MarkupText.Escape(TokenEstimate)}[/]";
+        }
+
         return new PaintLine(markup, plain);
     }
 }
