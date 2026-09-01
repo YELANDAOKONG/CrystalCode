@@ -149,7 +149,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     public void SetSlashCommands(
         IReadOnlyList<ISlashCommand>? extras,
         IReadOnlyList<SlashOption>? thinkingArguments = null,
-        IReadOnlyList<SlashOption>? modelArguments = null)
+        IReadOnlyList<SlashOption>? modelArguments = null,
+        IReadOnlyList<SlashOption>? promptSetArguments = null)
     {
         lock (_gate)
         {
@@ -159,7 +160,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             {
                 var keys = new List<string> { spec.Name };
                 keys.AddRange(spec.Aliases);
-                var arguments = ArgumentsFor(spec, thinkingArguments, modelArguments);
+                var arguments = ArgumentsFor(
+                    spec,
+                    thinkingArguments,
+                    modelArguments,
+                    promptSetArguments);
                 _slashOptions.Add(new SlashOption(spec.Name, spec.Help, keys, arguments));
             }
 
@@ -178,7 +183,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private static IReadOnlyList<SlashOption> ArgumentsFor(
         SlashSpec spec,
         IReadOnlyList<SlashOption>? thinkingArguments,
-        IReadOnlyList<SlashOption>? modelArguments)
+        IReadOnlyList<SlashOption>? modelArguments,
+        IReadOnlyList<SlashOption>? promptSetArguments)
     {
         if (spec.Verb == SessionVerb.Thinking && thinkingArguments is not null)
         {
@@ -188,6 +194,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         if (spec.Verb == SessionVerb.Model && modelArguments is not null)
         {
             return modelArguments;
+        }
+
+        if (spec.Verb == SessionVerb.PromptSet && promptSetArguments is not null)
+        {
+            return promptSetArguments;
         }
 
         return ToArgumentOptions(spec.Arguments);
@@ -214,7 +225,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         string workspaceRoot,
         bool planMode,
         ApprovalMode approval,
-        string thinking = "")
+        string thinking = "",
+        string promptSet = "")
     {
         lock (_gate)
         {
@@ -224,6 +236,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            _chrome.PromptSet = promptSet;
             _composer.PlanMode = planMode;
             if (Framed)
             {
@@ -236,11 +249,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             var thinkingText = string.IsNullOrWhiteSpace(thinking)
                 ? string.Empty
                 : $"  ·  {MarkupText.Escape(thinking)}";
+            var promptText = string.IsNullOrWhiteSpace(promptSet)
+                ? string.Empty
+                : $"  ·  Prompt {MarkupText.Escape(promptSet)}";
             AnsiConsole.MarkupLine(
                 $"[{Theme.Chrome}]{MarkupText.Escape(model)}  ·  [/]"
                 + $"[{modeColor}]{mode}[/]"
                 + $"[{Theme.Chrome}]  ·  {MarkupText.Escape(ApprovalLabel.For(approval))}"
-                + $"{thinkingText}  ·  "
+                + $"{thinkingText}{promptText}  ·  "
                 + $"{MarkupText.Escape(PathDisplay.Shorten(workspaceRoot))}[/]");
             AnsiConsole.WriteLine();
         }
@@ -251,7 +267,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         ApprovalMode approval,
         string thinking = "",
         string? model = null,
-        string? workspaceRoot = null)
+        string? workspaceRoot = null,
+        string? promptSet = null)
     {
         lock (_gate)
         {
@@ -259,6 +276,10 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _composer.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            if (promptSet is not null)
+            {
+                _chrome.PromptSet = promptSet;
+            }
             if (!string.IsNullOrWhiteSpace(model))
             {
                 _chrome.Model = model;
@@ -354,7 +375,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         bool planMode,
         ApprovalMode approval,
         int contextWindow,
-        string thinking = "")
+        string thinking = "",
+        string promptSet = "")
     {
         lock (_gate)
         {
@@ -363,12 +385,16 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            _chrome.PromptSet = promptSet;
             ApplyUsageUnlocked(ledger.Usage, contextWindow);
             var thinkingText = string.IsNullOrWhiteSpace(thinking)
                 ? string.Empty
                 : $"  ·  {thinking}";
+            var promptText = string.IsNullOrWhiteSpace(promptSet)
+                ? string.Empty
+                : $"  ·  Prompt {promptSet}";
             var text = $"{ModeLabel.For(planMode)}  ·  {ApprovalLabel.For(approval)}"
-                + $"{thinkingText}  ·  "
+                + $"{thinkingText}{promptText}  ·  "
                 + $"{ledger.UserTurns} turns  ·  {ledger.ModelCalls} model  ·  "
                 + $"{ledger.ToolCalls} tools  ·  {_chrome.Usage}";
             _log.Add(TranscriptKind.Note, text);

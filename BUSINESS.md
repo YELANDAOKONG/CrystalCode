@@ -35,6 +35,8 @@ operator surface and the only entry. It can:
 - compact conversation context when usage approaches the model window,
   or when the operator runs `/compact`;
 - persist configuration, permissions, and sessions under `~/.crystal`;
+- select a reusable Home prompt set without changing the higher-priority direct
+  prompt overrides in Home or the workspace;
 - list saved sessions for the current workspace or every workspace, resume a
   saved conversation, and fork a conversation into a new independent session;
 - discover OpenCode-compatible agent skills and load them through the
@@ -74,8 +76,9 @@ coding product built on Crystal.
 ## Data
 
 User data lives in `~/.crystal`. Prompts may be replaced in
-`~/.crystal/prompts` and the project's `.crystal/prompts`. Workspace
-hints are appended from `instructions.md`, `.crystal.md`, and
+`~/.crystal/prompts` and the project's `.crystal/prompts`. Home-only reusable
+prompt sets live under `~/.crystal/promptsets`; workspace hints remain
+independent and are appended from `instructions.md`, `.crystal.md`, and
 OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
 are never prompt overlays. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the

@@ -41,6 +41,7 @@ public sealed class CodingSession
     private readonly bool _replayOnStart;
     private Workspace _workspace;
     private PromptSet _prompts;
+    private PromptResolution _promptResolution;
     private SkillCatalog? _skills;
     private ExternalCatalog _external = ExternalCatalog.Empty;
     private ApprovalMode _approval;
@@ -84,7 +85,8 @@ public sealed class CodingSession
         _grants = new GrantStore(home);
         _home = home;
         _skillDiscovery = SkillDiscovery.Create(home);
-        _prompts = _promptStore.Load(workspace.Root);
+        _promptResolution = _promptStore.Resolve(workspace.Root, settings.PromptSet);
+        _prompts = _promptResolution.Prompts;
         ReloadSkills();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _sessionId = SessionStore.NewId();
@@ -147,10 +149,17 @@ public sealed class CodingSession
             _workspace.Root,
             _planMode,
             _approval,
-            CurrentThinkingStatus());
+            CurrentThinkingStatus(),
+            CurrentPromptStatus());
         if (_replayOnStart)
         {
             PresentResume();
+        }
+
+        WritePromptNotes();
+        if (!string.IsNullOrWhiteSpace(CurrentPromptStatus()))
+        {
+            _renderer.WriteNote("prompt set  " + _promptResolution.PromptSet);
         }
 
         ReloadExternalToolsWithProgress();
@@ -333,6 +342,9 @@ public sealed class CodingSession
             case SessionVerb.Model:
                 ChangeModel(command.Argument);
                 return (true, false);
+            case SessionVerb.PromptSet:
+                ChangePromptSet(command.Argument);
+                return (true, false);
             case SessionVerb.Status:
                 _renderer.WriteStatus(
                     _ledger,
@@ -340,7 +352,8 @@ public sealed class CodingSession
                     _planMode,
                     _approval,
                     _settings.ActiveModel.ContextWindow,
-                    CurrentThinkingStatus());
+                    CurrentThinkingStatus(),
+                    CurrentPromptStatus());
                 return (true, false);
             case SessionVerb.Clear:
                 BeginNewSession();
@@ -565,6 +578,41 @@ public sealed class CodingSession
         _renderer.WriteNote("model  " + selection);
     }
 
+    private void ChangePromptSet(string argument)
+    {
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            _renderer.WriteNote(PromptSelectionText.Format(_promptResolution));
+            return;
+        }
+
+        if (_turnActive)
+        {
+            _renderer.WriteError("Finish the current turn before switching prompt sets.");
+            return;
+        }
+
+        var requested = argument.Trim();
+        var resolution = _promptStore.Resolve(_workspace.Root, requested);
+        if (!string.Equals(requested, PromptSetNames.Default, StringComparison.Ordinal)
+            && !string.Equals(requested, resolution.PromptSet, StringComparison.Ordinal))
+        {
+            _renderer.WriteError("prompt set not found  " + requested);
+            return;
+        }
+
+        _settings = _settings.WithPromptSet(resolution.PromptSet);
+        _settingsStore.Save(_settings);
+        _promptResolution = resolution;
+        _prompts = resolution.Prompts;
+        ReplaceLiveSystem();
+        RebuildExecutors();
+        RefreshSlashCommands();
+        RefreshChrome();
+        WritePromptNotes();
+        _renderer.WriteNote("prompt set  " + resolution.PromptSet);
+    }
+
     private IStreamingChatClient CreateClient(HarnessSettings settings)
     {
         if (!_credentials.TryResolve(settings.ActiveProvider, out var apiKey, out var error))
@@ -626,8 +674,10 @@ public sealed class CodingSession
 
     private void ReloadPrompts()
     {
-        _prompts = _promptStore.Load(_workspace.Root);
+        _promptResolution = _promptStore.Resolve(_workspace.Root, _settings.PromptSet);
+        _prompts = _promptResolution.Prompts;
         ReplaceLiveSystem();
+        WritePromptNotes();
     }
 
     private CompactionLimits CurrentLimits() =>
@@ -1051,12 +1101,29 @@ public sealed class CodingSession
     private string CurrentThinkingStatus() =>
         ThinkingStatus.For(_settings.ActiveModel, _thinkingEffort);
 
+    private string CurrentPromptStatus() =>
+        string.Equals(
+            _promptResolution.PromptSet,
+            PromptSetNames.Default,
+            StringComparison.Ordinal)
+                ? string.Empty
+                : _promptResolution.PromptSet;
+
+    private void WritePromptNotes()
+    {
+        foreach (var note in _promptResolution.Notes)
+        {
+            _renderer.WriteNote(note);
+        }
+    }
+
     private void RefreshSlashCommands()
     {
         _renderer.SetSlashCommands(
             _plugins.Commands,
             ThinkingCompletions.For(_settings.ActiveModel),
-            ModelCompletions.For(_settings.Catalog, _settings.Provider));
+            ModelCompletions.For(_settings.Catalog, _settings.Provider),
+            PromptSetCompletions.For(_promptResolution));
     }
 
     private void RefreshChrome()
@@ -1066,7 +1133,8 @@ public sealed class CodingSession
             _approval,
             CurrentThinkingStatus(),
             _settings.Model,
-            _workspace.Root);
+            _workspace.Root,
+            CurrentPromptStatus());
     }
 
     private void PromoteAfterTools()

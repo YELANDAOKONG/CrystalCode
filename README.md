@@ -529,6 +529,7 @@ partial selection; a complete command still submits with one Enter.
 | `/thinking` | `/think` | Cycle or set the thinking gear |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
+| `/promptset` | `/prompts` | List prompt sets and effective sources, or select a set |
 | `/status` | | Turns, tokens, mode, workspace |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
@@ -624,11 +625,31 @@ by placing files under `~/.crystal/prompts` and
 Named files (`work.md`, `plan.md`, `review.md`; `.txt` is also
 accepted):
 
-- Overlay order: built-in default, then `~/.crystal/prompts`, then
-  `<workspace>/.crystal/prompts`.
+- Within direct overrides, the Home file is applied before the project file.
 - A project file replaces the home file for that name.
 - Empty files are treated as missing.
 - The host never writes prompt files.
+
+Prompt set selection is separate from direct prompt overrides. Reusable sets
+live only under `~/.crystal/promptsets/<name>/`; the workspace is never scanned
+for prompt sets. Each set may contain any subset of `work.md`, `plan.md`, and
+`review.md` (`.txt` is also accepted). Missing or empty members use the built-in
+prompt for that name.
+
+Final precedence for each named prompt:
+
+1. Built-in default.
+2. Selected Home prompt set.
+3. Direct `~/.crystal/prompts` override.
+4. Direct `<workspace>/.crystal/prompts` override.
+
+Use `/promptset` (alias `/prompts`) to list available sets and the effective
+source of Work, Plan, and Review. `/promptset <name>` switches and persists the
+selection; `/promptset default` returns to the virtual built-in selection.
+Switching is refused while a turn runs, though listing remains available. A
+non-default set appears as `Prompt <name>` in the status bar and as a startup
+note. If a configured set is missing, Crystal uses default prompts, reports the
+fallback, and leaves the configured name intact.
 
 The built-in Work and Plan assistant name is Crystal Code. A host-owned
 `<env>` block (workspace, git, platform, date, provider/model) is
@@ -776,6 +797,11 @@ Override with `CRYSTAL_HOME` or `--home`.
     work.md
     plan.md
     review.md
+  promptsets/
+    concise/
+      work.md
+      plan.md
+      review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json

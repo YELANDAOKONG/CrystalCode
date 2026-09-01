@@ -7,7 +7,7 @@ namespace CrystalCode.Display.Shell;
 /// </summary>
 public sealed class ShellChrome
 {
-    private static readonly string[] DropSlots = ["total", "elapsed", "model", "path"];
+    private static readonly string[] DropSlots = ["total", "elapsed", "prompt", "model", "path"];
     private int _spinnerFrame;
     private DateTimeOffset _lastSpinner;
     private string _progress = string.Empty;
@@ -23,6 +23,8 @@ public sealed class ShellChrome
     public string Approval { get; set; } = string.Empty;
 
     public string Thinking { get; set; } = string.Empty;
+
+    public string PromptSet { get; set; } = string.Empty;
 
     public string Usage { get; set; } = "CTX --";
 
@@ -74,6 +76,12 @@ public sealed class ShellChrome
         if (!string.IsNullOrWhiteSpace(Thinking))
         {
             items.Add((Thinking, $"[{Theme.Chrome}]{MarkupText.Escape(Thinking)}[/]", "keep"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(PromptSet))
+        {
+            var prompt = "Prompt " + PromptSet;
+            items.Add((prompt, $"[{Theme.Chrome}]{MarkupText.Escape(prompt)}[/]", "prompt"));
         }
 
         if (!string.IsNullOrWhiteSpace(Activity))

@@ -199,5 +199,35 @@ public sealed class SettingsStoreTests
         Assert.Equal("openai", loaded.Provider.Value);
         Assert.Equal("gpt-5.6-sol", loaded.Model);
     }
-}
 
+    [Fact]
+    public void Save_RoundTripsNonDefaultPromptSet()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithPromptSet("concise");
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal("concise", loaded.PromptSet);
+        Assert.Contains(
+            "\"promptSet\": \"concise\"",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_OmitsDefaultPromptSet()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+
+        store.Save(HarnessSettings.CreateDefault());
+
+        Assert.DoesNotContain(
+            "promptSet",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+}

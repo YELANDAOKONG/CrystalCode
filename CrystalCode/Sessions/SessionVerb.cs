@@ -12,6 +12,7 @@ public enum SessionVerb
     Thinking,
     Tokens,
     Model,
+    PromptSet,
     Status,
     Clear,
     Cd,

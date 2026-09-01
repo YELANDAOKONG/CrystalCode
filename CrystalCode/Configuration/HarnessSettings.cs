@@ -16,6 +16,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultEstimatedTokens = false;
 
+    public const string DefaultPromptSet = "default";
+
     public HarnessSettings(
         ProviderName provider,
         string model,
@@ -25,12 +27,14 @@ public sealed record HarnessSettings
         ThinkingSelection? thinkingEffort = null,
         bool skills = DefaultSkills,
         bool externalTools = DefaultExternalTools,
-        bool estimatedTokens = DefaultEstimatedTokens)
+        bool estimatedTokens = DefaultEstimatedTokens,
+        string promptSet = DefaultPromptSet)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentNullException.ThrowIfNull(approval);
         ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentException.ThrowIfNullOrWhiteSpace(promptSet);
 
         if (compactionThreshold is <= 0 or > 1)
         {
@@ -51,6 +55,7 @@ public sealed record HarnessSettings
         Skills = skills;
         ExternalTools = externalTools;
         EstimatedTokens = estimatedTokens;
+        PromptSet = promptSet.Trim();
     }
 
     public ProviderName Provider { get; }
@@ -70,6 +75,8 @@ public sealed record HarnessSettings
     public bool ExternalTools { get; }
 
     public bool EstimatedTokens { get; }
+
+    public string PromptSet { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
 
@@ -128,6 +135,12 @@ public sealed record HarnessSettings
     public HarnessSettings WithEstimatedTokens(bool estimatedTokens) =>
         Copy(estimatedTokens: estimatedTokens);
 
+    public HarnessSettings WithPromptSet(string promptSet)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(promptSet);
+        return Copy(promptSet: promptSet.Trim());
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -135,7 +148,8 @@ public sealed record HarnessSettings
         ThinkingSelection? thinkingEffort = null,
         bool? skills = null,
         bool? externalTools = null,
-        bool? estimatedTokens = null) =>
+        bool? estimatedTokens = null,
+        string? promptSet = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -145,7 +159,8 @@ public sealed record HarnessSettings
             thinkingEffort ?? ThinkingEffort,
             skills ?? Skills,
             externalTools ?? ExternalTools,
-            estimatedTokens ?? EstimatedTokens);
+            estimatedTokens ?? EstimatedTokens,
+            promptSet ?? PromptSet);
 
     public override string ToString() => nameof(HarnessSettings);
 

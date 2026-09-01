@@ -16,6 +16,7 @@ public static class SlashCatalog
         new(SessionVerb.Tokens, "tokens", [], "toggle estimated progress tokens",
             ["on", "off"]),
         new(SessionVerb.Model, "model", [], "show or set provider and model"),
+        new(SessionVerb.PromptSet, "promptset", ["prompts"], "show or select prompt set"),
         new(SessionVerb.Status, "status", [], "turns, tokens, mode"),
         new(SessionVerb.Clear, "clear", ["new"], "new conversation"),
         new(SessionVerb.Cd, "cd", [], "show or set workspace"),

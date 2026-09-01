@@ -204,6 +204,24 @@ overlay file and is refreshed on `/cd`, `/model`, and when the live system
 message is replaced. Skill guidance is host-owned and is not an overlay
 file.
 
+Prompt set selection and direct prompt overrides are separate features. A
+prompt set is a Home-only directory under `~/.crystal/promptsets/<name>` with
+any subset of `work.md`, `plan.md`, and `review.md` (`.txt` is also accepted).
+The host never scans a workspace for prompt sets. `default` is a virtual,
+reserved selection backed by the built-in prompts. A missing or empty file in
+a selected set falls back to the built-in prompt for that name.
+
+The complete named-prompt precedence is built-in, selected prompt set, direct
+`~/.crystal/prompts` override, then direct workspace `.crystal/prompts`
+override. Instructions, skill guidance, the environment block, and compaction
+text are not prompt-set members. `/promptset` (alias `/prompts`) lists sets and
+the effective source of Work, Plan, and Review. `/promptset <name>` switches at
+idle, persists `promptSet` in `config.json`, replaces the live system message,
+and rebuilds Review. `/promptset default` clears the stored selection. A
+configured set that is missing at startup falls back to `default`, reports a
+note, and is not silently rewritten. Resume and fork use the current global
+selection rather than storing a selection in the session.
+
 ## Model
 
 `/model` changes the configured provider and model for the next idle
@@ -350,6 +368,9 @@ installers replace the full platform release contents under `binaries/code/`.
   prompts/work.md
   prompts/plan.md
   prompts/review.md
+  promptsets/<name>/work.md
+  promptsets/<name>/plan.md
+  promptsets/<name>/review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
@@ -500,6 +521,10 @@ uses the provider default and the stored choice is unchanged.
 `externalTools` enables operator tool set discovery (default `true`).
 Set it to `false` to skip `tools/` manifests.
 
+`promptSet` selects a Home prompt set by directory name. It is omitted for the
+virtual `default` selection. Names are 1-64 lowercase alphanumeric words joined
+by single hyphens.
+
 `estimatedTokens` shows a live four-characters-per-token estimate on
 the progress row during Thinking and Writing (default `false`). The
 label is prefixed with `~` so it is not mistaken for provider usage.
@@ -540,7 +565,8 @@ console writer with the self-owned loop.
 
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
-thinking is on), model, workspace, context percent (`CTX`),
+thinking is on), the non-default prompt set as `Prompt <name>`, model,
+workspace, context percent (`CTX`),
 token counts (`IN` / `OUT`), and, when the bar has room, a Title Case
 total (`783k Total`). It also shows tool count (`Tool` / `Tools`), and
 elapsed time. When the session has todos, a pinned `Todos` bar sits
@@ -613,7 +639,7 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
-`/compact`, `/todo` is `/todos`). A slash picker appears while the prompt
+`/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`). A slash picker appears while the prompt
 is a command prefix. After a verb that takes an argument
 (`/thinking`, `/approval`, `/model`, `/tokens`), Tab also completes the argument.
 `/model` completes current-provider models, then a provider name, then

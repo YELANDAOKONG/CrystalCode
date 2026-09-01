@@ -177,6 +177,122 @@ public sealed class PromptStoreTests
         Assert.DoesNotContain("parent agents", prompts.Instructions, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Resolve_SelectedPartialSetFallsBackToBuiltInPrompts()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(
+            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
+            "work.md",
+            "concise work");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, "concise");
+
+        Assert.Equal("concise", resolution.PromptSet);
+        Assert.Equal("concise work", resolution.Prompts.Work);
+        Assert.Equal(PlanPrompt.Text, resolution.Prompts.Plan);
+        Assert.Equal(ApprovalReviewPrompt.SystemText, resolution.Prompts.Review);
+        Assert.Equal(PromptSource.PromptSet, resolution.WorkSource);
+        Assert.Equal(PromptSource.BuiltIn, resolution.PlanSource);
+        Assert.Equal(PromptSource.BuiltIn, resolution.ReviewSource);
+        Assert.Equal(["concise"], resolution.AvailableSets);
+    }
+
+    [Fact]
+    public void Resolve_DirectOverridesWinOverSelectedSet()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(
+            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
+            "work.md",
+            "set work");
+        WritePrompt(home.Home.PromptsDirectory, "work.md", "home work");
+        WritePrompt(
+            Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "prompts"),
+            "work.md",
+            "project work");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, "concise");
+
+        Assert.Equal("project work", resolution.Prompts.Work);
+        Assert.Equal(PromptSource.ProjectOverride, resolution.WorkSource);
+    }
+
+    [Fact]
+    public void Resolve_HomeOverrideWinsWhenProjectOverrideIsMissing()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(
+            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
+            "plan.md",
+            "set plan");
+        WritePrompt(home.Home.PromptsDirectory, "plan.md", "home plan");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, "concise");
+
+        Assert.Equal("home plan", resolution.Prompts.Plan);
+        Assert.Equal(PromptSource.HomeOverride, resolution.PlanSource);
+    }
+
+    [Fact]
+    public void Resolve_DoesNotDiscoverProjectPromptSets()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(
+            Path.Combine(workspace.Path, ".crystal", "promptsets", "project-only"),
+            "work.md",
+            "project set work");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, "project-only");
+
+        Assert.Equal(PromptSetNames.Default, resolution.PromptSet);
+        Assert.Empty(resolution.AvailableSets);
+        Assert.Equal(WorkPrompt.Text, resolution.Prompts.Work);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("was not found", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resolve_SkipsEmptyAndInvalidPromptSets()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(Path.Combine(home.Home.PromptSetsDirectory, "empty"), "work.md", "   ");
+        WritePrompt(Path.Combine(home.Home.PromptSetsDirectory, "Bad_Name"), "work.md", "bad");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default);
+
+        Assert.Empty(resolution.AvailableSets);
+        Assert.Equal(2, resolution.Notes.Count);
+    }
+
+    [Fact]
+    public void Resolve_PromptSetAcceptsTxtButPrefersMd()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(directory, "work.txt", "text work");
+        WritePrompt(directory, "work.md", "markdown work");
+        WritePrompt(directory, "plan.txt", "text plan");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, "concise");
+
+        Assert.Equal("markdown work", resolution.Prompts.Work);
+        Assert.Equal("text plan", resolution.Prompts.Plan);
+    }
+
     private static PromptStore CreateStore(TemporaryHome home) =>
         new(home.Home, InstructionDiscovery.Isolated(home.Home));
 

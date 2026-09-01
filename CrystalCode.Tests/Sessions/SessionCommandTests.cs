@@ -22,6 +22,8 @@ public sealed class SessionCommandTests
     [InlineData("/sessions all", SessionVerb.Sessions)]
     [InlineData("/compact", SessionVerb.Compact)]
     [InlineData("/model", SessionVerb.Model)]
+    [InlineData("/promptset concise", SessionVerb.PromptSet)]
+    [InlineData("/prompts", SessionVerb.PromptSet)]
     [InlineData("/tokens", SessionVerb.Tokens)]
     [InlineData("/tokens on", SessionVerb.Tokens)]
     [InlineData("/todos", SessionVerb.Todos)]

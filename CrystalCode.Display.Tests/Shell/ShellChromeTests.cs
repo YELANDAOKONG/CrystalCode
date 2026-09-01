@@ -98,6 +98,21 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ShowsNonDefaultPromptSet()
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Default",
+            PromptSet = "concise",
+            Usage = "CTX --"
+        };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Contains("Prompt concise", line.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StatusLine_TitleCasesToolCount()
     {
         var one = new ShellChrome

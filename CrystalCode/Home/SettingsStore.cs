@@ -60,7 +60,10 @@ public sealed class SettingsStore
             thinkingEffort,
             document.Skills ?? defaults.Skills,
             document.ExternalTools ?? defaults.ExternalTools,
-            document.EstimatedTokens ?? defaults.EstimatedTokens);
+            document.EstimatedTokens ?? defaults.EstimatedTokens,
+            string.IsNullOrWhiteSpace(document.PromptSet)
+                ? defaults.PromptSet
+                : document.PromptSet.Trim());
     }
 
     public void Save(HarnessSettings settings)
@@ -79,6 +82,12 @@ public sealed class SettingsStore
             Skills = settings.Skills ? null : false,
             ExternalTools = settings.ExternalTools ? null : false,
             EstimatedTokens = settings.EstimatedTokens ? true : null,
+            PromptSet = string.Equals(
+                settings.PromptSet,
+                HarnessSettings.DefaultPromptSet,
+                StringComparison.Ordinal)
+                    ? null
+                    : settings.PromptSet,
             CompactionThreshold = settings.CompactionThreshold,
             Providers = SettingsMapper.WriteProviders(settings.Catalog)
         };

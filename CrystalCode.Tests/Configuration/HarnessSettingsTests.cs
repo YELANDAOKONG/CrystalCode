@@ -42,4 +42,15 @@ public sealed class HarnessSettingsTests
         Assert.True(next.EstimatedTokens);
         Assert.False(settings.EstimatedTokens);
     }
+
+    [Fact]
+    public void WithPromptSet_SetsGlobalSelection()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithPromptSet("concise");
+
+        Assert.Equal("concise", next.PromptSet);
+        Assert.Equal(HarnessSettings.DefaultPromptSet, settings.PromptSet);
+    }
 }

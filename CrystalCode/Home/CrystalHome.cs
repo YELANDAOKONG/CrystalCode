@@ -32,6 +32,8 @@ public sealed class CrystalHome
 
     public string PromptsDirectory => Path.Combine(Root, "prompts");
 
+    public string PromptSetsDirectory => Path.Combine(Root, "promptsets");
+
     public string InstructionsPath => Path.Combine(Root, "instructions.md");
 
     public static CrystalHome Resolve(string? root = null)
