@@ -44,6 +44,11 @@ operator surface and the only entry. It can:
 - discover operator tool sets under `~/.crystal/tools` and
   `<workspace>/.crystal/tools` and register them as extra catalog tools
   when External Tools is enabled;
+- honor an author-declared `approval: always` in a tool set for ordinary
+  workspace-bounded calls, with the operator choosing per source whether
+  declarations take effect through `externalToolApproval` in
+  `config.json` (Home and Project each `author` or `host`; defaults are
+  Home `author`, Project `host`);
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses, and
   Anthropic Messages adapters, including user-added gateways;
 - register built-in tools and providers through an in-process plugin table.
@@ -84,7 +89,9 @@ are never prompt overlays. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the
 `skill` tool when enabled. Operator tool sets live under `tools/` in
 the home and project `.crystal` trees and are loaded as extra `ITool`
-entries when External Tools is enabled. The application never writes
+entries when External Tools is enabled. Whether each source's author
+approval declarations take effect is stored under `externalToolApproval`
+in `config.json`. The application never writes
 secrets into the workspace.
 
 ## Runtime language

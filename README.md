@@ -192,6 +192,7 @@ Top-level fields:
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
+| `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `providers` | Named endpoints and their model tables |

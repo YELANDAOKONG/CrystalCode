@@ -539,6 +539,13 @@ uses the provider default and the stored choice is unchanged.
 `externalTools` enables operator tool set discovery (default `true`).
 Set it to `false` to skip `tools/` manifests.
 
+`externalToolApproval` selects whether author `approval` declarations
+in `tools.json` take effect, independently for the Home and Project
+sources. Each member is `author` or `host`; defaults are Home `author`
+and Project `host`. The object is omitted from the written file when
+both members are the defaults; otherwise only changed members are
+written.
+
 `promptSet` selects a Home prompt set by directory name. It is omitted for the
 virtual `default` selection. Names are 1-64 lowercase alphanumeric words joined
 by single hyphens.
