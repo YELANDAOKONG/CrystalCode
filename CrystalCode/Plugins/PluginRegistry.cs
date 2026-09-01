@@ -34,6 +34,8 @@ public sealed class PluginRegistry
         registry.Add(new WorkspaceToolsPlugin());
         registry.Add(new DeepSeekPlugin());
         registry.Add(new OpenAIPlugin());
+        registry.Add(new ResponsesPlugin());
+        registry.Add(new AnthropicPlugin());
         return registry;
     }
 

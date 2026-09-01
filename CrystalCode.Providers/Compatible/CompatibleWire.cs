@@ -118,6 +118,11 @@ internal static class CompatibleWire
             {
                 code = codeElement.GetString();
             }
+            else if (error.TryGetProperty("type", out var typeElement)
+                && typeElement.ValueKind == JsonValueKind.String)
+            {
+                code = typeElement.GetString();
+            }
 
             string? message = null;
             if (error.TryGetProperty("message", out var messageElement)

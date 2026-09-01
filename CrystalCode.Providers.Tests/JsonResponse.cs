@@ -16,4 +16,13 @@ internal static class JsonResponse
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
     }
+
+    public static HttpResponseMessage CreateStream(string events)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(events);
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(events, Encoding.UTF8, "text/event-stream")
+        };
+    }
 }

@@ -18,11 +18,11 @@ public sealed class PluginRegistryTests
 
         Assert.Contains(registry.Tools, tool => tool.Name == ReadTool.ToolName);
         Assert.Contains(registry.Tools, tool => tool.Name == WriteTool.ToolName);
-        Assert.Equal(2, registry.Clients.Count);
-        Assert.True(registry.Clients[0].CanCreate(ProviderProtocol.DeepSeek)
-            || registry.Clients[1].CanCreate(ProviderProtocol.DeepSeek));
-        Assert.True(registry.Clients[0].CanCreate(ProviderProtocol.OpenAI)
-            || registry.Clients[1].CanCreate(ProviderProtocol.OpenAI));
+        Assert.Equal(4, registry.Clients.Count);
+        Assert.Contains(registry.Clients, client => client.CanCreate(ProviderProtocol.DeepSeek));
+        Assert.Contains(registry.Clients, client => client.CanCreate(ProviderProtocol.OpenAI));
+        Assert.Contains(registry.Clients, client => client.CanCreate(ProviderProtocol.Responses));
+        Assert.Contains(registry.Clients, client => client.CanCreate(ProviderProtocol.Anthropic));
     }
 
     [Fact]

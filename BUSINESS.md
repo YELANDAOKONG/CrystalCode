@@ -37,8 +37,8 @@ operator surface and the only entry. It can:
 - discover operator tool sets under `~/.crystal/tools` and
   `<workspace>/.crystal/tools` and register them as extra catalog tools
   when External Tools is enabled;
-- use DeepSeek and OpenAI-compatible chat adapters, including user-added
-  compatible endpoints;
+- use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses, and
+  Anthropic Messages adapters, including user-added gateways;
 - register built-in tools and providers through an in-process plugin table.
 
 ## Current exclusions
@@ -50,7 +50,8 @@ The current product does not include:
 - MCP servers;
 - a headless CI runner;
 - an operating-system sandbox;
-- Chat Completions dialects other than DeepSeek and OpenAI-compatible;
+- provider protocols other than DeepSeek and OpenAI-compatible Chat
+  Completions, OpenAI Responses, and Anthropic Messages;
 - multimodal coding (images, audio, video).
 
 Those remain later product work. Do not reserve empty public types for them.

@@ -1,6 +1,8 @@
 using CrystalCode.Approvals;
 using CrystalCode.Configuration;
+using CrystalCode.Providers.Anthropic;
 using CrystalCode.Providers.OpenAI;
+using CrystalCode.Providers.Responses;
 
 using Xunit;
 
@@ -34,6 +36,48 @@ public sealed class ChatClientFactoryTests
         try
         {
             Assert.IsType<OpenAIProvider>(client);
+        }
+        finally
+        {
+            (client as IDisposable)?.Dispose();
+        }
+    }
+
+    [Theory]
+    [InlineData("responses")]
+    [InlineData("anthropic")]
+    public void Create_UsesConfiguredWireAdapter(string protocolText)
+    {
+        var protocol = ProviderProtocol.Parse(protocolText);
+        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        [
+            new ProviderDefinition(
+                new ProviderName("gateway"),
+                protocol,
+                new Uri("https://example.test/v1/"),
+                new Dictionary<string, ModelSettings>
+                {
+                    ["model"] = new(200000, maxTokens: 4096)
+                })
+        ]);
+        var settings = new HarnessSettings(
+            new ProviderName("gateway"),
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            catalog);
+
+        var client = ChatClientFactory.Create(settings, "test-key");
+        try
+        {
+            if (protocol == ProviderProtocol.Responses)
+            {
+                Assert.IsType<ResponsesProvider>(client);
+            }
+            else
+            {
+                Assert.IsType<AnthropicProvider>(client);
+            }
         }
         finally
         {

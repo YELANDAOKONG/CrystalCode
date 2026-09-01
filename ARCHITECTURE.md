@@ -98,7 +98,7 @@ CrystalCode (executable):
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
-| `Plugins/Providers` | Built-in DeepSeek and OpenAI client factories |
+| `Plugins/Providers` | Built-in DeepSeek, OpenAI-compatible, Responses, and Anthropic client factories |
 
 CrystalCode.Display:
 
@@ -111,11 +111,13 @@ CrystalCode.Display:
 | `Transcript` | Viewport log, role cards, sequential fallback |
 | `Paint` | Markup, markdown, theme, wrapping |
 
-Provider types live under `CrystalCode.Providers` plus one folder per
-vendor (`DeepSeek`, `OpenAI`). Shared OpenAI-compatible request and stream
-parsing lives in `Compatible` so neither vendor adapter reimplements the
-wire format. Outbound chat requests send a constant `User-Agent` of
-`Crystal Code` with no version.
+Provider types live under `CrystalCode.Providers` plus one folder per wire
+family (`DeepSeek`, `OpenAI`, `Responses`, and `Anthropic`). Shared
+OpenAI-compatible Chat Completions request and stream parsing lives in
+`Compatible`. Shared direct-HTTP lifecycle and SSE framing for Responses and
+Messages lives in `Protocol`; each wire codec still owns its request and event
+semantics. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
+with no version. Provider SDKs are not used.
 
 ## Crystal consumption
 
@@ -415,10 +417,12 @@ libraries from the set directory only, in one `AssemblyLoadContext` per
 set.
 
 Provider names are open. `deepseek` and `openai` are starter entries. A user
-adds an OpenAI-compatible endpoint by inserting another `providers` object
-with `protocol` `openai`, a `baseUri`, and a `models` table. Context size
-and sampling live on each model, not on the host. Thinking capability
-also lives on the model. The current thinking gear is a host setting.
+adds an endpoint by inserting another `providers` object with `protocol`
+`deepseek`, `openai`, `responses`, or `anthropic`, a `baseUri`, and a `models`
+table. A gateway whose models use different wire formats is represented by
+multiple provider entries. Context size and sampling live on each model, not
+on the host. Thinking capability also lives on the model. The current thinking
+gear is a host setting.
 
 ```json
 {
@@ -432,7 +436,7 @@ also lives on the model. The current thinking gear is a host setting.
       "baseUri": "https://openrouter.ai/api/v1/",
       "replayReasoningContent": true,
       "tokenLimit": "max_tokens",
-      "apiKey": "sk-or-...",
+      "apiKey": "{env:OPENROUTER_API_KEY}",
       "apiKeyEnvironment": "OPENROUTER_API_KEY",
       "models": {
         "anthropic/claude-sonnet-4": {
@@ -577,8 +581,8 @@ sequential.
 ## Plugins
 
 `IPlugin` contributes tools, chat-client factories, approval classifiers, or
-slash commands through `PluginContribution`. Built-in tools and the DeepSeek
-and OpenAI adapters register through the same table. `PluginRegistry` does
+slash commands through `PluginContribution`. Built-in tools and all four wire
+protocol adapters register through the same table. `PluginRegistry` does
 not load assemblies from disk. `~/.crystal/plugins/` stays reserved.
 
 Operator tool sets are not plugins. They are discovered from `tools/` and

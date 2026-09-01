@@ -2,6 +2,7 @@ namespace CrystalCode.Configuration;
 
 /// <summary>
 /// Chooses which Chat Completions field carries the output-token cap.
+/// Non-Chat-Completions protocols retain a value for configuration round trips.
 /// </summary>
 public sealed record TokenLimitStyle
 {
@@ -34,6 +35,7 @@ public sealed record TokenLimitStyle
     {
         ArgumentNullException.ThrowIfNull(protocol);
         return protocol == ProviderProtocol.DeepSeek
+            || protocol == ProviderProtocol.Anthropic
             ? MaxTokens
             : MaxCompletionTokens;
     }

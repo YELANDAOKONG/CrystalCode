@@ -24,11 +24,11 @@ From a workspace you want the agent to inspect or change, CrystalCode:
 - compact conversation context when usage approaches the selected
   model's window;
 - persists configuration, permissions, and sessions under `~/.crystal`;
-- talks to DeepSeek and OpenAI-compatible chat endpoints, including
-  operator-added compatible providers.
+- talks to DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
+  and Anthropic Messages endpoints, including operator-added gateways.
 
-Built-in tools and the DeepSeek / OpenAI adapters register through the
-same in-process plugin table. Operators add extra catalog tools as
+Built-in tools and all provider adapters register through the same in-process
+plugin table. Operators add extra catalog tools as
 tool sets under `~/.crystal/tools` and `<workspace>/.crystal/tools`.
 `IPlugin` assemblies are not loaded from `plugins/`.
 
@@ -68,8 +68,8 @@ or `CrystalCode` on Windows.
 
 The current product does not include MCP servers, a headless CI runner,
 an operating-system sandbox, parent/child Agents, multimodal coding
-(images, audio, video), or Chat Completions dialects other than
-DeepSeek and OpenAI-compatible.
+(images, audio, video), or provider protocols other than DeepSeek and
+OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages.
 
 ## Requirements
 
@@ -216,17 +216,22 @@ thinking unless you add it.
 
 | Field | Meaning |
 | :--- | :--- |
-| `protocol` | `deepseek` or `openai` |
-| `baseUri` | Absolute Chat Completions base URI |
-| `organization` | Optional OpenAI organization |
-| `project` | Optional OpenAI project |
+| `protocol` | `deepseek`, `openai`, `responses`, or `anthropic` |
+| `baseUri` | Absolute API base URI; the adapter appends `chat/completions`, `responses`, or `messages` |
+| `organization` | Optional OpenAI organization for the `openai` protocol |
+| `project` | Optional OpenAI project for the `openai` protocol |
 | `replayReasoningContent` | Replay provider reasoning content (DeepSeek always does this) |
-| `tokenLimit` | `max_tokens` or `max_completion_tokens` (DeepSeek defaults to `max_tokens`; OpenAI-compatible defaults to `max_completion_tokens`) |
+| `tokenLimit` | Chat Completions output field: `max_tokens` or `max_completion_tokens` (ignored by `responses` and `anthropic`) |
 | `apiKeyEnvironment` | Preferred environment variable name for this provider |
 | `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |
 | `models` | Table of selectable model ids |
 
 Provider names are letters, digits, hyphen, or underscore.
+
+All protocol adapters send the constant `User-Agent: Crystal Code`, with no
+version. `responses` authenticates with `Authorization: Bearer`; `anthropic`
+uses `x-api-key` and `anthropic-version: 2023-06-01`. Both adapters use direct
+HTTP and JSON/SSE handling; no provider SDK is required.
 
 ### Model fields
 
@@ -283,6 +288,46 @@ Then export `OPENROUTER_API_KEY` in the shell that starts the
 process. Restart after editing `config.json` to add providers. CLI
 `--provider` and `--model` override the file for that run; `/approval`,
 `/thinking`, and `/model` write the new values back to `config.json`.
+
+### Example: add OpenCode Zen protocol endpoints
+
+One OpenCode catalog may be split into multiple provider entries because model
+families use different wire protocols:
+
+```json
+{
+  "providers": {
+    "opencode-zen-responses": {
+      "protocol": "responses",
+      "baseUri": "https://opencode.ai/zen/v1/",
+      "apiKey": "{env:OPENCODE_ZEN_API_KEY}",
+      "models": {
+        "gpt-5.6-sol": {
+          "contextWindow": 1050000,
+          "maxTokens": 128000,
+          "thinking": true,
+          "thinkingEfforts": ["low", "medium", "high", "maximum"]
+        }
+      }
+    },
+    "opencode-zen-anthropic": {
+      "protocol": "anthropic",
+      "baseUri": "https://opencode.ai/zen/v1/",
+      "apiKey": "{env:OPENCODE_ZEN_API_KEY}",
+      "models": {
+        "claude-sonnet-5": {
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "thinking": true,
+          "thinkingEfforts": ["low", "medium", "high", "maximum"]
+        }
+      }
+    }
+  }
+}
+```
+
+Keep Chat Completions models in a separate `protocol: "openai"` provider entry.
 
 ## Interactive session
 
