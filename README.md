@@ -349,7 +349,8 @@ progress row sits above the status bar (`Awaiting Approval · 5s`,
 `Retrying In 8s (Attempt 1)`, `Compacting`), prefixed with a spinner, and is
 independent of the status-bar activity bullet. The `~N Tokens` estimate
 appears only when `estimatedTokens` is on. When the session has todos, a
-pinned `Todos` bar sits above that progress row. Session start and `/cd`
+pinned `Todos` bar sits above that progress row (first four items; `/todos`
+prints the full list). Session start and `/cd`
 show `Loading Tools` on that row while operator tool sets load, after
 the frame is already up.
 
@@ -428,7 +429,7 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | Built-in read, glob, grep, todowrite, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Plan** | Built-in read, glob, grep, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
 | **Work** | Built-in Plan tools plus edit, write, bash, plus external tools listed for Work | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
@@ -529,6 +530,7 @@ Type `/` to open the picker. Built-in verbs:
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
 | `/resume` | `/continue`, `/sessions` | Replay the latest session for this workspace, or `/resume <id>` |
 | `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
+| `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
 | `/quit` | `/exit`, `/q` | Exit |
 
 Unknown `/` text prints `unknown command`. `/cd` with no argument
@@ -555,6 +557,7 @@ is the workspace root.
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`) |
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
+| `todoread` | Plan, Work | Read the current session todo list |
 | `question` | Plan, Work | Ask one or more questions with single/multiple choices and custom answers |
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `edit` | Work | Replace one unique `old_string` in a file |

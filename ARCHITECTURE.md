@@ -175,7 +175,7 @@ Two Ctrl+C presses on an empty composer exit.
 
 These are product modes, not Crystal types.
 
-- Plan registers read, glob, grep, todowrite, and question. When
+- Plan registers read, glob, grep, todowrite, todoread, and question. When
   Skills is enabled, it also registers skill. External tools whose
   `catalogs` include `plan` are appended after the built-ins.
 - Work registers those tools plus edit, write, and bash, then external
@@ -533,7 +533,9 @@ total (`783k Total`). It also shows tool count (`Tool` / `Tools`), and
 elapsed time. When the session has todos, a pinned `Todos` bar sits
 above the progress row and status bar. Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled
-muted. The transcript Result card uses the same colors for
+muted. The bar shows the first four items and a `+N more` line when
+the list is longer; `/todos` (alias `/todo`) prints the full untruncated
+list in the transcript. The transcript Result card uses the same colors for
 `- [ ]` / `- [~]` / `- [x]` / `- [-]` lines so they are not painted as
 diff removals. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode is Plan or Work on the
@@ -593,7 +595,7 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
-`/compact`). A slash picker appears while the prompt
+`/compact`, `/todo` is `/todos`). A slash picker appears while the prompt
 is a command prefix. After a verb that takes an argument
 (`/thinking`, `/approval`, `/model`, `/tokens`), Tab also completes the argument.
 `/model` completes current-provider models, then a provider name, then

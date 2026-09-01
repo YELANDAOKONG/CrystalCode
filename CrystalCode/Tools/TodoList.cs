@@ -1,7 +1,7 @@
 namespace CrystalCode.Tools;
 
 /// <summary>
-/// In-memory session todo list used by todowrite and compaction pins.
+/// In-memory session todo list used by todowrite, todoread, /todos, and compaction pins.
 /// </summary>
 public sealed class TodoList
 {

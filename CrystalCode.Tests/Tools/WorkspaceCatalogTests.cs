@@ -20,6 +20,7 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(catalog.Find(GlobTool.ToolName));
         Assert.NotNull(catalog.Find(GrepTool.ToolName));
         Assert.NotNull(catalog.Find(TodoWriteTool.ToolName));
+        Assert.NotNull(catalog.Find(TodoReadTool.ToolName));
         Assert.NotNull(catalog.Find(QuestionTool.ToolName));
         Assert.Null(catalog.Find(EditTool.ToolName));
         Assert.Null(catalog.Find(WriteTool.ToolName));
@@ -50,6 +51,10 @@ public sealed class WorkspaceCatalogTests
         Assert.Contains(
             "before multi-step work",
             catalog.Find(TodoWriteTool.ToolName)!.Definition.Description,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "without changing the list",
+            catalog.Find(TodoReadTool.ToolName)!.Definition.Description,
             StringComparison.Ordinal);
     }
 

@@ -18,6 +18,8 @@ public sealed class SlashCatalogTests
     [InlineData("/summarize", SessionVerb.Compact)]
     [InlineData("/model", SessionVerb.Model)]
     [InlineData("/tokens", SessionVerb.Tokens)]
+    [InlineData("/todos", SessionVerb.Todos)]
+    [InlineData("/todo", SessionVerb.Todos)]
     public void TryParse_MapsAliases(string input, SessionVerb verb)
     {
         var parsed = SessionCommand.TryParse(input, out var command);

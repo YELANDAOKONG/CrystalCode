@@ -356,6 +356,9 @@ public sealed class CodingSession
                 return (true, false);
             case SessionVerb.Compact:
                 return (true, false);
+            case SessionVerb.Todos:
+                ShowTodoList();
+                return (true, false);
             case SessionVerb.Quit:
                 return (true, true);
             case SessionVerb.Unknown:
@@ -1017,6 +1020,11 @@ public sealed class CodingSession
         }
 
         _renderer.SetTodos(items);
+    }
+
+    private void ShowTodoList()
+    {
+        _renderer.WriteNote(_todos.Format());
     }
 
     private void ShowQueue()

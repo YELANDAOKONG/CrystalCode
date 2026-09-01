@@ -25,4 +25,26 @@ public sealed class TodoListTests
         Assert.Contains("- [x] done", text, StringComparison.Ordinal);
         Assert.Contains("- [-] skip", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Format_IncludesEveryItem()
+    {
+        var todos = new TodoList();
+        var items = new List<TodoItem>();
+        for (var i = 0; i < 12; i++)
+        {
+            items.Add(new TodoItem(i.ToString(), "task " + i, TodoStatus.Pending));
+        }
+
+        todos.Replace(items);
+        var text = todos.Format();
+
+        Assert.StartsWith("12 todos", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("more", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("...", text, StringComparison.Ordinal);
+        for (var i = 0; i < 12; i++)
+        {
+            Assert.Contains("task " + i, text, StringComparison.Ordinal);
+        }
+    }
 }

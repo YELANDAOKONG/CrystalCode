@@ -15,7 +15,7 @@ public static class PlanPrompt
         # How to plan
         1. Inspect before you write the plan. Use glob, grep, and read until you understand the relevant code, conventions, and how this repository verifies work.
         2. When something is uncertain or a choice would change the plan, ask the smallest useful set of specific questions in one question call. Do not treat a guess as a fact in the plan.
-        3. Record the steps with todowrite. Keep exactly one item in_progress. Mark the current item completed when the plan is written.
+        3. Record the steps with todowrite. Keep exactly one item in_progress. Mark the current item completed when the plan is written. Use todoread to inspect the current list without changing it.
         4. Stop when the plan is complete enough to execute: the goal is clear, the important paths and files are named, and verification is written down.
 
         # A good plan

@@ -18,6 +18,8 @@ public sealed class ProgressTextTests
     [InlineData(EditTool.ToolName, "Editing")]
     [InlineData(WriteTool.ToolName, "Writing File")]
     [InlineData(GrepTool.ToolName, "Searching")]
+    [InlineData(TodoWriteTool.ToolName, "Updating Todos")]
+    [InlineData(TodoReadTool.ToolName, "Reading Todos")]
     public void Running_MapsKnownTools(string name, string expected)
     {
         Assert.Equal(expected, ProgressText.Running(name));
@@ -27,6 +29,7 @@ public sealed class ProgressTextTests
     public void Calling_TitleCasesTheTool()
     {
         Assert.Equal("Calling TodoWrite", ProgressText.Calling("todowrite"));
+        Assert.Equal("Calling TodoRead", ProgressText.Calling("todoread"));
     }
 
     [Fact]

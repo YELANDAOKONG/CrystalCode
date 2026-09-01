@@ -11,6 +11,7 @@ public sealed class PlanPromptTests
     {
         Assert.Contains("You are Crystal Code", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todowrite", PlanPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("todoread", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("question", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("smallest useful set", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("Do not edit", PlanPrompt.Text, StringComparison.Ordinal);

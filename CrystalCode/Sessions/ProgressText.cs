@@ -59,6 +59,7 @@ public static class ProgressText
             GlobTool.ToolName => "Searching",
             GrepTool.ToolName => "Searching",
             TodoWriteTool.ToolName => "Updating Todos",
+            TodoReadTool.ToolName => "Reading Todos",
             QuestionTool.ToolName => "Asking",
             SkillTool.ToolName => "Loading Skill",
             _ => "Running: " + DisplayCase.Token(toolName)

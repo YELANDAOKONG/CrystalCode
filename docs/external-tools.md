@@ -62,7 +62,7 @@ one-element `tools` array. Shorthand therefore requires a directory
 name that is also a legal tool name (no `.` in the directory).
 
 Tool names must be unique in the process catalog. Built-ins (`read`,
-`glob`, `grep`, `todowrite`, `question`, `edit`, `write`, `bash`,
+`glob`, `grep`, `todowrite`, `todoread`, `question`, `edit`, `write`, `bash`,
 `skill`) win. An exec set whose tool name is reserved is skipped. A
 dotnet type whose `Definition.Name` is reserved is omitted. Two sets
 that both contribute `deploy` collide the same way: the later name is

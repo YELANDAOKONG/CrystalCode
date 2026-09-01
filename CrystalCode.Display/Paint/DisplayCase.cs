@@ -18,6 +18,7 @@ public static class DisplayCase
             "autoedit" => "AutoEdit",
             "fullreview" => "FullReview",
             "todowrite" => "TodoWrite",
+            "todoread" => "TodoRead",
             "outside_workspace" => "Outside Workspace",
             "privileged_escalation" => "Privileged Escalation",
             _ => Words(value.Replace('_', ' '))

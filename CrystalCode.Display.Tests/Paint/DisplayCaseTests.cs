@@ -12,6 +12,7 @@ public sealed class DisplayCaseTests
         Assert.Equal("Review", DisplayCase.Token("review"));
         Assert.Equal("Read", DisplayCase.Token("read"));
         Assert.Equal("TodoWrite", DisplayCase.Token("todowrite"));
+        Assert.Equal("TodoRead", DisplayCase.Token("todoread"));
         Assert.Equal("AutoEdit", DisplayCase.Token("autoedit"));
         Assert.Equal("FullReview", DisplayCase.Token("fullreview"));
         Assert.Equal("Outside Workspace", DisplayCase.Token("outside_workspace"));

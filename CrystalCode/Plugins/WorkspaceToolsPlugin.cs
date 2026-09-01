@@ -31,6 +31,10 @@ public sealed class WorkspaceToolsPlugin : IPlugin
                     true,
                     (_, todos, _) => new TodoWriteTool(todos)),
                 new FactoryToolContribution(
+                    TodoReadTool.ToolName,
+                    true,
+                    (_, todos, _) => new TodoReadTool(todos)),
+                new FactoryToolContribution(
                     QuestionTool.ToolName,
                     true,
                     (_, _, prompt) => new QuestionTool(prompt)),
