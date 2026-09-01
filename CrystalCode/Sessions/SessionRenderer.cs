@@ -904,6 +904,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     private string? DispatchUnlocked(IInputEvent item, int pageRows, Func<bool> togglePlan)
     {
+        if (BelowUsableSize(out _, out _))
+        {
+            return null;
+        }
+
         switch (item)
         {
             case InputPaste paste:
@@ -1077,6 +1082,18 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
 
         var now = DateTimeOffset.UtcNow;
+        if (BelowUsableSize(out var width, out var height))
+        {
+            var sizeChanged = width != _paintedWidth || height != _paintedHeight;
+            if (!force && !sizeChanged && now - _lastPaint < PaintBudget)
+            {
+                return;
+            }
+
+            PaintTooSmallUnlocked(width, height, now);
+            return;
+        }
+
         if (!force && now - _lastPaint < PaintBudget)
         {
             return;
@@ -1110,6 +1127,35 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             showCursor: !_composerPaused);
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
+        _lastPaint = now;
+    }
+
+    private static bool BelowUsableSize(out int width, out int height)
+    {
+        if (!ScreenSize.TryRead(out width, out height))
+        {
+            return false;
+        }
+
+        return BelowUsableSize(width, height);
+    }
+
+    private static bool BelowUsableSize(int width, int height) =>
+        width < ShellLayout.MinUsableWidth || height < ShellLayout.MinUsableHeight;
+
+    private void PaintTooSmallUnlocked(int width, int height, DateTimeOffset now)
+    {
+        var message = $"Terminal too small - resize to at least "
+            + $"{ShellLayout.MinUsableWidth}x{ShellLayout.MinUsableHeight} "
+            + $"(currently {width}x{height})";
+        var paintWidth = Math.Max(1, width);
+        var paintHeight = Math.Max(1, height);
+        _painter.PaintFrame(
+            FrameRows.Notice(paintWidth, paintHeight, message),
+            paintHeight,
+            resetFrame: width != _paintedWidth || height != _paintedHeight);
+        _paintedWidth = width;
+        _paintedHeight = height;
         _lastPaint = now;
     }
 
@@ -1197,23 +1243,49 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         bool ignorePause,
         CancellationToken cancellationToken)
     {
+        var discardQueued = false;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var paused = false;
+            var tooSmall = false;
             lock (_gate)
             {
                 paused = !ignorePause && _composerPaused;
+                var haveSize = ScreenSize.TryRead(out var pollWidth, out var pollHeight);
+                tooSmall = haveSize && BelowUsableSize(pollWidth, pollHeight);
+                var sizeChanged = haveSize
+                    ? pollWidth != _paintedWidth || pollHeight != _paintedHeight
+                    : ScreenSize.Width != _paintedWidth || ScreenSize.Height != _paintedHeight;
+                if (sizeChanged || _chrome.SpinnerDue(DateTimeOffset.UtcNow))
+                {
+                    PaintUnlocked(force: true);
+                }
+            }
+
+            if (tooSmall)
+            {
+                discardQueued = true;
+                await DiscardAvailableKeysAsync(cancellationToken);
+                if (wake is { IsCompleted: true })
+                {
+                    return null;
+                }
+
+                await Task.Delay(PollMilliseconds, cancellationToken);
+                continue;
+            }
+
+            if (discardQueued)
+            {
+                discardQueued = false;
+                await DiscardAvailableKeysAsync(cancellationToken);
             }
 
             if (!paused && Console.KeyAvailable)
             {
-                return await KeyBurst.ReadAsync(
-                    () => Console.KeyAvailable,
-                    () => Console.ReadKey(intercept: true),
-                    token => Task.Delay(EscapeHoldMilliseconds, token),
-                    cancellationToken);
+                return await ReadBurstAsync(cancellationToken);
             }
 
             if (wake is { IsCompleted: true })
@@ -1221,17 +1293,28 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 return null;
             }
 
-            lock (_gate)
-            {
-                if (ScreenSize.Width != _paintedWidth
-                    || ScreenSize.Height != _paintedHeight
-                    || _chrome.SpinnerDue(DateTimeOffset.UtcNow))
-                {
-                    PaintUnlocked(force: true);
-                }
-            }
-
             await Task.Delay(PollMilliseconds, cancellationToken);
         }
     }
+
+    private async Task DiscardAvailableKeysAsync(CancellationToken cancellationToken)
+    {
+        if (!Console.KeyAvailable)
+        {
+            return;
+        }
+
+        var burst = await ReadBurstAsync(cancellationToken);
+        lock (_gate)
+        {
+            _decoder.Push(burst);
+        }
+    }
+
+    private Task<List<ConsoleKeyInfo>> ReadBurstAsync(CancellationToken cancellationToken) =>
+        KeyBurst.ReadAsync(
+            () => Console.KeyAvailable,
+            () => Console.ReadKey(intercept: true),
+            token => Task.Delay(EscapeHoldMilliseconds, token),
+            cancellationToken);
 }

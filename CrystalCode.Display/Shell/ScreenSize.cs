@@ -2,12 +2,13 @@ namespace CrystalCode.Display.Shell;
 
 /// <summary>
 /// Current terminal size, with a fallback when the console is detached.
+/// Width and Height clamp to the layout floor; TryRead reports the raw size.
 /// </summary>
 public static class ScreenSize
 {
-    public static int Width => TryRead(out var width, out _) ? width : 80;
+    public static int Width => TryRead(out var width, out _) ? Math.Max(width, ShellLayout.MinWidth) : 80;
 
-    public static int Height => TryRead(out _, out var height) ? height : 24;
+    public static int Height => TryRead(out _, out var height) ? Math.Max(height, ShellLayout.MinHeight) : 24;
 
     public static bool TryRead(out int width, out int height)
     {
@@ -15,8 +16,8 @@ public static class ScreenSize
         height = 24;
         try
         {
-            width = Math.Max(Console.WindowWidth, ShellLayout.MinWidth);
-            height = Math.Max(Console.WindowHeight, ShellLayout.MinHeight);
+            width = Console.WindowWidth;
+            height = Console.WindowHeight;
             return true;
         }
         catch (IOException)

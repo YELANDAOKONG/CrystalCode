@@ -56,6 +56,50 @@ public sealed class FrameRowsTests
     }
 
     [Fact]
+    public void Notice_CentersMessageInFullHeightFrame()
+    {
+        var frame = FrameRows.Notice(40, 10, "too small");
+
+        Assert.Equal(10, frame.Count);
+        Assert.Equal("too small", frame[4].Plain.Trim());
+        Assert.StartsWith(new string(' ', 15), frame[4].Plain, StringComparison.Ordinal);
+        Assert.All(frame.Where((_, index) => index != 4), line => Assert.Equal(PaintLine.Blank, line));
+    }
+
+    [Fact]
+    public void Notice_TruncatesMessageToWidth()
+    {
+        var frame = FrameRows.Notice(8, 3, "too small notice");
+
+        Assert.Equal(3, frame.Count);
+        Assert.True(TextWidth.Measure(frame[1].Plain) <= 8);
+        Assert.Contains("too", frame[1].Plain, StringComparison.Ordinal);
+        Assert.Contains(Theme.Fail, frame[1].Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(Theme.Chrome, frame[1].Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Notice_SurvivesTinyAndZeroHeights()
+    {
+        var one = FrameRows.Notice(10, 1, "too small");
+        var floor = FrameRows.Notice(10, 0, "too small");
+
+        Assert.Single(one);
+        Assert.Single(floor);
+        Assert.Equal("too small", one[0].Plain.Trim());
+        Assert.Equal("too small", floor[0].Plain.Trim());
+    }
+
+    [Fact]
+    public void Notice_SurvivesZeroWidth()
+    {
+        var frame = FrameRows.Notice(0, 4, "too small");
+
+        Assert.Equal(4, frame.Count);
+        Assert.All(frame, line => Assert.Equal(PaintLine.Blank, line));
+    }
+
+    [Fact]
     public void Dirty_AllRowsWhenPreviousMissingOrSizeChanges()
     {
         var current = new[] { PaintLine.Colored("grey50", "a"), PaintLine.Blank };

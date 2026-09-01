@@ -46,6 +46,26 @@ public static class FrameRows
         return lines;
     }
 
+    public static IReadOnlyList<PaintLine> Notice(int width, int height, string message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        var rows = Math.Max(1, height);
+        var frame = new PaintLine[rows];
+        Array.Fill(frame, PaintLine.Blank);
+        var columns = Math.Max(0, width);
+        if (columns < 1)
+        {
+            return frame;
+        }
+
+        var truncated = TextWidth.Measure(message) <= columns
+            ? message
+            : TextWidth.Truncate(message, columns);
+        var padding = Math.Max(0, (columns - TextWidth.Measure(truncated)) / 2);
+        frame[(rows - 1) / 2] = PaintLine.Colored(Theme.Fail, new string(' ', padding) + truncated);
+        return frame;
+    }
+
     public static IReadOnlyList<int> Dirty(
         IReadOnlyList<PaintLine>? previous,
         IReadOnlyList<PaintLine> current)

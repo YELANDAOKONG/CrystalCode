@@ -502,7 +502,13 @@ viewport, optional overlay, optional progress row, status bar, and multiline
 composer. Unchanged
 rows are left in place; a width or height change clears the buffer. The
 executable maps turns onto that frame through `SessionRenderer`; it does
-not paint rows itself.
+not paint rows itself. When the terminal drops below the usable minimum
+(`ShellLayout.MinUsableWidth` x `ShellLayout.MinUsableHeight`, 80x24),
+the frame is replaced by a centered resize notice sized to the real
+terminal and input is ignored, including keys typed while the window is
+too small. The session resumes automatically once the window is large
+enough. `ShellLayout.MinWidth`/`MinHeight` (16x8) remain a math floor
+for layout only.
 
 Terminal.Gui is referenced from CrystalCode.Display with a floating
 version and is not used. Do not call `Application.Init` or mix a second

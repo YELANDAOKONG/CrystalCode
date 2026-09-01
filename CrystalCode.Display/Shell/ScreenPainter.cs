@@ -33,38 +33,7 @@ public sealed class ScreenPainter
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
         var frame = FrameRows.Assemble(regions, transcript, overlay, status, queue, composer, progress);
-        var rewriteAll = resetFrame || _previous is null || _previous.Length != frame.Count;
-        var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame);
-        AnsiConsole.Cursor.Hide();
-        if (rewriteAll)
-        {
-            AnsiConsole.Write(new ControlCode("\u001b[2J\u001b[H"));
-        }
-
-        // Wrap-off plus absolute rows: a full-width write must not scroll the frame.
-        AnsiConsole.Write(new ControlCode("\u001b[?7l"));
-        try
-        {
-            if (rewriteAll)
-            {
-                for (var row = 0; row < frame.Count; row++)
-                {
-                    WriteLine(frame[row], row, regions.Height);
-                }
-            }
-            else
-            {
-                foreach (var row in dirty!)
-                {
-                    WriteLine(frame[row], row, regions.Height);
-                }
-            }
-        }
-        finally
-        {
-            AnsiConsole.Write(new ControlCode("\u001b[?7h"));
-        }
-
+        WriteFrame(frame, regions.Height, resetFrame);
         if (showCursor)
         {
             var cursorLine = Math.Clamp(
@@ -81,6 +50,49 @@ public sealed class ScreenPainter
         }
 
         _previous = [.. frame];
+    }
+
+    public void PaintFrame(IReadOnlyList<PaintLine> frame, int height, bool resetFrame)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        WriteFrame(frame, height, resetFrame);
+        AnsiConsole.Cursor.Hide();
+        _previous = [.. frame];
+    }
+
+    private void WriteFrame(IReadOnlyList<PaintLine> frame, int height, bool resetFrame)
+    {
+        var rewriteAll = resetFrame || _previous is null || _previous.Length != frame.Count;
+        var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame);
+        AnsiConsole.Cursor.Hide();
+        if (rewriteAll)
+        {
+            AnsiConsole.Write(new ControlCode("\u001b[2J\u001b[H"));
+        }
+
+        // Wrap-off plus absolute rows: a full-width write must not scroll the frame.
+        AnsiConsole.Write(new ControlCode("\u001b[?7l"));
+        try
+        {
+            if (rewriteAll)
+            {
+                for (var row = 0; row < frame.Count; row++)
+                {
+                    WriteLine(frame[row], row, height);
+                }
+            }
+            else
+            {
+                foreach (var row in dirty!)
+                {
+                    WriteLine(frame[row], row, height);
+                }
+            }
+        }
+        finally
+        {
+            AnsiConsole.Write(new ControlCode("\u001b[?7h"));
+        }
     }
 
     private static void WriteLine(PaintLine line, int row, int height)

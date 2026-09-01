@@ -13,9 +13,17 @@ public static class ShellLayout
 
     public const int MinTranscriptRows = 3;
 
+    /// <summary>Math floor for layout measurements.</summary>
     public const int MinWidth = 16;
 
+    /// <summary>Math floor for layout measurements.</summary>
     public const int MinHeight = 8;
+
+    /// <summary>Smallest terminal that gets a real frame; smaller terminals get a resize notice.</summary>
+    public const int MinUsableWidth = 80;
+
+    /// <summary>Smallest terminal that gets a real frame; smaller terminals get a resize notice.</summary>
+    public const int MinUsableHeight = 24;
 
     public static ShellRegions Measure(
         int width,
