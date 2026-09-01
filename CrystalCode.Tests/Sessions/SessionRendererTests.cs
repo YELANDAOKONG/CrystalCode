@@ -2,6 +2,7 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 
 using CrystalCode.Approvals;
+using CrystalCode.Display.Input;
 using CrystalCode.Sessions;
 
 using Xunit;
@@ -74,5 +75,22 @@ public sealed class SessionRendererTests
         var renderer = new SessionRenderer();
 
         Assert.False(renderer.TryClearComposer());
+    }
+
+    [Fact]
+    public void TryReadKeyScroll_PlainArrowReservedForQuestionSelection()
+    {
+        var up = new InputKey(ConsoleKey.UpArrow, '\0', ConsoleModifiers.None);
+
+        Assert.False(SessionRenderer.TryReadKeyScroll(
+            up,
+            scrollPlainArrows: false,
+            pageRows: 10,
+            out _));
+        Assert.True(SessionRenderer.TryReadKeyScroll(
+            up,
+            scrollPlainArrows: true,
+            pageRows: 10,
+            out _));
     }
 }

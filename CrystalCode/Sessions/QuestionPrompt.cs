@@ -36,7 +36,9 @@ public sealed class QuestionPrompt : IUserPrompt
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 _renderer.SetOverlay(CardWidget(flow));
-                var key = await _renderer.ReadKeyAsync(cancellationToken);
+                var key = await _renderer.ReadKeyAsync(
+                    scrollPlainArrows: false,
+                    cancellationToken);
                 if (key.Key == ConsoleKey.Escape)
                 {
                     return new QuestionResponse([], IsRejected: true);
@@ -113,18 +115,13 @@ public sealed class QuestionPrompt : IUserPrompt
         var action = flow.SelectCurrent();
         if (action.EditCustom)
         {
-            var draft = _renderer.ReplaceComposer(flow.CurrentCustom);
-            string answer;
-            try
+            var answer = await _renderer.ReadOverlayInputAsync(
+                flow.CurrentCustom,
+                (text, cursor) => CustomInputWidget(flow, text, cursor),
+                cancellationToken);
+            if (answer is null)
             {
-                answer = await _renderer.ReadInputAsync(
-                    planMode: false,
-                    static () => false,
-                    cancellationToken);
-            }
-            finally
-            {
-                _renderer.ReplaceComposer(draft);
+                return null;
             }
 
             action = flow.SaveCustom(answer);
@@ -174,9 +171,35 @@ public sealed class QuestionPrompt : IUserPrompt
             blocks.Add(QuestionWidget(flow));
         }
 
+        return PanelWidget("Question", blocks);
+    }
+
+    private static IRenderable CustomInputWidget(
+        QuestionFlow flow,
+        string text,
+        int cursor)
+    {
+        var blocks = new List<IRenderable>();
+        if (!flow.IsSingle)
+        {
+            blocks.Add(TabWidget(flow));
+        }
+
+        blocks.Add(QuestionWidget(flow, showFooter: false));
+        var before = MarkupText.Escape(text[..cursor]);
+        var after = MarkupText.Escape(text[cursor..]);
+        blocks.Add(new Markup(
+            $"[{Theme.User} bold]Answer > [/]{before}[{Theme.Accent} bold]|[/]{after}"));
+        blocks.Add(new Markup(
+            $"[{Theme.Muted}]Enter Save  Esc Cancel  Ctrl+J Newline[/]"));
+        return PanelWidget("Custom Answer", blocks);
+    }
+
+    private static IRenderable PanelWidget(string title, IReadOnlyList<IRenderable> blocks)
+    {
         var panel = new Panel(new Rows(blocks))
         {
-            Header = new PanelHeader("Question"),
+            Header = new PanelHeader(title),
             Border = BoxBorder.Rounded,
             BorderStyle = Style.Parse(Theme.Chrome),
             Padding = new Padding(1, 0, 1, 0),
@@ -202,7 +225,7 @@ public sealed class QuestionPrompt : IUserPrompt
         return new Markup(string.Join($" [{Theme.Chrome}]|[/] ", tabs));
     }
 
-    private static IRenderable QuestionWidget(QuestionFlow flow)
+    private static IRenderable QuestionWidget(QuestionFlow flow, bool showFooter = true)
     {
         var current = flow.Current!;
         var blocks = new List<IRenderable>
@@ -242,10 +265,14 @@ public sealed class QuestionPrompt : IUserPrompt
         }
 
         blocks.Add(grid);
-        var action = current.Multiple ? "Enter/Space Toggle" : "Enter Select";
-        var navigation = flow.IsSingle ? string.Empty : "  Left/Right or Tab Questions";
-        blocks.Add(new Markup(
-            $"[{Theme.Muted}]Up/Down Move  {action}{navigation}  Esc Dismiss[/]"));
+        if (showFooter)
+        {
+            var action = current.Multiple ? "Enter/Space Toggle" : "Enter Select";
+            var navigation = flow.IsSingle ? string.Empty : "  Left/Right or Tab Questions";
+            blocks.Add(new Markup(
+                $"[{Theme.Muted}]Up/Down Move  {action}{navigation}  Esc Dismiss[/]"));
+        }
+
         return new Rows(blocks);
     }
 

@@ -25,7 +25,8 @@ public sealed class ScreenPainter
         IReadOnlyList<PaintLine> queue,
         ComposerView composer,
         bool resetFrame = false,
-        PaintLine? progress = null)
+        PaintLine? progress = null,
+        bool showCursor = true)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(overlay);
@@ -64,13 +65,21 @@ public sealed class ScreenPainter
             AnsiConsole.Write(new ControlCode("\u001b[?7h"));
         }
 
-        var cursorLine = Math.Clamp(
-            regions.ComposerTop + composer.CursorRow + 1,
-            1,
-            regions.Height);
-        var cursorColumn = Math.Clamp(composer.CursorColumn + 1, 1, regions.Width);
-        AnsiConsole.Cursor.SetPosition(cursorColumn, cursorLine);
-        AnsiConsole.Cursor.Show();
+        if (showCursor)
+        {
+            var cursorLine = Math.Clamp(
+                regions.ComposerTop + composer.CursorRow + 1,
+                1,
+                regions.Height);
+            var cursorColumn = Math.Clamp(composer.CursorColumn + 1, 1, regions.Width);
+            AnsiConsole.Cursor.SetPosition(cursorColumn, cursorLine);
+            AnsiConsole.Cursor.Show();
+        }
+        else
+        {
+            AnsiConsole.Cursor.Hide();
+        }
+
         _previous = [.. frame];
     }
 

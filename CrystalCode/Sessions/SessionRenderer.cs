@@ -650,19 +650,6 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    internal string ReplaceComposer(string text)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        lock (_gate)
-        {
-            var previous = _composer.Text;
-            _composer.Replace(text);
-            RefreshPickerUnlocked();
-            PaintUnlocked(force: true);
-            return previous;
-        }
-    }
-
     public bool TryClearComposer()
     {
         lock (_gate)
@@ -751,7 +738,12 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    public async Task<InputKey> ReadKeyAsync(CancellationToken cancellationToken)
+    public Task<InputKey> ReadKeyAsync(CancellationToken cancellationToken) =>
+        ReadKeyAsync(scrollPlainArrows: true, cancellationToken);
+
+    internal async Task<InputKey> ReadKeyAsync(
+        bool scrollPlainArrows,
+        CancellationToken cancellationToken)
     {
         while (true)
         {
@@ -781,10 +773,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                             PaintUnlocked(force: true);
                             break;
                         case InputKey key:
-                            if (ScrollInput.TryKeyScroll(
+                            if (TryReadKeyScroll(
                                 key,
-                                composerEmpty: true,
-                                pickerOpen: false,
+                                scrollPlainArrows,
                                 pageRows,
                                 out var delta))
                             {
@@ -809,6 +800,104 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             if (mapped is { } chosen)
             {
                 return chosen;
+            }
+        }
+    }
+
+    internal static bool TryReadKeyScroll(
+        InputKey key,
+        bool scrollPlainArrows,
+        int pageRows,
+        out int delta) =>
+        ScrollInput.TryKeyScroll(
+            key,
+            composerEmpty: scrollPlainArrows,
+            pickerOpen: false,
+            pageRows,
+            out delta);
+
+    internal async Task<string?> ReadOverlayInputAsync(
+        string initialText,
+        Func<string, int, IRenderable> widget,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(initialText);
+        ArgumentNullException.ThrowIfNull(widget);
+        var buffer = new ComposerBuffer();
+        buffer.Replace(initialText);
+        SetOverlay(widget(buffer.Text, buffer.Cursor));
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var burst = await ReadAvailableKeysAsync(
+                wake: null,
+                ignorePause: true,
+                cancellationToken);
+            if (burst is null)
+            {
+                continue;
+            }
+
+            string? submitted = null;
+            var canceled = false;
+            lock (_gate)
+            {
+                var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                foreach (var item in _decoder.Push(burst))
+                {
+                    switch (item)
+                    {
+                        case InputPaste paste:
+                            buffer.Insert(paste.Text);
+                            break;
+                        case InputWheel wheel:
+                            _scrollBack = Math.Max(0, _scrollBack + wheel.Delta);
+                            break;
+                        case InputKey { Key: ConsoleKey.Escape }:
+                            canceled = true;
+                            break;
+                        case InputKey key when ScrollInput.TryKeyScroll(
+                            key,
+                            composerEmpty: false,
+                            pickerOpen: false,
+                            pageRows,
+                            out var delta):
+                            _scrollBack = Math.Max(0, _scrollBack + delta);
+                            break;
+                        case InputKey { KeyChar: '?' } when buffer.IsEmpty:
+                            buffer.Insert("?");
+                            break;
+                        case InputKey key:
+                            if (buffer.Handle(key) == ComposerAction.Submit)
+                            {
+                                submitted = buffer.Text;
+                            }
+
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (canceled || submitted is not null)
+                    {
+                        break;
+                    }
+                }
+
+                _modalOverlay.Clear();
+                _overlayWidget = widget(buffer.Text, buffer.Cursor);
+                PaintUnlocked(force: true);
+            }
+
+            if (canceled)
+            {
+                return null;
+            }
+
+            if (submitted is not null)
+            {
+                return submitted;
             }
         }
     }
@@ -1017,7 +1106,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             queue,
             composerView,
             resetFrame,
-            progressWanted == 0 ? null : _chrome.ProgressLine(regions.Width));
+            progressWanted == 0 ? null : _chrome.ProgressLine(regions.Width),
+            showCursor: !_composerPaused);
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
         _lastPaint = now;
