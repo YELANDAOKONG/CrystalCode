@@ -7,6 +7,7 @@ namespace CrystalCode.Display.Shell;
 /// </summary>
 public sealed class ShellChrome
 {
+    private static readonly string[] DropSlots = ["total", "elapsed", "model", "path"];
     private int _spinnerFrame;
     private DateTimeOffset _lastSpinner;
     private string _progress = string.Empty;
@@ -24,6 +25,8 @@ public sealed class ShellChrome
     public string Thinking { get; set; } = string.Empty;
 
     public string Usage { get; set; } = "CTX --";
+
+    public string UsageTotal { get; set; } = string.Empty;
 
     public string Activity { get; set; } = string.Empty;
 
@@ -56,33 +59,33 @@ public sealed class ShellChrome
 
     public PaintLine StatusLine(int width)
     {
-        var items = new List<(string Plain, string Markup)>();
+        var items = new List<(string Plain, string Markup, string Slot)>();
 
         if (!string.IsNullOrWhiteSpace(Approval))
         {
-            items.Add((Approval, $"[{Theme.Chrome}]{MarkupText.Escape(Approval)}[/]"));
+            items.Add((Approval, $"[{Theme.Chrome}]{MarkupText.Escape(Approval)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(Thinking))
         {
-            items.Add((Thinking, $"[{Theme.Chrome}]{MarkupText.Escape(Thinking)}[/]"));
+            items.Add((Thinking, $"[{Theme.Chrome}]{MarkupText.Escape(Thinking)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(Activity))
         {
             var activityPlain = "• " + Activity;
-            items.Add((activityPlain, $"[{Theme.Accent}]{MarkupText.Escape(activityPlain)}[/]"));
+            items.Add((activityPlain, $"[{Theme.Accent}]{MarkupText.Escape(activityPlain)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(Model))
         {
-            items.Add((Model, $"[{Theme.User}]{MarkupText.Escape(Model)}[/]"));
+            items.Add((Model, $"[{Theme.User}]{MarkupText.Escape(Model)}[/]", "model"));
         }
 
         if (!string.IsNullOrWhiteSpace(WorkspaceRoot))
         {
             var shortPath = PathDisplay.Shorten(WorkspaceRoot);
-            items.Add((shortPath, $"[{Theme.Muted}]{MarkupText.Escape(shortPath)}[/]"));
+            items.Add((shortPath, $"[{Theme.Muted}]{MarkupText.Escape(shortPath)}[/]", "path"));
         }
 
         var usageColor = Theme.Chrome;
@@ -103,23 +106,27 @@ public sealed class ShellChrome
             }
         }
 
-        items.Add((Usage, $"[{usageColor}]{MarkupText.Escape(Usage)}[/]"));
+        items.Add((Usage, $"[{usageColor}]{MarkupText.Escape(Usage)}[/]", "keep"));
+        if (!string.IsNullOrWhiteSpace(UsageTotal))
+        {
+            items.Add((UsageTotal, $"[{usageColor}]{MarkupText.Escape(UsageTotal)}[/]", "total"));
+        }
 
         if (ToolCount > 0)
         {
             var toolStr = ToolCount == 1 ? "1 Tool" : $"{ToolCount} Tools";
-            items.Add((toolStr, $"[{Theme.Chrome}]{toolStr}[/]"));
+            items.Add((toolStr, $"[{Theme.Chrome}]{toolStr}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(Elapsed))
         {
-            items.Add((Elapsed, $"[{Theme.Chrome}]{MarkupText.Escape(Elapsed)}[/]"));
+            items.Add((Elapsed, $"[{Theme.Chrome}]{MarkupText.Escape(Elapsed)}[/]", "elapsed"));
         }
 
         if (Queued > 0)
         {
             var queueStr = $"Queued {Queued}";
-            items.Add((queueStr, $"[{Theme.Warning} bold]{queueStr}[/]"));
+            items.Add((queueStr, $"[{Theme.Warning} bold]{queueStr}[/]", "keep"));
         }
 
         const string SepPlain = "  ·  ";
@@ -132,34 +139,15 @@ public sealed class ShellChrome
             return new PaintLine(fullMarkup, fullPlain);
         }
 
-        while (items.Count > 3 && TextWidth.Measure("  " + string.Join(SepPlain, items.Select(x => x.Plain))) > width)
+        while (TextWidth.Measure("  " + string.Join(SepPlain, items.Select(x => x.Plain))) > width)
         {
-            var dropIndex = -1;
-            for (var i = items.Count - 1; i >= 0; i--)
-            {
-                if (items[i].Plain == Elapsed
-                    || items[i].Plain.EndsWith(" Tool", StringComparison.Ordinal)
-                    || items[i].Plain.EndsWith(" Tools", StringComparison.Ordinal)
-                    || items[i].Plain == Model)
-                {
-                    dropIndex = i;
-                    break;
-                }
-            }
-
-            if (dropIndex < 0 && items.Count > 4)
-            {
-                dropIndex = 4;
-            }
-
-            if (dropIndex >= 0)
-            {
-                items.RemoveAt(dropIndex);
-            }
-            else
+            var dropIndex = IndexOfDroppable(items);
+            if (dropIndex < 0)
             {
                 break;
             }
+
+            items.RemoveAt(dropIndex);
         }
 
         var fittedPlain = "  " + string.Join(SepPlain, items.Select(x => x.Plain));
@@ -171,6 +159,22 @@ public sealed class ShellChrome
 
         var fittedMarkup = "  " + string.Join(SepMarkup, items.Select(x => x.Markup));
         return new PaintLine(fittedMarkup, fittedPlain);
+    }
+
+    private static int IndexOfDroppable(List<(string Plain, string Markup, string Slot)> items)
+    {
+        foreach (var slot in DropSlots)
+        {
+            for (var i = items.Count - 1; i >= 0; i--)
+            {
+                if (items[i].Slot == slot)
+                {
+                    return i;
+                }
+            }
+        }
+
+        return -1;
     }
 
     public bool SpinnerDue(DateTimeOffset now) =>

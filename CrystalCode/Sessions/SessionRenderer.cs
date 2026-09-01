@@ -336,7 +336,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
-            _chrome.Usage = UsageText.Format(ledger.Usage, contextWindow);
+            ApplyUsageUnlocked(ledger.Usage, contextWindow);
             var thinkingText = string.IsNullOrWhiteSpace(thinking)
                 ? string.Empty
                 : $"  ·  {thinking}";
@@ -358,7 +358,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             CommitLiveUnlocked();
-            _chrome.Usage = UsageText.Format(result.Usage, contextWindow);
+            ApplyUsageUnlocked(result.Usage, contextWindow);
             _chrome.ToolCount = result.ToolCallCount;
             _chrome.Elapsed = _turnClock is null
                 ? string.Empty
@@ -540,7 +540,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     {
         lock (_gate)
         {
-            _chrome.Usage = UsageText.Format(usage, ContextWindow);
+            ApplyUsageUnlocked(usage, ContextWindow);
             PaintUnlocked(force: true);
         }
     }
@@ -551,7 +551,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             if (usage is not null && ContextWindow > 0)
             {
-                _chrome.Usage = UsageText.Format(usage, ContextWindow);
+                ApplyUsageUnlocked(usage, ContextWindow);
             }
 
             PaintUnlocked(force: false);
@@ -1128,6 +1128,12 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
         _lastPaint = now;
+    }
+
+    private void ApplyUsageUnlocked(TokenUsage? usage, int contextWindow)
+    {
+        _chrome.Usage = UsageText.Format(usage, contextWindow);
+        _chrome.UsageTotal = UsageText.FormatTotal(usage);
     }
 
     private static bool BelowUsableSize(out int width, out int height)

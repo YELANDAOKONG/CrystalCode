@@ -9,7 +9,9 @@ namespace CrystalCode.Display.Shell;
 /// </summary>
 public sealed class AlternateScreen : IDisposable
 {
+    private const string ProductTitle = "Crystal Code";
     private bool _active;
+    private string? _previousTitle;
 
     private AlternateScreen(bool active)
     {
@@ -33,7 +35,9 @@ public sealed class AlternateScreen : IDisposable
             AnsiConsole.Write(new ControlCode("\u001b[?1007h"));
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
-            return new AlternateScreen(true);
+            var screen = new AlternateScreen(true);
+            screen.ApplyWindowTitle();
+            return screen;
         }
         catch (IOException)
         {
@@ -50,6 +54,7 @@ public sealed class AlternateScreen : IDisposable
 
         try
         {
+            RestoreWindowTitle();
             AnsiConsole.Cursor.Show();
             AnsiConsole.Write(new ControlCode("\u001b[?1007l"));
             AnsiConsole.Write(new ControlCode("\u001b[?2004l"));
@@ -60,6 +65,48 @@ public sealed class AlternateScreen : IDisposable
         }
 
         _active = false;
+    }
+
+    private void ApplyWindowTitle()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                _previousTitle = Console.Title;
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        AnsiConsole.Write(new ControlCode("\u001b[22;0t"));
+        AnsiConsole.Write(new ControlCode($"\u001b]0;{ProductTitle}\u0007"));
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                Console.Title = ProductTitle;
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
+    private void RestoreWindowTitle()
+    {
+        AnsiConsole.Write(new ControlCode("\u001b[23;0t"));
+        if (OperatingSystem.IsWindows() && !string.IsNullOrEmpty(_previousTitle))
+        {
+            try
+            {
+                Console.Title = _previousTitle;
+            }
+            catch (IOException)
+            {
+            }
+        }
     }
 
     private static bool IsSupported()

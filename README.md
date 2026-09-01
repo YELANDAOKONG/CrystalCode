@@ -338,7 +338,8 @@ status bar, and a multiline composer. Redirected output stays sequential.
 
 The status bar shows approval, thinking (when the selected model
 supports it), model, workspace, context percent (`CTX`), token counts
-(`IN` / `OUT`), tool count, and elapsed time. Named chrome labels are
+(`IN` / `OUT`), a Title Case total when the bar has room, tool count,
+and elapsed time. Named chrome labels are
 Title Case; short status abbreviations are uppercase. Mode is Plan or
 Work on the composer prompt, not repeated on the status bar. A
 queued-follow-up count appears while items wait. While a turn runs, a

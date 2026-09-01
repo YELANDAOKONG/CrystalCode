@@ -44,6 +44,7 @@ public sealed class ShellChromeTests
         var line = chrome.StatusLine(80);
 
         Assert.True(TextWidth.Measure(line.Plain) <= 80);
+        Assert.Contains("6 Tools", line.Plain, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -116,6 +117,74 @@ public sealed class ShellChromeTests
         Assert.DoesNotContain("1 tool", one.StatusLine(80).Plain, StringComparison.Ordinal);
         Assert.Contains("6 Tools", many.StatusLine(80).Plain, StringComparison.Ordinal);
         Assert.DoesNotContain("6 tools", many.StatusLine(80).Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_AppendsTotalWhenWidthAllows()
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Review",
+            Usage = "CTX 3%  ·  769.1k IN / 13.8k OUT",
+            UsageTotal = "783k Total"
+        };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Contains("769.1k IN / 13.8k OUT  ·  783k Total", line.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_OmitsTotalWhenNarrow()
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Review",
+            Usage = "CTX 3%  ·  769.1k IN / 13.8k OUT",
+            UsageTotal = "783k Total"
+        };
+        var withoutTotal = new ShellChrome
+        {
+            Approval = "Review",
+            Usage = "CTX 3%  ·  769.1k IN / 13.8k OUT"
+        };
+        var fitted = withoutTotal.StatusLine(120);
+        var width = TextWidth.Measure(fitted.Plain);
+
+        var line = chrome.StatusLine(width);
+
+        Assert.DoesNotContain("Total", line.Plain, StringComparison.Ordinal);
+        Assert.Contains("769.1k IN / 13.8k OUT", line.Plain, StringComparison.Ordinal);
+        Assert.True(TextWidth.Measure(line.Plain) <= width);
+    }
+
+    [Fact]
+    public void StatusLine_KeepsToolsWhenTotalDoesNotFit()
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Review",
+            Model = "deepseek-v4-flash",
+            WorkspaceRoot = "/tmp/workspace/CrystalCode",
+            Usage = "CTX 3%  ·  769.1k IN / 13.8k OUT",
+            UsageTotal = "783k Total",
+            ToolCount = 6
+        };
+        var withoutTotal = new ShellChrome
+        {
+            Approval = "Review",
+            Model = "deepseek-v4-flash",
+            WorkspaceRoot = "/tmp/workspace/CrystalCode",
+            Usage = "CTX 3%  ·  769.1k IN / 13.8k OUT",
+            ToolCount = 6
+        };
+        var fitted = withoutTotal.StatusLine(120);
+        var width = TextWidth.Measure(fitted.Plain);
+
+        var line = chrome.StatusLine(width);
+
+        Assert.Contains("6 Tools", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Total", line.Plain, StringComparison.Ordinal);
     }
 
     [Fact]

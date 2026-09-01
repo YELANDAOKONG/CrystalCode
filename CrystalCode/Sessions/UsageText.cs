@@ -20,6 +20,9 @@ public static class UsageText
         return $"CTX {percent}%  ·  {FormatNumber(usage.InputTokenCount)} IN / {FormatNumber(usage.OutputTokenCount)} OUT";
     }
 
+    public static string FormatTotal(TokenUsage? usage) =>
+        usage is null ? string.Empty : FormatNumber(usage.TotalTokenCount) + " Total";
+
     public static string FormatEstimate(int tokens)
     {
         if (tokens < 0)

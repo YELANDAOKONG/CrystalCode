@@ -26,6 +26,14 @@ public sealed class UsageTextTests
     }
 
     [Fact]
+    public void FormatTotal_SumsInputAndOutput()
+    {
+        Assert.Equal(string.Empty, UsageText.FormatTotal(null));
+        Assert.Equal("120 Total", UsageText.FormatTotal(new TokenUsage(100, 20)));
+        Assert.Equal("782.9k Total", UsageText.FormatTotal(new TokenUsage(769_100, 13_800)));
+    }
+
+    [Fact]
     public void FormatEstimate_PrefixesTildeAndTitleCaseTokens()
     {
         Assert.Equal("~0 Tokens", UsageText.FormatEstimate(0));

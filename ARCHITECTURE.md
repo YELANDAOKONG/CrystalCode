@@ -502,7 +502,9 @@ viewport, optional overlay, optional progress row, status bar, and multiline
 composer. Unchanged
 rows are left in place; a width or height change clears the buffer. The
 executable maps turns onto that frame through `SessionRenderer`; it does
-not paint rows itself. When the terminal drops below the usable minimum
+not paint rows itself. Entering the alternate screen sets the window
+title to Crystal Code when the terminal allows it, and restores the
+previous title on exit. When the terminal drops below the usable minimum
 (`ShellLayout.MinUsableWidth` x `ShellLayout.MinUsableHeight`, 80x24),
 the frame is replaced by a centered resize notice sized to the real
 terminal and input is ignored, including keys typed while the window is
@@ -517,7 +519,8 @@ console writer with the self-owned loop.
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
 thinking is on), model, workspace, context percent (`CTX`),
-token counts (`IN` / `OUT`), tool count (`Tool` / `Tools`), and
+token counts (`IN` / `OUT`), and, when the bar has room, a Title Case
+total (`783k Total`). It also shows tool count (`Tool` / `Tools`), and
 elapsed time. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode is Plan or Work on the
 composer prompt and is not repeated on the status bar. While a turn
