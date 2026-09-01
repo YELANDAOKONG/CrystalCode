@@ -404,7 +404,7 @@ composer. The queue is sent when the current tool batch finishes or
 when the turn (thinking or conversation) ends. Interrupt does not
 drop queued text.
 
-`/quit`, `/clear`, and `/resume` stop a busy turn before they run.
+`/quit`, `/clear`, `/resume`, and `/fork` stop a busy turn before they run.
 
 ### One turn
 
@@ -528,7 +528,9 @@ Type `/` to open the picker. Built-in verbs:
 | `/status` | | Turns, tokens, mode, workspace |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
-| `/resume` | `/continue`, `/sessions` | Replay the latest session for this workspace, or `/resume <id>` |
+| `/resume` | `/continue` | Replay the latest session for this workspace, or `/resume <id>` |
+| `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
+| `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
 | `/quit` | `/exit`, `/q` | Exit |
@@ -716,12 +718,22 @@ from inside a running session.
 | `crystal --resume <id>` | Load that file under `~/.crystal/sessions` at process start |
 | `/resume` | Load the latest session for this workspace and replay the transcript |
 | `/resume <id>` | Load that file under `~/.crystal/sessions` |
+| `/fork` | Save the current session and continue from an independent new id |
+| `/fork <id>` | Branch that saved session into a new id in the current workspace |
+| `/sessions` | List resumable sessions for the current workspace, newest first |
+| `/sessions all` | List resumable sessions from every workspace, newest first |
 | `/clear` | Start a new id |
 
 Resume also restores the last usage snapshot so the status bar and
 compaction still have a baseline before the next model call. A compacted
 session restores the summary and recent tail; only the live system
 prompt is refreshed.
+
+Fork preserves the transcript, compacted summary, todos, Plan/Work mode,
+turn counters, and usage baseline. The source session remains unchanged. The
+new branch receives a new creation time, uses the current workspace, and
+refreshes its live system prompt. Session lists mark the current id and retain
+complete ids so they can be copied into `/resume` or `/fork`.
 
 ## Compaction
 

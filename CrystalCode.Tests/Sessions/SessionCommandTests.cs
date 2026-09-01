@@ -16,6 +16,10 @@ public sealed class SessionCommandTests
     [InlineData("/quit", SessionVerb.Quit)]
     [InlineData("/new", SessionVerb.Clear)]
     [InlineData("/continue", SessionVerb.Resume)]
+    [InlineData("/fork", SessionVerb.Fork)]
+    [InlineData("/fork abc123", SessionVerb.Fork)]
+    [InlineData("/sessions", SessionVerb.Sessions)]
+    [InlineData("/sessions all", SessionVerb.Sessions)]
     [InlineData("/compact", SessionVerb.Compact)]
     [InlineData("/model", SessionVerb.Model)]
     [InlineData("/tokens", SessionVerb.Tokens)]
@@ -48,6 +52,15 @@ public sealed class SessionCommandTests
 
         Assert.Equal(SessionVerb.Model, command.Verb);
         Assert.Equal("openrouter anthropic/claude-sonnet-4", command.Argument);
+    }
+
+    [Fact]
+    public void TryParse_ReadsForkId()
+    {
+        SessionCommand.TryParse("/fork abc123", out var command);
+
+        Assert.Equal(SessionVerb.Fork, command.Verb);
+        Assert.Equal("abc123", command.Argument);
     }
 
     [Fact]

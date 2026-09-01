@@ -91,4 +91,73 @@ public sealed class SessionStoreTests
         Assert.Null(loaded.Usage);
         Assert.Equal(0, loaded.UserTurns);
     }
+
+    [Fact]
+    public void List_FiltersWorkspaceAndSortsNewestFirst()
+    {
+        using var home = new TemporaryHome();
+        var store = new SessionStore(home.Home);
+        store.Save(
+            new SessionDocument
+            {
+                Id = "older",
+                Workspace = "/tmp/one",
+                PlanMode = true,
+                UserTurns = 2,
+                Items =
+                [
+                    new SessionItemDocument
+                    {
+                        Kind = "message",
+                        Role = "user",
+                        Text = "first\nrequest"
+                    }
+                ]
+            });
+        Thread.Sleep(20);
+        store.Save(
+            new SessionDocument
+            {
+                Id = "newer",
+                Workspace = "/tmp/one",
+                Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "new" }]
+            });
+        store.Save(
+            new SessionDocument
+            {
+                Id = "other",
+                Workspace = "/tmp/two",
+                Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "other" }]
+            });
+
+        var sessions = store.List("/tmp/one");
+
+        Assert.Equal(["newer", "older"], sessions.Select(session => session.Id));
+        Assert.Equal("first request", sessions[1].Preview);
+        Assert.True(sessions[1].PlanMode);
+        Assert.Equal(2, sessions[1].UserTurns);
+    }
+
+    [Fact]
+    public void List_SkipsEmptyAndMalformedDocuments()
+    {
+        using var home = new TemporaryHome();
+        var store = new SessionStore(home.Home);
+        store.Save(new SessionDocument { Id = "empty", Workspace = "/tmp/one" });
+        home.Home.EnsureCreated();
+        File.WriteAllText(Path.Combine(home.Home.SessionsDirectory, "bad.json"), "{");
+
+        Assert.Empty(store.List());
+    }
+
+    [Theory]
+    [InlineData("../outside")]
+    [InlineData("..\\outside")]
+    public void TryLoad_RejectsPathTraversal(string id)
+    {
+        using var home = new TemporaryHome();
+        var store = new SessionStore(home.Home);
+
+        Assert.False(store.TryLoad(id, out _));
+    }
 }

@@ -354,6 +354,12 @@ public sealed class CodingSession
             case SessionVerb.Resume:
                 ResumeSession(command.Argument);
                 return (true, false);
+            case SessionVerb.Fork:
+                ForkSession(command.Argument);
+                return (true, false);
+            case SessionVerb.Sessions:
+                ShowSessions(command.Argument);
+                return (true, false);
             case SessionVerb.Compact:
                 return (true, false);
             case SessionVerb.Todos:
@@ -776,21 +782,23 @@ public sealed class CodingSession
 
     private void SaveSession()
     {
-        _sessionStore.Save(
-            new SessionDocument
-            {
-                Id = _sessionId,
-                Workspace = _workspace.Root,
-                PlanMode = _planMode,
-                CreatedUtc = _sessionCreatedUtc,
-                Items = TranscriptCodec.Write(_transcript),
-                Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
-                UserTurns = _ledger.UserTurns,
-                ModelCalls = _ledger.ModelCalls,
-                ToolCalls = _ledger.ToolCalls,
-                Usage = SessionMapper.WriteUsage(_ledger.Usage)
-            });
+        _sessionStore.Save(CreateDocument());
     }
+
+    private SessionDocument CreateDocument() =>
+        new()
+        {
+            Id = _sessionId,
+            Workspace = _workspace.Root,
+            PlanMode = _planMode,
+            CreatedUtc = _sessionCreatedUtc,
+            Items = TranscriptCodec.Write(_transcript),
+            Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
+            UserTurns = _ledger.UserTurns,
+            ModelCalls = _ledger.ModelCalls,
+            ToolCalls = _ledger.ToolCalls,
+            Usage = SessionMapper.WriteUsage(_ledger.Usage)
+        };
 
     private void BeginNewSession()
     {
@@ -821,6 +829,65 @@ public sealed class CodingSession
         ApplyDocument(document);
         DiscardQueue();
         PresentResume();
+    }
+
+    private void ForkSession(string argument)
+    {
+        SessionDocument source;
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            if (!HasConversation())
+            {
+                _renderer.WriteError("session is empty");
+                return;
+            }
+
+            source = CreateDocument();
+            _sessionStore.Save(source);
+        }
+        else if (!SessionResume.TryLoad(
+                     _sessionStore,
+                     _workspace.Root,
+                     argument,
+                     out source,
+                     out var error))
+        {
+            _renderer.WriteError(error);
+            return;
+        }
+
+        var sourceId = source.Id!;
+        var fork = SessionFork.Create(
+            source,
+            SessionStore.NewId(),
+            _workspace.Root,
+            DateTimeOffset.UtcNow);
+        ApplyDocument(fork);
+        SaveSession();
+        RefreshChrome();
+        _renderer.ShowUsage(_ledger.Usage);
+        _renderer.WriteHistory(_transcript);
+        ShowTodos();
+        _renderer.WriteNote($"forked  {sourceId}  ->  {_sessionId}");
+    }
+
+    private void ShowSessions(string argument)
+    {
+        var includeAll = string.Equals(argument, "all", StringComparison.OrdinalIgnoreCase);
+        if (!includeAll && !string.IsNullOrWhiteSpace(argument))
+        {
+            _renderer.WriteError("usage: /sessions [all]");
+            return;
+        }
+
+        var sessions = _sessionStore.List(includeAll ? null : _workspace.Root);
+        if (sessions.Count == 0)
+        {
+            _renderer.WriteNote(includeAll ? "no sessions" : "no sessions for this workspace");
+            return;
+        }
+
+        _renderer.WriteNote(SessionListText.Format(sessions, _sessionId, includeAll));
     }
 
     private void ApplyDocument(SessionDocument document)
@@ -1138,6 +1205,9 @@ public sealed class CodingSession
     private static bool StopsBusyTurn(string input)
     {
         return SessionCommand.TryParse(input, out var command)
-            && command.Verb is SessionVerb.Quit or SessionVerb.Clear or SessionVerb.Resume;
+            && command.Verb is SessionVerb.Quit
+                or SessionVerb.Clear
+                or SessionVerb.Resume
+                or SessionVerb.Fork;
     }
 }

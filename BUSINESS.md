@@ -35,6 +35,8 @@ operator surface and the only entry. It can:
 - compact conversation context when usage approaches the model window,
   or when the operator runs `/compact`;
 - persist configuration, permissions, and sessions under `~/.crystal`;
+- list saved sessions for the current workspace or every workspace, resume a
+  saved conversation, and fork a conversation into a new independent session;
 - discover OpenCode-compatible agent skills and load them through the
   `skill` tool when Skills is enabled;
 - discover operator tool sets under `~/.crystal/tools` and

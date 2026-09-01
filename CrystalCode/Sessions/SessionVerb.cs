@@ -16,6 +16,8 @@ public enum SessionVerb
     Clear,
     Cd,
     Resume,
+    Fork,
+    Sessions,
     Compact,
     Todos,
     Quit,

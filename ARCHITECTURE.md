@@ -320,6 +320,19 @@ refreshed from current Plan/Work text; the summary and tail are kept.
 Usage is restored so the status bar and the next compact decision have
 a baseline. `/clear` starts a new id.
 
+`/sessions` lists resumable sessions for the current workspace in descending
+update order; `/sessions all` includes every workspace. The current id is
+marked and every row keeps the complete id for use with `/resume <id>` or
+`/fork <id>`. Empty and unreadable session files are omitted.
+
+`/fork` first persists the current conversation, copies its transcript,
+compaction summary, todos, mode, counters, and usage baseline to a new id, and
+continues on that id. The source snapshot remains available under its original
+id and is not overwritten by the branch. `/fork <id>` branches a saved session
+instead. A branch uses the current workspace and a refreshed live system
+prompt. Forking stops a running turn before taking the snapshot; listing
+sessions does not.
+
 ## Home directory
 
 Self-contained release archives are named
@@ -593,7 +606,7 @@ bar includes a queued count while follow-ups wait. Auto-pass prints a
 panel with Status, Reason, Risk, Authority, and, for review, Outcome
 plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
-aliases (`/new` is `/clear`, `/continue` and `/sessions` are `/resume`,
+aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
 `/compact`, `/todo` is `/todos`). A slash picker appears while the prompt
 is a command prefix. After a verb that takes an argument
