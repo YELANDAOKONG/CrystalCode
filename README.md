@@ -333,8 +333,9 @@ Keep Chat Completions models in a separate `protocol: "openai"` provider entry.
 ## Interactive session
 
 The default command opens an alternate-screen shell when stdout is a
-TTY: transcript viewport, optional overlay, optional progress row,
-status bar, and a multiline composer. Redirected output stays sequential.
+TTY: transcript viewport, optional overlay, optional pinned todos,
+optional progress row, status bar, and a multiline composer. Redirected
+output stays sequential.
 
 The status bar shows approval, thinking (when the selected model
 supports it), model, workspace, context percent (`CTX`), token counts
@@ -346,7 +347,8 @@ queued-follow-up count appears while items wait. While a turn runs, a
 progress row sits above the status bar (`Awaiting Approval · 5s`,
 `Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`), prefixed with a spinner, and is
 independent of the status-bar activity bullet. The `~N Tokens` estimate
-appears only when `estimatedTokens` is on. Session start and `/cd`
+appears only when `estimatedTokens` is on. When the session has todos, a
+pinned `Todos` bar sits above that progress row. Session start and `/cd`
 show `Loading Tools` on that row while operator tool sets load, after
 the frame is already up.
 

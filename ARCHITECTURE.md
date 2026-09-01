@@ -498,8 +498,8 @@ color, panels, grids, rules, and padding as an offline rasterizer.
 `AnsiConsole.Live` is not the session shell: it fights the composer.
 Widgets are rasterized into frame rows. The shell enters the alternate
 screen when the terminal is a TTY and paints a retained frame: transcript
-viewport, optional overlay, optional progress row, status bar, and multiline
-composer. Unchanged
+viewport, optional overlay, optional pinned todos, optional progress row,
+status bar, and multiline composer. Unchanged
 rows are left in place; a width or height change clears the buffer. The
 executable maps turns onto that frame through `SessionRenderer`; it does
 not paint rows itself. Entering the alternate screen sets the window
@@ -521,7 +521,12 @@ supports it: `Think Off`, or `Think` plus the resolved gear when
 thinking is on), model, workspace, context percent (`CTX`),
 token counts (`IN` / `OUT`), and, when the bar has room, a Title Case
 total (`783k Total`). It also shows tool count (`Tool` / `Tools`), and
-elapsed time. Named chrome labels are Title Case. Short status
+elapsed time. When the session has todos, a pinned `Todos` bar sits
+above the progress row and status bar. Each row is a checkbox colored
+by status: pending chrome, in progress accent, completed ok, cancelled
+muted. The transcript Result card uses the same colors for
+`- [ ]` / `- [~]` / `- [x]` / `- [-]` lines so they are not painted as
+diff removals. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode is Plan or Work on the
 composer prompt and is not repeated on the status bar. While a turn
 runs, a progress row sits directly above the status bar

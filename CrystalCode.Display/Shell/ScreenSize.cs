@@ -34,6 +34,7 @@ public static class ScreenSize
         int composerWanted,
         int overlayWanted,
         int queueWanted = 0,
-        int progressWanted = 0) =>
-        ShellLayout.Measure(Width, Height, composerWanted, overlayWanted, queueWanted, progressWanted);
+        int progressWanted = 0,
+        int todoWanted = 0) =>
+        ShellLayout.Measure(Width, Height, composerWanted, overlayWanted, queueWanted, progressWanted, todoWanted);
 }

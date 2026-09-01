@@ -32,6 +32,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private readonly ShellChrome _chrome = new();
     private readonly List<string> _modalOverlay = [];
     private readonly List<string> _queueItems = [];
+    private readonly List<TodoBarItem> _todoItems = [];
     private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
     private readonly ScreenPainter _painter = new();
@@ -639,6 +640,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    public void SetTodos(IReadOnlyList<TodoBarItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        lock (_gate)
+        {
+            _todoItems.Clear();
+            _todoItems.AddRange(items);
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void SeedComposer(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -1104,6 +1116,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
         var overlay = OverlayLines(ScreenSize.Width);
         var queue = QueueLines(ScreenSize.Width);
+        var todos = TodoLines(ScreenSize.Width);
         var progressWanted = string.IsNullOrWhiteSpace(_chrome.Progress) ? 0 : 1;
         var regions = ShellLayout.Measure(
             ScreenSize.Width,
@@ -1111,7 +1124,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             composerView.Lines.Count,
             overlay.Count,
             queue.Count,
-            progressWanted);
+            progressWanted,
+            todos.Count);
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
         var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;
@@ -1124,6 +1138,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             composerView,
             resetFrame,
             progressWanted == 0 ? null : _chrome.ProgressLine(regions.Width),
+            todos,
             showCursor: !_composerPaused);
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
@@ -1192,6 +1207,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         return card is null ? [] : WidgetPaint.Lines(card, width);
     }
 
+    private IReadOnlyList<PaintLine> TodoLines(int width) =>
+        TodoBar.Lines(_todoItems, width);
+
     private ShellRegions CurrentRegions()
     {
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
@@ -1202,7 +1220,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             composerView.Lines.Count,
             OverlayLines(ScreenSize.Width).Count,
             QueueLines(ScreenSize.Width).Count,
-            progressWanted);
+            progressWanted,
+            TodoLines(ScreenSize.Width).Count);
     }
 
     private void SetTurnActivityUnlocked(string activity, string progress)

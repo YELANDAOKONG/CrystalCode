@@ -11,6 +11,7 @@ using CrystalCode.Prompts;
 using CrystalCode.Skills;
 using CrystalCode.Tools;
 using CrystalCode.Tools.External;
+using CrystalCode.Display.Cards;
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Paint;
 
@@ -154,6 +155,7 @@ public sealed class CodingSession
         ReloadExternalToolsWithProgress();
         RebuildExecutors();
         WriteExternalNotes();
+        ShowTodos();
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
@@ -735,6 +737,7 @@ public sealed class CodingSession
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         SaveSession();
+        ShowTodos();
     }
 
     private void ResumeSession(string argument)
@@ -783,6 +786,7 @@ public sealed class CodingSession
         _renderer.ShowUsage(_ledger.Usage);
         _renderer.WriteHistory(_transcript);
         _renderer.WriteNote("resumed  " + _sessionId);
+        ShowTodos();
     }
 
     private void ReplaceLiveSystem()
@@ -935,10 +939,22 @@ public sealed class CodingSession
 
     private void PromoteAfterTools()
     {
+        ShowTodos();
         if (_queue.Count > 0)
         {
             _turnSource?.Cancel();
         }
+    }
+
+    private void ShowTodos()
+    {
+        var items = new List<TodoBarItem>();
+        foreach (var todo in _todos.Snapshot())
+        {
+            items.Add(new TodoBarItem(TodoList.StatusMark(todo.Status), todo.Content));
+        }
+
+        _renderer.SetTodos(items);
     }
 
     private void ShowQueue()

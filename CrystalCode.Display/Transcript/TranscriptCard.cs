@@ -49,7 +49,11 @@ public static class TranscriptCard
         for (var i = 0; i < lines.Length; i++)
         {
             var line = lines[i];
-            if (line.StartsWith('+') && !line.StartsWith("+++", StringComparison.Ordinal))
+            if (TryTodoColor(line, out var todoColor))
+            {
+                sb.Append('[').Append(todoColor).Append(']').Append(MarkupText.Escape(line)).Append("[/]");
+            }
+            else if (line.StartsWith('+') && !line.StartsWith("+++", StringComparison.Ordinal))
             {
                 sb.Append('[').Append(Theme.DiffAdded).Append(']').Append(MarkupText.Escape(line)).Append("[/]");
             }
@@ -77,6 +81,26 @@ public static class TranscriptCard
         }
 
         return new Markup(sb.ToString());
+    }
+
+    private static bool TryTodoColor(string line, out string color)
+    {
+        color = Theme.Ok;
+        if (line.Length < 6
+            || !line.StartsWith("- [", StringComparison.Ordinal)
+            || line[4] != ']')
+        {
+            return false;
+        }
+
+        var mapped = TodoMarks.Color(line[3]);
+        if (mapped is null)
+        {
+            return false;
+        }
+
+        color = mapped;
+        return true;
     }
 
     private static string? Header(TranscriptKind kind) =>

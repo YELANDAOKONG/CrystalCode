@@ -15,16 +15,19 @@ public static class FrameRows
         PaintLine status,
         IReadOnlyList<PaintLine> queue,
         ComposerView composer,
-        PaintLine? progress = null)
+        PaintLine? progress = null,
+        IReadOnlyList<PaintLine>? todos = null)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(overlay);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
+        todos ??= [];
         var lines = new PaintLine[regions.Height];
         var row = 0;
         row = CopyBlock(lines, transcript, regions.TranscriptRows, regions.Width, row, regions.Height);
         row = CopyBlock(lines, overlay, regions.OverlayRows, regions.Width, row, regions.Height);
+        row = CopyBlock(lines, todos, regions.TodoRows, regions.Width, row, regions.Height);
         if (regions.ProgressRows > 0)
         {
             if (row >= 0 && row < regions.Height)

@@ -25,6 +25,28 @@ public sealed class TranscriptCardTests
     }
 
     [Fact]
+    public void TryCreate_ColorsTodoMarksByStatus()
+    {
+        var lines = WidgetPaint.Lines(
+            TranscriptCard.TryCreate(
+                TranscriptKind.Result,
+                "- [ ] wait\n- [~] now\n- [x] done\n- [-] skip")!,
+            48);
+
+        var wait = lines.Single(line => line.Plain.Contains("wait", StringComparison.Ordinal));
+        var now = lines.Single(line => line.Plain.Contains("now", StringComparison.Ordinal));
+        var done = lines.Single(line => line.Plain.Contains("done", StringComparison.Ordinal));
+        var skip = lines.Single(line => line.Plain.Contains("skip", StringComparison.Ordinal));
+
+        Assert.Contains(Theme.Chrome, wait.Markup, StringComparison.Ordinal);
+        Assert.Contains(Theme.Accent, now.Markup, StringComparison.Ordinal);
+        Assert.Contains(Theme.Ok, done.Markup, StringComparison.Ordinal);
+        Assert.Contains(Theme.Muted, skip.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(Theme.DiffRemoved, wait.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(Theme.DiffRemoved, now.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryCreate_SkipsNotes()
     {
         Assert.Null(TranscriptCard.TryCreate(TranscriptKind.Note, "compacted"));

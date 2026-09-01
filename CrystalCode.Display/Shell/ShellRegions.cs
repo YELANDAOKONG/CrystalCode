@@ -9,6 +9,8 @@ public readonly record struct ShellRegions(
     int TranscriptRows,
     int OverlayRows,
     int OverlayTop,
+    int TodoRows,
+    int TodoTop,
     int ProgressRows,
     int ProgressTop,
     int StatusTop,

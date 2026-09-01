@@ -56,6 +56,35 @@ public sealed class FrameRowsTests
     }
 
     [Fact]
+    public void Assemble_PlacesTodosAboveProgress()
+    {
+        var regions = ShellLayout.Measure(
+            20,
+            12,
+            composerWanted: 1,
+            overlayWanted: 0,
+            queueWanted: 0,
+            progressWanted: 1,
+            todoWanted: 2);
+        var composer = new ComposerView([PaintLine.Colored("grey50", "work")], 0, 1);
+
+        var frame = FrameRows.Assemble(
+            regions,
+            [PaintLine.Colored("grey84", "log")],
+            [],
+            PaintLine.Colored("grey50", "status"),
+            [],
+            composer,
+            PaintLine.Colored("lightsteelblue", "  Thinking"),
+            [PaintLine.Colored("grey50", "  Todos"), PaintLine.Colored("lightsteelblue", "  [~] now")]);
+
+        Assert.Equal("  Todos", frame[regions.TodoTop].Plain);
+        Assert.Equal("  [~] now", frame[regions.TodoTop + 1].Plain);
+        Assert.Equal("  Thinking", frame[regions.ProgressTop].Plain);
+        Assert.Equal(regions.TodoTop + 2, regions.ProgressTop);
+    }
+
+    [Fact]
     public void Notice_CentersMessageInFullHeightFrame()
     {
         var frame = FrameRows.Notice(40, 10, "too small");

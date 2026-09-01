@@ -26,13 +26,22 @@ public sealed class ScreenPainter
         ComposerView composer,
         bool resetFrame = false,
         PaintLine? progress = null,
+        IReadOnlyList<PaintLine>? todos = null,
         bool showCursor = true)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(overlay);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(composer);
-        var frame = FrameRows.Assemble(regions, transcript, overlay, status, queue, composer, progress);
+        var frame = FrameRows.Assemble(
+            regions,
+            transcript,
+            overlay,
+            status,
+            queue,
+            composer,
+            progress,
+            todos);
         WriteFrame(frame, regions.Height, resetFrame);
         if (showCursor)
         {
