@@ -135,4 +135,42 @@ public sealed class SlashPickerTests
         picker = picker.Move(1);
         Assert.Equal("resume", picker.Matches[picker.Selected].Name);
     }
+
+    [Fact]
+    public void Refresh_SameTextPreservesSelection()
+    {
+        var picker = SlashPicker.Create("/", Options);
+
+        Assert.NotNull(picker);
+        picker = picker.Move(1);
+        var refreshed = Assert.IsType<SlashPicker>(SlashPicker.Refresh("/", Options, picker));
+
+        Assert.Same(picker, refreshed);
+        Assert.Equal("resume", refreshed.Matches[refreshed.Selected].Name);
+    }
+
+    [Fact]
+    public void Refresh_ChangedTextCreatesFilteredSelection()
+    {
+        var picker = SlashPicker.Create("/", Options);
+
+        Assert.NotNull(picker);
+        picker = picker.Move(1);
+        var refreshed = Assert.IsType<SlashPicker>(SlashPicker.Refresh("/q", Options, picker));
+
+        Assert.NotSame(picker, refreshed);
+        Assert.Equal("quit", refreshed.Matches[refreshed.Selected].Name);
+    }
+
+    [Theory]
+    [InlineData("/cl", false)]
+    [InlineData("/clear", true)]
+    [InlineData("/CLEAR", true)]
+    public void IsExact_ComparesCompletedCommand(string text, bool expected)
+    {
+        var picker = SlashPicker.Create(text, Options);
+
+        Assert.NotNull(picker);
+        Assert.Equal(expected, picker.IsExact(text));
+    }
 }

@@ -154,6 +154,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             _slashOptions.Clear();
+            _picker = null;
             foreach (var spec in SlashCatalog.BuiltIn)
             {
                 var keys = new List<string> { spec.Name };
@@ -1044,6 +1045,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             return null;
         }
 
+        if (_picker is not null
+            && key.Key == ConsoleKey.Enter
+            && !_picker.IsExact(_composer.Text))
+        {
+            _composer.Replace(_picker.CompletedText);
+            return null;
+        }
+
         if (_picker is not null && key.Key == ConsoleKey.UpArrow)
         {
             _picker = _picker.Move(-1);
@@ -1120,7 +1129,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             return;
         }
 
-        _picker = SlashPicker.Create(_composer.Text, _slashOptions);
+        _picker = SlashPicker.Refresh(_composer.Text, _slashOptions, _picker);
     }
 
     private void Add(TranscriptKind kind, string text)

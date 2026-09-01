@@ -517,6 +517,10 @@ without changing the stored choice.
 
 Type `/` to open the picker. Built-in verbs:
 
+Plain Up/Down moves the picker selection. Tab accepts the selected completion.
+Enter also accepts a partial selection; a complete command still submits with
+one Enter.
+
 | Command | Aliases | Action |
 | :--- | :--- | :--- |
 | `/help` | `/h` | Shortcuts and commands |

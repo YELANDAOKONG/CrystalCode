@@ -13,17 +13,20 @@ public sealed class SlashPicker
     private readonly int _selected;
     private readonly string _completedPrefix;
     private readonly bool _arguments;
+    private readonly string _sourceText;
 
     private SlashPicker(
         IReadOnlyList<SlashOption> matches,
         int selected,
         string completedPrefix,
-        bool arguments)
+        bool arguments,
+        string sourceText)
     {
         _matches = matches;
         _selected = selected;
         _completedPrefix = completedPrefix;
         _arguments = arguments;
+        _sourceText = sourceText;
     }
 
     public IReadOnlyList<SlashOption> Matches => _matches;
@@ -31,6 +34,9 @@ public sealed class SlashPicker
     public int Selected => _selected;
 
     public string CompletedText => _completedPrefix + _matches[_selected].Name + " ";
+
+    public bool IsExact(string text) =>
+        string.Equals(text.TrimEnd(), CompletedText.TrimEnd(), StringComparison.OrdinalIgnoreCase);
 
     public static SlashPicker? Create(string text, IReadOnlyList<SlashOption> options)
     {
@@ -45,7 +51,7 @@ public sealed class SlashPicker
         var space = rest.IndexOf(' ');
         if (space >= 0)
         {
-            return CreateArguments(rest, space, options);
+            return CreateArguments(text, rest, space, options);
         }
 
         var prefix = rest.ToLowerInvariant();
@@ -60,7 +66,23 @@ public sealed class SlashPicker
 
         return matches.Count == 0
             ? null
-            : new SlashPicker(matches, 0, "/", arguments: false);
+            : new SlashPicker(matches, 0, "/", arguments: false, text);
+    }
+
+    public static SlashPicker? Refresh(
+        string text,
+        IReadOnlyList<SlashOption> options,
+        SlashPicker? current)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(options);
+        if (current is not null
+            && string.Equals(current._sourceText, text, StringComparison.Ordinal))
+        {
+            return current;
+        }
+
+        return Create(text, options);
     }
 
     public SlashPicker Move(int delta)
@@ -72,10 +94,11 @@ public sealed class SlashPicker
             next += count;
         }
 
-        return new SlashPicker(_matches, next, _completedPrefix, _arguments);
+        return new SlashPicker(_matches, next, _completedPrefix, _arguments, _sourceText);
     }
 
     private static SlashPicker? CreateArguments(
+        string sourceText,
         string rest,
         int space,
         IReadOnlyList<SlashOption> options)
@@ -91,7 +114,11 @@ public sealed class SlashPicker
         var nestedSpace = remainder.IndexOf(' ');
         if (nestedSpace < 0)
         {
-            return FilterArguments(command.ArgumentOptions, remainder, "/" + verb + " ");
+            return FilterArguments(
+                command.ArgumentOptions,
+                remainder,
+                "/" + verb + " ",
+                sourceText);
         }
 
         var first = remainder[..nestedSpace];
@@ -110,13 +137,15 @@ public sealed class SlashPicker
         return FilterArguments(
             nested.ArgumentOptions,
             nestedRemainder,
-            "/" + verb + " " + first + " ");
+            "/" + verb + " " + first + " ",
+            sourceText);
     }
 
     private static SlashPicker? FilterArguments(
         IReadOnlyList<SlashOption> arguments,
         string prefixSource,
-        string completedPrefix)
+        string completedPrefix,
+        string sourceText)
     {
         var prefix = prefixSource.ToLowerInvariant();
         var matches = new List<SlashOption>();
@@ -130,7 +159,7 @@ public sealed class SlashPicker
 
         return matches.Count == 0
             ? null
-            : new SlashPicker(matches, 0, completedPrefix, arguments: true);
+            : new SlashPicker(matches, 0, completedPrefix, arguments: true, sourceText);
     }
 
     private static SlashOption? FindNestedCommand(string verb, IReadOnlyList<SlashOption> options)
