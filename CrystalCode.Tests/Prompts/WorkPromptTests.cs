@@ -12,6 +12,7 @@ public sealed class WorkPromptTests
         Assert.Contains("You are Crystal Code", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todowrite", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("When you are uncertain", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("smallest useful set", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("emoji", WorkPrompt.Text, StringComparison.OrdinalIgnoreCase);
     }
 }

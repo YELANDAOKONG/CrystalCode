@@ -381,6 +381,13 @@ not a paste wrap are not treated as paste. Overlay prompts (approval
 and questions) keep using that same input loop, so scroll and resize
 still work while they are open.
 
+Question prompts support one or more tabbed questions, described choices,
+single or multiple selection, and custom text answers. Custom input is enabled
+by default. A single single-select answer submits immediately; multiple
+questions and multiple selection use a Confirm tab. Use Up/Down or `J`/`K` to
+move, Enter to select, Space to toggle multiple choices, Left/Right or Tab to
+navigate questions, and Escape to dismiss the request.
+
 ### Follow-up queue
 
 The composer stays open while a turn runs. Enter with text enqueues
@@ -539,7 +546,7 @@ is the workspace root.
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`) |
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
-| `question` | Plan, Work | Ask you a question (optional choices) and wait |
+| `question` | Plan, Work | Ask one or more questions with single/multiple choices and custom answers |
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `edit` | Work | Replace one unique `old_string` in a file |
 | `write` | Work | Create or overwrite a UTF-8 text file |

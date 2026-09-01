@@ -4,25 +4,27 @@ namespace CrystalCode.Tests.Tools;
 
 internal sealed class FixedUserPrompt : IUserPrompt
 {
-    private readonly string _answer;
+    private readonly QuestionResponse _response;
 
     public FixedUserPrompt(string answer)
     {
-        _answer = answer;
+        _response = new QuestionResponse([[answer]], IsRejected: false);
     }
 
-    public ValueTask<string> AskAsync(
-        string question,
-        IReadOnlyList<string>? options,
+    public FixedUserPrompt(QuestionResponse response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        _response = response;
+    }
+
+    public ValueTask<QuestionResponse> AskAsync(
+        IReadOnlyList<UserQuestion> questions,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        LastQuestion = question;
-        LastOptions = options;
-        return ValueTask.FromResult(_answer);
+        LastQuestions = questions;
+        return ValueTask.FromResult(_response);
     }
 
-    public string? LastQuestion { get; private set; }
-
-    public IReadOnlyList<string>? LastOptions { get; private set; }
+    public IReadOnlyList<UserQuestion>? LastQuestions { get; private set; }
 }

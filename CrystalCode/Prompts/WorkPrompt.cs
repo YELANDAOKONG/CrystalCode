@@ -53,7 +53,7 @@ public static class WorkPrompt
         - The action is irreversible, or it touches production, security, or billing
         - You need a secret, account, or environment fact that cannot be inferred from the repository
 
-        Do every part that is already certain, then ask one specific question and give your recommended default. Do not put a guess into the implementation. For a clear, small task, do not ask whether to continue — write the todos and do the work.
+        Do every part that is already certain, then ask the smallest useful set of specific questions in one question call. Give a recommended default for each choice. Do not put a guess into the implementation. For a clear, small task, do not ask whether to continue — write the todos and do the work.
 
         # References
         When you mention a specific function or piece of code, use path:line, for example CrystalCode/Prompts/WorkPrompt.cs:12. Do not paste a whole file you just wrote; give the path.

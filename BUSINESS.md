@@ -29,6 +29,8 @@ operator surface and the only entry. It can:
   either;
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
+- ask one or more operator questions in one request, with described choices,
+  single or multiple selection, optional custom answers, and confirmation;
 - compact conversation context when usage approaches the model window,
   or when the operator runs `/compact`;
 - persist configuration, permissions, and sessions under `~/.crystal`;

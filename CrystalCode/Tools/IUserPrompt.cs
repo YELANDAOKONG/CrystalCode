@@ -5,8 +5,7 @@ namespace CrystalCode.Tools;
 /// </summary>
 public interface IUserPrompt
 {
-    ValueTask<string> AskAsync(
-        string question,
-        IReadOnlyList<string>? options,
+    ValueTask<QuestionResponse> AskAsync(
+        IReadOnlyList<UserQuestion> questions,
         CancellationToken cancellationToken = default);
 }

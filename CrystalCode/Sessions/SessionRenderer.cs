@@ -650,6 +650,19 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    internal string ReplaceComposer(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        lock (_gate)
+        {
+            var previous = _composer.Text;
+            _composer.Replace(text);
+            RefreshPickerUnlocked();
+            PaintUnlocked(force: true);
+            return previous;
+        }
+    }
+
     public bool TryClearComposer()
     {
         lock (_gate)

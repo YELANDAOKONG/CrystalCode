@@ -177,6 +177,13 @@ These are product modes, not Crystal types.
 - Work registers those tools plus edit, write, and bash, then external
   tools whose `catalogs` include `work`.
 
+The built-in `question` tool accepts an ordered question array. Each question
+has a short header, full text, described options, optional multiple selection,
+and custom input enabled by default. A single single-select question submits
+immediately. Multiple questions and multiple-select questions use a shared
+confirmation step. Answers return in question order as arrays of selected
+labels; dismissing the overlay returns a failed tool result.
+
 Built-in Plan still has no edit, write, or bash. An external Plan tool
 keeps a Write + Workspace floor, so Plan is not built-in reads only
 once such a tool is installed. Approval still runs.
@@ -531,9 +538,11 @@ those calls execute, using the same one-line summary as session replay.
 Tool names in chrome and cards are Title Case; stream name chunks are
 coalesced per tool call so a repeated snapshot does not become
 `ReadReadRead` and sequential calls never concatenate.
-Approval and questions are Spectre panels with a two-column Title Case
-field grid (`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Ask and
-auto-pass cards for `edit` and `write` show a capped `+` / `-` preview
+Approval is a Spectre panel with a two-column Title Case field grid
+(`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Question panels show
+header tabs, described choices, selection state, custom input, and a final
+answer review when confirmation is required. Ask and auto-pass cards for
+`edit` and `write` show a capped `+` / `-` preview
 of `old_string` / `new_string` or `contents`. Overlay keys share the
 session frame loop, so transcript scroll and resize still work while a
 prompt is up. Ask overlays use the same card; `Y` / `S` / `A` / `N` map
