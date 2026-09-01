@@ -117,11 +117,21 @@ public sealed class TodoList
         };
         foreach (var item in _items)
         {
-            lines.Add($"- [{StatusName(item.Status)}] {item.Content}");
+            lines.Add($"- [{StatusMark(item.Status)}] {item.Content}");
         }
 
         return string.Join('\n', lines);
     }
+
+    internal static string StatusMark(TodoStatus status) =>
+        status switch
+        {
+            TodoStatus.Pending => " ",
+            TodoStatus.InProgress => "~",
+            TodoStatus.Completed => "x",
+            TodoStatus.Cancelled => "-",
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
+        };
 
     internal static string StatusName(TodoStatus status) =>
         status switch

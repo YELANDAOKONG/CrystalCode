@@ -28,7 +28,7 @@ public sealed class TodoWriteToolTests
         Assert.Equal(ToolResultStatus.Success, replaced.Status);
         Assert.Equal(ToolResultStatus.Success, merged.Status);
         Assert.Equal(2, todos.Count);
-        Assert.Contains("[completed] first", merged.Text);
-        Assert.Contains("[in_progress] second", merged.Text);
+        Assert.Contains("[x] first", merged.Text);
+        Assert.Contains("[~] second", merged.Text);
     }
 }
