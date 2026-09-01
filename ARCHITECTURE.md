@@ -144,20 +144,24 @@ One user message is one turn:
    exponential backoff (2s base, factor 2, 25% jitter, 30s cap when
    Retry-After is absent), honor Retry-After or retry-after-ms when
    present, and repeat the same round up to five times. The progress
-   row shows `Retrying In Ns (Attempt K)` and discards live stream
-   text from the failed attempt. HTTP 401, 403, quota,
-   `invalid_prompt`, and context overflow are not retried. User
-   cancel still interrupts immediately.
+   row shows `Retrying In Ns (Attempt K)` and counts the remaining
+   wait down; the transcript prints `retrying model request` plus the
+   operator message. Live stream text from the failed attempt is
+   discarded. HTTP 401, 403, quota, `invalid_prompt`, and context
+   overflow are not retried. User cancel still interrupts immediately.
 3. Select candidate zero.
 4. If the candidate has tool calls, execute the full batch through
    `ToolExecutor` (approval runs first).
 5. Append exact `ToolResult` values.
 6. Repeat until the candidate has no tool calls, a configured limit stops
    the turn, or the user cancels. Before each model round, compact if the
-   estimated request is over budget. One failed compact while still over
-   budget stops the turn (`context_overflow`).
-7. After a completed turn, consider compaction from reported token usage.
-   `/compact` (alias `/summarize`) runs the same summarizer immediately.
+   estimated transcript or the last model-round usage is over budget. One
+   failed compact while still over budget stops the turn
+   (`context_overflow`).
+7. After a completed turn, consider compaction from that last round's
+   reported usage and the estimated transcript. `/compact` (alias
+   `/summarize`) runs the same summarizer immediately. Compaction keeps
+   the frame pumping so the spinner, resize, and composer stay live.
 
 The composer stays open while a turn runs. Enter with text enqueues a
 follow-up (FIFO). Queued items stay in a panel above the composer until
@@ -282,9 +286,9 @@ Persistent grants are stored in `~/.crystal/permissions.json`.
 
 ## Compaction
 
-Crystal does not reduce context. When estimated or reported tokens cross
-the configured fraction of the selected model's usable window (context
-minus reserved output), the host:
+Crystal does not reduce context. When estimated transcript size or the
+last model-round usage crosses the configured fraction of the selected
+model's usable window (context minus reserved output), the host:
 
 1. Clears old tool results outside a protected recent band, when enough
    tokens would be freed.
@@ -294,6 +298,11 @@ minus reserved output), the host:
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.
+
+CTX percent uses the last model round's usage, not the sum of rounds in
+the turn. The status bar can show 100% when usage meets or exceeds the
+window. Compaction does not block the session loop: the progress row
+stays on `Compacting` and the composer remains usable.
 
 `/compact` (alias `/summarize`) runs that path immediately. It is
 refused while a turn is running. User and assistant text in the folded
@@ -532,7 +541,8 @@ composer prompt and is not repeated on the status bar. While a turn
 runs, a progress row sits directly above the status bar
 (`Waiting For Model`, `Thinking`, `Writing`, `Running Command`,
 `Awaiting Approval`, `Reviewing`, `Waiting For Answer`,
-`Compacting`, `Retrying In Ns (Attempt K)`). The same row shows
+`Compacting`, `Retrying In Ns (Attempt K)`). The retry caption counts
+remaining wait down. The same row shows
 `Loading Tools` while operator tool
 sets are discovered at session start and on `/cd`, after the frame is
 up, so a slow assembly load does not leave a blank terminal. The

@@ -53,6 +53,7 @@ public sealed class CodingSession
     private IToolExecutor _planExecutor = null!;
     private Task<TurnResult>? _turnTask;
     private CancellationTokenSource? _turnSource;
+    private CancellationTokenSource? _compactSource;
     private bool _turnActive;
     private int _idleCancels;
 
@@ -169,6 +170,12 @@ public sealed class CodingSession
                 return;
             }
 
+            if (_compactSource is not null)
+            {
+                _compactSource.Cancel();
+                return;
+            }
+
             if (_renderer.TryClearComposer())
             {
                 _idleCancels = 0;
@@ -197,7 +204,7 @@ public sealed class CodingSession
             {
                 if (_idleCancels >= 2 || cancellationToken.IsCancellationRequested)
                 {
-                    await FinishTurnAsync();
+                    await FinishTurnAsync(promptSource.Token);
                     return 0;
                 }
 
@@ -209,7 +216,7 @@ public sealed class CodingSession
                 _renderer.WriteNote("ctrl+c again to exit");
                 if (!promptSource.TryReset())
                 {
-                    await FinishTurnAsync();
+                    await FinishTurnAsync(promptSource.Token);
                     return 0;
                 }
 
@@ -218,7 +225,7 @@ public sealed class CodingSession
 
             if (read.TurnEnded)
             {
-                await FinishTurnAsync();
+                await FinishTurnAsync(promptSource.Token);
                 StartTurnIfQueued();
                 continue;
             }
@@ -231,7 +238,7 @@ public sealed class CodingSession
                     if (StopsBusyTurn(input))
                     {
                         _turnSource?.Cancel();
-                        await FinishTurnAsync();
+                        await FinishTurnAsync(promptSource.Token);
                     }
 
                     var busy = await TryHandleCommandAsync(input, promptSource.Token);
@@ -250,7 +257,7 @@ public sealed class CodingSession
                 }
 
                 _turnSource?.Cancel();
-                await FinishTurnAsync();
+                await FinishTurnAsync(promptSource.Token);
                 StartTurnIfQueued();
                 continue;
             }
@@ -286,7 +293,16 @@ public sealed class CodingSession
 
         if (parsed.Verb == SessionVerb.Compact)
         {
-            await CompactForcedAsync(cancellationToken);
+            try
+            {
+                await CompactForcedAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _renderer.WriteNote("compaction cancelled");
+            }
+
+            StartTurnIfQueued();
             return (true, false);
         }
 
@@ -613,27 +629,31 @@ public sealed class CodingSession
 
     private async Task CompactForcedAsync(CancellationToken cancellationToken)
     {
-        if (_turnActive)
+        if (_turnActive || _compactSource is not null)
         {
             _renderer.WriteError("Finish the current turn before compacting.");
             return;
         }
 
-        await RunCompactionAsync(_transcript, silentSkip: false, cancellationToken);
+        await RunCompactionAsync(
+            _transcript,
+            silentSkip: false,
+            pumpFrame: true,
+            cancellationToken);
     }
 
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
     {
-        if (!ContextAccountant.ShouldCompact(
-                result.Usage ?? _ledger.Usage,
-                _settings.ActiveModel.ContextWindow,
-                _settings.CompactionThreshold,
-                _settings.ActiveModel.MaxTokens))
+        if (!NeedsCompaction(_transcript, result.Usage ?? _ledger.Usage))
         {
             return;
         }
 
-        await RunCompactionAsync(_transcript, silentSkip: true, cancellationToken);
+        await RunCompactionAsync(
+            _transcript,
+            silentSkip: true,
+            pumpFrame: true,
+            cancellationToken);
     }
 
     private async Task<CompactionOutcome> CompactRoundAsync(
@@ -641,17 +661,16 @@ public sealed class CodingSession
         CancellationToken cancellationToken)
     {
         _reviewContext.Conversation = transcript;
-        var limits = CurrentLimits();
-        if (!ContextAccountant.ShouldCompact(
-                TokenEstimator.Items(transcript),
-                limits.ContextWindow,
-                limits.Threshold,
-                limits.MaxTokens))
+        if (!NeedsCompaction(transcript, _renderer.LastUsage))
         {
             return new CompactionOutcome(transcript, CompactionKind.Unchanged);
         }
 
-        var outcome = await RunCompactionAsync(transcript, silentSkip: true, cancellationToken);
+        var outcome = await RunCompactionAsync(
+            transcript,
+            silentSkip: true,
+            pumpFrame: false,
+            cancellationToken);
         if (outcome.Kind == CompactionKind.Unchanged)
         {
             _renderer.WriteError("Session is too large to compact.");
@@ -661,24 +680,62 @@ public sealed class CodingSession
         return outcome;
     }
 
+    private bool NeedsCompaction(IReadOnlyList<ChatItem> transcript, TokenUsage? reportedUsage)
+    {
+        var limits = CurrentLimits();
+        return ContextAccountant.ShouldCompact(
+            TokenEstimator.Items(transcript),
+            reportedUsage,
+            limits.ContextWindow,
+            limits.Threshold,
+            limits.MaxTokens);
+    }
+
     private async Task<CompactionOutcome> RunCompactionAsync(
         IReadOnlyList<ChatItem> transcript,
         bool silentSkip,
+        bool pumpFrame,
         CancellationToken cancellationToken)
     {
         _renderer.WriteNote("compacting context...");
         _renderer.SetProgress(ProgressText.Compacting);
         CompactionOutcome outcome;
+        using var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _compactSource = compactSource;
+        var compactTask = _compactor.CompactAsync(
+            transcript,
+            _todos.Format(),
+            CurrentLimits(),
+            compactSource.Token);
         try
         {
-            outcome = await _compactor.CompactAsync(
-                transcript,
-                _todos.Format(),
-                CurrentLimits(),
-                cancellationToken);
+            if (pumpFrame)
+            {
+                await _renderer.PumpUntilAsync(
+                    compactTask,
+                    Enqueue,
+                    _planMode,
+                    TogglePlanFromPrompt,
+                    compactSource.Token);
+            }
+
+            outcome = await compactTask;
         }
         finally
         {
+            if (!compactTask.IsCompleted)
+            {
+                compactSource.Cancel();
+                try
+                {
+                    await compactTask;
+                }
+                catch (OperationCanceledException)
+                {
+                }
+            }
+
+            _compactSource = null;
             _renderer.SetProgress(_turnActive ? ProgressText.WaitingForModel : string.Empty);
         }
         if (outcome.Kind == CompactionKind.Applied)
@@ -689,6 +746,11 @@ public sealed class CodingSession
                 BindReviewConversation();
                 RememberCompactedUsage();
                 SaveSession();
+            }
+            else
+            {
+                var input = TokenEstimator.Items(outcome.Transcript);
+                _renderer.ShowUsage(new TokenUsage(input, 0));
             }
 
             _renderer.WriteNote("compacted context");
@@ -1010,7 +1072,7 @@ public sealed class CodingSession
     private ContextCompactor CreateCompactor(IChatClient client) =>
         new(client, SessionRetryOptions.Default, _renderer.OnRetry);
 
-    private async Task FinishTurnAsync()
+    private async Task FinishTurnAsync(CancellationToken cancellationToken = default)
     {
         if (_turnTask is null)
         {
@@ -1048,7 +1110,14 @@ public sealed class CodingSession
 
         if (result.StopReason == TurnStopReason.Completed)
         {
-            await CompactIfNeededAsync(result, CancellationToken.None);
+            try
+            {
+                await CompactIfNeededAsync(result, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                _renderer.WriteNote("compaction cancelled");
+            }
         }
 
         SaveSession();

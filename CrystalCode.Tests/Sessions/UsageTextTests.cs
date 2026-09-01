@@ -26,6 +26,12 @@ public sealed class UsageTextTests
     }
 
     [Fact]
+    public void Format_CapsPercentAtOneHundred()
+    {
+        Assert.Equal("CTX 100%  ·  200 IN / 1 OUT", UsageText.Format(new TokenUsage(200, 1), 100));
+    }
+
+    [Fact]
     public void FormatTotal_SumsInputAndOutput()
     {
         Assert.Equal(string.Empty, UsageText.FormatTotal(null));

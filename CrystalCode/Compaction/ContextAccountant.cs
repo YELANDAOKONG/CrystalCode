@@ -68,4 +68,13 @@ public static class ContextAccountant
         var limit = CompactLimit(contextWindow, threshold, maxTokens);
         return limit > 0 && estimatedTokens >= limit;
     }
+
+    public static bool ShouldCompact(
+        long estimatedTokens,
+        TokenUsage? reportedUsage,
+        int contextWindow,
+        double threshold,
+        int? maxTokens = null) =>
+        ShouldCompact(estimatedTokens, contextWindow, threshold, maxTokens)
+        || ShouldCompact(reportedUsage, contextWindow, threshold, maxTokens);
 }

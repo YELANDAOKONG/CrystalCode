@@ -1,3 +1,4 @@
+using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 
@@ -92,5 +93,32 @@ public sealed class SessionRendererTests
             scrollPlainArrows: true,
             pageRows: 10,
             out _));
+    }
+
+    [Fact]
+    public void OnRetry_SetsRetryCaptionAndKeepsLastUsage()
+    {
+        var renderer = new SessionRenderer { ContextWindow = 1000 };
+        renderer.OnUsageUpdated(new TokenUsage(100, 20));
+
+        renderer.OnRetry(new SessionRetryAttempt(2, "slow down", TimeSpan.FromSeconds(8)));
+
+        Assert.StartsWith("Retrying In ", renderer.ChromeProgress, StringComparison.Ordinal);
+        Assert.Contains("(Attempt 2)", renderer.ChromeProgress, StringComparison.Ordinal);
+        Assert.Equal(100, renderer.LastUsage?.InputTokenCount);
+        Assert.Equal(20, renderer.LastUsage?.OutputTokenCount);
+    }
+
+    [Fact]
+    public async Task PumpUntilAsync_ReturnsWhenWakeCompletes()
+    {
+        var renderer = new SessionRenderer();
+
+        await renderer.PumpUntilAsync(
+            Task.CompletedTask,
+            onSubmit: null,
+            planMode: false,
+            togglePlan: static () => false,
+            CancellationToken.None);
     }
 }

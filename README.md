@@ -345,7 +345,8 @@ Title Case; short status abbreviations are uppercase. Mode is Plan or
 Work on the composer prompt, not repeated on the status bar. A
 queued-follow-up count appears while items wait. While a turn runs, a
 progress row sits above the status bar (`Awaiting Approval · 5s`,
-`Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`), prefixed with a spinner, and is
+`Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`,
+`Retrying In 8s (Attempt 1)`, `Compacting`), prefixed with a spinner, and is
 independent of the status-bar activity bullet. The `~N Tokens` estimate
 appears only when `estimatedTokens` is on. When the session has todos, a
 pinned `Todos` bar sits above that progress row. Session start and `/cd`
@@ -412,10 +413,12 @@ drop queued text.
    executor (approval first).
 4. Append exact tool results.
 5. Repeat until there are no tool calls, a limit stops the turn, or
-   you cancel. The host may compact before a model round; if compaction
-   cannot reduce further, the turn stops.
-6. After a completed turn, consider compaction from reported token
-   usage. `/compact` summarizes older context immediately.
+   you cancel. The host may compact before a model round when the
+   estimated transcript or the last model-round usage is over budget;
+   if compaction cannot reduce further, the turn stops.
+6. After a completed turn, consider compaction from that last round
+   and the estimated transcript. `/compact` summarizes older context
+   immediately.
 
 ## Modes
 
@@ -719,9 +722,9 @@ prompt is refreshed.
 
 ## Compaction
 
-Crystal does not reduce context. When estimated or reported tokens
-cross `compactionThreshold` of the selected model's usable window, the
-host:
+Crystal does not reduce context. When estimated transcript size or the
+last model-round usage crosses `compactionThreshold` of the selected
+model's usable window, the host:
 
 1. Clears old tool results outside a protected recent band, when that
    frees enough tokens.
@@ -730,11 +733,13 @@ host:
 3. Stops if the summary cannot be produced and nothing else can be
    reduced. Compaction does not loop.
 
-`/compact` (alias `/summarize`) runs this immediately. It is refused
-while a turn is running. A successful compact is written to the session
-file; `/resume` restores the summary and tail, and refreshes only the
-live system prompt. The transcript prints `compacting context...`
-while this runs.
+CTX percent is the last model round, not the sum of rounds in a turn.
+The transcript prints `compacting context...` and the progress row
+shows `Compacting` while this runs; the frame keeps painting so the
+terminal does not freeze. `/compact` (alias `/summarize`) runs this
+immediately. It is refused while a turn is running. A successful
+compact is written to the session file; `/resume` restores the summary
+and tail, and refreshes only the live system prompt.
 
 ## Data directory
 

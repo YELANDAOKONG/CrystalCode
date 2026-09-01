@@ -3,7 +3,9 @@ using Crystal;
 namespace CrystalCode.Sessions;
 
 /// <summary>
-/// Sums provider-reported usage across model rounds in one turn.
+/// Last provider-reported usage snapshot and the summed turn total.
+/// CTX and compaction use <see cref="Last"/> (one model round). <see cref="Build"/>
+/// stays the sum of rounds for turn accounting.
 /// </summary>
 public sealed class UsageAccumulator
 {
@@ -14,6 +16,8 @@ public sealed class UsageAccumulator
     private long _outputTokenCount;
     private long _reasoningTokenCount;
 
+    public TokenUsage? Last { get; private set; }
+
     public void Add(TokenUsage? usage)
     {
         if (usage is null)
@@ -23,6 +27,7 @@ public sealed class UsageAccumulator
         }
 
         _hasUsage = true;
+        Last = usage;
         _inputTokenCount = checked(_inputTokenCount + usage.InputTokenCount);
         _outputTokenCount = checked(_outputTokenCount + usage.OutputTokenCount);
         if (usage.ReasoningTokenCount is long reasoning)
@@ -43,6 +48,7 @@ public sealed class UsageAccumulator
         _inputTokenCount = 0;
         _outputTokenCount = 0;
         _reasoningTokenCount = 0;
+        Last = null;
     }
 
     public TokenUsage? Build()

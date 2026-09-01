@@ -38,6 +38,34 @@ public sealed class ContextAccountantTests
     }
 
     [Fact]
+    public void ShouldCompact_UsesReportedUsageWhenEstimateIsLow()
+    {
+        Assert.True(
+            ContextAccountant.ShouldCompact(
+                estimatedTokens: 10,
+                reportedUsage: new TokenUsage(80, 5),
+                100,
+                0.8));
+    }
+
+    [Fact]
+    public void ShouldCompact_UsesEstimateWhenReportedUsageIsMissing()
+    {
+        Assert.True(
+            ContextAccountant.ShouldCompact(
+                estimatedTokens: 90,
+                reportedUsage: null,
+                100,
+                0.8));
+        Assert.False(
+            ContextAccountant.ShouldCompact(
+                estimatedTokens: 10,
+                reportedUsage: null,
+                100,
+                0.8));
+    }
+
+    [Fact]
     public void CompactLimit_UsesReservedOutputOnLargeWindows()
     {
         Assert.Equal(80, ContextAccountant.CompactLimit(100, 0.8));

@@ -35,6 +35,9 @@ public sealed class ProgressTextTests
         Assert.Equal(
             "Retrying In 8s (Attempt 2)",
             ProgressText.Retrying(2, TimeSpan.FromSeconds(8)));
+        Assert.Equal(
+            "Retrying In 0s (Attempt 1)",
+            ProgressText.Retrying(1, TimeSpan.Zero));
     }
 
     [Fact]

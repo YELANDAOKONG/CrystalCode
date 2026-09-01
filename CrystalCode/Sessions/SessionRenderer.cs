@@ -49,6 +49,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private bool _composerPaused;
     private bool _showEstimatedTokens;
     private int _streamedCharacters;
+    private TokenUsage? _lastUsage;
+    private DateTimeOffset? _retryUntil;
+    private int _retryAttempt;
 
     public int ContextWindow { get; set; }
 
@@ -81,6 +84,28 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             lock (_gate)
             {
                 return _chrome.WorkspaceRoot;
+            }
+        }
+    }
+
+    internal string ChromeProgress
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _chrome.Progress;
+            }
+        }
+    }
+
+    public TokenUsage? LastUsage
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _lastUsage;
             }
         }
     }
@@ -359,7 +384,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             CommitLiveUnlocked();
-            ApplyUsageUnlocked(result.Usage, contextWindow);
+            ApplyUsageUnlocked(ledger.Usage ?? result.Usage, contextWindow);
             _chrome.ToolCount = result.ToolCallCount;
             _chrome.Elapsed = _turnClock is null
                 ? string.Empty
@@ -469,14 +494,12 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             DiscardLiveUnlocked();
             _streamedCharacters = 0;
+            _retryUntil = DateTimeOffset.UtcNow + attempt.Delay;
+            _retryAttempt = attempt.Attempt;
             SetTurnActivityUnlocked("Retrying", ProgressText.Retrying(attempt.Attempt, attempt.Delay));
-            if (!Framed)
-            {
-                WriteFallback(
-                    TranscriptKind.Note,
-                    "retrying model request  " + attempt.Message);
-            }
-
+            var note = "retrying model request  " + attempt.Message;
+            _log.Add(TranscriptKind.Note, note);
+            WriteFallback(TranscriptKind.Note, note);
             PaintUnlocked(force: true);
         }
     }
@@ -606,9 +629,73 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         ArgumentNullException.ThrowIfNull(progress);
         lock (_gate)
         {
+            if (!IsRetryCaption(progress))
+            {
+                ClearRetryUnlocked();
+            }
+
             _chrome.Progress = progress;
             PaintUnlocked(force: true);
         }
+    }
+
+    public async Task PumpUntilAsync(
+        Task wake,
+        Action<string>? onSubmit,
+        bool planMode,
+        Func<bool> togglePlan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(wake);
+        ArgumentNullException.ThrowIfNull(togglePlan);
+        lock (_gate)
+        {
+            _composer.PlanMode = planMode;
+            _chrome.PlanMode = planMode;
+            RefreshPickerUnlocked();
+            PaintUnlocked(force: true);
+        }
+
+        while (!wake.IsCompleted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var burst = await ReadAvailableKeysAsync(
+                wake,
+                ignorePause: false,
+                cancellationToken);
+            if (burst is null)
+            {
+                break;
+            }
+
+            string? submitted = null;
+            lock (_gate)
+            {
+                var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                foreach (var item in _decoder.Push(burst))
+                {
+                    submitted = DispatchUnlocked(item, pageRows, togglePlan);
+                    if (submitted is not null)
+                    {
+                        break;
+                    }
+                }
+
+                RefreshPickerUnlocked();
+                PaintUnlocked(force: true);
+            }
+
+            if (submitted is not null)
+            {
+                var text = submitted.Trim();
+                if (text.Length > 0)
+                {
+                    onSubmit?.Invoke(text);
+                }
+            }
+        }
+
+        await wake;
     }
 
     public void PauseComposer()
@@ -1112,6 +1199,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
 
         _chrome.TickSpinner(now);
+        RefreshRetryCaptionUnlocked(now);
 
         var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
         var overlay = OverlayLines(ScreenSize.Width);
@@ -1147,6 +1235,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     private void ApplyUsageUnlocked(TokenUsage? usage, int contextWindow)
     {
+        _lastUsage = usage;
         _chrome.Usage = UsageText.Format(usage, contextWindow);
         _chrome.UsageTotal = UsageText.FormatTotal(usage);
     }
@@ -1226,10 +1315,34 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     private void SetTurnActivityUnlocked(string activity, string progress)
     {
+        if (!IsRetryCaption(progress))
+        {
+            ClearRetryUnlocked();
+        }
+
         _chrome.Activity = activity;
         _chrome.Progress = progress;
         RefreshTokenEstimateUnlocked();
     }
+
+    private void RefreshRetryCaptionUnlocked(DateTimeOffset now)
+    {
+        if (_retryUntil is not { } deadline)
+        {
+            return;
+        }
+
+        _chrome.ReplaceProgress(ProgressText.Retrying(_retryAttempt, deadline - now));
+    }
+
+    private void ClearRetryUnlocked()
+    {
+        _retryUntil = null;
+        _retryAttempt = 0;
+    }
+
+    private static bool IsRetryCaption(string progress) =>
+        progress.StartsWith("Retrying", StringComparison.Ordinal);
 
     private void RefreshTokenEstimateUnlocked()
     {

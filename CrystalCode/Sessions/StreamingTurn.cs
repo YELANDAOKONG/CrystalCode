@@ -94,7 +94,7 @@ public sealed class StreamingTurn
                 var request = new ChatRequest(transcript, _executor.Definitions, _reasoning);
                 var response = await StreamModelAsync(request, linked.Token);
                 usage.Add(response.Usage);
-                _observer?.OnUsageUpdated(usage.Build() ?? response.Usage);
+                _observer?.OnUsageUpdated(response.Usage ?? usage.Last);
 
                 var candidate = response.Candidates[0];
                 transcript.AddRange(candidate.Items);
@@ -128,7 +128,7 @@ public sealed class StreamingTurn
                 var toolResults = await _executor.ExecuteAsync(toolCalls, linked.Token);
                 transcript.AddRange(toolResults);
                 _observer?.OnToolResults(toolResults);
-                _observer?.OnUsageUpdated(usage.Build() ?? response.Usage);
+                _observer?.OnUsageUpdated(response.Usage ?? usage.Last);
             }
         }
         catch (OperationCanceledException) when (durationSource.IsCancellationRequested)
@@ -186,7 +186,7 @@ public sealed class StreamingTurn
         List<ChatItem> transcript)
     {
         ReconcilePendingToolCalls(transcript);
-        return new(stopReason, modelCallCount, toolCallCount, usage.Build(), transcript);
+        return new(stopReason, modelCallCount, toolCallCount, usage.Last, transcript);
     }
 
     private static void ReconcilePendingToolCalls(List<ChatItem> transcript)

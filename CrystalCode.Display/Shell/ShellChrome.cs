@@ -49,6 +49,11 @@ public sealed class ShellChrome
         }
     }
 
+    public void ReplaceProgress(string progress)
+    {
+        _progress = progress ?? string.Empty;
+    }
+
     public string TokenEstimate { get; set; } = string.Empty;
 
     public int ToolCount { get; set; }

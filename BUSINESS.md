@@ -22,7 +22,8 @@ operator surface and the only entry. It can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
 - retry a failed model round on rate limits, server errors, timeouts,
-  network faults, and incomplete streams, waiting with backoff;
+  network faults, and incomplete streams, waiting with backoff, a
+  countdown on the progress row, and a transcript note;
 - switch the configured provider and model from `/model` without restarting;
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
   write, shell); operator tool sets may add extra catalog entries to

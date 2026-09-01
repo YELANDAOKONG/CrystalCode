@@ -260,6 +260,20 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void ReplaceProgress_DoesNotResetElapsed()
+    {
+        var chrome = new ShellChrome { Progress = "Retrying In 8s (Attempt 1)" };
+        var start = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        chrome.TickSpinner(start);
+        chrome.TickSpinner(start.AddSeconds(3));
+
+        chrome.ReplaceProgress("Retrying In 5s (Attempt 1)");
+        chrome.TickSpinner(start.AddSeconds(3));
+
+        Assert.Contains("Retrying In 5s (Attempt 1) · 3s", chrome.ProgressLine(80).Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProgressLine_AppendsTokenEstimateAfterElapsed()
     {
         var chrome = new ShellChrome
