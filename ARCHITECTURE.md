@@ -602,7 +602,8 @@ Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
 newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, AutoEdit, FullReview, and Full.
 When the slash picker is open, plain Up/Down moves its selection without
-resetting it. Tab accepts the selected completion. Enter accepts a partial
+resetting it and scrolls the visible candidate window to keep that selection
+on screen. Tab accepts the selected completion. Enter accepts a partial
 selection first; when the composer already contains that complete command or
 argument, Enter submits normally.
 Status abbreviations are CTX, IN, and OUT. The status

@@ -517,9 +517,9 @@ without changing the stored choice.
 
 Type `/` to open the picker. Built-in verbs:
 
-Plain Up/Down moves the picker selection. Tab accepts the selected completion.
-Enter also accepts a partial selection; a complete command still submits with
-one Enter.
+Plain Up/Down moves the picker selection and automatically scrolls the visible
+candidate window. Tab accepts the selected completion. Enter also accepts a
+partial selection; a complete command still submits with one Enter.
 
 | Command | Aliases | Action |
 | :--- | :--- | :--- |

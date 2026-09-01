@@ -173,4 +173,41 @@ public sealed class SlashPickerTests
         Assert.NotNull(picker);
         Assert.Equal(expected, picker.IsExact(text));
     }
+
+    [Fact]
+    public void Paint_MovingBelowViewportScrollsToSelectedOption()
+    {
+        var picker = SlashPicker.Create("/", ManyOptions());
+
+        Assert.NotNull(picker);
+        for (var i = 0; i < SlashPicker.MaximumVisible; i++)
+        {
+            picker = picker.Move(1);
+        }
+
+        var lines = picker.Paint(80);
+
+        Assert.Equal(SlashPicker.MaximumVisible, lines.Count);
+        Assert.DoesNotContain(lines, line => line.Plain.Contains("/item0", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("> /item8", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Paint_MovingUpFromFirstWrapsViewportToLastOption()
+    {
+        var picker = SlashPicker.Create("/", ManyOptions());
+
+        Assert.NotNull(picker);
+        picker = picker.Move(-1);
+        var lines = picker.Paint(80);
+
+        Assert.Equal(SlashPicker.MaximumVisible, lines.Count);
+        Assert.DoesNotContain(lines, line => line.Plain.Contains("/item0", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("> /item9", StringComparison.Ordinal));
+    }
+
+    private static SlashOption[] ManyOptions() =>
+        Enumerable.Range(0, 10)
+            .Select(index => new SlashOption($"item{index}", $"item {index}", [$"item{index}"]))
+            .ToArray();
 }

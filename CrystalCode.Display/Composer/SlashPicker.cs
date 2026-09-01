@@ -11,6 +11,7 @@ public sealed class SlashPicker
 
     private readonly IReadOnlyList<SlashOption> _matches;
     private readonly int _selected;
+    private readonly int _windowStart;
     private readonly string _completedPrefix;
     private readonly bool _arguments;
     private readonly string _sourceText;
@@ -18,12 +19,14 @@ public sealed class SlashPicker
     private SlashPicker(
         IReadOnlyList<SlashOption> matches,
         int selected,
+        int windowStart,
         string completedPrefix,
         bool arguments,
         string sourceText)
     {
         _matches = matches;
         _selected = selected;
+        _windowStart = windowStart;
         _completedPrefix = completedPrefix;
         _arguments = arguments;
         _sourceText = sourceText;
@@ -66,7 +69,7 @@ public sealed class SlashPicker
 
         return matches.Count == 0
             ? null
-            : new SlashPicker(matches, 0, "/", arguments: false, text);
+            : new SlashPicker(matches, 0, 0, "/", arguments: false, text);
     }
 
     public static SlashPicker? Refresh(
@@ -94,7 +97,23 @@ public sealed class SlashPicker
             next += count;
         }
 
-        return new SlashPicker(_matches, next, _completedPrefix, _arguments, _sourceText);
+        var windowStart = _windowStart;
+        if (next < windowStart)
+        {
+            windowStart = next;
+        }
+        else if (next >= windowStart + MaximumVisible)
+        {
+            windowStart = next - MaximumVisible + 1;
+        }
+
+        return new SlashPicker(
+            _matches,
+            next,
+            windowStart,
+            _completedPrefix,
+            _arguments,
+            _sourceText);
     }
 
     private static SlashPicker? CreateArguments(
@@ -159,7 +178,7 @@ public sealed class SlashPicker
 
         return matches.Count == 0
             ? null
-            : new SlashPicker(matches, 0, completedPrefix, arguments: true, sourceText);
+            : new SlashPicker(matches, 0, 0, completedPrefix, arguments: true, sourceText);
     }
 
     private static SlashOption? FindNestedCommand(string verb, IReadOnlyList<SlashOption> options)
@@ -204,13 +223,14 @@ public sealed class SlashPicker
 
     public IReadOnlyList<PaintLine> Paint(int width)
     {
-        var visible = Math.Min(_matches.Count, MaximumVisible);
+        var visible = Math.Min(_matches.Count - _windowStart, MaximumVisible);
         var lines = new List<PaintLine>(visible);
 
         var maxCmdLen = 0;
         for (var i = 0; i < visible; i++)
         {
-            var len = _matches[i].Name.Length + 1;
+            var index = _windowStart + i;
+            var len = _matches[index].Name.Length + 1;
             if (len > maxCmdLen)
             {
                 maxCmdLen = len;
@@ -221,8 +241,9 @@ public sealed class SlashPicker
 
         for (var i = 0; i < visible; i++)
         {
-            var option = _matches[i];
-            var isSelected = i == _selected;
+            var index = _windowStart + i;
+            var option = _matches[index];
+            var isSelected = index == _selected;
             var mark = isSelected ? ">" : " ";
             var cmdName = _arguments ? option.Name : "/" + option.Name;
             var paddedCmd = cmdName.PadRight(maxCmdLen);
