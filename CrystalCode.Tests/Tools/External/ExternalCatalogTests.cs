@@ -1,5 +1,6 @@
 using Crystal.Tools;
 
+using CrystalCode.Configuration;
 using CrystalCode.Home;
 using CrystalCode.Tests.Home;
 using CrystalCode.Tests.Tools;
@@ -164,6 +165,69 @@ public sealed class ExternalCatalogTests
 
         Assert.Null(plan.Find("echojson"));
         Assert.NotNull(work.Find("echojson"));
+    }
+
+    [Fact]
+    public void Load_HomeAuthorPolicy_HonorsAlwaysApproval()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(home.Home.ToolsDirectory, "echojson");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            """
+            {
+              "runner": "exec",
+              "approval": "always",
+              "description": "Echo.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["/bin/true"]
+            }
+            """);
+
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true,
+            approvalSettings: ExternalToolApprovalSettings.Default);
+
+        var tool = Assert.Single(catalog.Tools);
+        Assert.Equal(ExternalToolSource.Home, tool.Source);
+        Assert.Equal(ExternalApprovalMode.Always, tool.EffectiveApproval);
+        Assert.Contains("echojson", catalog.AutomaticTools);
+    }
+
+    [Fact]
+    public void Load_ProjectHostPolicy_IgnoresAlwaysApproval()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "echojson");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            """
+            {
+              "runner": "exec",
+              "approval": "always",
+              "description": "Echo.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["/bin/true"]
+            }
+            """);
+
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true,
+            approvalSettings: ExternalToolApprovalSettings.Default);
+
+        var tool = Assert.Single(catalog.Tools);
+        Assert.Equal(ExternalToolSource.Project, tool.Source);
+        Assert.Equal(ExternalApprovalMode.Always, tool.DeclaredApproval);
+        Assert.Equal(ExternalApprovalMode.Inherit, tool.EffectiveApproval);
+        Assert.Empty(catalog.AutomaticTools);
     }
 
     private static void WriteManifest(string workspace, string name, string commandJson)

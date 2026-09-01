@@ -23,6 +23,7 @@ public sealed class ApprovalPolicy
     private readonly IApprovalPrompt _prompt;
     private readonly IApprovalReviewer? _reviewer;
     private readonly IApprovalReviewContext? _reviewContext;
+    private readonly IReadOnlySet<string> _automaticTools;
 
     public ApprovalPolicy(
         ApprovalMode mode,
@@ -32,7 +33,8 @@ public sealed class ApprovalPolicy
         IApprovalReviewer? reviewer = null,
         IApprovalReviewContext? reviewContext = null,
         IReadOnlyList<IApprovalClassifier>? classifiers = null,
-        SkillCatalog? skills = null)
+        SkillCatalog? skills = null,
+        IReadOnlySet<string>? automaticTools = null)
     {
         ArgumentNullException.ThrowIfNull(mode);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -45,6 +47,7 @@ public sealed class ApprovalPolicy
         _prompt = prompt;
         _reviewer = reviewer;
         _reviewContext = reviewContext;
+        _automaticTools = automaticTools ?? new HashSet<string>(StringComparer.Ordinal);
     }
 
     public async ValueTask<ToolInvocationDecision> DecideAsync(
@@ -152,6 +155,11 @@ public sealed class ApprovalPolicy
             || classification.Authority != Authority.Workspace)
         {
             return false;
+        }
+
+        if (_automaticTools.Contains(toolName))
+        {
+            return true;
         }
 
         if (classification.Risk == Risk.Read)

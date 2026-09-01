@@ -16,7 +16,9 @@ public sealed record ParsedToolSet
         ExternalCatalogSelection catalogs,
         IReadOnlyList<ExternalToolSpec> tools,
         string? assembly = null,
-        IReadOnlyList<string>? types = null)
+        IReadOnlyList<string>? types = null,
+        ExternalApprovalMode? approval = null,
+        ExternalToolSource? source = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentException.ThrowIfNullOrWhiteSpace(directoryName);
@@ -36,6 +38,8 @@ public sealed record ParsedToolSet
         Tools = tools;
         Assembly = assembly;
         Types = types ?? [];
+        Approval = approval ?? ExternalApprovalMode.Inherit;
+        Source = source ?? ExternalToolSource.Home;
     }
 
     public string Directory { get; }
@@ -59,6 +63,10 @@ public sealed record ParsedToolSet
     public string? Assembly { get; }
 
     public IReadOnlyList<string> Types { get; }
+
+    public ExternalApprovalMode Approval { get; }
+
+    public ExternalToolSource Source { get; }
 
     public override string ToString() => DirectoryName;
 }

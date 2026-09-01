@@ -25,6 +25,7 @@ public static class SlashCatalog
         new(SessionVerb.Sessions, "sessions", [], "list workspace sessions or all", ["all"]),
         new(SessionVerb.Compact, "compact", ["summarize"], "summarize older context now"),
         new(SessionVerb.Todos, "todos", ["todo"], "show the full session todo list"),
+        new(SessionVerb.Tools, "tools", [], "list tools or configure external tools"),
         new(SessionVerb.Quit, "quit", ["exit", "q"], "exit")
     ];
 

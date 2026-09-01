@@ -538,6 +538,7 @@ partial selection; a complete command still submits with one Enter.
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
+| `/tools` | | List tools and configure external-tool loading and approval |
 | `/quit` | `/exit`, `/q` | Exit |
 
 Unknown `/` text prints `unknown command`. `/cd` with no argument
@@ -609,9 +610,13 @@ Runners:
   and `Crystal.Tools`; other dependencies stay private to the set.
 
 Every external tool is at least Write + Workspace and still goes
-through `ToolInvocationPolicy`. Full auto-passes a workspace-bounded
-external write; AutoEdit does not. Review and FullReview send it to
-the reviewing model. Details, manifest fields, and the
+through `ToolInvocationPolicy` by default. Authors may set `approval` to
+`always`; Home tools follow that declaration by default, while Project tools
+use host policy unless configured otherwise. `/tools` lists the effective
+catalog and approval, `/tools home|project author|host` changes source trust,
+and `/tools on|off|reload` controls discovery. Full auto-passes a
+workspace-bounded external write; AutoEdit does not. Details, manifest fields,
+and the
 dotnet publish layout are in
 [docs/external-tools.md](docs/external-tools.md).
 

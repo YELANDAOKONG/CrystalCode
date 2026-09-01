@@ -3,6 +3,7 @@ using Crystal.Tools;
 
 using CrystalCode.Approvals;
 using CrystalCode.Approvals.Interfaces;
+using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Skills;
 using CrystalCode.Tests.Home;
 using CrystalCode.Tests.Tools;
@@ -195,6 +196,31 @@ public sealed class ApprovalPolicyTests
         Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
         Assert.Equal(Risk.Write, prompt.LastClassification?.Risk);
         Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_AutomaticExternalTool_SkipsPromptAndReview()
+    {
+        using var context = new ApprovalContext(ApprovalMode.FullReview);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Deny("should not run"));
+        var classifier = new FixedApprovalClassifier(
+            "websearch",
+            new ToolClassification(Risk.Write, Authority.Workspace, "External tool"));
+        var policy = context.CreatePolicy(
+            prompt,
+            reviewer,
+            classifiers: [classifier],
+            automaticTools: new HashSet<string>(StringComparer.Ordinal) { "websearch" });
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", "websearch", """{"query":"Crystal"}"""));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(0, prompt.ReviewCount);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Null(reviewer.LastRequest);
     }
 
     [Fact]
@@ -443,6 +469,27 @@ public sealed class ApprovalPolicyTests
     private static ToolCall WriteCall() =>
         new("1", WriteTool.ToolName, """{"path":"src/App.cs","contents":"x"}""");
 
+    private sealed class FixedApprovalClassifier : IApprovalClassifier
+    {
+        private readonly string _name;
+        private readonly ToolClassification _classification;
+
+        public FixedApprovalClassifier(string name, ToolClassification classification)
+        {
+            _name = name;
+            _classification = classification;
+        }
+
+        public bool TryClassify(
+            ToolCall call,
+            Workspace workspace,
+            out ToolClassification classification)
+        {
+            classification = _classification;
+            return call.Name == _name;
+        }
+    }
+
     private sealed class ApprovalContext : IDisposable
     {
         private readonly TemporaryWorkspace _workspace;
@@ -461,7 +508,9 @@ public sealed class ApprovalPolicyTests
             IApprovalReviewer? reviewer = null,
             string userRequest = "Add a failing test.",
             IReadOnlyList<ChatItem>? conversation = null,
-            SkillCatalog? skills = null) =>
+            SkillCatalog? skills = null,
+            IReadOnlyList<IApprovalClassifier>? classifiers = null,
+            IReadOnlySet<string>? automaticTools = null) =>
             new(
                 _mode,
                 new Workspace(_workspace.Path),
@@ -471,7 +520,9 @@ public sealed class ApprovalPolicyTests
                 conversation is null
                     ? new StaticApprovalReviewContext(userRequest)
                     : new StaticApprovalReviewContext(conversation),
-                skills: skills);
+                classifiers,
+                skills,
+                automaticTools);
 
         public void Dispose()
         {

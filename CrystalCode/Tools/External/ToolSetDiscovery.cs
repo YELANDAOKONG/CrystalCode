@@ -22,9 +22,10 @@ public sealed class ToolSetDiscovery
         ArgumentNullException.ThrowIfNull(notes);
 
         var sets = new Dictionary<string, ParsedToolSet>(ExternalToolNames.OverlayComparer);
-        Scan(_home.ToolsDirectory, sets, notes);
+        Scan(_home.ToolsDirectory, ExternalToolSource.Home, sets, notes);
         Scan(
             Path.Combine(workspaceRoot, ExternalFiles.CrystalDirectory, ExternalFiles.DirectoryName),
+            ExternalToolSource.Project,
             sets,
             notes);
         return [.. sets.Values
@@ -34,6 +35,7 @@ public sealed class ToolSetDiscovery
 
     private static void Scan(
         string root,
+        ExternalToolSource source,
         Dictionary<string, ParsedToolSet> sets,
         IList<string> notes)
     {
@@ -98,7 +100,12 @@ public sealed class ToolSetDiscovery
                 continue;
             }
 
-            if (!ToolsManifestParser.TryParse(directory, json, out var set, out var error)
+            if (!ToolsManifestParser.TryParse(
+                    directory,
+                    json,
+                    out var set,
+                    out var error,
+                    source)
                 || set is null)
             {
                 notes.Add($"External tool set '{name}' was skipped: {error}");

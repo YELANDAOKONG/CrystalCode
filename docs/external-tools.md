@@ -227,6 +227,7 @@ Tool names come from `Definition.Name`:
 | `name` | Tool only | Model-facing tool name. Exec `tools[]` required. Shorthand defaults to the directory name. Dotnet from `Definition.Name`. A root `name` is unrecognized and ignored. |
 | `runner` | Set | `exec` or `dotnet`. |
 | `enabled` | Set | Boolean. Default `true`. `false` omits the whole set after overlay. |
+| `approval` | Set default, tool override | `inherit` or `always`. Default `inherit`. |
 | `command` | Set and/or tool | Exec argv. Set prefix then tool suffix. No substitution. |
 | `stdin` | Set | Exec only. Boolean, default `true`. Applies to every exec tool in the set. |
 | `argv` | Tool (or shorthand root) | Map of schema property name to one flag string. |
@@ -245,6 +246,53 @@ is expressed by argv (shared prefix + per-tool suffix).
 Shorthand vs `tools`: an exec set may use the shorthand root fields
 **or** a `tools` array, not both. Mixing refuses the set. A `tools`
 array with one element is valid and is not shorthand.
+
+## Author approval and source policy
+
+An author may declare that ordinary calls should not ask or enter Review:
+
+```json
+{
+  "runner": "exec",
+  "approval": "always",
+  "command": ["acme"],
+  "tools": [
+    {
+      "name": "acme_inventory",
+      "description": "List inventory.",
+      "schema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "acme_deploy",
+      "description": "Deploy.",
+      "schema": { "type": "object", "properties": {} },
+      "approval": "inherit"
+    }
+  ]
+}
+```
+
+`inherit` uses the host approval mode and remembered call grants. `always`
+skips the operator prompt and Review when the source policy follows the author.
+The tool-level value replaces the set default. Updating a tool does not revoke
+or re-confirm the declaration.
+
+The operator configures each source in `~/.crystal/config.json`:
+
+```json
+{
+  "externalToolApproval": {
+    "home": "author",
+    "project": "host"
+  }
+}
+```
+
+`author` follows `tools.json`; `host` treats every declaration as `inherit`.
+Defaults are Home `author` and Project `host`. `/tools home author|host` and
+`/tools project author|host` change these values. `/tools` lists the declared
+and effective value for every loaded external tool; `/tools reload` rescans,
+and `/tools on|off` controls discovery.
 
 ## Safety floors (all runners)
 

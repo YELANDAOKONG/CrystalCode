@@ -25,6 +25,8 @@ public sealed class SettingsStoreTests
         Assert.Equal(ThinkingSelection.Default, settings.ThinkingEffort);
         Assert.True(settings.Skills);
         Assert.True(settings.ExternalTools);
+        Assert.Equal(ExternalToolTrustPolicy.Author, settings.ExternalToolApproval.Home);
+        Assert.Equal(ExternalToolTrustPolicy.Host, settings.ExternalToolApproval.Project);
         Assert.False(settings.EstimatedTokens);
         Assert.True(File.Exists(root.Home.ConfigPath));
     }
@@ -156,6 +158,35 @@ public sealed class SettingsStoreTests
             "\"externalTools\": false",
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RoundTripsExternalToolApprovalPolicies()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "externalToolApproval": {
+                "home": "host",
+                "project": "author"
+              }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.Equal(ExternalToolTrustPolicy.Host, settings.ExternalToolApproval.Home);
+        Assert.Equal(ExternalToolTrustPolicy.Author, settings.ExternalToolApproval.Project);
+        store.Save(settings);
+        var json = File.ReadAllText(root.Home.ConfigPath);
+        Assert.Contains("\"home\": \"host\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"project\": \"author\"", json, StringComparison.Ordinal);
     }
 
     [Fact]

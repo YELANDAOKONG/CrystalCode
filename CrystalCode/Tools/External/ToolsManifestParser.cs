@@ -13,7 +13,8 @@ public static class ToolsManifestParser
         string directory,
         string json,
         out ParsedToolSet? set,
-        out string error)
+        out string error,
+        ExternalToolSource? source = null)
     {
         set = null;
         error = string.Empty;
@@ -56,7 +57,13 @@ public static class ToolsManifestParser
                 return false;
             }
 
-            return TryRead(directory, directoryName, document.RootElement, out set, out error);
+            return TryRead(
+                directory,
+                directoryName,
+                document.RootElement,
+                source ?? ExternalToolSource.Home,
+                out set,
+                out error);
         }
     }
 
@@ -64,6 +71,7 @@ public static class ToolsManifestParser
         string directory,
         string directoryName,
         JsonElement root,
+        ExternalToolSource source,
         out ParsedToolSet? set,
         out string error)
     {
@@ -80,6 +88,11 @@ public static class ToolsManifestParser
             || !ExternalCatalogSelection.TryParse(catalogValues, out var catalogs))
         {
             error = "catalogs must be plan, work, or both.";
+            return false;
+        }
+
+        if (!TryReadApproval(root, ExternalApprovalMode.Inherit, out var approval, out error))
+        {
             return false;
         }
 
@@ -133,14 +146,20 @@ public static class ToolsManifestParser
             IReadOnlyList<ExternalToolSpec> tools;
             if (hasTools)
             {
-                if (!TryReadExecTools(toolsElement, catalogs, out tools, out error))
+                if (!TryReadExecTools(toolsElement, catalogs, approval, out tools, out error))
                 {
                     return false;
                 }
             }
             else
             {
-                if (!TryReadShorthand(root, directoryName, catalogs, out var spec, out error))
+                if (!TryReadShorthand(
+                        root,
+                        directoryName,
+                        catalogs,
+                        approval,
+                        out var spec,
+                        out error))
                 {
                     return false;
                 }
@@ -163,7 +182,9 @@ public static class ToolsManifestParser
                 enabled,
                 timeout,
                 catalogs,
-                tools);
+                tools,
+                approval: approval,
+                source: source);
             return true;
         }
 
@@ -190,7 +211,12 @@ public static class ToolsManifestParser
         var overlays = new List<ExternalToolSpec>();
         if (hasTools)
         {
-            if (!TryReadDotnetOverlays(toolsElement, catalogs, out overlays, out error))
+            if (!TryReadDotnetOverlays(
+                    toolsElement,
+                    catalogs,
+                    approval,
+                    out overlays,
+                    out error))
             {
                 return false;
             }
@@ -207,7 +233,9 @@ public static class ToolsManifestParser
             catalogs,
             overlays,
             assembly.Trim(),
-            types);
+            types,
+            approval,
+            source);
         return true;
     }
 
@@ -229,6 +257,7 @@ public static class ToolsManifestParser
         JsonElement root,
         string directoryName,
         ExternalCatalogSelection catalogs,
+        ExternalApprovalMode approval,
         out ExternalToolSpec spec,
         out string error)
     {
@@ -242,6 +271,7 @@ public static class ToolsManifestParser
         return TryReadExecTool(
             root,
             catalogs,
+            approval,
             directoryName,
             allowMissingName: true,
             out spec,
@@ -251,6 +281,7 @@ public static class ToolsManifestParser
     private static bool TryReadExecTools(
         JsonElement array,
         ExternalCatalogSelection defaults,
+        ExternalApprovalMode approval,
         out IReadOnlyList<ExternalToolSpec> tools,
         out string error)
     {
@@ -266,7 +297,14 @@ public static class ToolsManifestParser
                 return false;
             }
 
-            if (!TryReadExecTool(element, defaults, null, allowMissingName: false, out var spec, out error))
+            if (!TryReadExecTool(
+                    element,
+                    defaults,
+                    approval,
+                    null,
+                    allowMissingName: false,
+                    out var spec,
+                    out error))
             {
                 return false;
             }
@@ -293,6 +331,7 @@ public static class ToolsManifestParser
     private static bool TryReadExecTool(
         JsonElement element,
         ExternalCatalogSelection defaults,
+        ExternalApprovalMode defaultApproval,
         string? fallbackName,
         bool allowMissingName,
         out ExternalToolSpec spec,
@@ -363,6 +402,12 @@ public static class ToolsManifestParser
                 return false;
             }
 
+            if (!TryReadApproval(element, defaultApproval, out var approval, out error))
+            {
+                error = $"Tool '{name}' has invalid approval: {error}";
+                return false;
+            }
+
             spec = new ExternalToolSpec(
                 name,
                 description,
@@ -370,13 +415,15 @@ public static class ToolsManifestParser
                 catalogs,
                 suffix,
                 argv,
-                pathArguments);
+                pathArguments,
+                approval);
         return true;
     }
 
     private static bool TryReadDotnetOverlays(
         JsonElement map,
         ExternalCatalogSelection defaults,
+        ExternalApprovalMode defaultApproval,
         out List<ExternalToolSpec> overlays,
         out string error)
     {
@@ -420,13 +467,48 @@ public static class ToolsManifestParser
                 return false;
             }
 
+            if (!TryReadApproval(
+                    property.Value,
+                    defaultApproval,
+                    out var approval,
+                    out error))
+            {
+                error = $"Overlay '{property.Name}' has invalid approval: {error}";
+                return false;
+            }
+
             overlays.Add(
                 new ExternalToolSpec(
                     property.Name,
                     property.Name,
                     EmptyObject,
                     catalogs,
-                    pathArguments: pathArguments));
+                    pathArguments: pathArguments,
+                    approval: approval));
+        }
+
+        return true;
+    }
+
+    private static bool TryReadApproval(
+        JsonElement element,
+        ExternalApprovalMode defaultValue,
+        out ExternalApprovalMode approval,
+        out string error)
+    {
+        approval = defaultValue;
+        error = string.Empty;
+        if (!element.TryGetProperty("approval", out var property)
+            || property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.String
+            || !ExternalApprovalMode.TryParse(property.GetString(), out approval))
+        {
+            error = "approval must be inherit or always.";
+            return false;
         }
 
         return true;

@@ -19,7 +19,8 @@ internal static class DotnetToolFactory
         IList<string> notes,
         List<ITool> plan,
         List<ITool> work,
-        Dictionary<string, ExternalToolSpec> classifications)
+        Dictionary<string, ExternalToolSpec> classifications,
+        Dictionary<string, ParsedToolSet> origins)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(set);
@@ -28,6 +29,7 @@ internal static class DotnetToolFactory
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(work);
         ArgumentNullException.ThrowIfNull(classifications);
+        ArgumentNullException.ThrowIfNull(origins);
 
         if (!TryResolveAssembly(set, out var assemblyPath, out var error))
         {
@@ -112,7 +114,8 @@ internal static class DotnetToolFactory
                     name,
                     tool.Definition.Description ?? name,
                     tool.Definition.InputSchema,
-                    set.Catalogs);
+                    set.Catalogs,
+                    approval: set.Approval);
             }
 
             loaded.Add((tool, spec));
@@ -139,7 +142,7 @@ internal static class DotnetToolFactory
         {
             registered.Add(pair.Spec.Name);
             var wrapped = new FencedExternalTool(pair.Tool, workspace, pair.Spec.PathArguments);
-            Add(pair.Spec, wrapped, plan, work, classifications);
+            Add(set, pair.Spec, wrapped, plan, work, classifications, origins);
         }
 
         return true;
@@ -216,7 +219,8 @@ internal static class DotnetToolFactory
             overlay.Catalogs,
             overlay.CommandSuffix,
             overlay.Argv,
-            overlay.PathArguments);
+            overlay.PathArguments,
+            overlay.Approval);
 
     private static bool IsToolType(Type type, IReadOnlyList<string> allowlist)
     {
@@ -291,13 +295,16 @@ internal static class DotnetToolFactory
     }
 
     private static void Add(
+        ParsedToolSet set,
         ExternalToolSpec spec,
         ITool tool,
         List<ITool> plan,
         List<ITool> work,
-        Dictionary<string, ExternalToolSpec> classifications)
+        Dictionary<string, ExternalToolSpec> classifications,
+        Dictionary<string, ParsedToolSet> origins)
     {
         classifications[spec.Name] = spec;
+        origins[spec.Name] = set;
         if (spec.Catalogs.Plan)
         {
             plan.Add(tool);

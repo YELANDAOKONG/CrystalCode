@@ -14,6 +14,8 @@ internal sealed class SettingsDocument
 
     public bool? ExternalTools { get; set; }
 
+    public ExternalToolApprovalDocument? ExternalToolApproval { get; set; }
+
     public bool? EstimatedTokens { get; set; }
 
     public string? PromptSet { get; set; }

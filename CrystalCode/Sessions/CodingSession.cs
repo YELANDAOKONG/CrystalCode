@@ -378,6 +378,9 @@ public sealed class CodingSession
             case SessionVerb.Todos:
                 ShowTodoList();
                 return (true, false);
+            case SessionVerb.Tools:
+                ChangeTools(command.Argument);
+                return (true, false);
             case SessionVerb.Quit:
                 return (true, true);
             case SessionVerb.Unknown:
@@ -612,6 +615,127 @@ public sealed class CodingSession
         WritePromptNotes();
         _renderer.WriteNote("prompt set  " + resolution.PromptSet);
     }
+
+    private void ChangeTools(string argument)
+    {
+        var parts = argument.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            ShowTools();
+            return;
+        }
+
+        var command = parts[0].ToLowerInvariant();
+        if (command == "approval" && parts.Length == 1)
+        {
+            _renderer.WriteNote(ToolListText.FormatApproval(_settings.ExternalToolApproval));
+            return;
+        }
+
+        if (command is "home" or "project")
+        {
+            ChangeToolApproval(command, parts);
+            return;
+        }
+
+        if (command is "on" or "off" or "reload")
+        {
+            if (parts.Length != 1)
+            {
+                WriteToolsUsage();
+                return;
+            }
+
+            ChangeToolLoading(command);
+            return;
+        }
+
+        WriteToolsUsage();
+    }
+
+    private void ChangeToolApproval(string source, IReadOnlyList<string> parts)
+    {
+        if (parts.Count == 1)
+        {
+            var currentPolicy = source == "home"
+                ? _settings.ExternalToolApproval.Home
+                : _settings.ExternalToolApproval.Project;
+            _renderer.WriteNote($"tool approval  {Title(source)} {Title(currentPolicy.Value)}");
+            return;
+        }
+
+        if (parts.Count != 2)
+        {
+            WriteToolsUsage();
+            return;
+        }
+
+        ExternalToolTrustPolicy policy;
+        try
+        {
+            policy = ExternalToolTrustPolicy.Parse(parts[1]);
+        }
+        catch (ArgumentException exception)
+        {
+            _renderer.WriteError(exception.Message);
+            return;
+        }
+
+        if (_turnActive)
+        {
+            _renderer.WriteError("Finish the current turn before changing tool approval.");
+            return;
+        }
+
+        var approval = source == "home"
+            ? _settings.ExternalToolApproval.WithHome(policy)
+            : _settings.ExternalToolApproval.WithProject(policy);
+        _settings = _settings.WithExternalToolApproval(approval);
+        _settingsStore.Save(_settings);
+        ReloadExternalToolsWithProgress();
+        RebuildExecutors();
+        _renderer.WriteNote($"tool approval  {Title(source)} {Title(policy.Value)}");
+    }
+
+    private void ChangeToolLoading(string command)
+    {
+        if (_turnActive)
+        {
+            _renderer.WriteError("Finish the current turn before reloading tools.");
+            return;
+        }
+
+        if (command != "reload")
+        {
+            _settings = _settings.WithExternalTools(command == "on");
+            _settingsStore.Save(_settings);
+        }
+
+        ReloadExternalToolsWithProgress();
+        RebuildExecutors();
+        WriteExternalNotes();
+        _renderer.WriteNote(command == "reload" ? "tools reloaded" : "external tools  " + Title(command));
+    }
+
+    private void ShowTools()
+    {
+        _renderer.WriteNote(
+            ToolListText.Format(
+                _planExecutor.Definitions,
+                _workExecutor.Definitions,
+                _external,
+                _settings));
+    }
+
+    private void WriteToolsUsage()
+    {
+        _renderer.WriteError(
+            "Tools command must be /tools, /tools approval, /tools on|off|reload, "
+            + "/tools home author|host, or /tools project author|host.");
+    }
+
+    private static string Title(string value) =>
+        char.ToUpperInvariant(value[0]) + value[1..].ToLowerInvariant();
 
     private IStreamingChatClient CreateClient(HarnessSettings settings)
     {
@@ -1024,7 +1148,8 @@ public sealed class CodingSession
             reviewer,
             _reviewContext,
             [.. _plugins.Classifiers, _external.Classifier],
-            _skills);
+            _skills,
+            _external.AutomaticTools);
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         _workExecutor = new ToolExecutor(
             WorkspaceCatalog.CreateWork(
@@ -1059,7 +1184,11 @@ public sealed class CodingSession
 
     private void ReloadExternalTools()
     {
-        _external = ExternalCatalog.Load(_home, _workspace, _settings.ExternalTools);
+        _external = ExternalCatalog.Load(
+            _home,
+            _workspace,
+            _settings.ExternalTools,
+            _settings.ExternalToolApproval);
     }
 
     private void ReloadExternalToolsWithProgress()
@@ -1123,7 +1252,8 @@ public sealed class CodingSession
             _plugins.Commands,
             ThinkingCompletions.For(_settings.ActiveModel),
             ModelCompletions.For(_settings.Catalog, _settings.Provider),
-            PromptSetCompletions.For(_promptResolution));
+            PromptSetCompletions.For(_promptResolution),
+            ToolCompletions.All);
     }
 
     private void RefreshChrome()

@@ -14,7 +14,8 @@ public sealed record ExternalToolSpec
         ExternalCatalogSelection catalogs,
         IReadOnlyList<string>? commandSuffix = null,
         IReadOnlyDictionary<string, string>? argv = null,
-        IReadOnlyList<string>? pathArguments = null)
+        IReadOnlyList<string>? pathArguments = null,
+        ExternalApprovalMode? approval = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -31,6 +32,7 @@ public sealed record ExternalToolSpec
         CommandSuffix = commandSuffix ?? [];
         Argv = argv ?? new Dictionary<string, string>(StringComparer.Ordinal);
         PathArguments = pathArguments ?? [];
+        Approval = approval ?? ExternalApprovalMode.Inherit;
     }
 
     public string Name { get; }
@@ -46,6 +48,8 @@ public sealed record ExternalToolSpec
     public IReadOnlyDictionary<string, string> Argv { get; }
 
     public IReadOnlyList<string> PathArguments { get; }
+
+    public ExternalApprovalMode Approval { get; }
 
     public override string ToString() => Name;
 }

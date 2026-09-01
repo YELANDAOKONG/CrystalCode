@@ -84,6 +84,70 @@ public sealed class ToolsManifestParserTests
     }
 
     [Fact]
+    public void TryParse_Approval_UsesSetDefaultAndToolOverride()
+    {
+        using var root = new TemporaryWorkspace();
+        var directory = Path.Combine(root.Path, "Acme.Tools");
+        Directory.CreateDirectory(directory);
+
+        var parsed = ToolsManifestParser.TryParse(
+            directory,
+            """
+            {
+              "runner": "exec",
+              "command": ["acme"],
+              "approval": "always",
+              "tools": [
+                {
+                  "name": "acme_inventory",
+                  "description": "Inventory.",
+                  "schema": { "type": "object", "properties": {} }
+                },
+                {
+                  "name": "acme_deploy",
+                  "description": "Deploy.",
+                  "schema": { "type": "object", "properties": {} },
+                  "approval": "inherit"
+                }
+              ]
+            }
+            """,
+            out var set,
+            out var error);
+
+        Assert.True(parsed, error);
+        Assert.NotNull(set);
+        Assert.Equal(ExternalApprovalMode.Always, set.Approval);
+        Assert.Equal(ExternalApprovalMode.Always, set.Tools[0].Approval);
+        Assert.Equal(ExternalApprovalMode.Inherit, set.Tools[1].Approval);
+    }
+
+    [Fact]
+    public void TryParse_InvalidApproval_Fails()
+    {
+        using var root = new TemporaryWorkspace();
+        var directory = Path.Combine(root.Path, "deploy");
+        Directory.CreateDirectory(directory);
+
+        var parsed = ToolsManifestParser.TryParse(
+            directory,
+            """
+            {
+              "runner": "exec",
+              "approval": "sometimes",
+              "description": "Ship it.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["/bin/true"]
+            }
+            """,
+            out _,
+            out var error);
+
+        Assert.False(parsed);
+        Assert.Contains("inherit or always", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryParse_MixesShorthandAndTools_Fails()
     {
         using var root = new TemporaryWorkspace();

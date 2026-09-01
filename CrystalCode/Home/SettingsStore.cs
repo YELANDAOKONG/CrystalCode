@@ -50,6 +50,9 @@ public sealed class SettingsStore
         var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
             ? defaults.ThinkingEffort
             : ThinkingSelection.Parse(document.ThinkingEffort);
+        var externalToolApproval = ReadExternalToolApproval(
+            document.ExternalToolApproval,
+            defaults.ExternalToolApproval);
 
         return new HarnessSettings(
             provider,
@@ -63,7 +66,8 @@ public sealed class SettingsStore
             document.EstimatedTokens ?? defaults.EstimatedTokens,
             string.IsNullOrWhiteSpace(document.PromptSet)
                 ? defaults.PromptSet
-                : document.PromptSet.Trim());
+                : document.PromptSet.Trim(),
+            externalToolApproval);
     }
 
     public void Save(HarnessSettings settings)
@@ -81,6 +85,7 @@ public sealed class SettingsStore
                 : settings.ThinkingEffort.Value,
             Skills = settings.Skills ? null : false,
             ExternalTools = settings.ExternalTools ? null : false,
+            ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
             EstimatedTokens = settings.EstimatedTokens ? true : null,
             PromptSet = string.Equals(
                 settings.PromptSet,
@@ -93,5 +98,42 @@ public sealed class SettingsStore
         };
         var json = JsonSerializer.Serialize(document, HomeJson.Options);
         File.WriteAllText(_home.ConfigPath, json);
+    }
+
+    private static ExternalToolApprovalSettings ReadExternalToolApproval(
+        ExternalToolApprovalDocument? document,
+        ExternalToolApprovalSettings defaults)
+    {
+        if (document is null)
+        {
+            return defaults;
+        }
+
+        var home = string.IsNullOrWhiteSpace(document.Home)
+            ? defaults.Home
+            : ExternalToolTrustPolicy.Parse(document.Home);
+        var project = string.IsNullOrWhiteSpace(document.Project)
+            ? defaults.Project
+            : ExternalToolTrustPolicy.Parse(document.Project);
+        return new ExternalToolApprovalSettings(home, project);
+    }
+
+    private static ExternalToolApprovalDocument? WriteExternalToolApproval(
+        ExternalToolApprovalSettings settings)
+    {
+        if (settings == ExternalToolApprovalSettings.Default)
+        {
+            return null;
+        }
+
+        return new ExternalToolApprovalDocument
+        {
+            Home = settings.Home == ExternalToolApprovalSettings.Default.Home
+                ? null
+                : settings.Home.Value,
+            Project = settings.Project == ExternalToolApprovalSettings.Default.Project
+                ? null
+                : settings.Project.Value
+        };
     }
 }

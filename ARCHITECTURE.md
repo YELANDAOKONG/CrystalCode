@@ -292,6 +292,18 @@ Modes:
   Write + Workspace, not only built-in `write` / `edit`. Forbidden,
   Privileged, and outside-workspace paths never fully auto-pass.
 
+External tool authors may set `approval` to `inherit` (default) or
+`always` at the set level and override it per tool. The operator controls
+whether author declarations are effective independently for Home and Project
+tools through `externalToolApproval` in `config.json`. Defaults are Home
+`author` and Project `host`: installing under `~/.crystal/tools` trusts the
+author declaration, while workspace-authored declarations stay under host
+policy unless the operator opts in. An effective `always` skips prompts and
+Review for ordinary workspace-bounded calls. Classification, schema checks,
+credential-path rejection, path fencing, and other execution safety floors
+still apply. Tool updates inherit the declaration; there is no content hash or
+version-bound trust grant.
+
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through.
 
@@ -460,6 +472,12 @@ name replaces the home set as a whole. `tools.json` field `enabled`
 (default `true`) omits a set without deleting it. `config.json` field
 `externalTools` enables discovery (default `true`). See
 [docs/external-tools.md](docs/external-tools.md).
+
+`/tools` lists the effective Plan and Work catalogs with external source, set,
+author declaration, and effective approval. It also owns external-tool
+configuration: `on`, `off`, `reload`, and independent `home` / `project`
+`author` or `host` policies. Changes are persisted to `config.json` and reload
+the catalogs when required.
 
 The `plugins` directory is reserved. The current product does not load
 `IPlugin` assemblies from that directory. Dotnet tool sets load class

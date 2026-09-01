@@ -28,7 +28,8 @@ public sealed record HarnessSettings
         bool skills = DefaultSkills,
         bool externalTools = DefaultExternalTools,
         bool estimatedTokens = DefaultEstimatedTokens,
-        string promptSet = DefaultPromptSet)
+        string promptSet = DefaultPromptSet,
+        ExternalToolApprovalSettings? externalToolApproval = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -56,6 +57,7 @@ public sealed record HarnessSettings
         ExternalTools = externalTools;
         EstimatedTokens = estimatedTokens;
         PromptSet = promptSet.Trim();
+        ExternalToolApproval = externalToolApproval ?? ExternalToolApprovalSettings.Default;
     }
 
     public ProviderName Provider { get; }
@@ -77,6 +79,8 @@ public sealed record HarnessSettings
     public bool EstimatedTokens { get; }
 
     public string PromptSet { get; }
+
+    public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
 
@@ -141,6 +145,12 @@ public sealed record HarnessSettings
         return Copy(promptSet: promptSet.Trim());
     }
 
+    public HarnessSettings WithExternalToolApproval(ExternalToolApprovalSettings approval)
+    {
+        ArgumentNullException.ThrowIfNull(approval);
+        return Copy(externalToolApproval: approval);
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -149,7 +159,8 @@ public sealed record HarnessSettings
         bool? skills = null,
         bool? externalTools = null,
         bool? estimatedTokens = null,
-        string? promptSet = null) =>
+        string? promptSet = null,
+        ExternalToolApprovalSettings? externalToolApproval = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -160,7 +171,8 @@ public sealed record HarnessSettings
             skills ?? Skills,
             externalTools ?? ExternalTools,
             estimatedTokens ?? EstimatedTokens,
-            promptSet ?? PromptSet);
+            promptSet ?? PromptSet,
+            externalToolApproval ?? ExternalToolApproval);
 
     public override string ToString() => nameof(HarnessSettings);
 

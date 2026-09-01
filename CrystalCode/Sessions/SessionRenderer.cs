@@ -150,7 +150,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         IReadOnlyList<ISlashCommand>? extras,
         IReadOnlyList<SlashOption>? thinkingArguments = null,
         IReadOnlyList<SlashOption>? modelArguments = null,
-        IReadOnlyList<SlashOption>? promptSetArguments = null)
+        IReadOnlyList<SlashOption>? promptSetArguments = null,
+        IReadOnlyList<SlashOption>? toolArguments = null)
     {
         lock (_gate)
         {
@@ -164,7 +165,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                     spec,
                     thinkingArguments,
                     modelArguments,
-                    promptSetArguments);
+                    promptSetArguments,
+                    toolArguments);
                 _slashOptions.Add(new SlashOption(spec.Name, spec.Help, keys, arguments));
             }
 
@@ -184,7 +186,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         SlashSpec spec,
         IReadOnlyList<SlashOption>? thinkingArguments,
         IReadOnlyList<SlashOption>? modelArguments,
-        IReadOnlyList<SlashOption>? promptSetArguments)
+        IReadOnlyList<SlashOption>? promptSetArguments,
+        IReadOnlyList<SlashOption>? toolArguments)
     {
         if (spec.Verb == SessionVerb.Thinking && thinkingArguments is not null)
         {
@@ -199,6 +202,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         if (spec.Verb == SessionVerb.PromptSet && promptSetArguments is not null)
         {
             return promptSetArguments;
+        }
+
+        if (spec.Verb == SessionVerb.Tools && toolArguments is not null)
+        {
+            return toolArguments;
         }
 
         return ToArgumentOptions(spec.Arguments);
