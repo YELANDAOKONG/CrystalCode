@@ -524,6 +524,7 @@ public sealed class CodingSession
             ReloadPrompts();
             RebuildExecutors();
             WriteExternalNotes();
+            RefreshChrome();
             _renderer.WriteNote("workspace  " + _workspace.Root);
             return;
         }
@@ -882,7 +883,8 @@ public sealed class CodingSession
             _planMode,
             _approval,
             CurrentThinkingStatus(),
-            _settings.Model);
+            _settings.Model,
+            _workspace.Root);
     }
 
     private void PromoteAfterTools()

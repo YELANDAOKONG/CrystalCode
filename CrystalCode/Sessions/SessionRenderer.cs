@@ -50,6 +50,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     public Action? AfterTools { get; set; }
 
+    internal string ChromeWorkspaceRoot
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _chrome.WorkspaceRoot;
+            }
+        }
+    }
+
     public IDisposable Open()
     {
         lock (_gate)
@@ -178,7 +189,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         bool planMode,
         ApprovalMode approval,
         string thinking = "",
-        string? model = null)
+        string? model = null,
+        string? workspaceRoot = null)
     {
         lock (_gate)
         {
@@ -189,6 +201,11 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             if (!string.IsNullOrWhiteSpace(model))
             {
                 _chrome.Model = model;
+            }
+
+            if (!string.IsNullOrWhiteSpace(workspaceRoot))
+            {
+                _chrome.WorkspaceRoot = workspaceRoot;
             }
 
             PaintUnlocked(force: true);
