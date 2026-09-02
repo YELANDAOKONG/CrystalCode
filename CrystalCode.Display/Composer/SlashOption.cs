@@ -7,7 +7,11 @@ public sealed record SlashOption(
     string Name,
     string Help,
     IReadOnlyList<string> Keys,
-    IReadOnlyList<SlashOption>? Arguments = null)
+    IReadOnlyList<SlashOption>? Arguments = null,
+    bool ArgumentsOptional = false,
+    IReadOnlyList<SlashOption>? ArgumentsAfterValue = null)
 {
     public IReadOnlyList<SlashOption> ArgumentOptions => Arguments ?? [];
+
+    public IReadOnlyList<SlashOption> TrailingArgumentOptions => ArgumentsAfterValue ?? [];
 }

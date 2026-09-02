@@ -14,6 +14,7 @@ public sealed class SlashPicker
     private readonly int _windowStart;
     private readonly string _completedPrefix;
     private readonly bool _arguments;
+    private readonly bool _parentArgumentsOptional;
     private readonly string _sourceText;
 
     private SlashPicker(
@@ -22,6 +23,7 @@ public sealed class SlashPicker
         int windowStart,
         string completedPrefix,
         bool arguments,
+        bool parentArgumentsOptional,
         string sourceText)
     {
         _matches = matches;
@@ -29,6 +31,7 @@ public sealed class SlashPicker
         _windowStart = windowStart;
         _completedPrefix = completedPrefix;
         _arguments = arguments;
+        _parentArgumentsOptional = parentArgumentsOptional;
         _sourceText = sourceText;
     }
 
@@ -39,7 +42,12 @@ public sealed class SlashPicker
     public string CompletedText => _completedPrefix + _matches[_selected].Name + " ";
 
     public bool IsExact(string text) =>
-        string.Equals(text.TrimEnd(), CompletedText.TrimEnd(), StringComparison.OrdinalIgnoreCase);
+        string.Equals(text.TrimEnd(), CompletedText.TrimEnd(), StringComparison.OrdinalIgnoreCase)
+        || (_parentArgumentsOptional
+            && string.Equals(
+                text.TrimEnd(),
+                _completedPrefix.TrimEnd(),
+                StringComparison.OrdinalIgnoreCase));
 
     public static SlashPicker? Create(string text, IReadOnlyList<SlashOption> options)
     {
@@ -69,7 +77,14 @@ public sealed class SlashPicker
 
         return matches.Count == 0
             ? null
-            : new SlashPicker(matches, 0, 0, "/", arguments: false, text);
+            : new SlashPicker(
+                matches,
+                0,
+                0,
+                "/",
+                arguments: false,
+                parentArgumentsOptional: false,
+                text);
     }
 
     public static SlashPicker? Refresh(
@@ -113,6 +128,7 @@ public sealed class SlashPicker
             windowStart,
             _completedPrefix,
             _arguments,
+            _parentArgumentsOptional,
             _sourceText);
     }
 
@@ -137,18 +153,43 @@ public sealed class SlashPicker
                 command.ArgumentOptions,
                 remainder,
                 "/" + verb + " ",
+                parentArgumentsOptional: false,
                 sourceText);
         }
 
         var first = remainder[..nestedSpace];
         var nestedRemainder = remainder[(nestedSpace + 1)..];
-        if (nestedRemainder.Contains(' ', StringComparison.Ordinal))
+        var nested = FindNestedCommand(first, command.ArgumentOptions);
+        if (nested is null)
         {
             return null;
         }
 
-        var nested = FindNestedCommand(first, command.ArgumentOptions);
-        if (nested is null || nested.ArgumentOptions.Count == 0)
+        var trailingSpace = nestedRemainder.IndexOf(' ');
+        if (trailingSpace >= 0)
+        {
+            if (nested.TrailingArgumentOptions.Count == 0
+                || nestedRemainder[(trailingSpace + 1)..].Contains(' ', StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var value = nestedRemainder[..trailingSpace];
+            var trailingRemainder = nestedRemainder[(trailingSpace + 1)..];
+            if (FindNestedCommand(value, nested.ArgumentOptions) is not null)
+            {
+                return null;
+            }
+
+            return FilterArguments(
+                nested.TrailingArgumentOptions,
+                trailingRemainder,
+                "/" + verb + " " + first + " " + value + " ",
+                parentArgumentsOptional: false,
+                sourceText);
+        }
+
+        if (nested.ArgumentOptions.Count == 0)
         {
             return null;
         }
@@ -157,6 +198,7 @@ public sealed class SlashPicker
             nested.ArgumentOptions,
             nestedRemainder,
             "/" + verb + " " + first + " ",
+            nested.ArgumentsOptional,
             sourceText);
     }
 
@@ -164,6 +206,7 @@ public sealed class SlashPicker
         IReadOnlyList<SlashOption> arguments,
         string prefixSource,
         string completedPrefix,
+        bool parentArgumentsOptional,
         string sourceText)
     {
         var prefix = prefixSource.ToLowerInvariant();
@@ -178,7 +221,14 @@ public sealed class SlashPicker
 
         return matches.Count == 0
             ? null
-            : new SlashPicker(matches, 0, 0, completedPrefix, arguments: true, sourceText);
+            : new SlashPicker(
+                matches,
+                0,
+                0,
+                completedPrefix,
+                arguments: true,
+                parentArgumentsOptional,
+                sourceText);
     }
 
     private static SlashOption? FindNestedCommand(string verb, IReadOnlyList<SlashOption> options)

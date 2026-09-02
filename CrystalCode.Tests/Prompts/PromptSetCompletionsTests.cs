@@ -20,6 +20,9 @@ public sealed class PromptSetCompletionsTests
 
         var options = PromptSetCompletions.For(resolution);
 
-        Assert.Equal(["default", "concise", "strict-review"], options.Select(option => option.Name));
+        Assert.Equal(
+            ["default", "export", "concise", "strict-review"],
+            options.Select(option => option.Name));
+        Assert.Equal([".", "./prompts"], options[1].ArgumentOptions.Select(option => option.Name));
     }
 }

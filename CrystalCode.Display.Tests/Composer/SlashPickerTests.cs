@@ -91,6 +91,40 @@ public sealed class SlashPickerTests
         Assert.All(picker.Matches, match => Assert.StartsWith("gpt-5.6-", match.Name, StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Create_CompletesExportFormatAndOptionalSystemFlag()
+    {
+        var options = ExportOptions();
+        var formats = SlashPicker.Create("/export ", options);
+        var flag = SlashPicker.Create("/export markdown ", options);
+
+        Assert.NotNull(formats);
+        Assert.Equal(["markdown", "json"], formats.Matches.Select(match => match.Name));
+        Assert.NotNull(flag);
+        Assert.Equal("--system", flag.Matches[0].Name);
+        Assert.True(flag.IsExact("/export markdown "));
+    }
+
+    [Fact]
+    public void Create_CompletesExportFlagAfterPath()
+    {
+        var picker = SlashPicker.Create("/export json ./out.json ", ExportOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal("--system", picker.Matches[0].Name);
+        Assert.Equal("/export json ./out.json --system ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_CompletesPromptExportDirectoryWithoutBlockingOptionalSubmit()
+    {
+        var picker = SlashPicker.Create("/prompts export ", PromptOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal(".", picker.Matches[0].Name);
+        Assert.True(picker.IsExact("/prompts export "));
+    }
+
     private static SlashOption[] ThinkingOptions()
     {
         var thinking = new SlashOption(
@@ -124,6 +158,37 @@ public sealed class SlashPickerTests
                     ])
             ]);
         return [model, .. Options];
+    }
+
+    private static SlashOption[] ExportOptions()
+    {
+        SlashOption[] flag = [new("--system", "include system", ["--system"])];
+        var export = new SlashOption(
+            "export",
+            "export conversation",
+            ["export"],
+            [
+                new("markdown", "Markdown", ["markdown", "md"], flag, true, flag),
+                new("json", "JSON", ["json"], flag, true, flag)
+            ]);
+        return [export, .. Options];
+    }
+
+    private static SlashOption[] PromptOptions()
+    {
+        var prompts = new SlashOption(
+            "promptset",
+            "prompt sets",
+            ["promptset", "prompts"],
+            [
+                new(
+                    "export",
+                    "export prompts",
+                    ["export"],
+                    [new(".", "current workspace", ["."])],
+                    ArgumentsOptional: true)
+            ]);
+        return [prompts, .. Options];
     }
 
     [Fact]

@@ -1676,7 +1676,8 @@ public sealed class CodingSession
             ThinkingCompletions.For(_settings.ActiveModel),
             ModelCompletions.For(_settings.Catalog, _settings.Provider),
             PromptSetCompletions.For(_promptResolution),
-            ToolCompletions.All);
+            ToolCompletions.All,
+            ExportCompletions.All);
     }
 
     private void RefreshChrome()

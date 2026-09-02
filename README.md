@@ -554,6 +554,9 @@ write the current conversation under `exportDirectory` (default
 `~/.crystal/exports/`). Markdown and JSON omit the live system prompt
 unless `--system` is set. `/prompts export [dir]` writes built-in
 prompt templates with placeholders. Quoted paths may contain spaces.
+The slash picker completes `markdown` / `json`, offers `--system` before or
+after an explicit export path, and exposes `export` plus directory examples
+under `/prompts`.
 
 Unknown `/` text prints `unknown command`. `/cd` with no argument
 prints the current workspace root. `/cd` only accepts a directory

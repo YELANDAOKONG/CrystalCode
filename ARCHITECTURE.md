@@ -725,7 +725,10 @@ writes built-in prompt templates. Export roots default to
 is a command prefix. After a verb that takes an argument
 (`/thinking`, `/approval`, `/model`, `/tokens`, `/verbose`), Tab also completes the argument.
 `/model` completes current-provider models, then a provider name, then
-that provider's models. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
+that provider's models. `/export` completes the format, optional system flag,
+and the system flag after an explicit path. `/prompts export` offers directory
+examples while Enter on the optional argument boundary still submits with the
+default directory. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Ctrl+O and
 Ctrl+G toggle verbose tool and command output when the composer is
 empty. Up/Down
