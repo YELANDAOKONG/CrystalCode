@@ -11,6 +11,8 @@ public static class ExportDirectory
 {
     public const string DefaultRelativePath = "exports";
 
+    public const string HomeKeyword = "home";
+
     public const string WorkspaceKeyword = "workspace";
 
     public const string ProjectKeyword = "project";
@@ -21,10 +23,15 @@ public static class ExportDirectory
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         if (string.IsNullOrWhiteSpace(configured))
         {
-            return Path.Combine(home.Root, DefaultRelativePath);
+            return ResolveHome(home);
         }
 
         var trimmed = configured.Trim();
+        if (IsHomeKeyword(trimmed))
+        {
+            return ResolveHome(home);
+        }
+
         if (IsWorkspaceKeyword(trimmed))
         {
             return Path.Combine(
@@ -71,6 +78,12 @@ public static class ExportDirectory
 
         return Path.GetFullPath(Path.Combine(homeRoot, expanded));
     }
+
+    private static string ResolveHome(CrystalHome home) =>
+        Path.Combine(home.Root, DefaultRelativePath);
+
+    private static bool IsHomeKeyword(string value) =>
+        string.Equals(value, HomeKeyword, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsWorkspaceKeyword(string value) =>
         string.Equals(value, WorkspaceKeyword, StringComparison.OrdinalIgnoreCase)

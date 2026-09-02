@@ -720,7 +720,8 @@ aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/verbose` toggles tool or command output detail). `/export`
 writes markdown or json for the current conversation; `/prompts export`
 writes built-in prompt templates. Export roots default to
-`~/.crystal/exports/` and are configurable through `exportDirectory` in
+`~/.crystal/exports/` (`exportDirectory` omitted or `home`) and are
+configurable through `exportDirectory` in
 `config.json`. A slash picker appears while the prompt
 is a command prefix. After a verb that takes an argument
 (`/thinking`, `/approval`, `/model`, `/tokens`, `/verbose`), Tab also completes the argument.

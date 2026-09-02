@@ -299,6 +299,19 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Save_RoundTripsHomeExportDirectory()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithExportDirectory("home");
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal("home", loaded.ExportDirectory);
+    }
+
+    [Fact]
     public void Save_ClearsExportDirectoryWhenUnset()
     {
         using var root = new TemporaryHome();

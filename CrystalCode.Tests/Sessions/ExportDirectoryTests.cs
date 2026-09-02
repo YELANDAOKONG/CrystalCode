@@ -19,6 +19,16 @@ public sealed class ExportDirectoryTests
     }
 
     [Fact]
+    public void Resolve_UsesHomeKeyword()
+    {
+        using var root = new TemporaryHome();
+
+        var path = ExportDirectory.Resolve("home", root.Home, "/tmp/workspace");
+
+        Assert.Equal(Path.Combine(root.Home.Root, "exports"), path);
+    }
+
+    [Fact]
     public void Resolve_UsesWorkspaceKeyword()
     {
         using var root = new TemporaryHome();
