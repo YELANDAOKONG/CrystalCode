@@ -1,6 +1,7 @@
 using Crystal.Tools;
 
 using CrystalCode.Configuration;
+using CrystalCode.Display.Paint;
 using CrystalCode.Home;
 using CrystalCode.Sessions;
 using CrystalCode.Tests.Home;
@@ -45,8 +46,26 @@ public sealed class ToolListTextTests
             external,
             HarnessSettings.CreateDefault());
 
-        Assert.Contains("Approval: Home Author, Project Host", text, StringComparison.Ordinal);
-        Assert.Contains("read  Host  Plan", text, StringComparison.Ordinal);
-        Assert.Contains("web  Home:web  Plan+Work  Author Always  Effective Always", text, StringComparison.Ordinal);
+        Assert.Contains("Tools  2 loaded  ·  Plan 2  ·  Work 1", text, StringComparison.Ordinal);
+        Assert.Contains("Host tools (1)", text, StringComparison.Ordinal);
+        Assert.Contains("read  Plan     Host", text, StringComparison.Ordinal);
+        Assert.Contains("External tools (1, On)", text, StringComparison.Ordinal);
+        Assert.Contains("web   Plan+Work  Home/web  Always  Always", text, StringComparison.Ordinal);
+        Assert.Contains("Home     Author", text, StringComparison.Ordinal);
+        Assert.Contains("Project  Host", text, StringComparison.Ordinal);
+        Assert.Contains("/tools home|project author|host", text, StringComparison.Ordinal);
+
+        var lines = WidgetPaint.Lines(
+            ToolListWidget.Create(
+                [host, external.PlanTools[0].Definition],
+                [external.WorkTools[0].Definition],
+                external,
+                HarnessSettings.CreateDefault()),
+            88);
+
+        Assert.Contains(lines, line => line.Plain.Contains("Host tools (1)", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("External tools (1, On)", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("Effective", StringComparison.Ordinal));
+        Assert.All(lines, line => Assert.True(TextWidth.Measure(line.Plain) <= 88));
     }
 }

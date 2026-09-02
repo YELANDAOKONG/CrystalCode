@@ -9,6 +9,7 @@ using Crystal.Tools;
 using CrystalCode.Approvals;
 using CrystalCode.Compaction;
 using CrystalCode.Plugins.Interfaces;
+using CrystalCode.Prompts;
 using CrystalCode.Display.Cards;
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Input;
@@ -312,6 +313,24 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         Add(TranscriptKind.Note, text);
     }
 
+    internal void WriteNote(IRenderable widget, string fallbackText)
+    {
+        ArgumentNullException.ThrowIfNull(widget);
+        ArgumentNullException.ThrowIfNull(fallbackText);
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            _log.Add(TranscriptKind.Note, fallbackText, widget);
+            if (!Framed)
+            {
+                AnsiConsole.Write(widget);
+                AnsiConsole.WriteLine();
+            }
+
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void WriteError(string text)
     {
         Add(TranscriptKind.Error, text);
@@ -377,36 +396,28 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    public void WriteStatus(
-        SessionLedger ledger,
-        string workspaceRoot,
-        bool planMode,
-        ApprovalMode approval,
-        int contextWindow,
-        string thinking = "",
-        string promptSet = "")
+    internal void WriteStatus(SessionStatus status, bool full)
     {
+        ArgumentNullException.ThrowIfNull(status);
         lock (_gate)
         {
             CommitLiveUnlocked();
-            _chrome.WorkspaceRoot = workspaceRoot;
-            _chrome.PlanMode = planMode;
-            _chrome.Approval = ApprovalLabel.For(approval);
-            _chrome.Thinking = thinking;
-            _chrome.PromptSet = promptSet;
-            ApplyUsageUnlocked(ledger.Usage, contextWindow);
-            var thinkingText = string.IsNullOrWhiteSpace(thinking)
+            _chrome.WorkspaceRoot = status.WorkspaceRoot;
+            _chrome.PlanMode = status.PlanMode;
+            _chrome.Approval = ApprovalLabel.For(status.Approval);
+            _chrome.Thinking = status.Thinking;
+            _chrome.PromptSet = status.PromptSet == PromptSetNames.Default
                 ? string.Empty
-                : $"  ·  {thinking}";
-            var promptText = string.IsNullOrWhiteSpace(promptSet)
-                ? string.Empty
-                : $"  ·  Prompt {promptSet}";
-            var text = $"{ModeLabel.For(planMode)}  ·  {ApprovalLabel.For(approval)}"
-                + $"{thinkingText}{promptText}  ·  "
-                + $"{ledger.UserTurns} turns  ·  {ledger.ModelCalls} model  ·  "
-                + $"{ledger.ToolCalls} tools  ·  {_chrome.Usage}";
-            _log.Add(TranscriptKind.Note, text);
-            WriteFallback(TranscriptKind.Note, text);
+                : status.PromptSet;
+            ApplyUsageUnlocked(status.Usage, status.ContextWindow);
+            var text = StatusText.Format(status, full);
+            var widget = StatusWidget.Create(status, full);
+            _log.Add(TranscriptKind.Note, text, widget);
+            if (!Framed)
+            {
+                AnsiConsole.Write(widget);
+                AnsiConsole.WriteLine();
+            }
             PaintUnlocked(force: true);
         }
     }
@@ -1106,6 +1117,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 var text = _composer.Text;
                 _composer.RememberAndClear();
                 _picker = null;
+                _scrollBack = 0;
                 return text;
             case ComposerAction.TogglePlan:
                 _composer.PlanMode = togglePlan();

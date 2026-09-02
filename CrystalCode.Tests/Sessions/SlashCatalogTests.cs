@@ -6,6 +6,14 @@ namespace CrystalCode.Tests.Sessions;
 
 public sealed class SlashCatalogTests
 {
+    [Fact]
+    public void Status_OffersFullCompletion()
+    {
+        var status = SlashCatalog.BuiltIn.Single(spec => spec.Verb == SessionVerb.Status);
+
+        Assert.Equal(["full"], status.Arguments);
+    }
+
     [Theory]
     [InlineData("/new", SessionVerb.Clear)]
     [InlineData("/clear", SessionVerb.Clear)]

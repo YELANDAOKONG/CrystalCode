@@ -53,6 +53,14 @@ supply-chain review and is not called. The host loop stays in this
 assembly's shell types; a later migration to Terminal.Gui would replace
 that loop inside this project only.
 
+Committed transcript entries may carry a Spectre `IRenderable` alongside a
+plain-text fallback. The display engine measures the widget at the current
+terminal width when its cache is rebuilt, so tables, grids, panels, and other
+high-level components participate in resize, scrollback, and repaint like
+text. Non-interactive output renders the same widget directly. The shell
+progress region owns transient indeterminate progress and elapsed time;
+static command reports remain committed transcript widgets.
+
 ### CrystalCode.Display.Tests
 
 Display tests: layout, chrome, input decoder, scroll policy, composer, paint,
@@ -473,11 +481,20 @@ name replaces the home set as a whole. `tools.json` field `enabled`
 `externalTools` enables discovery (default `true`). See
 [docs/external-tools.md](docs/external-tools.md).
 
-`/tools` lists the effective Plan and Work catalogs with external source, set,
-author declaration, and effective approval. It also owns external-tool
+`/tools` groups the effective host and external catalogs, aligns their Plan and
+Work membership, and shows external source, set, author declaration, effective
+approval, and catalog totals. It also owns external-tool
 configuration: `on`, `off`, `reload`, and independent `home` / `project`
 `author` or `host` policies. Changes are persisted to `config.json` and reload
 the catalogs when required.
+
+`/status` is the compact diagnostic view. Separate Workspace, Model, Tokens,
+and Options cards report operating modes, provider identity, the latest
+provider-reported input/output/total token usage, a proportional context bar,
+and feature switches. `/status full`
+adds Activity and Tools cards for session identity and start time, invocation
+counters, queue and todo counts, and tool-catalog totals. The persistent chrome
+remains the smallest live summary.
 
 The `plugins` directory is reserved. The current product does not load
 `IPlugin` assemblies from that directory. Dotnet tool sets load class

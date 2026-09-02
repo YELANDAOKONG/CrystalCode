@@ -17,7 +17,7 @@ public static class SlashCatalog
             ["on", "off"]),
         new(SessionVerb.Model, "model", [], "show or set provider and model"),
         new(SessionVerb.PromptSet, "promptset", ["prompts"], "show or select prompt set"),
-        new(SessionVerb.Status, "status", [], "turns, tokens, mode"),
+        new(SessionVerb.Status, "status", [], "summary or full diagnostics", ["full"]),
         new(SessionVerb.Clear, "clear", ["new"], "new conversation"),
         new(SessionVerb.Cd, "cd", [], "show or set workspace"),
         new(SessionVerb.Resume, "resume", ["continue"], "replay latest or id"),

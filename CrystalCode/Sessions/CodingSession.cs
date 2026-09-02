@@ -346,14 +346,7 @@ public sealed class CodingSession
                 ChangePromptSet(command.Argument);
                 return (true, false);
             case SessionVerb.Status:
-                _renderer.WriteStatus(
-                    _ledger,
-                    _workspace.Root,
-                    _planMode,
-                    _approval,
-                    _settings.ActiveModel.ContextWindow,
-                    CurrentThinkingStatus(),
-                    CurrentPromptStatus());
+                ShowStatus(command.Argument);
                 return (true, false);
             case SessionVerb.Clear:
                 BeginNewSession();
@@ -719,12 +712,53 @@ public sealed class CodingSession
 
     private void ShowTools()
     {
-        _renderer.WriteNote(
-            ToolListText.Format(
-                _planExecutor.Definitions,
-                _workExecutor.Definitions,
-                _external,
-                _settings));
+        var fallback = ToolListText.Format(
+            _planExecutor.Definitions,
+            _workExecutor.Definitions,
+            _external,
+            _settings);
+        var widget = ToolListWidget.Create(
+            _planExecutor.Definitions,
+            _workExecutor.Definitions,
+            _external,
+            _settings);
+        _renderer.WriteNote(widget, fallback);
+    }
+
+    private void ShowStatus(string argument)
+    {
+        var full = string.Equals(argument, "full", StringComparison.OrdinalIgnoreCase);
+        if (argument.Length > 0 && !full)
+        {
+            _renderer.WriteError("Status command must be /status or /status full.");
+            return;
+        }
+
+        _renderer.WriteStatus(
+            new SessionStatus(
+                SessionId: _sessionId,
+                StartedUtc: _sessionCreatedUtc,
+                WorkspaceRoot: _workspace.Root,
+                PlanMode: _planMode,
+                Approval: _approval,
+                Thinking: CurrentThinkingStatus(),
+                PromptSet: _promptResolution.PromptSet,
+                Provider: _settings.Provider.Value,
+                Model: _settings.Model,
+                ContextWindow: _settings.ActiveModel.ContextWindow,
+                Usage: _ledger.Usage,
+                UserTurns: _ledger.UserTurns,
+                ModelCalls: _ledger.ModelCalls,
+                ToolCalls: _ledger.ToolCalls,
+                QueuedMessages: _queue.Count,
+                Todos: _todos.Count,
+                SkillsEnabled: _settings.Skills,
+                ExternalToolsEnabled: _settings.ExternalTools,
+                EstimatedTokensEnabled: _settings.EstimatedTokens,
+                PlanTools: _planExecutor.Definitions.Count,
+                WorkTools: _workExecutor.Definitions.Count,
+                ExternalTools: _external.Tools.Count),
+            full);
     }
 
     private void WriteToolsUsage()

@@ -520,7 +520,8 @@ Type `/` to open the picker. Built-in verbs:
 
 Plain Up/Down moves the picker selection and automatically scrolls the visible
 candidate window. Tab accepts the selected completion. Enter also accepts a
-partial selection; a complete command still submits with one Enter.
+partial selection; a complete command still submits with one Enter. Submitting
+returns the transcript viewport to the latest output.
 
 | Command | Aliases | Action |
 | :--- | :--- | :--- |
@@ -531,7 +532,7 @@ partial selection; a complete command still submits with one Enter.
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, or select a set |
-| `/status` | | Turns, tokens, mode, workspace |
+| `/status` | | Compact workspace, model, token/context progress, and options; `full` adds diagnostics |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
 | `/resume` | `/continue` | Replay the latest session for this workspace, or `/resume <id>` |
@@ -539,7 +540,7 @@ partial selection; a complete command still submits with one Enter.
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
-| `/tools` | | List tools and configure external-tool loading and approval |
+| `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
 | `/quit` | `/exit`, `/q` | Exit |
 
 Unknown `/` text prints `unknown command`. `/cd` with no argument
