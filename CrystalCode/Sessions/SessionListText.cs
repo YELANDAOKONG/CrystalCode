@@ -26,7 +26,7 @@ internal static class SessionListText
                 ? "*"
                 : " ";
             var updated = session.UpdatedUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
-                ?? "unknown time";
+                ?? "Unknown time";
             var mode = session.PlanMode ? "Plan" : "Work";
             var workspace = includeWorkspace ? $"  {session.Workspace}" : string.Empty;
             lines.Add(

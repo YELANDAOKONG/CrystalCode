@@ -16,5 +16,6 @@ public sealed class DisplayCaseTests
         Assert.Equal("AutoEdit", DisplayCase.Token("autoedit"));
         Assert.Equal("FullReview", DisplayCase.Token("fullreview"));
         Assert.Equal("Outside Workspace", DisplayCase.Token("outside_workspace"));
+        Assert.Equal("Interrupted", DisplayCase.Token("interrupted"));
     }
 }

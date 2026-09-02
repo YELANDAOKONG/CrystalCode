@@ -23,19 +23,19 @@ public static class SessionResume
         {
             if (!store.TryLoadLatest(workspaceRoot, out document))
             {
-                error = "no session for this workspace";
+                error = "No session for this workspace";
                 return false;
             }
         }
         else if (!store.TryLoad(id, out document))
         {
-            error = "session not found  " + id.Trim();
+            error = "Session not found  " + id.Trim();
             return false;
         }
 
         if (TranscriptCodec.Read(document.Items).Count == 0)
         {
-            error = "session is empty";
+            error = "Session is empty";
             document = null!;
             return false;
         }

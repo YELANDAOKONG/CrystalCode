@@ -359,15 +359,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             CommitLiveUnlocked();
             AddHelpUnlocked(
-                "enter        submit; queue while working",
-                "enter        empty while working interrupts and sends",
-                "queue        stays above the composer; sends after this tool or turn",
-                "ctrl+j       newline",
-                "\\ enter      newline",
+                "enter        Submit; queue while working",
+                "enter        Empty while working interrupts and sends",
+                "queue        Stays above the composer; sends after this tool or turn",
+                "ctrl+j       Newline",
+                "\\ enter      Newline",
                 "tab          Plan / Work, or complete / and arguments",
                 "shift+tab    Plan / Work",
-                "?            shortcuts when empty",
-                "pageup       scroll transcript (also wheel, ctrl+up/down, empty up)",
+                "?            Shortcuts when empty",
+                "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)",
                 "up/down      history recall (or picker navigation)");
             foreach (var spec in SlashCatalog.BuiltIn)
             {
@@ -380,7 +380,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 AddHelpUnlocked($"{names,-28}{spec.Help}");
             }
 
-            AddHelpUnlocked("ctrl+c      stop turn; at idle clears input, twice on empty exits");
+            AddHelpUnlocked("ctrl+c      Stop turn; at idle clears input, twice on empty exits");
             if (extras is not null)
             {
                 foreach (var command in extras)
@@ -439,8 +439,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.Progress = string.Empty;
             if (result.StopReason != TurnStopReason.Completed)
             {
-                _log.Add(TranscriptKind.Note, result.StopReason.Value);
-                WriteFallback(TranscriptKind.Note, result.StopReason.Value);
+                var stopReason = DisplayCase.Token(result.StopReason.Value);
+                _log.Add(TranscriptKind.Note, stopReason);
+                WriteFallback(TranscriptKind.Note, stopReason);
             }
 
             PaintUnlocked(force: true);
@@ -543,7 +544,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _retryUntil = DateTimeOffset.UtcNow + attempt.Delay;
             _retryAttempt = attempt.Attempt;
             SetTurnActivityUnlocked("Retrying", ProgressText.Retrying(attempt.Attempt, attempt.Delay));
-            var note = "retrying model request  " + attempt.Message;
+            var note = "Retrying model request  " + attempt.Message;
             _log.Add(TranscriptKind.Note, note);
             WriteFallback(TranscriptKind.Note, note);
             PaintUnlocked(force: true);
@@ -1139,15 +1140,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     {
         CommitLiveUnlocked();
         AddHelpUnlocked(
-            "enter        submit; queue while working",
-            "enter        empty while working interrupts and sends",
-            "queue        stays above the composer; sends after this tool or turn",
-            "ctrl+j       newline",
-            "\\ enter      newline",
+            "enter        Submit; queue while working",
+            "enter        Empty while working interrupts and sends",
+            "queue        Stays above the composer; sends after this tool or turn",
+            "ctrl+j       Newline",
+            "\\ enter      Newline",
             "tab          Plan / Work, or complete / and arguments",
             "shift+tab    Plan / Work",
-            "?            shortcuts when empty",
-            "pageup       scroll transcript (also wheel, ctrl+up/down, empty up)");
+            "?            Shortcuts when empty",
+            "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)");
         foreach (var option in _slashOptions)
         {
             var aliases = option.Keys
@@ -1163,7 +1164,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             AddHelpUnlocked($"{names,-28}{option.Help}");
         }
 
-        AddHelpUnlocked("ctrl+c      stop turn; at idle clears input, twice on empty exits");
+        AddHelpUnlocked("ctrl+c      Stop turn; at idle clears input, twice on empty exits");
         PaintUnlocked(force: true);
     }
 

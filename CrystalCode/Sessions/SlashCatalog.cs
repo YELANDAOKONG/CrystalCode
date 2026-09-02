@@ -7,26 +7,26 @@ public static class SlashCatalog
 {
     public static IReadOnlyList<SlashSpec> BuiltIn { get; } =
     [
-        new(SessionVerb.Help, "help", ["h"], "shortcuts and commands"),
+        new(SessionVerb.Help, "help", ["h"], "Shortcuts and commands"),
         new(SessionVerb.Plan, "plan", [], "toggle Plan / Work"),
         new(SessionVerb.Approval, "approval", [], "default | autoedit | review | fullreview | full",
             ["default", "autoedit", "review", "fullreview", "full"]),
         new(SessionVerb.Thinking, "thinking", ["think"], "off | none | default | low | medium | high | maximum | max",
             ["off", "none", "default", "minimal", "low", "medium", "high", "maximum", "max"]),
-        new(SessionVerb.Tokens, "tokens", [], "toggle estimated progress tokens",
+        new(SessionVerb.Tokens, "tokens", [], "Toggle estimated progress tokens",
             ["on", "off"]),
-        new(SessionVerb.Model, "model", [], "show or set provider and model"),
-        new(SessionVerb.PromptSet, "promptset", ["prompts"], "show or select prompt set"),
-        new(SessionVerb.Status, "status", [], "summary or full diagnostics", ["full"]),
-        new(SessionVerb.Clear, "clear", ["new"], "new conversation"),
-        new(SessionVerb.Cd, "cd", [], "show or set workspace"),
-        new(SessionVerb.Resume, "resume", ["continue"], "replay latest or id"),
-        new(SessionVerb.Fork, "fork", [], "branch current conversation or id"),
-        new(SessionVerb.Sessions, "sessions", [], "list workspace sessions or all", ["all"]),
-        new(SessionVerb.Compact, "compact", ["summarize"], "summarize older context now"),
-        new(SessionVerb.Todos, "todos", ["todo"], "show the full session todo list"),
-        new(SessionVerb.Tools, "tools", [], "list tools or configure external tools"),
-        new(SessionVerb.Quit, "quit", ["exit", "q"], "exit")
+        new(SessionVerb.Model, "model", [], "Show or set provider and model"),
+        new(SessionVerb.PromptSet, "promptset", ["prompts"], "Show or select prompt set"),
+        new(SessionVerb.Status, "status", [], "Summary or full diagnostics", ["full"]),
+        new(SessionVerb.Clear, "clear", ["new"], "New conversation"),
+        new(SessionVerb.Cd, "cd", [], "Show or set workspace"),
+        new(SessionVerb.Resume, "resume", ["continue"], "Replay latest or ID"),
+        new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
+        new(SessionVerb.Sessions, "sessions", [], "List workspace sessions or all", ["all"]),
+        new(SessionVerb.Compact, "compact", ["summarize"], "Summarize older context now"),
+        new(SessionVerb.Todos, "todos", ["todo"], "Show the full session todo list"),
+        new(SessionVerb.Tools, "tools", [], "List tools or configure external tools"),
+        new(SessionVerb.Quit, "quit", ["exit", "q"], "Exit")
     ];
 
     public static bool TryMatch(string verb, out SessionVerb matched)

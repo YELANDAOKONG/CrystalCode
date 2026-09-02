@@ -60,7 +60,7 @@ public sealed class SessionResumeTests
 
         Assert.False(
             SessionResume.TryLoad(store, "/tmp/one", "missing", out _, out var error));
-        Assert.Equal("session not found  missing", error);
+        Assert.Equal("Session not found  missing", error);
     }
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed class SessionResumeTests
 
         Assert.False(
             SessionResume.TryLoad(store, "/tmp/one", "empty", out _, out var error));
-        Assert.Equal("session is empty", error);
+        Assert.Equal("Session is empty", error);
     }
 
     [Fact]
@@ -88,6 +88,6 @@ public sealed class SessionResumeTests
 
         Assert.False(
             SessionResume.TryLoad(store, "/tmp/one", id: null, out _, out var error));
-        Assert.Equal("no session for this workspace", error);
+        Assert.Equal("No session for this workspace", error);
     }
 }

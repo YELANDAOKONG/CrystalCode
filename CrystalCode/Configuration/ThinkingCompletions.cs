@@ -17,8 +17,8 @@ public static class ThinkingCompletions
 
         var options = new List<SlashOption>
         {
-            new("off", "disable thinking", ["off", "none"]),
-            new("default", "provider default", ["default"])
+            new("off", "Disable thinking", ["off", "none"]),
+            new("default", "Provider default", ["default"])
         };
 
         foreach (var effort in model.ThinkingEfforts)

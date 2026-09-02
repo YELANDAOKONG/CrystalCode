@@ -159,7 +159,7 @@ public sealed class CodingSession
         WritePromptNotes();
         if (!string.IsNullOrWhiteSpace(CurrentPromptStatus()))
         {
-            _renderer.WriteNote("prompt set  " + _promptResolution.PromptSet);
+            _renderer.WriteNote("Prompt set  " + _promptResolution.PromptSet);
         }
 
         ReloadExternalToolsWithProgress();
@@ -222,7 +222,7 @@ public sealed class CodingSession
                     continue;
                 }
 
-                _renderer.WriteNote("ctrl+c again to exit");
+                _renderer.WriteNote("Ctrl+C again to exit");
                 if (!promptSource.TryReset())
                 {
                     await FinishTurnAsync(promptSource.Token);
@@ -308,7 +308,7 @@ public sealed class CodingSession
             }
             catch (OperationCanceledException)
             {
-                _renderer.WriteNote("compaction cancelled");
+                _renderer.WriteNote("Compaction cancelled");
             }
 
             StartTurnIfQueued();
@@ -352,7 +352,7 @@ public sealed class CodingSession
                 BeginNewSession();
                 _renderer.ClearConversation();
                 _renderer.ShowUsage(null);
-                _renderer.WriteNote("new conversation");
+                _renderer.WriteNote("New conversation");
                 return (true, false);
             case SessionVerb.Cd:
                 ChangeDirectory(command.Argument);
@@ -382,7 +382,7 @@ public sealed class CodingSession
                     return (true, false);
                 }
 
-                _renderer.WriteError("unknown command  " + command.Argument);
+                _renderer.WriteError("Unknown command  " + command.Argument);
                 return (true, false);
             default:
                 return (false, false);
@@ -412,7 +412,7 @@ public sealed class CodingSession
         _settingsStore.Save(_settings);
         RebuildExecutors();
         RefreshChrome();
-        _renderer.WriteNote("approval  " + ApprovalLabel.For(_approval));
+        _renderer.WriteNote("Approval  " + ApprovalLabel.For(_approval));
     }
 
     private void ChangeThinking(string argument)
@@ -457,7 +457,7 @@ public sealed class CodingSession
         _settingsStore.Save(_settings);
         RebuildExecutors();
         RefreshChrome();
-        _renderer.WriteNote("thinking  " + ThinkingLabel.For(_thinkingEffort));
+        _renderer.WriteNote("Thinking  " + ThinkingLabel.For(_thinkingEffort));
     }
 
     private void ChangeEstimatedTokens(string argument)
@@ -479,7 +479,7 @@ public sealed class CodingSession
         _settingsStore.Save(_settings);
         _renderer.ShowEstimatedTokens = _settings.EstimatedTokens;
         _renderer.WriteNote(
-            "estimated tokens  " + (_settings.EstimatedTokens ? "On" : "Off"));
+            "Estimated tokens  " + (_settings.EstimatedTokens ? "On" : "Off"));
     }
 
     private static bool TryParseToggle(string argument, out bool enabled)
@@ -535,7 +535,7 @@ public sealed class CodingSession
         if (selection.Provider == _settings.Provider
             && string.Equals(selection.Model, _settings.Model, StringComparison.Ordinal))
         {
-            _renderer.WriteNote("model  " + selection);
+            _renderer.WriteNote("Model  " + selection);
             return;
         }
 
@@ -571,7 +571,7 @@ public sealed class CodingSession
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         RefreshSlashCommands();
         RefreshChrome();
-        _renderer.WriteNote("model  " + selection);
+        _renderer.WriteNote("Model  " + selection);
     }
 
     private void ChangePromptSet(string argument)
@@ -593,7 +593,7 @@ public sealed class CodingSession
         if (!string.Equals(requested, PromptSetNames.Default, StringComparison.Ordinal)
             && !string.Equals(requested, resolution.PromptSet, StringComparison.Ordinal))
         {
-            _renderer.WriteError("prompt set not found  " + requested);
+            _renderer.WriteError("Prompt set not found  " + requested);
             return;
         }
 
@@ -606,7 +606,7 @@ public sealed class CodingSession
         RefreshSlashCommands();
         RefreshChrome();
         WritePromptNotes();
-        _renderer.WriteNote("prompt set  " + resolution.PromptSet);
+        _renderer.WriteNote("Prompt set  " + resolution.PromptSet);
     }
 
     private void ChangeTools(string argument)
@@ -653,7 +653,7 @@ public sealed class CodingSession
             var currentPolicy = source == "home"
                 ? _settings.ExternalToolApproval.Home
                 : _settings.ExternalToolApproval.Project;
-            _renderer.WriteNote($"tool approval  {Title(source)} {Title(currentPolicy.Value)}");
+            _renderer.WriteNote($"Tool approval  {Title(source)} {Title(currentPolicy.Value)}");
             return;
         }
 
@@ -687,7 +687,7 @@ public sealed class CodingSession
         _settingsStore.Save(_settings);
         ReloadExternalToolsWithProgress();
         RebuildExecutors();
-        _renderer.WriteNote($"tool approval  {Title(source)} {Title(policy.Value)}");
+        _renderer.WriteNote($"Tool approval  {Title(source)} {Title(policy.Value)}");
     }
 
     private void ChangeToolLoading(string command)
@@ -707,7 +707,7 @@ public sealed class CodingSession
         ReloadExternalToolsWithProgress();
         RebuildExecutors();
         WriteExternalNotes();
-        _renderer.WriteNote(command == "reload" ? "tools reloaded" : "external tools  " + Title(command));
+        _renderer.WriteNote(command == "reload" ? "Tools reloaded" : "External tools  " + Title(command));
     }
 
     private void ShowTools()
@@ -804,7 +804,7 @@ public sealed class CodingSession
             RebuildExecutors();
             WriteExternalNotes();
             RefreshChrome();
-            _renderer.WriteNote("workspace  " + _workspace.Root);
+            _renderer.WriteNote("Workspace  " + _workspace.Root);
             return;
         }
 
@@ -914,7 +914,7 @@ public sealed class CodingSession
         bool pumpFrame,
         CancellationToken cancellationToken)
     {
-        _renderer.WriteNote("compacting context...");
+        _renderer.WriteNote("Compacting context...");
         _renderer.SetProgress(ProgressText.Compacting);
         CompactionOutcome outcome;
         using var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -970,7 +970,7 @@ public sealed class CodingSession
                 _renderer.ShowUsage(new TokenUsage(input, 0));
             }
 
-            _renderer.WriteNote("compacted context");
+            _renderer.WriteNote("Compacted context");
             return outcome;
         }
 
@@ -982,7 +982,7 @@ public sealed class CodingSession
 
         if (!silentSkip)
         {
-            _renderer.WriteNote("compaction skipped");
+            _renderer.WriteNote("Compaction skipped");
         }
 
         return outcome;
@@ -1046,7 +1046,7 @@ public sealed class CodingSession
         {
             if (!HasConversation())
             {
-                _renderer.WriteError("session is empty");
+                _renderer.WriteError("Session is empty");
                 return;
             }
 
@@ -1076,7 +1076,7 @@ public sealed class CodingSession
         _renderer.ShowUsage(_ledger.Usage);
         _renderer.WriteHistory(_transcript);
         ShowTodos();
-        _renderer.WriteNote($"forked  {sourceId}  ->  {_sessionId}");
+        _renderer.WriteNote($"Forked  {sourceId}  ->  {_sessionId}");
     }
 
     private void ShowSessions(string argument)
@@ -1084,14 +1084,14 @@ public sealed class CodingSession
         var includeAll = string.Equals(argument, "all", StringComparison.OrdinalIgnoreCase);
         if (!includeAll && !string.IsNullOrWhiteSpace(argument))
         {
-            _renderer.WriteError("usage: /sessions [all]");
+            _renderer.WriteError("Usage: /sessions [all]");
             return;
         }
 
         var sessions = _sessionStore.List(includeAll ? null : _workspace.Root);
         if (sessions.Count == 0)
         {
-            _renderer.WriteNote(includeAll ? "no sessions" : "no sessions for this workspace");
+            _renderer.WriteNote(includeAll ? "No sessions" : "No sessions for this workspace");
             return;
         }
 
@@ -1125,7 +1125,7 @@ public sealed class CodingSession
         RefreshChrome();
         _renderer.ShowUsage(_ledger.Usage);
         _renderer.WriteHistory(_transcript);
-        _renderer.WriteNote("resumed  " + _sessionId);
+        _renderer.WriteNote("Resumed  " + _sessionId);
         ShowTodos();
     }
 
@@ -1423,7 +1423,7 @@ public sealed class CodingSession
             }
             catch (OperationCanceledException)
             {
-                _renderer.WriteNote("compaction cancelled");
+                _renderer.WriteNote("Compaction cancelled");
             }
         }
 

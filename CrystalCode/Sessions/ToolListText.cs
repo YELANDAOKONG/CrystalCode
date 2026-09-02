@@ -95,7 +95,7 @@ public static class ToolListText
     public static string FormatApproval(ExternalToolApprovalSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        return $"tool approval  Home {Title(settings.Home.Value)}, Project {Title(settings.Project.Value)}";
+        return $"Tool approval  Home {Title(settings.Home.Value)}, Project {Title(settings.Project.Value)}";
     }
 
     private static string Catalogs(bool plan, bool work)

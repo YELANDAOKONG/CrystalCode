@@ -30,7 +30,7 @@ public static class ModelCompletions
                 nested.Add(new SlashOption(model, providerName, [model]));
             }
 
-            options.Add(new SlashOption(providerName, "provider", [providerName], nested));
+            options.Add(new SlashOption(providerName, "Provider", [providerName], nested));
         }
 
         return options;

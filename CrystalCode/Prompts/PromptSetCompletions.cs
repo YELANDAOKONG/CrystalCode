@@ -9,11 +9,11 @@ internal static class PromptSetCompletions
         ArgumentNullException.ThrowIfNull(resolution);
         var options = new List<SlashOption>
         {
-            new(PromptSetNames.Default, "no selected prompt set", [PromptSetNames.Default])
+            new(PromptSetNames.Default, "No selected prompt set", [PromptSetNames.Default])
         };
         foreach (var name in resolution.AvailableSets)
         {
-            options.Add(new SlashOption(name, "prompt set", [name]));
+            options.Add(new SlashOption(name, "Prompt set", [name]));
         }
 
         return options;

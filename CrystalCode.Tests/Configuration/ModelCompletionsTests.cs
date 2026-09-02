@@ -17,7 +17,7 @@ public sealed class ModelCompletionsTests
         Assert.Contains(options, option => option.Name == "deepseek-v4-flash");
         Assert.Contains(options, option => option.Name == "deepseek-v4-pro");
         var openrouter = Assert.Single(options, option => option.Name == "openrouter");
-        Assert.Equal("provider", openrouter.Help);
+        Assert.Equal("Provider", openrouter.Help);
         Assert.Contains(openrouter.ArgumentOptions, option => option.Name == "anthropic/claude-sonnet-4");
     }
 }
