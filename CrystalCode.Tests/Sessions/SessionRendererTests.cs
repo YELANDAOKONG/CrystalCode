@@ -110,6 +110,21 @@ public sealed class SessionRendererTests
     }
 
     [Fact]
+    public void OnUsageUpdated_RefreshesContextAndTurnCumulative()
+    {
+        var renderer = new SessionRenderer { ContextWindow = 1_000 };
+        renderer.ShowUsage(
+            new TokenUsage(100, 20),
+            new TokenUsage(12_900, 800));
+        renderer.BeginTurn();
+
+        renderer.OnUsageUpdated(new TokenUsage(200, 50), new TokenUsage(300, 70));
+
+        Assert.Equal("CTX 25%  ·  13.2k IN / 870 OUT", renderer.ChromeUsage);
+        Assert.Equal("14.1k Total", renderer.ChromeUsageTotal);
+    }
+
+    [Fact]
     public void OnUsageUpdated_RefreshesContextWithoutReplacingCumulativeCounts()
     {
         var renderer = new SessionRenderer { ContextWindow = 1_000 };

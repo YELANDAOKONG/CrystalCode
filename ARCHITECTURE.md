@@ -340,7 +340,9 @@ model's usable window (context minus reserved output), the host:
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.
 
-CTX percent uses the last model round's usage, not the sum of rounds in
+CTX percent uses the last model round's provider usage while a round is
+streaming, then a local transcript estimate after each tool batch until the
+next round reports. It is not the sum of rounds in
 the turn. The status bar can show 100% when usage meets or exceeds the
 window. Compaction does not block the session loop: the progress row
 stays on `Compacting` and the composer remains usable.
@@ -616,8 +618,9 @@ supports it: `Think Off`, or `Think` plus the resolved gear when
 thinking is on), the non-default prompt set as `Prompt <name>`, model,
 workspace, the latest request's context percent (`CTX`), cumulative
 token counts (`IN` / `OUT`), and, when the bar has room, a cumulative
-Title Case total (`783k Total`). During a turn the counts remain at the
-last completed cumulative value while `CTX` follows provider updates. It also
+Title Case total (`783k Total`). During a turn the status bar updates `CTX`, `IN`, and `OUT` after each
+model round and each tool batch: provider usage as it arrives, then a local
+transcript estimate after tools until the next round reports. It also
 shows tool count (`Tool` / `Tools`), and
 elapsed time. When the session has todos, a pinned `Todos` bar sits
 above the progress row and status bar. Each row is a checkbox colored

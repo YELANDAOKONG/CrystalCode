@@ -101,7 +101,7 @@ public sealed class SessionLedger
         CumulativeUsage = Add(CumulativeUsage, turnUsage);
     }
 
-    private static TokenUsage Add(TokenUsage? current, TokenUsage added)
+    internal static TokenUsage Add(TokenUsage? current, TokenUsage added)
     {
         if (current is null)
         {

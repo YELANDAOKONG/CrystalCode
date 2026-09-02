@@ -1,3 +1,4 @@
+using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
@@ -92,9 +93,9 @@ public sealed class StreamingTurn
 
                 modelCallCount++;
                 var request = new ChatRequest(transcript, _executor.Definitions, _reasoning);
-                var response = await StreamModelAsync(request, linked.Token);
+                var response = await StreamModelAsync(request, usage, linked.Token);
                 usage.Add(response.Usage);
-                _observer?.OnUsageUpdated(response.Usage ?? usage.Last);
+                _observer?.OnUsageUpdated(response.Usage ?? usage.Last, usage.Build());
 
                 var candidate = response.Candidates[0];
                 transcript.AddRange(candidate.Items);
@@ -128,7 +129,9 @@ public sealed class StreamingTurn
                 var toolResults = await _executor.ExecuteAsync(toolCalls, linked.Token);
                 transcript.AddRange(toolResults);
                 _observer?.OnToolResults(toolResults);
-                _observer?.OnUsageUpdated(response.Usage ?? usage.Last);
+                _observer?.OnUsageUpdated(
+                    new TokenUsage(TokenEstimator.Items(transcript), 0),
+                    usage.Build());
             }
         }
         catch (OperationCanceledException) when (durationSource.IsCancellationRequested)
@@ -155,10 +158,11 @@ public sealed class StreamingTurn
 
     private Task<ChatResponse> StreamModelAsync(
         ChatRequest request,
+        UsageAccumulator usage,
         CancellationToken cancellationToken)
     {
         return SessionRetry.RunAsync(
-            token => StreamOnceAsync(request, token),
+            token => StreamOnceAsync(request, usage, token),
             _retry,
             attempt => _observer?.OnRetry(attempt),
             cancellationToken);
@@ -166,12 +170,20 @@ public sealed class StreamingTurn
 
     private async Task<ChatResponse> StreamOnceAsync(
         ChatRequest request,
+        UsageAccumulator usage,
         CancellationToken cancellationToken)
     {
         var assembler = new ChatStreamAssembler();
         await foreach (var streamEvent in _client.StreamAsync(request, cancellationToken))
         {
             _observer?.OnStreamEvent(streamEvent);
+            if (streamEvent is ChatUsageReceived { Usage: not null } usageReceived)
+            {
+                _observer?.OnUsageUpdated(
+                    usageReceived.Usage,
+                    usage.Preview(usageReceived.Usage));
+            }
+
             assembler.Apply(streamEvent);
         }
 

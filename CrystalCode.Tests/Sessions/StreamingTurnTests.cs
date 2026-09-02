@@ -109,8 +109,9 @@ public sealed class StreamingTurnTests
 
         Assert.Equal(TurnStopReason.Completed, result.StopReason);
         Assert.True(observer.UsageUpdates.Count >= 2);
-        Assert.Equal(20, observer.UsageUpdates[^1]?.InputTokenCount);
-        Assert.Equal(10, observer.UsageUpdates[^1]?.OutputTokenCount);
+        Assert.Equal(20, observer.UsageUpdates[^1].Context?.InputTokenCount);
+        Assert.Equal(10, observer.UsageUpdates[^1].Context?.OutputTokenCount);
+        Assert.Equal(30, observer.UsageUpdates[^1].TurnCumulative?.InputTokenCount);
         Assert.Equal(20, result.Usage?.InputTokenCount);
         Assert.Equal(10, result.Usage?.OutputTokenCount);
         Assert.Equal(30, result.AccumulatedUsage?.InputTokenCount);
@@ -122,6 +123,30 @@ public sealed class StreamingTurnTests
         var results = Assert.Single(observer.ToolResultBatches);
         Assert.Equal("c1", Assert.Single(results).CallId);
         Assert.True(observer.ToolCallsBeforeResults);
+    }
+
+    [Fact]
+    public async Task RunAsync_UpdatesContextEstimateAfterToolResults()
+    {
+        var observer = new TestObserver();
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "echo", """{"message":"hi"}""", new TokenUsage(10, 5)),
+            TextRound("ok", new TokenUsage(20, 10)));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
+
+        await turn.RunAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        var afterTools = observer.UsageUpdates
+            .Last(update => update.Context?.OutputTokenCount == 0
+                && update.Context.InputTokenCount > 10);
+        Assert.Equal(10, afterTools.TurnCumulative?.InputTokenCount);
+        Assert.Equal(5, afterTools.TurnCumulative?.OutputTokenCount);
     }
 
     [Fact]
@@ -324,7 +349,7 @@ public sealed class StreamingTurnTests
 
     private sealed class TestObserver : ITurnObserver
     {
-        public List<TokenUsage?> UsageUpdates { get; } = [];
+        public List<(TokenUsage? Context, TokenUsage? TurnCumulative)> UsageUpdates { get; } = [];
 
         public List<IReadOnlyList<ToolCall>> ToolCallBatches { get; } = [];
 
@@ -351,7 +376,8 @@ public sealed class StreamingTurnTests
             ToolResultBatches.Add(results);
         }
 
-        public void OnUsageUpdated(TokenUsage? usage) => UsageUpdates.Add(usage);
+        public void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null) =>
+            UsageUpdates.Add((contextUsage, turnCumulativeUsage));
     }
 
     private sealed class FlakyStreamingClient : IStreamingChatClient

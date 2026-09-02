@@ -32,4 +32,17 @@ public sealed class UsageAccumulatorTests
         Assert.Equal(80, usage.Last?.InputTokenCount);
         Assert.Null(usage.Build());
     }
+
+    [Fact]
+    public void Preview_AddsCurrentRoundToCompletedTotals()
+    {
+        var usage = new UsageAccumulator();
+        usage.Add(new TokenUsage(10, 5, 2));
+
+        var preview = usage.Preview(new TokenUsage(20, 10, 4));
+
+        Assert.Equal(30, preview?.InputTokenCount);
+        Assert.Equal(15, preview?.OutputTokenCount);
+        Assert.Equal(6, preview?.ReasoningTokenCount);
+    }
 }

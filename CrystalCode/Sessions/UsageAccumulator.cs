@@ -63,4 +63,25 @@ public sealed class UsageAccumulator
             _outputTokenCount,
             _completeReasoning ? _reasoningTokenCount : null);
     }
+
+    public TokenUsage? Preview(TokenUsage? currentRoundUsage)
+    {
+        if (currentRoundUsage is null)
+        {
+            return Build();
+        }
+
+        if (!_hasUsage)
+        {
+            return currentRoundUsage;
+        }
+
+        long? reasoning = _completeReasoning && currentRoundUsage.ReasoningTokenCount is long roundReasoning
+            ? checked(_reasoningTokenCount + roundReasoning)
+            : currentRoundUsage.ReasoningTokenCount ?? (_completeReasoning ? _reasoningTokenCount : null);
+        return new TokenUsage(
+            checked(_inputTokenCount + currentRoundUsage.InputTokenCount),
+            checked(_outputTokenCount + currentRoundUsage.OutputTokenCount),
+            reasoning);
+    }
 }

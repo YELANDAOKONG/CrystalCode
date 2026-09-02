@@ -52,6 +52,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private int _streamedCharacters;
     private TokenUsage? _lastUsage;
     private TokenUsage? _cumulativeUsage;
+    private TokenUsage? _turnCumulativeBaseline;
     private DateTimeOffset? _retryUntil;
     private int _retryAttempt;
 
@@ -508,6 +509,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             CommitLiveUnlocked();
+            _turnCumulativeBaseline = _cumulativeUsage;
             _turnClock = Stopwatch.StartNew();
             _toolNames.Clear();
             _streamedCharacters = 0;
@@ -656,13 +658,19 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
-    public void OnUsageUpdated(TokenUsage? usage)
+    public void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null)
     {
         lock (_gate)
         {
-            if (usage is not null && ContextWindow > 0)
+            TokenUsage? cumulative = _cumulativeUsage;
+            if (turnCumulativeUsage is not null)
             {
-                ApplyContextUsageUnlocked(usage, ContextWindow);
+                cumulative = SessionLedger.Add(_turnCumulativeBaseline, turnCumulativeUsage);
+            }
+
+            if (contextUsage is not null || turnCumulativeUsage is not null)
+            {
+                ApplyUsageUnlocked(contextUsage ?? _lastUsage, cumulative, ContextWindow);
             }
 
             PaintUnlocked(force: false);
