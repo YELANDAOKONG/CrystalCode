@@ -700,7 +700,11 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
-`/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`). A slash picker appears while the prompt
+`/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`). `/export`
+writes markdown or json for the current conversation; `/prompts export`
+writes built-in prompt templates. Export roots default to
+`~/.crystal/exports/` and are configurable through `exportDirectory` in
+`config.json`. A slash picker appears while the prompt
 is a command prefix. After a verb that takes an argument
 (`/thinking`, `/approval`, `/model`, `/tokens`), Tab also completes the argument.
 `/model` completes current-provider models, then a provider name, then

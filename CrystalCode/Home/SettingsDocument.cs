@@ -20,6 +20,8 @@ internal sealed class SettingsDocument
 
     public string? PromptSet { get; set; }
 
+    public string? ExportDirectory { get; set; }
+
     public double? CompactionThreshold { get; set; }
 
     public Dictionary<string, ProviderDocument>? Providers { get; set; }

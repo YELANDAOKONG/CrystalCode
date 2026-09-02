@@ -261,4 +261,34 @@ public sealed class SettingsStoreTests
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Save_RoundTripsExportDirectory()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithExportDirectory("workspace");
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal("workspace", loaded.ExportDirectory);
+    }
+
+    [Fact]
+    public void Save_ClearsExportDirectoryWhenUnset()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.Save(store.LoadOrCreate().WithExportDirectory("workspace"));
+        store.Save(store.Load().WithExportDirectory(null));
+
+        var loaded = store.Load();
+
+        Assert.Null(loaded.ExportDirectory);
+        Assert.DoesNotContain(
+            "exportDirectory",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
 }

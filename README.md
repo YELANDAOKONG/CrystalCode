@@ -194,6 +194,7 @@ Top-level fields:
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
+| `exportDirectory` | Export root: omitted for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `providers` | Named endpoints and their model tables |
 
@@ -532,7 +533,7 @@ returns the transcript viewport to the latest output.
 | `/thinking` | `/think` | Cycle or set the thinking gear |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
-| `/promptset` | `/prompts` | List prompt sets and effective sources, or select a set |
+| `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
@@ -540,9 +541,16 @@ returns the transcript viewport to the latest output.
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
+| `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
 | `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
 | `/quit` | `/exit`, `/q` | Exit |
+
+`/export markdown [path] [--system]` and `/export json [path] [--system]`
+write the current conversation under `exportDirectory` (default
+`~/.crystal/exports/`). Markdown and JSON omit the live system prompt
+unless `--system` is set. `/prompts export [dir]` writes built-in
+prompt templates with placeholders. Quoted paths may contain spaces.
 
 Unknown `/` text prints `unknown command`. `/cd` with no argument
 prints the current workspace root. `/cd` only accepts a directory

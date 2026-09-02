@@ -29,7 +29,8 @@ public sealed record HarnessSettings
         bool externalTools = DefaultExternalTools,
         bool estimatedTokens = DefaultEstimatedTokens,
         string promptSet = DefaultPromptSet,
-        ExternalToolApprovalSettings? externalToolApproval = null)
+        ExternalToolApprovalSettings? externalToolApproval = null,
+        string? exportDirectory = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -58,6 +59,7 @@ public sealed record HarnessSettings
         EstimatedTokens = estimatedTokens;
         PromptSet = promptSet.Trim();
         ExternalToolApproval = externalToolApproval ?? ExternalToolApprovalSettings.Default;
+        ExportDirectory = string.IsNullOrWhiteSpace(exportDirectory) ? null : exportDirectory.Trim();
     }
 
     public ProviderName Provider { get; }
@@ -81,6 +83,8 @@ public sealed record HarnessSettings
     public string PromptSet { get; }
 
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
+
+    public string? ExportDirectory { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
 
@@ -151,6 +155,13 @@ public sealed record HarnessSettings
         return Copy(externalToolApproval: approval);
     }
 
+    public HarnessSettings WithExportDirectory(string? exportDirectory) =>
+        Copy(
+            exportDirectory: string.IsNullOrWhiteSpace(exportDirectory)
+                ? null
+                : exportDirectory.Trim(),
+            setExportDirectory: true);
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -160,7 +171,9 @@ public sealed record HarnessSettings
         bool? externalTools = null,
         bool? estimatedTokens = null,
         string? promptSet = null,
-        ExternalToolApprovalSettings? externalToolApproval = null) =>
+        ExternalToolApprovalSettings? externalToolApproval = null,
+        string? exportDirectory = null,
+        bool setExportDirectory = false) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -172,7 +185,8 @@ public sealed record HarnessSettings
             externalTools ?? ExternalTools,
             estimatedTokens ?? EstimatedTokens,
             promptSet ?? PromptSet,
-            externalToolApproval ?? ExternalToolApproval);
+            externalToolApproval ?? ExternalToolApproval,
+            setExportDirectory ? exportDirectory : ExportDirectory);
 
     public override string ToString() => nameof(HarnessSettings);
 

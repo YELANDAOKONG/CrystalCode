@@ -53,4 +53,15 @@ public sealed class HarnessSettingsTests
         Assert.Equal("concise", next.PromptSet);
         Assert.Equal(HarnessSettings.DefaultPromptSet, settings.PromptSet);
     }
+
+    [Fact]
+    public void WithExportDirectory_ClearsConfiguredDirectory()
+    {
+        var settings = HarnessSettings.CreateDefault().WithExportDirectory("workspace");
+
+        var cleared = settings.WithExportDirectory(null);
+
+        Assert.Equal("workspace", settings.ExportDirectory);
+        Assert.Null(cleared.ExportDirectory);
+    }
 }

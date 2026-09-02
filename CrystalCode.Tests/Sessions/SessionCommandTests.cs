@@ -25,7 +25,9 @@ public sealed class SessionCommandTests
     [InlineData("/promptset concise", SessionVerb.PromptSet)]
     [InlineData("/prompts", SessionVerb.PromptSet)]
     [InlineData("/tokens", SessionVerb.Tokens)]
-    [InlineData("/tokens on", SessionVerb.Tokens)]
+    [InlineData("/export", SessionVerb.Export)]
+    [InlineData("/export markdown", SessionVerb.Export)]
+    [InlineData("/export json --system", SessionVerb.Export)]
     [InlineData("/todos", SessionVerb.Todos)]
     [InlineData("/todo", SessionVerb.Todos)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)
@@ -34,6 +36,15 @@ public sealed class SessionCommandTests
 
         Assert.True(parsed);
         Assert.Equal(verb, command.Verb);
+    }
+
+    [Fact]
+    public void TryParse_ReadsExportArgument()
+    {
+        SessionCommand.TryParse("/export markdown ./out.md --system", out var command);
+
+        Assert.Equal(SessionVerb.Export, command.Verb);
+        Assert.Equal("markdown ./out.md --system", command.Argument);
     }
 
     [Fact]

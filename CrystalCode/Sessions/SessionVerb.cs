@@ -22,6 +22,7 @@ public enum SessionVerb
     Compact,
     Todos,
     Tools,
+    Export,
     Quit,
     Unknown
 }

@@ -67,7 +67,10 @@ public sealed class SettingsStore
             string.IsNullOrWhiteSpace(document.PromptSet)
                 ? defaults.PromptSet
                 : document.PromptSet.Trim(),
-            externalToolApproval);
+            externalToolApproval,
+            string.IsNullOrWhiteSpace(document.ExportDirectory)
+                ? null
+                : document.ExportDirectory.Trim());
     }
 
     public void Save(HarnessSettings settings)
@@ -93,6 +96,7 @@ public sealed class SettingsStore
                 StringComparison.Ordinal)
                     ? null
                     : settings.PromptSet,
+            ExportDirectory = settings.ExportDirectory,
             CompactionThreshold = settings.CompactionThreshold,
             Providers = SettingsMapper.WriteProviders(settings.Catalog)
         };

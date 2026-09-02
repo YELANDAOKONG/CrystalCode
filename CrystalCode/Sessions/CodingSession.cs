@@ -1,3 +1,4 @@
+using System.Text;
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
@@ -374,6 +375,9 @@ public sealed class CodingSession
             case SessionVerb.Tools:
                 ChangeTools(command.Argument);
                 return (true, false);
+            case SessionVerb.Export:
+                ExportSession(command.Argument);
+                return (true, false);
             case SessionVerb.Quit:
                 return (true, true);
             case SessionVerb.Unknown:
@@ -574,9 +578,268 @@ public sealed class CodingSession
         _renderer.WriteNote("Model  " + selection);
     }
 
+    private void ExportSession(string argument)
+    {
+        if (_turnActive)
+        {
+            _renderer.WriteError("Finish the current turn before exporting.");
+            return;
+        }
+
+        IReadOnlyList<string> tokens;
+        try
+        {
+            tokens = string.IsNullOrWhiteSpace(argument)
+                ? []
+                : CommandArguments.Split(argument);
+        }
+        catch (ArgumentException exception)
+        {
+            _renderer.WriteError(exception.Message);
+            return;
+        }
+
+        if (tokens.Count == 0)
+        {
+            WriteExportUsage();
+            return;
+        }
+
+        if (!ExportSessionArguments.TryParse(tokens, out var options, out var parseError))
+        {
+            if (parseError.Length > 0)
+            {
+                _renderer.WriteError(parseError);
+                return;
+            }
+
+            WriteExportUsage();
+            return;
+        }
+
+        switch (options.Format)
+        {
+            case "markdown":
+                ExportMarkdown(options.Path, options.IncludeSystem);
+                return;
+            case "json":
+                ExportJson(options.Path, options.IncludeSystem);
+                return;
+            default:
+                WriteExportUsage();
+                return;
+        }
+    }
+
+    private void ExportMarkdown(string? explicitPath, bool includeSystem)
+    {
+        if (!TryResolveExportOutputPath(explicitPath, ".md", out var path, out var error))
+        {
+            _renderer.WriteError(error);
+            return;
+        }
+
+        var metadata = CreateExportMetadata();
+        var items = TranscriptExport.ConversationItems(_transcript);
+        var systemText = includeSystem ? CurrentSystemText() : null;
+        var markdown = TranscriptExport.RenderMarkdown(
+            metadata,
+            items,
+            _todos.Snapshot(),
+            systemText);
+        WriteExportFile(path, markdown);
+    }
+
+    private void ExportJson(string? explicitPath, bool includeSystem)
+    {
+        if (!TryResolveExportOutputPath(explicitPath, ".json", out var path, out var error))
+        {
+            _renderer.WriteError(error);
+            return;
+        }
+
+        var metadata = CreateExportMetadata();
+        var document = CreateExportDocument();
+        var systemText = includeSystem ? CurrentSystemText() : null;
+        var json = SessionJsonExport.Render(metadata, document, systemText);
+        WriteExportFile(path, json);
+    }
+
+    private void ExportPromptTemplates(string? explicitDirectory)
+    {
+        if (_turnActive)
+        {
+            _renderer.WriteError("Finish the current turn before exporting prompts.");
+            return;
+        }
+
+        string directory;
+        if (string.IsNullOrWhiteSpace(explicitDirectory))
+        {
+            if (!TryResolveExportDirectory(out var exportRoot, out var resolveError))
+            {
+                _renderer.WriteError(resolveError);
+                return;
+            }
+
+            directory = Path.Combine(exportRoot, "prompts");
+        }
+        else if (!ExportPath.TryResolveOutputPath(
+                     explicitDirectory,
+                     _workspace.Root,
+                     _home,
+                     out directory,
+                     out var error))
+        {
+            _renderer.WriteError(error);
+            return;
+        }
+
+        if (!ExportFilesystem.TryEnsureDirectory(directory, out var ensureError))
+        {
+            _renderer.WriteError(ensureError);
+            return;
+        }
+
+        try
+        {
+            PromptTemplateExport.Write(directory);
+            _renderer.WriteNote("Exported prompts  " + directory);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _renderer.WriteError("Export failed  " + exception.Message);
+        }
+    }
+
+    private void WriteExportUsage()
+    {
+        if (!TryResolveExportDirectory(out var directory, out var error))
+        {
+            _renderer.WriteError(error);
+            return;
+        }
+
+        _renderer.WriteNote(ExportText.Usage(_sessionId, directory));
+    }
+
+    private bool TryResolveExportDirectory(out string directory, out string error) =>
+        ExportDirectory.TryResolve(_settings.ExportDirectory, _home, _workspace.Root, out directory, out error);
+
+    private bool TryResolveExportOutputPath(
+        string? explicitPath,
+        string extension,
+        out string fullPath,
+        out string error)
+    {
+        fullPath = string.Empty;
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(explicitPath))
+        {
+            if (!TryResolveExportDirectory(out var exportRoot, out error))
+            {
+                return false;
+            }
+
+            if (!ExportFilesystem.TryEnsureDirectory(exportRoot, out error))
+            {
+                return false;
+            }
+
+            fullPath = Path.Combine(exportRoot, _sessionId + extension);
+            return true;
+        }
+
+        if (!ExportPath.TryResolveOutputPath(explicitPath, _workspace.Root, _home, out fullPath, out error))
+        {
+            return false;
+        }
+
+        if (Directory.Exists(fullPath)
+            || explicitPath.EndsWith('/')
+            || explicitPath.EndsWith('\\'))
+        {
+            if (!ExportFilesystem.TryEnsureDirectory(fullPath, out error))
+            {
+                return false;
+            }
+
+            fullPath = Path.Combine(fullPath, _sessionId + extension);
+        }
+
+        return true;
+    }
+
+    private SessionExportMetadata CreateExportMetadata() =>
+        new(
+            _sessionId,
+            _workspace.Root,
+            _settings.Provider.Value,
+            _settings.Model,
+            _promptResolution.PromptSet,
+            _planMode,
+            DateTimeOffset.UtcNow);
+
+    private SessionDocument CreateExportDocument()
+    {
+        var document = CreateDocument();
+        document.Items = TranscriptCodec.Write(TranscriptExport.ConversationItems(_transcript));
+        document.UpdatedUtc = DateTimeOffset.UtcNow;
+        return document;
+    }
+    private void WriteExportFile(string path, string contents)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(directory)
+                && !ExportFilesystem.TryEnsureDirectory(directory, out var ensureError))
+            {
+                _renderer.WriteError(ensureError);
+                return;
+            }
+
+            File.WriteAllText(path, contents, Encoding.UTF8);
+            _renderer.WriteNote("Exported  " + path);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            _renderer.WriteError("Export failed  " + exception.Message);
+        }
+    }
+
     private void ChangePromptSet(string argument)
     {
-        if (string.IsNullOrWhiteSpace(argument))
+        IReadOnlyList<string> tokens;
+        try
+        {
+            tokens = string.IsNullOrWhiteSpace(argument)
+                ? []
+                : CommandArguments.Split(argument);
+        }
+        catch (ArgumentException exception)
+        {
+            _renderer.WriteError(exception.Message);
+            return;
+        }
+
+        if (tokens.Count > 0
+            && string.Equals(tokens[0], "export", StringComparison.OrdinalIgnoreCase))
+        {
+            if (tokens.Count > 2)
+            {
+                _renderer.WriteError("Prompt export accepts at most one directory.");
+                return;
+            }
+
+            ExportPromptTemplates(tokens.Count > 1 ? tokens[1] : null);
+            return;
+        }
+
+        if (tokens.Count == 0)
         {
             _renderer.WriteNote(PromptSelectionText.Format(_promptResolution));
             return;
@@ -588,7 +851,7 @@ public sealed class CodingSession
             return;
         }
 
-        var requested = argument.Trim();
+        var requested = tokens[0];
         var resolution = _promptStore.Resolve(_workspace.Root, requested);
         if (!string.Equals(requested, PromptSetNames.Default, StringComparison.Ordinal)
             && !string.Equals(requested, resolution.PromptSet, StringComparison.Ordinal))
