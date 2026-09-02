@@ -45,7 +45,9 @@ public sealed class ContextCompactorTests
         var prompt = string.Join('\n', client.LastRequest.Items.OfType<ChatMessage>().Select(message => message.Text));
         Assert.Contains("[User]: first", prompt, StringComparison.Ordinal);
         Assert.Contains("## Objective", prompt, StringComparison.Ordinal);
-        Assert.Contains(client.LastRequest.Items.OfType<ChatMessage>(), message => message.Text == CompactionPrompt.SystemText);
+        Assert.Contains(client.LastRequest.Items.OfType<ChatMessage>(), message =>
+            message.Text.Contains("context summarization agent", StringComparison.Ordinal)
+            && message.Text.Contains("Crystal Code", StringComparison.Ordinal));
     }
 
     [Fact]

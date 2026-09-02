@@ -819,17 +819,22 @@ public sealed class CodingSession
         return _planMode;
     }
 
-    private string CurrentSystemText()
-    {
-        var environment = PromptEnvironment.Render(
+    private PromptContext CurrentPromptContext() =>
+        PromptContext.Create(
             _workspace.Root,
             _settings.Provider.Value,
-            _settings.Model);
-        var skills = _skills is null ? string.Empty : SkillGuidance.Render(_skills);
-        return _planMode
-            ? _prompts.ComposePlan(environment, skills)
-            : _prompts.ComposeWork(environment, skills);
-    }
+            _settings.Model,
+            _planMode ? "plan" : "work",
+            _skills is null ? string.Empty : SkillGuidance.Render(_skills),
+            _prompts.Instructions);
+
+    private string CurrentSystemText() =>
+        _planMode
+            ? _prompts.ComposePlan(CurrentPromptContext())
+            : _prompts.ComposeWork(CurrentPromptContext());
+
+    private string CurrentReviewSystemText() =>
+        _prompts.ComposeReview(CurrentPromptContext().WithMode("review"));
 
     private void ReloadPrompts()
     {
@@ -1175,7 +1180,7 @@ public sealed class CodingSession
         var question = new QuestionPrompt(renderer);
         var reviewer = new ModelApprovalReviewer(
             _client,
-            _prompts.Review,
+            CurrentReviewSystemText(),
             CurrentReasoning());
         var policy = new ApprovalPolicy(
             _approval,
@@ -1380,7 +1385,11 @@ public sealed class CodingSession
     }
 
     private ContextCompactor CreateCompactor(IChatClient client) =>
-        new(client, SessionRetryOptions.Default, _renderer.OnRetry);
+        new(
+            client,
+            SessionRetryOptions.Default,
+            _renderer.OnRetry,
+            () => CompactionPrompt.ComposeSystem(CurrentPromptContext().WithMode("compaction")));
 
     private async Task FinishTurnAsync(CancellationToken cancellationToken = default)
     {

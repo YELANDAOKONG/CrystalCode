@@ -26,38 +26,23 @@ public sealed record PromptSet
 
     public string Instructions { get; }
 
-    public string WorkSystem => Combine(Work, string.Empty, string.Empty, Instructions);
+    public string WorkSystem =>
+        ComposeWork(PromptContext.InstructionsOnly(Instructions));
 
-    public string PlanSystem => Combine(Plan, string.Empty, string.Empty, Instructions);
+    public string PlanSystem =>
+        ComposePlan(PromptContext.InstructionsOnly(Instructions));
 
-    public string ComposeWork(string environment, string skills = "") =>
-        Combine(Work, environment, skills, Instructions);
+    public string ReviewSystem =>
+        ComposeReview(PromptContext.InstructionsOnly(Instructions).WithMode("review"));
 
-    public string ComposePlan(string environment, string skills = "") =>
-        Combine(Plan, environment, skills, Instructions);
+    public string ComposeWork(PromptContext context) =>
+        PromptBinder.Apply(Work, context);
+
+    public string ComposePlan(PromptContext context) =>
+        PromptBinder.Apply(Plan, context);
+
+    public string ComposeReview(PromptContext context) =>
+        PromptBinder.Apply(Review, context);
 
     public override string ToString() => nameof(PromptSet);
-
-    private static string Combine(string prompt, string environment, string skills, string instructions)
-    {
-        ArgumentNullException.ThrowIfNull(environment);
-        ArgumentNullException.ThrowIfNull(skills);
-        var text = prompt;
-        if (environment.Trim().Length > 0)
-        {
-            text += "\n\n" + environment.Trim();
-        }
-
-        if (skills.Trim().Length > 0)
-        {
-            text += "\n\n" + skills.Trim();
-        }
-
-        if (instructions.Length > 0)
-        {
-            text += "\n\n## Workspace instructions\n" + instructions;
-        }
-
-        return text;
-    }
 }

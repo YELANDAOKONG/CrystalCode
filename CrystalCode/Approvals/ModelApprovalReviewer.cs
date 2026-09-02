@@ -26,7 +26,8 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
         _systemText = string.IsNullOrWhiteSpace(systemText)
-            ? ApprovalReviewPrompt.SystemText
+            ? ApprovalReviewPrompt.ComposeSystem(
+                PromptContext.InstructionsOnly(string.Empty).WithMode("review"))
             : systemText.Trim();
         _reasoning = reasoning;
     }

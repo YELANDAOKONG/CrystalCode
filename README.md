@@ -659,11 +659,20 @@ non-default set appears as `Prompt <name>` in the status bar and as a startup
 note. If a configured set is missing, Crystal uses default prompts, reports the
 fallback, and leaves the configured name intact.
 
-The built-in Work and Plan assistant name is Crystal Code. A host-owned
-`<env>` block (workspace, git, platform, date, provider/model) is
-appended after the Work or Plan body and is not overlayable. When
-Skills is enabled, available-skill guidance is appended after `<env>`
-and is also host-owned.
+The built-in Work and Plan assistant name is Crystal Code. Work, Plan,
+Review, and compaction templates use host-owned placeholders (`{{name}}`).
+Composite session slots are `{{env}}`, `{{skills}}`, and
+`{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
+include `{{workspace}}`, `{{is_git_repo}}`, `{{platform}}`, `{{date}}`,
+`{{provider}}`, `{{model}}`, `{{model_line}}`, `{{mode}}`, and
+`{{product_name}}`. Review user templates add `{{conversation}}`,
+`{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
+and `{{classification_summary}}`. Compaction user templates add
+`{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
+`{{output_template}}`, and `{{todos_section}}`. Placeholder names are
+case-insensitive. Unknown names are left unchanged. Templates must declare
+every host slot they need. When Skills is enabled, available-skill guidance
+fills `{{skills}}`. Composite host values are not overlayable.
 
 Workspace facts are appended under "Workspace instructions" on Work
 and Plan only. Review is the named file alone so the reviewer stays

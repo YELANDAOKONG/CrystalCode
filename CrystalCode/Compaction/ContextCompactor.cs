@@ -12,18 +12,23 @@ public sealed class ContextCompactor
     public const string OmittedResultText = "Tool result omitted after compaction.";
 
     private readonly IChatClient _client;
+    private readonly Func<string> _systemText;
     private readonly SessionRetryOptions _retry;
     private readonly Action<SessionRetryAttempt>? _onRetry;
 
     public ContextCompactor(
         IChatClient client,
         SessionRetryOptions? retry = null,
-        Action<SessionRetryAttempt>? onRetry = null)
+        Action<SessionRetryAttempt>? onRetry = null,
+        Func<string>? systemText = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
         _retry = retry ?? SessionRetryOptions.Default;
         _onRetry = onRetry;
+        _systemText = systemText
+            ?? (() => CompactionPrompt.ComposeSystem(
+                PromptContext.InstructionsOnly(string.Empty).WithMode("compaction")));
     }
 
     public async Task<CompactionOutcome> CompactAsync(
@@ -58,7 +63,8 @@ public sealed class ContextCompactor
         }
 
         var prompt = CompactionPrompt.UserText(conversation, todos, split.PreviousSummary);
-        var promptTokens = TokenEstimator.Text(CompactionPrompt.SystemText) + TokenEstimator.Text(prompt);
+        var systemText = _systemText();
+        var promptTokens = TokenEstimator.Text(systemText) + TokenEstimator.Text(prompt);
         if (promptTokens > limits.SummaryPromptBudget())
         {
             return FinishWithoutSummary(pruned, prunedChanged);
@@ -70,7 +76,7 @@ public sealed class ContextCompactor
                 token => _client.CompleteAsync(
                     new ChatRequest(
                     [
-                        new ChatMessage(ChatRole.System, CompactionPrompt.SystemText),
+                        new ChatMessage(ChatRole.System, systemText),
                         new ChatMessage(ChatRole.User, prompt)
                     ]),
                     token),

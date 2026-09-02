@@ -9,11 +9,19 @@ public sealed class PromptSetTests
     [Fact]
     public void ComposeWork_InsertsEnvironmentBeforeInstructions()
     {
-        var set = new PromptSet("work body", "plan body", "review body", "prefer tests");
+        var set = new PromptSet(WorkPrompt.Text, "plan body", "review body", "prefer tests");
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            "prefer tests",
+            new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero));
 
-        var text = set.ComposeWork("<env>\n  Workspace: /tmp/demo\n</env>");
+        var text = set.ComposeWork(context);
 
-        Assert.StartsWith("work body", text, StringComparison.Ordinal);
+        Assert.StartsWith("You are Crystal Code", text, StringComparison.Ordinal);
         var env = text.IndexOf("<env>", StringComparison.Ordinal);
         var instructions = text.IndexOf("## Workspace instructions", StringComparison.Ordinal);
         Assert.True(env > 0);
@@ -26,11 +34,19 @@ public sealed class PromptSetTests
     [Fact]
     public void ComposePlan_UsesPlanBody()
     {
-        var set = new PromptSet("work body", "plan body", "review body", string.Empty);
+        var set = new PromptSet("work body", PlanPrompt.Text, "review body", string.Empty);
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "plan",
+            string.Empty,
+            string.Empty,
+            new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero));
 
-        var text = set.ComposePlan("<env>\n  Workspace: /tmp/demo\n</env>");
+        var text = set.ComposePlan(context);
 
-        Assert.StartsWith("plan body", text, StringComparison.Ordinal);
+        Assert.StartsWith("You are Crystal Code, planning", text, StringComparison.Ordinal);
         Assert.Contains("<env>", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Workspace instructions", text, StringComparison.Ordinal);
     }
@@ -38,11 +54,17 @@ public sealed class PromptSetTests
     [Fact]
     public void ComposeWork_InsertsSkillGuidanceBetweenEnvironmentAndInstructions()
     {
-        var set = new PromptSet("work body", "plan body", "review body", "prefer tests");
+        var set = new PromptSet(WorkPrompt.Text, "plan body", "review body", "prefer tests");
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            "Skills provide specialized instructions.",
+            "prefer tests",
+            new DateTimeOffset(2026, 8, 31, 12, 0, 0, TimeSpan.Zero));
 
-        var text = set.ComposeWork(
-            "<env>\n  Workspace: /tmp/demo\n</env>",
-            "Skills provide specialized instructions.");
+        var text = set.ComposeWork(context);
 
         var env = text.IndexOf("<env>", StringComparison.Ordinal);
         var skills = text.IndexOf("Skills provide", StringComparison.Ordinal);

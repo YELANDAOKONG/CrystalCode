@@ -21,7 +21,9 @@ public sealed class PromptStoreTests
         Assert.Equal(PlanPrompt.Text, prompts.Plan);
         Assert.Equal(ApprovalReviewPrompt.SystemText, prompts.Review);
         Assert.Equal(string.Empty, prompts.Instructions);
-        Assert.Equal(WorkPrompt.Text, prompts.WorkSystem);
+        Assert.Equal(
+            PromptBinder.Apply(WorkPrompt.Text, PromptContext.InstructionsOnly(string.Empty)),
+            prompts.WorkSystem);
     }
 
     [Fact]

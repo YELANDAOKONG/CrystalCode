@@ -49,8 +49,11 @@ public sealed class ApprovalReviewPromptTests
     }
 
     [Fact]
-    public void SystemText_ForbidsAllowingForbiddenActions()
+    public void SystemText_UsesPlaceholdersAndForbidsAllowingForbiddenActions()
     {
+        Assert.Contains("{{product_name}}", ApprovalReviewPrompt.SystemText, StringComparison.Ordinal);
+        Assert.Contains("{{env}}", ApprovalReviewPrompt.SystemText, StringComparison.Ordinal);
+        Assert.Contains("{{conversation}}", ApprovalReviewPrompt.UserTemplate, StringComparison.Ordinal);
         Assert.Contains(
             "Forbidden actions must not be allowed.",
             ApprovalReviewPrompt.SystemText,

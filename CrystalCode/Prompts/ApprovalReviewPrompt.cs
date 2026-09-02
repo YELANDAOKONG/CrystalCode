@@ -11,7 +11,7 @@ public static class ApprovalReviewPrompt
 {
     public const string SystemText =
         """
-        You are a separate approval reviewer. You do not execute the action.
+        You are a separate approval reviewer for {{product_name}}. You do not execute the action.
         First assign residual risk and how strongly the user's authorized task
         permits this exact action. Then set outcome from those two judgments.
 
@@ -29,7 +29,31 @@ public static class ApprovalReviewPrompt
 
         Reply with a single JSON object and no other text:
         {"outcome":"allow"|"deny"|"ask","risk_level":"low"|"medium"|"high","user_authorization":"low"|"medium"|"high","rationale":"short English explanation"}
+
+        {{env}}
         """;
+
+    public const string UserTemplate =
+        """
+        ## Conversation
+        {{conversation}}
+
+        ## Proposed action
+        Tool: {{tool_name}}
+        Host risk: {{host_risk}}
+        Host authority: {{host_authority}}
+        Summary: {{classification_summary}}
+        Arguments:
+        {{tool_arguments}}
+
+        Assess this exact action against the user's authorized task in the conversation above.
+        """;
+
+    public static string ComposeSystem(PromptContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return PromptBinder.Apply(SystemText, context.WithMode("review"));
+    }
 
     public static string UserText(ApprovalReviewRequest request)
     {
@@ -41,20 +65,8 @@ public static class ApprovalReviewPrompt
                 nameof(request));
         }
 
-        return
-            $"""
-            ## Conversation
-            {request.Conversation.Trim()}
-
-            ## Proposed action
-            Tool: {request.Call.Name}
-            Host risk: {request.Classification.Risk.Value}
-            Host authority: {request.Classification.Authority.Value}
-            Summary: {request.Classification.Summary}
-            Arguments:
-            {request.Call.Arguments}
-
-            Assess this exact action against the user's authorized task in the conversation above.
-            """;
+        return PromptBinder.Apply(
+            UserTemplate,
+            new PromptBinding(Review: ReviewPromptContext.From(request)));
     }
 }

@@ -203,14 +203,22 @@ once such a tool is installed. Approval still runs.
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.
 
-Live Work and Plan system text is assembled in this order: the overlayable
-Work or Plan body, a host-owned `<env>` block (workspace path, whether the
-directory is a git repo, platform, today's date, and provider/model),
-available-skill guidance when Skills is enabled, then Workspace
-instructions. Review is the named file alone. The env block is not an
-overlay file and is refreshed on `/cd`, `/model`, and when the live system
-message is replaced. Skill guidance is host-owned and is not an overlay
-file.
+Live Work and Plan system text is assembled from overlayable templates using
+host-owned placeholders (`{{name}}`). Review and compaction prompts use the
+same placeholder syntax. Composite session slots are `{{env}}`, `{{skills}}`,
+and `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
+include `{{workspace}}`, `{{is_git_repo}}`, `{{platform}}`, `{{date}}`,
+`{{provider}}`, `{{model}}`, `{{model_line}}`, `{{mode}}`, and
+`{{product_name}}`. Review user templates add `{{conversation}}`,
+`{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
+and `{{classification_summary}}`. Compaction user templates add
+`{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
+`{{output_template}}`, and `{{todos_section}}`. Built-in Work, Plan, Review,
+and compaction templates declare the slots they need explicitly. Review is the
+named file alone for system text; its user turn is template-driven. Composite
+and atomic host values are not overlay files and refresh on `/cd`, `/model`,
+and when the live system message is replaced. Skill guidance is host-owned
+and is not an overlay file.
 
 Prompt set selection and direct prompt overrides are separate features. A
 prompt set is a Home-only directory under `~/.crystal/promptsets/<name>` with
