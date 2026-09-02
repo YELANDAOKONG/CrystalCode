@@ -8,4 +8,5 @@ namespace CrystalCode.Display.Transcript;
 public sealed record TranscriptEntry(
     TranscriptKind Kind,
     string Text,
-    IRenderable? Widget = null);
+    IRenderable? Widget = null,
+    string? ToolName = null);

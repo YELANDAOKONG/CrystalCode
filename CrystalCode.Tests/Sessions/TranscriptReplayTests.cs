@@ -33,6 +33,7 @@ public sealed class TranscriptReplayTests
         Assert.Equal(TranscriptKind.Tool, lines[2].Kind);
         Assert.Contains("a.txt", lines[2].Text, StringComparison.Ordinal);
         Assert.Equal(TranscriptKind.Result, lines[3].Kind);
+        Assert.Equal("read", lines[3].ToolName);
         Assert.Contains("hello", lines[3].Text, StringComparison.Ordinal);
     }
 

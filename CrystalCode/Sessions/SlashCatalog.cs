@@ -15,6 +15,8 @@ public static class SlashCatalog
             ["off", "none", "default", "minimal", "low", "medium", "high", "maximum", "max"]),
         new(SessionVerb.Tokens, "tokens", [], "Toggle estimated progress tokens",
             ["on", "off"]),
+        new(SessionVerb.Verbose, "verbose", [], "Tool or command output detail",
+            ["tools", "commands", "on", "off"]),
         new(SessionVerb.Model, "model", [], "Show or set provider and model"),
         new(SessionVerb.PromptSet, "promptset", ["prompts"], "Show or select prompt set"),
         new(SessionVerb.Status, "status", [], "Summary or full diagnostics", ["full"]),

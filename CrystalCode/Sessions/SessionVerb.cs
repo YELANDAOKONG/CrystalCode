@@ -23,6 +23,7 @@ public enum SessionVerb
     Todos,
     Tools,
     Export,
+    Verbose,
     Quit,
     Unknown
 }

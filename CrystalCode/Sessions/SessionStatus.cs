@@ -27,6 +27,8 @@ internal sealed record SessionStatus(
     bool SkillsEnabled,
     bool ExternalToolsEnabled,
     bool EstimatedTokensEnabled,
+    bool VerboseToolsEnabled,
+    bool VerboseCommandsEnabled,
     int PlanTools,
     int WorkTools,
     int ExternalTools,

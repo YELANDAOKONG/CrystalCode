@@ -216,6 +216,29 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsVerboseDisplayFlags()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "verboseTools": false,
+              "verboseCommands": false
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.VerboseTools);
+        Assert.False(settings.VerboseCommands);
+    }
+
+    [Fact]
     public void Save_WritesProviderAndModelSelection()
     {
         using var root = new TemporaryHome();

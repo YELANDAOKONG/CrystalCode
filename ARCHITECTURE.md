@@ -663,7 +663,15 @@ writes a Tool card when the model round closes with tool calls, before
 those calls execute, using the same one-line summary as session replay.
 Tool names in chrome and cards are Title Case; stream name chunks are
 coalesced per tool call so a repeated snapshot does not become
-`ReadReadRead` and sequential calls never concatenate.
+`ReadReadRead` and sequential calls never concatenate. Tool and bash
+result panels honor independent verbose toggles (`verboseTools` and
+`verboseCommands` in `config.json`, default on). When tool verbose is
+off, read/search/skill result panels are omitted while the Tool card
+remains; `edit` and `write` results always stay visible. When command
+verbose is off, bash results collapse to a hidden-line hint plus the
+last output line. Ctrl+O toggles tool verbose and Ctrl+Shift+O toggles
+command verbose when the composer is empty; `/verbose` shows or changes
+the same settings (`tools`, `commands`, `on`, `off`).
 Approval is a Spectre panel with a two-column Title Case field grid
 (`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Question panels show
 header tabs, described choices, selection state, custom input, and a final
@@ -700,16 +708,19 @@ plus rationale. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
-`/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`). `/export`
+`/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`,
+`/verbose` toggles tool or command output detail). `/export`
 writes markdown or json for the current conversation; `/prompts export`
 writes built-in prompt templates. Export roots default to
 `~/.crystal/exports/` and are configurable through `exportDirectory` in
 `config.json`. A slash picker appears while the prompt
 is a command prefix. After a verb that takes an argument
-(`/thinking`, `/approval`, `/model`, `/tokens`), Tab also completes the argument.
+(`/thinking`, `/approval`, `/model`, `/tokens`, `/verbose`), Tab also completes the argument.
 `/model` completes current-provider models, then a provider name, then
 that provider's models. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
-and Up/Down when the prompt is empty scroll the transcript. Up/Down
+and Up/Down when the prompt is empty scroll the transcript. Ctrl+O and
+Ctrl+Shift+O toggle verbose tool and command output when the composer is
+empty. Up/Down
 arrows navigate composer history or the slash picker when the prompt
 has text. Alternate-scroll (1007) turns the wheel into batched Up/Down
 CSI; a burst of two or more is transcript scroll even when the

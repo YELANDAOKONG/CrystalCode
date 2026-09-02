@@ -64,6 +64,8 @@ public sealed class SettingsStore
             document.Skills ?? defaults.Skills,
             document.ExternalTools ?? defaults.ExternalTools,
             document.EstimatedTokens ?? defaults.EstimatedTokens,
+            document.VerboseTools ?? defaults.VerboseTools,
+            document.VerboseCommands ?? defaults.VerboseCommands,
             string.IsNullOrWhiteSpace(document.PromptSet)
                 ? defaults.PromptSet
                 : document.PromptSet.Trim(),
@@ -90,6 +92,8 @@ public sealed class SettingsStore
             ExternalTools = settings.ExternalTools ? null : false,
             ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
             EstimatedTokens = settings.EstimatedTokens ? true : null,
+            VerboseTools = settings.VerboseTools ? null : false,
+            VerboseCommands = settings.VerboseCommands ? null : false,
             PromptSet = string.Equals(
                 settings.PromptSet,
                 HarnessSettings.DefaultPromptSet,

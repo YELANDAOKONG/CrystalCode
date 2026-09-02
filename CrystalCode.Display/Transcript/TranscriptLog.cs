@@ -17,8 +17,44 @@ public sealed class TranscriptLog
 
     private int _cachedWidth;
     private readonly List<PaintLine> _committedLines = [];
+    private bool _verboseTools = true;
+    private bool _verboseCommands = true;
 
-    public void Add(TranscriptKind kind, string text, IRenderable? widget = null)
+    public bool VerboseTools
+    {
+        get => _verboseTools;
+        set
+        {
+            if (_verboseTools == value)
+            {
+                return;
+            }
+
+            _verboseTools = value;
+            InvalidateCache();
+        }
+    }
+
+    public bool VerboseCommands
+    {
+        get => _verboseCommands;
+        set
+        {
+            if (_verboseCommands == value)
+            {
+                return;
+            }
+
+            _verboseCommands = value;
+            InvalidateCache();
+        }
+    }
+
+    public void Add(
+        TranscriptKind kind,
+        string text,
+        IRenderable? widget = null,
+        string? toolName = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         CommitLive();
@@ -27,7 +63,7 @@ public sealed class TranscriptLog
             return;
         }
 
-        var entry = new TranscriptEntry(kind, text, widget);
+        var entry = new TranscriptEntry(kind, text, widget, toolName);
         _entries.Add(entry);
         if (_cachedWidth > 0)
         {
@@ -87,6 +123,8 @@ public sealed class TranscriptLog
         _live.Clear();
         _liveKind = null;
     }
+
+    public void InvalidateCache() => _cachedWidth = 0;
 
     public IReadOnlyList<PaintLine> Viewport(int width, int rows, int scrollBack)
     {
@@ -156,7 +194,7 @@ public sealed class TranscriptLog
         }
     }
 
-    private static IReadOnlyList<PaintLine> RenderEntry(
+    private IReadOnlyList<PaintLine> RenderEntry(
         TranscriptEntry entry,
         int width)
     {
@@ -176,10 +214,40 @@ public sealed class TranscriptLog
             return lines;
         }
 
-        var card = TranscriptCard.TryCreate(entry.Kind, entry.Text);
-        if (card is not null)
+        if (entry.Kind is TranscriptKind.Result or TranscriptKind.Error)
         {
-            lines.AddRange(WidgetPaint.Lines(card, width));
+            if (!TranscriptResultDisplay.ShouldRender(
+                entry.Kind,
+                entry.ToolName,
+                _verboseTools,
+                _verboseCommands))
+            {
+                return lines;
+            }
+
+            var displayText = TranscriptResultDisplay.Text(
+                entry.Kind,
+                entry.Text,
+                entry.ToolName,
+                _verboseTools,
+                _verboseCommands);
+            if (displayText.Length == 0)
+            {
+                return lines;
+            }
+
+            var resultCard = TranscriptCard.TryCreate(entry.Kind, displayText);
+            if (resultCard is not null)
+            {
+                lines.AddRange(WidgetPaint.Lines(resultCard, width));
+                return lines;
+            }
+        }
+
+        var panel = TranscriptCard.TryCreate(entry.Kind, entry.Text);
+        if (panel is not null)
+        {
+            lines.AddRange(WidgetPaint.Lines(panel, width));
             return lines;
         }
 

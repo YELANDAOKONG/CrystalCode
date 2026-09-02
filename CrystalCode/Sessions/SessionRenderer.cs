@@ -42,6 +42,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private SlashPicker? _picker;
     private string? _streamKind;
     private readonly StreamToolNames _toolNames = new();
+    private readonly Queue<string> _pendingToolNames = new();
     private Stopwatch? _turnClock;
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
@@ -60,6 +61,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     public Action? AfterTools { get; set; }
 
+    public Action<DisplayInput.VerboseToggle>? OnVerboseToggled { get; set; }
+
     public bool ShowEstimatedTokens
     {
         get
@@ -75,6 +78,44 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             {
                 _showEstimatedTokens = value;
                 RefreshTokenEstimateUnlocked();
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
+    public bool VerboseTools
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _log.VerboseTools;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _log.VerboseTools = value;
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
+    public bool VerboseCommands
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _log.VerboseCommands;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _log.VerboseCommands = value;
                 PaintUnlocked(force: true);
             }
         }
@@ -391,6 +432,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 "tab          Plan / Work, or complete / and arguments",
                 "shift+tab    Plan / Work",
                 "?            Shortcuts when empty",
+                "ctrl+o       Toggle verbose tool results",
+                "ctrl+shift+o Toggle verbose command output",
                 "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)",
                 "up/down      history recall (or picker navigation)");
             foreach (var spec in SlashCatalog.BuiltIn)
@@ -496,7 +539,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _scrollBack = 0;
             foreach (var line in TranscriptReplay.Lines(items))
             {
-                _log.Add(line.Kind, line.Text);
+                _log.Add(line.Kind, line.Text, toolName: line.ToolName);
                 WriteFallback(line.Kind, line.Text);
             }
 
@@ -512,6 +555,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _turnCumulativeBaseline = _cumulativeUsage;
             _turnClock = Stopwatch.StartNew();
             _toolNames.Clear();
+            _pendingToolNames.Clear();
             _streamedCharacters = 0;
             SetTurnActivityUnlocked("Running", ProgressText.WaitingForModel);
             _chrome.ToolCount = 0;
@@ -597,6 +641,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             foreach (var call in calls)
             {
                 var text = ToolCallText.Summary(call.Name, call.Arguments);
+                _pendingToolNames.Enqueue(call.Name);
                 _log.Add(TranscriptKind.Tool, text);
                 WriteFallback(TranscriptKind.Tool, text);
             }
@@ -622,7 +667,10 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 var kind = result.Status == ToolResultStatus.Success
                     ? TranscriptKind.Result
                     : TranscriptKind.Error;
-                _log.Add(kind, body);
+                var toolName = _pendingToolNames.Count > 0
+                    ? _pendingToolNames.Dequeue()
+                    : null;
+                _log.Add(kind, body, toolName: toolName);
                 WriteFallback(kind, body);
             }
 
@@ -1096,6 +1144,31 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    private void ApplyVerboseToggleUnlocked(DisplayInput.VerboseToggle toggle)
+    {
+        switch (toggle)
+        {
+            case DisplayInput.VerboseToggle.Tools:
+                _log.VerboseTools = !_log.VerboseTools;
+                AddNoteUnlocked($"Verbose tools  {(_log.VerboseTools ? "On" : "Off")}");
+                break;
+            case DisplayInput.VerboseToggle.Commands:
+                _log.VerboseCommands = !_log.VerboseCommands;
+                AddNoteUnlocked($"Verbose commands  {(_log.VerboseCommands ? "On" : "Off")}");
+                break;
+            default:
+                return;
+        }
+
+        OnVerboseToggled?.Invoke(toggle);
+    }
+
+    private void AddNoteUnlocked(string text)
+    {
+        _log.Add(TranscriptKind.Note, text);
+        WriteFallback(TranscriptKind.Note, text);
+    }
+
     private string? DispatchUnlocked(IInputEvent item, int pageRows, Func<bool> togglePlan)
     {
         if (BelowUsableSize(out _, out _))
@@ -1112,6 +1185,16 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 _scrollBack = Math.Max(0, _scrollBack + wheel.Delta);
                 return null;
             case InputKey key:
+                if (DisplayInput.TryToggleVerbose(
+                    key,
+                    _composer.IsEmpty,
+                    _picker is not null,
+                    out var verboseToggle))
+                {
+                    ApplyVerboseToggleUnlocked(verboseToggle);
+                    return null;
+                }
+
                 if (ScrollInput.TryKeyScroll(
                     key,
                     _composer.IsEmpty,
@@ -1196,6 +1279,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             "tab          Plan / Work, or complete / and arguments",
             "shift+tab    Plan / Work",
             "?            Shortcuts when empty",
+            "ctrl+o       Toggle verbose tool results",
+            "ctrl+shift+o Toggle verbose command output",
             "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)");
         foreach (var option in _slashOptions)
         {

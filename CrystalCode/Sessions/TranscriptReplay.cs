@@ -7,49 +7,56 @@ using CrystalCode.Display.Transcript;
 namespace CrystalCode.Sessions;
 
 /// <summary>
+/// One replay row for the transcript viewport.
+/// </summary>
+public sealed record TranscriptLine(
+    TranscriptKind Kind,
+    string Text,
+    string? ToolName = null);
+
+/// <summary>
 /// Maps a persisted transcript into viewport rows. Skips the live system prompt.
 /// </summary>
 public static class TranscriptReplay
 {
-    public static IReadOnlyList<(TranscriptKind Kind, string Text)> Lines(
-        IReadOnlyList<ChatItem> items)
+    public static IReadOnlyList<TranscriptLine> Lines(IReadOnlyList<ChatItem> items)
     {
         ArgumentNullException.ThrowIfNull(items);
-        var lines = new List<(TranscriptKind Kind, string Text)>();
+        var lines = new List<TranscriptLine>();
+        string? pendingToolName = null;
         foreach (var item in items)
         {
-            if (!TryMap(item, out var kind, out var text) || text.Length == 0)
+            switch (item)
             {
-                continue;
-            }
+                case ChatMessage message when TryMapMessage(message, out var messageKind, out var messageText):
+                    if (messageText.Length > 0)
+                    {
+                        lines.Add(new TranscriptLine(messageKind, messageText));
+                    }
 
-            lines.Add((kind, text));
+                    break;
+                case ToolCall call:
+                    lines.Add(new TranscriptLine(
+                        TranscriptKind.Tool,
+                        ToolCallText.Summary(call.Name, call.Arguments)));
+                    pendingToolName = call.Name;
+                    break;
+                case ToolResult result:
+                    var kind = result.Status == ToolResultStatus.Success
+                        ? TranscriptKind.Result
+                        : TranscriptKind.Error;
+                    var body = ToolResultText.Body(result.Text);
+                    if (body.Length > 0)
+                    {
+                        lines.Add(new TranscriptLine(kind, body, pendingToolName));
+                    }
+
+                    pendingToolName = null;
+                    break;
+            }
         }
 
         return lines;
-    }
-
-    private static bool TryMap(ChatItem item, out TranscriptKind kind, out string text)
-    {
-        switch (item)
-        {
-            case ChatMessage message:
-                return TryMapMessage(message, out kind, out text);
-            case ToolCall call:
-                kind = TranscriptKind.Tool;
-                text = ToolCallText.Summary(call.Name, call.Arguments);
-                return true;
-            case ToolResult result:
-                kind = result.Status == ToolResultStatus.Success
-                    ? TranscriptKind.Result
-                    : TranscriptKind.Error;
-                text = ToolResultText.Body(result.Text);
-                return true;
-            default:
-                kind = TranscriptKind.Note;
-                text = string.Empty;
-                return false;
-        }
     }
 
     private static bool TryMapMessage(

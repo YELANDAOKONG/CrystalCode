@@ -15,6 +15,7 @@ using CrystalCode.Tools.External;
 using CrystalCode.Display.Cards;
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 
 namespace CrystalCode.Sessions;
 
@@ -145,6 +146,9 @@ public sealed class CodingSession
         _renderer.AfterTools = PromoteAfterTools;
         RefreshSlashCommands();
         _renderer.ShowEstimatedTokens = _settings.EstimatedTokens;
+        _renderer.VerboseTools = _settings.VerboseTools;
+        _renderer.VerboseCommands = _settings.VerboseCommands;
+        _renderer.OnVerboseToggled = PersistVerboseToggle;
         _renderer.WriteHeader(
             _settings.Model,
             _workspace.Root,
@@ -340,6 +344,9 @@ public sealed class CodingSession
             case SessionVerb.Tokens:
                 ChangeEstimatedTokens(command.Argument);
                 return (true, false);
+            case SessionVerb.Verbose:
+                ChangeVerbose(command.Argument);
+                return (true, false);
             case SessionVerb.Model:
                 ChangeModel(command.Argument);
                 return (true, false);
@@ -484,6 +491,59 @@ public sealed class CodingSession
         _renderer.ShowEstimatedTokens = _settings.EstimatedTokens;
         _renderer.WriteNote(
             "Estimated tokens  " + (_settings.EstimatedTokens ? "On" : "Off"));
+    }
+
+    private void ChangeVerbose(string argument)
+    {
+        if (!VerboseChangeArguments.TryParse(argument, out var target, out var enabled, out var error))
+        {
+            _renderer.WriteError(error);
+            return;
+        }
+
+        if (target is null)
+        {
+            _renderer.WriteNote(
+                "Verbose tools  " + (_settings.VerboseTools ? "On" : "Off")
+                + "  ·  Verbose commands  "
+                + (_settings.VerboseCommands ? "On" : "Off"));
+            return;
+        }
+
+        switch (target.Value)
+        {
+            case VerboseChangeArguments.Target.Tools:
+                _settings = enabled is bool toolsEnabled
+                    ? _settings.WithVerboseTools(toolsEnabled)
+                    : _settings.WithVerboseTools(!_settings.VerboseTools);
+                _renderer.VerboseTools = _settings.VerboseTools;
+                _renderer.WriteNote(
+                    "Verbose tools  " + (_settings.VerboseTools ? "On" : "Off"));
+                break;
+            case VerboseChangeArguments.Target.Commands:
+                _settings = enabled is bool commandsEnabled
+                    ? _settings.WithVerboseCommands(commandsEnabled)
+                    : _settings.WithVerboseCommands(!_settings.VerboseCommands);
+                _renderer.VerboseCommands = _settings.VerboseCommands;
+                _renderer.WriteNote(
+                    "Verbose commands  " + (_settings.VerboseCommands ? "On" : "Off"));
+                break;
+            default:
+                return;
+        }
+
+        _settingsStore.Save(_settings);
+    }
+
+    private void PersistVerboseToggle(DisplayInput.VerboseToggle toggle)
+    {
+        _settings = toggle switch
+        {
+            DisplayInput.VerboseToggle.Tools => _settings.WithVerboseTools(_renderer.VerboseTools),
+            DisplayInput.VerboseToggle.Commands => _settings.WithVerboseCommands(_renderer.VerboseCommands),
+            _ => _settings
+        };
+        _settingsStore.Save(_settings);
     }
 
     private static bool TryParseToggle(string argument, out bool enabled)
@@ -1022,6 +1082,8 @@ public sealed class CodingSession
                 SkillsEnabled: _settings.Skills,
                 ExternalToolsEnabled: _settings.ExternalTools,
                 EstimatedTokensEnabled: _settings.EstimatedTokens,
+                VerboseToolsEnabled: _settings.VerboseTools,
+                VerboseCommandsEnabled: _settings.VerboseCommands,
                 PlanTools: _planExecutor.Definitions.Count,
                 WorkTools: _workExecutor.Definitions.Count,
                 ExternalTools: _external.Tools.Count,

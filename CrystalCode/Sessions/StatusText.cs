@@ -53,7 +53,9 @@ internal static class StatusText
             [
                 ("Skills", Toggle(status.SkillsEnabled)),
                 ("External tools", Toggle(status.ExternalToolsEnabled)),
-                ("Estimated tokens", Toggle(status.EstimatedTokensEnabled))
+                ("Estimated tokens", Toggle(status.EstimatedTokensEnabled)),
+                ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
+                ("Verbose commands", Toggle(status.VerboseCommandsEnabled))
             ],
             trailingBlankLine: full);
 

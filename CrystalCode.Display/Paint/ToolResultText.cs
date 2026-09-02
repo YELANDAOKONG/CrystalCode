@@ -11,6 +11,8 @@ public static class ToolResultText
 
     public const int MaximumBodyLength = 1200;
 
+    public const string CommandExpandHint = "ctrl+shift+o to expand";
+
     public static string FirstLine(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -63,6 +65,53 @@ public static class ToolResultText
         return joined.Length <= MaximumBodyLength
             ? joined
             : joined[..(MaximumBodyLength - 3)] + "...";
+    }
+
+    public static string CompactCommandBody(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var contentLines = ContentLines(text);
+        if (contentLines.Count == 0)
+        {
+            return FirstContentLine(text);
+        }
+
+        if (contentLines.Count == 1)
+        {
+            return contentLines[0];
+        }
+
+        var hidden = contentLines.Count - 1;
+        var last = contentLines[^1];
+        return $"... {hidden} output lines hidden · {CommandExpandHint}\n{last}";
+    }
+
+    public static int ContentLineCount(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return ContentLines(text).Count;
+    }
+
+    private static List<string> ContentLines(string text)
+    {
+        var lines = new List<string>();
+        foreach (var raw in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        {
+            var line = raw.TrimEnd();
+            if (line.Length == 0)
+            {
+                continue;
+            }
+
+            if (lines.Count == 0 && line.StartsWith("exit ", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            lines.Add(line);
+        }
+
+        return lines;
     }
 
     private static string FirstContentLine(string text)

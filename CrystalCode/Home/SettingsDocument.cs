@@ -18,6 +18,10 @@ internal sealed class SettingsDocument
 
     public bool? EstimatedTokens { get; set; }
 
+    public bool? VerboseTools { get; set; }
+
+    public bool? VerboseCommands { get; set; }
+
     public string? PromptSet { get; set; }
 
     public string? ExportDirectory { get; set; }

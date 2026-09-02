@@ -25,6 +25,8 @@ public sealed class SessionCommandTests
     [InlineData("/promptset concise", SessionVerb.PromptSet)]
     [InlineData("/prompts", SessionVerb.PromptSet)]
     [InlineData("/tokens", SessionVerb.Tokens)]
+    [InlineData("/verbose", SessionVerb.Verbose)]
+    [InlineData("/verbose tools off", SessionVerb.Verbose)]
     [InlineData("/export", SessionVerb.Export)]
     [InlineData("/export markdown", SessionVerb.Export)]
     [InlineData("/export json --system", SessionVerb.Export)]

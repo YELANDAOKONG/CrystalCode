@@ -95,7 +95,9 @@ internal static class StatusWidget
         [
             ("Skills", Toggle(status.SkillsEnabled)),
             ("External tools", Toggle(status.ExternalToolsEnabled)),
-            ("Token estimate", Toggle(status.EstimatedTokensEnabled))
+            ("Token estimate", Toggle(status.EstimatedTokensEnabled)),
+            ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
+            ("Verbose commands", Toggle(status.VerboseCommandsEnabled))
         ]);
 
     private static Panel ActivityCard(SessionStatus status) =>

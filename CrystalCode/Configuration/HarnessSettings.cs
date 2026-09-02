@@ -16,6 +16,10 @@ public sealed record HarnessSettings
 
     public const bool DefaultEstimatedTokens = false;
 
+    public const bool DefaultVerboseTools = true;
+
+    public const bool DefaultVerboseCommands = true;
+
     public const string DefaultPromptSet = "default";
 
     public HarnessSettings(
@@ -28,6 +32,8 @@ public sealed record HarnessSettings
         bool skills = DefaultSkills,
         bool externalTools = DefaultExternalTools,
         bool estimatedTokens = DefaultEstimatedTokens,
+        bool verboseTools = DefaultVerboseTools,
+        bool verboseCommands = DefaultVerboseCommands,
         string promptSet = DefaultPromptSet,
         ExternalToolApprovalSettings? externalToolApproval = null,
         string? exportDirectory = null)
@@ -57,6 +63,8 @@ public sealed record HarnessSettings
         Skills = skills;
         ExternalTools = externalTools;
         EstimatedTokens = estimatedTokens;
+        VerboseTools = verboseTools;
+        VerboseCommands = verboseCommands;
         PromptSet = promptSet.Trim();
         ExternalToolApproval = externalToolApproval ?? ExternalToolApprovalSettings.Default;
         ExportDirectory = string.IsNullOrWhiteSpace(exportDirectory) ? null : exportDirectory.Trim();
@@ -79,6 +87,10 @@ public sealed record HarnessSettings
     public bool ExternalTools { get; }
 
     public bool EstimatedTokens { get; }
+
+    public bool VerboseTools { get; }
+
+    public bool VerboseCommands { get; }
 
     public string PromptSet { get; }
 
@@ -143,6 +155,12 @@ public sealed record HarnessSettings
     public HarnessSettings WithEstimatedTokens(bool estimatedTokens) =>
         Copy(estimatedTokens: estimatedTokens);
 
+    public HarnessSettings WithVerboseTools(bool verboseTools) =>
+        Copy(verboseTools: verboseTools);
+
+    public HarnessSettings WithVerboseCommands(bool verboseCommands) =>
+        Copy(verboseCommands: verboseCommands);
+
     public HarnessSettings WithPromptSet(string promptSet)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(promptSet);
@@ -170,6 +188,8 @@ public sealed record HarnessSettings
         bool? skills = null,
         bool? externalTools = null,
         bool? estimatedTokens = null,
+        bool? verboseTools = null,
+        bool? verboseCommands = null,
         string? promptSet = null,
         ExternalToolApprovalSettings? externalToolApproval = null,
         string? exportDirectory = null,
@@ -184,6 +204,8 @@ public sealed record HarnessSettings
             skills ?? Skills,
             externalTools ?? ExternalTools,
             estimatedTokens ?? EstimatedTokens,
+            verboseTools ?? VerboseTools,
+            verboseCommands ?? VerboseCommands,
             promptSet ?? PromptSet,
             externalToolApproval ?? ExternalToolApproval,
             setExportDirectory ? exportDirectory : ExportDirectory);
