@@ -17,6 +17,7 @@ public static class PromptTemplateExport
             ("work.md", WorkPrompt.Text),
             ("plan.md", PlanPrompt.Text),
             ("review.md", ApprovalReviewPrompt.SystemText),
+            ("topic.md", TopicNamingPrompt.Text),
             ("review.user.md", ApprovalReviewPrompt.UserTemplate),
             ("compaction.system.md", CompactionPrompt.SystemText),
             ("compaction.user.md", CompactionPrompt.UserTemplate),

@@ -214,7 +214,10 @@ include `{{workspace}}`, `{{is_git_repo}}`, `{{platform}}`, `{{date}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
 `{{output_template}}`, and `{{todos_section}}`. Built-in Work, Plan, Review,
-and compaction templates declare the slots they need explicitly. Review is the
+and compaction templates declare the slots they need explicitly. Topic naming
+has a built-in prompt and is overridden by `topic.md` in Home or project
+`prompts/`; it is not a prompt-set member and is not yet invoked by the live
+session. Review is the
 named file alone for system text; its user turn is template-driven. Composite
 and atomic host values are not overlay files and refresh on `/cd`, `/model`,
 and when the live system message is replaced. Skill guidance is host-owned
@@ -404,6 +407,7 @@ installers replace the full platform release contents under `binaries/code/`.
   prompts/work.md
   prompts/plan.md
   prompts/review.md
+  prompts/topic.md
   promptsets/<name>/work.md
   promptsets/<name>/plan.md
   promptsets/<name>/review.md
@@ -424,6 +428,7 @@ tool sets of the same directory name):
   prompts/work.md
   prompts/plan.md
   prompts/review.md
+  prompts/topic.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json

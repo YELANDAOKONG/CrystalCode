@@ -10,4 +10,6 @@ public static class PromptNames
     public const string Plan = "plan";
 
     public const string Review = "review";
+
+    public const string Topic = "topic";
 }

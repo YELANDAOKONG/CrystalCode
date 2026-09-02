@@ -26,6 +26,15 @@ public sealed class PromptStore
         return Resolve(workspaceRoot, PromptSetNames.Default).Prompts;
     }
 
+    public string LoadTopicNaming(string workspaceRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
+        var project = new CrystalHome(Path.Combine(workspaceRoot, ProjectDirectoryName));
+        var text = PromptFiles.ReadNamed(_home.PromptsDirectory, PromptNames.Topic);
+        var projectText = PromptFiles.ReadNamed(project.PromptsDirectory, PromptNames.Topic);
+        return projectText ?? text ?? TopicNamingPrompt.Text;
+    }
+
     internal PromptResolution Resolve(string workspaceRoot, string selectedSet)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);

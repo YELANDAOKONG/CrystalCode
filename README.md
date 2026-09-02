@@ -650,11 +650,12 @@ dotnet publish layout are in
 ## Prompts and instructions
 
 Crystal is prompt-neutral. Every model-bound string this product
-sends is authored here. Operators may replace Work, Plan, and Review
+sends is authored here. Operators may replace Work, Plan, Review, and
+the reserved topic-naming prompt
 by placing files under `~/.crystal/prompts` and
 `<workspace>/.crystal/prompts`.
 
-Named files (`work.md`, `plan.md`, `review.md`; `.txt` is also
+Named files (`work.md`, `plan.md`, `review.md`, and `topic.md`; `.txt` is also
 accepted):
 
 - Within direct overrides, the Home file is applied before the project file.
@@ -665,7 +666,8 @@ accepted):
 Prompt set selection is separate from direct prompt overrides. Reusable sets
 live only under `~/.crystal/promptsets/<name>/`; the workspace is never scanned
 for prompt sets. Each set may contain any subset of `work.md`, `plan.md`, and
-`review.md` (`.txt` is also accepted). Missing or empty members use the built-in
+`review.md` (`.txt` is also accepted). `topic.md` is a direct override only;
+it is not a prompt-set member. Missing or empty members use the built-in
 prompt for that name.
 
 Final precedence for each named prompt:
