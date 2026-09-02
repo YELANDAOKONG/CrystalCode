@@ -51,6 +51,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private bool _showEstimatedTokens;
     private int _streamedCharacters;
     private TokenUsage? _lastUsage;
+    private TokenUsage? _cumulativeUsage;
     private DateTimeOffset? _retryUntil;
     private int _retryAttempt;
 
@@ -107,6 +108,28 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             lock (_gate)
             {
                 return _lastUsage;
+            }
+        }
+    }
+
+    internal string ChromeUsage
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _chrome.Usage;
+            }
+        }
+    }
+
+    internal string ChromeUsageTotal
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _chrome.UsageTotal;
             }
         }
     }
@@ -409,7 +432,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _chrome.PromptSet = status.PromptSet == PromptSetNames.Default
                 ? string.Empty
                 : status.PromptSet;
-            ApplyUsageUnlocked(status.Usage, status.ContextWindow);
+            ApplyUsageUnlocked(status.Usage, status.CumulativeUsage, status.ContextWindow);
             var text = StatusText.Format(status, full);
             var widget = StatusWidget.Create(status, full);
             _log.Add(TranscriptKind.Note, text, widget);
@@ -430,7 +453,10 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             CommitLiveUnlocked();
-            ApplyUsageUnlocked(ledger.Usage ?? result.Usage, contextWindow);
+            ApplyUsageUnlocked(
+                ledger.Usage ?? result.Usage,
+                ledger.CumulativeUsage,
+                contextWindow);
             _chrome.ToolCount = result.ToolCallCount;
             _chrome.Elapsed = _turnClock is null
                 ? string.Empty
@@ -607,11 +633,25 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         AfterTools?.Invoke();
     }
 
-    public void ShowUsage(TokenUsage? usage)
+    public void ShowUsage(TokenUsage? usage, TokenUsage? cumulativeUsage)
     {
         lock (_gate)
         {
-            ApplyUsageUnlocked(usage, ContextWindow);
+            ApplyUsageUnlocked(usage, cumulativeUsage, ContextWindow);
+            PaintUnlocked(force: true);
+        }
+    }
+
+    public void ShowUsage(TokenUsage? usage)
+    {
+        ShowUsage(usage, usage);
+    }
+
+    internal void ShowContextUsage(TokenUsage? usage)
+    {
+        lock (_gate)
+        {
+            ApplyContextUsageUnlocked(usage, ContextWindow);
             PaintUnlocked(force: true);
         }
     }
@@ -622,7 +662,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         {
             if (usage is not null && ContextWindow > 0)
             {
-                ApplyUsageUnlocked(usage, ContextWindow);
+                ApplyContextUsageUnlocked(usage, ContextWindow);
             }
 
             PaintUnlocked(force: false);
@@ -1289,11 +1329,21 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         _lastPaint = now;
     }
 
-    private void ApplyUsageUnlocked(TokenUsage? usage, int contextWindow)
+    private void ApplyUsageUnlocked(
+        TokenUsage? usage,
+        TokenUsage? cumulativeUsage,
+        int contextWindow)
     {
         _lastUsage = usage;
-        _chrome.Usage = UsageText.Format(usage, contextWindow);
-        _chrome.UsageTotal = UsageText.FormatTotal(usage);
+        _cumulativeUsage = cumulativeUsage;
+        _chrome.Usage = UsageText.Format(usage, cumulativeUsage, contextWindow);
+        _chrome.UsageTotal = UsageText.FormatTotal(cumulativeUsage);
+    }
+
+    private void ApplyContextUsageUnlocked(TokenUsage? usage, int contextWindow)
+    {
+        _lastUsage = usage;
+        _chrome.Usage = UsageText.Format(usage, _cumulativeUsage, contextWindow);
     }
 
     private static bool BelowUsableSize(out int width, out int height)

@@ -32,6 +32,25 @@ public sealed class UsageTextTests
     }
 
     [Fact]
+    public void Format_UsesLatestUsageForContextAndCumulativeUsageForCounts()
+    {
+        var text = UsageText.Format(
+            new TokenUsage(100, 20),
+            new TokenUsage(12_900, 800),
+            1_000);
+
+        Assert.Equal("CTX 12%  ·  12.9k IN / 800 OUT", text);
+    }
+
+    [Fact]
+    public void Format_OmitsCountsWhenCumulativeUsageIsUnknown()
+    {
+        Assert.Equal(
+            "CTX 12%",
+            UsageText.Format(new TokenUsage(100, 20), null, 1_000));
+    }
+
+    [Fact]
     public void FormatTotal_SumsInputAndOutput()
     {
         Assert.Equal(string.Empty, UsageText.FormatTotal(null));

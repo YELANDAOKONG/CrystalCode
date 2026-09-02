@@ -351,7 +351,7 @@ public sealed class CodingSession
             case SessionVerb.Clear:
                 BeginNewSession();
                 _renderer.ClearConversation();
-                _renderer.ShowUsage(null);
+                _renderer.ShowUsage(null, null);
                 _renderer.WriteNote("New conversation");
                 return (true, false);
             case SessionVerb.Cd:
@@ -968,7 +968,7 @@ public sealed class CodingSession
             else
             {
                 var input = TokenEstimator.Items(outcome.Transcript);
-                _renderer.ShowUsage(new TokenUsage(input, 0));
+                _renderer.ShowContextUsage(new TokenUsage(input, 0));
             }
 
             _renderer.WriteNote("Compacted context");
@@ -1075,7 +1075,7 @@ public sealed class CodingSession
         ApplyDocument(fork);
         SaveSession();
         RefreshChrome();
-        _renderer.ShowUsage(_ledger.Usage);
+        _renderer.ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
         _renderer.WriteHistory(_transcript);
         ShowTodos();
         _renderer.WriteNote($"Forked  {sourceId}  ->  {_sessionId}");
@@ -1126,7 +1126,7 @@ public sealed class CodingSession
     private void PresentResume()
     {
         RefreshChrome();
-        _renderer.ShowUsage(_ledger.Usage);
+        _renderer.ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
         _renderer.WriteHistory(_transcript);
         _renderer.WriteNote("Resumed  " + _sessionId);
         ShowTodos();
@@ -1151,7 +1151,7 @@ public sealed class CodingSession
     {
         var input = TokenEstimator.Items(_transcript);
         _ledger.ReplaceUsage(new TokenUsage(input, 0));
-        _renderer.ShowUsage(_ledger.Usage);
+        _renderer.ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
     }
 
     private bool HasConversation() => TranscriptCodec.HasConversation(_transcript);

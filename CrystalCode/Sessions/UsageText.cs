@@ -8,6 +8,24 @@ namespace CrystalCode.Sessions;
 public static class UsageText
 {
     public static string Format(TokenUsage? usage, int contextWindow)
+        => Format(usage, usage, contextWindow);
+
+    public static string Format(
+        TokenUsage? contextUsage,
+        TokenUsage? cumulativeUsage,
+        int contextWindow)
+    {
+        var context = FormatContext(contextUsage, contextWindow);
+        if (cumulativeUsage is null)
+        {
+            return context;
+        }
+
+        return $"{context}  ·  {FormatNumber(cumulativeUsage.InputTokenCount)} IN / "
+            + $"{FormatNumber(cumulativeUsage.OutputTokenCount)} OUT";
+    }
+
+    private static string FormatContext(TokenUsage? usage, int contextWindow)
     {
         if (usage is null)
         {
@@ -16,8 +34,8 @@ public static class UsageText
 
         var percent = contextWindow <= 0
             ? 0
-            : Math.Clamp((int)(usage.TotalTokenCount * 100 / contextWindow), 0, 100);
-        return $"CTX {percent}%  ·  {FormatNumber(usage.InputTokenCount)} IN / {FormatNumber(usage.OutputTokenCount)} OUT";
+            : Math.Clamp((int)((double)usage.TotalTokenCount / contextWindow * 100), 0, 100);
+        return $"CTX {percent}%";
     }
 
     public static string FormatTotal(TokenUsage? usage) =>

@@ -611,9 +611,11 @@ console writer with the self-owned loop.
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
 thinking is on), the non-default prompt set as `Prompt <name>`, model,
-workspace, context percent (`CTX`),
-token counts (`IN` / `OUT`), and, when the bar has room, a Title Case
-total (`783k Total`). It also shows tool count (`Tool` / `Tools`), and
+workspace, the latest request's context percent (`CTX`), cumulative
+token counts (`IN` / `OUT`), and, when the bar has room, a cumulative
+Title Case total (`783k Total`). During a turn the counts remain at the
+last completed cumulative value while `CTX` follows provider updates. It also
+shows tool count (`Tool` / `Tools`), and
 elapsed time. When the session has todos, a pinned `Todos` bar sits
 above the progress row and status bar. Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled
