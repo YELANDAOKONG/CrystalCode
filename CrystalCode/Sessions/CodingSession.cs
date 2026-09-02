@@ -851,7 +851,11 @@ public sealed class CodingSession
             return;
         }
 
-        var requested = tokens[0];
+        if (!PromptSetChangeArguments.TryParseName(tokens, out var requested, out var parseError))
+        {
+            _renderer.WriteError(parseError);
+            return;
+        }
         var resolution = _promptStore.Resolve(_workspace.Root, requested);
         if (!string.Equals(requested, PromptSetNames.Default, StringComparison.Ordinal)
             && !string.Equals(requested, resolution.PromptSet, StringComparison.Ordinal))
