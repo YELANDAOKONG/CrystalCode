@@ -146,7 +146,7 @@ public sealed class ApprovalPolicy
         && ReviewTranscript.HasAuthorization(_reviewContext?.Conversation);
 
     private bool UsesReviewer =>
-        _mode == ApprovalMode.Review || _mode == ApprovalMode.FullReview;
+        _mode == ApprovalMode.Review || _mode == ApprovalMode.Audit;
 
     private bool CanPassWithoutReview(string toolName, ToolClassification classification)
     {
@@ -175,7 +175,7 @@ public sealed class ApprovalPolicy
             }
 
             return toolName is WriteTool.ToolName or EditTool.ToolName
-                && (_mode == ApprovalMode.AutoEdit || _mode == ApprovalMode.Review);
+                && (_mode == ApprovalMode.Edit || _mode == ApprovalMode.Review);
         }
 
         if (toolName == BashTool.ToolName)

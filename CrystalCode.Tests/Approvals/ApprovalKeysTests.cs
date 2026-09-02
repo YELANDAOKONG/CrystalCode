@@ -23,6 +23,7 @@ public sealed class ApprovalKeysTests
     public void For_TitleCasesApprovalMode()
     {
         Assert.Equal("Review", ApprovalLabel.For(ApprovalMode.Review));
-        Assert.Equal("FullReview", ApprovalLabel.For(ApprovalMode.FullReview));
+        Assert.Equal("Audit", ApprovalLabel.For(ApprovalMode.Audit));
+        Assert.Equal("Edit", ApprovalLabel.For(ApprovalMode.Edit));
     }
 }

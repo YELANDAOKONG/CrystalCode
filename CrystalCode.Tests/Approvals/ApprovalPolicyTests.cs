@@ -182,9 +182,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_AutoEdit_AutoExecutesWorkspaceWrite()
+    public async Task DecideAsync_Edit_AutoExecutesWorkspaceWrite()
     {
-        using var context = new ApprovalContext(ApprovalMode.AutoEdit);
+        using var context = new ApprovalContext(ApprovalMode.Edit);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = context.CreatePolicy(prompt);
 
@@ -201,7 +201,7 @@ public sealed class ApprovalPolicyTests
     [Fact]
     public async Task DecideAsync_AutomaticExternalTool_SkipsPromptAndReview()
     {
-        using var context = new ApprovalContext(ApprovalMode.FullReview);
+        using var context = new ApprovalContext(ApprovalMode.Audit);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Deny("should not run"));
         var classifier = new FixedApprovalClassifier(
@@ -284,9 +284,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_FullReview_AllowsWriteWhenReviewerAllows()
+    public async Task DecideAsync_Audit_AllowsWriteWhenReviewerAllows()
     {
-        using var context = new ApprovalContext(ApprovalMode.FullReview);
+        using var context = new ApprovalContext(ApprovalMode.Audit);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = context.CreatePolicy(
             prompt,
@@ -307,9 +307,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_FullReview_RejectsWhenReviewerDenies()
+    public async Task DecideAsync_Audit_RejectsWhenReviewerDenies()
     {
-        using var context = new ApprovalContext(ApprovalMode.FullReview);
+        using var context = new ApprovalContext(ApprovalMode.Audit);
         var policy = context.CreatePolicy(
             new ThrowingApprovalPrompt(),
             new FixedApprovalReviewer(
@@ -325,9 +325,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_FullReview_AsksUserWhenReviewerIsUncertain()
+    public async Task DecideAsync_Audit_AsksUserWhenReviewerIsUncertain()
     {
-        using var context = new ApprovalContext(ApprovalMode.FullReview);
+        using var context = new ApprovalContext(ApprovalMode.Audit);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
         var policy = context.CreatePolicy(
             prompt,
@@ -341,9 +341,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_FullReview_AsksUserWhenConversationMissing()
+    public async Task DecideAsync_Audit_AsksUserWhenConversationMissing()
     {
-        using var context = new ApprovalContext(ApprovalMode.FullReview);
+        using var context = new ApprovalContext(ApprovalMode.Audit);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
         var policy = context.CreatePolicy(
             prompt,
@@ -357,9 +357,9 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_FullReview_AttachesEarlierUserTurns()
+    public async Task DecideAsync_Audit_AttachesEarlierUserTurns()
     {
-        using var context = new ApprovalContext(ApprovalMode.FullReview);
+        using var context = new ApprovalContext(ApprovalMode.Audit);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("matches the task"));
         var policy = context.CreatePolicy(

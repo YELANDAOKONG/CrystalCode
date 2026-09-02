@@ -274,11 +274,11 @@ Modes:
   approval.
 - Default: Workspace Read auto-executes. Write, shell, and
   outside-workspace reads ask the operator.
-- AutoEdit: workspace file changes for built-in `write` and `edit`
+- Edit: workspace file changes for built-in `write` and `edit`
   pass without review. Shell, external tools, and outside-workspace
   reads still ask.
 - Review: workspace file changes for built-in `write` and `edit`
-  pass without review, same names as AutoEdit. Another model checks
+  pass without review, same as Edit. Another model checks
   each remaining side-effect call (Codex guardian-style), including
   bash, reads, glob, and grep of paths outside the workspace, and
   external Write. Workspace reads and Skills search directories still
@@ -293,12 +293,15 @@ Modes:
   `rationale`. Allow executes. Deny becomes model-visible rejection
   text. Ask and Forbidden-allow fall back to the operator. Review is
   not a grant and is not full pass-through.
-- FullReview: the same reviewer and transcript rules as Review, but
+- Audit: the same reviewer and transcript rules as Review, but
   workspace `write` and `edit` are also checked. They do not auto-pass.
 - Full: workspace-bounded, policy-allowed actions pass without review.
   That includes any loaded external tool whose classification stays
   Write + Workspace, not only built-in `write` / `edit`. Forbidden,
   Privileged, and outside-workspace paths never fully auto-pass.
+
+Legacy config values `autoedit`, `fullreview`, and `full-review` still
+parse to Edit and Audit.
 
 External tool authors may set `approval` to `inherit` (default) or
 `always` at the set level and override it per tool. The operator controls
@@ -439,7 +442,7 @@ Skills is enabled, `read`, glob, and grep of any path inside a Skills
 search directory (`skill` / `skills` trees, including files that are
 not `SKILL.md`) auto-execute as workspace reads. Other
 outside-workspace reads ask the operator, or go to the Review model
-in Review or FullReview. They never replace Work, Plan, or Review. `config.json` field `skills`
+in Review or Audit. They never replace Work, Plan, or Review. `config.json` field `skills`
 enables or disables the feature
 (default `true`). When `false`, the tool is omitted and skill guidance
 is not appended. Later sources overwrite earlier ones with the same
@@ -673,7 +676,7 @@ platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
 plain Backspace as Control; that is still one character. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
-newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, AutoEdit, FullReview, and Full.
+newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, Edit, Audit, and Full.
 When the slash picker is open, plain Up/Down moves its selection without
 resetting it and scrolls the visible candidate window to keep that selection
 on screen. Tab accepts the selected completion. Enter accepts a partial

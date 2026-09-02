@@ -15,8 +15,6 @@ public static class DisplayCase
 
         return value.ToLowerInvariant() switch
         {
-            "autoedit" => "AutoEdit",
-            "fullreview" => "FullReview",
             "todowrite" => "TodoWrite",
             "todoread" => "TodoRead",
             "outside_workspace" => "Outside Workspace",

@@ -9,11 +9,11 @@ public sealed record ApprovalMode
 
     public static ApprovalMode Default { get; } = new("default");
 
-    public static ApprovalMode AutoEdit { get; } = new("autoedit");
+    public static ApprovalMode Edit { get; } = new("edit");
 
     public static ApprovalMode Review { get; } = new("review");
 
-    public static ApprovalMode FullReview { get; } = new("fullreview");
+    public static ApprovalMode Audit { get; } = new("audit");
 
     public static ApprovalMode Full { get; } = new("full");
 
@@ -39,9 +39,14 @@ public sealed record ApprovalMode
                 nameof(value));
         }
 
-        if (mode.Value is "full-review")
+        if (mode.Value is "autoedit")
         {
-            return FullReview;
+            return Edit;
+        }
+
+        if (mode.Value is "fullreview" or "full-review")
+        {
+            return Audit;
         }
 
         if (mode.Value is "fullauto" or "yolo")
@@ -51,16 +56,16 @@ public sealed record ApprovalMode
 
         if (mode == Plan
             || mode == Default
-            || mode == AutoEdit
+            || mode == Edit
             || mode == Review
-            || mode == FullReview
+            || mode == Audit
             || mode == Full)
         {
             return mode;
         }
 
         throw new ArgumentException(
-            "Approval mode must be plan, default, autoedit, review, fullreview, or full.",
+            "Approval mode must be plan, default, edit, review, audit, or full.",
             nameof(value));
     }
 
@@ -68,20 +73,20 @@ public sealed record ApprovalMode
     {
         if (current == Default)
         {
-            return AutoEdit;
+            return Edit;
         }
 
-        if (current == AutoEdit)
+        if (current == Edit)
         {
             return Review;
         }
 
         if (current == Review)
         {
-            return FullReview;
+            return Audit;
         }
 
-        if (current == FullReview)
+        if (current == Audit)
         {
             return Full;
         }
