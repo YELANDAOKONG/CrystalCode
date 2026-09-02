@@ -39,7 +39,7 @@ public sealed class ExportDirectoryTests
             "/tmp/workspace");
 
         Assert.Equal(
-            Path.Combine("/tmp/workspace", ".crystal", "exports"),
+            Path.Combine(Path.GetFullPath("/tmp/workspace"), ".crystal", "exports"),
             path);
     }
 

@@ -85,7 +85,8 @@ public sealed class PromptBinderTests
             context);
 
         Assert.Equal(
-            "Workspace=/tmp/demo git=no date=Monday Aug 31, 2026 model=deepseek / deepseek-v4-flash mode=work product=Crystal Code",
+            "Workspace=" + Path.GetFullPath("/tmp/demo")
+                + " git=no date=Monday Aug 31, 2026 model=deepseek / deepseek-v4-flash mode=work product=Crystal Code",
             text);
     }
 
@@ -113,7 +114,7 @@ public sealed class PromptBinderTests
 
         var text = PromptBinder.Apply("{{ WORKSPACE }}", context);
 
-        Assert.Equal("/tmp/demo", text);
+        Assert.Equal(Path.GetFullPath("/tmp/demo"), text);
     }
 
     [Fact]
