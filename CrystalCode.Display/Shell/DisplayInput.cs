@@ -26,15 +26,23 @@ public static class DisplayInput
             return false;
         }
 
-        if (key.Key != ConsoleKey.O
-            || !key.Modifiers.HasFlag(ConsoleModifiers.Control))
+        if (!key.Modifiers.HasFlag(ConsoleModifiers.Control)
+            || key.Modifiers.HasFlag(ConsoleModifiers.Alt)
+            || key.Modifiers.HasFlag(ConsoleModifiers.Shift))
         {
             return false;
         }
 
-        toggle = key.Modifiers.HasFlag(ConsoleModifiers.Shift)
-            ? VerboseToggle.Commands
-            : VerboseToggle.Tools;
-        return true;
+        switch (key.Key)
+        {
+            case ConsoleKey.O:
+                toggle = VerboseToggle.Tools;
+                return true;
+            case ConsoleKey.G:
+                toggle = VerboseToggle.Commands;
+                return true;
+            default:
+                return false;
+        }
     }
 }

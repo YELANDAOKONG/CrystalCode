@@ -42,7 +42,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private SlashPicker? _picker;
     private string? _streamKind;
     private readonly StreamToolNames _toolNames = new();
-    private readonly Queue<string> _pendingToolNames = new();
+    private readonly Dictionary<string, string> _toolCallNames = new(StringComparer.Ordinal);
     private Stopwatch? _turnClock;
     private DateTimeOffset _lastPaint;
     private int _scrollBack;
@@ -433,7 +433,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 "shift+tab    Plan / Work",
                 "?            Shortcuts when empty",
                 "ctrl+o       Toggle verbose tool results",
-                "ctrl+shift+o Toggle verbose command output",
+                "ctrl+g       Toggle verbose command output",
                 "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)",
                 "up/down      history recall (or picker navigation)");
             foreach (var spec in SlashCatalog.BuiltIn)
@@ -555,7 +555,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _turnCumulativeBaseline = _cumulativeUsage;
             _turnClock = Stopwatch.StartNew();
             _toolNames.Clear();
-            _pendingToolNames.Clear();
+            _toolCallNames.Clear();
             _streamedCharacters = 0;
             SetTurnActivityUnlocked("Running", ProgressText.WaitingForModel);
             _chrome.ToolCount = 0;
@@ -641,7 +641,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             foreach (var call in calls)
             {
                 var text = ToolCallText.Summary(call.Name, call.Arguments);
-                _pendingToolNames.Enqueue(call.Name);
+                _toolCallNames[call.CallId] = call.Name;
                 _log.Add(TranscriptKind.Tool, text);
                 WriteFallback(TranscriptKind.Tool, text);
             }
@@ -667,9 +667,10 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 var kind = result.Status == ToolResultStatus.Success
                     ? TranscriptKind.Result
                     : TranscriptKind.Error;
-                var toolName = _pendingToolNames.Count > 0
-                    ? _pendingToolNames.Dequeue()
+                var toolName = _toolCallNames.TryGetValue(result.CallId, out var name)
+                    ? name
                     : null;
+                _toolCallNames.Remove(result.CallId);
                 _log.Add(kind, body, toolName: toolName);
                 WriteFallback(kind, body);
             }
@@ -1280,7 +1281,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             "shift+tab    Plan / Work",
             "?            Shortcuts when empty",
             "ctrl+o       Toggle verbose tool results",
-            "ctrl+shift+o Toggle verbose command output",
+            "ctrl+g       Toggle verbose command output",
             "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)");
         foreach (var option in _slashOptions)
         {

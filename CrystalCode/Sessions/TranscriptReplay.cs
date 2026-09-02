@@ -23,7 +23,7 @@ public static class TranscriptReplay
     {
         ArgumentNullException.ThrowIfNull(items);
         var lines = new List<TranscriptLine>();
-        string? pendingToolName = null;
+        var callNames = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var item in items)
         {
             switch (item)
@@ -36,22 +36,22 @@ public static class TranscriptReplay
 
                     break;
                 case ToolCall call:
+                    callNames[call.CallId] = call.Name;
                     lines.Add(new TranscriptLine(
                         TranscriptKind.Tool,
                         ToolCallText.Summary(call.Name, call.Arguments)));
-                    pendingToolName = call.Name;
                     break;
                 case ToolResult result:
+                    callNames.TryGetValue(result.CallId, out var toolName);
                     var kind = result.Status == ToolResultStatus.Success
                         ? TranscriptKind.Result
                         : TranscriptKind.Error;
                     var body = ToolResultText.Body(result.Text);
                     if (body.Length > 0)
                     {
-                        lines.Add(new TranscriptLine(kind, body, pendingToolName));
+                        lines.Add(new TranscriptLine(kind, body, toolName));
                     }
 
-                    pendingToolName = null;
                     break;
             }
         }

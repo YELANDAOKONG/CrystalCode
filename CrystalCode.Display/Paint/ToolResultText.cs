@@ -11,7 +11,7 @@ public static class ToolResultText
 
     public const int MaximumBodyLength = 1200;
 
-    public const string CommandExpandHint = "ctrl+shift+o to expand";
+    public const string CommandExpandHint = "ctrl+g to expand";
 
     public static string FirstLine(string text)
     {

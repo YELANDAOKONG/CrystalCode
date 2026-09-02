@@ -38,6 +38,26 @@ public sealed class TranscriptReplayTests
     }
 
     [Fact]
+    public void Lines_PairsBatchToolResultsByCallId()
+    {
+        var items = new List<ChatItem>
+        {
+            new ToolCall("1", "read", """{"path":"a.txt"}"""),
+            new ToolCall("2", "bash", """{"command":"echo hi"}"""),
+            new ToolResult("1", "file contents", ToolResultStatus.Success),
+            new ToolResult("2", "exit 0\nhi\n", ToolResultStatus.Success)
+        };
+
+        var lines = TranscriptReplay.Lines(items);
+
+        Assert.Equal(4, lines.Count);
+        Assert.Equal("read", lines[2].ToolName);
+        Assert.Contains("file contents", lines[2].Text, StringComparison.Ordinal);
+        Assert.Equal("bash", lines[3].ToolName);
+        Assert.Contains("hi", lines[3].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Lines_KeepsEarlierContextSummary()
     {
         var items = new List<ChatItem>

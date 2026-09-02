@@ -669,7 +669,7 @@ result panels honor independent verbose toggles (`verboseTools` and
 off, read/search/skill result panels are omitted while the Tool card
 remains; `edit` and `write` results always stay visible. When command
 verbose is off, bash results collapse to a hidden-line hint plus the
-last output line. Ctrl+O toggles tool verbose and Ctrl+Shift+O toggles
+last output line. Ctrl+O toggles tool verbose and Ctrl+G toggles
 command verbose when the composer is empty; `/verbose` shows or changes
 the same settings (`tools`, `commands`, `on`, `off`).
 Approval is a Spectre panel with a two-column Title Case field grid
@@ -719,7 +719,7 @@ is a command prefix. After a verb that takes an argument
 `/model` completes current-provider models, then a provider name, then
 that provider's models. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
 and Up/Down when the prompt is empty scroll the transcript. Ctrl+O and
-Ctrl+Shift+O toggle verbose tool and command output when the composer is
+Ctrl+G toggle verbose tool and command output when the composer is
 empty. Up/Down
 arrows navigate composer history or the slash picker when the prompt
 has text. Alternate-scroll (1007) turns the wheel into batched Up/Down
