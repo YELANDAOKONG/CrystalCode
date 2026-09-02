@@ -32,14 +32,31 @@ public static class UsageText
             return "CTX --";
         }
 
-        var percent = contextWindow <= 0
-            ? 0
-            : Math.Clamp((int)((double)usage.TotalTokenCount / contextWindow * 100), 0, 100);
+        var percent = ContextPercent(usage, contextWindow);
         return $"CTX {percent}%";
     }
 
+    private static int ContextPercent(TokenUsage usage, int contextWindow) =>
+        contextWindow <= 0
+            ? 0
+            : Math.Clamp((int)((double)usage.TotalTokenCount / contextWindow * 100), 0, 100);
+
     public static string FormatTotal(TokenUsage? usage) =>
         usage is null ? string.Empty : FormatNumber(usage.TotalTokenCount) + " Total";
+
+    public static string FormatContextUsed(TokenUsage? usage, int contextWindow) =>
+        usage is null ? "CTX --" : $"CTX {ContextPercent(usage, contextWindow)}%";
+
+    public static string FormatContextLeft(TokenUsage? usage, int contextWindow) =>
+        usage is null ? "CTX -- Left" : $"CTX {100 - ContextPercent(usage, contextWindow)}% Left";
+
+    public static string FormatContextTokens(TokenUsage? usage, int contextWindow) =>
+        usage is null
+            ? $"-- / {FormatNumber(contextWindow)} CTX"
+            : $"{FormatNumber(usage.TotalTokenCount)} / {FormatNumber(contextWindow)} CTX";
+
+    public static string FormatScoped(long? value, string scope) =>
+        value is null ? string.Empty : $"{FormatNumber(value.Value)} {scope}";
 
     public static string FormatEstimate(int tokens)
     {

@@ -368,6 +368,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         }
     }
 
+    public void SetStatusLine(bool enabled, IReadOnlyList<string> fields)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        lock (_gate)
+        {
+            _chrome.CustomStatusLine = enabled;
+            _chrome.StatusLineFields = [.. fields];
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void WriteUser(string text)
     {
         Add(TranscriptKind.User, text);
@@ -1432,12 +1443,30 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         _cumulativeUsage = cumulativeUsage;
         _chrome.Usage = UsageText.Format(usage, cumulativeUsage, contextWindow);
         _chrome.UsageTotal = UsageText.FormatTotal(cumulativeUsage);
+        ApplyCustomUsageUnlocked(usage, cumulativeUsage, contextWindow);
     }
 
     private void ApplyContextUsageUnlocked(TokenUsage? usage, int contextWindow)
     {
         _lastUsage = usage;
         _chrome.Usage = UsageText.Format(usage, _cumulativeUsage, contextWindow);
+        ApplyCustomUsageUnlocked(usage, _cumulativeUsage, contextWindow);
+    }
+
+    private void ApplyCustomUsageUnlocked(
+        TokenUsage? usage,
+        TokenUsage? cumulativeUsage,
+        int contextWindow)
+    {
+        _chrome.ContextUsed = UsageText.FormatContextUsed(usage, contextWindow);
+        _chrome.ContextLeft = UsageText.FormatContextLeft(usage, contextWindow);
+        _chrome.ContextTokens = UsageText.FormatContextTokens(usage, contextWindow);
+        _chrome.RequestInput = UsageText.FormatScoped(usage?.InputTokenCount, "Request In");
+        _chrome.RequestOutput = UsageText.FormatScoped(usage?.OutputTokenCount, "Request Out");
+        _chrome.RequestTotal = UsageText.FormatScoped(usage?.TotalTokenCount, "Request");
+        _chrome.SessionInput = UsageText.FormatScoped(cumulativeUsage?.InputTokenCount, "Session In");
+        _chrome.SessionOutput = UsageText.FormatScoped(cumulativeUsage?.OutputTokenCount, "Session Out");
+        _chrome.SessionTotal = UsageText.FormatScoped(cumulativeUsage?.TotalTokenCount, "Session");
     }
 
     private static bool BelowUsableSize(out int width, out int height)

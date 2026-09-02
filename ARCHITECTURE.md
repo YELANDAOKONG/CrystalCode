@@ -511,6 +511,9 @@ proportional context bar, and feature switches. `/status full` also shows the
 latest request token breakdown and adds Activity and Tools cards for session
 identity and start time, invocation counters, queue and todo counts, and
 tool-catalog totals. The persistent chrome remains the smallest live summary.
+`/status` labels cumulative values as session usage and reserves the latest
+request breakdown for `/status full`; its output does not depend on status-line
+customization.
 
 The `plugins` directory is reserved. The current product does not load
 `IPlugin` assemblies from that directory. Dotnet tool sets load class
@@ -631,7 +634,12 @@ model round and each tool batch: provider usage as it arrives, then a local
 transcript estimate after tools until the next round reports. It also
 shows tool count (`Tool` / `Tools`), and
 elapsed time. When the session has todos, a pinned `Todos` bar sits
-above the progress row and status bar. Each row is a checkbox colored
+above the progress row and status bar. The existing adaptive status bar is the
+default. Operators may independently enable an ordered custom status line
+through `customStatusLine`, `statusLine`, or `/statusline`. Custom token fields
+name their scope explicitly as context, request, or session usage. Disabling
+the custom line returns to the existing adaptive rendering path.
+Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled
 muted. The bar shows the first four items and a `+N more` line when
 the list is longer; `/todos` (alias `/todo`) prints the full untruncated

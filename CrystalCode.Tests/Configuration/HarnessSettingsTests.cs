@@ -75,4 +75,17 @@ public sealed class HarnessSettingsTests
         Assert.Equal("workspace", settings.ExportDirectory);
         Assert.Null(cleared.ExportDirectory);
     }
+
+    [Fact]
+    public void WithStatusLine_EnablesOrderedFields()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithStatusLine(
+            new StatusLineSettings(true, ["context-left", "session-total"]));
+
+        Assert.True(next.StatusLine.Enabled);
+        Assert.Equal(["context-left", "session-total"], next.StatusLine.Fields);
+        Assert.False(settings.StatusLine.Enabled);
+    }
 }

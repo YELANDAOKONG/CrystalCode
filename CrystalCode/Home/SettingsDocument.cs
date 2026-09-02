@@ -26,6 +26,10 @@ internal sealed class SettingsDocument
 
     public string? ExportDirectory { get; set; }
 
+    public bool? CustomStatusLine { get; set; }
+
+    public List<string>? StatusLine { get; set; }
+
     public double? CompactionThreshold { get; set; }
 
     public Dictionary<string, ProviderDocument>? Providers { get; set; }

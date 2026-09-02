@@ -30,6 +30,8 @@ public sealed class SessionCommandTests
     [InlineData("/export", SessionVerb.Export)]
     [InlineData("/export markdown", SessionVerb.Export)]
     [InlineData("/export json --system", SessionVerb.Export)]
+    [InlineData("/statusline", SessionVerb.StatusLine)]
+    [InlineData("/statusline on", SessionVerb.StatusLine)]
     [InlineData("/todos", SessionVerb.Todos)]
     [InlineData("/todo", SessionVerb.Todos)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)

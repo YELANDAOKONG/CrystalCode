@@ -7,7 +7,7 @@ namespace CrystalCode.Display.Shell;
 /// </summary>
 public sealed class ShellChrome
 {
-    private static readonly string[] DropSlots = ["total", "elapsed", "prompt", "model", "path"];
+    private static readonly string[] DropSlots = ["total", "elapsed", "prompt", "model", "path", "custom"];
     private int _spinnerFrame;
     private DateTimeOffset _lastSpinner;
     private string _progress = string.Empty;
@@ -29,6 +29,28 @@ public sealed class ShellChrome
     public string Usage { get; set; } = "CTX --";
 
     public string UsageTotal { get; set; } = string.Empty;
+
+    public bool CustomStatusLine { get; set; }
+
+    public IReadOnlyList<string> StatusLineFields { get; set; } = [];
+
+    public string ContextUsed { get; set; } = "CTX --";
+
+    public string ContextLeft { get; set; } = "CTX -- Left";
+
+    public string ContextTokens { get; set; } = "-- CTX";
+
+    public string RequestInput { get; set; } = string.Empty;
+
+    public string RequestOutput { get; set; } = string.Empty;
+
+    public string RequestTotal { get; set; } = string.Empty;
+
+    public string SessionInput { get; set; } = string.Empty;
+
+    public string SessionOutput { get; set; } = string.Empty;
+
+    public string SessionTotal { get; set; } = string.Empty;
 
     public string Activity { get; set; } = string.Empty;
 
@@ -67,6 +89,12 @@ public sealed class ShellChrome
     public PaintLine StatusLine(int width)
     {
         var items = new List<(string Plain, string Markup, string Slot)>();
+
+        if (CustomStatusLine)
+        {
+            AddCustomItems(items);
+            return FitStatusLine(items, width);
+        }
 
         if (!string.IsNullOrWhiteSpace(Approval))
         {
@@ -142,6 +170,50 @@ public sealed class ShellChrome
             items.Add((queueStr, $"[{Theme.Warning} bold]{queueStr}[/]", "keep"));
         }
 
+        return FitStatusLine(items, width);
+    }
+
+    private void AddCustomItems(List<(string Plain, string Markup, string Slot)> items)
+    {
+        foreach (var field in StatusLineFields)
+        {
+            var value = field switch
+            {
+                "approval" => Approval,
+                "thinking" => Thinking,
+                "prompt-set" => string.IsNullOrWhiteSpace(PromptSet)
+                    ? string.Empty
+                    : "Prompt " + PromptSet,
+                "activity" => string.IsNullOrWhiteSpace(Activity) ? string.Empty : "• " + Activity,
+                "model" => Model,
+                "workspace" => string.IsNullOrWhiteSpace(WorkspaceRoot)
+                    ? string.Empty
+                    : PathDisplay.Shorten(WorkspaceRoot),
+                "context-used" => ContextUsed,
+                "context-left" => ContextLeft,
+                "context-tokens" => ContextTokens,
+                "request-input" => RequestInput,
+                "request-output" => RequestOutput,
+                "request-total" => RequestTotal,
+                "session-input" => SessionInput,
+                "session-output" => SessionOutput,
+                "session-total" => SessionTotal,
+                "tools" => ToolCount switch { 0 => string.Empty, 1 => "1 Tool", _ => $"{ToolCount} Tools" },
+                "elapsed" => Elapsed,
+                "queued" => Queued > 0 ? $"Queued {Queued}" : string.Empty,
+                _ => string.Empty
+            };
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                items.Add((value, $"[{Theme.Chrome}]{MarkupText.Escape(value)}[/]", "custom"));
+            }
+        }
+    }
+
+    private static PaintLine FitStatusLine(
+        List<(string Plain, string Markup, string Slot)> items,
+        int width)
+    {
         const string SepPlain = "  ·  ";
         const string SepMarkup = $"[{Theme.Rule}]  ·  [/]";
 

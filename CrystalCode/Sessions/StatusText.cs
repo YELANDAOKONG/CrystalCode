@@ -34,11 +34,11 @@ internal static class StatusText
             ]);
         AddSection(
             lines,
-            "Tokens - cumulative",
+            "Session tokens",
             [
-                ("Input tokens", TokenValue(status.CumulativeUsage?.InputTokenCount)),
-                ("Output tokens", TokenValue(status.CumulativeUsage?.OutputTokenCount)),
-                ("Total tokens", TokenValue(status.CumulativeUsage?.TotalTokenCount))
+                ("Session input", TokenValue(status.CumulativeUsage?.InputTokenCount)),
+                ("Session output", TokenValue(status.CumulativeUsage?.OutputTokenCount)),
+                ("Session total", TokenValue(status.CumulativeUsage?.TotalTokenCount))
             ]);
         AddSection(
             lines,
@@ -54,6 +54,7 @@ internal static class StatusText
                 ("Skills", Toggle(status.SkillsEnabled)),
                 ("External tools", Toggle(status.ExternalToolsEnabled)),
                 ("Estimated tokens", Toggle(status.EstimatedTokensEnabled)),
+                ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
                 ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
                 ("Verbose commands", Toggle(status.VerboseCommandsEnabled))
             ],

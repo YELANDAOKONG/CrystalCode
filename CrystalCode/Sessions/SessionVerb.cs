@@ -14,6 +14,7 @@ public enum SessionVerb
     Model,
     PromptSet,
     Status,
+    StatusLine,
     Clear,
     Cd,
     Resume,

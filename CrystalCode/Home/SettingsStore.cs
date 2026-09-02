@@ -72,7 +72,10 @@ public sealed class SettingsStore
             externalToolApproval,
             string.IsNullOrWhiteSpace(document.ExportDirectory)
                 ? null
-                : document.ExportDirectory.Trim());
+                : document.ExportDirectory.Trim(),
+            new StatusLineSettings(
+                document.CustomStatusLine ?? false,
+                document.StatusLine));
     }
 
     public void Save(HarnessSettings settings)
@@ -101,6 +104,12 @@ public sealed class SettingsStore
                     ? null
                     : settings.PromptSet,
             ExportDirectory = settings.ExportDirectory,
+            CustomStatusLine = settings.StatusLine.Enabled ? true : null,
+            StatusLine = settings.StatusLine.Fields.SequenceEqual(
+                StatusLineSettings.DefaultFields,
+                StringComparer.Ordinal)
+                    ? null
+                    : [.. settings.StatusLine.Fields],
             CompactionThreshold = settings.CompactionThreshold,
             Providers = SettingsMapper.WriteProviders(settings.Catalog)
         };

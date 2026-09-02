@@ -314,4 +314,19 @@ public sealed class SettingsStoreTests
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Save_RoundTripsCustomStatusLine()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithStatusLine(
+            new StatusLineSettings(true, ["context-left", "session-total"]));
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.True(loaded.StatusLine.Enabled);
+        Assert.Equal(["context-left", "session-total"], loaded.StatusLine.Fields);
+    }
 }

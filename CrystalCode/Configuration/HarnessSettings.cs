@@ -36,7 +36,8 @@ public sealed record HarnessSettings
         bool verboseCommands = DefaultVerboseCommands,
         string promptSet = DefaultPromptSet,
         ExternalToolApprovalSettings? externalToolApproval = null,
-        string? exportDirectory = null)
+        string? exportDirectory = null,
+        StatusLineSettings? statusLine = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -68,6 +69,7 @@ public sealed record HarnessSettings
         PromptSet = promptSet.Trim();
         ExternalToolApproval = externalToolApproval ?? ExternalToolApprovalSettings.Default;
         ExportDirectory = string.IsNullOrWhiteSpace(exportDirectory) ? null : exportDirectory.Trim();
+        StatusLine = statusLine ?? new StatusLineSettings();
     }
 
     public ProviderName Provider { get; }
@@ -97,6 +99,8 @@ public sealed record HarnessSettings
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
     public string? ExportDirectory { get; }
+
+    public StatusLineSettings StatusLine { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
 
@@ -180,6 +184,12 @@ public sealed record HarnessSettings
                 : exportDirectory.Trim(),
             setExportDirectory: true);
 
+    public HarnessSettings WithStatusLine(StatusLineSettings statusLine)
+    {
+        ArgumentNullException.ThrowIfNull(statusLine);
+        return Copy(statusLine: statusLine);
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -193,7 +203,8 @@ public sealed record HarnessSettings
         string? promptSet = null,
         ExternalToolApprovalSettings? externalToolApproval = null,
         string? exportDirectory = null,
-        bool setExportDirectory = false) =>
+        bool setExportDirectory = false,
+        StatusLineSettings? statusLine = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -208,7 +219,8 @@ public sealed record HarnessSettings
             verboseCommands ?? VerboseCommands,
             promptSet ?? PromptSet,
             externalToolApproval ?? ExternalToolApproval,
-            setExportDirectory ? exportDirectory : ExportDirectory);
+            setExportDirectory ? exportDirectory : ExportDirectory,
+            statusLine ?? StatusLine);
 
     public override string ToString() => nameof(HarnessSettings);
 

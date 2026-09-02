@@ -8,6 +8,27 @@ namespace CrystalCode.Display.Tests.Shell;
 public sealed class ShellChromeTests
 {
     [Fact]
+    public void StatusLine_CustomModeUsesConfiguredFieldsInOrder()
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = true,
+            StatusLineFields = ["context-left", "session-total", "model"],
+            ContextLeft = "CTX 37% Left",
+            SessionTotal = "801k Session",
+            Model = "gpt-5.6-sol",
+            Approval = "Review",
+            Usage = "legacy usage"
+        };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Contains("CTX 37% Left  ·  801k Session  ·  gpt-5.6-sol", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Review", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("legacy usage", line.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StatusLine_ActivityPlainMatchesBullet()
     {
         var chrome = new ShellChrome

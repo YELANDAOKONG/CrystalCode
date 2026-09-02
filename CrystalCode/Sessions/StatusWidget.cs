@@ -59,9 +59,9 @@ internal static class StatusWidget
         {
             FieldGrid(
             [
-                ("Input", TokenValue(status.CumulativeUsage?.InputTokenCount)),
-                ("Output", TokenValue(status.CumulativeUsage?.OutputTokenCount)),
-                ("Total", TokenValue(status.CumulativeUsage?.TotalTokenCount))
+                ("Session input", TokenValue(status.CumulativeUsage?.InputTokenCount)),
+                ("Session output", TokenValue(status.CumulativeUsage?.OutputTokenCount)),
+                ("Session total", TokenValue(status.CumulativeUsage?.TotalTokenCount))
             ]),
             SectionRule("Current context"),
             ContextGrid(status)
@@ -78,7 +78,7 @@ internal static class StatusWidget
                 ]));
         }
 
-        return Card("Tokens · Cumulative", new Rows(blocks));
+        return Card("Tokens", new Rows(blocks));
     }
 
     private static Grid ContextGrid(SessionStatus status)
@@ -96,6 +96,7 @@ internal static class StatusWidget
             ("Skills", Toggle(status.SkillsEnabled)),
             ("External tools", Toggle(status.ExternalToolsEnabled)),
             ("Token estimate", Toggle(status.EstimatedTokensEnabled)),
+            ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
             ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
             ("Verbose commands", Toggle(status.VerboseCommandsEnabled))
         ]);

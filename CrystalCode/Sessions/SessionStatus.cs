@@ -32,4 +32,5 @@ internal sealed record SessionStatus(
     int PlanTools,
     int WorkTools,
     int ExternalTools,
-    TokenUsage? CumulativeUsage);
+    TokenUsage? CumulativeUsage,
+    bool CustomStatusLineEnabled = false);

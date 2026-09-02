@@ -195,6 +195,8 @@ Top-level fields:
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `exportDirectory` | Export root: omitted for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
+| `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
+| `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `providers` | Named endpoints and their model tables |
 
@@ -535,6 +537,7 @@ returns the transcript viewport to the latest output.
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
+| `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
 | `/resume` | `/continue` | Replay the latest session for this workspace, or `/resume <id>` |
@@ -557,6 +560,16 @@ prints the current workspace root. `/cd` only accepts a directory
 that already exists. `/tokens` with no argument toggles the live
 progress-row estimate (four characters per token, prefixed with `~`).
 It is not provider-billed usage. The choice is written to `config.json`.
+
+`/statusline` does not replace `/status`. The status line is a configurable
+live summary, while `/status` remains a stable diagnostic report. Supported
+custom fields are `approval`, `thinking`, `prompt-set`, `activity`, `model`,
+`workspace`, `context-used`, `context-left`, `context-tokens`,
+`request-input`, `request-output`, `request-total`, `session-input`,
+`session-output`, `session-total`, `tools`, `elapsed`, and `queued`.
+Setting an ordered field list enables the custom line. `/statusline off`
+restores the existing adaptive line; `/statusline reset` enables the built-in
+custom field order.
 
 ## Built-in tools
 

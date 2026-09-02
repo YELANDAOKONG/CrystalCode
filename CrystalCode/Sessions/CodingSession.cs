@@ -142,6 +142,7 @@ public sealed class CodingSession
     private async Task<int> RunLoopAsync(CancellationToken cancellationToken)
     {
         using var screen = _renderer.Open();
+        _renderer.SetStatusLine(_settings.StatusLine.Enabled, _settings.StatusLine.Fields);
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
         RefreshSlashCommands();
@@ -355,6 +356,9 @@ public sealed class CodingSession
                 return (true, false);
             case SessionVerb.Status:
                 ShowStatus(command.Argument);
+                return (true, false);
+            case SessionVerb.StatusLine:
+                ChangeStatusLine(command.Argument);
                 return (true, false);
             case SessionVerb.Clear:
                 BeginNewSession();
@@ -1087,8 +1091,56 @@ public sealed class CodingSession
                 PlanTools: _planExecutor.Definitions.Count,
                 WorkTools: _workExecutor.Definitions.Count,
                 ExternalTools: _external.Tools.Count,
-                CumulativeUsage: _ledger.CumulativeUsage),
+                CumulativeUsage: _ledger.CumulativeUsage,
+                CustomStatusLineEnabled: _settings.StatusLine.Enabled),
             full);
+    }
+
+    private void ChangeStatusLine(string argument)
+    {
+        IReadOnlyList<string> tokens;
+        try
+        {
+            tokens = string.IsNullOrWhiteSpace(argument) ? [] : CommandArguments.Split(argument);
+        }
+        catch (ArgumentException exception)
+        {
+            _renderer.WriteError(exception.Message);
+            return;
+        }
+
+        if (tokens.Count == 0)
+        {
+            _renderer.WriteNote(
+                "Custom status line  " + (_settings.StatusLine.Enabled ? "On" : "Off")
+                + "\nFields  " + string.Join(' ', _settings.StatusLine.Fields)
+                + "\nAvailable  " + string.Join(' ', StatusLineSettings.AvailableFields));
+            return;
+        }
+
+        StatusLineSettings statusLine;
+        try
+        {
+            statusLine = tokens[0].ToLowerInvariant() switch
+            {
+                "on" when tokens.Count == 1 => _settings.StatusLine.WithEnabled(true),
+                "off" when tokens.Count == 1 => _settings.StatusLine.WithEnabled(false),
+                "reset" when tokens.Count == 1 => new StatusLineSettings(true),
+                "on" or "off" or "reset" => throw new ArgumentException(
+                    "Status line on, off, and reset do not accept additional fields."),
+                _ => _settings.StatusLine.WithFields(tokens)
+            };
+        }
+        catch (ArgumentException exception)
+        {
+            _renderer.WriteError(exception.Message);
+            return;
+        }
+
+        _settings = _settings.WithStatusLine(statusLine);
+        _settingsStore.Save(_settings);
+        _renderer.SetStatusLine(statusLine.Enabled, statusLine.Fields);
+        _renderer.WriteNote("Custom status line  " + (statusLine.Enabled ? "On" : "Off"));
     }
 
     private void WriteToolsUsage()
