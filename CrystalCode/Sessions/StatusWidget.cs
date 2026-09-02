@@ -23,7 +23,7 @@ internal static class StatusWidget
         layout.AddColumn(new GridColumn().PadRight(1));
         layout.AddColumn();
         layout.AddRow(WorkspaceCard(status), ModelCard(status));
-        layout.AddRow(TokenCard(status), OptionsCard(status));
+        layout.AddRow(TokenCard(status, full), OptionsCard(status));
         if (full)
         {
             layout.AddRow(ActivityCard(status), ToolsCard(status));
@@ -53,19 +53,41 @@ internal static class StatusWidget
             ("Thinking", ThinkingValue(status.Thinking))
         ]);
 
-    private static Panel TokenCard(SessionStatus status)
+    private static Panel TokenCard(SessionStatus status, bool full)
     {
-        var grid = FieldGrid(
-        [
-            ("Input", TokenValue(status.Usage?.InputTokenCount)),
-            ("Output", TokenValue(status.Usage?.OutputTokenCount)),
-            ("Total", TokenValue(status.Usage?.TotalTokenCount)),
-            ("Window", Number(status.ContextWindow))
-        ]);
+        var blocks = new List<IRenderable>
+        {
+            FieldGrid(
+            [
+                ("Input", TokenValue(status.CumulativeUsage?.InputTokenCount)),
+                ("Output", TokenValue(status.CumulativeUsage?.OutputTokenCount)),
+                ("Total", TokenValue(status.CumulativeUsage?.TotalTokenCount))
+            ]),
+            SectionRule("Current context"),
+            ContextGrid(status)
+        };
+        if (full)
+        {
+            blocks.Add(SectionRule("Latest request"));
+            blocks.Add(
+                FieldGrid(
+                [
+                    ("Input", TokenValue(status.Usage?.InputTokenCount)),
+                    ("Output", TokenValue(status.Usage?.OutputTokenCount)),
+                    ("Total", TokenValue(status.Usage?.TotalTokenCount))
+                ]));
+        }
+
+        return Card("Tokens · Cumulative", new Rows(blocks));
+    }
+
+    private static Grid ContextGrid(SessionStatus status)
+    {
+        var grid = FieldGrid([("Window", Number(status.ContextWindow))]);
         grid.AddRow(
-            new Markup($"[{Theme.Chrome}]Context[/]"),
+            new Markup($"[{Theme.Chrome}]Usage[/]"),
             ContextProgress(status));
-        return Card("Tokens", grid);
+        return grid;
     }
 
     private static Panel OptionsCard(SessionStatus status) =>
@@ -131,6 +153,13 @@ internal static class StatusWidget
             BorderStyle = Style.Parse(Theme.Rule),
             Padding = new Padding(1, 0, 1, 0),
             Expand = true
+        };
+
+    private static Rule SectionRule(string title) =>
+        new($"[{Theme.Chrome}]{MarkupText.Escape(title)}[/]")
+        {
+            Style = Style.Parse(Theme.Rule),
+            Justification = Justify.Left
         };
 
     private static Grid FieldGrid(IReadOnlyList<(string Field, string Value)> fields)

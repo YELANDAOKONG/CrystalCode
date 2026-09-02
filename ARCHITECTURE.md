@@ -350,13 +350,16 @@ Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a successful `/compact`, and on an orderly exit
 when the transcript has a user message or a compaction summary. The
 file stores the compacted model transcript (live system prompt, one
-summary, recent tail) plus the last usage snapshot. `crystal --resume
+summary, recent tail), the last usage snapshot, and cumulative provider usage.
+`crystal --resume
 <id>` (`-r`) loads that file at process start; a missing or empty
 session exits without entering the TTY. `/resume` restores the same
 transcript from inside a running session: the live system prompt is
 refreshed from current Plan/Work text; the summary and tail are kept.
-Usage is restored so the status bar and the next compact decision have
-a baseline. `/clear` starts a new id.
+Usage is restored so the status bar, `/status`, and the next compact decision
+have a baseline. Sessions saved before cumulative usage was introduced retain
+an unknown cumulative value rather than treating their last request as the
+whole session. `/clear` starts a new id.
 
 `/sessions` lists resumable sessions for the current workspace in descending
 update order; `/sessions all` includes every workspace. The current id is
@@ -489,12 +492,12 @@ configuration: `on`, `off`, `reload`, and independent `home` / `project`
 the catalogs when required.
 
 `/status` is the compact diagnostic view. Separate Workspace, Model, Tokens,
-and Options cards report operating modes, provider identity, the latest
-provider-reported input/output/total token usage, a proportional context bar,
-and feature switches. `/status full`
-adds Activity and Tools cards for session identity and start time, invocation
-counters, queue and todo counts, and tool-catalog totals. The persistent chrome
-remains the smallest live summary.
+and Options cards report operating modes, provider identity, cumulative
+provider-reported input/output/total token usage, the latest request's
+proportional context bar, and feature switches. `/status full` also shows the
+latest request token breakdown and adds Activity and Tools cards for session
+identity and start time, invocation counters, queue and todo counts, and
+tool-catalog totals. The persistent chrome remains the smallest live summary.
 
 The `plugins` directory is reserved. The current product does not load
 `IPlugin` assemblies from that directory. Dotnet tool sets load class

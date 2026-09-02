@@ -532,7 +532,7 @@ returns the transcript viewport to the latest output.
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, or select a set |
-| `/status` | | Compact workspace, model, token/context progress, and options; `full` adds diagnostics |
+| `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
 | `/resume` | `/continue` | Replay the latest session for this workspace, or `/resume <id>` |
@@ -736,8 +736,8 @@ current `<env>` block, and current skill guidance.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, and again on an orderly exit when the transcript has
-a user message. The file stores the transcript, todos, last
-provider-reported token usage, and turn counts.
+a user message. The file stores the transcript, todos, last-request and
+cumulative provider-reported token usage, and turn counts.
 
 `/quit` and two Ctrl+C presses on an empty composer leave the
 alternate screen, then print the session id and `crystal --resume <id>`.
@@ -756,8 +756,10 @@ from inside a running session.
 | `/sessions all` | List resumable sessions from every workspace, newest first |
 | `/clear` | Start a new id |
 
-Resume also restores the last usage snapshot so the status bar and
-compaction still have a baseline before the next model call. A compacted
+Resume also restores the last usage snapshot and cumulative usage so the
+status bar, `/status`, and compaction have the correct baselines before the
+next model call. Older session files without cumulative usage show an unknown
+cumulative value rather than a partial total. A compacted
 session restores the summary and recent tail; only the live system
 prompt is refreshed.
 

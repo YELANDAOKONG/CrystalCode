@@ -29,4 +29,5 @@ internal sealed record SessionStatus(
     bool EstimatedTokensEnabled,
     int PlanTools,
     int WorkTools,
-    int ExternalTools);
+    int ExternalTools,
+    TokenUsage? CumulativeUsage);

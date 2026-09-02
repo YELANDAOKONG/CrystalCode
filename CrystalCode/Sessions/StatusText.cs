@@ -34,13 +34,18 @@ internal static class StatusText
             ]);
         AddSection(
             lines,
-            "Tokens",
+            "Tokens - cumulative",
+            [
+                ("Input tokens", TokenValue(status.CumulativeUsage?.InputTokenCount)),
+                ("Output tokens", TokenValue(status.CumulativeUsage?.OutputTokenCount)),
+                ("Total tokens", TokenValue(status.CumulativeUsage?.TotalTokenCount))
+            ]);
+        AddSection(
+            lines,
+            "Current context",
             [
                 ("Window", Number(status.ContextWindow)),
-                ("Context", ContextValue(status.Usage?.TotalTokenCount, status.ContextWindow)),
-                ("Input tokens", TokenValue(status.Usage?.InputTokenCount)),
-                ("Output tokens", TokenValue(status.Usage?.OutputTokenCount)),
-                ("Total tokens", TokenValue(status.Usage?.TotalTokenCount))
+                ("Usage", ContextValue(status.Usage?.TotalTokenCount, status.ContextWindow))
             ]);
         AddSection(
             lines,
@@ -54,6 +59,14 @@ internal static class StatusText
 
         if (full)
         {
+            AddSection(
+                lines,
+                "Latest request",
+                [
+                    ("Input tokens", TokenValue(status.Usage?.InputTokenCount)),
+                    ("Output tokens", TokenValue(status.Usage?.OutputTokenCount)),
+                    ("Total tokens", TokenValue(status.Usage?.TotalTokenCount))
+                ]);
             AddSection(
                 lines,
                 "Activity",

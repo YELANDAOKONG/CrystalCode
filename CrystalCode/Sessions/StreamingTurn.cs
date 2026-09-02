@@ -186,7 +186,13 @@ public sealed class StreamingTurn
         List<ChatItem> transcript)
     {
         ReconcilePendingToolCalls(transcript);
-        return new(stopReason, modelCallCount, toolCallCount, usage.Last, transcript);
+        return new(
+            stopReason,
+            modelCallCount,
+            toolCallCount,
+            usage.Last,
+            transcript,
+            usage.Build());
     }
 
     private static void ReconcilePendingToolCalls(List<ChatItem> transcript)

@@ -757,7 +757,8 @@ public sealed class CodingSession
                 EstimatedTokensEnabled: _settings.EstimatedTokens,
                 PlanTools: _planExecutor.Definitions.Count,
                 WorkTools: _workExecutor.Definitions.Count,
-                ExternalTools: _external.Tools.Count),
+                ExternalTools: _external.Tools.Count,
+                CumulativeUsage: _ledger.CumulativeUsage),
             full);
     }
 
@@ -1005,7 +1006,8 @@ public sealed class CodingSession
             UserTurns = _ledger.UserTurns,
             ModelCalls = _ledger.ModelCalls,
             ToolCalls = _ledger.ToolCalls,
-            Usage = SessionMapper.WriteUsage(_ledger.Usage)
+            Usage = SessionMapper.WriteUsage(_ledger.Usage),
+            CumulativeUsage = SessionMapper.WriteUsage(_ledger.CumulativeUsage)
         };
 
     private void BeginNewSession()
@@ -1114,7 +1116,8 @@ public sealed class CodingSession
             Math.Max(0, document.UserTurns),
             Math.Max(0, document.ModelCalls),
             Math.Max(0, document.ToolCalls),
-            SessionMapper.ReadUsage(document.Usage));
+            SessionMapper.ReadUsage(document.Usage),
+            SessionMapper.ReadUsage(document.CumulativeUsage));
         _queue.Clear();
         BindReviewConversation();
         RebuildExecutors();

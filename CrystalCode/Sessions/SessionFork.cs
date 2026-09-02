@@ -27,7 +27,8 @@ internal static class SessionFork
             UserTurns = Math.Max(0, source.UserTurns),
             ModelCalls = Math.Max(0, source.ModelCalls),
             ToolCalls = Math.Max(0, source.ToolCalls),
-            Usage = CloneUsage(source.Usage)
+            Usage = CloneUsage(source.Usage),
+            CumulativeUsage = CloneUsage(source.CumulativeUsage)
         };
     }
 

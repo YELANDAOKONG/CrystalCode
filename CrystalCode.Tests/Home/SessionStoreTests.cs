@@ -61,6 +61,12 @@ public sealed class SessionStoreTests
                     OutputTokenCount = 80,
                     ReasoningTokenCount = 12
                 },
+                CumulativeUsage = new SessionUsageDocument
+                {
+                    InputTokenCount = 4000,
+                    OutputTokenCount = 300,
+                    ReasoningTokenCount = 50
+                },
                 Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "hi" }]
             });
 
@@ -72,6 +78,10 @@ public sealed class SessionStoreTests
         Assert.Equal(1200, loaded.Usage.InputTokenCount);
         Assert.Equal(80, loaded.Usage.OutputTokenCount);
         Assert.Equal(12, loaded.Usage.ReasoningTokenCount);
+        Assert.NotNull(loaded.CumulativeUsage);
+        Assert.Equal(4000, loaded.CumulativeUsage.InputTokenCount);
+        Assert.Equal(300, loaded.CumulativeUsage.OutputTokenCount);
+        Assert.Equal(50, loaded.CumulativeUsage.ReasoningTokenCount);
     }
 
     [Fact]

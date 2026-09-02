@@ -22,7 +22,8 @@ public sealed class SessionForkTests
             UserTurns = 3,
             ModelCalls = 4,
             ToolCalls = 5,
-            Usage = new SessionUsageDocument { InputTokenCount = 10, OutputTokenCount = 2 }
+            Usage = new SessionUsageDocument { InputTokenCount = 10, OutputTokenCount = 2 },
+            CumulativeUsage = new SessionUsageDocument { InputTokenCount = 30, OutputTokenCount = 6 }
         };
         var created = DateTimeOffset.Parse("2026-02-01T00:00:00Z");
 
@@ -39,8 +40,10 @@ public sealed class SessionForkTests
         Assert.Equal("hello", fork.Items[0].Text);
         Assert.Equal("work", fork.Todos[0].Content);
         Assert.Equal(10, fork.Usage?.InputTokenCount);
+        Assert.Equal(30, fork.CumulativeUsage?.InputTokenCount);
         Assert.NotSame(source.Items[0], fork.Items[0]);
         Assert.NotSame(source.Todos[0], fork.Todos[0]);
         Assert.NotSame(source.Usage, fork.Usage);
+        Assert.NotSame(source.CumulativeUsage, fork.CumulativeUsage);
     }
 }

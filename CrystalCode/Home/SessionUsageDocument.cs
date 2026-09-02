@@ -1,7 +1,7 @@
 namespace CrystalCode.Home;
 
 /// <summary>
-/// Last provider-reported token usage persisted with a session.
+/// Provider-reported token usage persisted with a session.
 /// </summary>
 public sealed class SessionUsageDocument
 {

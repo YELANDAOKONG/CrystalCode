@@ -35,7 +35,8 @@ public sealed class StatusTextTests
             EstimatedTokensEnabled: false,
             PlanTools: 7,
             WorkTools: 8,
-            ExternalTools: 2);
+            ExternalTools: 2,
+            CumulativeUsage: new TokenUsage(1_000, 200));
 
         var text = StatusText.Format(status, full: true);
 
@@ -46,8 +47,9 @@ public sealed class StatusTextTests
         Assert.Contains("Thinking  Medium", text, StringComparison.Ordinal);
         Assert.Contains("Prompt set  focused", text, StringComparison.Ordinal);
         Assert.Contains("Provider  openai", text, StringComparison.Ordinal);
-        Assert.Contains("Context        120 / 1,000 (12%)", text, StringComparison.Ordinal);
-        Assert.Contains("Total tokens   120", text, StringComparison.Ordinal);
+        Assert.Contains("Usage   120 / 1,000 (12%)", text, StringComparison.Ordinal);
+        Assert.Contains("Total tokens   1,200", text, StringComparison.Ordinal);
+        Assert.Contains("Latest request", text, StringComparison.Ordinal);
         Assert.Contains("Model calls      4", text, StringComparison.Ordinal);
         Assert.Contains("External loaded  2", text, StringComparison.Ordinal);
     }
@@ -77,12 +79,13 @@ public sealed class StatusTextTests
             false,
             4,
             6,
-            0);
+            0,
+            null);
 
         var text = StatusText.Format(status, full: false);
 
         Assert.Contains("Thinking  Unavailable", text, StringComparison.Ordinal);
-        Assert.Contains("Context        -- / 128,000", text, StringComparison.Ordinal);
+        Assert.Contains("Usage   -- / 128,000", text, StringComparison.Ordinal);
         Assert.Contains("Input tokens   --", text, StringComparison.Ordinal);
         Assert.Contains("External tools    Off", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Activity", text, StringComparison.Ordinal);
@@ -114,7 +117,8 @@ public sealed class StatusTextTests
             true,
             5,
             8,
-            2);
+            2,
+            null);
 
         var lines = WidgetPaint.Lines(StatusWidget.Create(status, full: true), 72);
 
@@ -152,13 +156,15 @@ public sealed class StatusTextTests
             false,
             5,
             8,
-            2);
+            2,
+            new TokenUsage(500, 50));
 
         var text = string.Join('\n', WidgetPaint.Plain(StatusWidget.Create(status, full: false), 88));
 
         Assert.Contains("|##--------------|", text, StringComparison.Ordinal);
         Assert.Contains("Window", text, StringComparison.Ordinal);
         Assert.Contains("12%", text, StringComparison.Ordinal);
+        Assert.Contains("550", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Activity", text, StringComparison.Ordinal);
     }
 }

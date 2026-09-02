@@ -26,4 +26,6 @@ public sealed class SessionDocument
     public int ToolCalls { get; set; }
 
     public SessionUsageDocument? Usage { get; set; }
+
+    public SessionUsageDocument? CumulativeUsage { get; set; }
 }

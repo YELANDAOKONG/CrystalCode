@@ -113,6 +113,9 @@ public sealed class StreamingTurnTests
         Assert.Equal(10, observer.UsageUpdates[^1]?.OutputTokenCount);
         Assert.Equal(20, result.Usage?.InputTokenCount);
         Assert.Equal(10, result.Usage?.OutputTokenCount);
+        Assert.Equal(30, result.AccumulatedUsage?.InputTokenCount);
+        Assert.Equal(15, result.AccumulatedUsage?.OutputTokenCount);
+        Assert.Equal(6, result.AccumulatedUsage?.ReasoningTokenCount);
         var calls = Assert.Single(observer.ToolCallBatches);
         Assert.Equal("c1", Assert.Single(calls).CallId);
         Assert.Equal("echo", calls[0].Name);
