@@ -53,9 +53,10 @@ operator surface and the only entry. It can:
   Anthropic Messages adapters, including user-added gateways;
 - register built-in tools and providers through an in-process plugin table.
 
-## Current exclusions
+## Deferred product work
 
-The current product does not include:
+The following capabilities are part of the product direction but are not yet
+implemented in the current build:
 
 - loading `IPlugin` assemblies from `~/.crystal/plugins/`;
 - parent/child Agents through `Crystal.Harness.AgentHarness`;
@@ -66,7 +67,10 @@ The current product does not include:
   Completions, OpenAI Responses, and Anthropic Messages;
 - multimodal coding (images, audio, video).
 
-Those remain later product work. Do not reserve empty public types for them.
+They were deferred until the product had a concrete use case and enough runtime
+infrastructure to support them safely; they are not excluded from the product.
+Implement each capability only when its behavior and ownership are defined, and
+do not reserve empty public types in advance.
 
 ## Relationship to Crystal
 

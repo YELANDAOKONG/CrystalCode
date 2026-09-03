@@ -27,7 +27,7 @@ Exec may use stdin, argv, or both. Dotnet does not use stdin or argv.
 | `IPlugin` / `PluginRegistry` | First-party in-process contributions (built-in tools, DeepSeek, OpenAI). Unchanged. |
 | `~/.crystal/plugins/` | Reserved. External tools do not live there and do not implement `IPlugin`. |
 | Skills | Markdown instructions loaded through the `skill` tool. They do not become extra `ITool` entries. |
-| MCP | A product exclusion. |
+| MCP | A separate, deferred integration; it is not an external-tool runner. |
 
 First-party code contributions stay on `PluginRegistry`. Operator tools
 are discovered as tool sets. Dotnet runners load **class libraries from

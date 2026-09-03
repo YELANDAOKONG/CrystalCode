@@ -134,8 +134,11 @@ session owns that client and may replace it on `/model`. It does
 not use `Crystal.Agents.Agent` for the live UI: that Agent completes model
 turns without token streaming.
 
-The product does not use `Crystal.Harness.AgentHarness` until it has a real
-parent/child Agent topology.
+The live session does not yet use `Crystal.Harness.AgentHarness`. Parent/child
+Agent composition is deferred product work; when that topology is implemented,
+the host consumes `AgentHarness` for named invocation ancestry and shared
+budgets while retaining ownership of prompts, tools, approval, persistence, and
+the terminal projection.
 
 Approval is a `ToolInvocationPolicy` supplied to `ToolExecutor`. Rejection
 returns Harness-authored `ToolOutput`. Tool exceptions become model-visible

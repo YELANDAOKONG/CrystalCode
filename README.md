@@ -64,12 +64,13 @@ PATH.
 Open a new terminal after installation, then run `crystal` on Linux or macOS,
 or `CrystalCode` on Windows.
 
-## What it does not do
+## Not yet implemented
 
-The current product does not include MCP servers, a headless CI runner,
-an operating-system sandbox, parent/child Agents, multimodal coding
-(images, audio, video), or provider protocols other than DeepSeek and
-OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages.
+The following planned capabilities are not yet implemented in the current
+build: MCP servers, a headless CI runner, an operating-system sandbox,
+parent/child Agents, multimodal coding (images, audio, video), and provider
+protocols other than DeepSeek and OpenAI-compatible Chat Completions, OpenAI
+Responses, and Anthropic Messages.
 
 ## Requirements
 
