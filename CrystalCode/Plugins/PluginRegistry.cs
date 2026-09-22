@@ -1,4 +1,6 @@
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
+using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 using CrystalCode.Configuration;
 using CrystalCode.Plugins.Interfaces;
@@ -117,6 +119,42 @@ public sealed class PluginRegistry
         return tools;
     }
 
+    public IReadOnlyList<IMultimodalTool> CreateMultimodalTools(
+        Workspace workspace,
+        TodoList todos,
+        IUserPrompt prompt,
+        bool plan)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(todos);
+        ArgumentNullException.ThrowIfNull(prompt);
+        var tools = new List<IMultimodalTool>();
+        foreach (var contribution in _tools)
+        {
+            if (plan && !contribution.IncludeInPlan)
+            {
+                continue;
+            }
+
+            var tool = contribution.CreateMultimodal(workspace, todos, prompt);
+            if (tool is not null)
+            {
+                if (!string.Equals(
+                        tool.Definition.Name,
+                        contribution.Name,
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Multimodal tool '{tool.Definition.Name}' must match contribution '{contribution.Name}'.");
+                }
+
+                tools.Add(tool);
+            }
+        }
+
+        return tools;
+    }
+
     public IStreamingChatClient CreateClient(HarnessSettings settings, string apiKey)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -132,6 +170,29 @@ public sealed class PluginRegistry
 
         throw new NotSupportedException(
             $"Provider protocol '{protocol.Value}' is not supported.");
+    }
+
+    public IStreamingMultimodalChatClient? CreateMultimodalClient(
+        HarnessSettings settings,
+        string apiKey)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (!settings.ActiveModel.ImageInput)
+        {
+            return null;
+        }
+
+        var protocol = settings.ActiveProvider.Protocol;
+        foreach (var factory in _clients)
+        {
+            if (factory.CanCreate(protocol))
+            {
+                return factory.CreateMultimodal(settings, apiKey);
+            }
+        }
+
+        return null;
     }
 
     public ISlashCommand? FindCommand(string name)

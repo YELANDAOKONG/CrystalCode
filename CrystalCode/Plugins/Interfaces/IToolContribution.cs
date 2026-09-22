@@ -1,4 +1,5 @@
 using Crystal.Tools;
+using Crystal.Multimodal.Tools;
 using CrystalCode.Tools;
 
 namespace CrystalCode.Plugins.Interfaces;
@@ -13,4 +14,9 @@ public interface IToolContribution
     bool IncludeInPlan { get; }
 
     ITool Create(Workspace workspace, TodoList todos, IUserPrompt prompt);
+
+    IMultimodalTool? CreateMultimodal(
+        Workspace workspace,
+        TodoList todos,
+        IUserPrompt prompt) => null;
 }

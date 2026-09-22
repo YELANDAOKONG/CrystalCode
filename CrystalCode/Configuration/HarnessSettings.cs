@@ -114,7 +114,7 @@ public sealed record HarnessSettings
         var catalog = ProviderCatalog.CreateStarter();
         return new HarnessSettings(
             ProviderName.DeepSeek,
-            "deepseek-v4-flash",
+            "deepseek-flash",
             ApprovalMode.Default,
             DefaultCompactionThreshold,
             catalog);

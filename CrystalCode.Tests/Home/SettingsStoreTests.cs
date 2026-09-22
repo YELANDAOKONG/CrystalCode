@@ -18,7 +18,7 @@ public sealed class SettingsStoreTests
         var settings = store.LoadOrCreate();
 
         Assert.Equal(ProviderName.DeepSeek, settings.Provider);
-        Assert.Equal("deepseek-v4-flash", settings.Model);
+        Assert.Equal("deepseek-flash", settings.Model);
         Assert.Equal(1_000_000, settings.ActiveModel.ContextWindow);
         Assert.True(settings.ActiveModel.Thinking);
         Assert.Equal(["low", "high", "maximum"], settings.ActiveModel.ThinkingEfforts);

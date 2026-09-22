@@ -69,7 +69,8 @@ transcript log, and queue card. Does not reference the host executable.
 ### CrystalCode.Providers
 
 Model adapters. Each adapter implements `IChatClient` and, when the provider
-can stream, `IStreamingChatClient`. Provider options, wire DTOs, and
+can stream, `IStreamingChatClient`. Image-capable adapters additionally
+implement `IStreamingMultimodalChatClient`. Provider options, wire DTOs, and
 transport exceptions stay in this assembly. No tools, no UI, no home-directory
 layout.
 
@@ -129,8 +130,11 @@ with no version. Provider SDKs are not used.
 
 ## Crystal consumption
 
-The interactive turn uses `IStreamingChatClient` and `ToolExecutor`. The
-session owns that client and may replace it on `/model`. It does
+The interactive turn uses `IStreamingChatClient` and `ToolExecutor`. When the
+selected model declares `imageInput` and its adapter supports it, the session
+uses `IStreamingMultimodalChatClient` and a host executor that preserves the
+same approval policy. The session owns those clients and may replace them on
+`/model`. It does
 not use `Crystal.Agents.Agent` for the live UI: that Agent completes model
 turns without token streaming.
 
@@ -143,6 +147,28 @@ the terminal projection.
 Approval is a `ToolInvocationPolicy` supplied to `ToolExecutor`. Rejection
 returns Harness-authored `ToolOutput`. Tool exceptions become model-visible
 only through a Harness `ToolExceptionMapper`.
+
+### Image input boundary
+
+CrystalCode owns terminal image attachment, MIME signature validation,
+session persistence, transcript markers, and projection onto Crystal's typed
+multimodal contracts. `[Image #N]` is presentation and persistence metadata;
+providers receive typed `ImageContent`, never a marker in place of its bytes.
+Inline image bytes and absolute image URIs are supported. Images returned by
+an in-process plugin's optional `IMultimodalTool` path are assigned the same
+markers and become input on the following model round.
+
+The Responses adapter and DeepSeek Chat Completions adapter accept text and
+image input and emit only text, reasoning, and tool-call events. DeepSeek
+images are restricted to user and tool messages, matching its wire contract.
+A model must opt in with `imageInput: true`; unsupported combinations are
+rejected before sending a request. Audio/video input and non-text model output
+are TODO. MCP media transport is TODO.
+
+CrystalCode does not capture screenshots, control browsers, phones, virtual
+machines, interpret coordinates, or define frame/device protocols. External
+plugins own those behaviors and may return ordinary typed images through the
+generic tool boundary.
 
 ## Session and turn
 
@@ -162,7 +188,8 @@ One user message is one turn:
    overflow are not retried. User cancel still interrupts immediately.
 3. Select candidate zero.
 4. If the candidate has tool calls, execute the full batch through
-   `ToolExecutor` (approval runs first).
+   `ToolExecutor`, or the multimodal bridge for an image-capable turn
+   (approval runs first in either case).
 5. Append exact `ToolResult` values.
 6. Repeat until the candidate has no tool calls, a configured limit stops
    the turn, or the user cancels. Before each model round, compact if the
@@ -768,7 +795,10 @@ sequential.
 ## Plugins
 
 `IPlugin` contributes tools, chat-client factories, approval classifiers, or
-slash commands through `PluginContribution`. Built-in tools and all four wire
+slash commands through `PluginContribution`. A tool contribution always has a
+text `ITool` implementation and may additionally provide an `IMultimodalTool`
+with the same definition name; the latter may return generic image content
+while reusing the host approval policy. Built-in tools and all four wire
 protocol adapters register through the same table. `PluginRegistry` does
 not load assemblies from disk. `~/.crystal/plugins/` stays reserved.
 

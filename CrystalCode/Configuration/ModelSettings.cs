@@ -12,7 +12,8 @@ public sealed record ModelSettings
         double? topP = null,
         int? maxTokens = null,
         bool thinking = false,
-        IReadOnlyList<string>? thinkingEfforts = null)
+        IReadOnlyList<string>? thinkingEfforts = null,
+        bool imageInput = false)
     {
         if (contextWindow <= 0)
         {
@@ -52,6 +53,7 @@ public sealed record ModelSettings
         MaxTokens = maxTokens;
         Thinking = thinking;
         ThinkingEfforts = NormalizeEfforts(thinking, thinkingEfforts);
+        ImageInput = imageInput;
     }
 
     public int ContextWindow { get; }
@@ -65,6 +67,9 @@ public sealed record ModelSettings
     public bool Thinking { get; }
 
     public IReadOnlyList<string> ThinkingEfforts { get; }
+
+    /// <summary>Gets whether the configured model accepts image input.</summary>
+    public bool ImageInput { get; }
 
     public bool AllowsEffort(string effort)
     {

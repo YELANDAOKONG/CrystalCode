@@ -47,6 +47,19 @@ public sealed class ComposerBufferTests
     }
 
     [Fact]
+    public void Handle_CtrlVRequestsImagePasteWithoutChangingText()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("inspect ");
+        var key = new ConsoleKeyInfo('\x16', ConsoleKey.V, false, false, true);
+
+        var action = buffer.Handle(key);
+
+        Assert.Equal(ComposerAction.PasteImage, action);
+        Assert.Equal("inspect ", buffer.Text);
+    }
+
+    [Fact]
     public void Handle_WordNavigationAndDeletion()
     {
         var buffer = new ComposerBuffer();

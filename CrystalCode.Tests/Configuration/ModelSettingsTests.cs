@@ -60,4 +60,20 @@ public sealed class ModelSettingsTests
         Assert.True(model.AllowsEffort("max"));
         Assert.True(model.AllowsEffort("maximum"));
     }
+
+    [Fact]
+    public void Constructor_DefaultsImageInputToFalse()
+    {
+        var model = new ModelSettings(1000);
+
+        Assert.False(model.ImageInput);
+    }
+
+    [Fact]
+    public void Constructor_PreservesImageInputCapability()
+    {
+        var model = new ModelSettings(1000, imageInput: true);
+
+        Assert.True(model.ImageInput);
+    }
 }

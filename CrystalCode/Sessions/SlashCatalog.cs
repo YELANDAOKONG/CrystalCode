@@ -30,6 +30,7 @@ public static class SlashCatalog
         new(SessionVerb.Compact, "compact", ["summarize"], "Summarize older context now"),
         new(SessionVerb.Todos, "todos", ["todo"], "Show the full session todo list"),
         new(SessionVerb.Tools, "tools", [], "List tools or configure external tools"),
+        new(SessionVerb.Attach, "attach", ["image"], "Attach a workspace image"),
         new(SessionVerb.Export, "export", [], "Export markdown, json, or show usage"),
         new(SessionVerb.Quit, "quit", ["exit", "q"], "Exit")
     ];

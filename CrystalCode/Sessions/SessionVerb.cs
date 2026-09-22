@@ -23,6 +23,7 @@ public enum SessionVerb
     Compact,
     Todos,
     Tools,
+    Attach,
     Export,
     Verbose,
     Quit,

@@ -59,6 +59,11 @@ public sealed class ComposerBuffer
         var isAlt = key.Modifiers.HasFlag(ConsoleModifiers.Alt);
         var isCtrl = key.Modifiers.HasFlag(ConsoleModifiers.Control);
 
+        if (key.Key == ConsoleKey.V && isCtrl && !isAlt)
+        {
+            return ComposerAction.PasteImage;
+        }
+
         switch (key.Key)
         {
             case ConsoleKey.Backspace when ComposerKeys.IsWordDeleteLeft(key):
