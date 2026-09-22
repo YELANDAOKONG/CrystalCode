@@ -24,7 +24,13 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var profile = new CompatibleProfile(
+        _client = new CompatibleChatClient(CreateProfile(options), options.ToCompatibleOptions(), httpClient);
+    }
+
+    internal static CompatibleProfile CreateProfile(OpenAIOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new CompatibleProfile(
             vendorName: options.VendorName,
             chatCompletionsPath: CompatibleWire.ChatCompletionsPath,
             reasoningStateFormat: ReasoningStateFormat,
@@ -39,8 +45,6 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
                 typeof(OpenAIException),
                 static (message, statusCode, inner, errorCode, retryAfter) =>
                     new OpenAIException(message, statusCode, inner, errorCode, retryAfter)));
-
-        _client = new CompatibleChatClient(profile, options.ToCompatibleOptions(), httpClient);
     }
 
     /// <inheritdoc />

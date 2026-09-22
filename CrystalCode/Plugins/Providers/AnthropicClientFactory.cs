@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
 using CrystalCode.Configuration;
 using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Providers.Anthropic;
@@ -20,6 +21,25 @@ public sealed class AnthropicClientFactory : IChatClientFactory
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new AnthropicProvider(
+            new AnthropicOptions(
+                apiKey,
+                settings.Model,
+                provider.BaseUri,
+                model.Temperature,
+                model.TopP,
+                model.MaxTokens,
+                provider.Name.Value));
+    }
+
+    public IStreamingMultimodalChatClient CreateMultimodal(
+        HarnessSettings settings,
+        string apiKey)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        var provider = settings.ActiveProvider;
+        var model = settings.ActiveModel;
+        return new AnthropicMultimodalProvider(
             new AnthropicOptions(
                 apiKey,
                 settings.Model,

@@ -10,6 +10,48 @@ namespace CrystalCode.Tests.Configuration;
 
 public sealed class ChatClientFactoryTests
 {
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("anthropic")]
+    public void CreateMultimodal_UsesConfiguredImageAdapter(string protocolText)
+    {
+        var protocol = ProviderProtocol.Parse(protocolText);
+        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        [
+            new ProviderDefinition(
+                new ProviderName("gateway"),
+                protocol,
+                new Uri("https://example.test/v1/"),
+                new Dictionary<string, ModelSettings>
+                {
+                    ["model"] = new(200000, imageInput: true)
+                })
+        ]);
+        var settings = new HarnessSettings(
+            new ProviderName("gateway"),
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            catalog);
+
+        var client = MultimodalChatClientFactory.Create(settings, "test-key");
+        try
+        {
+            if (protocol == ProviderProtocol.OpenAI)
+            {
+                Assert.IsType<OpenAIMultimodalProvider>(client);
+            }
+            else
+            {
+                Assert.IsType<AnthropicMultimodalProvider>(client);
+            }
+        }
+        finally
+        {
+            (client as IDisposable)?.Dispose();
+        }
+    }
+
     [Fact]
     public void Create_UsesOpenAIAdapterForCompatibleProtocol()
     {

@@ -160,12 +160,15 @@ are assigned the same markers and become input on the following model round.
 Dotnet multimodal tools are omitted from active catalogs when the selected
 model or provider does not support image input.
 
-The Responses adapter and DeepSeek Chat Completions adapter accept text and
-image input and emit only text, reasoning, and tool-call events. DeepSeek
-images are restricted to user and tool messages, matching its wire contract.
-A model must opt in with `imageInput: true`; unsupported combinations are
-rejected before sending a request. Audio/video input and non-text model output
-are TODO. MCP media transport is TODO.
+The Responses, OpenAI-compatible Chat Completions, DeepSeek Chat Completions,
+and Anthropic Messages adapters accept text and image input and emit only text,
+reasoning, and tool-call events. Chat Completions and Anthropic images are
+restricted to user and tool messages, matching their wire contracts. Clipboard
+image input is read through Windows PowerShell on Windows, `pngpaste` on macOS,
+and `wl-paste` or `xclip` on Linux; it does not capture the screen. A model must
+opt in with `imageInput: true`; unsupported combinations are rejected before
+sending a request. Audio/video input and non-text model output are TODO. MCP
+media transport is TODO.
 
 CrystalCode does not capture screenshots, control browsers, phones, virtual
 machines, interpret coordinates, or define frame/device protocols. External

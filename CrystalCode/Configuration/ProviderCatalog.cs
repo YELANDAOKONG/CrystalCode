@@ -52,9 +52,9 @@ public sealed class ProviderCatalog
                 new Uri("https://api.openai.com/v1/"),
                 new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
                 {
-                    ["gpt-5.6-sol"] = new(400_000),
-                    ["gpt-5.6-terra"] = new(400_000),
-                    ["gpt-5.6-luna"] = new(400_000)
+                    ["gpt-5.6-sol"] = new(400_000, imageInput: true),
+                    ["gpt-5.6-terra"] = new(400_000, imageInput: true),
+                    ["gpt-5.6-luna"] = new(400_000, imageInput: true)
                 })
         ]);
     }

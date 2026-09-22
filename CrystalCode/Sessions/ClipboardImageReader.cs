@@ -12,13 +12,14 @@ public static class ClipboardImageReader
         int number,
         CancellationToken cancellationToken)
     {
-        if (!OperatingSystem.IsLinux())
+        var commands = Commands();
+        if (commands.Count == 0)
         {
             return (null,
-                "Clipboard image paste is currently available on Linux with wl-paste or xclip. Use /attach on this platform.");
+                "Clipboard image paste is not available on this operating system. Use /attach <workspace-image-path>.");
         }
 
-        foreach (var command in Commands())
+        foreach (var command in commands)
         {
             var data = await TryRunAsync(command.FileName, command.Arguments, cancellationToken);
             if (data is not { Length: > 0 })
@@ -33,15 +34,60 @@ public static class ClipboardImageReader
             }
         }
 
-        return (null,
-            "No clipboard image was found. Install wl-paste or xclip, or use /attach <workspace-image-path>.");
+        return (null, FailureMessage());
     }
 
-    private static IReadOnlyList<(string FileName, string[] Arguments)> Commands() =>
-    [
-        ("wl-paste", ["--no-newline", "--type", "image/png"]),
-        ("xclip", ["-selection", "clipboard", "-t", "image/png", "-o"])
-    ];
+    private static IReadOnlyList<(string FileName, string[] Arguments)> Commands()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            const string script =
+                "Add-Type -AssemblyName System.Windows.Forms; "
+                + "Add-Type -AssemblyName System.Drawing; "
+                + "$image=[Windows.Forms.Clipboard]::GetImage(); "
+                + "if ($null -eq $image) { exit 1 }; "
+                + "$stream=[IO.MemoryStream]::new(); "
+                + "try { $image.Save($stream,[Drawing.Imaging.ImageFormat]::Png); "
+                + "[Console]::OpenStandardOutput().Write($stream.GetBuffer(),0,[int]$stream.Length) } "
+                + "finally { $stream.Dispose(); $image.Dispose() }";
+            return
+            [
+                ("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", script]),
+                ("pwsh.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", script])
+            ];
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return [("pngpaste", ["-"])];
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return
+            [
+                ("wl-paste", ["--no-newline", "--type", "image/png"]),
+                ("xclip", ["-selection", "clipboard", "-t", "image/png", "-o"])
+            ];
+        }
+
+        return [];
+    }
+
+    private static string FailureMessage()
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            return "No clipboard image was found. Install pngpaste, or use /attach <workspace-image-path>.";
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return "No clipboard image was found. Install wl-paste or xclip, or use /attach <workspace-image-path>.";
+        }
+
+        return "No clipboard image was found. Use /attach <workspace-image-path>.";
+    }
 
     private static async Task<byte[]?> TryRunAsync(
         string fileName,

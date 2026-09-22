@@ -249,7 +249,7 @@ HTTP and JSON/SSE handling; no provider SDK is required.
 | `maxTokens` | Optional positive output-token cap |
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Crystal effort names this model accepts: `minimal`, `low`, `medium`, `high`, `maximum` (`max` is stored as `maximum`) |
-| `imageInput` | Whether this model may receive images (default `false`; supported by `deepseek` and `responses`) |
+| `imageInput` | Whether this model may receive images (default `false`; supported by `openai`, `deepseek`, `responses`, and `anthropic`) |
 
 `thinkingEffort` is a host setting, not a model field. Changing
 models never fails: if the model does not support thinking, requests
@@ -327,7 +327,8 @@ families use different wire protocols:
           "contextWindow": 1000000,
           "maxTokens": 128000,
           "thinking": true,
-          "thinkingEfforts": ["low", "medium", "high", "maximum"]
+          "thinkingEfforts": ["low", "medium", "high", "maximum"],
+          "imageInput": true
         }
       }
     }
@@ -339,10 +340,12 @@ Keep Chat Completions models in a separate `protocol: "openai"` provider entry.
 
 ## Interactive session
 
-For a DeepSeek or Responses model configured with `imageInput: true`, run
-`/attach <workspace-image-path>` and enter the prompt, or press Ctrl+V when a
-Linux clipboard provider (`wl-paste` or `xclip`) is installed. The composer and
-transcript show `[Image #N]`; raw image data is kept out of rendered text.
+For an OpenAI Chat Completions, DeepSeek, Responses, or Anthropic model
+configured with `imageInput: true`, run `/attach <workspace-image-path>` and
+enter the prompt, or press Ctrl+V to attach an image from the clipboard.
+Clipboard image paste uses Windows PowerShell on Windows, `pngpaste` on macOS,
+and `wl-paste` or `xclip` on Linux. The composer and transcript show
+`[Image #N]`; raw image data is kept out of rendered text.
 PNG, JPEG, GIF, and WebP input is accepted up to 20 MiB per image. Optional
 multimodal plugin tools may return generic Crystal `ImageContent`, which is
 fed into the next model round. Screenshot capture, device/browser/VM control,
