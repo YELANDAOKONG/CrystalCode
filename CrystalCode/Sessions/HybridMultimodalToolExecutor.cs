@@ -7,7 +7,7 @@ using CrystalCode.Tools;
 namespace CrystalCode.Sessions;
 
 /// <summary>
-/// Executes optional image-producing plugin tools and delegates all other calls
+/// Executes optional image-producing tools and delegates all other calls
 /// to the existing approved text executor.
 /// </summary>
 public sealed class HybridMultimodalToolExecutor : IMultimodalToolExecutor
@@ -39,7 +39,19 @@ public sealed class HybridMultimodalToolExecutor : IMultimodalToolExecutor
         }
 
         _tools = registered;
-        Definitions = textExecutor.Definitions;
+        var definitions = new List<ToolDefinition>(textExecutor.Definitions);
+        var names = new HashSet<string>(
+            definitions.Select(static definition => definition.Name),
+            StringComparer.Ordinal);
+        foreach (var tool in registered.Values)
+        {
+            if (names.Add(tool.Definition.Name))
+            {
+                definitions.Add(tool.Definition);
+            }
+        }
+
+        Definitions = definitions.AsReadOnly();
     }
 
     public IReadOnlyList<ToolDefinition> Definitions { get; }

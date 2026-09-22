@@ -101,7 +101,9 @@ are never prompt overlays. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the
 `skill` tool when enabled. Operator tool sets live under `tools/` in
 the home and project `.crystal` trees and are loaded as extra `ITool`
-entries when External Tools is enabled. Whether each source's author
+or `IMultimodalTool` entries when External Tools is enabled. Native
+multimodal entries are exposed only while the selected model and provider
+support image input. Whether each source's author
 approval declarations take effect is stored under `externalToolApproval`
 in `config.json`. The application never writes
 secrets into the workspace.

@@ -111,7 +111,12 @@ public sealed class MultimodalStreamingTurnTests
                     [
                         new TextContent("rendered"),
                         new ImageContent(new ImageMedia(
-                            new InlineMediaSource(new byte[] { 1, 2, 3 }),
+                            new InlineMediaSource(
+                                new byte[]
+                                {
+                                    0x89, 0x50, 0x4e, 0x47,
+                                    0x0d, 0x0a, 0x1a, 0x0a
+                                }),
                             new MediaMimeType("image/png")))
                     ])
             ];

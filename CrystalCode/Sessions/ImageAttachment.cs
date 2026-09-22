@@ -28,8 +28,23 @@ public sealed record ImageAttachment
                 nameof(data));
         }
 
+        var detectedMimeType = ImageFile.DetectMimeType(data.Span);
+        if (detectedMimeType is null)
+        {
+            throw new ArgumentException(
+                "Image data is not a supported PNG, JPEG, GIF, or WebP image.",
+                nameof(data));
+        }
+
+        if (!string.Equals(mimeType, detectedMimeType, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Image MIME type does not match the image data.",
+                nameof(mimeType));
+        }
+
         Number = number;
-        MimeType = mimeType;
+        MimeType = detectedMimeType;
         _data = data.ToArray();
     }
 

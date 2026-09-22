@@ -1149,14 +1149,20 @@ public sealed class CodingSession
 
     private void ShowTools()
     {
+        var planDefinitions = _multimodalClient is null
+            ? _planExecutor.Definitions
+            : _planMultimodalExecutor.Definitions;
+        var workDefinitions = _multimodalClient is null
+            ? _workExecutor.Definitions
+            : _workMultimodalExecutor.Definitions;
         var fallback = ToolListText.Format(
-            _planExecutor.Definitions,
-            _workExecutor.Definitions,
+            planDefinitions,
+            workDefinitions,
             _external,
             _settings);
         var widget = ToolListWidget.Create(
-            _planExecutor.Definitions,
-            _workExecutor.Definitions,
+            planDefinitions,
+            workDefinitions,
             _external,
             _settings);
         _renderer.WriteNote(widget, fallback);
@@ -1171,6 +1177,12 @@ public sealed class CodingSession
             return;
         }
 
+        var planToolCount = _multimodalClient is null
+            ? _planExecutor.Definitions.Count
+            : _planMultimodalExecutor.Definitions.Count;
+        var workToolCount = _multimodalClient is null
+            ? _workExecutor.Definitions.Count
+            : _workMultimodalExecutor.Definitions.Count;
         _renderer.WriteStatus(
             new SessionStatus(
                 SessionId: _sessionId,
@@ -1194,8 +1206,8 @@ public sealed class CodingSession
                 EstimatedTokensEnabled: _settings.EstimatedTokens,
                 VerboseToolsEnabled: _settings.VerboseTools,
                 VerboseCommandsEnabled: _settings.VerboseCommands,
-                PlanTools: _planExecutor.Definitions.Count,
-                WorkTools: _workExecutor.Definitions.Count,
+                PlanTools: planToolCount,
+                WorkTools: workToolCount,
                 ExternalTools: _external.Tools.Count,
                 CumulativeUsage: _ledger.CumulativeUsage,
                 CustomStatusLineEnabled: _settings.StatusLine.Enabled),
@@ -1732,20 +1744,34 @@ public sealed class CodingSession
             HarnessExceptionMapper.MapAsync);
         _workMultimodalExecutor = new HybridMultimodalToolExecutor(
             _workExecutor,
-            _plugins.CreateMultimodalTools(
-                _workspace,
-                _todos,
-                question,
-                plan: false),
+            CreateMultimodalTools(question, plan: false),
             policy);
         _planMultimodalExecutor = new HybridMultimodalToolExecutor(
             _planExecutor,
+            CreateMultimodalTools(question, plan: true),
+            policy);
+    }
+
+    private IReadOnlyList<IMultimodalTool> CreateMultimodalTools(
+        IUserPrompt prompt,
+        bool plan)
+    {
+        if (_multimodalClient is null)
+        {
+            return [];
+        }
+
+        var tools = new List<IMultimodalTool>(
             _plugins.CreateMultimodalTools(
                 _workspace,
                 _todos,
-                question,
-                plan: true),
-            policy);
+                prompt,
+                plan));
+        tools.AddRange(
+            plan
+                ? _external.PlanMultimodalTools
+                : _external.WorkMultimodalTools);
+        return tools;
     }
 
     private void ReloadSkills()

@@ -102,7 +102,7 @@ CrystalCode (executable):
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
-| `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` loaders |
+| `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` / `IMultimodalTool` loaders |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
@@ -155,8 +155,10 @@ session persistence, transcript markers, and projection onto Crystal's typed
 multimodal contracts. `[Image #N]` is presentation and persistence metadata;
 providers receive typed `ImageContent`, never a marker in place of its bytes.
 Inline image bytes and absolute image URIs are supported. Images returned by
-an in-process plugin's optional `IMultimodalTool` path are assigned the same
-markers and become input on the following model round.
+an in-process plugin or dotnet operator tool's native `IMultimodalTool` path
+are assigned the same markers and become input on the following model round.
+Dotnet multimodal tools are omitted from active catalogs when the selected
+model or provider does not support image input.
 
 The Responses adapter and DeepSeek Chat Completions adapter accept text and
 image input and emit only text, reasoning, and tool-call events. DeepSeek
@@ -807,8 +809,11 @@ wrapped by `ExternalCatalog`. A dotnet set uses one non-collectible
 `AssemblyLoadContext` for that directory only. Shared contract types
 (`Crystal`, `Crystal.Tools`, and already-loaded `System.*` /
 `Microsoft.*`) come from the host context that already loaded
-`Crystal.Tools`. That loader does not implement `IPlugin` and does not
-scan `plugins/`.
+`Crystal.Tools`. Public `ITool` and `IMultimodalTool` implementations are
+loaded directly. A type may implement either contract or both; when it
+implements both, both definitions must match. Native multimodal tools join
+the active catalog only for an image-capable model and provider. The loader
+does not implement `IPlugin` and does not scan `plugins/`.
 
 Environment variables:
 

@@ -17,7 +17,10 @@ public sealed class MultimodalTranscriptTests
     {
         var images = new Dictionary<int, ImageAttachment>
         {
-            [1] = new(1, "image/png", new byte[] { 1, 2, 3 })
+            [1] = new(
+                1,
+                "image/png",
+                new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a })
         };
 
         var converted = MultimodalTranscript.Convert(
@@ -29,7 +32,7 @@ public sealed class MultimodalTranscriptTests
         Assert.Equal("before ", Assert.IsType<TextContent>(message.Contents[0]).Text);
         var image = Assert.IsType<ImageContent>(message.Contents[1]);
         Assert.Equal(
-            new byte[] { 1, 2, 3 },
+            new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a },
             Assert.IsType<InlineMediaSource>(image.Image.Source).Data.ToArray());
         Assert.Equal(" after", Assert.IsType<TextContent>(message.Contents[2]).Text);
     }

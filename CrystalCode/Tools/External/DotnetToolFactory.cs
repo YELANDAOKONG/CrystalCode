@@ -1,12 +1,15 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Text.Json;
 
+using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
 namespace CrystalCode.Tools.External;
 
 /// <summary>
-/// Loads every public <see cref="ITool"/> from one framework-dependent assembly.
+/// Loads every public <see cref="ITool"/> or <see cref="IMultimodalTool"/>
+/// from one framework-dependent assembly.
 /// </summary>
 internal static class DotnetToolFactory
 {
@@ -19,6 +22,8 @@ internal static class DotnetToolFactory
         IList<string> notes,
         List<ITool> plan,
         List<ITool> work,
+        List<IMultimodalTool> planMultimodal,
+        List<IMultimodalTool> workMultimodal,
         Dictionary<string, ExternalToolSpec> classifications,
         Dictionary<string, ParsedToolSet> origins)
     {
@@ -28,6 +33,8 @@ internal static class DotnetToolFactory
         ArgumentNullException.ThrowIfNull(notes);
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(work);
+        ArgumentNullException.ThrowIfNull(planMultimodal);
+        ArgumentNullException.ThrowIfNull(workMultimodal);
         ArgumentNullException.ThrowIfNull(classifications);
         ArgumentNullException.ThrowIfNull(origins);
 
@@ -64,7 +71,10 @@ internal static class DotnetToolFactory
         }
 
         var overlays = set.Tools.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
-        var loaded = new List<(ITool Tool, ExternalToolSpec Spec)>();
+        var loaded = new List<(
+            ITool? Text,
+            IMultimodalTool? Multimodal,
+            ExternalToolSpec Spec)>();
         var claimed = new HashSet<string>(StringComparer.Ordinal);
         var types = SelectTypes(exported, set.Types, set.DirectoryName, notes);
         if (types is null)
@@ -74,12 +84,27 @@ internal static class DotnetToolFactory
 
         foreach (var type in types)
         {
-            if (!TryCreateTool(type, set.DirectoryName, notes, out var tool))
+            if (!TryCreateTool(
+                    type,
+                    set.DirectoryName,
+                    notes,
+                    out var textTool,
+                    out var multimodalTool))
             {
                 return false;
             }
 
-            var name = tool.Definition.Name;
+            var definition = textTool?.Definition ?? multimodalTool!.Definition;
+            if (textTool is not null
+                && multimodalTool is not null
+                && !DefinitionsMatch(textTool.Definition, multimodalTool.Definition))
+            {
+                notes.Add(
+                    $"External tool set '{set.DirectoryName}' was skipped: '{type.FullName}' exposes different text and multimodal definitions.");
+                return false;
+            }
+
+            var name = definition.Name;
             if (!ExternalToolNames.IsToolName(name))
             {
                 notes.Add(
@@ -106,19 +131,19 @@ internal static class DotnetToolFactory
             ExternalToolSpec spec;
             if (overlays.Remove(name, out var overlay))
             {
-                spec = WithDefinition(tool, overlay);
+                spec = WithDefinition(definition, overlay);
             }
             else
             {
                 spec = new ExternalToolSpec(
                     name,
-                    tool.Definition.Description ?? name,
-                    tool.Definition.InputSchema,
+                    definition.Description ?? name,
+                    definition.InputSchema,
                     set.Catalogs,
                     approval: set.Approval);
             }
 
-            loaded.Add((tool, spec));
+            loaded.Add((textTool, multimodalTool, spec));
         }
 
         if (overlays.Count > 0)
@@ -134,15 +159,37 @@ internal static class DotnetToolFactory
                 ? "none"
                 : string.Join(", ", exported.Select(type => type.FullName ?? type.Name));
             notes.Add(
-                $"External tool set '{set.DirectoryName}' was skipped: no public ITool types. Exported types: {listed}.");
+                $"External tool set '{set.DirectoryName}' was skipped: no public ITool or IMultimodalTool types. Exported types: {listed}.");
             return false;
         }
 
         foreach (var pair in loaded)
         {
             registered.Add(pair.Spec.Name);
-            var wrapped = new FencedExternalTool(pair.Tool, workspace, pair.Spec.PathArguments);
-            Add(set, pair.Spec, wrapped, plan, work, classifications, origins);
+            if (pair.Text is not null)
+            {
+                var wrapped = new FencedExternalTool(
+                    pair.Text,
+                    workspace,
+                    pair.Spec.PathArguments);
+                AddText(pair.Spec, wrapped, plan, work);
+            }
+
+            if (pair.Multimodal is not null)
+            {
+                var wrapped = new FencedExternalMultimodalTool(
+                    pair.Multimodal,
+                    workspace,
+                    pair.Spec.PathArguments);
+                AddMultimodal(
+                    pair.Spec,
+                    wrapped,
+                    planMultimodal,
+                    workMultimodal);
+            }
+
+            classifications[pair.Spec.Name] = pair.Spec;
+            origins[pair.Spec.Name] = set;
         }
 
         return true;
@@ -152,9 +199,11 @@ internal static class DotnetToolFactory
         Type type,
         string directoryName,
         IList<string> notes,
-        out ITool tool)
+        out ITool? textTool,
+        out IMultimodalTool? multimodalTool)
     {
-        tool = null!;
+        textTool = null;
+        multimodalTool = null;
         object? instance;
         try
         {
@@ -170,14 +219,15 @@ internal static class DotnetToolFactory
             return false;
         }
 
-        if (instance is not ITool created)
+        textTool = instance as ITool;
+        multimodalTool = instance as IMultimodalTool;
+        if (textTool is null && multimodalTool is null)
         {
             notes.Add(
-                $"External tool set '{directoryName}' was skipped: '{type.FullName}' is not an ITool.");
+                $"External tool set '{directoryName}' was skipped: '{type.FullName}' is not an ITool or IMultimodalTool.");
             return false;
         }
 
-        tool = created;
         return true;
     }
 
@@ -198,7 +248,7 @@ internal static class DotnetToolFactory
             var type = exported.FirstOrDefault(candidate =>
                 string.Equals(candidate.FullName, typeName, StringComparison.Ordinal)
                 || string.Equals(candidate.Name, typeName, StringComparison.Ordinal));
-            if (type is null || !typeof(ITool).IsAssignableFrom(type) || !type.IsClass || type.IsAbstract)
+            if (type is null || !IsToolType(type, []))
             {
                 notes.Add(
                     $"External tool set '{directoryName}' was skipped: type '{typeName}' was not found.");
@@ -211,11 +261,13 @@ internal static class DotnetToolFactory
         return selected;
     }
 
-    private static ExternalToolSpec WithDefinition(ITool tool, ExternalToolSpec overlay) =>
+    private static ExternalToolSpec WithDefinition(
+        ToolDefinition definition,
+        ExternalToolSpec overlay) =>
         new(
-            tool.Definition.Name,
-            tool.Definition.Description ?? overlay.Description,
-            tool.Definition.InputSchema,
+            definition.Name,
+            definition.Description ?? overlay.Description,
+            definition.InputSchema,
             overlay.Catalogs,
             overlay.CommandSuffix,
             overlay.Argv,
@@ -229,7 +281,8 @@ internal static class DotnetToolFactory
             return false;
         }
 
-        if (!typeof(ITool).IsAssignableFrom(type))
+        if (!typeof(ITool).IsAssignableFrom(type)
+            && !typeof(IMultimodalTool).IsAssignableFrom(type))
         {
             return false;
         }
@@ -294,17 +347,34 @@ internal static class DotnetToolFactory
         return true;
     }
 
-    private static void Add(
-        ParsedToolSet set,
+    private static bool DefinitionsMatch(ToolDefinition left, ToolDefinition right) =>
+        string.Equals(left.Name, right.Name, StringComparison.Ordinal)
+        && string.Equals(left.Description, right.Description, StringComparison.Ordinal)
+        && JsonElement.DeepEquals(left.InputSchema, right.InputSchema);
+
+    private static void AddText(
         ExternalToolSpec spec,
         ITool tool,
         List<ITool> plan,
-        List<ITool> work,
-        Dictionary<string, ExternalToolSpec> classifications,
-        Dictionary<string, ParsedToolSet> origins)
+        List<ITool> work)
     {
-        classifications[spec.Name] = spec;
-        origins[spec.Name] = set;
+        if (spec.Catalogs.Plan)
+        {
+            plan.Add(tool);
+        }
+
+        if (spec.Catalogs.Work)
+        {
+            work.Add(tool);
+        }
+    }
+
+    private static void AddMultimodal(
+        ExternalToolSpec spec,
+        IMultimodalTool tool,
+        List<IMultimodalTool> plan,
+        List<IMultimodalTool> work)
+    {
         if (spec.Catalogs.Plan)
         {
             plan.Add(tool);
