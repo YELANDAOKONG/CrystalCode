@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
 using CrystalCode.Configuration;
 
 namespace CrystalCode.Plugins.Interfaces;
@@ -11,4 +12,8 @@ public interface IChatClientFactory
     bool CanCreate(ProviderProtocol protocol);
 
     IStreamingChatClient Create(HarnessSettings settings, string apiKey);
+
+    IStreamingMultimodalChatClient? CreateMultimodal(
+        HarnessSettings settings,
+        string apiKey) => null;
 }

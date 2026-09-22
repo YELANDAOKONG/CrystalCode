@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
 using CrystalCode.Configuration;
 using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Providers.DeepSeek;
@@ -23,6 +24,24 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new DeepSeekProvider(
+            new DeepSeekOptions(
+                apiKey,
+                settings.Model,
+                provider.BaseUri,
+                model.Temperature,
+                model.TopP,
+                model.MaxTokens));
+    }
+
+    public IStreamingMultimodalChatClient CreateMultimodal(
+        HarnessSettings settings,
+        string apiKey)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        var provider = settings.ActiveProvider;
+        var model = settings.ActiveModel;
+        return new DeepSeekMultimodalProvider(
             new DeepSeekOptions(
                 apiKey,
                 settings.Model,

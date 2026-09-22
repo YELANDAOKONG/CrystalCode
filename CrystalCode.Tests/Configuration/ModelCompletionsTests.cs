@@ -14,7 +14,7 @@ public sealed class ModelCompletionsTests
 
         var options = ModelCompletions.For(catalog, ProviderName.DeepSeek);
 
-        Assert.Contains(options, option => option.Name == "deepseek-v4-flash");
+        Assert.Contains(options, option => option.Name == "deepseek-flash");
         Assert.Contains(options, option => option.Name == "deepseek-v4-pro");
         var openrouter = Assert.Single(options, option => option.Name == "openrouter");
         Assert.Equal("Provider", openrouter.Help);

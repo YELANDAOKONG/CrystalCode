@@ -1,3 +1,4 @@
+using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 using CrystalCode.Configuration;
 using CrystalCode.Home;
@@ -14,18 +15,24 @@ public sealed class ExternalCatalog
         [],
         [],
         [],
+        [],
+        [],
         new ExternalApprovalClassifier(new Dictionary<string, ExternalToolSpec>(StringComparer.Ordinal)),
         new HashSet<string>(StringComparer.Ordinal));
 
     private ExternalCatalog(
         IReadOnlyList<ITool> plan,
         IReadOnlyList<ITool> work,
+        IReadOnlyList<IMultimodalTool> planMultimodal,
+        IReadOnlyList<IMultimodalTool> workMultimodal,
         IReadOnlyList<string> notes,
         IApprovalClassifier classifier,
         IReadOnlySet<string> automaticTools)
     {
         PlanTools = plan;
         WorkTools = work;
+        PlanMultimodalTools = planMultimodal;
+        WorkMultimodalTools = workMultimodal;
         Notes = notes;
         Classifier = classifier;
         AutomaticTools = automaticTools;
@@ -34,6 +41,10 @@ public sealed class ExternalCatalog
     public IReadOnlyList<ITool> PlanTools { get; }
 
     public IReadOnlyList<ITool> WorkTools { get; }
+
+    internal IReadOnlyList<IMultimodalTool> PlanMultimodalTools { get; }
+
+    internal IReadOnlyList<IMultimodalTool> WorkMultimodalTools { get; }
 
     public IReadOnlyList<string> Notes { get; }
 
@@ -62,6 +73,8 @@ public sealed class ExternalCatalog
         var registered = new HashSet<string>(StringComparer.Ordinal);
         var plan = new List<ITool>();
         var work = new List<ITool>();
+        var planMultimodal = new List<IMultimodalTool>();
+        var workMultimodal = new List<IMultimodalTool>();
         var classifications = new Dictionary<string, ExternalToolSpec>(StringComparer.Ordinal);
         var origins = new Dictionary<string, ParsedToolSet>(StringComparer.Ordinal);
         foreach (var set in sets)
@@ -87,6 +100,8 @@ public sealed class ExternalCatalog
                 notes,
                 plan,
                 work,
+                planMultimodal,
+                workMultimodal,
                 classifications,
                 origins);
         }
@@ -122,6 +137,8 @@ public sealed class ExternalCatalog
         return new ExternalCatalog(
             plan,
             work,
+            planMultimodal,
+            workMultimodal,
             notes,
             new ExternalApprovalClassifier(classifications),
             automaticTools)

@@ -68,6 +68,12 @@
   operator.
 - Credential files are written with owner-only access where the OS allows it.
 - Do not log request bodies that may contain secrets.
+- Do not put image bytes, data URIs, or remote image URIs in composer text,
+  transcript rendering, logs, diagnostics, or exception messages. Use stable
+  `[Image #N]` markers.
+- Validate local image content by signature, enforce the host size limit, and
+  preserve exact bytes and MIME type. Do not decode, transform, fetch, or
+  execute media implicitly.
 
 ## Dependencies
 

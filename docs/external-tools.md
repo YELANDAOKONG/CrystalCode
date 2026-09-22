@@ -2,8 +2,9 @@
 
 Operators add model-callable tools as **tool sets**. A set is one
 directory, one `tools.json`, and one runner (one executable prefix, or
-one assembly and one load context). Each set contributes one or more
-Crystal `ITool` values.
+one assembly and one load context). Each set contributes one or more Crystal
+tool values. Dotnet sets may contribute native `ITool`, `IMultimodalTool`, or
+combined implementations.
 
 The host owns catalog registration, workspace fencing of model-supplied
 paths, approval classification, output truncation, and timeouts.
@@ -15,8 +16,9 @@ Invocation channels:
   written to the child stdin, then stdin is closed.
 - **exec + argv**: listed scalar properties become extra process
   arguments. Operator-authored command arrays are never interpolated.
-- **dotnet**: a class library whose public `Crystal.Tools.ITool` types
-  are all loaded in one isolated `AssemblyLoadContext`.
+- **dotnet**: a class library whose public `Crystal.Tools.ITool` and
+  `Crystal.Multimodal.Tools.IMultimodalTool` types are loaded in one isolated
+  `AssemblyLoadContext`.
 
 Exec may use stdin, argv, or both. Dotnet does not use stdin or argv.
 
@@ -109,7 +111,7 @@ set) omit the whole set.
 | Enabled | `enabled` on the set (default `true`) | Same runner; no per-tool switch |
 | Runner | One `exec` or `dotnet` | Same runner |
 | Exec command | Shared argv prefix | Optional extra argv suffix (subcommand) |
-| Dotnet | One assembly, one ALC | One public `ITool` type |
+| Dotnet | One assembly, one ALC | One public `ITool` and/or `IMultimodalTool` type |
 | `catalogs` | Default for every tool | Override |
 | `pathArguments` / `argv` / schema | Defaults when there is a single exec tool | Required per exec tool when several exist |
 
@@ -234,9 +236,9 @@ Tool names come from `Definition.Name`:
 | `pathArguments` | Tool (or shorthand root) | Property names treated as filesystem paths. |
 | `timeoutSeconds` | Set | Default 120, same as bash. |
 | `catalogs` | Set default, tool override | `plan` and/or `work`. Default `["plan", "work"]`. Both members means both catalogs. |
-| `description` / `schema` | Each exec tool | Required for exec. Dotnet takes these from `ITool.Definition`. Overlay does not replace them. |
+| `description` / `schema` | Each exec tool | Required for exec. Dotnet takes these from the native tool `Definition`. Overlay does not replace them. |
 | `assembly` | Set | Dotnet only. File name relative to the set directory. |
-| `types` | Set | Dotnet only. Optional allowlist of type names. Default: every public `ITool`. |
+| `types` | Set | Dotnet only. Optional allowlist of type names. Default: every public `ITool` or `IMultimodalTool`. |
 | `tools` | Set | Exec: array of tool objects. Dotnet: optional map keyed by `Definition.Name` for overlays (`catalogs`, `pathArguments`). |
 
 Stdin is always the arguments object for the one call. There is no JSON
@@ -359,19 +361,22 @@ Several exec tools should live in one set when they share a binary.
 That is the same unit as a multi-`ITool` assembly: one install, one
 ALC or one executable, many catalog entries.
 
-## Dotnet: every public `ITool`
+## Dotnet: native text and multimodal tools
 
 The assembly is a **framework-dependent class library**, not a second
 self-contained runtime and not `IPlugin`.
 
-Compile against `Crystal.Tools` (and the `Crystal` reference it
-requires). Implement `Crystal.Tools.ITool` with a public parameterless
-constructor.
+Compile against `Crystal.Tools` (and the `Crystal` reference it requires).
+Implement `Crystal.Tools.ITool`, `Crystal.Multimodal.Tools.IMultimodalTool`,
+or both, with a public parameterless constructor. Multimodal output uses
+Crystal's native `MultimodalToolOutput`, `TextContent`, `ImageContent`, and
+media-source contracts; there is no manifest or JSON output protocol.
 
 The host loads the assembly once, then **adds every matching type**:
 
 - Public, non-abstract, non-generic class
-- Implements `ITool` (host identity, see load context)
+- Implements `ITool` or `IMultimodalTool` (host identity, see load context)
+- A type may implement both. Its text and multimodal definitions must match.
 - Optional `types` allowlist: if present, only those type names; names
   in the list that are missing refuse the set
 - Skip nested types unless they are public
@@ -385,17 +390,19 @@ register with set defaults. Overlay may set `catalogs` and
 `pathArguments`; it does not replace the type's name, description, or
 schema.
 
-The host does not put operator `ITool` instances in the catalog raw.
-Each one is wrapped:
+The host does not put operator tool instances in the catalog raw. Each text
+or multimodal tool is wrapped:
 
-1. Rewrite `pathArguments` on the `ToolCall` (overlay or empty).
+1. Rewrite `pathArguments` on the text or multimodal tool call (overlay or empty).
 2. Apply timeout via the cancellation token the session already
    threads.
-3. Truncate `ToolOutput` text.
+3. Truncate text output blocks.
 4. Run approval before `InvokeAsync`, same as every other tool.
 
-The wrapper is the catalog entry. `AssemblyLoadContext` is not a
-sandbox.
+The wrapper is the catalog entry. Pure multimodal tools are exposed only when
+the selected model and provider support image input. Text-only sessions ignore
+them. A type implementing both retains its ordinary `ITool` entry in a
+text-only session. `AssemblyLoadContext` is not a sandbox.
 
 Operator types must not reference `CrystalCode`, `CrystalCode.Display`,
 or `Spectre.Console`. No slash commands, client factories, or
@@ -486,11 +493,12 @@ Single-file implications:
 
 ## Catalog composition
 
-`WorkspaceCatalog` is: built-in plugin tools, then every contributed
-external tool whose `catalogs` contains Plan or Work respectively, then
-`skill` when enabled. External tools are not registered through
-`PluginRegistry.Add`. The external classifier is appended to the
-session's classifier list.
+The text `WorkspaceCatalog` is: built-in plugin tools, then every contributed
+external `ITool` whose `catalogs` contains Plan or Work respectively, then
+`skill` when enabled. For an image-capable turn, the multimodal executor adds
+plugin and external `IMultimodalTool` definitions to that catalog. External
+tools are not registered through `PluginRegistry.Add`. The external classifier
+is appended to the session's classifier list.
 
 ## Not included
 

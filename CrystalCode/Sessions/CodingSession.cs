@@ -1,6 +1,8 @@
 using System.Text;
 using Crystal;
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
+using Crystal.Multimodal.Tools;
 using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Approvals;
@@ -25,6 +27,7 @@ namespace CrystalCode.Sessions;
 public sealed class CodingSession
 {
     private IStreamingChatClient _client;
+    private IStreamingMultimodalChatClient? _multimodalClient;
     private HarnessSettings _settings;
     private readonly SettingsStore _settingsStore;
     private readonly CredentialStore _credentials;
@@ -50,10 +53,15 @@ public sealed class CodingSession
     private ThinkingSelection _thinkingEffort;
     private bool _planMode;
     private List<ChatItem> _transcript;
+    private Dictionary<int, ImageAttachment> _images = [];
+    private readonly List<int> _pendingImages = [];
+    private int _nextImageNumber = 1;
     private string _sessionId;
     private DateTimeOffset _sessionCreatedUtc;
     private IToolExecutor _workExecutor = null!;
     private IToolExecutor _planExecutor = null!;
+    private IMultimodalToolExecutor _workMultimodalExecutor = null!;
+    private IMultimodalToolExecutor _planMultimodalExecutor = null!;
     private Task<TurnResult>? _turnTask;
     private CancellationTokenSource? _turnSource;
     private CancellationTokenSource? _compactSource;
@@ -80,6 +88,7 @@ public sealed class CodingSession
         _workspace = workspace;
         _plugins = plugins;
         _client = CreateClient(settings);
+        _multimodalClient = CreateMultimodalClient(settings);
         _renderer = renderer;
         _compactor = CreateCompactor(_client);
         _approval = settings.Approval;
@@ -145,6 +154,7 @@ public sealed class CodingSession
         _renderer.SetStatusLine(_settings.StatusLine.Enabled, _settings.StatusLine.Fields);
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
+        _renderer.OnImagePasteAsync = PasteClipboardImageAsync;
         RefreshSlashCommands();
         _renderer.ShowEstimatedTokens = _settings.EstimatedTokens;
         _renderer.VerboseTools = _settings.VerboseTools;
@@ -386,6 +396,9 @@ public sealed class CodingSession
             case SessionVerb.Tools:
                 ChangeTools(command.Argument);
                 return (true, false);
+            case SessionVerb.Attach:
+                AttachImage(command.Argument);
+                return (true, false);
             case SessionVerb.Export:
                 ExportSession(command.Argument);
                 return (true, false);
@@ -617,23 +630,40 @@ public sealed class CodingSession
             return;
         }
 
-        IStreamingChatClient nextClient;
+        IStreamingChatClient? nextClient = null;
+        IStreamingMultimodalChatClient? nextMultimodalClient;
         try
         {
             nextClient = ChatClientFactory.Create(nextSettings, apiKey, _plugins);
+            nextMultimodalClient = MultimodalChatClientFactory.Create(
+                nextSettings,
+                apiKey,
+                _plugins);
+            if ((_pendingImages.Count > 0 || HasReferencedImages())
+                && nextMultimodalClient is null)
+            {
+                DisposeClient(nextClient);
+                _renderer.WriteError(
+                    "The selected model cannot continue a session containing images.");
+                return;
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            DisposeClient(nextClient);
             _renderer.WriteError(exception.Message);
             return;
         }
 
         var previous = _client;
+        var previousMultimodal = _multimodalClient;
         _client = nextClient;
+        _multimodalClient = nextMultimodalClient;
         _compactor = CreateCompactor(nextClient);
         _settings = nextSettings;
         _settingsStore.Save(_settings);
         DisposeClient(previous);
+        DisposeClient(previousMultimodal);
         ReplaceLiveSystem();
         RebuildExecutors();
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
@@ -977,6 +1007,82 @@ public sealed class CodingSession
         WriteToolsUsage();
     }
 
+    private void AttachImage(string argument)
+    {
+        if (_multimodalClient is null)
+        {
+            _renderer.WriteError(
+                "The selected model and provider do not support image input.");
+            return;
+        }
+
+        IReadOnlyList<string> paths;
+        try
+        {
+            paths = string.IsNullOrWhiteSpace(argument)
+                ? []
+                : CommandArguments.Split(argument);
+        }
+        catch (ArgumentException exception)
+        {
+            _renderer.WriteError(exception.Message);
+            return;
+        }
+
+        if (paths.Count != 1)
+        {
+            _renderer.WriteError("Usage: /attach <workspace-image-path>");
+            return;
+        }
+
+        if (!_workspace.TryResolveExistingFile(paths[0], out var path, out var error))
+        {
+            _renderer.WriteError(error);
+            return;
+        }
+
+        try
+        {
+            var image = ImageFile.Load(path, _nextImageNumber);
+            _images.Add(image.Number, image);
+            _pendingImages.Add(image.Number);
+            _nextImageNumber++;
+            _renderer.WriteNote($"Attached  {image.Marker}  {Path.GetFileName(path)}");
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or InvalidDataException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            _renderer.WriteError("Image attachment failed  " + exception.Message);
+        }
+    }
+
+    private async Task<string?> PasteClipboardImageAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_multimodalClient is null)
+        {
+            _renderer.WriteError(
+                "The selected model and provider do not support image input.");
+            return null;
+        }
+
+        var (image, error) = await ClipboardImageReader.TryReadAsync(
+            _nextImageNumber,
+            cancellationToken);
+        if (image is null)
+        {
+            _renderer.WriteError(error);
+            return null;
+        }
+
+        _images.Add(image.Number, image);
+        _nextImageNumber++;
+        return image.Marker;
+    }
+
     private void ChangeToolApproval(string source, IReadOnlyList<string> parts)
     {
         if (parts.Count == 1)
@@ -1043,14 +1149,20 @@ public sealed class CodingSession
 
     private void ShowTools()
     {
+        var planDefinitions = _multimodalClient is null
+            ? _planExecutor.Definitions
+            : _planMultimodalExecutor.Definitions;
+        var workDefinitions = _multimodalClient is null
+            ? _workExecutor.Definitions
+            : _workMultimodalExecutor.Definitions;
         var fallback = ToolListText.Format(
-            _planExecutor.Definitions,
-            _workExecutor.Definitions,
+            planDefinitions,
+            workDefinitions,
             _external,
             _settings);
         var widget = ToolListWidget.Create(
-            _planExecutor.Definitions,
-            _workExecutor.Definitions,
+            planDefinitions,
+            workDefinitions,
             _external,
             _settings);
         _renderer.WriteNote(widget, fallback);
@@ -1065,6 +1177,12 @@ public sealed class CodingSession
             return;
         }
 
+        var planToolCount = _multimodalClient is null
+            ? _planExecutor.Definitions.Count
+            : _planMultimodalExecutor.Definitions.Count;
+        var workToolCount = _multimodalClient is null
+            ? _workExecutor.Definitions.Count
+            : _workMultimodalExecutor.Definitions.Count;
         _renderer.WriteStatus(
             new SessionStatus(
                 SessionId: _sessionId,
@@ -1088,8 +1206,8 @@ public sealed class CodingSession
                 EstimatedTokensEnabled: _settings.EstimatedTokens,
                 VerboseToolsEnabled: _settings.VerboseTools,
                 VerboseCommandsEnabled: _settings.VerboseCommands,
-                PlanTools: _planExecutor.Definitions.Count,
-                WorkTools: _workExecutor.Definitions.Count,
+                PlanTools: planToolCount,
+                WorkTools: workToolCount,
                 ExternalTools: _external.Tools.Count,
                 CumulativeUsage: _ledger.CumulativeUsage,
                 CustomStatusLineEnabled: _settings.StatusLine.Enabled),
@@ -1163,9 +1281,29 @@ public sealed class CodingSession
         return ChatClientFactory.Create(settings, apiKey, _plugins);
     }
 
-    private void DisposeClient() => DisposeClient(_client);
+    private IStreamingMultimodalChatClient? CreateMultimodalClient(
+        HarnessSettings settings)
+    {
+        if (!_credentials.TryResolve(settings.ActiveProvider, out var apiKey, out var error))
+        {
+            throw new InvalidOperationException(error);
+        }
 
-    private static void DisposeClient(IStreamingChatClient client)
+        return MultimodalChatClientFactory.Create(settings, apiKey, _plugins);
+    }
+
+    private void DisposeClient()
+    {
+        DisposeClient(_client);
+        DisposeClient(_multimodalClient);
+    }
+
+    private static void DisposeClient(IStreamingChatClient? client)
+    {
+        (client as IDisposable)?.Dispose();
+    }
+
+    private static void DisposeClient(IStreamingMultimodalChatClient? client)
     {
         (client as IDisposable)?.Dispose();
     }
@@ -1388,6 +1526,7 @@ public sealed class CodingSession
             PlanMode = _planMode,
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_transcript),
+            Images = SessionMapper.WriteImages(_images.Values),
             Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
             UserTurns = _ledger.UserTurns,
             ModelCalls = _ledger.ModelCalls,
@@ -1400,6 +1539,9 @@ public sealed class CodingSession
     {
         DiscardQueue();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
+        _images.Clear();
+        _pendingImages.Clear();
+        _nextImageNumber = 1;
         _ledger.Clear();
         _todos.Clear();
         BindReviewConversation();
@@ -1494,6 +1636,10 @@ public sealed class CodingSession
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         _planMode = document.PlanMode;
         _transcript = items;
+        _images = new Dictionary<int, ImageAttachment>(
+            SessionMapper.ReadImages(document.Images));
+        _pendingImages.Clear();
+        _nextImageNumber = _images.Count == 0 ? 1 : _images.Keys.Max() + 1;
         ReplaceLiveSystem();
 
         _todos.Clear();
@@ -1596,6 +1742,36 @@ public sealed class CodingSession
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
+        _workMultimodalExecutor = new HybridMultimodalToolExecutor(
+            _workExecutor,
+            CreateMultimodalTools(question, plan: false),
+            policy);
+        _planMultimodalExecutor = new HybridMultimodalToolExecutor(
+            _planExecutor,
+            CreateMultimodalTools(question, plan: true),
+            policy);
+    }
+
+    private IReadOnlyList<IMultimodalTool> CreateMultimodalTools(
+        IUserPrompt prompt,
+        bool plan)
+    {
+        if (_multimodalClient is null)
+        {
+            return [];
+        }
+
+        var tools = new List<IMultimodalTool>(
+            _plugins.CreateMultimodalTools(
+                _workspace,
+                _todos,
+                prompt,
+                plan));
+        tools.AddRange(
+            plan
+                ? _external.PlanMultimodalTools
+                : _external.WorkMultimodalTools);
+        return tools;
     }
 
     private void ReloadSkills()
@@ -1745,8 +1921,9 @@ public sealed class CodingSession
 
     private void StartTurn(string input)
     {
-        _renderer.WriteUser(input);
-        _transcript.Add(new ChatMessage(ChatRole.User, input));
+        var message = AttachPendingImages(input);
+        _renderer.WriteUser(message);
+        _transcript.Add(new ChatMessage(ChatRole.User, message));
         _turnSource = new CancellationTokenSource();
         _turnActive = true;
         _renderer.BeginTurn();
@@ -1755,6 +1932,20 @@ public sealed class CodingSession
 
     private Task<TurnResult> ExecuteTurnAsync(CancellationToken cancellationToken)
     {
+        if (_multimodalClient is not null)
+        {
+            var multimodalTurn = new MultimodalStreamingTurn(
+                _multimodalClient,
+                _planMode ? _planMultimodalExecutor : _workMultimodalExecutor,
+                TurnLimits.CreateDefault(),
+                _images,
+                _renderer,
+                CurrentReasoning(),
+                CompactRoundAsync,
+                SessionRetryOptions.Default);
+            return multimodalTurn.RunAsync(_transcript, cancellationToken);
+        }
+
         var turn = new StreamingTurn(
             _client,
             _planMode ? _planExecutor : _workExecutor,
@@ -1764,6 +1955,40 @@ public sealed class CodingSession
             CompactRoundAsync,
             SessionRetryOptions.Default);
         return turn.RunAsync(_transcript, cancellationToken);
+    }
+
+    private string AttachPendingImages(string input)
+    {
+        if (_pendingImages.Count == 0)
+        {
+            return input;
+        }
+
+        var markers = string.Join(
+            ' ',
+            _pendingImages.Select(number => _images[number].Marker));
+        _pendingImages.Clear();
+        return input.Length == 0 ? markers : input + "\n\n" + markers;
+    }
+
+    private bool HasReferencedImages()
+    {
+        if (_images.Count == 0)
+        {
+            return false;
+        }
+
+        return _transcript.Any(item =>
+        {
+            var text = item switch
+            {
+                ChatMessage message => message.Text,
+                ToolResult result => result.Text,
+                _ => null
+            };
+            return text is not null && _images.Values.Any(image =>
+                text.Contains(image.Marker, StringComparison.Ordinal));
+        });
     }
 
     private ContextCompactor CreateCompactor(IChatClient client) =>
@@ -1803,6 +2028,7 @@ public sealed class CodingSession
         }
 
         _transcript = [.. result.Transcript];
+        _nextImageNumber = _images.Count == 0 ? 1 : _images.Keys.Max() + 1;
         BindReviewConversation();
         if (result.ModelCallCount > 0)
         {

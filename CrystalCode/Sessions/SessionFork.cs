@@ -23,6 +23,7 @@ internal static class SessionFork
             PlanMode = source.PlanMode,
             CreatedUtc = createdUtc,
             Items = source.Items.Select(CloneItem).ToList(),
+            Images = source.Images.Select(CloneImage).ToList(),
             Todos = source.Todos.Select(CloneTodo).ToList(),
             UserTurns = Math.Max(0, source.UserTurns),
             ModelCalls = Math.Max(0, source.ModelCalls),
@@ -42,6 +43,15 @@ internal static class SessionFork
             Name = item.Name,
             Arguments = item.Arguments,
             Status = item.Status
+        };
+
+    private static SessionImageDocument CloneImage(SessionImageDocument image) =>
+        new()
+        {
+            Number = image.Number,
+            MimeType = image.MimeType,
+            Data = image.Data?.ToArray(),
+            Uri = image.Uri
         };
 
     private static SessionTodoDocument CloneTodo(SessionTodoDocument todo) =>

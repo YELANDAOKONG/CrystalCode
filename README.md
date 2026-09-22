@@ -103,7 +103,7 @@ Start from the workspace the agent should edit. The current directory
 is the workspace unless `--workspace` is set.
 
 ```bash
-dotnet run --project CrystalCode -- --provider deepseek --model deepseek-v4-flash
+dotnet run --project CrystalCode -- --provider deepseek --model deepseek-flash
 ```
 
 CLI options:
@@ -120,7 +120,7 @@ CLI options:
 
 The first run creates `~/.crystal` (or `--home` / `CRYSTAL_HOME`) and
 writes a starter `config.json` if one is missing. Defaults are
-provider `deepseek`, model `deepseek-v4-flash`, approval `default`,
+provider `deepseek`, model `deepseek-flash`, approval `default`,
 and compaction at 80% of the selected model's `contextWindow`.
 
 If the provider has more than one model and neither `config.json` nor
@@ -210,7 +210,7 @@ Starter catalog (merged with your `providers` overlay):
 
 | Provider | Protocol | Default base URI | Starter models |
 | :--- | :--- | :--- | :--- |
-| `deepseek` | `deepseek` | `https://api.deepseek.com/` | `deepseek-v4-flash`, `deepseek-v4-pro` |
+| `deepseek` | `deepseek` | `https://api.deepseek.com/` | `deepseek-flash`, `deepseek-v4-flash` (compatibility alias), `deepseek-v4-pro` |
 | `openai` | `openai` | `https://api.openai.com/v1/` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
 
 Built-in DeepSeek V4 models enable thinking with efforts `low`,
@@ -249,6 +249,7 @@ HTTP and JSON/SSE handling; no provider SDK is required.
 | `maxTokens` | Optional positive output-token cap |
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Crystal effort names this model accepts: `minimal`, `low`, `medium`, `high`, `maximum` (`max` is stored as `maximum`) |
+| `imageInput` | Whether this model may receive images (default `false`; supported by `deepseek` and `responses`) |
 
 `thinkingEffort` is a host setting, not a model field. Changing
 models never fails: if the model does not support thinking, requests
@@ -312,7 +313,8 @@ families use different wire protocols:
           "contextWindow": 1050000,
           "maxTokens": 128000,
           "thinking": true,
-          "thinkingEfforts": ["low", "medium", "high", "maximum"]
+          "thinkingEfforts": ["low", "medium", "high", "maximum"],
+          "imageInput": true
         }
       }
     },
@@ -336,6 +338,15 @@ families use different wire protocols:
 Keep Chat Completions models in a separate `protocol: "openai"` provider entry.
 
 ## Interactive session
+
+For a DeepSeek or Responses model configured with `imageInput: true`, run
+`/attach <workspace-image-path>` and enter the prompt, or press Ctrl+V when a
+Linux clipboard provider (`wl-paste` or `xclip`) is installed. The composer and
+transcript show `[Image #N]`; raw image data is kept out of rendered text.
+PNG, JPEG, GIF, and WebP input is accepted up to 20 MiB per image. Optional
+multimodal plugin tools may return generic Crystal `ImageContent`, which is
+fed into the next model round. Screenshot capture, device/browser/VM control,
+and coordinate protocols belong to external plugins, not CrystalCode.
 
 The default command opens an alternate-screen shell when stdout is a
 TTY: transcript viewport, optional overlay, optional pinned todos,

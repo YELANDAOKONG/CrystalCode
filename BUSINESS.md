@@ -51,6 +51,10 @@ operator surface and the only entry. It can:
   Home `author`, Project `host`);
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses, and
   Anthropic Messages adapters, including user-added gateways;
+- attach PNG, JPEG, GIF, or WebP images from the workspace, paste clipboard
+  images on supported terminals, persist image references with sessions, and
+  carry generic plugin-returned images into the next model round when a model
+  explicitly declares image-input support;
 - register built-in tools and providers through an in-process plugin table.
 
 ## Deferred product work
@@ -65,7 +69,11 @@ implemented in the current build:
 - an operating-system sandbox;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, and Anthropic Messages;
-- multimodal coding (images, audio, video).
+- audio and video input, and image, audio, or video model output;
+
+TODO: add audio/video input and non-text model output only after their terminal
+interaction, persistence, size, and provider semantics are defined. TODO: add
+MCP without bypassing the existing plugin, approval, and media boundaries.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
@@ -93,7 +101,9 @@ are never prompt overlays. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the
 `skill` tool when enabled. Operator tool sets live under `tools/` in
 the home and project `.crystal` trees and are loaded as extra `ITool`
-entries when External Tools is enabled. Whether each source's author
+or `IMultimodalTool` entries when External Tools is enabled. Native
+multimodal entries are exposed only while the selected model and provider
+support image input. Whether each source's author
 approval declarations take effect is stored under `externalToolApproval`
 in `config.json`. The application never writes
 secrets into the workspace.

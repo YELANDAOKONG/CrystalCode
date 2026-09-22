@@ -56,12 +56,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
     private TokenUsage? _turnCumulativeBaseline;
     private DateTimeOffset? _retryUntil;
     private int _retryAttempt;
+    private bool _imagePasteRequested;
 
     public int ContextWindow { get; set; }
 
     public Action? AfterTools { get; set; }
 
     public Action<DisplayInput.VerboseToggle>? OnVerboseToggled { get; set; }
+
+    public Func<CancellationToken, Task<string?>>? OnImagePasteAsync { get; set; }
 
     public bool ShowEstimatedTokens
     {
@@ -832,6 +835,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             }
 
             string? submitted = null;
+            var pasteImage = false;
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
@@ -846,6 +850,24 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
                 RefreshPickerUnlocked();
                 PaintUnlocked(force: true);
+                pasteImage = _imagePasteRequested;
+                _imagePasteRequested = false;
+            }
+
+            if (pasteImage && OnImagePasteAsync is not null)
+            {
+                var marker = await OnImagePasteAsync(cancellationToken);
+                if (!string.IsNullOrWhiteSpace(marker))
+                {
+                    lock (_gate)
+                    {
+                        _composer.Insert(marker);
+                        RefreshPickerUnlocked();
+                        PaintUnlocked(force: true);
+                    }
+                }
+
+                continue;
             }
 
             if (submitted is not null)
@@ -977,6 +999,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             }
 
             string? submitted = null;
+            var pasteImage = false;
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
@@ -991,6 +1014,24 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
                 RefreshPickerUnlocked();
                 PaintUnlocked(force: true);
+                pasteImage = _imagePasteRequested;
+                _imagePasteRequested = false;
+            }
+
+            if (pasteImage && OnImagePasteAsync is not null)
+            {
+                var marker = await OnImagePasteAsync(cancellationToken);
+                if (!string.IsNullOrWhiteSpace(marker))
+                {
+                    lock (_gate)
+                    {
+                        _composer.Insert(marker);
+                        RefreshPickerUnlocked();
+                        PaintUnlocked(force: true);
+                    }
+                }
+
+                continue;
             }
 
             if (submitted is not null)
@@ -1271,6 +1312,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 _picker = null;
                 _scrollBack = 0;
                 return text;
+            case ComposerAction.PasteImage:
+                _imagePasteRequested = true;
+                break;
             case ComposerAction.TogglePlan:
                 _composer.PlanMode = togglePlan();
                 _chrome.PlanMode = _composer.PlanMode;
@@ -1295,6 +1339,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             "enter        Empty while working interrupts and sends",
             "queue        Stays above the composer; sends after this tool or turn",
             "ctrl+j       Newline",
+            "ctrl+v       Paste clipboard image",
             "\\ enter      Newline",
             "tab          Plan / Work, or complete / and arguments",
             "shift+tab    Plan / Work",

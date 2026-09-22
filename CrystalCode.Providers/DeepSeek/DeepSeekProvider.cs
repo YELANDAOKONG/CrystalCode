@@ -24,7 +24,13 @@ public sealed class DeepSeekProvider : IStreamingChatClient, IDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var profile = new CompatibleProfile(
+        _client = new CompatibleChatClient(
+            CreateProfile(),
+            options.ToCompatibleOptions(),
+            httpClient);
+    }
+
+    internal static CompatibleProfile CreateProfile() => new(
             vendorName: "DeepSeek",
             chatCompletionsPath: CompatibleWire.ChatCompletionsPath,
             reasoningStateFormat: ReasoningStateFormat,
@@ -37,9 +43,6 @@ public sealed class DeepSeekProvider : IStreamingChatClient, IDisposable
                 typeof(DeepSeekException),
                 static (message, statusCode, inner, errorCode, retryAfter) =>
                     new DeepSeekException(message, statusCode, inner, errorCode, retryAfter)));
-
-        _client = new CompatibleChatClient(profile, options.ToCompatibleOptions(), httpClient);
-    }
 
     /// <inheritdoc />
     public Task<ChatResponse> CompleteAsync(

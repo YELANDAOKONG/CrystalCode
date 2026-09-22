@@ -1,6 +1,7 @@
 using Crystal;
 
 using CrystalCode.Home;
+using CrystalCode.Sessions;
 using CrystalCode.Tools;
 
 using Xunit;
@@ -53,5 +54,28 @@ public sealed class SessionMapperTests
                     OutputTokenCount = 2,
                     ReasoningTokenCount = 1
                 }));
+    }
+
+    [Fact]
+    public void WriteImages_ThenReadImages_RoundTripsInlineAndUriSources()
+    {
+        var written = SessionMapper.WriteImages(
+        [
+            new ImageAttachment(
+                1,
+                "image/png",
+                new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a }),
+            new ImageAttachment(
+                2,
+                "image/webp",
+                new Uri("https://example.test/image.webp"))
+        ]);
+
+        var read = SessionMapper.ReadImages(written);
+
+        Assert.Equal(
+            new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a },
+            read[1].Data?.ToArray());
+        Assert.Equal(new Uri("https://example.test/image.webp"), read[2].Uri);
     }
 }

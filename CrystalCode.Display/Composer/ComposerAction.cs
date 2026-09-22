@@ -7,6 +7,7 @@ public enum ComposerAction
 {
     None,
     Submit,
+    PasteImage,
     TogglePlan,
     ShowHelp
 }

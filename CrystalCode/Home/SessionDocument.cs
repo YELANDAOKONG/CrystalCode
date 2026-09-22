@@ -17,6 +17,8 @@ public sealed class SessionDocument
 
     public List<SessionItemDocument> Items { get; set; } = [];
 
+    public List<SessionImageDocument> Images { get; set; } = [];
+
     public List<SessionTodoDocument> Todos { get; set; } = [];
 
     public int UserTurns { get; set; }

@@ -1,5 +1,7 @@
 using System.Diagnostics;
 
+using Crystal.Multimodal;
+using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
 using CrystalCode.Home;
@@ -136,6 +138,85 @@ public sealed class DotnetToolFactoryTests
                 && note.Contains("constructor failed", StringComparison.Ordinal));
         Assert.Empty(catalog.WorkTools);
         Assert.Empty(catalog.PlanTools);
+    }
+
+    [Fact]
+    public async Task Load_DotnetMultimodalTool_RegistersNativeToolOnlyInMultimodalCatalog()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var output = Path.Combine(workspace.Path, ".crystal", "tools", "ImageTools");
+        PublishFixture(
+            output,
+            """
+            using System.Text.Json;
+
+            using Crystal.Media;
+            using Crystal.Multimodal;
+            using Crystal.Multimodal.Tools;
+            using Crystal.Tools;
+
+            namespace FixtureTools;
+
+            public sealed class ImageTool : IMultimodalTool
+            {
+                public ImageTool()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}}}");
+                    Definition = new ToolDefinition("image", document.RootElement.Clone(), "Image.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public ValueTask<MultimodalToolOutput> InvokeAsync(
+                    MultimodalToolCall call,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(
+                        new MultimodalToolOutput(
+                        [
+                            new TextContent(call.Arguments),
+                            new ImageContent(
+                                new ImageMedia(
+                                    new InlineMediaSource(new byte[] { 1, 2, 3 }),
+                                    new MediaMimeType("image/png")))
+                        ]));
+            }
+            """);
+        File.WriteAllText(
+            Path.Combine(output, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "tools": {
+                "image": {
+                  "catalogs": ["work"],
+                  "pathArguments": ["path"]
+                }
+              }
+            }
+            """);
+
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+
+        Assert.Empty(catalog.Notes);
+        Assert.DoesNotContain(catalog.WorkTools, tool => tool.Definition.Name == "image");
+        Assert.DoesNotContain(catalog.PlanMultimodalTools, tool => tool.Definition.Name == "image");
+        var tool = Assert.Single(
+            catalog.WorkMultimodalTools,
+            tool => tool.Definition.Name == "image");
+        var result = await tool.InvokeAsync(
+            new MultimodalToolCall("1", "image", """{"path":"capture.png"}"""));
+
+        var text = Assert.IsType<TextContent>(result.Contents[0]);
+        Assert.Contains(
+            Path.Combine(workspace.Path, "capture.png"),
+            text.Text,
+            StringComparison.Ordinal);
+        Assert.IsType<ImageContent>(result.Contents[1]);
     }
 
     private static void WriteExecSet(string workspace, string directoryName, string toolName)
