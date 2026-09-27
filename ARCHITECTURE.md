@@ -184,8 +184,11 @@ The Responses, OpenAI-compatible Chat Completions, DeepSeek Chat Completions,
 and Anthropic Messages adapters accept text and image input and emit only text,
 reasoning, and tool-call events. Chat Completions and Anthropic images are
 restricted to user and tool messages, matching their wire contracts. Clipboard
-image input is read through Windows PowerShell on Windows, `pngpaste` on macOS,
-and `wl-paste` or `xclip` on Linux; it does not capture the screen. A model must
+image input is read through Windows PowerShell on Windows, the macOS system
+`osascript` command on macOS, and `wl-paste` or `xclip` on Linux; it does not
+capture the screen. A missing reader is reported separately from an empty
+image clipboard. Reader commands are optional at runtime, and their absence
+does not prevent the application from starting. A model must
 opt in with `imageInput: true`; unsupported combinations are rejected before
 sending a request. Audio/video input and non-text model output are TODO. MCP
 media transport is TODO.

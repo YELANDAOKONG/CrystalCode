@@ -343,8 +343,10 @@ Keep Chat Completions models in a separate `protocol: "openai"` provider entry.
 For an OpenAI Chat Completions, DeepSeek, Responses, or Anthropic model
 configured with `imageInput: true`, run `/attach <workspace-image-path>` and
 enter the prompt, or press Ctrl+V to attach an image from the clipboard.
-Clipboard image paste uses Windows PowerShell on Windows, `pngpaste` on macOS,
-and `wl-paste` or `xclip` on Linux. The composer and transcript show
+Clipboard image paste uses Windows PowerShell on Windows, the built-in
+`osascript` command on macOS, and `wl-paste` or `xclip` on Linux. If a reader
+is unavailable, Crystal Code reports that separately from a clipboard with
+no image. The composer and transcript show
 `[Image #N]`; raw image data is kept out of rendered text.
 PNG, JPEG, GIF, and WebP input is accepted up to 20 MiB per image. Optional
 multimodal plugin tools may return generic Crystal `ImageContent`, which is
