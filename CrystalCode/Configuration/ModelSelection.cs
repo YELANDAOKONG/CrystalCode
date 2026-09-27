@@ -138,7 +138,7 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
         {
             error =
                 $"Provider '{providerToken.Trim()}' is not configured. "
-                + "Add it under providers in config.json.";
+                + "Add it to providers.json.";
             return false;
         }
 

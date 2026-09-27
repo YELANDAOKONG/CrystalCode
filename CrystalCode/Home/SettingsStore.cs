@@ -5,7 +5,8 @@ using CrystalCode.Configuration;
 namespace CrystalCode.Home;
 
 /// <summary>
-/// Reads and writes <c>config.json</c> under a Crystal home directory.
+/// Reads user preferences from <c>config.json</c> and provider definitions
+/// from <c>providers.json</c> under a Crystal home directory.
 /// </summary>
 public sealed class SettingsStore
 {
@@ -24,7 +25,7 @@ public sealed class SettingsStore
         {
             var created = HarnessSettings.CreateDefault();
             Save(created);
-            return created;
+            return Load();
         }
 
         return Load();
@@ -36,7 +37,7 @@ public sealed class SettingsStore
         var document = JsonSerializer.Deserialize<SettingsDocument>(json, HomeJson.Options)
             ?? new SettingsDocument();
         var catalog = ProviderCatalog.CreateStarter()
-            .Overlay(SettingsMapper.ReadProviders(document.Providers));
+            .Overlay(ReadProviders(document));
         var defaults = HarnessSettings.CreateDefault();
         var provider = string.IsNullOrWhiteSpace(document.Provider)
             ? defaults.Provider
@@ -82,6 +83,16 @@ public sealed class SettingsStore
     {
         ArgumentNullException.ThrowIfNull(settings);
         _home.EnsureCreated();
+        var previous = File.Exists(_home.ConfigPath)
+            ? JsonSerializer.Deserialize<SettingsDocument>(
+                File.ReadAllText(_home.ConfigPath), HomeJson.Options)
+            : null;
+        if (!File.Exists(_home.ProvidersPath)
+            && previous?.Providers is { ValueKind: JsonValueKind.Object } legacyProviders)
+        {
+            _ = SettingsMapper.ReadProviders(legacyProviders);
+            CopyProviders(legacyProviders);
+        }
 
         var document = new SettingsDocument
         {
@@ -111,10 +122,51 @@ public sealed class SettingsStore
                     ? null
                     : [.. settings.StatusLine.Fields],
             CompactionThreshold = settings.CompactionThreshold,
-            Providers = SettingsMapper.WriteProviders(settings.Catalog)
+            Providers = previous?.Providers
         };
         var json = JsonSerializer.Serialize(document, HomeJson.Options);
         File.WriteAllText(_home.ConfigPath, json);
+    }
+
+    private IReadOnlyList<ProviderDefinition> ReadProviders(SettingsDocument document)
+    {
+        if (!File.Exists(_home.ProvidersPath))
+        {
+            return SettingsMapper.ReadProviders(document.Providers);
+        }
+
+        using var providers = JsonDocument.Parse(File.ReadAllText(_home.ProvidersPath));
+        return SettingsMapper.ReadProviders(providers.RootElement);
+    }
+
+    private void CopyProviders(JsonElement providers)
+    {
+        var temporaryPath = Path.Combine(_home.Root, $".providers-{Guid.NewGuid():N}.tmp");
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None
+        };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        try
+        {
+            using (var stream = new FileStream(temporaryPath, options))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.Write(JsonSerializer.Serialize(providers, HomeJson.Options));
+            }
+
+            File.Move(temporaryPath, _home.ProvidersPath);
+        }
+        finally
+        {
+            File.Delete(temporaryPath);
+        }
     }
 
     private static ExternalToolApprovalSettings ReadExternalToolApproval(

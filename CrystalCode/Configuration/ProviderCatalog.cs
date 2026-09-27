@@ -100,7 +100,7 @@ public sealed class ProviderCatalog
         }
 
         throw new KeyNotFoundException(
-            $"Provider '{name.Value}' is not configured. Add it under providers in config.json.");
+            $"Provider '{name.Value}' is not configured. Add it to providers.json.");
     }
 
     public IReadOnlyList<string> GetModelNames(ProviderName name) =>

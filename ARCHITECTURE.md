@@ -444,6 +444,7 @@ installers replace the full platform release contents under `binaries/code/`.
 ~/.crystal/
   binaries/code/CrystalCode (CrystalCode.exe on Windows)
   config.json
+  providers.json
   prompt-history.jsonl
   credentials.json
   permissions.json
@@ -462,6 +463,17 @@ installers replace the full platform release contents under `binaries/code/`.
   logs/
   plugins/
 ```
+
+`config.json` stores mutable operator preferences such as the selected provider
+and model. `providers.json` stores the provider catalog as a root object keyed
+by provider name, with an array for multiple protocols under one name. The
+catalog overlays built-in definitions. When `providers.json` exists, it takes
+precedence over legacy `config.json.providers`; otherwise the legacy field is
+read. Saving preferences copies legacy provider definitions to `providers.json`
+if needed, then preserves the legacy field in `config.json` so an older running
+version can continue reading it. Preference saves do not rewrite an existing
+`providers.json`. Duplicate model ids across protocols under one provider are
+rejected.
 
 Project overlay (wins over home for named prompts, Crystal skills, and
 tool sets of the same directory name):

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Crystal.Reasoning;
 
 using CrystalCode.Configuration;
@@ -10,7 +12,7 @@ namespace CrystalCode.Tests.Home;
 public sealed class SettingsStoreTests
 {
     [Fact]
-    public void LoadOrCreate_WritesStarterCatalog()
+    public void LoadOrCreate_UsesStarterCatalogWithoutWritingProviderDefinitions()
     {
         using var root = new TemporaryHome();
         var store = new SettingsStore(root.Home);
@@ -29,6 +31,108 @@ public sealed class SettingsStoreTests
         Assert.Equal(ExternalToolTrustPolicy.Host, settings.ExternalToolApproval.Project);
         Assert.False(settings.EstimatedTokens);
         Assert.True(File.Exists(root.Home.ConfigPath));
+        Assert.False(File.Exists(root.Home.ProvidersPath));
+        using var config = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
+        Assert.False(config.RootElement.TryGetProperty("providers", out _));
+    }
+
+    [Fact]
+    public void Load_PrefersProvidersFileOverLegacyDefinitions()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        root.Home.EnsureCreated();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "openrouter",
+              "model": "current",
+              "providers": {
+                "openrouter": {
+                  "protocol": "openai",
+                  "baseUri": "https://legacy.example.test/",
+                  "models": { "old": { "contextWindow": 1000 } }
+                }
+              }
+            }
+            """);
+        File.WriteAllText(
+            root.Home.ProvidersPath,
+            """
+            {
+              "openrouter": {
+                "protocol": "openai",
+                "baseUri": "https://current.example.test/",
+                "models": { "current": { "contextWindow": 2000 } }
+              }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.Equal("current", settings.Model);
+        Assert.Equal(2000, settings.ActiveModel.ContextWindow);
+        Assert.Equal("https://current.example.test/", settings.ActiveProvider.BaseUri.AbsoluteUri);
+        Assert.DoesNotContain("old", settings.Catalog.GetModelNames(new ProviderName("openrouter")));
+    }
+
+    [Fact]
+    public void Save_CopiesLegacyProvidersAndPreservesOriginalDefinitions()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        root.Home.EnsureCreated();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "openrouter",
+              "model": "custom",
+              "providers": {
+                "openrouter": {
+                  "protocol": "openai",
+                  "baseUri": "https://example.test/",
+                  "models": { "custom": { "contextWindow": 123456 } }
+                }
+              }
+            }
+            """);
+        using var original = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
+
+        store.Save(store.Load().WithPromptSet("concise"));
+
+        Assert.True(File.Exists(root.Home.ProvidersPath));
+        using var copied = JsonDocument.Parse(File.ReadAllText(root.Home.ProvidersPath));
+        using var saved = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
+        var oldProviders = original.RootElement.GetProperty("providers");
+        Assert.True(JsonElement.DeepEquals(oldProviders, copied.RootElement));
+        Assert.True(JsonElement.DeepEquals(oldProviders, saved.RootElement.GetProperty("providers")));
+        Assert.Equal("concise", store.Load().PromptSet);
+        Assert.Equal(123456, store.Load().ActiveModel.ContextWindow);
+    }
+
+    [Fact]
+    public void Save_DoesNotRewriteExistingProvidersFile()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate();
+        const string providers = """
+            {
+              "deepseek": {
+                "protocol": "deepseek",
+                "baseUri": "https://api.deepseek.com/",
+                "models": { "deepseek-flash": { "contextWindow": 123456 } }
+              }
+            }
+            """;
+        File.WriteAllText(root.Home.ProvidersPath, providers);
+
+        store.Save(settings.WithPromptSet("concise"));
+
+        Assert.Equal(providers, File.ReadAllText(root.Home.ProvidersPath));
+        Assert.Equal(123456, store.Load().ActiveModel.ContextWindow);
     }
 
     [Fact]

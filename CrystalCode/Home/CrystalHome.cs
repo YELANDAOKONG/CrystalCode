@@ -18,6 +18,8 @@ public sealed class CrystalHome
 
     public string ConfigPath => Path.Combine(Root, "config.json");
 
+    public string ProvidersPath => Path.Combine(Root, "providers.json");
+
     public string PromptHistoryPath => Path.Combine(Root, "prompt-history.jsonl");
 
     public string CredentialsPath => Path.Combine(Root, "credentials.json");

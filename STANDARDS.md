@@ -67,6 +67,8 @@
   and Audit may deny those calls or escalate them to the
   operator.
 - Credential files are written with owner-only access where the OS allows it.
+- New provider catalog files are created with owner-only access because
+  provider definitions may contain credential references or inline keys.
 - Do not log request bodies that may contain secrets.
 - Do not put image bytes, data URIs, or remote image URIs in composer text,
   transcript rendering, logs, diagnostics, or exception messages. Use stable

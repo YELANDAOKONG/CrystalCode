@@ -99,9 +99,12 @@ coding product built on Crystal.
 ## Data
 
 User data lives in `~/.crystal`. Prompts may be replaced in
-`~/.crystal/prompts` and the project's `.crystal/prompts`. Home-only reusable
-prompt sets live under `~/.crystal/promptsets`; workspace hints remain
-independent and are appended from `instructions.md`, `.crystal.md`, and
+`~/.crystal/prompts` and the project's `.crystal/prompts`. Provider and model
+definitions live in `~/.crystal/providers.json`; changing preferences in
+`config.json` does not rewrite those definitions. The legacy
+`config.json.providers` field remains readable for existing installations.
+Home-only reusable prompt sets live under `~/.crystal/promptsets`; workspace
+hints remain independent and are appended from `instructions.md`, `.crystal.md`, and
 OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
 are never prompt overlays. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the
