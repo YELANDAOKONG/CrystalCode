@@ -169,6 +169,32 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_CtrlVInBurst_PreservesKeyOrder()
+    {
+        var ctrlV = new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true);
+        var letter = new ConsoleKeyInfo('x', ConsoleKey.X, false, false, false);
+        var enter = new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false);
+
+        var events = new InputDecoder().Push(Linux(ctrlV, letter, enter));
+
+        Assert.Collection(events,
+            item => Assert.Equal(ConsoleKey.V, Assert.IsType<InputKey>(item).Key),
+            item => Assert.Equal(ConsoleKey.X, Assert.IsType<InputKey>(item).Key),
+            item => Assert.Equal(ConsoleKey.Enter, Assert.IsType<InputKey>(item).Key));
+    }
+
+    [Fact]
+    public void Push_VtCtrlVInBurst_PreservesKeyOrder()
+    {
+        var events = new InputDecoder().Push(WindowsVt("x\u0016\r"));
+
+        Assert.Collection(events,
+            item => Assert.Equal(ConsoleKey.X, Assert.IsType<InputKey>(item).Key),
+            item => Assert.Equal(ConsoleKey.V, Assert.IsType<InputKey>(item).Key),
+            item => Assert.Equal(ConsoleKey.Enter, Assert.IsType<InputKey>(item).Key));
+    }
+
+    [Fact]
     public void Push_HoldsPasteUntilEndMarker()
     {
         var windows = new InputDecoder();

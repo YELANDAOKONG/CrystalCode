@@ -163,4 +163,42 @@ public sealed class SessionRendererTests
             togglePlan: static () => false,
             CancellationToken.None);
     }
+
+    [Fact]
+    public async Task DispatchBurstAsync_PastesImageBeforeSubmittingSameBurst()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SeedComposer("describe ");
+        renderer.OnImagePasteAsync = static _ => Task.FromResult<string?>("[Image #7]");
+
+        var submitted = await renderer.DispatchBurstAsync(
+            [
+                new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true),
+                new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)
+            ],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Contains("[Image #7]", submitted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_KeepsTextAfterImageInSameBurst()
+    {
+        var renderer = new SessionRenderer();
+        renderer.OnImagePasteAsync = static _ => Task.FromResult<string?>("[Image #7]");
+
+        var submitted = await renderer.DispatchBurstAsync(
+            [
+                new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true),
+                new ConsoleKeyInfo('x', ConsoleKey.X, false, false, false),
+                new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)
+            ],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Contains("[Image #7]x", submitted, StringComparison.Ordinal);
+    }
 }

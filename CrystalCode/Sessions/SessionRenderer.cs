@@ -852,41 +852,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 break;
             }
 
-            string? submitted = null;
-            var pasteImage = false;
-            lock (_gate)
-            {
-                var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
-                foreach (var item in _decoder.Push(burst))
-                {
-                    submitted = DispatchUnlocked(item, pageRows, togglePlan);
-                    if (submitted is not null)
-                    {
-                        break;
-                    }
-                }
-
-                RefreshPickerUnlocked();
-                PaintUnlocked(force: true);
-                pasteImage = _imagePasteRequested;
-                _imagePasteRequested = false;
-            }
-
-            if (pasteImage && OnImagePasteAsync is not null)
-            {
-                var marker = await OnImagePasteAsync(cancellationToken);
-                if (!string.IsNullOrWhiteSpace(marker))
-                {
-                    lock (_gate)
-                    {
-                        _composer.InsertAtomic(marker);
-                        RefreshPickerUnlocked();
-                        PaintUnlocked(force: true);
-                    }
-                }
-
-                continue;
-            }
+            var submitted = await DispatchBurstAsync(burst, togglePlan, cancellationToken);
 
             if (submitted is not null)
             {
@@ -1017,24 +983,39 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 return PromptRead.Ended;
             }
 
-            string? submitted = null;
-            var pasteImage = false;
+            var submitted = await DispatchBurstAsync(burst, togglePlan, cancellationToken);
+
+            if (submitted is not null)
+            {
+                return PromptRead.Submitted(submitted);
+            }
+        }
+    }
+
+    internal async Task<string?> DispatchBurstAsync(
+        IReadOnlyList<ConsoleKeyInfo> burst,
+        Func<bool> togglePlan,
+        CancellationToken cancellationToken,
+        bool checkSize = true)
+    {
+        IReadOnlyList<IInputEvent> events;
+        lock (_gate)
+        {
+            events = _decoder.Push(burst);
+        }
+
+        foreach (var item in events)
+        {
+            string? submitted;
+            bool pasteImage;
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
-                foreach (var item in _decoder.Push(burst))
-                {
-                    submitted = DispatchUnlocked(item, pageRows, togglePlan);
-                    if (submitted is not null)
-                    {
-                        break;
-                    }
-                }
-
-                RefreshPickerUnlocked();
-                PaintUnlocked(force: true);
+                submitted = DispatchUnlocked(item, pageRows, togglePlan, checkSize);
                 pasteImage = _imagePasteRequested;
                 _imagePasteRequested = false;
+                RefreshPickerUnlocked();
+                PaintUnlocked(force: true);
             }
 
             if (pasteImage && OnImagePasteAsync is not null)
@@ -1049,15 +1030,15 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                         PaintUnlocked(force: true);
                     }
                 }
-
-                continue;
             }
 
             if (submitted is not null)
             {
-                return PromptRead.Submitted(submitted);
+                return submitted;
             }
         }
+
+        return null;
     }
 
     public Task<InputKey> ReadKeyAsync(CancellationToken cancellationToken) =>
@@ -1247,9 +1228,13 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         WriteFallback(TranscriptKind.Note, text);
     }
 
-    private string? DispatchUnlocked(IInputEvent item, int pageRows, Func<bool> togglePlan)
+    private string? DispatchUnlocked(
+        IInputEvent item,
+        int pageRows,
+        Func<bool> togglePlan,
+        bool checkSize = true)
     {
-        if (BelowUsableSize(out _, out _))
+        if (checkSize && BelowUsableSize(out _, out _))
         {
             return null;
         }

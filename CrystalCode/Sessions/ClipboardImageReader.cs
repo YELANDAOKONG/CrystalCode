@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using System.Text;
 
 namespace CrystalCode.Sessions;
 
@@ -8,6 +9,11 @@ namespace CrystalCode.Sessions;
 public static class ClipboardImageReader
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan WindowsTimeout = TimeSpan.FromSeconds(20);
+    private static readonly string[] ImageTypes =
+        ["image/png", "image/jpeg", "image/gif", "image/webp"];
+    private static readonly string[] MacTypes =
+        ["\"PNGf\"", "JPEG picture", "GIF picture"];
 
     public static async Task<(ImageAttachment? Image, string Error)> TryReadAsync(
         int number,
@@ -26,39 +32,44 @@ public static class ClipboardImageReader
         var readerFailed = false;
         foreach (var command in commands)
         {
-            var result = OperatingSystem.IsMacOS()
+            IReadOnlyList<CommandResult> results = OperatingSystem.IsMacOS()
                 ? await TryReadMacAsync(cancellationToken)
-                : await TryRunAsync(command.FileName, command.Arguments, true, cancellationToken);
-            if (result.Status == CommandStatus.Missing)
+                : OperatingSystem.IsWindows()
+                    ? [await TryReadWindowsAsync(command.FileName, command.Arguments, cancellationToken)]
+                    : await TryReadLinuxAsync(command.FileName, cancellationToken);
+            foreach (var result in results)
             {
-                continue;
-            }
+                if (result.Status == CommandStatus.Missing)
+                {
+                    continue;
+                }
 
-            commandAvailable = true;
-            if (result.Status == CommandStatus.TooLarge)
-            {
-                imageTooLarge = true;
-                continue;
-            }
+                commandAvailable = true;
+                if (result.Status == CommandStatus.TooLarge)
+                {
+                    imageTooLarge = true;
+                    continue;
+                }
 
-            if (result.Status == CommandStatus.Failed)
-            {
-                readerFailed = true;
-                continue;
-            }
+                if (result.Status == CommandStatus.Failed)
+                {
+                    readerFailed = true;
+                    continue;
+                }
 
-            if (result.Data is not { Length: > 0 } data)
-            {
-                continue;
-            }
+                if (result.Data is not { Length: > 0 } data)
+                {
+                    continue;
+                }
 
-            var mimeType = ImageFile.DetectMimeType(data);
-            if (mimeType is not null)
-            {
-                return (new ImageAttachment(number, mimeType, data), string.Empty);
-            }
+                var mimeType = ImageFile.DetectMimeType(data);
+                if (mimeType is not null)
+                {
+                    return (new ImageAttachment(number, mimeType, data), string.Empty);
+                }
 
-            invalidImage = true;
+                invalidImage = true;
+            }
         }
 
         return (null, FailureMessage(
@@ -69,15 +80,34 @@ public static class ClipboardImageReader
     {
         if (OperatingSystem.IsWindows())
         {
-            const string script =
-                "Add-Type -AssemblyName System.Windows.Forms; "
-                + "Add-Type -AssemblyName System.Drawing; "
-                + "$image=[Windows.Forms.Clipboard]::GetImage(); "
-                + "if ($null -eq $image) { exit 1 }; "
-                + "$stream=[IO.MemoryStream]::new(); "
-                + "try { $image.Save($stream,[Drawing.Imaging.ImageFormat]::Png); "
-                + "[Console]::OpenStandardOutput().Write($stream.GetBuffer(),0,[int]$stream.Length) } "
-                + "finally { $stream.Dispose(); $image.Dispose() }";
+            const string script = """
+                $ErrorActionPreference='Stop'
+                Add-Type -AssemblyName System.Windows.Forms
+                Add-Type -AssemblyName System.Drawing
+                $dataObject=[Windows.Forms.Clipboard]::GetDataObject()
+                if ($null -eq $dataObject) { [Console]::Write('NO_IMAGE'); exit 0 }
+                $bytes=$null
+                if ($dataObject.GetDataPresent('PNG')) {
+                    $data=$dataObject.GetData('PNG')
+                    if ($data -is [byte[]]) { $bytes=$data }
+                    elseif ($data -is [IO.Stream]) {
+                        if ($data.Length -gt 20971520) { [Console]::Write('TOO_LARGE'); exit 0 }
+                        $data.Position=0
+                        $stream=[IO.MemoryStream]::new()
+                        try { $data.CopyTo($stream); $bytes=$stream.ToArray() }
+                        finally { $stream.Dispose() }
+                    }
+                }
+                if ($null -eq $bytes) {
+                    $image=[Windows.Forms.Clipboard]::GetImage()
+                    if ($null -eq $image) { [Console]::Write('NO_IMAGE'); exit 0 }
+                    $stream=[IO.MemoryStream]::new()
+                    try { $image.Save($stream,[Drawing.Imaging.ImageFormat]::Png); $bytes=$stream.ToArray() }
+                    finally { $stream.Dispose(); $image.Dispose() }
+                }
+                if ($bytes.Length -gt 20971520) { [Console]::Write('TOO_LARGE'); exit 0 }
+                [Console]::Write([Convert]::ToBase64String($bytes))
+                """;
             return
             [
                 ("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", script]),
@@ -94,24 +124,135 @@ public static class ClipboardImageReader
         {
             return
             [
-                ("wl-paste", ["--no-newline", "--type", "image/png"]),
-                ("xclip", ["-selection", "clipboard", "-t", "image/png", "-o"])
+                ("wl-paste", ["--list-types"]),
+                ("xclip", ["-selection", "clipboard", "-t", "TARGETS", "-o"])
             ];
         }
 
         return [];
     }
 
-    [SupportedOSPlatform("macos")]
-    private static async Task<CommandResult> TryReadMacAsync(CancellationToken cancellationToken)
+    internal static IReadOnlyList<string> SupportedTypesInOrder(string advertisedTypes) =>
+        ImageTypes.Where(type => advertisedTypes.Split('\n', '\r')
+            .Any(line => string.Equals(line.Trim(), type, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+    internal static IReadOnlyList<string> MacClipboardTypes => MacTypes;
+
+    internal static CommandStatus ClassifyExit(int exitCode, int outputLength) =>
+        exitCode != 0 ? CommandStatus.Failed
+            : outputLength == 0 ? CommandStatus.Empty : CommandStatus.Success;
+
+    private static async Task<CommandResult> TryReadWindowsAsync(
+        string reader,
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken)
     {
-        var path = Path.Combine(Path.GetTempPath(), $"crystal-clipboard-{Guid.NewGuid():N}.png");
+        var result = await TryRunAsync(reader, arguments, true, cancellationToken);
+        if (result.Status != CommandStatus.Success || result.Data is null)
+        {
+            return result;
+        }
+
+        var encoded = Encoding.ASCII.GetString(result.Data).Trim();
+        if (encoded == "NO_IMAGE")
+        {
+            return new CommandResult(CommandStatus.Empty, null);
+        }
+
+        if (encoded == "TOO_LARGE")
+        {
+            return new CommandResult(CommandStatus.TooLarge, null);
+        }
+
+        try
+        {
+            var bytes = Convert.FromBase64String(encoded);
+            return bytes.Length > ImageFile.MaximumBytes
+                ? new CommandResult(CommandStatus.TooLarge, null)
+                : new CommandResult(CommandStatus.Success, bytes);
+        }
+        catch (FormatException)
+        {
+            return new CommandResult(CommandStatus.Failed, null);
+        }
+    }
+
+    private static async Task<IReadOnlyList<CommandResult>> TryReadLinuxAsync(
+        string reader,
+        CancellationToken cancellationToken)
+    {
+        var listArguments = reader == "wl-paste"
+            ? new[] { "--list-types" }
+            : ["-selection", "clipboard", "-t", "TARGETS", "-o"];
+        var list = await TryRunAsync(reader, listArguments, true, cancellationToken);
+        if (list.Status != CommandStatus.Success || list.Data is null)
+        {
+            return [list];
+        }
+
+        var types = SupportedTypesInOrder(Encoding.UTF8.GetString(list.Data));
+        if (types.Count == 0)
+        {
+            return [new CommandResult(CommandStatus.Empty, null)];
+        }
+
+        var results = new List<CommandResult>();
+        foreach (var type in types)
+        {
+            string[] arguments = reader == "wl-paste"
+                ? ["--no-newline", "--type", type]
+                : ["-selection", "clipboard", "-t", type, "-o"];
+            var result = await TryRunAsync(reader, arguments, true, cancellationToken);
+            results.Add(result);
+            if (result.Status is CommandStatus.Success
+                or CommandStatus.TooLarge
+                or CommandStatus.Missing)
+            {
+                break;
+            }
+        }
+
+        return results;
+    }
+
+    [SupportedOSPlatform("macos")]
+    private static async Task<IReadOnlyList<CommandResult>> TryReadMacAsync(
+        CancellationToken cancellationToken)
+    {
+        var results = new List<CommandResult>();
+        foreach (var type in MacTypes)
+        {
+            var result = await TryReadMacTypeAsync(type, cancellationToken);
+            results.Add(result);
+            if (result.Status is CommandStatus.Success
+                or CommandStatus.TooLarge
+                or CommandStatus.Missing)
+            {
+                break;
+            }
+        }
+
+        return results;
+    }
+
+    [SupportedOSPlatform("macos")]
+    private static async Task<CommandResult> TryReadMacTypeAsync(
+        string type,
+        CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"crystal-clipboard-{Guid.NewGuid():N}.image");
         var escapedPath = path.Replace("\\", "\\\\", StringComparison.Ordinal)
             .Replace("\"", "\\\"", StringComparison.Ordinal);
         // The extra byte reveals an oversized image without writing all of it to disk.
         string[] arguments =
         [
-            "-e", "set imageData to the clipboard as \"PNGf\"",
+            "-e", "try",
+            "-e", $"set imageData to the clipboard as {type}",
+            "-e", "on error number errorNumber",
+            "-e", "if errorNumber is -1700 or errorNumber is -25133 then return \"NO_IMAGE\"",
+            "-e", "error number errorNumber",
+            "-e", "end try",
             "-e", $"set fileRef to open for access (POSIX file \"{escapedPath}\") with write permission",
             "-e", "set eof fileRef to 0",
             "-e", $"write imageData to fileRef for {ImageFile.MaximumBytes + 1}",
@@ -134,6 +275,12 @@ public static class ClipboardImageReader
             if (result.Status != CommandStatus.Success)
             {
                 return result;
+            }
+
+            if (result.Data is not null
+                && Encoding.UTF8.GetString(result.Data).Trim() == "NO_IMAGE")
+            {
+                return new CommandResult(CommandStatus.Empty, null);
             }
 
             await using var stream = new FileStream(
@@ -222,7 +369,7 @@ public static class ClipboardImageReader
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
-        timeout.CancelAfter(Timeout);
+        timeout.CancelAfter(OperatingSystem.IsWindows() ? WindowsTimeout : Timeout);
         var startInfo = new ProcessStartInfo
         {
             FileName = fileName,
@@ -244,9 +391,12 @@ public static class ClipboardImageReader
                 return new CommandResult(CommandStatus.Failed, null);
             }
 
-            var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+            var stderr = process.StandardError.BaseStream.CopyToAsync(Stream.Null, timeout.Token);
             using var output = new MemoryStream();
             var buffer = new byte[81920];
+            var maximumOutputBytes = OperatingSystem.IsWindows()
+                ? (ImageFile.MaximumBytes + 1) * 4 / 3 + 8
+                : ImageFile.MaximumBytes + 1;
             while (true)
             {
                 var read = await process.StandardOutput.BaseStream.ReadAsync(
@@ -257,7 +407,7 @@ public static class ClipboardImageReader
                     break;
                 }
 
-                if (output.Length + read > ImageFile.MaximumBytes)
+                if (output.Length + read > maximumOutputBytes)
                 {
                     TryKill(process);
                     return new CommandResult(CommandStatus.TooLarge, null);
@@ -268,7 +418,13 @@ public static class ClipboardImageReader
 
             await process.WaitForExitAsync(timeout.Token);
             await stderr;
-            if (process.ExitCode != 0 || (expectImageOnOutput && output.Length == 0))
+            var status = ClassifyExit(process.ExitCode, (int)output.Length);
+            if (status == CommandStatus.Failed)
+            {
+                return new CommandResult(CommandStatus.Failed, null);
+            }
+
+            if (status == CommandStatus.Empty && expectImageOnOutput)
             {
                 return new CommandResult(CommandStatus.Empty, null);
             }
@@ -306,7 +462,7 @@ public static class ClipboardImageReader
         }
     }
 
-    private enum CommandStatus
+    internal enum CommandStatus
     {
         Missing,
         Empty,

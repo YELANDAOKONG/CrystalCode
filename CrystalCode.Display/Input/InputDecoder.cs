@@ -38,6 +38,8 @@ public sealed class InputDecoder
             var flat = InputChars.From(burst);
             if (flat.Length >= 2
                 && !flat.Contains(EscapeChar, StringComparison.Ordinal)
+                && !burst.Any(static key => key.KeyChar == '\u0016'
+                    || key.Key == ConsoleKey.V && key.Modifiers.HasFlag(ConsoleModifiers.Control))
                 && HasPrintable(flat)
                 && !IsOnlyEdits(burst))
             {

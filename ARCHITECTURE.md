@@ -183,6 +183,11 @@ not automatically delete unreferenced media files.
 Inline image bytes and absolute image URIs are supported. Images returned by
 an in-process plugin or dotnet operator tool's native `IMultimodalTool` path
 are assigned the same markers and become input on the following model round.
+Clipboard paste reserves its image number before waiting for the OS reader.
+Tool images reserve numbers through the same session lock, which also protects
+image lookup and mutation. A failed paste leaves a gap rather than reusing its
+number. Input batches dispatch keys in order, so Ctrl+V finishes attaching
+before a following Enter submits the prompt.
 Dotnet multimodal tools are omitted from active catalogs when the selected
 model or provider does not support image input.
 
@@ -192,8 +197,14 @@ reasoning, and tool-call events. Chat Completions and Anthropic images are
 restricted to user and tool messages, matching their wire contracts. Clipboard
 image input is read through Windows PowerShell on Windows, the macOS system
 `osascript` command on macOS, and `wl-paste` or `xclip` on Linux; it does not
-capture the screen. A missing reader is reported separately from an empty
-image clipboard. Reader commands are optional at runtime, and their absence
+capture the screen. Windows reads clipboard PNG bytes before falling back to
+bitmap conversion, and passes Base64 text from PowerShell to the host. macOS
+tries PNG, JPEG, and GIF clipboard representations in that order. Linux checks
+advertised clipboard types and tries PNG, JPEG, GIF, and WebP in that order.
+Reader output and temporary files are bounded by the image size limit. A
+missing reader, an empty image clipboard, unsupported image bytes, an oversized
+image, and a reader failure have separate operator errors. Reader commands are
+optional at runtime, and their absence
 does not prevent the application from starting. A model must
 opt in with `imageInput: true`; unsupported combinations are rejected before
 sending a request. Audio/video input and non-text model output are TODO. MCP

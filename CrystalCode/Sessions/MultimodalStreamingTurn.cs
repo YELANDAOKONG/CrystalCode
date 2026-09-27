@@ -21,7 +21,9 @@ public sealed class MultimodalStreamingTurn
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>?
         _compactBeforeRound;
     private readonly SessionRetryOptions _retry;
-    private readonly IDictionary<int, ImageAttachment> _images;
+    private readonly Func<int> _reserveImageNumber;
+    private readonly Action<ImageAttachment> _addImage;
+    private readonly Func<IDictionary<int, ImageAttachment>> _imageSnapshot;
 
     public MultimodalStreamingTurn(
         IStreamingMultimodalChatClient client,
@@ -41,11 +43,53 @@ public sealed class MultimodalStreamingTurn
         _client = client;
         _executor = executor;
         _limits = limits;
-        _images = images;
+        var imageGate = new object();
+        var nextImageNumber = images.Keys.DefaultIfEmpty(0).Max() + 1;
+        _reserveImageNumber = () =>
+        {
+            lock (imageGate)
+            {
+                return nextImageNumber++;
+            }
+        };
+        _addImage = image =>
+        {
+            lock (imageGate)
+            {
+                images.Add(image.Number, image);
+            }
+        };
+        _imageSnapshot = () =>
+        {
+            lock (imageGate)
+            {
+                return new Dictionary<int, ImageAttachment>(images);
+            }
+        };
         _observer = observer;
         _reasoning = reasoning;
         _compactBeforeRound = compactBeforeRound;
         _retry = retry ?? SessionRetryOptions.Default;
+    }
+
+    internal MultimodalStreamingTurn(
+        IStreamingMultimodalChatClient client,
+        IMultimodalToolExecutor executor,
+        TurnLimits limits,
+        IDictionary<int, ImageAttachment> images,
+        ITurnObserver? observer,
+        ReasoningOptions? reasoning,
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>?
+            compactBeforeRound,
+        SessionRetryOptions? retry,
+        Func<int> reserveImageNumber,
+        Action<ImageAttachment> addImage,
+        Func<IDictionary<int, ImageAttachment>> imageSnapshot)
+        : this(client, executor, limits, images, observer, reasoning, compactBeforeRound, retry)
+    {
+        _reserveImageNumber = reserveImageNumber;
+        _addImage = addImage;
+        _imageSnapshot = imageSnapshot;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -104,7 +148,7 @@ public sealed class MultimodalStreamingTurn
 
                 modelCallCount++;
                 var request = new MultimodalChatRequest(
-                    MultimodalTranscript.Convert(transcript, _images),
+                    MultimodalTranscript.Convert(transcript, _imageSnapshot()),
                     _executor.Definitions,
                     _reasoning);
                 var response = await StreamModelAsync(request, usage, linked.Token);
@@ -252,7 +296,7 @@ public sealed class MultimodalStreamingTurn
                         try
                         {
                             var attachment = CreateAttachment(image.Image);
-                            _images.Add(attachment.Number, attachment);
+                            _addImage(attachment);
                             blocks.Add(attachment.TrustedMarker);
                         }
                         catch (Exception exception) when (exception is ArgumentException
@@ -284,7 +328,7 @@ public sealed class MultimodalStreamingTurn
 
     private ImageAttachment CreateAttachment(ImageMedia image)
     {
-        var number = _images.Count == 0 ? 1 : _images.Keys.Max() + 1;
+        var number = _reserveImageNumber();
         return image.Source switch
         {
             InlineMediaSource inline => new ImageAttachment(

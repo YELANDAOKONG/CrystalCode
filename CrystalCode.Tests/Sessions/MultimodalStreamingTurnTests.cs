@@ -39,6 +39,68 @@ public sealed class MultimodalStreamingTurnTests
         Assert.Contains(replay.Contents, content => content is ImageContent);
     }
 
+    [Fact]
+    public async Task RunAsync_ClipboardReservationDuringToolImageInsertion_UsesDistinctNumber()
+    {
+        var client = new ScriptedClient();
+        var images = new Dictionary<int, ImageAttachment>();
+        var imageGate = new object();
+        var nextNumber = 1;
+        var clipboardNumber = 0;
+        int ReserveNumber()
+        {
+            lock (imageGate)
+            {
+                return nextNumber++;
+            }
+        }
+
+        void AddImage(ImageAttachment image)
+        {
+            lock (imageGate)
+            {
+                if (clipboardNumber == 0)
+                {
+                    clipboardNumber = ReserveNumber();
+                    images.Add(clipboardNumber, new ImageAttachment(
+                        clipboardNumber,
+                        "image/png",
+                        new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a }));
+                }
+
+                images.Add(image.Number, image);
+            }
+        }
+
+        Dictionary<int, ImageAttachment> Snapshot()
+        {
+            lock (imageGate)
+            {
+                return new Dictionary<int, ImageAttachment>(images);
+            }
+        }
+
+        var turn = new MultimodalStreamingTurn(
+            client,
+            new ImageToolExecutor(),
+            TurnLimits.Unlimited,
+            Snapshot(),
+            null,
+            null,
+            null,
+            null,
+            ReserveNumber,
+            AddImage,
+            Snapshot);
+
+        var result = await turn.RunAsync(
+            [new ChatMessage(ChatRole.User, "render")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(2, clipboardNumber);
+        Assert.Equal([1, 2], images.Keys.Order());
+    }
+
     private sealed class ScriptedClient : IStreamingMultimodalChatClient
     {
         public MultimodalChatCapabilities Capabilities { get; } = new(

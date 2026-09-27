@@ -346,7 +346,10 @@ enter the prompt, or press Ctrl+V to attach an image from the clipboard.
 Clipboard image paste uses Windows PowerShell on Windows, the built-in
 `osascript` command on macOS, and `wl-paste` or `xclip` on Linux. If a reader
 is unavailable, Crystal Code reports that separately from a clipboard with
-no image. The composer and transcript show
+no image. Windows supports raw PNG clipboard data and bitmap fallback; macOS
+accepts PNG, JPEG, and GIF clipboard representations; Linux accepts advertised
+PNG, JPEG, GIF, and WebP formats. Ctrl+V is handled before a following Enter
+in the same key batch. The composer and transcript show
 `[Image #N]`; pasted markers have a distinct color and behave as one editing
 unit. Typing the same text does not attach an image. Raw image data is kept out
 of rendered text.
