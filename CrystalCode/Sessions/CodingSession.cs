@@ -1590,11 +1590,12 @@ public sealed class CodingSession
             PlanMode = _planMode,
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_transcript),
+            ImageMarkersTagged = true,
             Images =
             [
                 .. SessionMapper.WriteImages(_images.Values.Where(IsReferencedInTranscript)),
                 .. _unavailableImages.Where(image => IsReferencedInTranscript(
-                    $"[Image #{image.Number}]"))
+                    ImageMarkerText.Tag(image.Number)))
             ],
             Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
             UserTurns = _ledger.UserTurns,
@@ -1736,7 +1737,13 @@ public sealed class CodingSession
         _sessionId = document.Id!;
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         _planMode = document.PlanMode;
-        _transcript = items;
+        _transcript = document.ImageMarkersTagged
+            ? items
+            : ImageMarkerText.TagLegacy(
+                items,
+                document.Images.Where(static image => image is not null)
+                    .Select(static image => image.Number)
+                    .ToHashSet());
         _images = new Dictionary<int, ImageAttachment>(
             _sessionStore.ReadImages(document.Images));
         _unavailableImages = document.Images
@@ -2040,7 +2047,7 @@ public sealed class CodingSession
         _renderer.WriteUser(message);
         _transcript.Add(new ChatMessage(ChatRole.User, message));
         _draftImages.RemoveWhere(number => message.Contains(
-            _images[number].Marker,
+            _images[number].TrustedMarker,
             StringComparison.Ordinal));
         _turnSource = new CancellationTokenSource();
         _turnActive = true;
@@ -2084,7 +2091,7 @@ public sealed class CodingSession
 
         var markers = string.Join(
             ' ',
-            _pendingImages.Select(number => _images[number].Marker));
+            _pendingImages.Select(number => _images[number].TrustedMarker));
         _pendingImages.Clear();
         return input.Length == 0 ? markers : input + "\n\n" + markers;
     }
@@ -2105,12 +2112,12 @@ public sealed class CodingSession
                 _ => null
             };
             return text is not null && _images.Values.Any(image =>
-                text.Contains(image.Marker, StringComparison.Ordinal));
+                text.Contains(image.TrustedMarker, StringComparison.Ordinal));
         });
     }
 
     private bool IsReferencedInTranscript(ImageAttachment image) =>
-        IsReferencedInTranscript(image.Marker);
+        IsReferencedInTranscript(image.TrustedMarker);
 
     private bool IsReferencedInTranscript(string marker) =>
         _transcript.Any(item => item switch
@@ -2136,8 +2143,8 @@ public sealed class CodingSession
         foreach (var number in _draftImages.ToArray())
         {
             var image = _images[number];
-            if (input.Contains(image.Marker, StringComparison.Ordinal)
-                || queued.Any(text => text.Contains(image.Marker, StringComparison.Ordinal)))
+            if (input.Contains(image.TrustedMarker, StringComparison.Ordinal)
+                || queued.Any(text => text.Contains(image.TrustedMarker, StringComparison.Ordinal)))
             {
                 continue;
             }

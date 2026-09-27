@@ -12,7 +12,8 @@ public sealed class ComposerBuffer
     private const int MaximumHistory = 200;
     private readonly StringBuilder _text = new();
     private readonly List<string> _history = [];
-    private readonly HashSet<string> _atomicText = new(StringComparer.Ordinal);
+    private readonly List<AtomicSpan> _atomicSpans = [];
+    private readonly List<AtomicSpan> _draftAtomicSpans = [];
     private int _cursor;
     private int _historyIndex;
     private string _draft = string.Empty;
@@ -22,6 +23,22 @@ public sealed class ComposerBuffer
     public bool PlanMode { get; set; }
 
     public string Text => _text.ToString();
+
+    public const char ImageMarkerPrefix = '\u2063';
+
+    public string SubmissionText
+    {
+        get
+        {
+            var value = new StringBuilder(Text);
+            for (var index = _atomicSpans.Count - 1; index >= 0; index--)
+            {
+                value.Insert(_atomicSpans[index].Start, ImageMarkerPrefix);
+            }
+
+            return value.ToString();
+        }
+    }
 
     public int Cursor => _cursor;
 
@@ -156,6 +173,7 @@ public sealed class ComposerBuffer
         _text.Clear();
         _text.Append(text);
         _cursor = _text.Length;
+        _atomicSpans.Clear();
     }
 
     public void Insert(string text)
@@ -168,6 +186,15 @@ public sealed class ComposerBuffer
 
         DetachHistoryNavigation();
         _cursor = SnapCursor(_cursor, moveRight: true);
+        for (var index = 0; index < _atomicSpans.Count; index++)
+        {
+            var span = _atomicSpans[index];
+            if (span.Start >= _cursor)
+            {
+                _atomicSpans[index] = span with { Start = span.Start + text.Length };
+            }
+        }
+
         _text.Insert(_cursor, text);
         _cursor += text.Length;
     }
@@ -176,16 +203,19 @@ public sealed class ComposerBuffer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         Insert(text);
-        _atomicText.Add(text);
+        _atomicSpans.Add(new AtomicSpan(_cursor - text.Length, text.Length));
+        _atomicSpans.Sort(static (left, right) => left.Start.CompareTo(right.Start));
     }
 
     public void Clear()
     {
         _text.Clear();
+        _atomicSpans.Clear();
         _cursor = 0;
         _historyIndex = _history.Count;
         _draft = string.Empty;
         _draftCursor = 0;
+        _draftAtomicSpans.Clear();
     }
 
     public void SeedHistory(IEnumerable<string> entries)
@@ -212,8 +242,9 @@ public sealed class ComposerBuffer
 
     public void ForgetImageHistory()
     {
-        _history.RemoveAll(entry => entry.Contains("[Image #", StringComparison.Ordinal));
-        _atomicText.Clear();
+        _history.RemoveAll(entry => entry.Contains(ImageMarkerPrefix));
+        _atomicSpans.Clear();
+        _draftAtomicSpans.Clear();
         _historyIndex = _history.Count;
         _draft = Text;
         _draftCursor = _cursor;
@@ -222,7 +253,8 @@ public sealed class ComposerBuffer
     public void RememberAndClear()
     {
         var value = Text;
-        if (!string.IsNullOrWhiteSpace(value)
+        if (_atomicSpans.Count == 0
+            && !string.IsNullOrWhiteSpace(value)
             && (_history.Count == 0
                 || !string.Equals(_history[^1], value, StringComparison.Ordinal)))
         {
@@ -254,9 +286,11 @@ public sealed class ComposerBuffer
         var lines = new List<PaintLine>(wrapped.Count);
         var modeColor = PlanMode ? Theme.Plan : Theme.Work;
 
+        var bodyStart = 0;
         for (var i = 0; i < wrapped.Count; i++)
         {
             var body = wrapped[i];
+            var bodyMarkup = ColorBody(body, bodyStart);
             if (i == 0)
             {
                 if (string.IsNullOrEmpty(text))
@@ -274,14 +308,21 @@ public sealed class ComposerBuffer
                 {
                     var plain = promptPlain + body;
                     var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
-                        + $"[{Theme.Chrome}] > [/]{MarkupText.Escape(body)}";
+                        + $"[{Theme.Chrome}] > [/]{bodyMarkup}";
                     lines.Add(new PaintLine(markup, plain));
                 }
             }
             else
             {
                 var plain = new string(' ', promptColumns) + body;
-                lines.Add(new PaintLine(MarkupText.Escape(plain), plain));
+                lines.Add(new PaintLine(MarkupText.Escape(new string(' ', promptColumns))
+                    + bodyMarkup, plain));
+            }
+
+            bodyStart += body.Length;
+            if (bodyStart < text.Length && text[bodyStart] == '\n')
+            {
+                bodyStart++;
             }
         }
 
@@ -400,49 +441,46 @@ public sealed class ComposerBuffer
     private void DeleteRange(int from, int to)
     {
         DetachHistoryNavigation();
-        var text = Text;
         bool expanded;
         do
         {
             expanded = false;
-            foreach (var token in _atomicText)
+            foreach (var span in _atomicSpans)
             {
-                var start = 0;
-                while ((start = text.IndexOf(token, start, StringComparison.Ordinal)) >= 0)
+                var end = span.Start + span.Length;
+                if (from < end && to > span.Start
+                    && (from > span.Start || to < end))
                 {
-                    var end = start + token.Length;
-                    if (from < end && to > start && (from > start || to < end))
-                    {
-                        from = Math.Min(from, start);
-                        to = Math.Max(to, end);
-                        expanded = true;
-                    }
-
-                    start = end;
+                    from = Math.Min(from, span.Start);
+                    to = Math.Max(to, end);
+                    expanded = true;
                 }
             }
         }
         while (expanded);
 
         _text.Remove(from, to - from);
+        _atomicSpans.RemoveAll(span => span.Start < to && span.Start + span.Length > from);
+        for (var index = 0; index < _atomicSpans.Count; index++)
+        {
+            var span = _atomicSpans[index];
+            if (span.Start >= to)
+            {
+                _atomicSpans[index] = span with { Start = span.Start - (to - from) };
+            }
+        }
+
         _cursor = from;
     }
 
     private int SnapCursor(int position, bool moveRight)
     {
-        var text = Text;
-        foreach (var token in _atomicText)
+        foreach (var span in _atomicSpans)
         {
-            var start = 0;
-            while ((start = text.IndexOf(token, start, StringComparison.Ordinal)) >= 0)
+            var end = span.Start + span.Length;
+            if (position > span.Start && position < end)
             {
-                var end = start + token.Length;
-                if (position > start && position < end)
-                {
-                    return moveRight ? end : start;
-                }
-
-                start = end;
+                return moveRight ? end : span.Start;
             }
         }
 
@@ -518,6 +556,8 @@ public sealed class ComposerBuffer
         {
             _draft = Text;
             _draftCursor = _cursor;
+            _draftAtomicSpans.Clear();
+            _draftAtomicSpans.AddRange(_atomicSpans);
         }
 
         var next = _historyIndex + delta;
@@ -529,6 +569,11 @@ public sealed class ComposerBuffer
         _historyIndex = next;
         _text.Clear();
         _text.Append(_historyIndex == _history.Count ? _draft : _history[_historyIndex]);
+        _atomicSpans.Clear();
+        if (_historyIndex == _history.Count)
+        {
+            _atomicSpans.AddRange(_draftAtomicSpans);
+        }
         _cursor = _historyIndex == _history.Count
             ? _draftCursor
             : delta < 0 ? 0 : _text.Length;
@@ -632,4 +677,30 @@ public sealed class ComposerBuffer
 
         return (row, column);
     }
+
+    private string ColorBody(string body, int start)
+    {
+        var markup = new StringBuilder();
+        var cursor = 0;
+        foreach (var span in _atomicSpans)
+        {
+            var from = Math.Max(span.Start - start, 0);
+            var to = Math.Min(span.Start + span.Length - start, body.Length);
+            if (from >= to)
+            {
+                continue;
+            }
+
+            markup.Append(MarkupText.Escape(body[cursor..from]));
+            markup.Append($"[{Theme.Image}]");
+            markup.Append(MarkupText.Escape(body[from..to]));
+            markup.Append("[/]");
+            cursor = to;
+        }
+
+        markup.Append(MarkupText.Escape(body[cursor..]));
+        return markup.ToString();
+    }
+
+    private sealed record AtomicSpan(int Start, int Length);
 }

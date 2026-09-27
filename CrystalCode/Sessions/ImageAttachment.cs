@@ -88,6 +88,8 @@ public sealed record ImageAttachment
 
     public string Marker => $"[Image #{Number}]";
 
+    public string TrustedMarker => ImageMarkerText.Tag(Number);
+
     public bool Equals(ImageAttachment? other) =>
         other is not null
         && Number == other.Number

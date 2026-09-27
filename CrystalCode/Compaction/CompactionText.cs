@@ -1,6 +1,8 @@
 using Crystal.Chat;
 using Crystal.Tools;
 
+using CrystalCode.Sessions;
+
 namespace CrystalCode.Compaction;
 
 /// <summary>
@@ -31,15 +33,18 @@ public static class CompactionText
         ArgumentNullException.ThrowIfNull(item);
         return item switch
         {
-            ChatMessage message when message.Role == ChatRole.User => "[User]: " + message.Text,
-            ChatMessage message when message.Role == ChatRole.Assistant => "[Assistant]: " + message.Text,
-            ChatMessage message when CompactionSelection.IsSummary(message) => message.Text,
+            ChatMessage message when message.Role == ChatRole.User =>
+                "[User]: " + ImageMarkerText.Display(message.Text),
+            ChatMessage message when message.Role == ChatRole.Assistant =>
+                "[Assistant]: " + ImageMarkerText.Display(message.Text),
+            ChatMessage message when CompactionSelection.IsSummary(message) =>
+                ImageMarkerText.Display(message.Text),
             ToolCall call => "[Assistant tool call]: " + call.Name + "(" + call.Arguments + ")",
             ToolResult result when result.Status == ToolResultStatus.Failure =>
-                "[Tool error]: " + Truncate(result.Text),
+                "[Tool error]: " + Truncate(ImageMarkerText.Display(result.Text)),
             ToolResult result when result.Text == ContextCompactor.OmittedResultText =>
                 "[Tool result]: [Old tool result content cleared]",
-            ToolResult result => "[Tool result]: " + Truncate(result.Text),
+            ToolResult result => "[Tool result]: " + Truncate(ImageMarkerText.Display(result.Text)),
             _ => string.Empty
         };
     }

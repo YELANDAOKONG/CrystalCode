@@ -253,7 +253,7 @@ public sealed class MultimodalStreamingTurn
                         {
                             var attachment = CreateAttachment(image.Image);
                             _images.Add(attachment.Number, attachment);
-                            blocks.Add(attachment.Marker);
+                            blocks.Add(attachment.TrustedMarker);
                         }
                         catch (Exception exception) when (exception is ArgumentException
                             or NotSupportedException)

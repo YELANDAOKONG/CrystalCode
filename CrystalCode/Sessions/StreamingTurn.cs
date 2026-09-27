@@ -95,7 +95,10 @@ public sealed class StreamingTurn
                 }
 
                 modelCallCount++;
-                var request = new ChatRequest(transcript, _executor.Definitions, _reasoning);
+                var request = new ChatRequest(
+                    ImageMarkerText.ForTextModel(transcript),
+                    _executor.Definitions,
+                    _reasoning);
                 var response = await StreamModelAsync(request, usage, linked.Token);
                 usage.Add(response.Usage);
                 _observer?.OnUsageUpdated(response.Usage ?? usage.Last, usage.Build());

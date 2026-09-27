@@ -11,7 +11,7 @@ using Crystal.Tools;
 namespace CrystalCode.Sessions;
 
 /// <summary>Projects the text transcript and referenced images onto Crystal contracts.</summary>
-public static partial class MultimodalTranscript
+public static class MultimodalTranscript
 {
     public static IReadOnlyList<MultimodalChatItem> Convert(
         IReadOnlyList<ChatItem> items,
@@ -28,7 +28,9 @@ public static partial class MultimodalTranscript
     {
         ChatMessage message => new MultimodalMessage(
             new MultimodalChatRole(message.Role.Value),
-            ConvertMessage(message.Text, images)),
+            message.Role == ChatRole.User
+                ? ConvertMessage(message.Text, images)
+                : [new TextContent(ImageMarkerText.Display(message.Text))]),
         ChatReasoningItem reasoning => new MultimodalReasoningItem(
             new MultimodalReasoningContent(
                 reasoning.Content.TextSegments.Select(static text =>
@@ -58,7 +60,7 @@ public static partial class MultimodalTranscript
     {
         var contents = new List<MultimodalContent>();
         var cursor = 0;
-        foreach (Match match in ImageMarker().Matches(text))
+        foreach (Match match in ImageMarkerText.Matches(text))
         {
             if (!int.TryParse(match.Groups[1].Value, out var number)
                 || !images.TryGetValue(number, out var image))
@@ -68,7 +70,8 @@ public static partial class MultimodalTranscript
 
             if (match.Index > cursor)
             {
-                contents.Add(new TextContent(text[cursor..match.Index]));
+                contents.Add(new TextContent(
+                    ImageMarkerText.Display(text[cursor..match.Index])));
             }
 
             contents.Add(new ImageContent(new ImageMedia(
@@ -81,12 +84,9 @@ public static partial class MultimodalTranscript
 
         if (cursor < text.Length || contents.Count == 0)
         {
-            contents.Add(new TextContent(text[cursor..]));
+            contents.Add(new TextContent(ImageMarkerText.Display(text[cursor..])));
         }
 
         return contents;
     }
-
-    [GeneratedRegex(@"\[Image #(\d+)\]", RegexOptions.CultureInvariant)]
-    private static partial Regex ImageMarker();
 }

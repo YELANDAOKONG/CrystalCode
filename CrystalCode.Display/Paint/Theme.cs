@@ -12,6 +12,8 @@ public static class Theme
 
     public const string User = "grey84";
 
+    public const string Image = "darkseagreen";
+
     public const string Thinking = "grey46";
 
     public const string Tool = "grey62";
@@ -44,4 +46,3 @@ public static class Theme
 
     public const string Accent = "lightsteelblue";
 }
-

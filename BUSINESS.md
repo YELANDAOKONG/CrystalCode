@@ -63,8 +63,9 @@ operator surface and the only entry. It can:
   in JSON, and
   carry generic plugin-returned images into the next model round when a model
   explicitly declares image-input support;
-- edit pasted image markers as single composer units and discard unsent images
-  whose markers were deleted;
+- color pasted image markers and edit them as single composer units while
+  identically spelled user text remains ordinary text; discard unsent images
+  whose attached markers were deleted;
 - register built-in tools and providers through an in-process plugin table.
 
 ## Deferred product work

@@ -46,7 +46,7 @@ public static class TranscriptReplay
                     var kind = result.Status == ToolResultStatus.Success
                         ? TranscriptKind.Result
                         : TranscriptKind.Error;
-                    var body = ToolResultText.Body(result.Text);
+                    var body = ToolResultText.Body(ImageMarkerText.Display(result.Text));
                     if (body.Length > 0)
                     {
                         lines.Add(new TranscriptLine(kind, body, toolName));
@@ -64,7 +64,7 @@ public static class TranscriptReplay
         out TranscriptKind kind,
         out string text)
     {
-        text = message.Text;
+        text = ImageMarkerText.Display(message.Text);
         if (message.Role == ChatRole.User)
         {
             kind = TranscriptKind.User;

@@ -125,6 +125,58 @@ public sealed class ComposerBufferTests
     }
 
     [Fact]
+    public void Project_ColorsOnlyAttachedMarkerWithTheSameTypedText()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("[Image #1] ");
+        buffer.InsertAtomic("[Image #1]");
+
+        var view = buffer.Project(80, 8);
+
+        Assert.Equal("Work > [Image #1] [Image #1]", Assert.Single(view.Lines).Plain);
+        Assert.Contains($"[{Theme.Image}]", view.Lines[0].Markup, StringComparison.Ordinal);
+        Assert.Equal(1, view.Lines[0].Markup.Split($"[{Theme.Image}]").Length - 1);
+        Assert.Equal("[Image #1] " + ComposerBuffer.ImageMarkerPrefix + "[Image #1]",
+            buffer.SubmissionText);
+
+        buffer.Handle(new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false));
+        Assert.Equal("[Image #1] ", buffer.Text);
+        Assert.Equal(buffer.Text, buffer.SubmissionText);
+
+        buffer.Handle(new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false));
+        buffer.Handle(new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false));
+        Assert.Equal("[Image #1", buffer.Text);
+    }
+
+    [Fact]
+    public void Handle_HistoryNavigationRestoresAttachedMarkerIdentity()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.SeedHistory(["older"]);
+        buffer.InsertAtomic("[Image #1]");
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.DownArrow, false, false, false));
+
+        Assert.Equal(ComposerBuffer.ImageMarkerPrefix + "[Image #1]",
+            buffer.SubmissionText);
+    }
+
+    [Fact]
+    public void Project_ColorsAttachedMarkerOnLaterComposerRow()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("request\n");
+        buffer.InsertAtomic("[Image #1]");
+
+        var view = buffer.Project(30, 8);
+
+        Assert.Equal(2, view.Lines.Count);
+        Assert.Contains($"[{Theme.Image}]", view.Lines[1].Markup, StringComparison.Ordinal);
+        Assert.EndsWith("[Image #1]", view.Lines[1].Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Handle_ArrowAndDeleteTreatImageMarkerAsOneUnit()
     {
         var buffer = new ComposerBuffer();

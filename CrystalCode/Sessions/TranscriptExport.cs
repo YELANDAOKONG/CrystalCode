@@ -91,13 +91,13 @@ public static class TranscriptExport
             case ChatMessage message when message.Role == ChatRole.User:
                 lines.Add("### User");
                 lines.Add(string.Empty);
-                lines.Add(message.Text.Trim());
+                lines.Add(ImageMarkerText.Display(message.Text).Trim());
                 lines.Add(string.Empty);
                 break;
             case ChatMessage message when message.Role == ChatRole.Assistant:
                 lines.Add("### Assistant");
                 lines.Add(string.Empty);
-                lines.Add(message.Text.Trim());
+                lines.Add(ImageMarkerText.Display(message.Text).Trim());
                 lines.Add(string.Empty);
                 break;
             case ChatMessage message when CompactionSelection.IsSummary(message):
@@ -120,7 +120,7 @@ public static class TranscriptExport
                     : "### Tool error");
                 lines.Add(string.Empty);
                 lines.Add("```");
-                lines.Add(result.Text.Trim());
+                lines.Add(ImageMarkerText.Display(result.Text).Trim());
                 lines.Add("```");
                 lines.Add(string.Empty);
                 break;

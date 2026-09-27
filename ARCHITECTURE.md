@@ -154,10 +154,15 @@ CrystalCode owns terminal image attachment, MIME signature validation,
 session persistence, transcript markers, and projection onto Crystal's typed
 multimodal contracts. `[Image #N]` is presentation and persistence metadata;
 providers receive typed `ImageContent`, never a marker in place of its bytes.
-Pasted markers are atomic composer text: cursor movement and deletion cannot
-leave a partial marker. Only complete markers in submitted transcript items
-produce model images; deleted unsent images are discarded immediately while
-idle and at submission during an active turn. Workspace and clipboard images
+Pasted markers are atomic composer spans with a distinct color: cursor movement
+and deletion cannot leave a partial attached marker. User-entered text with the
+same spelling remains plain text. On submission, only attached spans receive an
+invisible provenance prefix; only prefixed markers in transcript items produce
+model images. The prefix is removed for display and text-only model requests.
+Session JSON records whether markers have this prefix. Older sessions without
+that flag tag references to their saved images on load, preserving their prior
+semantics. Deleted unsent images are discarded immediately while idle and at
+submission during an active turn. Workspace and clipboard images
 are checked against the 20 MiB limit and validated by MIME signature before
 they enter the session; the media store validates again before writing. Saved
 image bytes live in owner-only, content-addressed files under
@@ -170,7 +175,8 @@ remain available; the operator receives a note, and its reference is retained
 on later saves so restoring the file can repair the session. Inline `data` is
 a supported session representation; local saves move its image bytes to the
 media store.
-JSON session export inlines available image bytes in `data` so its contents do
+JSON session export retains marker provenance and inlines available image bytes
+in `data` so its contents do
 not depend on Home media files. If a referenced media file is unavailable, its
 metadata remains in the export but bytes cannot be included. The store does
 not automatically delete unreferenced media files.

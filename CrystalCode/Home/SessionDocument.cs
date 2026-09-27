@@ -19,6 +19,8 @@ public sealed class SessionDocument
 
     public List<SessionImageDocument> Images { get; set; } = [];
 
+    public bool ImageMarkersTagged { get; set; }
+
     public List<SessionTodoDocument> Todos { get; set; } = [];
 
     public int UserTurns { get; set; }

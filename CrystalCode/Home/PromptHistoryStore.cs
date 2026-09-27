@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using CrystalCode.Display.Composer;
+
 namespace CrystalCode.Home;
 
 internal sealed class PromptHistoryStore
@@ -32,7 +34,7 @@ internal sealed class PromptHistoryStore
     public async Task AppendAsync(string text, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(text);
-        if (string.IsNullOrWhiteSpace(text) || text.Contains("[Image #", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(text) || text.Contains(ComposerBuffer.ImageMarkerPrefix))
         {
             return;
         }
@@ -104,7 +106,7 @@ internal sealed class PromptHistoryStore
                 if (entry is not null
                     && !string.IsNullOrWhiteSpace(entry.Workspace)
                     && !string.IsNullOrWhiteSpace(entry.Text)
-                    && !entry.Text.Contains("[Image #", StringComparison.Ordinal))
+                    && !entry.Text.Contains(ComposerBuffer.ImageMarkerPrefix))
                 {
                     entries.Add(entry);
                 }

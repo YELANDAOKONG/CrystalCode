@@ -347,7 +347,9 @@ Clipboard image paste uses Windows PowerShell on Windows, the built-in
 `osascript` command on macOS, and `wl-paste` or `xclip` on Linux. If a reader
 is unavailable, Crystal Code reports that separately from a clipboard with
 no image. The composer and transcript show
-`[Image #N]`; raw image data is kept out of rendered text.
+`[Image #N]`; pasted markers have a distinct color and behave as one editing
+unit. Typing the same text does not attach an image. Raw image data is kept out
+of rendered text.
 PNG, JPEG, GIF, and WebP input is accepted up to 20 MiB per image. Optional
 multimodal plugin tools may return generic Crystal `ImageContent`, which is
 fed into the next model round. Screenshot capture, device/browser/VM control,

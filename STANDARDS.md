@@ -73,6 +73,8 @@
 - Do not put image bytes, data URIs, or remote image URIs in composer text,
   transcript rendering, logs, diagnostics, or exception messages. Use stable
   `[Image #N]` markers.
+- Treat attachment provenance as separate from marker spelling. User-entered
+  text that resembles an image marker is plain text, not a media reference.
 - Prompt history persists text-only entries under `~/.crystal` with owner-only
   permissions where supported. Do not persist image markers without their
   session attachment identity.

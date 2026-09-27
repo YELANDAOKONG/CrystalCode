@@ -924,7 +924,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             _queueItems.Clear();
-            _queueItems.AddRange(items);
+            _queueItems.AddRange(items.Select(ImageMarkerText.Display));
             _chrome.Queued = _queueItems.Count;
             PaintUnlocked(force: true);
         }
@@ -962,7 +962,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             }
 
             _composer.Clear();
-            OnComposerEdited?.Invoke(_composer.Text);
+            OnComposerEdited?.Invoke(_composer.SubmissionText);
             _picker = null;
             PaintUnlocked(force: true);
             return true;
@@ -1296,7 +1296,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
         {
             _composer.Replace(_picker.CompletedText);
-            OnComposerEdited?.Invoke(_composer.Text);
+            OnComposerEdited?.Invoke(_composer.SubmissionText);
             return null;
         }
 
@@ -1305,7 +1305,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             && !_picker.IsExact(_composer.Text))
         {
             _composer.Replace(_picker.CompletedText);
-            OnComposerEdited?.Invoke(_composer.Text);
+            OnComposerEdited?.Invoke(_composer.SubmissionText);
             return null;
         }
 
@@ -1326,7 +1326,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         switch (action)
         {
             case ComposerAction.Submit:
-                var text = _composer.Text;
+                var text = _composer.SubmissionText;
                 _composer.RememberAndClear();
                 _picker = null;
                 _scrollBack = 0;
@@ -1352,7 +1352,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             && !(key.Modifiers.HasFlag(ConsoleModifiers.Control)
                 && key.Key is ConsoleKey.P or ConsoleKey.N))
         {
-            OnComposerEdited?.Invoke(_composer.Text);
+            OnComposerEdited?.Invoke(_composer.SubmissionText);
         }
 
         return null;
@@ -1410,8 +1410,9 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         lock (_gate)
         {
             CommitLiveUnlocked();
-            _log.Add(kind, text);
-            WriteFallback(kind, text);
+            var displayText = ImageMarkerText.Display(text);
+            _log.Add(kind, displayText);
+            WriteFallback(kind, displayText);
             PaintUnlocked(force: true);
         }
     }
