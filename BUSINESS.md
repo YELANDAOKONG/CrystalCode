@@ -99,7 +99,7 @@ context, or draw a UI.
 
 Crystal.Harness is a named-Agent composition runtime with shared budgets. It
 is not this product. This product is named CrystalCode because it is the
-coding product built on Crystal.
+coding product built on Crystal. Its Chinese name is "晶码".
 
 ## Data
 
