@@ -32,5 +32,5 @@ internal sealed class SettingsDocument
 
     public double? CompactionThreshold { get; set; }
 
-    public Dictionary<string, ProviderDocument>? Providers { get; set; }
+    public System.Text.Json.JsonElement? Providers { get; set; }
 }

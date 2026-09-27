@@ -24,7 +24,7 @@ public static class SlashCatalog
             ["on", "off", "reset"]),
         new(SessionVerb.Clear, "clear", ["new"], "New conversation"),
         new(SessionVerb.Cd, "cd", [], "Show or set workspace"),
-        new(SessionVerb.Resume, "resume", ["continue"], "Replay latest or ID"),
+        new(SessionVerb.Resume, "resume", ["continue"], "Choose saved session or ID"),
         new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
         new(SessionVerb.Sessions, "sessions", [], "List workspace sessions or all", ["all"]),
         new(SessionVerb.Compact, "compact", ["summarize"], "Summarize older context now"),

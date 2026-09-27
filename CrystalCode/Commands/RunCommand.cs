@@ -22,13 +22,45 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         var home = CrystalHome.Resolve(settings.Home);
         var workspace = ResolveWorkspace(settings.Workspace);
         SessionDocument? resume = null;
-        if (!string.IsNullOrWhiteSpace(settings.Resume))
+        if (settings.Resume.IsSet)
         {
             var sessions = new SessionStore(home);
+            var id = settings.Resume.Value;
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                var available = sessions.List(workspace);
+                if (available.Count == 0)
+                {
+                    AnsiConsole.MarkupLine("[red]No session for this workspace[/]");
+                    return 1;
+                }
+
+                if (Console.IsInputRedirected)
+                {
+                    AnsiConsole.MarkupLine(
+                        "[red]Interactive resume requires a terminal. Pass --resume <id>.[/]");
+                    return 1;
+                }
+
+                using var pickerRenderer = new SessionRenderer();
+                using (pickerRenderer.Open())
+                {
+                    id = await new SessionPicker(pickerRenderer).ChooseAsync(
+                        available,
+                        currentId: null,
+                        cancellationToken);
+                }
+
+                if (id is null)
+                {
+                    return 0;
+                }
+            }
+
             if (!SessionResume.TryLoad(
                     sessions,
                     workspace,
-                    settings.Resume,
+                    id,
                     out resume,
                     out var resumeError))
             {

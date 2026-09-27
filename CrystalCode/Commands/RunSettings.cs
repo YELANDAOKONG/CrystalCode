@@ -19,6 +19,6 @@ public sealed class RunSettings : CommandSettings
     [CommandOption("--home <PATH>")]
     public string? Home { get; init; }
 
-    [CommandOption("-r|--resume <ID>")]
-    public string? Resume { get; init; }
+    [CommandOption("-r|--resume [ID]")]
+    public required FlagValue<string?> Resume { get; init; }
 }

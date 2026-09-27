@@ -37,8 +37,8 @@ operator surface and the only entry. It can:
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace;
-- list saved sessions for the current workspace or every workspace, resume a
-  saved conversation, and fork a conversation into a new independent session;
+- list saved sessions for the current workspace or every workspace, choose a
+  saved conversation by recent update time, and fork into a new independent session;
 - discover OpenCode-compatible agent skills and load them through the
   `skill` tool when Skills is enabled;
 - discover operator tool sets under `~/.crystal/tools` and
@@ -51,10 +51,14 @@ operator surface and the only entry. It can:
   Home `author`, Project `host`);
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses, and
   Anthropic Messages adapters, including user-added gateways;
+- group one gateway's protocol endpoints under a single provider name and route
+  each uniquely named model through its configured protocol;
 - attach PNG, JPEG, GIF, or WebP images from the workspace, paste clipboard
   images on supported terminals, persist image references with sessions, and
   carry generic plugin-returned images into the next model round when a model
   explicitly declares image-input support;
+- edit pasted image markers as single composer units and discard unsent images
+  whose markers were deleted;
 - register built-in tools and providers through an in-process plugin table.
 
 ## Deferred product work

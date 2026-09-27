@@ -54,10 +54,10 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
         ArgumentException.ThrowIfNullOrWhiteSpace(currentModel);
 
         var blocks = new List<string>();
-        foreach (var (providerName, provider) in catalog.Providers)
+        foreach (var providerName in catalog.Providers.Keys)
         {
             var lines = new List<string> { providerName };
-            foreach (var model in provider.Models.Keys)
+            foreach (var model in catalog.GetModelNames(new ProviderName(providerName)))
             {
                 var current = providerName == currentProvider.Value
                     && string.Equals(model, currentModel, StringComparison.Ordinal);
@@ -79,8 +79,7 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
     {
         selection = null;
         error = string.Empty;
-        var current = catalog.Get(currentProvider);
-        if (current.TryGetModel(token, out _))
+        if (catalog.GetModelNames(currentProvider).Contains(token, StringComparer.Ordinal))
         {
             selection = new ModelSelection(currentProvider, token);
             return true;
@@ -103,9 +102,13 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
 
         if (ProviderName.TryParse(token, out var providerName)
             && providerName is not null
-            && catalog.Providers.TryGetValue(providerName.Value, out var provider))
+            && catalog.Providers.ContainsKey(providerName.Value))
         {
-            return TrySelectProvider(providerName, provider, out selection, out error);
+            return TrySelectProvider(
+                providerName,
+                catalog.GetModelNames(providerName),
+                out selection,
+                out error);
         }
 
         error =
@@ -131,7 +134,7 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
 
         if (!ProviderName.TryParse(providerToken, out var providerName)
             || providerName is null
-            || !catalog.Providers.TryGetValue(providerName.Value, out var provider))
+            || !catalog.Providers.ContainsKey(providerName.Value))
         {
             error =
                 $"Provider '{providerToken.Trim()}' is not configured. "
@@ -139,7 +142,7 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
             return false;
         }
 
-        if (!provider.TryGetModel(model, out _))
+        if (!catalog.GetModelNames(providerName).Contains(model, StringComparer.Ordinal))
         {
             error =
                 $"Model '{model}' is not configured for provider '{providerName.Value}'. "
@@ -153,19 +156,19 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
 
     private static bool TrySelectProvider(
         ProviderName providerName,
-        ProviderDefinition provider,
+        IReadOnlyList<string> models,
         out ModelSelection? selection,
         out string error)
     {
         selection = null;
         error = string.Empty;
-        if (provider.Models.Count == 1)
+        if (models.Count == 1)
         {
-            selection = new ModelSelection(providerName, provider.Models.Keys.First());
+            selection = new ModelSelection(providerName, models[0]);
             return true;
         }
 
-        if (provider.Models.Count == 0)
+        if (models.Count == 0)
         {
             error = $"Provider '{providerName.Value}' has no models configured.";
             return false;
@@ -180,9 +183,9 @@ public sealed record ModelSelection(ProviderName Provider, string Model)
     private static List<ModelSelection> FindModels(ProviderCatalog catalog, string token)
     {
         var matches = new List<ModelSelection>();
-        foreach (var (name, provider) in catalog.Providers)
+        foreach (var name in catalog.Providers.Keys)
         {
-            if (provider.TryGetModel(token, out _))
+            if (catalog.GetModelNames(new ProviderName(name)).Contains(token, StringComparer.Ordinal))
             {
                 matches.Add(new ModelSelection(new ProviderName(name), token));
             }

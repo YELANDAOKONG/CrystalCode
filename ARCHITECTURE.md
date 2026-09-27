@@ -154,6 +154,10 @@ CrystalCode owns terminal image attachment, MIME signature validation,
 session persistence, transcript markers, and projection onto Crystal's typed
 multimodal contracts. `[Image #N]` is presentation and persistence metadata;
 providers receive typed `ImageContent`, never a marker in place of its bytes.
+Pasted markers are atomic composer text: cursor movement and deletion cannot
+leave a partial marker. Only complete markers in submitted transcript items
+produce model images; unused pasted images are discarded, and session files
+persist only images referenced by the transcript.
 Inline image bytes and absolute image URIs are supported. Images returned by
 an in-process plugin or dotnet operator tool's native `IMultimodalTool` path
 are assigned the same markers and become input on the following model round.
@@ -402,12 +406,15 @@ completed turn, after a successful `/compact`, and on an orderly exit
 when the transcript has a user message or a compaction summary. The
 file stores the compacted model transcript (live system prompt, one
 summary, recent tail), the last usage snapshot, and cumulative provider usage.
-`crystal --resume
-<id>` (`-r`) loads that file at process start; a missing or empty
-session exits without entering the TTY. `/resume` restores the same
+`crystal --resume` (`-r`) opens a terminal selector for this workspace;
+`crystal --resume <id>` loads a specific file at process start. A missing or empty
+session exits without entering the TTY. `/resume` opens the same selector inside
+the running session; `/resume <id>` restores a specific
 transcript from inside a running session: the live system prompt is
 refreshed from current Plan/Work text; the summary and tail are kept.
-Usage is restored so the status bar, `/status`, and the next compact decision
+The selector lists resumable sessions newest first by update time, supports
+typing to filter by id or preview, and leaves the current session untouched on
+Escape. Usage is restored so the status bar, `/status`, and the next compact decision
 have a baseline. Sessions saved before cumulative usage was introduced retain
 an unknown cumulative value rather than treating their last request as the
 whole session. `/clear` starts a new id.
@@ -563,8 +570,13 @@ set.
 Provider names are open. `deepseek` and `openai` are starter entries. A user
 adds an endpoint by inserting another `providers` object with `protocol`
 `deepseek`, `openai`, `responses`, or `anthropic`, a `baseUri`, and a `models`
-table. A gateway whose models use different wire formats is represented by
-multiple provider entries. Context size and sampling live on each model, not
+table. A gateway with different wire formats uses one provider name whose value
+is an array of endpoint objects, one per protocol. Model ids must be unique
+across that array; duplicates fail configuration loading. A selected model
+determines the endpoint, protocol, and credentials used by the adapter.
+Repeated JSON provider keys are rejected; the array form preserves both
+endpoints. Repeated model keys within one endpoint are also rejected.
+Context size and sampling live on each model, not
 on the host. Thinking capability also lives on the model. The current thinking
 gear is a host setting.
 
@@ -592,6 +604,27 @@ gear is a host setting.
         }
       }
     }
+  }
+}
+```
+
+For a mixed-protocol gateway, `providers.openrouter` may instead be an array:
+
+```json
+{
+  "providers": {
+    "openrouter": [
+      {
+        "protocol": "anthropic",
+        "baseUri": "https://gateway.example.test/anthropic/",
+        "models": { "claude-model": { "contextWindow": 200000 } }
+      },
+      {
+        "protocol": "openai",
+        "baseUri": "https://gateway.example.test/openai/",
+        "models": { "gpt-model": { "contextWindow": 128000 } }
+      }
+    ]
   }
 }
 ```
@@ -632,7 +665,7 @@ label is prefixed with `~` so it is not mistaken for provider usage.
 `/tokens` toggles it, or sets `on` / `off`. A successful change writes
 `estimatedTokens` to `config.json` (`true` when on; omitted when off).
 
-`protocol` is `deepseek` or `openai`. Models that are not listed cannot be
+`protocol` is `deepseek`, `openai`, `responses`, or `anthropic`. Models that are not listed cannot be
 selected. There is no global context window.
 
 `apiKey` may be a literal secret, `{env:NAME}`, or `{file:path}` (relative

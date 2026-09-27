@@ -55,6 +55,7 @@ public sealed class CodingSession
     private List<ChatItem> _transcript;
     private Dictionary<int, ImageAttachment> _images = [];
     private readonly List<int> _pendingImages = [];
+    private readonly HashSet<int> _draftImages = [];
     private int _nextImageNumber = 1;
     private string _sessionId;
     private DateTimeOffset _sessionCreatedUtc;
@@ -256,6 +257,7 @@ public sealed class CodingSession
             }
 
             var input = read.Text.Trim();
+            PruneDraftImages(input);
             if (_turnActive)
             {
                 if (input.Length > 0)
@@ -328,10 +330,20 @@ public sealed class CodingSession
             }
 
             StartTurnIfQueued();
+            PruneDraftImages(string.Empty);
             return (true, false);
         }
 
-        return HandleCommand(parsed);
+        if (parsed.Verb == SessionVerb.Resume)
+        {
+            await ResumeSessionAsync(parsed.Argument, cancellationToken);
+            PruneDraftImages(string.Empty);
+            return (true, false);
+        }
+
+        var handled = HandleCommand(parsed);
+        PruneDraftImages(string.Empty);
+        return handled;
     }
 
     private (bool Handled, bool Exit) HandleCommand(SessionCommand command)
@@ -378,9 +390,6 @@ public sealed class CodingSession
                 return (true, false);
             case SessionVerb.Cd:
                 ChangeDirectory(command.Argument);
-                return (true, false);
-            case SessionVerb.Resume:
-                ResumeSession(command.Argument);
                 return (true, false);
             case SessionVerb.Fork:
                 ForkSession(command.Argument);
@@ -1079,6 +1088,7 @@ public sealed class CodingSession
         }
 
         _images.Add(image.Number, image);
+        _draftImages.Add(image.Number);
         _nextImageNumber++;
         return image.Marker;
     }
@@ -1526,7 +1536,7 @@ public sealed class CodingSession
             PlanMode = _planMode,
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_transcript),
-            Images = SessionMapper.WriteImages(_images.Values),
+            Images = SessionMapper.WriteImages(_images.Values.Where(IsReferencedInTranscript)),
             Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
             UserTurns = _ledger.UserTurns,
             ModelCalls = _ledger.ModelCalls,
@@ -1541,6 +1551,7 @@ public sealed class CodingSession
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _images.Clear();
         _pendingImages.Clear();
+        _draftImages.Clear();
         _nextImageNumber = 1;
         _ledger.Clear();
         _todos.Clear();
@@ -1551,8 +1562,36 @@ public sealed class CodingSession
         ShowTodos();
     }
 
-    private void ResumeSession(string argument)
+    private async Task ResumeSessionAsync(
+        string argument,
+        CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            if (HasConversation())
+            {
+                SaveSession();
+            }
+
+            var available = _sessionStore.List(_workspace.Root);
+            if (available.Count == 0)
+            {
+                _renderer.WriteError("No session for this workspace");
+                return;
+            }
+
+            var chosen = await new SessionPicker(_renderer).ChooseAsync(
+                available,
+                _sessionId,
+                cancellationToken);
+            if (chosen is null)
+            {
+                return;
+            }
+
+            argument = chosen;
+        }
+
         if (!SessionResume.TryLoad(
                 _sessionStore,
                 _workspace.Root,
@@ -1639,6 +1678,7 @@ public sealed class CodingSession
         _images = new Dictionary<int, ImageAttachment>(
             SessionMapper.ReadImages(document.Images));
         _pendingImages.Clear();
+        _draftImages.Clear();
         _nextImageNumber = _images.Count == 0 ? 1 : _images.Keys.Max() + 1;
         ReplaceLiveSystem();
 
@@ -1690,6 +1730,7 @@ public sealed class CodingSession
 
     private void WriteResumeHint()
     {
+        PruneDraftImages(string.Empty, includeQueue: false);
         if (HasConversation())
         {
             SaveSession();
@@ -1924,6 +1965,9 @@ public sealed class CodingSession
         var message = AttachPendingImages(input);
         _renderer.WriteUser(message);
         _transcript.Add(new ChatMessage(ChatRole.User, message));
+        _draftImages.RemoveWhere(number => message.Contains(
+            _images[number].Marker,
+            StringComparison.Ordinal));
         _turnSource = new CancellationTokenSource();
         _turnActive = true;
         _renderer.BeginTurn();
@@ -1989,6 +2033,39 @@ public sealed class CodingSession
             return text is not null && _images.Values.Any(image =>
                 text.Contains(image.Marker, StringComparison.Ordinal));
         });
+    }
+
+    private bool IsReferencedInTranscript(ImageAttachment image) =>
+        _transcript.Any(item => item switch
+        {
+            ChatMessage message => message.Text.Contains(image.Marker, StringComparison.Ordinal),
+            ToolResult result => result.Text.Contains(image.Marker, StringComparison.Ordinal),
+            _ => false
+        });
+
+    private void PruneDraftImages(string input, bool includeQueue = true)
+    {
+        if (_draftImages.Count == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<string> queued = includeQueue ? _queue.Snapshot() : [];
+        foreach (var number in _draftImages.ToArray())
+        {
+            var image = _images[number];
+            if (input.Contains(image.Marker, StringComparison.Ordinal)
+                || queued.Any(text => text.Contains(image.Marker, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            _draftImages.Remove(number);
+            if (!IsReferencedInTranscript(image))
+            {
+                _images.Remove(number);
+            }
+        }
     }
 
     private ContextCompactor CreateCompactor(IChatClient client) =>

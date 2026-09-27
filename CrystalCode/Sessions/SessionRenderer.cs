@@ -861,7 +861,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 {
                     lock (_gate)
                     {
-                        _composer.Insert(marker);
+                        _composer.InsertAtomic(marker);
                         RefreshPickerUnlocked();
                         PaintUnlocked(force: true);
                     }
@@ -1025,7 +1025,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 {
                     lock (_gate)
                     {
-                        _composer.Insert(marker);
+                        _composer.InsertAtomic(marker);
                         RefreshPickerUnlocked();
                         PaintUnlocked(force: true);
                     }

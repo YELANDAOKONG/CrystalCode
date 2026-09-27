@@ -102,7 +102,7 @@ public sealed record HarnessSettings
 
     public StatusLineSettings StatusLine { get; }
 
-    public ProviderDefinition ActiveProvider => Catalog.Get(Provider);
+    public ProviderDefinition ActiveProvider => Catalog.GetModelProvider(Provider, Model);
 
     public ModelSettings ActiveModel => Catalog.GetModel(Provider, Model);
 
@@ -226,18 +226,18 @@ public sealed record HarnessSettings
 
     private string ResolveModel(ProviderName provider)
     {
-        if (provider == Provider && Catalog.Get(provider).TryGetModel(Model, out _))
+        if (provider == Provider && Catalog.GetModelNames(provider).Contains(Model, StringComparer.Ordinal))
         {
             return Model;
         }
 
-        var models = Catalog.Get(provider).Models;
+        var models = Catalog.GetModelNames(provider);
         if (models.Count == 1)
         {
-            return models.Keys.First();
+            return models[0];
         }
 
-        if (models.ContainsKey(Model))
+        if (models.Contains(Model, StringComparer.Ordinal))
         {
             return Model;
         }

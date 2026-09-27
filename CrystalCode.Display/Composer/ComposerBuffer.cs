@@ -12,6 +12,7 @@ public sealed class ComposerBuffer
     private const int MaximumHistory = 200;
     private readonly StringBuilder _text = new();
     private readonly List<string> _history = [];
+    private readonly HashSet<string> _atomicText = new(StringComparer.Ordinal);
     private int _cursor;
     private int _historyIndex;
     private string _draft = string.Empty;
@@ -81,25 +82,25 @@ public sealed class ComposerBuffer
                 break;
             case ConsoleKey.B when isAlt:
             case ConsoleKey.LeftArrow when isCtrl || isAlt:
-                _cursor = WordLeft();
+                _cursor = SnapCursor(WordLeft(), moveRight: false);
                 break;
             case ConsoleKey.F when isAlt:
             case ConsoleKey.RightArrow when isCtrl || isAlt:
-                _cursor = WordRight();
+                _cursor = SnapCursor(WordRight(), moveRight: true);
                 break;
             case ConsoleKey.LeftArrow:
-                _cursor = TextWidth.MoveLeft(Text, _cursor);
+                _cursor = SnapCursor(TextWidth.MoveLeft(Text, _cursor), moveRight: false);
                 break;
             case ConsoleKey.RightArrow:
-                _cursor = TextWidth.MoveRight(Text, _cursor);
+                _cursor = SnapCursor(TextWidth.MoveRight(Text, _cursor), moveRight: true);
                 break;
             case ConsoleKey.Home:
             case ConsoleKey.A when isCtrl:
-                _cursor = LineStart();
+                _cursor = SnapCursor(LineStart(), moveRight: false);
                 break;
             case ConsoleKey.End:
             case ConsoleKey.E when isCtrl:
-                _cursor = LineEnd();
+                _cursor = SnapCursor(LineEnd(), moveRight: true);
                 break;
             case ConsoleKey.UpArrow:
             case ConsoleKey.P when isCtrl:
@@ -158,8 +159,16 @@ public sealed class ComposerBuffer
             return;
         }
 
+        _cursor = SnapCursor(_cursor, moveRight: true);
         _text.Insert(_cursor, text);
         _cursor += text.Length;
+    }
+
+    public void InsertAtomic(string text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        Insert(text);
+        _atomicText.Add(text);
     }
 
     public void Clear()
@@ -289,8 +298,7 @@ public sealed class ComposerBuffer
         }
 
         var from = TextWidth.MoveLeft(Text, _cursor);
-        _text.Remove(from, _cursor - from);
-        _cursor = from;
+        DeleteRange(from, _cursor);
     }
 
     private void DeleteRight()
@@ -301,7 +309,7 @@ public sealed class ComposerBuffer
         }
 
         var to = TextWidth.MoveRight(Text, _cursor);
-        _text.Remove(_cursor, to - _cursor);
+        DeleteRange(_cursor, to);
     }
 
     private void DeleteWordRight()
@@ -312,7 +320,7 @@ public sealed class ComposerBuffer
         }
 
         var to = WordRight();
-        _text.Remove(_cursor, to - _cursor);
+        DeleteRange(_cursor, to);
     }
 
     private void DeleteToLineStart()
@@ -323,8 +331,7 @@ public sealed class ComposerBuffer
             return;
         }
 
-        _text.Remove(start, _cursor - start);
-        _cursor = start;
+        DeleteRange(start, _cursor);
     }
 
     private void DeleteToLineEnd()
@@ -335,7 +342,7 @@ public sealed class ComposerBuffer
             return;
         }
 
-        _text.Remove(_cursor, end - _cursor);
+        DeleteRange(_cursor, end);
     }
 
     private void DeleteWordLeft()
@@ -346,8 +353,58 @@ public sealed class ComposerBuffer
             return;
         }
 
-        _text.Remove(from, _cursor - from);
+        DeleteRange(from, _cursor);
+    }
+
+    private void DeleteRange(int from, int to)
+    {
+        var text = Text;
+        bool expanded;
+        do
+        {
+            expanded = false;
+            foreach (var token in _atomicText)
+            {
+                var start = 0;
+                while ((start = text.IndexOf(token, start, StringComparison.Ordinal)) >= 0)
+                {
+                    var end = start + token.Length;
+                    if (from < end && to > start && (from > start || to < end))
+                    {
+                        from = Math.Min(from, start);
+                        to = Math.Max(to, end);
+                        expanded = true;
+                    }
+
+                    start = end;
+                }
+            }
+        }
+        while (expanded);
+
+        _text.Remove(from, to - from);
         _cursor = from;
+    }
+
+    private int SnapCursor(int position, bool moveRight)
+    {
+        var text = Text;
+        foreach (var token in _atomicText)
+        {
+            var start = 0;
+            while ((start = text.IndexOf(token, start, StringComparison.Ordinal)) >= 0)
+            {
+                var end = start + token.Length;
+                if (position > start && position < end)
+                {
+                    return moveRight ? end : start;
+                }
+
+                start = end;
+            }
+        }
+
+        return position;
     }
 
     private int LineStart()

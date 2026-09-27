@@ -17,7 +17,7 @@ public sealed class ResumeHintTests
     }
 
     [Fact]
-    public void ForWorkspace_ExplainsLatestAndId()
+    public void ForWorkspace_ExplainsSelectionAndId()
     {
         var text = ResumeHint.ForWorkspace();
 

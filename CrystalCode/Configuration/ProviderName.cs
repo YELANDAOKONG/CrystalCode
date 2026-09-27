@@ -1,7 +1,7 @@
 namespace CrystalCode.Configuration;
 
 /// <summary>
-/// Identifies one configured provider entry. Names are open; built-in
+/// Identifies one configured provider group. Names are open; built-in
 /// DeepSeek and OpenAI values are only well-known starters.
 /// </summary>
 public sealed record ProviderName

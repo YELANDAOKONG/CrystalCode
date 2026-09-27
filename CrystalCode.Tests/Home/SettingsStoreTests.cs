@@ -75,6 +75,147 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_GroupsProtocolsUnderOneProviderAndRoundTrips()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "openrouter",
+              "model": "claude",
+              "providers": {
+                "openrouter": [
+                  {
+                    "protocol": "anthropic",
+                    "baseUri": "https://example.test/anthropic/",
+                    "apiKeyEnvironment": "ANTHROPIC_GATEWAY_KEY",
+                    "models": { "claude": { "contextWindow": 200000 } }
+                  },
+                  {
+                    "protocol": "openai",
+                    "baseUri": "https://example.test/openai/",
+                    "apiKeyEnvironment": "OPENAI_GATEWAY_KEY",
+                    "models": { "gpt": { "contextWindow": 128000 } }
+                  }
+                ]
+              }
+            }
+            """);
+
+        var settings = store.Load();
+        Assert.Equal(ProviderProtocol.Anthropic, settings.ActiveProvider.Protocol);
+        Assert.Equal("ANTHROPIC_GATEWAY_KEY", settings.ActiveProvider.ApiKeyEnvironment);
+        Assert.Equal(ProviderProtocol.OpenAI, settings.WithSelection(
+            new ProviderName("openrouter"), "gpt").ActiveProvider.Protocol);
+        Assert.Equal(["claude", "gpt"], settings.Catalog.GetModelNames(
+            new ProviderName("openrouter")));
+        Assert.True(ModelSelection.TryResolve(
+            settings.Catalog,
+            settings.Provider,
+            "openrouter gpt",
+            out var selected,
+            out _));
+        Assert.Equal("gpt", selected?.Model);
+
+        store.Save(settings);
+        var reloaded = store.Load();
+        Assert.Equal(2, reloaded.Catalog.Providers["openrouter"].Count);
+        Assert.Equal(ProviderProtocol.OpenAI, reloaded.WithSelection(
+            new ProviderName("openrouter"), "gpt").ActiveProvider.Protocol);
+    }
+
+    [Fact]
+    public void Load_RejectsDuplicateModelAcrossProtocols()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "providers": {
+                "openrouter": [
+                  {
+                    "protocol": "anthropic",
+                    "baseUri": "https://example.test/anthropic/",
+                    "models": { "shared": { "contextWindow": 200000 } }
+                  },
+                  {
+                    "protocol": "openai",
+                    "baseUri": "https://example.test/openai/",
+                    "models": { "shared": { "contextWindow": 128000 } }
+                  }
+                ]
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(store.Load);
+        Assert.Contains("shared", error.Message, StringComparison.Ordinal);
+        Assert.Contains("openrouter", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsRepeatedProviderKeyInsteadOfDroppingAnEndpoint()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "providers": {
+                "openrouter": {
+                  "protocol": "anthropic",
+                  "baseUri": "https://example.test/anthropic/",
+                  "models": { "claude": { "contextWindow": 200000 } }
+                },
+                "openrouter": {
+                  "protocol": "openai",
+                  "baseUri": "https://example.test/openai/",
+                  "models": { "gpt": { "contextWindow": 128000 } }
+                }
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(store.Load);
+        Assert.Contains("Use an array", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsRepeatedModelKeyInOneEndpoint()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "providers": {
+                "openrouter": {
+                  "protocol": "openai",
+                  "baseUri": "https://example.test/openai/",
+                  "models": {
+                    "shared": { "contextWindow": 128000 },
+                    "shared": { "contextWindow": 200000 }
+                  }
+                }
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(store.Load);
+        Assert.Contains("shared", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_ReadsHostThinkingEffortAndModelCapability()
     {
         using var root = new TemporaryHome();

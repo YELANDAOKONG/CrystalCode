@@ -16,16 +16,16 @@ public static class ModelCompletions
         ArgumentNullException.ThrowIfNull(currentProvider);
 
         var options = new List<SlashOption>();
-        var current = catalog.Get(currentProvider);
-        foreach (var model in current.Models.Keys)
+        foreach (var model in catalog.GetModelNames(currentProvider))
         {
             options.Add(new SlashOption(model, currentProvider.Value, [model]));
         }
 
-        foreach (var (providerName, provider) in catalog.Providers)
+        foreach (var providerName in catalog.Providers.Keys)
         {
-            var nested = new List<SlashOption>(provider.Models.Count);
-            foreach (var model in provider.Models.Keys)
+            var models = catalog.GetModelNames(new ProviderName(providerName));
+            var nested = new List<SlashOption>(models.Count);
+            foreach (var model in models)
             {
                 nested.Add(new SlashOption(model, providerName, [model]));
             }

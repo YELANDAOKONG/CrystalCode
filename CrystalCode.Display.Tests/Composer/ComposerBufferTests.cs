@@ -112,6 +112,40 @@ public sealed class ComposerBufferTests
     }
 
     [Fact]
+    public void Handle_BackspaceRemovesAtomicImageMarker()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("inspect ");
+        buffer.InsertAtomic("[Image #1]");
+
+        buffer.Handle(new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false));
+
+        Assert.Equal("inspect ", buffer.Text);
+        Assert.Equal(buffer.Text.Length, buffer.Cursor);
+    }
+
+    [Fact]
+    public void Handle_ArrowAndDeleteTreatImageMarkerAsOneUnit()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.InsertAtomic("[Image #2]");
+        buffer.Insert(" later");
+        for (var index = 0; index < " later".Length; index++)
+        {
+            buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.LeftArrow, false, false, false));
+        }
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.LeftArrow, false, false, false));
+        Assert.Equal(0, buffer.Cursor);
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.RightArrow, false, false, false));
+        Assert.Equal("[Image #2]".Length, buffer.Cursor);
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.LeftArrow, false, false, false));
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.Delete, false, false, false));
+
+        Assert.Equal(" later", buffer.Text);
+    }
+
+    [Fact]
     public void Handle_HistoryRecall_CtrlP_CtrlN()
     {
         var buffer = new ComposerBuffer();

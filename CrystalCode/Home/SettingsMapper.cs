@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using CrystalCode.Configuration;
 
 namespace CrystalCode.Home;
@@ -5,35 +7,99 @@ namespace CrystalCode.Home;
 internal static class SettingsMapper
 {
     public static IReadOnlyList<ProviderDefinition> ReadProviders(
-        Dictionary<string, ProviderDocument>? document)
+        JsonElement? document)
     {
-        if (document is null || document.Count == 0)
+        if (document is null || document.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
         {
             return [];
         }
 
-        var providers = new List<ProviderDefinition>();
-        foreach (var (name, entry) in document)
+        if (document.Value.ValueKind != JsonValueKind.Object)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(name);
-            ArgumentNullException.ThrowIfNull(entry);
-            providers.Add(ReadProvider(name, entry));
+            throw new InvalidOperationException("Providers must be an object.");
+        }
+
+        var providers = new List<ProviderDefinition>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in document.Value.EnumerateObject())
+        {
+            var name = ProviderName.Parse(property.Name).Value;
+            if (!names.Add(name))
+            {
+                throw new InvalidOperationException(
+                    $"Provider '{name}' is listed more than once. Use an array under one name.");
+            }
+
+            var entry = property.Value;
+            if (entry.ValueKind == JsonValueKind.Array)
+            {
+                if (entry.GetArrayLength() == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Provider '{name}' must contain at least one protocol.");
+                }
+
+                foreach (var variant in entry.EnumerateArray())
+                {
+                    providers.Add(ReadProvider(name, ReadDocument(name, variant)));
+                }
+            }
+            else
+            {
+                providers.Add(ReadProvider(name, ReadDocument(name, entry)));
+            }
         }
 
         return providers;
     }
 
-    public static Dictionary<string, ProviderDocument> WriteProviders(ProviderCatalog catalog)
+    public static JsonElement WriteProviders(ProviderCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
 
-        var document = new Dictionary<string, ProviderDocument>(StringComparer.Ordinal);
-        foreach (var (name, provider) in catalog.Providers)
+        var document = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var (name, variants) in catalog.Providers)
         {
-            document[name] = WriteProvider(provider);
+            document[name] = variants.Count == 1
+                ? JsonSerializer.SerializeToElement(WriteProvider(variants[0]), HomeJson.Options)
+                : JsonSerializer.SerializeToElement(
+                    variants.Select(WriteProvider).ToArray(),
+                    HomeJson.Options);
         }
 
-        return document;
+        return JsonSerializer.SerializeToElement(document, HomeJson.Options);
+    }
+
+    private static ProviderDocument ReadDocument(string name, JsonElement entry)
+    {
+        if (entry.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException(
+                $"Provider '{name}' must be an object or an array of objects.");
+        }
+
+        var modelNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var property in entry.EnumerateObject())
+        {
+            if (!string.Equals(property.Name, "models", StringComparison.OrdinalIgnoreCase)
+                || property.Value.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            foreach (var model in property.Value.EnumerateObject())
+            {
+                if (!modelNames.Add(model.Name))
+                {
+                    throw new InvalidOperationException(
+                        $"Model '{model.Name}' is configured more than once "
+                        + $"for provider '{name}'.");
+                }
+            }
+        }
+
+        return entry.Deserialize<ProviderDocument>(HomeJson.Options)
+            ?? throw new InvalidOperationException($"Provider '{name}' is invalid.");
     }
 
     private static ProviderDefinition ReadProvider(string name, ProviderDocument entry)

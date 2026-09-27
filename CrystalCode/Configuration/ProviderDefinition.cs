@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace CrystalCode.Configuration;
 
 /// <summary>
@@ -30,7 +32,8 @@ public sealed record ProviderDefinition
         Name = name;
         Protocol = protocol;
         BaseUri = baseUri;
-        Models = new Dictionary<string, ModelSettings>(models, StringComparer.Ordinal);
+        Models = new ReadOnlyDictionary<string, ModelSettings>(
+            new Dictionary<string, ModelSettings>(models, StringComparer.Ordinal));
         Organization = organization;
         Project = project;
         ReplayReasoningContent = replayReasoningContent
