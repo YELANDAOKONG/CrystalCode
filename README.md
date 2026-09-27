@@ -14,7 +14,7 @@ Crystal Code works in a local repository through a streaming terminal UI. Ask it
 - **Use the model endpoints you prefer.** Built-in DeepSeek and OpenAI catalogs are available, and you can configure OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages endpoints.
 - **Extend the workflow.** Load skills and operator tool sets from your home directory or workspace. Image-capable models can receive workspace or clipboard images.
 
-Crystal Code is the coding product built on the sibling Crystal library. The terminal is its operator surface.
+Crystal Code is the coding product built on the sibling [Crystal](https://github.com/YELANDAOKONG/Crystal) library. The terminal is its operator surface.
 
 ## Get started
 
@@ -84,7 +84,7 @@ File edits and shell commands stay within the workspace. Reads outside it requir
 
 ## Build from source
 
-You need the .NET 10 SDK and a sibling checkout of Crystal at `../Crystal`.
+You need the .NET 10 SDK and a sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal`.
 
 ```bash
 dotnet build CrystalCode.sln

@@ -8,7 +8,7 @@ only operator surface. It runs a streaming model-and-tool loop, with
 Plan/Work modes, risk-aware approval, automatic context compaction,
 and operator data under `~/.crystal`.
 
-CrystalCode consumes the Crystal library. It does not modify Crystal.
+CrystalCode consumes the [Crystal](https://github.com/YELANDAOKONG/Crystal) library. It does not modify Crystal.
 It is not a Crystal demo and not a replacement for Crystal.
 
 ## What it does
@@ -86,7 +86,7 @@ models and providers.
 Building from source also requires:
 
 - .NET 10 SDK
-- A sibling checkout of Crystal at `../Crystal` (relative to this
+- A sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal` (relative to this
   repository root)
 
 ## Build
@@ -140,12 +140,17 @@ operating system allows it.
 Resolution order for the active provider:
 
 1. Process environment (see below)
-2. `<name>.apiKey` in `providers.json`
+2. `apiKey` on the effective provider definition
 3. `~/.crystal/credentials.json`, keyed by provider name
+
+The effective definition is the provider entry in `providers.json`. When
+that file is absent, it is the entry under the legacy `config.json.providers`
+field. When `providers.json` exists, the legacy field is not used for the
+catalog or for this key lookup. See [Configuration](#configuration).
 
 Environment names, in order:
 
-1. `<name>.apiKeyEnvironment` in `providers.json` when set
+1. `apiKeyEnvironment` on that same definition, when set
 2. `<PROVIDER>_API_KEY` derived from the provider name (hyphens
    become underscores; for example `DEEPSEEK_API_KEY`,
    `OPENAI_API_KEY`, `OPENROUTER_API_KEY`)
@@ -153,7 +158,7 @@ Environment names, in order:
 
 A provider-specific variable wins over `CRYSTAL_API_KEY`.
 
-`<name>.apiKey` in `providers.json` may be one of:
+`apiKey` on that definition may be one of:
 
 | Form | Meaning |
 | :--- | :--- |
@@ -161,7 +166,7 @@ A provider-specific variable wins over `CRYSTAL_API_KEY`.
 | `{file:path}` | Read a file (relative to `~/.crystal`, or absolute; `~` is expanded) |
 | a literal string | Used as-is (avoid this in shared files) |
 
-Prefer `{env:NAME}` or `{file:path}` so `providers.json` can be copied
+Prefer `{env:NAME}` or `{file:path}` so the provider definition can be copied
 without embedding a secret.
 
 `credentials.json` shape:
@@ -185,9 +190,17 @@ with status 1. It does not print the secret.
 
 Host settings live in `~/.crystal/config.json`. Provider and model definitions
 live in `~/.crystal/providers.json`; the built-in DeepSeek and OpenAI catalog
-is available even when this file is absent. The legacy `config.json.providers`
-field remains readable for existing installations. Edit either file, then
-restart for the changes to take effect.
+is available even when this file is absent. Operator definitions overlay that
+catalog. Edit the file you changed, then restart for the changes to take effect.
+
+When `providers.json` exists, it supplies the operator catalog, and the legacy
+`config.json.providers` field is not read. When `providers.json` is absent,
+that legacy field is read instead, including its `apiKey` and
+`apiKeyEnvironment` values. Saving preferences does not rewrite an existing
+`providers.json`. If that file is absent and `config.json` still has a
+`providers` object, the save copies that object to `providers.json` and keeps
+the original field in `config.json`. After the copy, later edits belong in
+`providers.json`.
 
 Top-level fields:
 
@@ -931,6 +944,7 @@ lists.
 ## Documents
 
 - [README.md](../README.md) — project overview and quick start
+- [Crystal](https://github.com/YELANDAOKONG/Crystal) — sibling library this product consumes
 - [BUSINESS.md](../BUSINESS.md) — product boundary
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — ownership and runtime
 - [STANDARDS.md](../STANDARDS.md) — engineering rules
