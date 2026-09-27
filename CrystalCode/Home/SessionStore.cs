@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using CrystalCode.Sessions;
+
 namespace CrystalCode.Home;
 
 /// <summary>
@@ -31,9 +33,43 @@ public sealed class SessionStore
         document.UpdatedUtc = DateTimeOffset.UtcNow;
         document.CreatedUtc ??= document.UpdatedUtc;
         var path = PathFor(id);
-        var json = JsonSerializer.Serialize(document, HomeJson.Options);
-        File.WriteAllText(path, json);
+        var stored = CopyWithImages(document, PersistImages(document.Images));
+        var json = JsonSerializer.Serialize(stored, HomeJson.Options);
+        var temporaryPath = Path.Combine(
+            _home.SessionsDirectory,
+            $".{id}.{Guid.NewGuid():N}.tmp");
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None
+        };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        try
+        {
+            using (var stream = new FileStream(temporaryPath, options))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.Write(json);
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(temporaryPath, path, overwrite: true);
+        }
+        finally
+        {
+            File.Delete(temporaryPath);
+        }
     }
+
+    internal IReadOnlyDictionary<int, ImageAttachment> ReadImages(
+        IEnumerable<SessionImageDocument> images) =>
+        SessionMapper.ReadImages(images, new ImageBlobStore(_home));
 
     public bool TryLoad(string id, out SessionDocument document)
     {
@@ -150,6 +186,7 @@ public sealed class SessionStore
             }
 
             parsed.Id = parsed.Id.Trim();
+            parsed.Images ??= [];
             document = parsed;
             return true;
         }
@@ -201,4 +238,68 @@ public sealed class SessionStore
 
     private string PathFor(string id) =>
         Path.Combine(_home.SessionsDirectory, id + ".json");
+
+    private List<SessionImageDocument> PersistImages(IEnumerable<SessionImageDocument> images)
+    {
+        var store = new ImageBlobStore(_home);
+        var persisted = new List<SessionImageDocument>();
+        foreach (var image in images)
+        {
+            if (image is null
+                || image.Number <= 0
+                || string.IsNullOrWhiteSpace(image.MimeType))
+            {
+                continue;
+            }
+
+            if (image.Data is { Length: > 0 } data)
+            {
+                if (data.Length > ImageFile.MaximumBytes
+                    || !string.Equals(
+                        ImageFile.DetectMimeType(data),
+                        image.MimeType,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                persisted.Add(new SessionImageDocument
+                {
+                    Number = image.Number,
+                    MimeType = image.MimeType,
+                    ContentHash = store.Store(data, image.MimeType)
+                });
+                continue;
+            }
+
+            persisted.Add(new SessionImageDocument
+            {
+                Number = image.Number,
+                MimeType = image.MimeType,
+                ContentHash = image.ContentHash,
+                Uri = image.Uri
+            });
+        }
+
+        return persisted;
+    }
+
+    private static SessionDocument CopyWithImages(
+        SessionDocument source,
+        List<SessionImageDocument> images) => new()
+    {
+        Id = source.Id,
+        Workspace = source.Workspace,
+        PlanMode = source.PlanMode,
+        CreatedUtc = source.CreatedUtc,
+        UpdatedUtc = source.UpdatedUtc,
+        Items = source.Items,
+        Images = images,
+        Todos = source.Todos,
+        UserTurns = source.UserTurns,
+        ModelCalls = source.ModelCalls,
+        ToolCalls = source.ToolCalls,
+        Usage = source.Usage,
+        CumulativeUsage = source.CumulativeUsage
+    };
 }

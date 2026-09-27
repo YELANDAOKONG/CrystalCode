@@ -23,7 +23,7 @@ public sealed class MultimodalStreamingTurnTests
         var turn = new MultimodalStreamingTurn(
             client,
             new ImageToolExecutor(),
-            new TurnLimits(4, 4, TimeSpan.FromSeconds(5)),
+            TurnLimits.Unlimited,
             images);
 
         var result = await turn.RunAsync(

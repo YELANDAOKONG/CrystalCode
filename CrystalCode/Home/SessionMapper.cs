@@ -24,14 +24,17 @@ internal static class SessionMapper
     }
 
     public static IReadOnlyDictionary<int, ImageAttachment> ReadImages(
-        IEnumerable<SessionImageDocument>? documents)
+        IEnumerable<SessionImageDocument>? documents,
+        ImageBlobStore? store = null)
     {
         var images = new Dictionary<int, ImageAttachment>();
         foreach (var document in documents ?? [])
         {
-            if (document.Number <= 0
+            if (document is null
+                || document.Number <= 0
                 || string.IsNullOrWhiteSpace(document.MimeType)
                 || (document.Data is not { Length: > 0 }
+                    && string.IsNullOrWhiteSpace(document.ContentHash)
                     && string.IsNullOrWhiteSpace(document.Uri))
                 || document.Data?.Length > ImageFile.MaximumBytes)
             {
@@ -39,26 +42,41 @@ internal static class SessionMapper
             }
 
             ImageAttachment image;
-            if (document.Data is { Length: > 0 })
+            try
             {
-                image = new ImageAttachment(
-                    document.Number,
-                    document.MimeType,
-                    document.Data);
+                if (document.Data is { Length: > 0 } data)
+                {
+                    image = new ImageAttachment(
+                        document.Number,
+                        document.MimeType,
+                        data);
+                }
+                else if (store is not null
+                    && store.TryLoad(document.ContentHash, document.MimeType, out var stored))
+                {
+                    image = new ImageAttachment(
+                        document.Number,
+                        document.MimeType,
+                        stored);
+                }
+                else if (System.Uri.TryCreate(
+                             document.Uri,
+                             UriKind.Absolute,
+                             out var uri)
+                         && uri.Scheme is "http" or "https"
+                         && uri.AbsoluteUri.Length <= 8192)
+                {
+                    image = new ImageAttachment(
+                        document.Number,
+                        document.MimeType,
+                        uri);
+                }
+                else
+                {
+                    continue;
+                }
             }
-            else if (System.Uri.TryCreate(
-                         document.Uri,
-                         UriKind.Absolute,
-                         out var uri)
-                     && uri.Scheme is "http" or "https"
-                     && uri.AbsoluteUri.Length <= 8192)
-            {
-                image = new ImageAttachment(
-                    document.Number,
-                    document.MimeType,
-                    uri);
-            }
-            else
+            catch (ArgumentException)
             {
                 continue;
             }

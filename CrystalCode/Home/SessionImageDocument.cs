@@ -9,5 +9,7 @@ public sealed class SessionImageDocument
 
     public byte[]? Data { get; set; }
 
+    public string? ContentHash { get; set; }
+
     public string? Uri { get; set; }
 }

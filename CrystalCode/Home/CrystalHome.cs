@@ -28,6 +28,8 @@ public sealed class CrystalHome
 
     public string SessionsDirectory => Path.Combine(Root, "sessions");
 
+    public string MediaDirectory => Path.Combine(Root, "media");
+
     public string LogsDirectory => Path.Combine(Root, "logs");
 
     public string PluginsDirectory => Path.Combine(Root, "plugins");

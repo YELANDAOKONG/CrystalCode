@@ -55,6 +55,7 @@ public sealed class CodingSession
     private bool _planMode;
     private List<ChatItem> _transcript;
     private Dictionary<int, ImageAttachment> _images = [];
+    private List<SessionImageDocument> _unavailableImages = [];
     private readonly List<int> _pendingImages = [];
     private readonly HashSet<int> _draftImages = [];
     private int _nextImageNumber = 1;
@@ -1589,7 +1590,12 @@ public sealed class CodingSession
             PlanMode = _planMode,
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_transcript),
-            Images = SessionMapper.WriteImages(_images.Values.Where(IsReferencedInTranscript)),
+            Images =
+            [
+                .. SessionMapper.WriteImages(_images.Values.Where(IsReferencedInTranscript)),
+                .. _unavailableImages.Where(image => IsReferencedInTranscript(
+                    $"[Image #{image.Number}]"))
+            ],
             Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
             UserTurns = _ledger.UserTurns,
             ModelCalls = _ledger.ModelCalls,
@@ -1604,6 +1610,7 @@ public sealed class CodingSession
         _renderer.ForgetImageHistory();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _images.Clear();
+        _unavailableImages.Clear();
         _pendingImages.Clear();
         _draftImages.Clear();
         _nextImageNumber = 1;
@@ -1731,10 +1738,15 @@ public sealed class CodingSession
         _planMode = document.PlanMode;
         _transcript = items;
         _images = new Dictionary<int, ImageAttachment>(
-            SessionMapper.ReadImages(document.Images));
+            _sessionStore.ReadImages(document.Images));
+        _unavailableImages = document.Images
+            .Where(image => image is not null
+                && image.Number > 0
+                && !_images.ContainsKey(image.Number))
+            .ToList();
         _pendingImages.Clear();
         _draftImages.Clear();
-        _nextImageNumber = _images.Count == 0 ? 1 : _images.Keys.Max() + 1;
+        _nextImageNumber = NextImageNumber();
         ReplaceLiveSystem();
 
         _todos.Clear();
@@ -1756,6 +1768,13 @@ public sealed class CodingSession
         _renderer.ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
         _renderer.WriteHistory(_transcript);
         _renderer.WriteNote("Resumed  " + _sessionId);
+        if (_unavailableImages.Count > 0)
+        {
+            _renderer.WriteNote(
+                $"{_unavailableImages.Count} saved image attachment(s) unavailable; "
+                + "session text remains available.");
+        }
+
         ShowTodos();
     }
 
@@ -2036,7 +2055,7 @@ public sealed class CodingSession
             var multimodalTurn = new MultimodalStreamingTurn(
                 _multimodalClient,
                 _planMode ? _planMultimodalExecutor : _workMultimodalExecutor,
-                TurnLimits.CreateDefault(),
+                _settings.ExecutionBudget,
                 _images,
                 _renderer,
                 CurrentReasoning(),
@@ -2048,7 +2067,7 @@ public sealed class CodingSession
         var turn = new StreamingTurn(
             _client,
             _planMode ? _planExecutor : _workExecutor,
-            TurnLimits.CreateDefault(),
+            _settings.ExecutionBudget,
             _renderer,
             CurrentReasoning(),
             CompactRoundAsync,
@@ -2091,12 +2110,20 @@ public sealed class CodingSession
     }
 
     private bool IsReferencedInTranscript(ImageAttachment image) =>
+        IsReferencedInTranscript(image.Marker);
+
+    private bool IsReferencedInTranscript(string marker) =>
         _transcript.Any(item => item switch
         {
-            ChatMessage message => message.Text.Contains(image.Marker, StringComparison.Ordinal),
-            ToolResult result => result.Text.Contains(image.Marker, StringComparison.Ordinal),
+            ChatMessage message => message.Text.Contains(marker, StringComparison.Ordinal),
+            ToolResult result => result.Text.Contains(marker, StringComparison.Ordinal),
             _ => false
         });
+
+    private int NextImageNumber() =>
+        _images.Keys.Concat(_unavailableImages.Select(static image => image.Number))
+            .DefaultIfEmpty(0)
+            .Max() + 1;
 
     private void PruneDraftImages(string input, bool includeQueue = true)
     {
@@ -2160,7 +2187,7 @@ public sealed class CodingSession
         }
 
         _transcript = [.. result.Transcript];
-        _nextImageNumber = _images.Count == 0 ? 1 : _images.Keys.Max() + 1;
+        _nextImageNumber = Math.Max(_nextImageNumber, NextImageNumber());
         BindReviewConversation();
         if (result.ModelCallCount > 0)
         {

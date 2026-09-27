@@ -157,8 +157,23 @@ providers receive typed `ImageContent`, never a marker in place of its bytes.
 Pasted markers are atomic composer text: cursor movement and deletion cannot
 leave a partial marker. Only complete markers in submitted transcript items
 produce model images; deleted unsent images are discarded immediately while
-idle and at submission during an active turn. Session files
-persist only images referenced by the transcript.
+idle and at submission during an active turn. Workspace and clipboard images
+are checked against the 20 MiB limit and validated by MIME signature before
+they enter the session; the media store validates again before writing. Saved
+image bytes live in owner-only, content-addressed files under
+`~/.crystal/media/<sha256>`. Session JSON stores the hash and MIME type, not
+Base64 bytes. The media file is written before the session references it, and
+both writes use a temporary file followed by an atomic replacement. Sessions
+persist only images referenced by the transcript. A missing, truncated, or
+modified media file is skipped on resume while the text and other attachments
+remain available; the operator receives a note, and its reference is retained
+on later saves so restoring the file can repair the session. Inline `data` is
+a supported session representation; local saves move its image bytes to the
+media store.
+JSON session export inlines available image bytes in `data` so its contents do
+not depend on Home media files. If a referenced media file is unavailable, its
+metadata remains in the export but bytes cannot be included. The store does
+not automatically delete unreferenced media files.
 Inline image bytes and absolute image URIs are supported. Images returned by
 an in-process plugin or dotnet operator tool's native `IMultimodalTool` path
 are assigned the same markers and become input on the following model round.
@@ -206,6 +221,18 @@ One user message is one turn:
    estimated transcript or the last model-round usage is over budget. One
    failed compact while still over budget stops the turn
    (`context_overflow`).
+
+Text and image-capable turns share `executionBudget` from `config.json`.
+The default per-turn limits are 1024 model calls, 8192 tool calls, and 7 days.
+The setting may be `"unlimited"` for all three, or an object with optional
+`maximumModelCalls`, `maximumToolCalls`, and `maximumDurationSeconds` fields.
+Omitted fields keep their defaults; `null` removes that field's limit.
+Model calls and duration must be positive when finite. Tool calls may be zero
+to prevent tool execution. Duration must fit the runtime timer. A turn with
+unlimited limits still ends on model completion, user cancellation, or context
+compaction exhaustion. This host owns the live turn budget; it follows the
+nullable-limit semantics of Crystal's `AgentRunLimits` without using Agent
+for streaming UI turns.
 7. After a completed turn, consider compaction from that last round's
    reported usage and the estimated transcript. `/compact` (alias
    `/summarize`) runs the same summarizer immediately. Compaction keeps
@@ -460,12 +487,25 @@ installers replace the full platform release contents under `binaries/code/`.
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
   sessions/<id>.json
+  media/<sha256>
   logs/
   plugins/
 ```
 
 `config.json` stores mutable operator preferences such as the selected provider
-and model. `providers.json` stores the provider catalog as a root object keyed
+and model. For example, an unlimited time budget with finite call limits is:
+
+```json
+{
+  "executionBudget": {
+    "maximumModelCalls": 48,
+    "maximumToolCalls": 96,
+    "maximumDurationSeconds": null
+  }
+}
+```
+
+`providers.json` stores the provider catalog as a root object keyed
 by provider name, with an array for multiple protocols under one name. The
 catalog overlays built-in definitions. When `providers.json` exists, it takes
 precedence over legacy `config.json.providers`; otherwise the legacy field is

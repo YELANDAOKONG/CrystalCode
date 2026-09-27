@@ -79,6 +79,12 @@
 - Validate local image content by signature, enforce the host size limit, and
   preserve exact bytes and MIME type. Do not decode, transform, fetch, or
   execute media implicitly.
+- Validate size and MIME type again before copying session images to the
+  owner-only media store. Persist and verify a content hash; write the media
+  file before its session reference. Missing or damaged media must not make
+  the remaining session unreadable.
+- Keep text and image-capable turn budgets on the same configured limits.
+  A null limit is unlimited; omitted budget fields retain the finite defaults.
 
 ## Dependencies
 

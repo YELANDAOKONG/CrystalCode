@@ -1,22 +1,27 @@
 namespace CrystalCode.Sessions;
 
 /// <summary>
-/// Bounds for one user-message turn.
+/// Optional bounds for one user-message turn. Null means unlimited.
 /// </summary>
 public sealed record TurnLimits
 {
-    public const int DefaultMaximumModelCalls = 32;
+    private static readonly TimeSpan MaximumSupportedDuration =
+        TimeSpan.FromMilliseconds(uint.MaxValue - 1);
 
-    public const int DefaultMaximumToolCalls = 64;
+    public const int DefaultMaximumModelCalls = 1024;
 
-    public static readonly TimeSpan DefaultMaximumDuration = TimeSpan.FromMinutes(15);
+    public const int DefaultMaximumToolCalls = 8192;
+
+    public static readonly TimeSpan DefaultMaximumDuration = TimeSpan.FromDays(7);
+
+    public static TurnLimits Unlimited { get; } = new(null, null, null);
 
     public TurnLimits(
-        int maximumModelCalls,
-        int maximumToolCalls,
-        TimeSpan maximumDuration)
+        int? maximumModelCalls,
+        int? maximumToolCalls,
+        TimeSpan? maximumDuration)
     {
-        if (maximumModelCalls <= 0)
+        if (maximumModelCalls is <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maximumModelCalls),
@@ -24,20 +29,21 @@ public sealed record TurnLimits
                 "Maximum model calls must be positive.");
         }
 
-        if (maximumToolCalls <= 0)
+        if (maximumToolCalls is < 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maximumToolCalls),
                 maximumToolCalls,
-                "Maximum tool calls must be positive.");
+                "Maximum tool calls cannot be negative.");
         }
 
-        if (maximumDuration <= TimeSpan.Zero)
+        if (maximumDuration is TimeSpan duration
+            && (duration <= TimeSpan.Zero || duration > MaximumSupportedDuration))
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maximumDuration),
                 maximumDuration,
-                "Maximum duration must be positive.");
+                "Maximum duration must be positive and supported by the runtime timer.");
         }
 
         MaximumModelCalls = maximumModelCalls;
@@ -45,11 +51,11 @@ public sealed record TurnLimits
         MaximumDuration = maximumDuration;
     }
 
-    public int MaximumModelCalls { get; }
+    public int? MaximumModelCalls { get; }
 
-    public int MaximumToolCalls { get; }
+    public int? MaximumToolCalls { get; }
 
-    public TimeSpan MaximumDuration { get; }
+    public TimeSpan? MaximumDuration { get; }
 
     public static TurnLimits CreateDefault() =>
         new(DefaultMaximumModelCalls, DefaultMaximumToolCalls, DefaultMaximumDuration);

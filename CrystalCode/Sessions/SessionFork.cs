@@ -23,7 +23,7 @@ internal static class SessionFork
             PlanMode = source.PlanMode,
             CreatedUtc = createdUtc,
             Items = source.Items.Select(CloneItem).ToList(),
-            Images = source.Images.Select(CloneImage).ToList(),
+            Images = source.Images.OfType<SessionImageDocument>().Select(CloneImage).ToList(),
             Todos = source.Todos.Select(CloneTodo).ToList(),
             UserTurns = Math.Max(0, source.UserTurns),
             ModelCalls = Math.Max(0, source.ModelCalls),
@@ -51,6 +51,7 @@ internal static class SessionFork
             Number = image.Number,
             MimeType = image.MimeType,
             Data = image.Data?.ToArray(),
+            ContentHash = image.ContentHash,
             Uri = image.Uri
         };
 

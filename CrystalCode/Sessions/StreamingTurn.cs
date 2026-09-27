@@ -50,7 +50,9 @@ public sealed class StreamingTurn
         var toolCallCount = 0;
         var usage = new UsageAccumulator();
 
-        using var durationSource = new CancellationTokenSource(_limits.MaximumDuration);
+        using var durationSource = _limits.MaximumDuration is TimeSpan duration
+            ? new CancellationTokenSource(duration)
+            : new CancellationTokenSource();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
             durationSource.Token);
@@ -80,7 +82,8 @@ public sealed class StreamingTurn
                     }
                 }
 
-                if (modelCallCount >= _limits.MaximumModelCalls)
+                if (_limits.MaximumModelCalls is int maximumModelCalls
+                    && modelCallCount >= maximumModelCalls)
                 {
                     _observer?.OnModelRoundClosed();
                     return Create(
@@ -112,7 +115,8 @@ public sealed class StreamingTurn
                         transcript);
                 }
 
-                if (toolCalls.Length > _limits.MaximumToolCalls - toolCallCount)
+                if (_limits.MaximumToolCalls is int maximumToolCalls
+                    && toolCalls.Length > maximumToolCalls - toolCallCount)
                 {
                     _observer?.OnModelRoundClosed();
                     return Create(

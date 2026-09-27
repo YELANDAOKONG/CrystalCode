@@ -76,7 +76,8 @@ public sealed class SettingsStore
                 : document.ExportDirectory.Trim(),
             new StatusLineSettings(
                 document.CustomStatusLine ?? false,
-                document.StatusLine));
+                document.StatusLine),
+            ExecutionBudgetMapper.Read(document.ExecutionBudget));
     }
 
     public void Save(HarnessSettings settings)
@@ -122,6 +123,7 @@ public sealed class SettingsStore
                     ? null
                     : [.. settings.StatusLine.Fields],
             CompactionThreshold = settings.CompactionThreshold,
+            ExecutionBudget = ExecutionBudgetMapper.Write(settings.ExecutionBudget),
             Providers = previous?.Providers
         };
         var json = JsonSerializer.Serialize(document, HomeJson.Options);

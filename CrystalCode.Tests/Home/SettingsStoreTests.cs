@@ -4,6 +4,7 @@ using Crystal.Reasoning;
 
 using CrystalCode.Configuration;
 using CrystalCode.Home;
+using CrystalCode.Sessions;
 
 using Xunit;
 
@@ -30,10 +31,79 @@ public sealed class SettingsStoreTests
         Assert.Equal(ExternalToolTrustPolicy.Author, settings.ExternalToolApproval.Home);
         Assert.Equal(ExternalToolTrustPolicy.Host, settings.ExternalToolApproval.Project);
         Assert.False(settings.EstimatedTokens);
+        Assert.Equal(1024, settings.ExecutionBudget.MaximumModelCalls);
+        Assert.Equal(8192, settings.ExecutionBudget.MaximumToolCalls);
+        Assert.Equal(TimeSpan.FromDays(7), settings.ExecutionBudget.MaximumDuration);
         Assert.True(File.Exists(root.Home.ConfigPath));
         Assert.False(File.Exists(root.Home.ProvidersPath));
         using var config = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
         Assert.False(config.RootElement.TryGetProperty("providers", out _));
+    }
+
+    [Fact]
+    public void Load_ExecutionBudgetSupportsPartialOverridesAndUnlimitedDimensions()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ConfigPath, """
+            {
+              "executionBudget": {
+                "maximumModelCalls": null,
+                "maximumToolCalls": 0,
+                "maximumDurationSeconds": 120.5
+              }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.Null(settings.ExecutionBudget.MaximumModelCalls);
+        Assert.Equal(0, settings.ExecutionBudget.MaximumToolCalls);
+        Assert.Equal(TimeSpan.FromSeconds(120.5), settings.ExecutionBudget.MaximumDuration);
+        store.Save(settings.WithVerboseTools(false));
+        var reloaded = store.Load();
+        Assert.Equal(settings.ExecutionBudget, reloaded.ExecutionBudget);
+        using var saved = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
+        Assert.Equal(
+            JsonValueKind.Null,
+            saved.RootElement.GetProperty("executionBudget")
+                .GetProperty("maximumModelCalls").ValueKind);
+    }
+
+    [Fact]
+    public void Load_ExecutionBudgetUnlimitedRoundTrips()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ConfigPath, """
+            { "executionBudget": "unlimited" }
+            """);
+
+        var settings = store.Load();
+
+        Assert.Equal(TurnLimits.Unlimited, settings.ExecutionBudget);
+        store.Save(settings);
+        Assert.Equal(TurnLimits.Unlimited, store.Load().ExecutionBudget);
+    }
+
+    [Theory]
+    [InlineData("{ \"maximumModelCalls\": 0 }")]
+    [InlineData("{ \"maximumToolCalls\": -1 }")]
+    [InlineData("{ \"maximumDurationSeconds\": 0 }")]
+    [InlineData("{ \"maximumDurationSeconds\": 999999999 }")]
+    [InlineData("{ \"maximumModelCalls\": \"many\" }")]
+    [InlineData("{ \"maximumModelCall\": 5 }")]
+    public void Load_RejectsInvalidExecutionBudget(string budget)
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ConfigPath, "{ \"executionBudget\": " + budget + " }");
+
+        var error = Record.Exception(() => store.Load());
+        Assert.True(error is JsonException or ArgumentOutOfRangeException);
     }
 
     [Fact]

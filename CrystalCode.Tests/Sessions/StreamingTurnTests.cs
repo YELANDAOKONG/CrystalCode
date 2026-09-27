@@ -50,6 +50,33 @@ public sealed class StreamingTurnTests
     }
 
     [Fact]
+    public async Task RunAsync_UnlimitedBudgetAllowsToolRoundAndCompletion()
+    {
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "echo", "{}"),
+            TextRound("ok"));
+        var turn = CreateTurn(client, TurnLimits.Unlimited);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "echo")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(2, result.ModelCallCount);
+        Assert.Equal(1, result.ToolCallCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_ZeroToolBudgetStopsBeforeExecution()
+    {
+        var client = new ScriptedStreamingClient(ToolRound("c1", "echo", "{}"));
+        var turn = CreateTurn(client, new TurnLimits(2, 0, TimeSpan.FromSeconds(5)));
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "echo")]);
+
+        Assert.Equal(TurnStopReason.ToolCallLimitReached, result.StopReason);
+        Assert.Equal(0, result.ToolCallCount);
+    }
+
+    [Fact]
     public async Task RunAsync_StopsAtModelCallLimit()
     {
         var client = new ScriptedStreamingClient(ToolRound("c1", "echo", "{}"));

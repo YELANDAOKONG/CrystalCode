@@ -21,6 +21,8 @@ The current product is a terminal UI application. The terminal is the only
 operator surface and the only entry. It can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
+- configure per-turn model-call, tool-call, and wall-clock budgets, including
+  unlimited budgets;
 - retry a failed model round on rate limits, server errors, timeouts,
   network faults, and incomplete streams, waiting with backoff, a
   countdown on the progress row, and a transcript note;
@@ -56,7 +58,9 @@ operator surface and the only entry. It can:
 - group one gateway's protocol endpoints under a single provider name and route
   each uniquely named model through its configured protocol;
 - attach PNG, JPEG, GIF, or WebP images from the workspace, paste clipboard
-  images on supported terminals, persist image references with sessions, and
+  images on supported terminals, copy submitted images into Home as validated
+  binary files, persist references with sessions, export available images inline
+  in JSON, and
   carry generic plugin-returned images into the next model round when a model
   explicitly declares image-input support;
 - edit pasted image markers as single composer units and discard unsent images

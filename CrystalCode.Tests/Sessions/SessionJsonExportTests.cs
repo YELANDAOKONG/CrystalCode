@@ -1,5 +1,8 @@
+using System.Text.Json;
+
 using CrystalCode.Home;
 using CrystalCode.Sessions;
+using CrystalCode.Tests.Home;
 
 using Xunit;
 
@@ -48,5 +51,50 @@ public sealed class SessionJsonExportTests
         var json = SessionJsonExport.Render(metadata, session, "system body");
 
         Assert.Contains("\"system\": \"system body\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_InlinesImagesRestoredFromBinarySessionStorage()
+    {
+        using var root = new TemporaryHome();
+        var store = new SessionStore(root.Home);
+        byte[] png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+        var session = new SessionDocument
+        {
+            Id = "image-export",
+            Workspace = "/tmp/demo",
+            Items =
+            [
+                new SessionItemDocument
+                {
+                    Kind = "message",
+                    Role = "user",
+                    Text = "See [Image #1]"
+                }
+            ],
+            Images =
+            [
+                new SessionImageDocument
+                {
+                    Number = 1,
+                    MimeType = "image/png",
+                    Data = png
+                }
+            ]
+        };
+        store.Save(session);
+        Assert.True(store.TryLoad("image-export", out var stored));
+        Assert.Null(stored.Images[0].Data);
+        session.Images = SessionMapper.WriteImages(store.ReadImages(stored.Images).Values);
+        var metadata = new SessionExportMetadata(
+            "image-export", "/tmp/demo", "deepseek", "deepseek-flash", "default",
+            false, DateTimeOffset.UtcNow);
+
+        var json = SessionJsonExport.Render(metadata, session, null);
+
+        using var export = JsonDocument.Parse(json);
+        var image = export.RootElement.GetProperty("session").GetProperty("images")[0];
+        Assert.Equal(Convert.ToBase64String(png), image.GetProperty("data").GetString());
+        Assert.False(image.TryGetProperty("contentHash", out _));
     }
 }

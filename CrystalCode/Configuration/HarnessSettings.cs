@@ -1,5 +1,7 @@
 using Crystal.Reasoning;
+
 using CrystalCode.Approvals;
+using CrystalCode.Sessions;
 
 namespace CrystalCode.Configuration;
 
@@ -37,7 +39,8 @@ public sealed record HarnessSettings
         string promptSet = DefaultPromptSet,
         ExternalToolApprovalSettings? externalToolApproval = null,
         string? exportDirectory = null,
-        StatusLineSettings? statusLine = null)
+        StatusLineSettings? statusLine = null,
+        TurnLimits? executionBudget = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -70,6 +73,7 @@ public sealed record HarnessSettings
         ExternalToolApproval = externalToolApproval ?? ExternalToolApprovalSettings.Default;
         ExportDirectory = string.IsNullOrWhiteSpace(exportDirectory) ? null : exportDirectory.Trim();
         StatusLine = statusLine ?? new StatusLineSettings();
+        ExecutionBudget = executionBudget ?? TurnLimits.CreateDefault();
     }
 
     public ProviderName Provider { get; }
@@ -101,6 +105,8 @@ public sealed record HarnessSettings
     public string? ExportDirectory { get; }
 
     public StatusLineSettings StatusLine { get; }
+
+    public TurnLimits ExecutionBudget { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.GetModelProvider(Provider, Model);
 
@@ -190,6 +196,12 @@ public sealed record HarnessSettings
         return Copy(statusLine: statusLine);
     }
 
+    public HarnessSettings WithExecutionBudget(TurnLimits executionBudget)
+    {
+        ArgumentNullException.ThrowIfNull(executionBudget);
+        return Copy(executionBudget: executionBudget);
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -204,7 +216,8 @@ public sealed record HarnessSettings
         ExternalToolApprovalSettings? externalToolApproval = null,
         string? exportDirectory = null,
         bool setExportDirectory = false,
-        StatusLineSettings? statusLine = null) =>
+        StatusLineSettings? statusLine = null,
+        TurnLimits? executionBudget = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -220,7 +233,8 @@ public sealed record HarnessSettings
             promptSet ?? PromptSet,
             externalToolApproval ?? ExternalToolApproval,
             setExportDirectory ? exportDirectory : ExportDirectory,
-            statusLine ?? StatusLine);
+            statusLine ?? StatusLine,
+            executionBudget ?? ExecutionBudget);
 
     public override string ToString() => nameof(HarnessSettings);
 
