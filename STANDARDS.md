@@ -71,6 +71,9 @@
 - Do not put image bytes, data URIs, or remote image URIs in composer text,
   transcript rendering, logs, diagnostics, or exception messages. Use stable
   `[Image #N]` markers.
+- Prompt history persists text-only entries under `~/.crystal` with owner-only
+  permissions where supported. Do not persist image markers without their
+  session attachment identity.
 - Validate local image content by signature, enforce the host size limit, and
   preserve exact bytes and MIME type. Do not decode, transform, fetch, or
   execute media implicitly.

@@ -12,8 +12,7 @@ public static class ScrollInput
 
     public static bool TryKeyScroll(
         InputKey key,
-        bool composerEmpty,
-        bool pickerOpen,
+        bool scrollPlainArrows,
         int pageRows,
         out int delta)
     {
@@ -45,13 +44,13 @@ public static class ScrollInput
             return true;
         }
 
-        if (key.Key == ConsoleKey.UpArrow && composerEmpty && !pickerOpen)
+        if (key.Key == ConsoleKey.UpArrow && scrollPlainArrows)
         {
             delta = LineStep;
             return true;
         }
 
-        if (key.Key == ConsoleKey.DownArrow && composerEmpty && !pickerOpen)
+        if (key.Key == ConsoleKey.DownArrow && scrollPlainArrows)
         {
             delta = -LineStep;
             return true;

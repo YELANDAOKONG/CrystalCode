@@ -164,6 +164,83 @@ public sealed class ComposerBufferTests
     }
 
     [Fact]
+    public void Handle_EmptyUpRecallsHistoryAndDownRestoresDraft()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.SeedHistory(["older", "newer"]);
+        buffer.Insert("draft");
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.LeftArrow, false, false, false));
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+        Assert.Equal("newer", buffer.Text);
+        Assert.Equal(0, buffer.Cursor);
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.DownArrow, false, false, false));
+        Assert.Equal("draft", buffer.Text);
+        Assert.Equal(4, buffer.Cursor);
+    }
+
+    [Fact]
+    public void Handle_EmptyPromptUpRecallsLatestSubmission()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("previous prompt");
+        buffer.RememberAndClear();
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+
+        Assert.Equal("previous prompt", buffer.Text);
+    }
+
+    [Fact]
+    public void Handle_ArrowsMoveWithinMultilineBeforeHistory()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.SeedHistory(["history"]);
+        buffer.Insert("one\ntwo\nthree");
+        buffer.Project(40, 8);
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+        Assert.Equal("one\ntwo\nthree", buffer.Text);
+        Assert.Equal("one\ntwo".Length, buffer.Cursor);
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+        Assert.Equal(3, buffer.Cursor);
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+        Assert.Equal("history", buffer.Text);
+    }
+
+    [Fact]
+    public void Handle_ArrowsMoveAcrossWrappedRows()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("abcdefghijklmnop");
+        buffer.Project(16, 8);
+
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+
+        Assert.Equal("abcdefghijklmnop", buffer.Text);
+        Assert.True(buffer.Cursor < buffer.Text.Length);
+    }
+
+    [Fact]
+    public void ForgetImageHistory_DropsEntriesWithImageMarkers()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.InsertAtomic("[Image #1]");
+        buffer.RememberAndClear();
+        buffer.Insert("text");
+        buffer.RememberAndClear();
+
+        buffer.ForgetImageHistory();
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+        Assert.Equal("text", buffer.Text);
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+        Assert.Equal("text", buffer.Text);
+    }
+
+    [Fact]
     public void Project_EmptyKeepsPromptAndPlaceholderOnOneLine()
     {
         var buffer = new ComposerBuffer();

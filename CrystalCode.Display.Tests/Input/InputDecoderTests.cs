@@ -84,8 +84,8 @@ public sealed class InputDecoderTests
         var events = new InputDecoder().Push(WindowsVt("\u001b[A"));
         var key = Assert.IsType<InputKey>(Assert.Single(events));
         Assert.Equal(ConsoleKey.UpArrow, key.Key);
-        Assert.False(ScrollInput.TryKeyScroll(key, composerEmpty: false, pickerOpen: false, 8, out _));
-        Assert.True(ScrollInput.TryKeyScroll(key, composerEmpty: true, pickerOpen: false, 8, out var delta));
+        Assert.False(ScrollInput.TryKeyScroll(key, scrollPlainArrows: false, 8, out _));
+        Assert.True(ScrollInput.TryKeyScroll(key, scrollPlainArrows: true, 8, out var delta));
         Assert.Equal(InputWheel.LineStep, delta);
     }
 

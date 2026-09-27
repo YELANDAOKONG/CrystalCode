@@ -12,7 +12,7 @@ public sealed class ScrollInputTests
     {
         var pageUp = new InputKey(ConsoleKey.PageUp, '\0', ConsoleModifiers.None);
 
-        Assert.True(ScrollInput.TryKeyScroll(pageUp, false, false, 10, out var delta));
+        Assert.True(ScrollInput.TryKeyScroll(pageUp, false, 10, out var delta));
         Assert.Equal(10, delta);
     }
 
@@ -22,10 +22,10 @@ public sealed class ScrollInputTests
         var plainUp = new InputKey(ConsoleKey.UpArrow, '\0', ConsoleModifiers.None);
         var ctrlUp = new InputKey(ConsoleKey.UpArrow, '\0', ConsoleModifiers.Control);
 
-        Assert.True(ScrollInput.TryKeyScroll(plainUp, composerEmpty: true, pickerOpen: false, 10, out var emptyDelta));
+        Assert.True(ScrollInput.TryKeyScroll(plainUp, scrollPlainArrows: true, 10, out var emptyDelta));
         Assert.Equal(ScrollInput.LineStep, emptyDelta);
-        Assert.False(ScrollInput.TryKeyScroll(plainUp, composerEmpty: false, pickerOpen: false, 10, out _));
-        Assert.True(ScrollInput.TryKeyScroll(ctrlUp, composerEmpty: false, pickerOpen: false, 10, out var delta));
+        Assert.False(ScrollInput.TryKeyScroll(plainUp, scrollPlainArrows: false, 10, out _));
+        Assert.True(ScrollInput.TryKeyScroll(ctrlUp, scrollPlainArrows: false, 10, out var delta));
         Assert.Equal(ScrollInput.LineStep, delta);
     }
 }

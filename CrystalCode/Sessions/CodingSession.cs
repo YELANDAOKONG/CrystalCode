@@ -33,6 +33,7 @@ public sealed class CodingSession
     private readonly CredentialStore _credentials;
     private readonly PromptStore _promptStore;
     private readonly SessionStore _sessionStore;
+    private readonly PromptHistoryStore _promptHistoryStore;
     private ContextCompactor _compactor;
     private readonly PluginRegistry _plugins;
     private readonly SessionRenderer _renderer;
@@ -68,6 +69,7 @@ public sealed class CodingSession
     private CancellationTokenSource? _compactSource;
     private bool _turnActive;
     private int _idleCancels;
+    private bool _promptHistoryAvailable = true;
 
     private CodingSession(
         HarnessSettings settings,
@@ -86,6 +88,7 @@ public sealed class CodingSession
         _credentials = credentials;
         _promptStore = new PromptStore(home);
         _sessionStore = new SessionStore(home);
+        _promptHistoryStore = new PromptHistoryStore(home, workspace.Root);
         _workspace = workspace;
         _plugins = plugins;
         _client = CreateClient(settings);
@@ -151,11 +154,19 @@ public sealed class CodingSession
 
     private async Task<int> RunLoopAsync(CancellationToken cancellationToken)
     {
+        await LoadPromptHistoryAsync(cancellationToken);
         using var screen = _renderer.Open();
         _renderer.SetStatusLine(_settings.StatusLine.Enabled, _settings.StatusLine.Fields);
         _renderer.ContextWindow = _settings.ActiveModel.ContextWindow;
         _renderer.AfterTools = PromoteAfterTools;
         _renderer.OnImagePasteAsync = PasteClipboardImageAsync;
+        _renderer.OnComposerEdited = input =>
+        {
+            if (!_turnActive)
+            {
+                PruneDraftImages(input);
+            }
+        };
         RefreshSlashCommands();
         _renderer.ShowEstimatedTokens = _settings.EstimatedTokens;
         _renderer.VerboseTools = _settings.VerboseTools;
@@ -256,6 +267,7 @@ public sealed class CodingSession
                 continue;
             }
 
+            await SavePromptHistoryAsync(read.Text, promptSource.Token);
             var input = read.Text.Trim();
             PruneDraftImages(input);
             if (_turnActive)
@@ -306,6 +318,47 @@ public sealed class CodingSession
             }
 
             StartTurn(input);
+        }
+    }
+
+    private async Task LoadPromptHistoryAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _renderer.SeedPromptHistory(await _promptHistoryStore.LoadAsync(cancellationToken));
+        }
+        catch (IOException)
+        {
+            _promptHistoryAvailable = false;
+            _renderer.WriteNote("Prompt history is unavailable");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _promptHistoryAvailable = false;
+            _renderer.WriteNote("Prompt history is unavailable");
+        }
+    }
+
+    private async Task SavePromptHistoryAsync(string text, CancellationToken cancellationToken)
+    {
+        if (!_promptHistoryAvailable)
+        {
+            return;
+        }
+
+        try
+        {
+            await _promptHistoryStore.AppendAsync(text, cancellationToken);
+        }
+        catch (IOException)
+        {
+            _promptHistoryAvailable = false;
+            _renderer.WriteNote("Prompt history could not be saved");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _promptHistoryAvailable = false;
+            _renderer.WriteNote("Prompt history could not be saved");
         }
     }
 
@@ -1548,6 +1601,7 @@ public sealed class CodingSession
     private void BeginNewSession()
     {
         DiscardQueue();
+        _renderer.ForgetImageHistory();
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _images.Clear();
         _pendingImages.Clear();
@@ -1670,6 +1724,7 @@ public sealed class CodingSession
     private void ApplyDocument(SessionDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
+        _renderer.ForgetImageHistory();
         var items = TranscriptCodec.Read(document.Items);
         _sessionId = document.Id!;
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;

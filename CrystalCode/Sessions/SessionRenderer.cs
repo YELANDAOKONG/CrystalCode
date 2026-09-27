@@ -66,6 +66,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     public Func<CancellationToken, Task<string?>>? OnImagePasteAsync { get; set; }
 
+    public Action<string>? OnComposerEdited { get; set; }
+
     public bool ShowEstimatedTokens
     {
         get
@@ -456,8 +458,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 "?            Shortcuts when empty",
                 "ctrl+o       Toggle verbose tool results",
                 "ctrl+g       Toggle verbose command output",
-                "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)",
-                "up/down      history recall (or picker navigation)");
+                "pageup       Scroll transcript (also pagedown and wheel)",
+                "up/down      Move cursor; at edge, browse prompt history");
             foreach (var spec in SlashCatalog.BuiltIn)
             {
                 var names = "/" + spec.Name;
@@ -548,6 +550,22 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             _log.Clear();
             _scrollBack = 0;
             PaintUnlocked(force: true);
+        }
+    }
+
+    public void SeedPromptHistory(IEnumerable<string> entries)
+    {
+        lock (_gate)
+        {
+            _composer.SeedHistory(entries);
+        }
+    }
+
+    public void ForgetImageHistory()
+    {
+        lock (_gate)
+        {
+            _composer.ForgetImageHistory();
         }
     }
 
@@ -944,6 +962,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             }
 
             _composer.Clear();
+            OnComposerEdited?.Invoke(_composer.Text);
             _picker = null;
             PaintUnlocked(force: true);
             return true;
@@ -1114,8 +1133,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         out int delta) =>
         ScrollInput.TryKeyScroll(
             key,
-            composerEmpty: scrollPlainArrows,
-            pickerOpen: false,
+            scrollPlainArrows,
             pageRows,
             out delta);
 
@@ -1162,8 +1180,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                             break;
                         case InputKey key when ScrollInput.TryKeyScroll(
                             key,
-                            composerEmpty: false,
-                            pickerOpen: false,
+                            scrollPlainArrows: false,
                             pageRows,
                             out var delta):
                             _scrollBack = Math.Max(0, _scrollBack + delta);
@@ -1258,8 +1275,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
                 if (ScrollInput.TryKeyScroll(
                     key,
-                    _composer.IsEmpty,
-                    _picker is not null,
+                    scrollPlainArrows: false,
                     pageRows,
                     out var delta))
                 {
@@ -1280,6 +1296,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
         {
             _composer.Replace(_picker.CompletedText);
+            OnComposerEdited?.Invoke(_composer.Text);
             return null;
         }
 
@@ -1288,6 +1305,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             && !_picker.IsExact(_composer.Text))
         {
             _composer.Replace(_picker.CompletedText);
+            OnComposerEdited?.Invoke(_composer.Text);
             return null;
         }
 
@@ -1303,6 +1321,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             return null;
         }
 
+        var previousText = _composer.Text;
         var action = _composer.Handle(key);
         switch (action)
         {
@@ -1328,6 +1347,14 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 break;
         }
 
+        if (!string.Equals(previousText, _composer.Text, StringComparison.Ordinal)
+            && key.Key is not ConsoleKey.UpArrow and not ConsoleKey.DownArrow
+            && !(key.Modifiers.HasFlag(ConsoleModifiers.Control)
+                && key.Key is ConsoleKey.P or ConsoleKey.N))
+        {
+            OnComposerEdited?.Invoke(_composer.Text);
+        }
+
         return null;
     }
 
@@ -1346,7 +1373,8 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
             "?            Shortcuts when empty",
             "ctrl+o       Toggle verbose tool results",
             "ctrl+g       Toggle verbose command output",
-            "pageup       Scroll transcript (also wheel, ctrl+up/down, empty up)");
+            "up/down      Move cursor; at edge, browse prompt history",
+            "pageup       Scroll transcript (also pagedown and wheel)");
         foreach (var option in _slashOptions)
         {
             var aliases = option.Keys

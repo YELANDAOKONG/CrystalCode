@@ -16,6 +16,8 @@ public sealed class ComposerBuffer
     private int _cursor;
     private int _historyIndex;
     private string _draft = string.Empty;
+    private int _draftCursor;
+    private int _bodyWidth = 80;
 
     public bool PlanMode { get; set; }
 
@@ -103,10 +105,14 @@ public sealed class ComposerBuffer
                 _cursor = SnapCursor(LineEnd(), moveRight: true);
                 break;
             case ConsoleKey.UpArrow:
+                MoveVerticalOrRecall(-1);
+                break;
             case ConsoleKey.P when isCtrl:
                 RecallHistory(-1);
                 break;
             case ConsoleKey.DownArrow:
+                MoveVerticalOrRecall(1);
+                break;
             case ConsoleKey.N when isCtrl:
                 RecallHistory(1);
                 break;
@@ -146,6 +152,7 @@ public sealed class ComposerBuffer
     public void Replace(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        DetachHistoryNavigation();
         _text.Clear();
         _text.Append(text);
         _cursor = _text.Length;
@@ -159,6 +166,7 @@ public sealed class ComposerBuffer
             return;
         }
 
+        DetachHistoryNavigation();
         _cursor = SnapCursor(_cursor, moveRight: true);
         _text.Insert(_cursor, text);
         _cursor += text.Length;
@@ -177,6 +185,38 @@ public sealed class ComposerBuffer
         _cursor = 0;
         _historyIndex = _history.Count;
         _draft = string.Empty;
+        _draftCursor = 0;
+    }
+
+    public void SeedHistory(IEnumerable<string> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        foreach (var entry in entries)
+        {
+            if (string.IsNullOrWhiteSpace(entry)
+                || (_history.Count > 0
+                    && string.Equals(_history[^1], entry, StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            _history.Add(entry);
+            if (_history.Count > MaximumHistory)
+            {
+                _history.RemoveAt(0);
+            }
+        }
+
+        _historyIndex = _history.Count;
+    }
+
+    public void ForgetImageHistory()
+    {
+        _history.RemoveAll(entry => entry.Contains("[Image #", StringComparison.Ordinal));
+        _atomicText.Clear();
+        _historyIndex = _history.Count;
+        _draft = Text;
+        _draftCursor = _cursor;
     }
 
     public void RememberAndClear()
@@ -202,6 +242,7 @@ public sealed class ComposerBuffer
         var promptPlain = mode + " > ";
         var promptColumns = TextWidth.Measure(promptPlain);
         var bodyWidth = Math.Max(width - promptColumns, 8);
+        _bodyWidth = bodyWidth;
         var text = Text;
         var wrapped = TextWidth.Wrap(text, bodyWidth);
         if (wrapped.Count == 0)
@@ -358,6 +399,7 @@ public sealed class ComposerBuffer
 
     private void DeleteRange(int from, int to)
     {
+        DetachHistoryNavigation();
         var text = Text;
         bool expanded;
         do
@@ -475,6 +517,7 @@ public sealed class ComposerBuffer
         if (_historyIndex == _history.Count)
         {
             _draft = Text;
+            _draftCursor = _cursor;
         }
 
         var next = _historyIndex + delta;
@@ -486,7 +529,78 @@ public sealed class ComposerBuffer
         _historyIndex = next;
         _text.Clear();
         _text.Append(_historyIndex == _history.Count ? _draft : _history[_historyIndex]);
-        _cursor = _text.Length;
+        _cursor = _historyIndex == _history.Count
+            ? _draftCursor
+            : delta < 0 ? 0 : _text.Length;
+    }
+
+    private void MoveVerticalOrRecall(int delta)
+    {
+        var text = Text;
+        var (row, column) = MapCursor(text, _cursor, _bodyWidth);
+        var lastRow = MapCursor(text, text.Length, _bodyWidth).Row;
+        var targetRow = row + delta;
+        if (targetRow < 0 || targetRow > lastRow)
+        {
+            RecallHistory(delta);
+            return;
+        }
+
+        var candidate = _cursor;
+        var distance = int.MaxValue;
+        var offset = 0;
+        var visualRow = 0;
+        var visualColumn = 0;
+        while (true)
+        {
+            if (visualRow == targetRow)
+            {
+                var nextDistance = Math.Abs(visualColumn - column);
+                if (nextDistance < distance)
+                {
+                    candidate = offset;
+                    distance = nextDistance;
+                }
+            }
+
+            if (offset == text.Length)
+            {
+                break;
+            }
+
+            if (text[offset] == '\n')
+            {
+                visualRow++;
+                visualColumn = 0;
+                offset++;
+                continue;
+            }
+
+            var next = TextWidth.MoveRight(text, offset);
+            var width = TextWidth.Measure(text.AsSpan(offset, next - offset));
+            if (visualColumn + width > _bodyWidth && visualColumn > 0)
+            {
+                visualRow++;
+                visualColumn = 0;
+            }
+
+            visualColumn += width;
+            offset = next;
+        }
+
+        _cursor = SnapCursor(candidate, moveRight: delta > 0);
+    }
+
+    private void DetachHistoryNavigation()
+    {
+        if (_historyIndex == _history.Count)
+        {
+            return;
+        }
+
+        _historyIndex = _history.Count;
+        _draft = Text;
+        _draftCursor = _cursor;
     }
 
     private static (int Row, int Column) MapCursor(string text, int cursor, int bodyWidth)

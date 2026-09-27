@@ -79,6 +79,19 @@ public sealed class SessionRendererTests
     }
 
     [Fact]
+    public void TryClearComposer_NotifiesHostToDiscardDraftAttachments()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SeedComposer("draft [Image #1]");
+        string? edited = null;
+        renderer.OnComposerEdited = text => edited = text;
+
+        Assert.True(renderer.TryClearComposer());
+
+        Assert.Equal(string.Empty, edited);
+    }
+
+    [Fact]
     public void TryReadKeyScroll_PlainArrowReservedForQuestionSelection()
     {
         var up = new InputKey(ConsoleKey.UpArrow, '\0', ConsoleModifiers.None);

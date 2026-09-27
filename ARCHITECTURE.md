@@ -156,7 +156,8 @@ multimodal contracts. `[Image #N]` is presentation and persistence metadata;
 providers receive typed `ImageContent`, never a marker in place of its bytes.
 Pasted markers are atomic composer text: cursor movement and deletion cannot
 leave a partial marker. Only complete markers in submitted transcript items
-produce model images; unused pasted images are discarded, and session files
+produce model images; deleted unsent images are discarded immediately while
+idle and at submission during an active turn. Session files
 persist only images referenced by the transcript.
 Inline image bytes and absolute image URIs are supported. Images returned by
 an in-process plugin or dotnet operator tool's native `IMultimodalTool` path
@@ -443,6 +444,7 @@ installers replace the full platform release contents under `binaries/code/`.
 ~/.crystal/
   binaries/code/CrystalCode (CrystalCode.exe on Windows)
   config.json
+  prompt-history.jsonl
   credentials.json
   permissions.json
   instructions.md
@@ -802,15 +804,22 @@ is a command prefix. After a verb that takes an argument
 that provider's models. `/export` completes the format, optional system flag,
 and the system flag after an explicit path. `/prompts export` offers directory
 examples while Enter on the optional argument boundary still submits with the
-default directory. PageUp, PageDown, the mouse wheel, Ctrl+Up/Down,
-and Up/Down when the prompt is empty scroll the transcript. Ctrl+O and
-Ctrl+G toggle verbose tool and command output when the composer is
-empty. Up/Down
-arrows navigate composer history or the slash picker when the prompt
-has text. Alternate-scroll (1007) turns the wheel into batched Up/Down
+default directory. Ctrl+O and Ctrl+G toggle verbose tool and command output when the composer is
+empty. Plain Up/Down move through the composer's visual rows, including
+wrapped rows. At the first or last row they navigate submitted prompt
+history; Up on an empty prompt recalls the latest entry, and Down past
+the newest entry restores the unsent draft and its cursor. The slash
+picker owns plain Up/Down while open. Submitted text-only history is
+stored by workspace in `~/.crystal/prompt-history.jsonl` with an
+owner-only file mode where supported. Image-bearing prompts remain in
+memory only and are forgotten when the session changes, since their
+markers do not carry image bytes or a stable cross-session attachment.
+PageUp/PageDown and the wheel are the primary transcript scroll controls;
+Ctrl+Up/Down also scroll when the terminal passes those keys through.
+Alternate-scroll (1007) turns the wheel into batched Up/Down
 CSI; a burst of two or more is transcript scroll even when the
 composer has text, so one Windows wheel notch is not dropped. A single
-Up/Down stays history. The alternate screen enables alternate-scroll
+Up/Down stays with the composer. The alternate screen enables alternate-scroll
 arrows (1007) and bracketed paste (2004). It does not enable SGR mouse
 tracking (1000/1006), so left-drag still selects and copies. Wheel
 reports that a terminal still sends are drained without waiting. Escape is held only

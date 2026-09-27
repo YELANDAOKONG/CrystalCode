@@ -35,6 +35,8 @@ operator surface and the only entry. It can:
 - compact conversation context when usage approaches the model window,
   or when the operator runs `/compact`;
 - persist configuration, permissions, and sessions under `~/.crystal`;
+- recall submitted prompts from the composer with Up/Down and retain up to 200
+  recent text-only entries across runs for the same workspace;
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace;
 - list saved sessions for the current workspace or every workspace, choose a
