@@ -1,0 +1,938 @@
+# Crystal Code
+
+Detailed usage reference. For a shorter introduction, start with the
+[project README](../README.md).
+
+A production coding TUI for local repositories. The terminal is the
+only operator surface. It runs a streaming model-and-tool loop, with
+Plan/Work modes, risk-aware approval, automatic context compaction,
+and operator data under `~/.crystal`.
+
+CrystalCode consumes the Crystal library. It does not modify Crystal.
+It is not a Crystal demo and not a replacement for Crystal.
+
+## What it does
+
+From a workspace you want the agent to inspect or change, CrystalCode:
+
+- streams a model turn with tool calls, and queues follow-ups while a
+  turn is running;
+- retries a failed model round on rate limits, server errors, timeouts,
+  network faults, and incomplete streams, waiting with backoff;
+- switches the configured provider and model with `/model`;
+- switches Plan (built-in reads; no edit, write, or bash) and Work
+  (edit, write, shell);
+- approves side effects manually, by a reviewing model, or by full
+  pass-through according to risk and authority;
+- compacts conversation context when usage approaches the selected
+  model's window;
+- persists configuration, permissions, and sessions under `~/.crystal`;
+- talks to DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
+  and Anthropic Messages endpoints, including operator-added gateways.
+
+Built-in tools and all provider adapters register through the same in-process
+plugin table. Operators add extra catalog tools as
+tool sets under `~/.crystal/tools` and `<workspace>/.crystal/tools`.
+`IPlugin` assemblies are not loaded from `plugins/`.
+
+## Install
+
+The latest self-contained release can be installed on Linux x64, Linux ARM64,
+macOS ARM64, or Windows x64. The installers download the matching standard
+release asset, `CrystalCode-<os>-<architecture>.zip`, then replace the
+full published contents in `~/.crystal/binaries/code/`.
+
+On Linux or macOS, run:
+
+```bash
+curl --fail --location --show-error \
+  https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.sh | sh
+```
+
+On Windows PowerShell:
+
+```powershell
+Invoke-RestMethod `
+  -Uri https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.ps1 | Invoke-Expression
+```
+
+To inspect an installer before running it, download it to a file and run it
+manually instead.
+
+The installers do not write credentials. On Linux and macOS, the installer adds
+a `# Crystal Code CLI (Installer)` block to the selected zsh or bash profile.
+The block adds the CrystalCode directory to PATH and aliases `crystal` to
+`CrystalCode`. On Windows, the installer adds that directory to the user-level
+PATH.
+Open a new terminal after installation, then run `crystal` on Linux or macOS,
+or `CrystalCode` on Windows.
+
+## Not yet implemented
+
+The following planned capabilities are not yet implemented in the current
+build: MCP servers, a headless CI runner, an operating-system sandbox,
+parent/child Agents, audio and video input, non-text model output, and provider
+protocols other than DeepSeek and OpenAI-compatible Chat Completions, OpenAI
+Responses, and Anthropic Messages. Image input is available for supported
+models and providers.
+
+## Requirements
+
+- An API key for the selected provider, supplied through configuration
+  or the environment (see [Credentials](#credentials))
+- A TTY for the interactive alternate-screen UI
+- `bash` on the `PATH` (Git Bash is used on Windows when present)
+
+Building from source also requires:
+
+- .NET 10 SDK
+- A sibling checkout of Crystal at `../Crystal` (relative to this
+  repository root)
+
+## Build
+
+From the repository root:
+
+```bash
+dotnet build CrystalCode.sln
+dotnet test CrystalCode.sln
+```
+
+The executable project is `CrystalCode`. The Spectre application
+name is `crystal`.
+
+## Run
+
+Start from the workspace the agent should edit. The current directory
+is the workspace unless `--workspace` is set.
+
+```bash
+dotnet run --project CrystalCode -- --provider deepseek --model deepseek-flash
+```
+
+CLI options:
+
+| Option | Meaning |
+| :--- | :--- |
+| `-p`, `--provider <name>` | Provider name (`deepseek`, `openai`, or a name you added to `providers.json`) |
+| `-m`, `--model <id>` | Model id listed under that provider |
+| `-w`, `--workspace <path>` | Workspace root (default: current directory) |
+| `--home <path>` | Data directory (default: `CRYSTAL_HOME`, then `~/.crystal`) |
+| `-r`, `--resume <id>` | Replay that session file under `~/.crystal/sessions` |
+
+`--help` prints the same options.
+
+The first run creates `~/.crystal` (or `--home` / `CRYSTAL_HOME`) and
+writes a starter `config.json` if one is missing. Defaults are
+provider `deepseek`, model `deepseek-flash`, approval `default`,
+and compaction at 80% of the selected model's `contextWindow`.
+
+If the provider has more than one model and neither `config.json` nor
+`--model` picks one, the process exits and asks for `--model`.
+
+## Credentials
+
+Do not put secrets in the workspace, in this repository, or in commit
+contents. CrystalCode never writes secrets into the project tree.
+`credentials.json` is created with owner-only permissions where the
+operating system allows it.
+
+Resolution order for the active provider:
+
+1. Process environment (see below)
+2. `<name>.apiKey` in `providers.json`
+3. `~/.crystal/credentials.json`, keyed by provider name
+
+Environment names, in order:
+
+1. `<name>.apiKeyEnvironment` in `providers.json` when set
+2. `<PROVIDER>_API_KEY` derived from the provider name (hyphens
+   become underscores; for example `DEEPSEEK_API_KEY`,
+   `OPENAI_API_KEY`, `OPENROUTER_API_KEY`)
+3. `CRYSTAL_API_KEY` (shared fallback)
+
+A provider-specific variable wins over `CRYSTAL_API_KEY`.
+
+`<name>.apiKey` in `providers.json` may be one of:
+
+| Form | Meaning |
+| :--- | :--- |
+| `{env:NAME}` | Read the named process environment variable |
+| `{file:path}` | Read a file (relative to `~/.crystal`, or absolute; `~` is expanded) |
+| a literal string | Used as-is (avoid this in shared files) |
+
+Prefer `{env:NAME}` or `{file:path}` so `providers.json` can be copied
+without embedding a secret.
+
+`credentials.json` shape:
+
+```json
+{
+  "deepseek": {
+    "apiKey": ""
+  }
+}
+```
+
+Leave the value empty in examples and in any file that might be
+shared. Put the real secret only in the local environment or in a
+file that is not committed.
+
+If no key is found, the process prints an English error and exits
+with status 1. It does not print the secret.
+
+## Configuration
+
+Host settings live in `~/.crystal/config.json`. Provider and model definitions
+live in `~/.crystal/providers.json`; the built-in DeepSeek and OpenAI catalog
+is available even when this file is absent. The legacy `config.json.providers`
+field remains readable for existing installations. Edit either file, then
+restart for the changes to take effect.
+
+Top-level fields:
+
+| Field | Meaning |
+| :--- | :--- |
+| `provider` | Active provider name |
+| `model` | Active model id (must exist under that provider) |
+| `approval` | `default`, `edit`, `review`, `audit`, or `full` |
+| `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
+| `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
+| `externalTools` | Enable operator tool set discovery (default `true`) |
+| `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
+| `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
+| `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
+| `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
+| `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
+| `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
+
+Add named endpoints and model tables in `providers.json`, not in new
+`config.json` configurations.
+
+There is no global context window. Models that are not listed cannot
+be selected.
+
+### Built-in providers
+
+Starter catalog (merged with `providers.json`):
+
+| Provider | Protocol | Default base URI | Starter models |
+| :--- | :--- | :--- | :--- |
+| `deepseek` | `deepseek` | `https://api.deepseek.com/` | `deepseek-flash`, `deepseek-v4-flash` (compatibility alias), `deepseek-v4-pro` |
+| `openai` | `openai` | `https://api.openai.com/v1/` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
+
+Built-in DeepSeek V4 models enable thinking with efforts `low`,
+`high`, and `maximum`. Each has a 1,000,000-token context window.
+Starter OpenAI models use a 400,000-token window and do not enable
+thinking unless you add it.
+
+### Provider fields
+
+| Field | Meaning |
+| :--- | :--- |
+| `protocol` | `deepseek`, `openai`, `responses`, or `anthropic` |
+| `baseUri` | Absolute API base URI; the adapter appends `chat/completions`, `responses`, or `messages` |
+| `organization` | Optional OpenAI organization for the `openai` protocol |
+| `project` | Optional OpenAI project for the `openai` protocol |
+| `replayReasoningContent` | Replay provider reasoning content (DeepSeek always does this) |
+| `tokenLimit` | Chat Completions output field: `max_tokens` or `max_completion_tokens` (ignored by `responses` and `anthropic`) |
+| `apiKeyEnvironment` | Preferred environment variable name for this provider |
+| `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |
+| `models` | Table of selectable model ids |
+
+Provider names are letters, digits, hyphen, or underscore.
+
+All protocol adapters send the constant `User-Agent: Crystal Code`, with no
+version. `responses` authenticates with `Authorization: Bearer`; `anthropic`
+uses `x-api-key` and `anthropic-version: 2023-06-01`. Both adapters use direct
+HTTP and JSON/SSE handling; no provider SDK is required.
+
+### Model fields
+
+| Field | Meaning |
+| :--- | :--- |
+| `contextWindow` | Required. Positive token window used for compaction and the status bar |
+| `temperature` | Optional, 0 to 2 |
+| `topP` | Optional, 0 to 1 |
+| `maxTokens` | Optional positive output-token cap |
+| `thinking` | Whether the model accepts reasoning hints |
+| `thinkingEfforts` | Crystal effort names this model accepts: `minimal`, `low`, `medium`, `high`, `maximum` (`max` is stored as `maximum`) |
+| `imageInput` | Whether this model may receive images (default `false`; supported by `openai`, `deepseek`, `responses`, and `anthropic`) |
+
+`thinkingEffort` is a host setting, not a model field. Changing
+models never fails: if the model does not support thinking, requests
+omit reasoning hints; if the stored gear is not in that model's list,
+the request uses the provider default and the stored choice is
+unchanged. An empty `thinkingEfforts` list is on/off only.
+
+### Example: add an OpenAI-compatible provider
+
+Add this entry to `~/.crystal/providers.json`. Do not put a secret in `apiKey`;
+point at an environment variable.
+
+```json
+{
+  "openrouter": {
+    "protocol": "openai",
+    "baseUri": "https://openrouter.ai/api/v1/",
+    "replayReasoningContent": true,
+    "tokenLimit": "max_tokens",
+    "apiKey": "{env:OPENROUTER_API_KEY}",
+    "apiKeyEnvironment": "OPENROUTER_API_KEY",
+    "models": {
+      "anthropic/claude-sonnet-4": {
+        "contextWindow": 200000,
+        "temperature": 0.2,
+        "maxTokens": 8192,
+        "thinking": true,
+        "thinkingEfforts": ["low", "medium", "high"]
+      }
+    }
+  }
+}
+```
+
+Set `OPENROUTER_API_KEY` in the shell that starts the process, then restart
+after editing `providers.json`. Select the model with `/model openrouter
+anthropic/claude-sonnet-4`, or set `provider` and `model` in `config.json`.
+CLI `--provider` and `--model` override that selection for one run;
+`/approval`, `/thinking`, and `/model` write their values to `config.json`.
+
+### Example: add OpenCode Zen protocol endpoints
+
+One gateway can group models that use different wire protocols under one
+provider name. Put this example in `providers.json`:
+
+```json
+{
+  "opencode-zen": [
+    {
+      "protocol": "responses",
+      "baseUri": "https://opencode.ai/zen/v1/",
+      "apiKey": "{env:OPENCODE_ZEN_API_KEY}",
+      "models": {
+        "gpt-5.6-sol": {
+          "contextWindow": 1050000,
+          "maxTokens": 128000,
+          "thinking": true,
+          "thinkingEfforts": ["low", "medium", "high", "maximum"],
+          "imageInput": true
+        }
+      }
+    },
+    {
+      "protocol": "anthropic",
+      "baseUri": "https://opencode.ai/zen/v1/",
+      "apiKey": "{env:OPENCODE_ZEN_API_KEY}",
+      "models": {
+        "claude-sonnet-5": {
+          "contextWindow": 1000000,
+          "maxTokens": 128000,
+          "thinking": true,
+          "thinkingEfforts": ["low", "medium", "high", "maximum"],
+          "imageInput": true
+        }
+      }
+    }
+  ]
+}
+```
+
+Add a `protocol: "openai"` object to the same array for Chat Completions
+models. Each model id must be unique within a provider.
+
+## Interactive session
+
+For an OpenAI Chat Completions, DeepSeek, Responses, or Anthropic model
+configured with `imageInput: true`, run `/attach <workspace-image-path>` and
+enter the prompt, or press Ctrl+V to attach an image from the clipboard.
+Clipboard image paste uses Windows PowerShell on Windows, the built-in
+`osascript` command on macOS, and `wl-paste` or `xclip` on Linux. If a reader
+is unavailable, Crystal Code reports that separately from a clipboard with
+no image. Windows supports raw PNG clipboard data and bitmap fallback; macOS
+accepts PNG, JPEG, and GIF clipboard representations; Linux accepts advertised
+PNG, JPEG, GIF, and WebP formats. Ctrl+V is handled before a following Enter
+in the same key batch. The composer and transcript show
+`[Image #N]`; pasted markers have a distinct color and behave as one editing
+unit. Typing the same text does not attach an image. Raw image data is kept out
+of rendered text.
+PNG, JPEG, GIF, and WebP input is accepted up to 20 MiB per image. Optional
+multimodal plugin tools may return generic Crystal `ImageContent`, which is
+fed into the next model round. Screenshot capture, device/browser/VM control,
+and coordinate protocols belong to external plugins, not CrystalCode.
+
+The default command opens an alternate-screen shell when stdout is a
+TTY: transcript viewport, optional overlay, optional pinned todos,
+optional progress row, status bar, and a multiline composer. Redirected
+output stays sequential.
+
+The status bar shows approval, thinking (when the selected model
+supports it), model, workspace, context percent (`CTX`), token counts
+(`IN` / `OUT`), a Title Case total when the bar has room, tool count,
+and elapsed time. Named chrome labels are
+Title Case; short status abbreviations are uppercase. Mode is Plan or
+Work on the composer prompt, not repeated on the status bar. A
+queued-follow-up count appears while items wait. While a turn runs, a
+progress row sits above the status bar (`Awaiting Approval · 5s`,
+`Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`,
+`Retrying In 8s (Attempt 1)`, `Compacting`), prefixed with a spinner, and is
+independent of the status-bar activity bullet. The `~N Tokens` estimate
+appears only when `estimatedTokens` is on. When the session has todos, a
+pinned `Todos` bar sits above that progress row (first four items; `/todos`
+prints the full list). Session start and `/cd`
+show `Loading Tools` on that row while operator tool sets load, after
+the frame is already up.
+
+Assistant text is rendered as markdown while it streams and after it
+commits (headings, lists, fenced code, inline code and bold). User,
+thinking, tool, and result blocks are rounded panels. Tool names in
+chrome are Title Case. Approval cards for edit and write show a short
+`+` / `-` preview of the change.
+
+### Composer keys
+
+| Key | Action |
+| :--- | :--- |
+| Enter | Submit when idle; queue a follow-up while a turn is running |
+| Empty Enter while working | Interrupt immediately and send the queue |
+| Ctrl+J or `\` then Enter | Insert a newline |
+| Backspace | Delete one character |
+| Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
+| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, `/model`, or `/tokens`) |
+| Shift+Tab | Toggle Plan/Work |
+| `?` on an empty composer | Show shortcuts and commands |
+| Up / Down | Composer history, or slash-picker navigation when the prompt has text; empty Up/Down scroll the transcript |
+| PageUp / PageDown, mouse wheel, Ctrl+Up/Down | Scroll the transcript |
+| Ctrl+C during a turn | Cancel the turn |
+| Ctrl+C at idle | Clear the composer |
+| Ctrl+C twice on an empty composer | Exit |
+
+The alternate screen enables alternate-scroll arrows and bracketed
+paste. Mouse tracking stays off so left-drag selects and copies. Wheel
+reports that a terminal still sends are drained without waiting. The
+frame repaints when the terminal is resized. Escape sequences that are
+not a paste wrap are not treated as paste. Overlay prompts (approval
+and questions) keep using that same input loop, so scroll and resize
+still work while they are open.
+
+Question prompts support one or more tabbed questions, described choices,
+single or multiple selection, and custom text answers. Custom input is enabled
+by default. A single single-select answer submits immediately; multiple
+questions and multiple selection use a Confirm tab. Use Up/Down or `J`/`K` to
+move, Enter to select, Space to toggle multiple choices, Left/Right or Tab to
+navigate questions, and Escape to dismiss the request. While a custom answer is
+being edited, its text and cursor appear inside the question panel; Enter saves
+it and Escape returns to the choices without changing the answer. PageUp,
+PageDown, the wheel, and Ctrl+Up/Down remain available for transcript scrolling.
+
+### Follow-up queue
+
+The composer stays open while a turn runs. Enter with text enqueues
+a follow-up (FIFO). Queued items stay in a `Queued` panel above the
+composer. The queue is sent when the current tool batch finishes or
+when the turn (thinking or conversation) ends. Interrupt does not
+drop queued text.
+
+`/quit`, `/clear`, `/resume`, and `/fork` stop a busy turn before they run.
+
+### One turn
+
+1. Snapshot the transcript and current tool definitions.
+2. Stream one chat request. Render deltas as they arrive.
+3. If the candidate has tool calls, run the full batch through the
+   executor (approval first).
+4. Append exact tool results.
+5. Repeat until there are no tool calls, a limit stops the turn, or
+   you cancel. The host may compact before a model round when the
+   estimated transcript or the last model-round usage is over budget;
+   if compaction cannot reduce further, the turn stops.
+6. After a completed turn, consider compaction from that last round
+   and the estimated transcript. `/compact` summarizes older context
+   immediately.
+
+## Modes
+
+These are product modes, not Crystal types. Switching replaces the
+first system message and the tool catalog. The transcript is
+otherwise the same conversation.
+
+| Mode | Tools | Side effects |
+| :--- | :--- | :--- |
+| **Plan** | Built-in read, glob, grep, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Work** | Built-in Plan tools plus edit, write, bash, plus external tools listed for Work | After approval |
+
+Tab, Shift+Tab, or `/plan` toggles Plan and Work.
+
+## Approval
+
+Every side-effect tool call is classified before invocation.
+
+Risk: Read, Write, Privileged, Forbidden.
+
+Authority: Workspace, OutsideWorkspace, Network, PrivilegedEscalation.
+
+Grant: Once, Session, Persistent.
+
+| Mode | Behavior |
+| :--- | :--- |
+| **Default** | Workspace read auto-executes. Write, shell, and reads outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
+| **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and outside-workspace reads still ask. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including bash, reads outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
+| **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
+
+Do not name a mode `auto`. That word is ambiguous between review and
+full pass-through. `/approval` with no argument cycles Default,
+Edit, Review, Audit, and Full. `/approval review` (and the
+other names) sets one mode and writes it to `config.json`. Legacy
+values `autoedit`, `fullreview`, and `full-review` still parse.
+
+When you are asked, the overlay uses a two-column field grid
+(Status, Reason, Risk, Authority, and for review also Outcome plus
+rationale):
+
+| Key | Grant |
+| :--- | :--- |
+| Y, Enter, or 1 | Once |
+| S or 2 | Session |
+| A or 3 | Always (persistent) |
+| N, Escape, or 4 | Deny |
+
+Persistent grants are stored in `~/.crystal/permissions.json`.
+
+When a call auto-passes (policy, remembered grant, or review allow),
+the shell prints a panel with Status, Reason, Risk, and Authority,
+plus the classifier summary.
+
+Shell classification treats `sudo`, destructive filesystem commands,
+pipe-to-shell downloads, force-push, and credential-path writes as
+Forbidden or Privileged. Forbidden never fully auto-passes. Review and Audit
+may deny those calls or escalate them to you. Writes under `.ssh`,
+`.gnupg`, or `~/.crystal/credentials.json` are Forbidden.
+
+## Thinking
+
+`/thinking` (alias `/think`) cycles the host gear, or sets one by
+name: `off`, `none`, `default`, `minimal`, `low`, `medium`, `high`,
+`maximum`, `max`. Tab completes the argument from the efforts the
+selected model lists. The choice is written to `config.json`.
+
+If the selected model does not support thinking, the command reports
+that and does nothing. The status bar shows `Think Off`, or `Think`
+plus the resolved gear when thinking is on.
+
+## Model
+
+`/model` lists configured models, or selects one for the next idle
+turn. The conversation stays in place; only the `<env>` model line,
+status bar, context window, and chat client change. The command is
+refused while a turn is running.
+
+- `/model <model>` uses the current provider. A name that is unique in
+  the catalog still works. A provider with one model can be selected
+  by provider name alone.
+- `/model <provider> <model>` switches providers. The model id is
+  everything after the first space, so ids may contain `/`.
+- Tab completes current-provider models, then a provider name, then
+  that provider's models.
+- Only models listed under `providers` can be selected. A missing API
+  key leaves the current model unchanged.
+- The new `provider` and `model` are written to `config.json`.
+
+Switching models never fails because of thinking: unsupported thinking
+is omitted, and an unsupported stored gear uses the provider default
+without changing the stored choice.
+
+## Slash commands
+
+Type `/` to open the picker. Built-in verbs:
+
+Plain Up/Down moves the picker selection and automatically scrolls the visible
+candidate window. Tab accepts the selected completion. Enter also accepts a
+partial selection; a complete command still submits with one Enter. Submitting
+returns the transcript viewport to the latest output.
+
+| Command | Aliases | Action |
+| :--- | :--- | :--- |
+| `/help` | `/h` | Shortcuts and commands |
+| `/plan` | | Toggle Plan / Work |
+| `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full` |
+| `/attach` | | Attach an image from the workspace |
+| `/thinking` | `/think` | Cycle or set the thinking gear |
+| `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
+| `/model` | | List catalog models, or set `model` / `provider model` |
+| `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
+| `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
+| `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
+| `/clear` | `/new` | Start a new conversation (new session id) |
+| `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
+| `/resume` | `/continue` | Replay the latest session for this workspace, or `/resume <id>` |
+| `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
+| `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
+| `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
+| `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
+| `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
+| `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
+| `/quit` | `/exit`, `/q` | Exit |
+
+`/export markdown [path] [--system]` and `/export json [path] [--system]`
+write the current conversation under `exportDirectory` (default
+`~/.crystal/exports/`). Markdown and JSON omit the live system prompt
+unless `--system` is set. `/prompts export [dir]` writes built-in
+prompt templates with placeholders. Quoted paths may contain spaces.
+The slash picker completes `markdown` / `json`, offers `--system` before or
+after an explicit export path, and exposes `export` plus directory examples
+under `/prompts`.
+
+Unknown `/` text prints `unknown command`. `/cd` with no argument
+prints the current workspace root. `/cd` only accepts a directory
+that already exists. `/tokens` with no argument toggles the live
+progress-row estimate (four characters per token, prefixed with `~`).
+It is not provider-billed usage. The choice is written to `config.json`.
+
+`/statusline` does not replace `/status`. The status line is a configurable
+live summary, while `/status` remains a stable diagnostic report. Supported
+custom fields are `approval`, `thinking`, `prompt-set`, `activity`, `model`,
+`workspace`, `context-used`, `context-left`, `context-tokens`,
+`request-input`, `request-output`, `request-total`, `session-input`,
+`session-output`, `session-total`, `tools`, `elapsed`, and `queued`.
+Setting an ordered field list enables the custom line. `/statusline off`
+restores the existing adaptive line; `/statusline reset` enables the built-in
+custom field order.
+
+## Built-in tools
+
+Filesystem and shell writes are fenced to the workspace root. Paths
+that escape the root are rejected for `edit`, `write`, and `bash`.
+`read`, `glob`, and `grep` may use an absolute path outside the
+workspace after approval (you, or the Review model in Review or
+Audit). Credential paths
+(`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob and grep
+skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
+files are rejected for read/edit (NUL probe). Shell working directory
+is the workspace root.
+
+| Tool | Catalog | Purpose |
+| :--- | :--- | :--- |
+| `read` | Plan, Work | Read a workspace text file (`path`, optional 1-based `offset` and `limit`) |
+| `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`) |
+| `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
+| `todowrite` | Plan, Work | Replace or merge the session todo list |
+| `todoread` | Plan, Work | Read the current session todo list |
+| `question` | Plan, Work | Ask one or more questions with single/multiple choices and custom answers |
+| `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
+| `edit` | Work | Replace one unique `old_string` in a file |
+| `write` | Work | Create or overwrite a UTF-8 text file |
+| `bash` | Work | Run one shell command after approval (`bash -lc`, 120 second timeout) |
+
+Practical limits: read up to 1,000,000 characters or 20,000 lines;
+write up to 2 MiB; grep up to 500 matches and 8 MiB per file; glob
+up to 1,000 matches; tool output truncated at 100,000 characters.
+
+## External tools
+
+Operators add extra catalog tools as **tool sets**: one directory, one
+`tools.json`, one runner. Discovery is Crystal-owned only:
+
+```text
+~/.crystal/tools/<directory>/tools.json
+<workspace>/.crystal/tools/<directory>/tools.json
+```
+
+A project directory of the same name replaces the home set as a whole.
+`"enabled": false` in `tools.json` leaves the directory in place without
+loading that set (default `true`). Set `"externalTools": false` in
+`config.json` to skip discovery. When `true`, the field is omitted from
+the written file, same as `skills`.
+
+The set identity is the directory name (1–64 characters, start with a
+letter, then letters, digits, `_`, `.`, `-`). There is no JSON `name`
+or `id`. Each tool's model-facing name is `tools[].name` (exec) or
+`ITool.Definition.Name` (dotnet). Built-in names win. Default
+`catalogs` is Plan and Work; `"catalogs": ["work"]` is Work only.
+
+Runners:
+
+- **exec**: `ProcessStartInfo.ArgumentList`, no shell templates. Stdin
+  is the fenced arguments object (default on). An `argv` map turns
+  scalar properties into flags. Working directory is the workspace
+  root.
+- **dotnet**: a framework-dependent class library that implements
+  `Crystal.Tools.ITool`. Every public non-abstract tool is loaded in
+  one isolated load context for that set. Shared types are `Crystal`
+  and `Crystal.Tools`; other dependencies stay private to the set.
+
+Every external tool is at least Write + Workspace and still goes
+through `ToolInvocationPolicy` by default. Authors may set `approval` to
+`always`; Home tools follow that declaration by default, while Project tools
+use host policy unless configured otherwise. `/tools` lists the effective
+catalog and approval, `/tools home|project author|host` changes source trust,
+and `/tools on|off|reload` controls discovery. Full auto-passes a
+workspace-bounded external write; Edit does not. Details, manifest fields,
+and the
+dotnet publish layout are in
+[External tools](external-tools.md).
+
+## Prompts and instructions
+
+Crystal is prompt-neutral. Every model-bound string this product
+sends is authored here. Operators may replace Work, Plan, Review, and
+the reserved topic-naming prompt
+by placing files under `~/.crystal/prompts` and
+`<workspace>/.crystal/prompts`.
+
+Named files (`work.md`, `plan.md`, `review.md`, and `topic.md`; `.txt` is also
+accepted):
+
+- Within direct overrides, the Home file is applied before the project file.
+- A project file replaces the home file for that name.
+- Empty files are treated as missing.
+- The host never writes prompt files.
+
+Prompt set selection is separate from direct prompt overrides. Reusable sets
+live only under `~/.crystal/promptsets/<name>/`; the workspace is never scanned
+for prompt sets. Each set may contain any subset of `work.md`, `plan.md`, and
+`review.md` (`.txt` is also accepted). `topic.md` is a direct override only;
+it is not a prompt-set member. Missing or empty members use the built-in
+prompt for that name.
+
+Final precedence for each named prompt:
+
+1. Built-in default.
+2. Selected Home prompt set.
+3. Direct `~/.crystal/prompts` override.
+4. Direct `<workspace>/.crystal/prompts` override.
+
+Use `/promptset` (alias `/prompts`) to list available sets and the effective
+source of Work, Plan, and Review. `/promptset <name>` switches and persists the
+selection; `/promptset default` returns to the virtual built-in selection.
+Switching is refused while a turn runs, though listing remains available. A
+non-default set appears as `Prompt <name>` in the status bar and as a startup
+note. If a configured set is missing, Crystal uses default prompts, reports the
+fallback, and leaves the configured name intact.
+
+The built-in Work and Plan assistant name is Crystal Code. Work, Plan,
+Review, and compaction templates use host-owned placeholders (`{{name}}`).
+Composite session slots are `{{env}}`, `{{skills}}`, and
+`{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
+include `{{workspace}}`, `{{is_git_repo}}`, `{{platform}}`, `{{date}}`,
+`{{provider}}`, `{{model}}`, `{{model_line}}`, `{{mode}}`, and
+`{{product_name}}`. Review user templates add `{{conversation}}`,
+`{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
+and `{{classification_summary}}`. Compaction user templates add
+`{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
+`{{output_template}}`, and `{{todos_section}}`. Placeholder names are
+case-insensitive. Unknown names are left unchanged. Templates must declare
+every host slot they need. When Skills is enabled, available-skill guidance
+fills `{{skills}}`. Composite host values are not overlayable.
+
+Workspace facts are appended under "Workspace instructions" on Work
+and Plan only. Review is the named file alone so the reviewer stays
+a safety check.
+
+Instruction sources, in order:
+
+1. `~/.crystal/instructions.md` (or `.txt`)
+2. `<workspace>/.crystal/instructions.md` (or `.txt`)
+3. `<workspace>/.crystal.md`
+4. OpenCode-compatible rule files (below)
+
+`AGENTS.md` and `CLAUDE.md` are extra instructions, not prompt
+replacements. They never replace Work, Plan, or Review.
+
+- Global: first existing file among `~/.crystal/AGENTS.md`,
+  `~/.crystal/CLAUDE.md`, `~/.config/opencode/AGENTS.md`, and
+  `~/.claude/CLAUDE.md` (`XDG_CONFIG_HOME` is honored for the
+  OpenCode path).
+- Project: walk from the workspace up to the git root. The first
+  matching name wins (`AGENTS.md`, then `CLAUDE.md`, then
+  `CONTEXT.md`). Every file of that name on the walk is appended.
+  `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
+
+## Skills
+
+Skills are OpenCode-compatible instruction folders. They are not
+prompt overlays. The model sees a list of available skills and loads
+one with the `skill` tool. When Skills is enabled, `read`/`glob`/`grep`
+of any path inside a Skills search directory (`skill` / `skills`
+trees, including scripts and other files that are not `SKILL.md`)
+auto-passes; it does not ask you. Set `"skills": false` in
+`config.json` to disable the tool, the guidance, and that auto-pass.
+Other files outside the workspace still need approval (you, or the
+Review model in Review or Audit).
+
+Each skill is a directory with a `SKILL.md` that starts with YAML
+frontmatter (`name` and `description` required). The skill id is the
+directory name when it matches `^[a-z0-9]+(-[a-z0-9]+)*$` (1–64
+characters). Frontmatter `name` may be that id or a display title
+and does not have to match the directory. If the directory name is
+not a valid id, a valid frontmatter `name` is used instead. Folded
+(`>`) and literal (`|`) YAML descriptions are accepted.
+
+Discovery follows OpenCode's global and project walk. Later sources
+overwrite earlier ones with the same name. Crystal-native paths win
+over OpenCode-compatible paths.
+
+Global:
+
+1. `~/.claude/skills/<name>/SKILL.md`
+2. `~/.agents/skills/<name>/SKILL.md`
+3. `~/.config/opencode/{skill,skills}/<name>/SKILL.md` (`XDG_CONFIG_HOME`
+   is honored)
+4. `~/.opencode/{skill,skills}/<name>/SKILL.md`
+5. `~/.crystal/{skill,skills}/<name>/SKILL.md`
+
+Project, walking from the workspace up to the git root:
+
+1. `.claude/skills/<name>/SKILL.md`
+2. `.agents/skills/<name>/SKILL.md`
+3. `.opencode/{skill,skills}/<name>/SKILL.md`
+4. `.crystal/{skill,skills}/<name>/SKILL.md`
+
+`/cd` reloads skills and external tool sets from the new workspace. `/cd`
+and resume also reload prompts from the current workspace. Resume
+refreshes the first system message from the current prompt files, the
+current `<env>` block, and current skill guidance.
+
+## Sessions
+
+Sessions are written to `~/.crystal/sessions/<id>.json` after each
+completed turn, and again on an orderly exit when the transcript has
+a user message. The file stores the transcript, todos, last-request and
+cumulative provider-reported token usage, and turn counts.
+
+`/quit` and two Ctrl+C presses on an empty composer leave the
+alternate screen, then print the session id and `crystal --resume <id>`.
+`--resume` loads that file before the alternate screen. A missing or
+empty session exits without entering the TTY. `/resume` still replays
+from inside a running session.
+
+| Command | Effect |
+| :--- | :--- |
+| `crystal --resume <id>` | Load that file under `~/.crystal/sessions` at process start |
+| `/resume` | Load the latest session for this workspace and replay the transcript |
+| `/resume <id>` | Load that file under `~/.crystal/sessions` |
+| `/fork` | Save the current session and continue from an independent new id |
+| `/fork <id>` | Branch that saved session into a new id in the current workspace |
+| `/sessions` | List resumable sessions for the current workspace, newest first |
+| `/sessions all` | List resumable sessions from every workspace, newest first |
+| `/clear` | Start a new id |
+
+Resume also restores the last usage snapshot and cumulative usage so the
+status bar, `/status`, and compaction have the correct baselines before the
+next model call. Older session files without cumulative usage show an unknown
+cumulative value rather than a partial total. A compacted
+session restores the summary and recent tail; only the live system
+prompt is refreshed.
+
+Fork preserves the transcript, compacted summary, todos, Plan/Work mode,
+turn counters, and usage baseline. The source session remains unchanged. The
+new branch receives a new creation time, uses the current workspace, and
+refreshes its live system prompt. Session lists mark the current id and retain
+complete ids so they can be copied into `/resume` or `/fork`.
+
+## Compaction
+
+Crystal does not reduce context. When estimated transcript size or the
+last model-round usage crosses `compactionThreshold` of the selected
+model's usable window, the host:
+
+1. Clears old tool results outside a protected recent band, when that
+   frees enough tokens.
+2. Asks the model for a structured summary of older turns (folding any
+   previous summary) and keeps a recent tail verbatim.
+3. Stops if the summary cannot be produced and nothing else can be
+   reduced. Compaction does not loop.
+
+CTX percent is the last model round, not the sum of rounds in a turn.
+The transcript prints `compacting context...` and the progress row
+shows `Compacting` while this runs; the frame keeps painting so the
+terminal does not freeze. `/compact` (alias `/summarize`) runs this
+immediately. It is refused while a turn is running. A successful
+compact is written to the session file; `/resume` restores the summary
+and tail, and refreshes only the live system prompt.
+
+## Data directory
+
+Override with `CRYSTAL_HOME` or `--home`.
+
+```text
+~/.crystal/
+  binaries/code/CrystalCode (CrystalCode.exe on Windows)
+  config.json
+  providers.json
+  credentials.json
+  permissions.json
+  instructions.md
+  AGENTS.md
+  prompts/
+    work.md
+    plan.md
+    review.md
+  promptsets/
+    concise/
+      work.md
+      plan.md
+      review.md
+  skill/<name>/SKILL.md
+  skills/<name>/SKILL.md
+  tools/<directory>/tools.json
+  sessions/<id>.json
+  logs/
+  plugins/
+```
+
+Project overlay (named prompts, Crystal skills, and tool sets of the
+same directory name win over home):
+
+```text
+<workspace>/.crystal/
+  instructions.md
+  prompts/
+    work.md
+    plan.md
+    review.md
+  skill/<name>/SKILL.md
+  skills/<name>/SKILL.md
+  tools/<directory>/tools.json
+<workspace>/.crystal.md
+<workspace>/AGENTS.md
+```
+
+`plugins/` is reserved. The current product does not load `IPlugin`
+assemblies from that directory. Dotnet tool sets load class libraries
+from the set directory only.
+
+## Environment variables
+
+| Variable | Meaning |
+| :--- | :--- |
+| `CRYSTAL_HOME` | Data directory instead of `~/.crystal` |
+| `DEEPSEEK_API_KEY` | DeepSeek key (overrides `credentials.json`) |
+| `OPENAI_API_KEY` | OpenAI key (overrides `credentials.json`) |
+| `<PROVIDER>_API_KEY` | Key for a named provider (hyphens become underscores) |
+| `CRYSTAL_API_KEY` | Shared fallback key |
+| `XDG_CONFIG_HOME` | Base for the global OpenCode `AGENTS.md` fallback |
+
+Do not pass secrets on the command line. They appear in process
+lists.
+
+## Safety
+
+- Workspace tools reject paths that leave the workspace root.
+- Credential and keyring paths are classified Forbidden.
+- Forbidden and Privileged actions never fully auto-pass.
+- Approval goes through `Crystal.Tools.ToolInvocationPolicy`. Side
+  effects are not invoked by bypassing the executor.
+- Runtime text is plain English. No emoji in exceptions, logs, or UI
+  chrome.
+- Secrets must not appear in source, logs, diagnostics, or commits.
+
+## Documents
+
+- [README.md](../README.md) — project overview and quick start
+- [BUSINESS.md](../BUSINESS.md) — product boundary
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — ownership and runtime
+- [STANDARDS.md](../STANDARDS.md) — engineering rules
+- [AGENTS.md](../AGENTS.md) — instructions for coding agents
+- [external-tools.md](external-tools.md) — operator tool sets
