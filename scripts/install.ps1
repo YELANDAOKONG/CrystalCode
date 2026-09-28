@@ -42,8 +42,12 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     Fail "This installer is for Windows."
 }
 
-$architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-if ($architecture -ne [System.Runtime.InteropServices.Architecture]::X64) {
+$architecture = [Environment]::GetEnvironmentVariable("PROCESSOR_ARCHITEW6432")
+if ([string]::IsNullOrWhiteSpace($architecture)) {
+    $architecture = [Environment]::GetEnvironmentVariable("PROCESSOR_ARCHITECTURE")
+}
+
+if ($architecture -ne "AMD64") {
     Fail "Unsupported Windows architecture: $architecture"
 }
 
