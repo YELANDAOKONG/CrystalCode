@@ -102,6 +102,8 @@ loads with several tools and fails one name omits only that name when
 the failure is per-tool (reserved or duplicate name). Failures that are
 per-set (missing DLL, invalid runner, duplicate names inside one exec
 set) omit the whole set.
+When a project directory has a `tools.json`, it hides the same-named Home
+set even if its manifest is unreadable or invalid.
 
 ## Tool set vs tool
 
@@ -234,7 +236,7 @@ Tool names come from `Definition.Name`:
 | `stdin` | Set | Exec only. Boolean, default `true`. Applies to every exec tool in the set. |
 | `argv` | Tool (or shorthand root) | Map of schema property name to one flag string. |
 | `pathArguments` | Tool (or shorthand root) | Property names treated as filesystem paths. |
-| `timeoutSeconds` | Set | Default 120, same as bash. |
+| `timeoutSeconds` | Set | Positive integer up to 4,294,967, or `"unlimited"`; default 120. Applies to exec and dotnet. |
 | `catalogs` | Set default, tool override | `plan` and/or `work`. Default `["plan", "work"]`. Both members means both catalogs. |
 | `description` / `schema` | Each exec tool | Required for exec. Dotnet takes these from the native tool `Definition`. Overlay does not replace them. |
 | `assembly` | Set | Dotnet only. File name relative to the set directory. |
@@ -318,8 +320,9 @@ credentials into the child environment or into a loaded assembly.
 Exec children inherit the host process environment. Dotnet assemblies
 must not receive secrets via `Environment.SetEnvironmentVariable`
 (process-wide). Do not log argument JSON that may contain secrets.
-Stdout and stderr are concatenated and truncated the same way as bash
-(`MaximumToolOutputCharacters`).
+Stdout and stderr are drained concurrently while only a bounded prefix is
+retained. The combined result is truncated to
+`MaximumToolOutputCharacters`, the same limit as bash.
 
 ## Exec: stdin JSON and argv
 
@@ -353,9 +356,12 @@ suffix, and mapped scalars.
 **Stdin off**: stdin is still redirected and closed so the child does
 not block.
 
-Non-zero exit is `ToolResultStatus.Failure`. Timeout kills the process
-tree when the OS allows it. stdout then stderr are concatenated,
-truncated, and returned as `ToolOutput` text.
+Non-zero exit is `ToolResultStatus.Failure`. The timeout starts when the
+process starts and covers stdin writing, process exit, and output reading.
+`"timeoutSeconds": "unlimited"` disables this per-call timeout; user and
+turn cancellation still apply. Timeout, cancellation, and stdin failure
+kill the process tree when the OS allows it. stdout then stderr are
+concatenated, truncated, and returned as `ToolOutput` text.
 
 Several exec tools should live in one set when they share a binary.
 That is the same unit as a multi-`ITool` assembly: one install, one
@@ -394,12 +400,15 @@ The host does not put operator tool instances in the catalog raw. Each text
 or multimodal tool is wrapped:
 
 1. Rewrite `pathArguments` on the text or multimodal tool call (overlay or empty).
-2. Apply timeout via the cancellation token the session already
-   threads.
+2. Apply the set's timeout and forward user and turn cancellation.
 3. Truncate text output blocks.
 4. Run approval before `InvokeAsync`, same as every other tool.
 
-The wrapper is the catalog entry. Pure multimodal tools are exposed only when
+The wrapper is the catalog entry. On timeout, the wrapper asks the tool to
+cancel and returns a failure. In-process code that ignores cancellation may
+continue running; `AssemblyLoadContext` cannot terminate it. Set
+`"timeoutSeconds": "unlimited"` to disable only the per-call timeout.
+Pure multimodal tools are exposed only when
 the selected model and provider support image input. Text-only sessions ignore
 them. A type implementing both retains its ordinary `ITool` entry in a
 text-only session. `AssemblyLoadContext` is not a sandbox.

@@ -84,6 +84,11 @@ public sealed class ToolSetDiscovery
                 continue;
             }
 
+            if (source == ExternalToolSource.Project)
+            {
+                sets.Remove(name);
+            }
+
             string json;
             try
             {

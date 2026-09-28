@@ -8,6 +8,57 @@ namespace CrystalCode.Tests.Tools.External;
 public sealed class ToolsManifestParserTests
 {
     [Fact]
+    public void TryParse_UnlimitedTimeout_DisablesPerCallTimer()
+    {
+        using var root = new TemporaryWorkspace();
+        var directory = Path.Combine(root.Path, "deploy");
+        Directory.CreateDirectory(directory);
+
+        var parsed = ToolsManifestParser.TryParse(
+            directory,
+            """
+            {
+              "runner": "exec",
+              "timeoutSeconds": "unlimited",
+              "description": "Ship it.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["deploy"]
+            }
+            """,
+            out var set,
+            out var error);
+
+        Assert.True(parsed, error);
+        Assert.NotNull(set);
+        Assert.Null(set.TimeoutSeconds);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("4294968")]
+    [InlineData("\"forever\"")]
+    public void TryParse_InvalidTimeout_Fails(string value)
+    {
+        using var root = new TemporaryWorkspace();
+        var directory = Path.Combine(root.Path, "deploy");
+        Directory.CreateDirectory(directory);
+        var json = $$"""
+            {
+              "runner": "exec",
+              "timeoutSeconds": {{value}},
+              "description": "Ship it.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["deploy"]
+            }
+            """;
+
+        var parsed = ToolsManifestParser.TryParse(directory, json, out _, out var error);
+
+        Assert.False(parsed);
+        Assert.Contains("timeoutSeconds", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryParse_ExecShorthand_UsesDirectoryNameAndBothCatalogs()
     {
         using var root = new TemporaryWorkspace();

@@ -94,7 +94,7 @@ public sealed class BashTool : ITool
                 ToolResultStatus.Failure);
         }
 
-        var output = ReadBoundedOutputAsync(process, cancellationToken);
+        var output = ProcessOutputReader.ReadAsync(process, cancellationToken);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(WorkspaceLimits.BashTimeoutSeconds));
@@ -181,31 +181,6 @@ public sealed class BashTool : ITool
 
             yield return Path.Combine(fullDirectory, "bash.exe");
         }
-    }
-
-    private static async Task<string> ReadBoundedOutputAsync(
-        Process process,
-        CancellationToken cancellationToken)
-    {
-        var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderr = await process.StandardError.ReadToEndAsync(cancellationToken);
-        var builder = new StringBuilder();
-        if (stdout.Length > 0)
-        {
-            builder.Append(stdout);
-        }
-
-        if (stderr.Length > 0)
-        {
-            if (builder.Length > 0)
-            {
-                builder.AppendLine();
-            }
-
-            builder.Append(stderr);
-        }
-
-        return ToolOutputText.Truncate(builder.ToString());
     }
 
     private static void TryKill(Process process)

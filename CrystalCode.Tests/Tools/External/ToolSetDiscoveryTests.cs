@@ -77,6 +77,23 @@ public sealed class ToolSetDiscoveryTests
         Assert.Empty(notes);
     }
 
+    [Fact]
+    public void Collect_InvalidProjectManifest_HidesHomeSet()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WriteSet(home.Home.ToolsDirectory, "echojson", "home");
+        var projectDirectory = Path.Combine(workspace.Path, ".crystal", "tools", "echojson");
+        Directory.CreateDirectory(projectDirectory);
+        File.WriteAllText(Path.Combine(projectDirectory, ExternalFiles.FileName), "{");
+        var notes = new List<string>();
+
+        var sets = new ToolSetDiscovery(home.Home).Collect(workspace.Path, notes);
+
+        Assert.Empty(sets);
+        Assert.Contains(notes, note => note.Contains("echojson", StringComparison.Ordinal));
+    }
+
     private static void WriteSet(
         string toolsRoot,
         string name,

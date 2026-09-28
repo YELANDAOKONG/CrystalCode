@@ -621,6 +621,12 @@ name replaces the home set as a whole. `tools.json` field `enabled`
 (default `true`) omits a set without deleting it. `config.json` field
 `externalTools` enables discovery (default `true`). See
 [docs/external-tools.md](docs/external-tools.md).
+An unreadable or invalid project manifest with the same directory name
+also hides the home set. `timeoutSeconds` defaults to 120 for both runners;
+`"unlimited"` disables the per-call timer while preserving turn and user
+cancellation. Exec processes are killed on cancellation or timeout. Dotnet
+calls receive a cancellation token and stop waiting on timeout; in-process
+code that ignores cancellation cannot be forcibly stopped.
 
 `/tools` groups the effective host and external catalogs, aligns their Plan and
 Work membership, and shows external source, set, author declaration, effective

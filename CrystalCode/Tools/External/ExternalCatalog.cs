@@ -180,7 +180,8 @@ public sealed class ExternalCatalog
             var wrapped = new FencedExternalTool(
                 new ExecExternalTool(workspace, set, spec),
                 workspace,
-                spec.PathArguments);
+                spec.PathArguments,
+                timeoutSeconds: null);
             classifications[spec.Name] = spec;
             origins[spec.Name] = set;
             if (spec.Catalogs.Plan)

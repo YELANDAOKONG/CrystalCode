@@ -82,6 +82,77 @@ public sealed class ExternalCatalogTests
     }
 
     [Fact]
+    public async Task Load_ExecLargeStdinAndOutput_DrainsAndTruncates()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "echojson");
+        Directory.CreateDirectory(directory);
+        var script = WriteStdinScript(directory);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            $$"""
+            {
+              "runner": "exec",
+              "description": "Echo stdin.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["{{script.Replace("\\", "/")}}"],
+              "timeoutSeconds": 5
+            }
+            """);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+        var arguments = "{\"payload\":\"" + new string('x', WorkspaceLimits.MaximumToolOutputCharacters + 10_000) + "\"}";
+
+        var output = await catalog.WorkTools[0].InvokeAsync(
+            new ToolCall("1", "echojson", arguments));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains("[truncated to", output.Text, StringComparison.Ordinal);
+        Assert.True(output.Text.Length < WorkspaceLimits.MaximumToolOutputCharacters + 100);
+    }
+
+    [Fact]
+    public async Task Load_ExecCancellation_StopsChildProcess()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "sleeping");
+        Directory.CreateDirectory(directory);
+        var script = WriteDelayedMarkerScript(directory);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            $$"""
+            {
+              "runner": "exec",
+              "description": "Wait then write a marker.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["{{script.Replace("\\", "/")}}"],
+              "stdin": false,
+              "timeoutSeconds": "unlimited"
+            }
+            """);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+        using var cancellation = new CancellationTokenSource();
+        var invocation = catalog.WorkTools[0].InvokeAsync(
+            new ToolCall("1", "sleeping", "{}"),
+            cancellation.Token).AsTask();
+        var started = Path.Combine(workspace.Path, "started.txt");
+        Assert.True(SpinWait.SpinUntil(() => File.Exists(started), TimeSpan.FromSeconds(5)));
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => invocation);
+        await Task.Delay(TimeSpan.FromSeconds(3));
+
+        Assert.False(File.Exists(Path.Combine(workspace.Path, "survived.txt")));
+    }
+
+    [Fact]
     public async Task Load_ExecArgv_AppendsFlags()
     {
         using var home = new TemporaryHome();
@@ -308,6 +379,33 @@ public sealed class ExternalCatalogTests
 
         var path = Path.Combine(directory, "probe-stdin.sh");
         File.WriteAllText(path, "#!/bin/sh\ncat > stdin.bin\n");
+        File.SetUnixFileMode(
+            path,
+            UnixFileMode.UserRead
+            | UnixFileMode.UserWrite
+            | UnixFileMode.UserExecute
+            | UnixFileMode.GroupRead
+            | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead
+            | UnixFileMode.OtherExecute);
+        return path;
+    }
+
+    private static string WriteDelayedMarkerScript(string directory)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var script = Path.Combine(directory, "delayed-marker.cmd");
+            File.WriteAllText(
+                script,
+                "@echo off\r\necho ready>started.txt\r\nping -n 3 127.0.0.1 >nul\r\necho alive>survived.txt\r\n");
+            return script;
+        }
+
+        var path = Path.Combine(directory, "delayed-marker.sh");
+        File.WriteAllText(
+            path,
+            "#!/bin/sh\nprintf ready > started.txt\nsleep 2\nprintf alive > survived.txt\n");
         File.SetUnixFileMode(
             path,
             UnixFileMode.UserRead

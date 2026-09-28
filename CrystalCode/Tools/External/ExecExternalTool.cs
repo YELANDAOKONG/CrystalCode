@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using System.Text;
 using System.Text.Json;
+using System.Text;
 
 using Crystal.Tools;
 
@@ -83,62 +83,68 @@ internal sealed class ExecExternalTool : ITool
                 ToolResultStatus.Failure);
         }
 
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (_set.TimeoutSeconds is int seconds)
+        {
+            timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
+        }
+
+        var outputTask = ProcessOutputReader.ReadAsync(process, timeout.Token);
         try
         {
             if (_set.Stdin)
             {
-                await process.StandardInput.WriteAsync(call.Arguments);
-                await process.StandardInput.FlushAsync(cancellationToken);
+                await process.StandardInput.WriteAsync(call.Arguments.AsMemory(), timeout.Token);
+                await process.StandardInput.FlushAsync(timeout.Token);
             }
 
             process.StandardInput.Close();
-        }
-        catch (Exception exception) when (exception is IOException or ObjectDisposedException)
-        {
-            return new ToolOutput(
-                "The external process stdin failed: " + exception.Message,
-                ToolResultStatus.Failure);
-        }
-
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(_set.TimeoutSeconds));
-        try
-        {
             await process.WaitForExitAsync(timeout.Token);
+            var text = await outputTask.WaitAsync(timeout.Token);
+            var status = process.ExitCode == 0
+                ? ToolResultStatus.Success
+                : ToolResultStatus.Failure;
+            return new ToolOutput($"exit {process.ExitCode}\n{text}", status);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            TryKill(process);
+            throw;
+        }
+        catch (OperationCanceledException) when (_set.TimeoutSeconds is int limit)
         {
             TryKill(process);
             return new ToolOutput(
-                $"The command timed out after {_set.TimeoutSeconds} seconds.",
+                ToolOutputText.Timeout(limit),
                 ToolResultStatus.Failure);
         }
-
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-        var builder = new StringBuilder();
-        if (stdout.Length > 0)
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException)
         {
-            builder.Append(stdout);
+            timeout.Cancel();
+            TryKill(process);
+            return new ToolOutput(
+                "The external process stdin or output failed: " + exception.Message,
+                ToolResultStatus.Failure);
         }
-
-        if (stderr.Length > 0)
+        finally
         {
-            if (builder.Length > 0)
+            if (!process.HasExited)
             {
-                builder.AppendLine();
+                TryKill(process);
             }
 
-            builder.Append(stderr);
+            if (timeout.IsCancellationRequested)
+            {
+                try
+                {
+                    await outputTask;
+                }
+                catch (Exception exception) when (
+                    exception is OperationCanceledException or IOException or ObjectDisposedException)
+                {
+                }
+            }
         }
-
-        var text = ToolOutputText.Truncate(builder.ToString());
-        var status = process.ExitCode == 0
-            ? ToolResultStatus.Success
-            : ToolResultStatus.Failure;
-        return new ToolOutput($"exit {process.ExitCode}\n{text}", status);
     }
 
     private bool TryBuildArgv(
@@ -289,6 +295,9 @@ internal sealed class ExecExternalTool : ITool
             }
         }
         catch (InvalidOperationException)
+        {
+        }
+        catch (System.ComponentModel.Win32Exception)
         {
         }
     }

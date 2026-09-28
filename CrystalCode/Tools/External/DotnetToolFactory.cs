@@ -171,7 +171,8 @@ internal static class DotnetToolFactory
                 var wrapped = new FencedExternalTool(
                     pair.Text,
                     workspace,
-                    pair.Spec.PathArguments);
+                    pair.Spec.PathArguments,
+                    set.TimeoutSeconds);
                 AddText(pair.Spec, wrapped, plan, work);
             }
 
@@ -180,7 +181,8 @@ internal static class DotnetToolFactory
                 var wrapped = new FencedExternalMultimodalTool(
                     pair.Multimodal,
                     workspace,
-                    pair.Spec.PathArguments);
+                    pair.Spec.PathArguments,
+                    set.TimeoutSeconds);
                 AddMultimodal(
                     pair.Spec,
                     wrapped,

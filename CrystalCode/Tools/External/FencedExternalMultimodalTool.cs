@@ -12,11 +12,13 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
     private readonly IMultimodalTool _inner;
     private readonly Workspace _workspace;
     private readonly IReadOnlyList<string> _pathArguments;
+    private readonly int? _timeoutSeconds;
 
     public FencedExternalMultimodalTool(
         IMultimodalTool inner,
         Workspace workspace,
-        IReadOnlyList<string> pathArguments)
+        IReadOnlyList<string> pathArguments,
+        int? timeoutSeconds)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -24,6 +26,7 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
         _inner = inner;
         _workspace = workspace;
         _pathArguments = pathArguments;
+        _timeoutSeconds = timeoutSeconds;
         Definition = inner.Definition;
     }
 
@@ -54,11 +57,31 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
                 call.Name,
                 rewritten,
                 call.Contents);
-        var output = await _inner.InvokeAsync(next, cancellationToken);
-        var contents = output.Contents.Select(static content =>
-            content is TextContent text
-                ? new TextContent(ToolOutputText.Truncate(text.Text))
-                : content);
-        return new MultimodalToolOutput(contents, output.Status);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (_timeoutSeconds is int seconds)
+        {
+            timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
+        }
+
+        try
+        {
+            var output = await _inner.InvokeAsync(next, timeout.Token)
+                .AsTask()
+                .WaitAsync(timeout.Token);
+            var contents = output.Contents.Select(static content =>
+                content is TextContent text
+                    ? new TextContent(ToolOutputText.Truncate(text.Text))
+                    : content);
+            return new MultimodalToolOutput(contents, output.Status);
+        }
+        catch (OperationCanceledException) when (
+            !cancellationToken.IsCancellationRequested
+            && timeout.IsCancellationRequested
+            && _timeoutSeconds is int limit)
+        {
+            return new MultimodalToolOutput(
+                [new TextContent(ToolOutputText.Timeout(limit))],
+                MultimodalToolResultStatus.Failure);
+        }
     }
 }

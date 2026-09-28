@@ -8,6 +8,7 @@ namespace CrystalCode.Tools.External;
 public static class ToolsManifestParser
 {
     private static readonly JsonElement EmptyObject = JsonDocument.Parse("{}").RootElement.Clone();
+    private const int MaximumTimeoutSeconds = (int)((uint.MaxValue - 1) / 1000);
 
     public static bool TryParse(
         string directory,
@@ -96,14 +97,24 @@ public static class ToolsManifestParser
             return false;
         }
 
-        var timeout = WorkspaceLimits.BashTimeoutSeconds;
+        int? timeout = WorkspaceLimits.BashTimeoutSeconds;
         if (root.TryGetProperty("timeoutSeconds", out var timeoutElement))
         {
-            if (timeoutElement.ValueKind != JsonValueKind.Number
-                || !timeoutElement.TryGetInt32(out timeout)
-                || timeout <= 0)
+            if (timeoutElement.ValueKind == JsonValueKind.String
+                && timeoutElement.GetString() == "unlimited")
             {
-                error = "timeoutSeconds must be a positive integer.";
+                timeout = null;
+            }
+            else if (timeoutElement.ValueKind == JsonValueKind.Number
+                && timeoutElement.TryGetInt32(out var seconds)
+                && seconds > 0
+                && seconds <= MaximumTimeoutSeconds)
+            {
+                timeout = seconds;
+            }
+            else
+            {
+                error = "timeoutSeconds must be a supported positive integer or unlimited.";
                 return false;
             }
         }

@@ -48,6 +48,82 @@ public sealed class DotnetToolFactoryTests
     }
 
     [Fact]
+    public async Task Load_DotnetTimeoutAndUnlimited_ApplyToCalls()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "SlowTools");
+        PublishFixture(
+            directory,
+            """
+            using System.Text.Json;
+            using Crystal.Tools;
+
+            namespace FixtureTools;
+
+            public sealed class SlowTool : ITool
+            {
+                public SlowTool()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                    Definition = new ToolDefinition("slow", document.RootElement.Clone(), "Slow.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public async ValueTask<ToolOutput> InvokeAsync(
+                    ToolCall call,
+                    CancellationToken cancellationToken = default)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+                    return new ToolOutput("finished");
+                }
+            }
+            """);
+        var manifest = Path.Combine(directory, ExternalFiles.FileName);
+        File.WriteAllText(
+            manifest,
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "types": ["SlowTool"],
+              "timeoutSeconds": 1
+            }
+            """);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+        var tool = Assert.Single(catalog.WorkTools);
+
+        var timedOut = await tool.InvokeAsync(new ToolCall("1", "slow", "{}"));
+
+        Assert.Equal(ToolResultStatus.Failure, timedOut.Status);
+        Assert.Contains("timed out after 1 second", timedOut.Text, StringComparison.Ordinal);
+
+        File.WriteAllText(
+            manifest,
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "types": ["SlowTool"],
+              "timeoutSeconds": "unlimited"
+            }
+            """);
+        catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+        tool = Assert.Single(catalog.WorkTools);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => tool.InvokeAsync(new ToolCall("2", "slow", "{}"), cancellation.Token).AsTask());
+    }
+
+    [Fact]
     public void Load_DotnetOverlayMismatch_DoesNotOccupyNames()
     {
         using var home = new TemporaryHome();
@@ -218,6 +294,64 @@ public sealed class DotnetToolFactoryTests
             Path.GetFullPath(Path.Combine(workspace.Path, "capture.png")),
             arguments.RootElement.GetProperty("path").GetString());
         Assert.IsType<ImageContent>(result.Contents[1]);
+    }
+
+    [Fact]
+    public async Task Load_DotnetMultimodalTimeout_ReturnsFailure()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "SlowImageTools");
+        PublishFixture(
+            directory,
+            """
+            using System.Text.Json;
+            using Crystal.Multimodal;
+            using Crystal.Multimodal.Tools;
+            using Crystal.Tools;
+
+            namespace FixtureTools;
+
+            public sealed class SlowImageTool : IMultimodalTool
+            {
+                public SlowImageTool()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                    Definition = new ToolDefinition("slow_image", document.RootElement.Clone(), "Slow image.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public async ValueTask<MultimodalToolOutput> InvokeAsync(
+                    MultimodalToolCall call,
+                    CancellationToken cancellationToken = default)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+                    return new MultimodalToolOutput([new TextContent("finished")]);
+                }
+            }
+            """);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "types": ["SlowImageTool"],
+              "timeoutSeconds": 1
+            }
+            """);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+        var tool = Assert.Single(catalog.WorkMultimodalTools);
+
+        var result = await tool.InvokeAsync(new MultimodalToolCall("1", "slow_image", "{}"));
+
+        Assert.Equal(MultimodalToolResultStatus.Failure, result.Status);
+        var text = Assert.IsType<TextContent>(Assert.Single(result.Contents));
+        Assert.Contains("timed out after 1 second", text.Text, StringComparison.Ordinal);
     }
 
     private static void WriteExecSet(string workspace, string directoryName, string toolName)

@@ -2,6 +2,9 @@ namespace CrystalCode.Tools;
 
 internal static class ToolOutputText
 {
+    public static string Timeout(int seconds) =>
+        $"The command timed out after {seconds} {(seconds == 1 ? "second" : "seconds")}.";
+
     public static string Truncate(string text)
     {
         ArgumentNullException.ThrowIfNull(text);

@@ -12,7 +12,7 @@ public sealed record ParsedToolSet
         IReadOnlyList<string> command,
         bool stdin,
         bool enabled,
-        int timeoutSeconds,
+        int? timeoutSeconds,
         ExternalCatalogSelection catalogs,
         IReadOnlyList<ExternalToolSpec> tools,
         string? assembly = null,
@@ -54,7 +54,7 @@ public sealed record ParsedToolSet
 
     public bool Enabled { get; }
 
-    public int TimeoutSeconds { get; }
+    public int? TimeoutSeconds { get; }
 
     public ExternalCatalogSelection Catalogs { get; }
 
