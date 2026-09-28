@@ -4,7 +4,7 @@ namespace CrystalCode.Display.Shell;
 
 /// <summary>
 /// Product rules for which decoded keys scroll the transcript.
-/// CSI and wheel bursts are already events; this does not parse VT.
+/// Mouse reports are already wheel events; this does not parse VT.
 /// </summary>
 public static class ScrollInput
 {

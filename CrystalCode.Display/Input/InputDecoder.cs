@@ -11,6 +11,9 @@ public sealed class InputDecoder
     private const char EscapeChar = '\u001b';
     private const string PasteStart = "\u001b[200~";
     private const string PasteEnd = "\u001b[201~";
+    private const int WheelButtonBit = 64;
+    private const int HorizontalWheelBit = 2;
+    private const int WheelDownBit = 1;
 
     private readonly StringBuilder _held = new();
     private readonly StringBuilder _paste = new();
@@ -37,6 +40,7 @@ public sealed class InputDecoder
         {
             var flat = InputChars.From(burst);
             if (flat.Length >= 2
+                && burst.All(static key => key.KeyChar != '\0')
                 && !flat.Contains(EscapeChar, StringComparison.Ordinal)
                 && !burst.Any(static key => key.KeyChar == '\u0016'
                     || key.Key == ConsoleKey.V && key.Modifiers.HasFlag(ConsoleModifiers.Control))
@@ -49,12 +53,29 @@ public sealed class InputDecoder
 
         if (!_pasteOpen && _held.Length == 0 && TryParsedKeys(burst, out var parsed))
         {
-            return CoalesceWheel(parsed);
+            return parsed;
         }
 
-        var text = _held + InputChars.From(burst);
+        var text = new StringBuilder(_held.ToString());
         _held.Clear();
-        return CoalesceWheel(Parse(text));
+        var events = new List<IInputEvent>();
+        foreach (var key in burst)
+        {
+            if (key.KeyChar == '\0' && key.Key is not (default(ConsoleKey) or ConsoleKey.Escape))
+            {
+                events.AddRange(Parse(text.ToString()));
+                text.Clear();
+                text.Append(_held);
+                _held.Clear();
+                events.Add(InputKey.From(key));
+                continue;
+            }
+
+            text.Append(InputChars.From([key]));
+        }
+
+        events.AddRange(Parse(text.ToString()));
+        return events;
     }
 
     private static bool TryParsedKeys(
@@ -247,6 +268,7 @@ public sealed class InputDecoder
             return false;
         }
 
+        var pressed = text[close] == 'M';
         var payload = text[(index + 3)..close];
         index = close + 1;
         var first = payload.IndexOf(';');
@@ -255,12 +277,12 @@ public sealed class InputDecoder
             return true;
         }
 
-        if ((button & 64) == 0)
+        if (!pressed || (button & (WheelButtonBit | HorizontalWheelBit)) != WheelButtonBit)
         {
             return true;
         }
 
-        var delta = (button & 1) == 0 ? InputWheel.LineStep : -InputWheel.LineStep;
+        var delta = (button & WheelDownBit) == 0 ? InputWheel.LineStep : -InputWheel.LineStep;
         events.Add(new InputWheel(delta));
         return true;
     }
@@ -274,12 +296,12 @@ public sealed class InputDecoder
 
         var button = text[index + 3] - 32;
         index += 6;
-        if ((button & 64) == 0)
+        if ((button & (WheelButtonBit | HorizontalWheelBit)) != WheelButtonBit)
         {
             return true;
         }
 
-        var delta = (button & 1) == 0 ? InputWheel.LineStep : -InputWheel.LineStep;
+        var delta = (button & WheelDownBit) == 0 ? InputWheel.LineStep : -InputWheel.LineStep;
         events.Add(new InputWheel(delta));
         return true;
     }
@@ -431,40 +453,6 @@ public sealed class InputDecoder
         }
 
         return new InputKey(default, value, ConsoleModifiers.None);
-    }
-
-    private static IReadOnlyList<IInputEvent> CoalesceWheel(List<IInputEvent> events)
-    {
-        if (events.Count < 2)
-        {
-            return events;
-        }
-
-        var ups = 0;
-        var downs = 0;
-        foreach (var item in events)
-        {
-            if (item is not InputKey key || key.Modifiers.HasFlag(ConsoleModifiers.Alt))
-            {
-                return events;
-            }
-
-            if (key.Key == ConsoleKey.UpArrow)
-            {
-                ups++;
-                continue;
-            }
-
-            if (key.Key == ConsoleKey.DownArrow)
-            {
-                downs++;
-                continue;
-            }
-
-            return events;
-        }
-
-        return [new InputWheel((ups - downs) * InputWheel.LineStep)];
     }
 
     private static string NormalizePaste(string text)

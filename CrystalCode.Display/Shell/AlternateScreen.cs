@@ -4,14 +4,15 @@ namespace CrystalCode.Display.Shell;
 
 /// <summary>
 /// Alternate buffer for the session shell. Not AnsiConsole.Live.
-/// Alternate-scroll turns the wheel into arrows. Bracketed paste is on.
-/// Mouse tracking stays off so left-drag still selects text.
+/// Mouse reports keep wheel input distinct from keyboard arrows.
+/// Bracketed paste is on. Shift-drag selects text in terminals with mouse mode.
 /// </summary>
 public sealed class AlternateScreen : IDisposable
 {
     private const string ProductTitle = "Crystal Code";
     private bool _active;
     private string? _previousTitle;
+    private uint? _previousInputMode;
 
     private AlternateScreen(bool active)
     {
@@ -27,20 +28,23 @@ public sealed class AlternateScreen : IDisposable
             return new AlternateScreen(false);
         }
 
+        var previousInputMode = WindowsConsole.EnableVirtualInput();
         try
         {
-            WindowsConsole.EnableVirtualInput();
             AnsiConsole.Write(new ControlCode("\u001b[?1049h"));
             AnsiConsole.Write(new ControlCode("\u001b[?2004h"));
-            AnsiConsole.Write(new ControlCode("\u001b[?1007h"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1000h"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1006h"));
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
             var screen = new AlternateScreen(true);
+            screen._previousInputMode = previousInputMode;
             screen.ApplyWindowTitle();
             return screen;
         }
         catch (IOException)
         {
+            WindowsConsole.RestoreVirtualInput(previousInputMode);
             return new AlternateScreen(false);
         }
     }
@@ -56,15 +60,19 @@ public sealed class AlternateScreen : IDisposable
         {
             RestoreWindowTitle();
             AnsiConsole.Cursor.Show();
-            AnsiConsole.Write(new ControlCode("\u001b[?1007l"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1006l"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1000l"));
             AnsiConsole.Write(new ControlCode("\u001b[?2004l"));
             AnsiConsole.Write(new ControlCode("\u001b[?1049l"));
         }
         catch (IOException)
         {
         }
-
-        _active = false;
+        finally
+        {
+            WindowsConsole.RestoreVirtualInput(_previousInputMode);
+            _active = false;
+        }
     }
 
     private void ApplyWindowTitle()

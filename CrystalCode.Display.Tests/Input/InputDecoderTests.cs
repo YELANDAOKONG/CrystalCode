@@ -66,16 +66,47 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
-    public void Push_BatchedCsiUp_IsWheelOnEveryPlatform()
+    public void Push_RepeatedArrowsRemainKeysOnEveryPlatform()
     {
         var payload = "\u001b[A\u001b[A\u001b[A";
-        AssertWheel(new InputDecoder().Push(WindowsVt(payload)), InputWheel.LineStep * 3);
-        AssertWheel(new InputDecoder().Push(UnixCsi(payload)), InputWheel.LineStep * 3);
+        AssertArrows(new InputDecoder().Push(WindowsVt(payload)), 3);
+        AssertArrows(new InputDecoder().Push(UnixCsi(payload)), 3);
 
         var linux = Linux(
             new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false),
             new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
-        AssertWheel(new InputDecoder().Push(linux), InputWheel.LineStep * 2);
+        AssertArrows(new InputDecoder().Push(linux), 2);
+    }
+
+    [Fact]
+    public void Push_WheelAndParsedArrowsRemainDistinctInOneBurst()
+    {
+        var burst = UnixCsi("\u001b[<64;12;8M");
+        burst.Add(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
+
+        var events = new InputDecoder().Push(burst);
+
+        Assert.Collection(events,
+            item => Assert.Equal(InputWheel.LineStep, Assert.IsType<InputWheel>(item).Delta),
+            item => Assert.Equal(ConsoleKey.UpArrow, Assert.IsType<InputKey>(item).Key));
+    }
+
+    [Fact]
+    public void Push_SeparateWheelReportsNeverBecomeHistoryKeys()
+    {
+        var decoder = new InputDecoder();
+
+        AssertWheel(decoder.Push(WindowsVt("\u001b[<64;12;8M")), InputWheel.LineStep);
+        AssertWheel(decoder.Push(WindowsVt("\u001b[<65;12;8M")), -InputWheel.LineStep);
+    }
+
+    [Fact]
+    public void Push_HorizontalWheelAndSgrReleaseAreIgnored()
+    {
+        var decoder = new InputDecoder();
+
+        Assert.Empty(decoder.Push(WindowsVt("\u001b[<66;12;8M")));
+        Assert.Empty(decoder.Push(WindowsVt("\u001b[<64;12;8m")));
     }
 
     [Fact]
@@ -262,6 +293,15 @@ public sealed class InputDecoderTests
     {
         var wheel = Assert.IsType<InputWheel>(Assert.Single(events));
         Assert.Equal(delta, wheel.Delta);
+    }
+
+    private static void AssertArrows(IReadOnlyList<IInputEvent> events, int count)
+    {
+        Assert.Equal(count, events.Count);
+        foreach (var item in events)
+        {
+            Assert.Equal(ConsoleKey.UpArrow, Assert.IsType<InputKey>(item).Key);
+        }
     }
 
     private static List<ConsoleKeyInfo> Linux(params ConsoleKeyInfo[] keys) => [.. keys];

@@ -201,4 +201,47 @@ public sealed class SessionRendererTests
 
         Assert.Contains("[Image #7]x", submitted, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task DispatchBurstAsync_WheelDoesNotRecallPromptHistory()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SeedPromptHistory(["previous prompt"]);
+
+        var wheel = "\u001b[<64;12;8M".Select(
+            ch => new ConsoleKeyInfo(ch, default, false, false, false)).ToArray();
+        var wheelSubmission = await renderer.DispatchBurstAsync(
+            wheel,
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Null(wheelSubmission);
+        Assert.Equal(string.Empty, submitted);
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_UpArrowStillRecallsPromptHistory()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SeedPromptHistory(["previous prompt"]);
+
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Equal("previous prompt", submitted);
+    }
 }

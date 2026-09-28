@@ -909,13 +909,12 @@ memory only and are forgotten when the session changes, since their
 markers do not carry image bytes or a stable cross-session attachment.
 PageUp/PageDown and the wheel are the primary transcript scroll controls;
 Ctrl+Up/Down also scroll when the terminal passes those keys through.
-Alternate-scroll (1007) turns the wheel into batched Up/Down
-CSI; a burst of two or more is transcript scroll even when the
-composer has text, so one Windows wheel notch is not dropped. A single
-Up/Down stays with the composer. The alternate screen enables alternate-scroll
-arrows (1007) and bracketed paste (2004). It does not enable SGR mouse
-tracking (1000/1006), so left-drag still selects and copies. Wheel
-reports that a terminal still sends are drained without waiting. Escape is held only
+The alternate screen enables mouse reporting (1000/1006) so wheel reports
+remain distinct from Up/Down keys, including a single Windows wheel notch.
+Plain Up/Down always stays with the composer or active selection. Shift-drag
+selects and copies in terminals that reserve mouse input for applications.
+Bracketed paste (2004) is also enabled. SGR and X10 wheel reports are drained
+without waiting. Escape is held only
 when no further bytes are available or the sequence is still incomplete.
 
 `KeyBurst` collects one `ReadKey` drain. `InputDecoder` turns that burst
@@ -923,7 +922,8 @@ into `InputKey`, `InputPaste`, or `InputWheel`. Platform differences stay
 in the decoder; the composer, scroll policy, and overlays consume events
 only. Linux and macOS usually deliver parsed `ConsoleKey` values. Windows
 VT input leaves `Key` empty, so Tab, Enter, letters, and CSI arrive as
-`KeyChar`. macOS Option-as-Meta is `ESC` plus a letter or Backspace and
+`KeyChar`. The shell restores the prior Windows console input mode on exit.
+macOS Option-as-Meta is `ESC` plus a letter or Backspace and
 becomes Alt; a native Alt modifier on a parsed key is kept. A CR+LF drain
 is one Enter, not paste. Paste is the text between CSI `200~` and `201~`;
 a printable key burst is still treated as paste when those markers are

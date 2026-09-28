@@ -11,25 +11,44 @@ internal static class WindowsConsole
     private const int StandardInputHandle = -10;
     private const uint EnableVirtualTerminalInput = 0x0200;
 
-    public static void EnableVirtualInput()
+    public static uint? EnableVirtualInput()
     {
         if (!OperatingSystem.IsWindows())
         {
-            return;
+            return null;
         }
 
         var handle = GetStdHandle(StandardInputHandle);
         if (handle == nint.Zero || handle == unchecked((nint)(-1)))
         {
-            return;
+            return null;
         }
 
         if (!GetConsoleMode(handle, out var mode))
         {
+            return null;
+        }
+
+        if ((mode & EnableVirtualTerminalInput) != 0)
+        {
+            return null;
+        }
+
+        return SetConsoleMode(handle, mode | EnableVirtualTerminalInput) ? mode : null;
+    }
+
+    public static void RestoreVirtualInput(uint? previousMode)
+    {
+        if (!OperatingSystem.IsWindows() || previousMode is null)
+        {
             return;
         }
 
-        _ = SetConsoleMode(handle, mode | EnableVirtualTerminalInput);
+        var handle = GetStdHandle(StandardInputHandle);
+        if (handle != nint.Zero && handle != unchecked((nint)(-1)))
+        {
+            _ = SetConsoleMode(handle, previousMode.Value);
+        }
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
