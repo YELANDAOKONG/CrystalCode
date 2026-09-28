@@ -22,7 +22,10 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     public void AddHeaders(HttpRequestMessage request, string apiKey)
     {
-        request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+        }
         request.Headers.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
     }
 

@@ -18,5 +18,7 @@ internal sealed class ProviderDocument
 
     public string? ApiKey { get; set; }
 
+    public bool? RequiresApiKey { get; set; }
+
     public Dictionary<string, ModelDocument>? Models { get; set; }
 }

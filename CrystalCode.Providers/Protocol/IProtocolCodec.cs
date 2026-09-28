@@ -8,6 +8,10 @@ internal interface IProtocolCodec
 {
     string Path { get; }
 
+    string GetPath(bool stream) => Path;
+
+    bool UsesJsonLines => false;
+
     byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream);
 
     void AddHeaders(HttpRequestMessage request, string apiKey);

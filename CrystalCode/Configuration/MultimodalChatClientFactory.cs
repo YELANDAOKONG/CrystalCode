@@ -14,7 +14,10 @@ public static class MultimodalChatClientFactory
         PluginRegistry? registry = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         return (registry ?? PluginRegistry.CreateBuiltIn())
             .CreateMultimodalClient(settings, apiKey);
     }

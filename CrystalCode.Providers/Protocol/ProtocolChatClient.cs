@@ -72,12 +72,13 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
         var parser = _codec.CreateStreamParser();
         while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
         {
-            if (!line.StartsWith("data:", StringComparison.Ordinal))
+            if (!_codec.UsesJsonLines
+                && !line.StartsWith("data:", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var data = line[5..].TrimStart();
+            var data = _codec.UsesJsonLines ? line : line[5..].TrimStart();
             if (data.Length == 0 || data == "[DONE]")
             {
                 continue;
@@ -124,7 +125,7 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
     {
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            new Uri(_options.BaseUri, _codec.Path))
+            new Uri(_options.BaseUri, _codec.GetPath(stream)))
         {
             Content = new ByteArrayContent(body)
         };
@@ -134,7 +135,10 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
         };
         request.Headers.UserAgent.ParseAdd(CompatibleWire.UserAgent);
         request.Headers.Accept.Add(
-            new MediaTypeWithQualityHeaderValue(stream ? "text/event-stream" : "application/json"));
+            new MediaTypeWithQualityHeaderValue(
+                stream && _codec.UsesJsonLines
+                    ? "application/x-ndjson"
+                    : stream ? "text/event-stream" : "application/json"));
         _codec.AddHeaders(request, _options.ApiKey);
 
         HttpResponseMessage? response = null;

@@ -20,7 +20,10 @@ public sealed class OpenAIClientFactory : IChatClientFactory
     public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new OpenAIProvider(
@@ -43,7 +46,10 @@ public sealed class OpenAIClientFactory : IChatClientFactory
         string apiKey)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new OpenAIMultimodalProvider(

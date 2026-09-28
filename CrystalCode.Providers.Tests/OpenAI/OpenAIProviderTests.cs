@@ -10,6 +10,23 @@ namespace CrystalCode.Providers.Tests.OpenAI;
 public sealed class OpenAIProviderTests
 {
     [Fact]
+    public async Task CompleteAsync_OmitsAuthorizationWhenKeyIsEmpty()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(new OpenAIOptions(
+            string.Empty,
+            "local-model",
+            new Uri("http://localhost:9000/v1/")), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "hi")]));
+
+        Assert.Null(handler.Request!.Headers.Authorization);
+    }
+
+    [Fact]
     public async Task CompleteAsync_WritesMaxCompletionTokensAndOrganization()
     {
         var handler = new RecordingHandler(

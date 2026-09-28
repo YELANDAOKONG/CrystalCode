@@ -14,7 +14,10 @@ public static class ChatClientFactory
         PluginRegistry? registry = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         return (registry ?? PluginRegistry.CreateBuiltIn()).CreateClient(settings, apiKey);
     }
 }

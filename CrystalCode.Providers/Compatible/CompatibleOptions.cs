@@ -13,7 +13,7 @@ internal sealed record CompatibleOptions
         string? organization,
         string? project)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentNullException.ThrowIfNull(baseUri);
 

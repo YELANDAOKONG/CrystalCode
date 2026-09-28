@@ -56,7 +56,33 @@ public sealed class ProviderCatalog
                 ["gpt-5.6-sol"] = new(400_000, imageInput: true),
                 ["gpt-5.6-terra"] = new(400_000, imageInput: true),
                 ["gpt-5.6-luna"] = new(400_000, imageInput: true)
-            })
+            }),
+        new ProviderDefinition(
+            ProviderName.Gemini,
+            ProviderProtocol.Gemini,
+            new Uri("https://generativelanguage.googleapis.com/v1beta/"),
+            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
+            {
+                ["gemini-3.8-flash"] = new(
+                    1_048_576,
+                    thinking: true,
+                    thinkingEfforts: ["low", "medium", "high"],
+                    imageInput: true),
+                ["gemini-3.1-pro-preview"] = new(
+                    1_048_576,
+                    thinking: true,
+                    thinkingEfforts: ["low", "medium", "high"],
+                    imageInput: true)
+            }),
+        new ProviderDefinition(
+            ProviderName.Ollama,
+            ProviderProtocol.Ollama,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
+            {
+                ["qwen3:8b"] = new(4_096, thinking: true)
+            },
+            requiresApiKey: false)
     ]);
 
     public ProviderCatalog Overlay(IEnumerable<ProviderDefinition> replacements)
@@ -182,6 +208,7 @@ public sealed class ProviderCatalog
             replacement.ReplayReasoningContent,
             replacement.TokenLimit,
             replacement.ApiKeyEnvironment ?? existing.ApiKeyEnvironment,
-            replacement.ApiKey ?? existing.ApiKey);
+            replacement.ApiKey ?? existing.ApiKey,
+            replacement.RequiresApiKey);
     }
 }

@@ -32,7 +32,7 @@ public sealed record DeepSeekOptions
         int? maxTokens = null,
         TimeSpan? requestTimeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
 
         if (baseUri is { IsAbsoluteUri: false })

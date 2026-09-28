@@ -17,7 +17,7 @@ public sealed record ResponsesOptions
         string? vendorName = null,
         TimeSpan? requestTimeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentNullException.ThrowIfNull(baseUri);
         if (!baseUri.IsAbsoluteUri)

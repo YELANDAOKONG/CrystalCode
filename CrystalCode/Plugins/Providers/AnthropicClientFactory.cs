@@ -17,7 +17,10 @@ public sealed class AnthropicClientFactory : IChatClientFactory
     public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new AnthropicProvider(
@@ -36,7 +39,10 @@ public sealed class AnthropicClientFactory : IChatClientFactory
         string apiKey)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new AnthropicMultimodalProvider(

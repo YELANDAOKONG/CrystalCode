@@ -8,6 +8,10 @@ internal interface IMultimodalProtocolCodec
 {
     string Path { get; }
 
+    string GetPath(bool stream) => Path;
+
+    bool UsesJsonLines => false;
+
     MultimodalChatCapabilities Capabilities { get; }
 
     byte[] WriteRequest(

@@ -153,7 +153,8 @@ internal static class SettingsMapper
                 ? null
                 : TokenLimitStyle.Parse(entry.TokenLimit),
             entry.ApiKeyEnvironment,
-            entry.ApiKey);
+            entry.ApiKey,
+            entry.RequiresApiKey);
     }
 
     private static ProviderDocument WriteProvider(ProviderDefinition provider)
@@ -185,6 +186,10 @@ internal static class SettingsMapper
             TokenLimit = provider.TokenLimit.Value,
             ApiKeyEnvironment = provider.ApiKeyEnvironment,
             ApiKey = provider.ApiKey,
+            RequiresApiKey = provider.RequiresApiKey ==
+                (provider.Protocol != ProviderProtocol.Ollama)
+                    ? null
+                    : provider.RequiresApiKey,
             Models = models
         };
     }

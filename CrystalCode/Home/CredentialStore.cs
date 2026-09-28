@@ -45,6 +45,13 @@ public sealed class CredentialStore
             return true;
         }
 
+        if (!provider.RequiresApiKey)
+        {
+            apiKey = string.Empty;
+            error = string.Empty;
+            return true;
+        }
+
         apiKey = string.Empty;
         var environmentName = ResolveEnvironmentName(provider);
         error =
@@ -98,7 +105,10 @@ public sealed class CredentialStore
             yield return derived;
         }
 
-        yield return SharedApiKeyVariable;
+        if (provider.RequiresApiKey)
+        {
+            yield return SharedApiKeyVariable;
+        }
     }
 
     private static string ResolveEnvironmentName(ProviderDefinition provider) =>

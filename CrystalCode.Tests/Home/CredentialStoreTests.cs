@@ -8,6 +8,20 @@ namespace CrystalCode.Tests.Home;
 public sealed class CredentialStoreTests
 {
     [Fact]
+    public void TryResolve_AllowsProviderWithoutApiKey()
+    {
+        using var root = new TemporaryHome();
+        var store = new CredentialStore(root.Home);
+        var provider = ProviderCatalog.CreateStarter().Get(ProviderName.Ollama)[0];
+
+        var resolved = store.TryResolve(provider, out var apiKey, out var error);
+
+        Assert.True(resolved);
+        Assert.Equal(string.Empty, apiKey);
+        Assert.Equal(string.Empty, error);
+    }
+
+    [Fact]
     public void TryResolve_ReadsFileByProviderName()
     {
         using var root = new TemporaryHome();

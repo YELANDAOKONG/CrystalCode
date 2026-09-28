@@ -114,7 +114,7 @@ CLI options:
 
 | Option | Meaning |
 | :--- | :--- |
-| `-p`, `--provider <name>` | Provider name (`deepseek`, `openai`, or a name you added to `providers.json`) |
+| `-p`, `--provider <name>` | Provider name (`deepseek`, `openai`, `gemini`, `ollama`, or a name you added to `providers.json`) |
 | `-m`, `--model <id>` | Model id listed under that provider |
 | `-w`, `--workspace <path>` | Workspace root (default: current directory) |
 | `--home <path>` | Data directory (default: `CRYSTAL_HOME`, then `~/.crystal`) |
@@ -233,24 +233,30 @@ Starter catalog (merged with `providers.json`):
 | :--- | :--- | :--- | :--- |
 | `deepseek` | `deepseek` | `https://api.deepseek.com/` | `deepseek-flash`, `deepseek-v4-flash` (compatibility alias), `deepseek-v4-pro` |
 | `openai` | `openai` | `https://api.openai.com/v1/` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
+| `gemini` | `gemini` | `https://generativelanguage.googleapis.com/v1beta/` | `gemini-3.8-flash`, `gemini-3.1-pro-preview` |
+| `ollama` | `ollama` | `http://localhost:11434/` | `qwen3:8b` (pull this model before selecting it) |
 
 Built-in DeepSeek V4 models enable thinking with efforts `low`,
 `high`, and `maximum`. Each has a 1,000,000-token context window.
 Starter OpenAI models use a 400,000-token window and do not enable
 thinking unless you add it.
+The Ollama starter assumes a 4,096-token local context. If the local model
+uses a different context size, set that size in `providers.json` and configure
+the Ollama model to match it. Other local or cloud model IDs may be added there.
 
 ### Provider fields
 
 | Field | Meaning |
 | :--- | :--- |
-| `protocol` | `deepseek`, `openai`, `responses`, or `anthropic` |
-| `baseUri` | Absolute API base URI; the adapter appends `chat/completions`, `responses`, or `messages` |
+| `protocol` | `deepseek`, `openai`, `responses`, `anthropic`, `gemini`, or `ollama` |
+| `baseUri` | Absolute API base URI; the adapter appends the protocol's chat path |
 | `organization` | Optional OpenAI organization for the `openai` protocol |
 | `project` | Optional OpenAI project for the `openai` protocol |
 | `replayReasoningContent` | Replay provider reasoning content (DeepSeek always does this) |
 | `tokenLimit` | Chat Completions output field: `max_tokens` or `max_completion_tokens` (ignored by `responses` and `anthropic`) |
 | `apiKeyEnvironment` | Preferred environment variable name for this provider |
 | `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |
+| `requiresApiKey` | Whether a missing key is an error (default `true`, except `ollama`; set `false` for an unauthenticated endpoint) |
 | `models` | Table of selectable model ids |
 
 Provider names are letters, digits, hyphen, or underscore.
@@ -259,6 +265,16 @@ All protocol adapters send the constant `User-Agent: Crystal Code`, with no
 version. `responses` authenticates with `Authorization: Bearer`; `anthropic`
 uses `x-api-key` and `anthropic-version: 2023-06-01`. Both adapters use direct
 HTTP and JSON/SSE handling; no provider SDK is required.
+Gemini uses `x-goog-api-key` and native `generateContent` SSE. Ollama uses
+native `/api/chat` JSON lines and omits authorization when no key is configured.
+For a provider with `requiresApiKey: false`, an explicit provider key or its
+specific environment variable is still used; `CRYSTAL_API_KEY` is skipped.
+
+Amazon Bedrock models that support its OpenAI-compatible Chat Completions API
+can be configured with `protocol: "openai"`, a regional
+`https://bedrock-runtime.REGION.amazonaws.com/openai/v1/` base URI, and a
+Bedrock API key. This path uses bearer authentication. IAM SigV4 credentials
+are not supported by the current adapter.
 
 ### Model fields
 
@@ -270,7 +286,10 @@ HTTP and JSON/SSE handling; no provider SDK is required.
 | `maxTokens` | Optional positive output-token cap |
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Crystal effort names this model accepts: `minimal`, `low`, `medium`, `high`, `maximum` (`max` is stored as `maximum`) |
-| `imageInput` | Whether this model may receive images (default `false`; supported by `openai`, `deepseek`, `responses`, and `anthropic`) |
+| `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
+
+Gemini and Ollama native adapters accept inline images in user messages.
+They currently reject image content returned by tools.
 
 `thinkingEffort` is a host setting, not a model field. Changing
 models never fails: if the model does not support thinking, requests

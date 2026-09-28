@@ -38,8 +38,13 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         supportsTools: true,
         supportsReasoningOptions: true);
 
-    public void AddHeaders(HttpRequestMessage request, string apiKey) =>
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+    public void AddHeaders(HttpRequestMessage request, string apiKey)
+    {
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        }
+    }
 
     public byte[] WriteRequest(
         ProtocolOptions options,

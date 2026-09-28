@@ -10,6 +10,10 @@ public sealed record ProviderName
 
     public static ProviderName OpenAI { get; } = new("openai");
 
+    public static ProviderName Gemini { get; } = new("gemini");
+
+    public static ProviderName Ollama { get; } = new("ollama");
+
     public ProviderName(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);

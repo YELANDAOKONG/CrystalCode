@@ -1,6 +1,8 @@
 using CrystalCode.Approvals;
 using CrystalCode.Configuration;
 using CrystalCode.Providers.Anthropic;
+using CrystalCode.Providers.Gemini;
+using CrystalCode.Providers.Ollama;
 using CrystalCode.Providers.OpenAI;
 using CrystalCode.Providers.Responses;
 
@@ -10,6 +12,21 @@ namespace CrystalCode.Tests.Configuration;
 
 public sealed class ChatClientFactoryTests
 {
+    [Fact]
+    public void Create_UsesNativeAdaptersAndKeylessOllama()
+    {
+        var defaults = HarnessSettings.CreateDefault();
+        var gemini = defaults.WithSelection(ProviderName.Gemini, "gemini-3.8-flash");
+        var ollama = defaults.WithSelection(ProviderName.Ollama, "qwen3:8b");
+
+        using var geminiClient = Assert.IsType<GeminiProvider>(
+            ChatClientFactory.Create(gemini, "test-key"));
+        using var ollamaClient = Assert.IsType<OllamaProvider>(
+            ChatClientFactory.Create(ollama, string.Empty));
+        using var geminiImages = Assert.IsType<GeminiMultimodalProvider>(
+            MultimodalChatClientFactory.Create(gemini, "test-key"));
+    }
+
     [Theory]
     [InlineData("openai")]
     [InlineData("anthropic")]

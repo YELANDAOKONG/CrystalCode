@@ -107,7 +107,7 @@ CrystalCode (executable):
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
-| `Plugins/Providers` | Built-in DeepSeek, OpenAI-compatible, Responses, and Anthropic client factories |
+| `Plugins/Providers` | Built-in DeepSeek, OpenAI-compatible, Responses, Anthropic, Gemini, and Ollama client factories |
 
 CrystalCode.Display:
 
@@ -121,11 +121,13 @@ CrystalCode.Display:
 | `Paint` | Markup, markdown, theme, wrapping |
 
 Provider types live under `CrystalCode.Providers` plus one folder per wire
-family (`DeepSeek`, `OpenAI`, `Responses`, and `Anthropic`). Shared
+family (`DeepSeek`, `OpenAI`, `Responses`, `Anthropic`, `Gemini`, and `Ollama`). Shared
 OpenAI-compatible Chat Completions request and stream parsing lives in
 `Compatible`. Shared direct-HTTP lifecycle and SSE framing for Responses and
-Messages lives in `Protocol`; each wire codec still owns its request and event
-semantics. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
+Messages, Gemini GenerateContent, and Ollama Chat lives in `Protocol`; each
+wire codec still owns its request and event semantics. Gemini uses SSE and
+replays signed response parts so function calls retain thought signatures.
+Ollama uses JSON lines and native `tool_name` results. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
 with no version. Provider SDKs are not used.
 
 ## Crystal consumption
@@ -192,9 +194,11 @@ Dotnet multimodal tools are omitted from active catalogs when the selected
 model or provider does not support image input.
 
 The Responses, OpenAI-compatible Chat Completions, DeepSeek Chat Completions,
-and Anthropic Messages adapters accept text and image input and emit only text,
-reasoning, and tool-call events. Chat Completions and Anthropic images are
-restricted to user and tool messages, matching their wire contracts. Clipboard
+Anthropic Messages, Gemini GenerateContent, and Ollama Chat adapters accept
+text and image input and emit only text, reasoning, and tool-call events.
+The native Gemini and Ollama adapters accept inline images in user messages;
+image content in tool results is rejected. Chat Completions and Anthropic images
+are restricted to user and tool messages, matching their wire contracts. Clipboard
 image input is read through Windows PowerShell on Windows, the macOS system
 `osascript` command on macOS, and `wl-paste` or `xclip` on Linux; it does not
 capture the screen. Windows reads clipboard PNG bytes before falling back to
@@ -641,9 +645,9 @@ The `plugins` directory is reserved. The current product does not load
 libraries from the set directory only, in one `AssemblyLoadContext` per
 set.
 
-Provider names are open. `deepseek` and `openai` are starter entries. A user
+Provider names are open. `deepseek`, `openai`, `gemini`, and `ollama` are starter entries. A user
 adds an endpoint by inserting another `providers` object with `protocol`
-`deepseek`, `openai`, `responses`, or `anthropic`, a `baseUri`, and a `models`
+`deepseek`, `openai`, `responses`, `anthropic`, `gemini`, or `ollama`, a `baseUri`, and a `models`
 table. A gateway with different wire formats uses one provider name whose value
 is an array of endpoint objects, one per protocol. Model ids must be unique
 across that array; duplicates fail configuration loading. A selected model
@@ -739,12 +743,23 @@ label is prefixed with `~` so it is not mistaken for provider usage.
 `/tokens` toggles it, or sets `on` / `off`. A successful change writes
 `estimatedTokens` to `config.json` (`true` when on; omitted when off).
 
-`protocol` is `deepseek`, `openai`, `responses`, or `anthropic`. Models that are not listed cannot be
+`protocol` is `deepseek`, `openai`, `responses`, `anthropic`, `gemini`, or `ollama`. Models that are not listed cannot be
 selected. There is no global context window.
 
 `apiKey` may be a literal secret, `{env:NAME}`, or `{file:path}` (relative
 to `~/.crystal` or absolute, with `~` expanded). Process environment
 variables still override. `credentials.json` remains a fallback store.
+`requiresApiKey` defaults to `true`, except for the native `ollama` protocol.
+When false, a missing key resolves to empty text and the adapter omits its
+authentication header. Provider-specific environment variables and explicit
+credential references still take precedence; the shared `CRYSTAL_API_KEY`
+is not applied to keyless endpoints.
+
+Amazon Bedrock has no dedicated adapter in this build. Its OpenAI-compatible
+Chat Completions endpoint can use the `openai` protocol with a Bedrock API key
+and the regional `/openai/v1/` base URI for models that support that API.
+IAM SigV4 authentication would require a separate signing implementation;
+it is not provided by the current bearer-token transport.
 
 ## Display
 
@@ -917,7 +932,7 @@ sequential.
 slash commands through `PluginContribution`. A tool contribution always has a
 text `ITool` implementation and may additionally provide an `IMultimodalTool`
 with the same definition name; the latter may return generic image content
-while reusing the host approval policy. Built-in tools and all four wire
+while reusing the host approval policy. Built-in tools and all six wire
 protocol adapters register through the same table. `PluginRegistry` does
 not load assemblies from disk. `~/.crystal/plugins/` stays reserved.
 
@@ -935,5 +950,5 @@ does not implement `IPlugin` and does not scan `plugins/`.
 Environment variables:
 
 - `CRYSTAL_HOME` overrides the data directory.
-- `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, and `CRYSTAL_API_KEY` override
+- `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `CRYSTAL_API_KEY` override
   `credentials.json`. A provider-specific variable wins over `CRYSTAL_API_KEY`.

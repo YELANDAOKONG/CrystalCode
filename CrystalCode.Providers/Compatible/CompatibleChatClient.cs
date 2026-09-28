@@ -151,7 +151,10 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
         {
             CharSet = "utf-8"
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+        }
         request.Headers.UserAgent.ParseAdd(CompatibleWire.UserAgent);
         request.Headers.Accept.Add(
             new MediaTypeWithQualityHeaderValue(stream ? "text/event-stream" : "application/json"));

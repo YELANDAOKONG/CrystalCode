@@ -53,8 +53,9 @@ operator surface and the only entry. It can:
   declarations take effect through `externalToolApproval` in
   `config.json` (Home and Project each `author` or `host`; defaults are
   Home `author`, Project `host`);
-- use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses, and
-  Anthropic Messages adapters, including user-added gateways;
+- use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
+  Anthropic Messages, native Gemini GenerateContent, and native Ollama Chat
+  adapters, including user-added gateways;
 - group one gateway's protocol endpoints under a single provider name and route
   each uniquely named model through its configured protocol;
 - attach PNG, JPEG, GIF, or WebP images from the workspace, paste clipboard
@@ -79,7 +80,8 @@ implemented in the current build:
 - a headless CI runner;
 - an operating-system sandbox;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
-  Completions, OpenAI Responses, and Anthropic Messages;
+  Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
+  and Ollama Chat;
 - audio and video input, and image, audio, or video model output;
 
 TODO: add audio/video input and non-text model output only after their terminal

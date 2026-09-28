@@ -19,8 +19,13 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
     public string Path => "responses";
 
-    public void AddHeaders(HttpRequestMessage request, string apiKey) =>
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+    public void AddHeaders(HttpRequestMessage request, string apiKey)
+    {
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        }
+    }
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {

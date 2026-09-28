@@ -96,6 +96,11 @@ public sealed class DeepSeekProviderTests
         Assert.NotNull(handler.Body);
         Assert.Contains("\"role\":\"tool\"", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"tool_call_id\":\"call_dangling\"", handler.Body, StringComparison.Ordinal);
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Body);
+        var messages = body.RootElement.GetProperty("messages");
+        Assert.Equal("assistant", messages[1].GetProperty("role").GetString());
+        Assert.Equal("tool", messages[2].GetProperty("role").GetString());
+        Assert.Equal("user", messages[3].GetProperty("role").GetString());
         Assert.Equal("recovered", Assert.IsType<ChatMessage>(response.Candidates[0].Items[0]).Text);
     }
 

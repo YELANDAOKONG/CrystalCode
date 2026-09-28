@@ -38,6 +38,8 @@ public sealed class PluginRegistry
         registry.Add(new OpenAIPlugin());
         registry.Add(new ResponsesPlugin());
         registry.Add(new AnthropicPlugin());
+        registry.Add(new GeminiPlugin());
+        registry.Add(new OllamaPlugin());
         return registry;
     }
 
@@ -158,7 +160,10 @@ public sealed class PluginRegistry
     public IStreamingChatClient CreateClient(HarnessSettings settings, string apiKey)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         var protocol = settings.ActiveProvider.Protocol;
         foreach (var factory in _clients)
         {
@@ -177,7 +182,10 @@ public sealed class PluginRegistry
         string apiKey)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        if (settings.ActiveProvider.RequiresApiKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        }
         if (!settings.ActiveModel.ImageInput)
         {
             return null;

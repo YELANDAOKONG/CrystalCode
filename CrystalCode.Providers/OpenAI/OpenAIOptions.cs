@@ -55,7 +55,7 @@ public sealed record OpenAIOptions
         string? vendorName = null,
         TimeSpan? requestTimeout = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
 
         if (baseUri is { IsAbsoluteUri: false })

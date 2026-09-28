@@ -13,6 +13,54 @@ namespace CrystalCode.Tests.Home;
 public sealed class SettingsStoreTests
 {
     [Fact]
+    public void Load_AllowsKeylessCompatibleEndpointAndPreservesOllamaDefault()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ProvidersPath,
+            """
+            {
+              "local": {
+                "protocol": "openai",
+                "baseUri": "http://localhost:9000/v1/",
+                "requiresApiKey": false,
+                "models": { "model": { "contextWindow": 8192 } }
+              },
+              "ollama": {
+                "protocol": "ollama",
+                "baseUri": "http://localhost:11434/",
+                "models": { "custom": { "contextWindow": 8192 } }
+              }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.Catalog.Get(new ProviderName("local"))[0].RequiresApiKey);
+        Assert.False(settings.Catalog.GetModelProvider(ProviderName.Ollama, "custom").RequiresApiKey);
+    }
+
+    [Fact]
+    public void ProviderDocument_PreservesExplicitOllamaKeyRequirement()
+    {
+        var catalog = new ProviderCatalog([
+            new ProviderDefinition(
+                ProviderName.Ollama,
+                ProviderProtocol.Ollama,
+                new Uri("https://ollama.example/"),
+                new Dictionary<string, ModelSettings> { ["model"] = new(8192) },
+                requiresApiKey: true)
+        ]);
+
+        var document = SettingsMapper.WriteProviders(catalog);
+        var provider = SettingsMapper.ReadProviders(document).Single();
+
+        Assert.True(provider.RequiresApiKey);
+        Assert.True(document.GetProperty("ollama").GetProperty("requiresApiKey").GetBoolean());
+    }
+
+    [Fact]
     public void LoadOrCreate_UsesStarterCatalogWithoutWritingProviderDefinitions()
     {
         using var root = new TemporaryHome();

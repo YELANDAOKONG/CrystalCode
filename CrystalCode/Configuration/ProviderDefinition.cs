@@ -17,7 +17,8 @@ public sealed record ProviderDefinition
         bool replayReasoningContent = false,
         TokenLimitStyle? tokenLimit = null,
         string? apiKeyEnvironment = null,
-        string? apiKey = null)
+        string? apiKey = null,
+        bool? requiresApiKey = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(protocol);
@@ -41,6 +42,7 @@ public sealed record ProviderDefinition
         TokenLimit = tokenLimit ?? TokenLimitStyle.ForProtocol(protocol);
         ApiKeyEnvironment = apiKeyEnvironment;
         ApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey.Trim();
+        RequiresApiKey = requiresApiKey ?? protocol != ProviderProtocol.Ollama;
     }
 
     public ProviderName Name { get; }
@@ -66,6 +68,8 @@ public sealed record ProviderDefinition
     /// or <c>{file:path}</c>.
     /// </summary>
     public string? ApiKey { get; }
+
+    public bool RequiresApiKey { get; }
 
     public bool TryGetModel(string model, out ModelSettings settings)
     {

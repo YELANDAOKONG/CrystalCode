@@ -102,10 +102,18 @@ internal static class CompatibleChatRequestWriter
             switch (item)
             {
                 case ChatMessage message:
+                    if (pendingToolCallIds.Count > 0)
+                    {
+                        FlushAssistant(writer, ref assistant);
+                    }
                     FlushPendingToolCalls(writer, pendingToolCallIds);
                     WriteChatMessage(writer, profile, ref assistant, message);
                     break;
                 case ChatReasoningItem reasoning:
+                    if (pendingToolCallIds.Count > 0)
+                    {
+                        FlushAssistant(writer, ref assistant);
+                    }
                     FlushPendingToolCalls(writer, pendingToolCallIds);
                     AppendReasoning(writer, profile, ref assistant, reasoning);
                     break;
