@@ -1,5 +1,6 @@
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 
 using Xunit;
 
@@ -304,5 +305,49 @@ public sealed class ComposerBufferTests
         Assert.True(TextWidth.Measure(view.Lines[0].Plain) <= 40);
         Assert.Equal(0, view.CursorRow);
         Assert.Equal(TextWidth.Measure("Work > "), view.CursorColumn);
+    }
+
+    [Fact]
+    public void Project_UsesTheVisibleComposerRowsWhenOtherRegionsConsumeSpace()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight");
+        var initial = buffer.Project(80, ShellLayout.MaxComposerRows);
+        var regions = ShellLayout.Measure(
+            80, 24, initial.Lines.Count, overlayWanted: 8, queueWanted: 8, progressWanted: 1);
+        var visible = buffer.Project(80, regions.ComposerRows);
+        var frame = FrameRows.Assemble(regions, [], [], PaintLine.Blank, [], visible);
+
+        Assert.Equal(3, regions.ComposerRows);
+        Assert.Equal(["       six", "       seven", "       eight"],
+            visible.Lines.Select(line => line.Plain));
+        Assert.Equal(2, visible.CursorRow);
+        Assert.Equal("       eight", frame[regions.ComposerTop + visible.CursorRow].Plain);
+    }
+
+    [Fact]
+    public void Project_ExpandsPastedTabsWithoutChangingSubmission()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("a\tb");
+
+        var view = buffer.Project(80, 8);
+
+        Assert.Equal("a\tb", buffer.SubmissionText);
+        Assert.Equal("Work > a    b", Assert.Single(view.Lines).Plain);
+        Assert.DoesNotContain('\t', view.Lines[0].Markup);
+        Assert.Equal(TextWidth.Measure(view.Lines[0].Plain), view.CursorColumn);
+    }
+
+    [Fact]
+    public void Project_ReservesTheLastColumnForTheEndCursor()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("abcdefgh");
+
+        var view = buffer.Project(16, 8);
+
+        Assert.Equal(15, TextWidth.Measure(Assert.Single(view.Lines).Plain));
+        Assert.Equal(15, view.CursorColumn);
     }
 }

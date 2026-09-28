@@ -5,6 +5,11 @@ namespace CrystalCode.Display.Paint;
 
 public static class TextWidth
 {
+    public const int TabColumns = 4;
+
+    internal static string ExpandTabs(string text) =>
+        text.Replace("\t", new string(' ', TabColumns), StringComparison.Ordinal);
+
     public static int Measure(ReadOnlySpan<char> text)
     {
         var columns = 0;
@@ -166,6 +171,11 @@ public static class TextWidth
     public static int ColumnWidth(Rune rune)
     {
         var value = rune.Value;
+        if (value == '\t')
+        {
+            return TabColumns;
+        }
+
         if (value == 0 || value < 0x20 || value == 0x7F)
         {
             return 0;

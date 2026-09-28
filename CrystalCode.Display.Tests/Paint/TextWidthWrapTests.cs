@@ -22,4 +22,20 @@ public sealed class TextWidthWrapTests
     {
         Assert.Equal("hel...", TextWidth.Truncate("hello world", 6));
     }
+
+    [Fact]
+    public void Wrap_CountsTabsAsFourDisplayColumns()
+    {
+        Assert.Equal(6, TextWidth.Measure("a\tb"));
+        Assert.Equal(["a\t", "b"], TextWidth.Wrap("a\tb", 5));
+    }
+
+    [Fact]
+    public void PaintLine_FitExpandsTabsInPlainAndMarkup()
+    {
+        var line = PaintLine.Colored(Theme.Chrome, "a\tb").Fit(10);
+
+        Assert.Equal("a    b", line.Plain);
+        Assert.DoesNotContain('\t', line.Markup);
+    }
 }

@@ -273,7 +273,7 @@ public sealed class ComposerBuffer
         var mode = ModeLabel.For(PlanMode);
         var promptPlain = mode + " > ";
         var promptColumns = TextWidth.Measure(promptPlain);
-        var bodyWidth = Math.Max(width - promptColumns, 8);
+        var bodyWidth = Math.Max(width - promptColumns - 1, 8);
         _bodyWidth = bodyWidth;
         var text = Text;
         var wrapped = TextWidth.Wrap(text, bodyWidth);
@@ -291,6 +291,7 @@ public sealed class ComposerBuffer
         {
             var body = wrapped[i];
             var bodyMarkup = ColorBody(body, bodyStart);
+            var displayBody = TextWidth.ExpandTabs(body);
             if (i == 0)
             {
                 if (string.IsNullOrEmpty(text))
@@ -306,7 +307,7 @@ public sealed class ComposerBuffer
                 }
                 else
                 {
-                    var plain = promptPlain + body;
+                    var plain = promptPlain + displayBody;
                     var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
                         + $"[{Theme.Chrome}] > [/]{bodyMarkup}";
                     lines.Add(new PaintLine(markup, plain));
@@ -314,7 +315,7 @@ public sealed class ComposerBuffer
             }
             else
             {
-                var plain = new string(' ', promptColumns) + body;
+                var plain = new string(' ', promptColumns) + displayBody;
                 lines.Add(new PaintLine(MarkupText.Escape(new string(' ', promptColumns))
                     + bodyMarkup, plain));
             }
@@ -691,14 +692,14 @@ public sealed class ComposerBuffer
                 continue;
             }
 
-            markup.Append(MarkupText.Escape(body[cursor..from]));
+            markup.Append(MarkupText.Escape(TextWidth.ExpandTabs(body[cursor..from])));
             markup.Append($"[{Theme.Image}]");
-            markup.Append(MarkupText.Escape(body[from..to]));
+            markup.Append(MarkupText.Escape(TextWidth.ExpandTabs(body[from..to])));
             markup.Append("[/]");
             cursor = to;
         }
 
-        markup.Append(MarkupText.Escape(body[cursor..]));
+        markup.Append(MarkupText.Escape(TextWidth.ExpandTabs(body[cursor..])));
         return markup.ToString();
     }
 

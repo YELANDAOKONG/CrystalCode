@@ -1470,19 +1470,24 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
         _chrome.TickSpinner(now);
         RefreshRetryCaptionUnlocked(now);
 
-        var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
-        var overlay = OverlayLines(ScreenSize.Width);
-        var queue = QueueLines(ScreenSize.Width);
-        var todos = TodoLines(ScreenSize.Width);
+        var composerView = _composer.Project(width, ShellLayout.MaxComposerRows);
+        var overlay = OverlayLines(width);
+        var queue = QueueLines(width);
+        var todos = TodoLines(width);
         var progressWanted = string.IsNullOrWhiteSpace(_chrome.Progress) ? 0 : 1;
         var regions = ShellLayout.Measure(
-            ScreenSize.Width,
-            ScreenSize.Height,
+            width,
+            height,
             composerView.Lines.Count,
             overlay.Count,
             queue.Count,
             progressWanted,
             todos.Count);
+        if (composerView.Lines.Count > regions.ComposerRows)
+        {
+            composerView = _composer.Project(width, regions.ComposerRows);
+        }
+
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
         var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;
@@ -1598,16 +1603,17 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
 
     private ShellRegions CurrentRegions()
     {
-        var composerView = _composer.Project(ScreenSize.Width, ShellLayout.MaxComposerRows);
+        _ = ScreenSize.TryRead(out var width, out var height);
+        var composerView = _composer.Project(width, ShellLayout.MaxComposerRows);
         var progressWanted = string.IsNullOrWhiteSpace(_chrome.Progress) ? 0 : 1;
         return ShellLayout.Measure(
-            ScreenSize.Width,
-            ScreenSize.Height,
+            width,
+            height,
             composerView.Lines.Count,
-            OverlayLines(ScreenSize.Width).Count,
-            QueueLines(ScreenSize.Width).Count,
+            OverlayLines(width).Count,
+            QueueLines(width).Count,
             progressWanted,
-            TodoLines(ScreenSize.Width).Count);
+            TodoLines(width).Count);
     }
 
     private void SetTurnActivityUnlocked(string activity, string progress)
@@ -1690,9 +1696,7 @@ public sealed class SessionRenderer : ITurnObserver, ISlashOutput, IDisposable
                 paused = !ignorePause && _composerPaused;
                 var haveSize = ScreenSize.TryRead(out var pollWidth, out var pollHeight);
                 tooSmall = haveSize && BelowUsableSize(pollWidth, pollHeight);
-                var sizeChanged = haveSize
-                    ? pollWidth != _paintedWidth || pollHeight != _paintedHeight
-                    : ScreenSize.Width != _paintedWidth || ScreenSize.Height != _paintedHeight;
+                var sizeChanged = pollWidth != _paintedWidth || pollHeight != _paintedHeight;
                 if (sizeChanged || _chrome.SpinnerDue(DateTimeOffset.UtcNow))
                 {
                     PaintUnlocked(force: true);

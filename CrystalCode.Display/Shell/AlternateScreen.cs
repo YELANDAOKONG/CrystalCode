@@ -12,7 +12,7 @@ public sealed class AlternateScreen : IDisposable
     private const string ProductTitle = "Crystal Code";
     private bool _active;
     private string? _previousTitle;
-    private uint? _previousInputMode;
+    private WindowsConsole.InputModeLease? _inputMode;
 
     private AlternateScreen(bool active)
     {
@@ -28,7 +28,7 @@ public sealed class AlternateScreen : IDisposable
             return new AlternateScreen(false);
         }
 
-        var previousInputMode = WindowsConsole.EnableVirtualInput();
+        var inputMode = WindowsConsole.EnableVirtualInput();
         try
         {
             AnsiConsole.Write(new ControlCode("\u001b[?1049h"));
@@ -38,13 +38,13 @@ public sealed class AlternateScreen : IDisposable
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
             var screen = new AlternateScreen(true);
-            screen._previousInputMode = previousInputMode;
+            screen._inputMode = inputMode;
             screen.ApplyWindowTitle();
             return screen;
         }
         catch (IOException)
         {
-            WindowsConsole.RestoreVirtualInput(previousInputMode);
+            inputMode?.Dispose();
             return new AlternateScreen(false);
         }
     }
@@ -70,8 +70,10 @@ public sealed class AlternateScreen : IDisposable
         }
         finally
         {
-            WindowsConsole.RestoreVirtualInput(_previousInputMode);
+            var inputMode = _inputMode;
+            _inputMode = null;
             _active = false;
+            inputMode?.Dispose();
         }
     }
 

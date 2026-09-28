@@ -22,11 +22,16 @@ public readonly record struct PaintLine(string Markup, string Plain)
             return Blank;
         }
 
-        if (TextWidth.Measure(Plain) <= width)
+        var line = Plain.Contains('\t') || Markup.Contains('\t')
+            ? new PaintLine(
+                TextWidth.ExpandTabs(Markup),
+                TextWidth.ExpandTabs(Plain))
+            : this;
+        if (TextWidth.Measure(line.Plain) <= width)
         {
-            return this;
+            return line;
         }
 
-        return Colored(Theme.Chrome, TextWidth.Truncate(Plain, width));
+        return Colored(Theme.Chrome, TextWidth.Truncate(line.Plain, width));
     }
 }

@@ -777,10 +777,17 @@ screen when the terminal is a TTY and paints a retained frame: transcript
 viewport, optional overlay, optional pinned todos, optional progress row,
 status bar, and multiline composer. Unchanged
 rows are left in place; a width or height change clears the buffer. The
-executable maps turns onto that frame through `SessionRenderer`; it does
+frame uses one terminal-size snapshot, and the composer window is projected
+again if overlays or pinned rows leave fewer rows than it requested. Composer
+tabs display as four spaces while the submitted prompt retains tab characters;
+other painted rows expand tabs by the same width. One column remains free for
+the cursor at the right edge. The executable maps turns onto that frame through
+`SessionRenderer`; it does
 not paint rows itself. Entering the alternate screen sets the window
 title to Crystal Code when the terminal allows it, and restores the
-previous title on exit. When the terminal drops below the usable minimum
+previous title on exit. Windows VT input mode is restored on screen disposal,
+with a process-exit retry if the first restoration fails. When the terminal
+drops below the usable minimum
 (`ShellLayout.MinUsableWidth` x `ShellLayout.MinUsableHeight`, 80x24),
 the frame is replaced by a centered resize notice sized to the real
 terminal and input is ignored, including keys typed while the window is
