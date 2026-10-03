@@ -1,7 +1,6 @@
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
-using Spectre.Console;
 
 using CrystalCode.Display.Input;
 using CrystalCode.Engine.Approvals;
@@ -248,19 +247,54 @@ public sealed class SessionRendererTests
     }
 
     [Fact]
-    public async Task DispatchBurstAsync_QDismissesOverlayInsteadOfEditingComposer()
+    public async Task DispatchBurstAsync_StatsPageIgnoresComposerInputUntilClosed()
     {
         var renderer = new SessionRenderer();
-        renderer.SetOverlay(new Text("stats"));
+        renderer.SeedComposer("draft");
+        renderer.ShowStatsPage("Stats");
         Assert.True(renderer.OverlayVisible);
 
-        var dismissed = await renderer.DispatchBurstAsync(
+        var typed = await renderer.DispatchBurstAsync(
+            [
+                new ConsoleKeyInfo('h', ConsoleKey.H, false, false, false),
+                new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)
+            ],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var closed = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('q', ConsoleKey.Q, false, false, false)],
             static () => false,
             CancellationToken.None,
             checkSize: false);
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
 
-        Assert.Null(dismissed);
+        Assert.Null(typed);
+        Assert.Null(closed);
         Assert.False(renderer.OverlayVisible);
+        Assert.Equal("draft", submitted);
+    }
+
+    [Fact]
+    public async Task TryClearComposer_ClosesStatsPageAndKeepsDraft()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SeedComposer("draft");
+        renderer.ShowStatsPage("Stats");
+
+        Assert.True(renderer.TryClearComposer());
+        Assert.False(renderer.OverlayVisible);
+
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Equal("draft", submitted);
     }
 }

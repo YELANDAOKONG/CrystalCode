@@ -58,6 +58,8 @@ public sealed class SessionRenderer : IDisposable
     private DateTimeOffset? _retryUntil;
     private int _retryAttempt;
     private bool _imagePasteRequested;
+    private bool _fullPageOverlay;
+    private int _pageScroll;
 
     public int ContextWindow { get; set; }
 
@@ -450,6 +452,8 @@ public sealed class SessionRenderer : IDisposable
         lock (_gate)
         {
             CommitLiveUnlocked();
+            _fullPageOverlay = true;
+            _pageScroll = 0;
             _modalOverlay.Clear();
             _overlayWidget = StatsPageWidget.Create(text);
             PaintUnlocked(force: true);
@@ -705,6 +709,8 @@ public sealed class SessionRenderer : IDisposable
         ArgumentNullException.ThrowIfNull(lines);
         lock (_gate)
         {
+            _fullPageOverlay = false;
+            _pageScroll = 0;
             _overlayWidget = null;
             _modalOverlay.Clear();
             _modalOverlay.AddRange(lines);
@@ -717,6 +723,8 @@ public sealed class SessionRenderer : IDisposable
         ArgumentNullException.ThrowIfNull(widget);
         lock (_gate)
         {
+            _fullPageOverlay = false;
+            _pageScroll = 0;
             _modalOverlay.Clear();
             _overlayWidget = widget;
             PaintUnlocked(force: true);
@@ -727,8 +735,7 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
-            _modalOverlay.Clear();
-            _overlayWidget = null;
+            CloseFullPageUnlocked();
             PaintUnlocked(force: true);
         }
     }
@@ -847,6 +854,13 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
+            if (_fullPageOverlay)
+            {
+                CloseFullPageUnlocked();
+                PaintUnlocked(force: true);
+                return true;
+            }
+
             if (_composer.IsEmpty)
             {
                 return false;
@@ -1182,6 +1196,11 @@ public sealed class SessionRenderer : IDisposable
             return null;
         }
 
+        if (_fullPageOverlay)
+        {
+            return DispatchFullPageUnlocked(item, pageRows);
+        }
+
         switch (item)
         {
             case InputPaste paste:
@@ -1217,17 +1236,42 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    private string? DispatchFullPageUnlocked(IInputEvent item, int pageRows)
+    {
+        switch (item)
+        {
+            case InputWheel wheel:
+                _pageScroll = Math.Max(0, _pageScroll - wheel.Delta);
+                return null;
+            case InputKey key when IsFullPageClose(key):
+                CloseFullPageUnlocked();
+                return null;
+            case InputKey key when ScrollInput.TryKeyScroll(
+                key,
+                scrollPlainArrows: true,
+                pageRows,
+                out var delta):
+                _pageScroll = Math.Max(0, _pageScroll - delta);
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    private static bool IsFullPageClose(InputKey key) =>
+        key.Modifiers == ConsoleModifiers.None
+        && (key.Key == ConsoleKey.Escape || key.Key == ConsoleKey.Q || key.KeyChar is 'q' or 'Q');
+
+    private void CloseFullPageUnlocked()
+    {
+        _fullPageOverlay = false;
+        _pageScroll = 0;
+        _overlayWidget = null;
+        _modalOverlay.Clear();
+    }
+
     private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> togglePlan)
     {
-        if (_overlayWidget is not null
-            && key.Modifiers == ConsoleModifiers.None
-            && (key.Key == ConsoleKey.Escape || key.Key == ConsoleKey.Q || key.KeyChar is 'q' or 'Q'))
-        {
-            _overlayWidget = null;
-            _modalOverlay.Clear();
-            return null;
-        }
-
         if (_picker is not null
             && key.Key == ConsoleKey.Tab
             && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
@@ -1421,6 +1465,11 @@ public sealed class SessionRenderer : IDisposable
 
         _chrome.TickSpinner(now);
         RefreshRetryCaptionUnlocked(now);
+        if (_fullPageOverlay && _overlayWidget is not null)
+        {
+            PaintFullPageUnlocked(width, height, now);
+            return;
+        }
 
         var composerView = _composer.Project(width, ShellLayout.MaxComposerRows);
         var overlay = OverlayLines(width);
@@ -1456,6 +1505,29 @@ public sealed class SessionRenderer : IDisposable
             showCursor: !_composerPaused);
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
+        _lastPaint = now;
+    }
+
+    private void PaintFullPageUnlocked(int width, int height, DateTimeOffset now)
+    {
+        var body = _overlayWidget is null
+            ? []
+            : WidgetPaint.Lines(_overlayWidget, width);
+        var frame = new PaintLine[height];
+        var start = Math.Clamp(_pageScroll, 0, Math.Max(0, body.Count - 1));
+        _pageScroll = start;
+        for (var row = 0; row < height; row++)
+        {
+            var source = start + row;
+            frame[row] = source < body.Count ? body[source].Fit(width) : PaintLine.Blank;
+        }
+
+        _painter.PaintFrame(
+            frame,
+            height,
+            resetFrame: width != _paintedWidth || height != _paintedHeight);
+        _paintedWidth = width;
+        _paintedHeight = height;
         _lastPaint = now;
     }
 
