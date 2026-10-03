@@ -53,15 +53,10 @@ internal sealed class GeminiMultimodalCodec : IMultimodalProtocolCodec
             for (var index = parts.Count - 1; index >= 0; index--)
             {
                 var part = parts[index]!.AsObject();
-                if (part["functionResponse"] is not null)
+                if (part["functionResponse"] is JsonObject functionResponse)
                 {
-                    var result = part["functionResponse"]?["response"]?["result"]?.GetValue<string>();
-                    if (result is not null && bridge.Images.Keys.Any(
-                        token => result.Contains(token, StringComparison.Ordinal)))
-                    {
-                        throw new NotSupportedException(
-                            "Gemini tool-result images are not supported by this adapter.");
-                    }
+                    AttachFunctionImages(functionResponse, bridge.Images);
+                    continue;
                 }
 
                 if (part["text"] is not JsonValue textValue
@@ -102,6 +97,97 @@ internal sealed class GeminiMultimodalCodec : IMultimodalProtocolCodec
         string? errorCode = null,
         TimeSpan? retryAfter = null) =>
         _text.CreateException(message, statusCode, innerException, errorCode, retryAfter);
+
+    private static void AttachFunctionImages(
+        JsonObject functionResponse,
+        IReadOnlyDictionary<string, ImageContent> images)
+    {
+        if (functionResponse["response"] is not JsonObject response)
+        {
+            return;
+        }
+
+        var key = ResponseTextKey(response);
+        if (key is null
+            || response[key] is not JsonValue value
+            || !value.TryGetValue<string>(out var text))
+        {
+            return;
+        }
+
+        var taken = TakeImages(text, images);
+        if (taken.Images.Count == 0)
+        {
+            return;
+        }
+
+        response[key] = taken.Text;
+        var parts = new JsonArray();
+        foreach (var image in taken.Images)
+        {
+            parts.Add(InlineData(image));
+        }
+
+        functionResponse["parts"] = parts;
+    }
+
+    private static string? ResponseTextKey(JsonObject response)
+    {
+        if (response["result"] is JsonValue)
+        {
+            return "result";
+        }
+
+        if (response["error"] is JsonValue)
+        {
+            return "error";
+        }
+
+        return null;
+    }
+
+    private readonly record struct TakenImages(string Text, IReadOnlyList<ImageContent> Images);
+
+    private static TakenImages TakeImages(
+        string text,
+        IReadOnlyDictionary<string, ImageContent> images)
+    {
+        var matches = images
+            .Where(pair => text.Contains(pair.Key, StringComparison.Ordinal))
+            .OrderBy(pair => text.IndexOf(pair.Key, StringComparison.Ordinal))
+            .ToArray();
+        if (matches.Length == 0)
+        {
+            return new TakenImages(text, []);
+        }
+
+        var kept = text;
+        var found = new List<ImageContent>(matches.Length);
+        foreach (var (token, image) in matches)
+        {
+            found.Add(image);
+            kept = kept.Replace(token, string.Empty, StringComparison.Ordinal);
+        }
+
+        return new TakenImages(kept, found);
+    }
+
+    private static JsonObject InlineData(ImageContent image)
+    {
+        if (image.Image.Source is not InlineMediaSource inline)
+        {
+            throw new NotSupportedException("Gemini images must use inline bytes.");
+        }
+
+        return new JsonObject
+        {
+            ["inlineData"] = new JsonObject
+            {
+                ["mimeType"] = image.Image.MimeType.Value,
+                ["data"] = Convert.ToBase64String(inline.Data.Span)
+            }
+        };
+    }
 
     private static JsonArray Expand(
         string text,

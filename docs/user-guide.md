@@ -365,7 +365,9 @@ are not supported by the current adapter.
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 
 Gemini and Ollama native adapters accept inline images in user messages.
-They currently reject image content returned by tools.
+Tool images are sent on Gemini `functionResponse` parts and on the Ollama
+tool message `images` array. Gemini tool images require a model that accepts
+multimodal function responses.
 
 `thinkingEffort` is a host setting, not a model field. Changing
 models never fails: if the model does not support thinking, requests

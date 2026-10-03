@@ -52,7 +52,7 @@ internal sealed class ExecExternalTool : ITool, IMultimodalTool
 
         if (_spec.Output == ExternalToolOutputMode.Content)
         {
-            return ToText(finished);
+            return ContentText(finished);
         }
 
         var text = Combine(finished.Streams);
@@ -85,12 +85,11 @@ internal sealed class ExecExternalTool : ITool, IMultimodalTool
                 status);
         }
 
-        if (!ExecContentOutput.TryRead(
+        if (!ExecContentOutput.TryParse(
                 finished.Streams.Stdout,
                 finished.Streams.Stderr,
-                _workspace,
                 out var textBody,
-                out var images,
+                out var pending,
                 out var error))
         {
             return Failed(PrefixExit(finished.ExitCode, error));
@@ -101,17 +100,25 @@ internal sealed class ExecExternalTool : ITool, IMultimodalTool
             return Failed(PrefixExit(finished.ExitCode, textBody));
         }
 
+        var loaded = await ExecContentOutput.LoadAsync(pending, _workspace, cancellationToken);
+        if (!loaded.Succeeded)
+        {
+            var failure = finished.Streams.Stderr.Length == 0
+                ? loaded.Error
+                : loaded.Error + "\n" + finished.Streams.Stderr;
+            return Failed(PrefixExit(finished.ExitCode, failure));
+        }
+
         var contents = new List<MultimodalContent> { new TextContent(textBody) };
-        contents.AddRange(images);
+        contents.AddRange(loaded.Images);
         return new MultimodalToolOutput(contents);
     }
 
-    private ToolOutput ToText(ExecFinished finished)
+    private ToolOutput ContentText(ExecFinished finished)
     {
-        if (!ExecContentOutput.TryRead(
+        if (!ExecContentOutput.TryParse(
                 finished.Streams.Stdout,
                 finished.Streams.Stderr,
-                _workspace,
                 out var text,
                 out var images,
                 out var error))

@@ -247,8 +247,11 @@ model or provider does not support image input.
 The Responses, OpenAI-compatible Chat Completions, DeepSeek Chat Completions,
 Anthropic Messages, Gemini GenerateContent, and Ollama Chat adapters accept
 text and image input and emit only text, reasoning, and tool-call events.
-The native Gemini and Ollama adapters accept inline images in user messages;
-image content in tool results is rejected. Chat Completions and Anthropic images
+The native Gemini adapter sends tool-result images as `inlineData` parts on
+`functionResponse`. That is the Gemini 3 multimodal function-response field;
+an older model may reject the request. The native Ollama adapter sends them
+on the tool message `images` array. Transcripts keep markers either way.
+Chat Completions and Anthropic images
 are restricted to user and tool messages, matching their wire contracts. Clipboard
 image input is read through Windows PowerShell on Windows, the macOS system
 `osascript` command on macOS, and `wl-paste` or `xclip` on Linux; it does not

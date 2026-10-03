@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 using Crystal.Media;
@@ -9,22 +10,37 @@ namespace CrystalCode.Engine.Tools.External;
 
 /// <summary>
 /// Parses exec stdout that was declared as content JSON.
+/// Image bytes are loaded only after the caller decides to attach them.
 /// </summary>
 internal static class ExecContentOutput
 {
     public const int MaximumImages = 8;
+    private const int InvalidJsonPreviewCharacters = 2_000;
+    private const int ReadBufferBytes = 81920;
 
-    public static bool TryRead(
+    internal readonly record struct PendingImage(string MimeType, string? Base64, string? Path);
+
+    internal readonly record struct ImageLoad(
+        bool Succeeded,
+        IReadOnlyList<ImageContent> Images,
+        string Error)
+    {
+        public static ImageLoad Ok(IReadOnlyList<ImageContent> images) =>
+            new(true, images, string.Empty);
+
+        public static ImageLoad Fail(string error) =>
+            new(false, [], error);
+    }
+
+    public static bool TryParse(
         string stdout,
         string stderr,
-        Workspace workspace,
         out string text,
-        out IReadOnlyList<ImageContent> images,
+        out IReadOnlyList<PendingImage> images,
         out string error)
     {
         ArgumentNullException.ThrowIfNull(stdout);
         ArgumentNullException.ThrowIfNull(stderr);
-        ArgumentNullException.ThrowIfNull(workspace);
         text = string.Empty;
         images = [];
         error = string.Empty;
@@ -42,7 +58,7 @@ internal static class ExecContentOutput
         }
         catch (JsonException)
         {
-            error = WithStderr("Tool output is not valid content JSON.", stderr);
+            error = WithStderr(InvalidJson(body), stderr);
             return false;
         }
 
@@ -50,7 +66,7 @@ internal static class ExecContentOutput
         {
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
-                error = WithStderr("Tool output is not valid content JSON.", stderr);
+                error = WithStderr(InvalidJson(body), stderr);
                 return false;
             }
 
@@ -60,7 +76,7 @@ internal static class ExecContentOutput
                 return false;
             }
 
-            if (!TryReadImages(document.RootElement, workspace, out var parsed, out error))
+            if (!TryReadImageRefs(document.RootElement, out var parsed, out error))
             {
                 error = WithStderr(error, stderr);
                 return false;
@@ -75,6 +91,38 @@ internal static class ExecContentOutput
         }
 
         return true;
+    }
+
+    public static async ValueTask<ImageLoad> LoadAsync(
+        IReadOnlyList<PendingImage> images,
+        Workspace workspace,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(images);
+        ArgumentNullException.ThrowIfNull(workspace);
+        var loaded = new List<ImageContent>(images.Count);
+        foreach (var pending in images)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var one = pending.Base64 is not null
+                ? LoadBase64(pending)
+                : await LoadPathAsync(pending, workspace, cancellationToken);
+            if (!one.Succeeded || one.Image is null)
+            {
+                return ImageLoad.Fail(one.Error);
+            }
+
+            loaded.Add(one.Image);
+        }
+
+        return ImageLoad.Ok(loaded);
+    }
+
+    private readonly record struct OneImage(bool Succeeded, ImageContent? Image, string Error)
+    {
+        public static OneImage Ok(ImageContent image) => new(true, image, string.Empty);
+
+        public static OneImage Fail(string error) => new(false, null, error);
     }
 
     private static bool TryReadText(JsonElement root, out string text, out string error)
@@ -101,10 +149,9 @@ internal static class ExecContentOutput
         return true;
     }
 
-    private static bool TryReadImages(
+    private static bool TryReadImageRefs(
         JsonElement root,
-        Workspace workspace,
-        out IReadOnlyList<ImageContent> images,
+        out IReadOnlyList<PendingImage> images,
         out string error)
     {
         images = [];
@@ -125,7 +172,7 @@ internal static class ExecContentOutput
             return false;
         }
 
-        var list = new List<ImageContent>();
+        var list = new List<PendingImage>();
         foreach (var item in property.EnumerateArray())
         {
             if (list.Count >= MaximumImages)
@@ -134,7 +181,7 @@ internal static class ExecContentOutput
                 return false;
             }
 
-            if (!TryReadImage(item, workspace, out var image, out error))
+            if (!TryReadImageRef(item, out var image, out error))
             {
                 return false;
             }
@@ -146,13 +193,9 @@ internal static class ExecContentOutput
         return true;
     }
 
-    private static bool TryReadImage(
-        JsonElement item,
-        Workspace workspace,
-        out ImageContent image,
-        out string error)
+    private static bool TryReadImageRef(JsonElement item, out PendingImage image, out string error)
     {
-        image = null!;
+        image = default;
         error = string.Empty;
         if (item.ValueKind != JsonValueKind.Object)
         {
@@ -181,31 +224,160 @@ internal static class ExecContentOutput
             return false;
         }
 
-        byte[] bytes;
         if (hasBase64)
         {
             if (base64Property.ValueKind != JsonValueKind.String
-                || !TryDecode(base64Property.GetString(), out bytes, out error))
+                || string.IsNullOrWhiteSpace(base64Property.GetString()))
             {
-                if (error.Length == 0)
-                {
-                    error = "Image base64 must be a string.";
-                }
-
+                error = base64Property.ValueKind == JsonValueKind.String
+                    ? "Image base64 cannot be empty."
+                    : "Image base64 must be a string.";
                 return false;
             }
-        }
-        else if (pathProperty.ValueKind != JsonValueKind.String
-            || !TryReadPath(workspace, pathProperty.GetString(), out bytes, out error))
-        {
-            if (error.Length == 0)
-            {
-                error = "Image path must be a string.";
-            }
 
+            image = new PendingImage(declared, base64Property.GetString(), null);
+            return true;
+        }
+
+        if (pathProperty.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(pathProperty.GetString()))
+        {
+            error = pathProperty.ValueKind == JsonValueKind.String
+                ? "Image path cannot be empty."
+                : "Image path must be a string.";
             return false;
         }
 
+        image = new PendingImage(declared, null, pathProperty.GetString());
+        return true;
+    }
+
+    private static OneImage LoadBase64(PendingImage pending)
+    {
+        if (!TryDecode(pending.Base64, out var bytes, out var error))
+        {
+            return OneImage.Fail(error);
+        }
+
+        if (!TryCreateImage(pending.MimeType, bytes, out var image, out error))
+        {
+            return OneImage.Fail(error);
+        }
+
+        return OneImage.Ok(image);
+    }
+
+    private static async ValueTask<OneImage> LoadPathAsync(
+        PendingImage pending,
+        Workspace workspace,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(pending.Path))
+        {
+            return OneImage.Fail("Image path cannot be empty.");
+        }
+
+        if (Workspace.IsCredentialPath(pending.Path))
+        {
+            return OneImage.Fail("Reading credential paths is not allowed.");
+        }
+
+        if (!workspace.TryResolveExistingFile(pending.Path, out var fullPath, out var error))
+        {
+            return OneImage.Fail(error);
+        }
+
+        if (Workspace.IsCredentialPath(fullPath))
+        {
+            return OneImage.Fail("Reading credential paths is not allowed.");
+        }
+
+        if (!RegularFile.IsRegular(fullPath))
+        {
+            return OneImage.Fail("The image file could not be read.");
+        }
+
+        byte[] bytes;
+        try
+        {
+            await using var stream = new FileStream(
+                fullPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: ReadBufferBytes,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            if (stream.Length == 0)
+            {
+                return OneImage.Fail("The image file is empty.");
+            }
+
+            if (stream.Length > ImageFile.MaximumBytes)
+            {
+                return OneImage.Fail("The image file exceeds the 20 MiB host limit.");
+            }
+
+            bytes = new byte[(int)stream.Length];
+            await stream.ReadExactlyAsync(bytes, cancellationToken);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or NotSupportedException)
+        {
+            return OneImage.Fail("The image file could not be read.");
+        }
+
+        if (!TryCreateImage(pending.MimeType, bytes, out var image, out error))
+        {
+            return OneImage.Fail(error);
+        }
+
+        return OneImage.Ok(image);
+    }
+
+    private static bool TryDecode(string? text, out byte[] bytes, out string error)
+    {
+        bytes = [];
+        error = string.Empty;
+        var compact = WithoutWhitespace(text ?? string.Empty);
+        if (compact.Length == 0)
+        {
+            error = "Image base64 cannot be empty.";
+            return false;
+        }
+
+        var maximumChars = ((ImageFile.MaximumBytes + 2) / 3) * 4;
+        if (compact.Length > maximumChars)
+        {
+            error = "The image file exceeds the 20 MiB host limit.";
+            return false;
+        }
+
+        var buffer = new byte[compact.Length];
+        if (!Convert.TryFromBase64String(compact, buffer, out var written) || written == 0)
+        {
+            error = "Image base64 is not valid.";
+            return false;
+        }
+
+        if (written > ImageFile.MaximumBytes)
+        {
+            error = "The image file exceeds the 20 MiB host limit.";
+            return false;
+        }
+
+        bytes = buffer[..written];
+        return true;
+    }
+
+    private static bool TryCreateImage(
+        string declared,
+        byte[] bytes,
+        out ImageContent image,
+        out string error)
+    {
+        image = null!;
+        error = string.Empty;
         var detected = ImageFile.DetectMimeType(bytes);
         if (detected is null)
         {
@@ -224,101 +396,46 @@ internal static class ExecContentOutput
         return true;
     }
 
-    private static bool TryDecode(string? text, out byte[] bytes, out string error)
+    private static string WithoutWhitespace(string text)
     {
-        bytes = [];
-        error = string.Empty;
-        if (string.IsNullOrWhiteSpace(text))
+        var stripped = false;
+        foreach (var character in text)
         {
-            error = "Image base64 cannot be empty.";
-            return false;
+            if (char.IsWhiteSpace(character))
+            {
+                stripped = true;
+                break;
+            }
         }
 
-        var maximumChars = ((ImageFile.MaximumBytes + 2) / 3) * 4;
-        if (text.Length > maximumChars)
+        if (!stripped)
         {
-            error = "The image file exceeds the 20 MiB host limit.";
-            return false;
+            return text;
         }
 
-        var buffer = new byte[text.Length];
-        if (!Convert.TryFromBase64String(text, buffer, out var written) || written == 0)
+        var builder = new StringBuilder(text.Length);
+        foreach (var character in text)
         {
-            error = "Image base64 is not valid.";
-            return false;
+            if (!char.IsWhiteSpace(character))
+            {
+                builder.Append(character);
+            }
         }
 
-        if (written > ImageFile.MaximumBytes)
-        {
-            error = "The image file exceeds the 20 MiB host limit.";
-            return false;
-        }
-
-        bytes = buffer[..written];
-        return true;
+        return builder.ToString();
     }
 
-    private static bool TryReadPath(
-        Workspace workspace,
-        string? path,
-        out byte[] bytes,
-        out string error)
+    private static string InvalidJson(string body)
     {
-        bytes = [];
-        error = string.Empty;
-        if (string.IsNullOrWhiteSpace(path))
+        if (body.Length == 0)
         {
-            error = "Image path cannot be empty.";
-            return false;
+            return "Tool output is not valid content JSON.";
         }
 
-        if (Workspace.IsCredentialPath(path))
-        {
-            error = "Reading credential paths is not allowed.";
-            return false;
-        }
-
-        if (!workspace.TryResolveExistingFile(path, out var fullPath, out error))
-        {
-            return false;
-        }
-
-        if (Workspace.IsCredentialPath(fullPath))
-        {
-            error = "Reading credential paths is not allowed.";
-            return false;
-        }
-
-        try
-        {
-            using var stream = new FileStream(
-                fullPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: 81920,
-                FileOptions.SequentialScan);
-            if (stream.Length == 0)
-            {
-                error = "The image file is empty.";
-                return false;
-            }
-
-            if (stream.Length > ImageFile.MaximumBytes)
-            {
-                error = "The image file exceeds the 20 MiB host limit.";
-                return false;
-            }
-
-            bytes = new byte[(int)stream.Length];
-            stream.ReadExactly(bytes);
-            return true;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            error = "The image file could not be read.";
-            return false;
-        }
+        var preview = body.Length <= InvalidJsonPreviewCharacters
+            ? body
+            : body[..InvalidJsonPreviewCharacters];
+        return "Tool output is not valid content JSON.\n" + preview;
     }
 
     private static string WithStderr(string message, string stderr) =>

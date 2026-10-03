@@ -62,9 +62,11 @@ internal sealed class OllamaMultimodalCodec : IMultimodalProtocolCodec
                 continue;
             }
 
-            if (message["role"]?.GetValue<string>() != "user")
+            var role = message["role"]?.GetValue<string>();
+            if (role is not ("user" or "tool"))
             {
-                throw new NotSupportedException("Ollama images are supported only in user messages.");
+                throw new NotSupportedException(
+                    "Ollama images are supported only in user and tool messages.");
             }
 
             var images = new JsonArray();

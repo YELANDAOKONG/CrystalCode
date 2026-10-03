@@ -44,7 +44,7 @@ internal sealed class NativeMultimodalRequest
             "Multimodal tool-call content is unsupported."),
         MultimodalToolResult result => new ToolResult(
             result.CallId,
-            Flatten(result.Contents, allowImages: false),
+            Flatten(result.Contents, allowImages: true),
             result.Status == MultimodalToolResultStatus.Success
                 ? ToolResultStatus.Success
                 : ToolResultStatus.Failure),
@@ -69,7 +69,7 @@ internal sealed class NativeMultimodalRequest
                     break;
                 case ImageContent:
                     throw new NotSupportedException(
-                        "Native provider images are supported only in user messages.");
+                        "Native provider images are supported only in user messages and tool results.");
                 default:
                     throw new NotSupportedException(
                         $"Multimodal input {content.Modality.Value} is unsupported.");

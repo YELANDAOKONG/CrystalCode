@@ -374,19 +374,23 @@ not block.
 be one UTF-8 JSON object. `text` is an optional string. `images` is an
 optional array of at most 8 objects. Each image sets `mimeType`
 (`image/png`, `image/jpeg`, `image/gif`, or `image/webp`) and exactly
-one of `base64` or `path`. `path` must stay inside the workspace;
-credential paths are rejected. Bytes must match the declared type and
-the 20 MiB host limit. Stderr is appended to `text`. A non-zero exit
-fails the call and does not attach images. On a text-only turn, a
-result that contains images fails with "This model cannot accept tool
-images." On an image-capable turn the same tool is also registered as
-a multimodal tool, and accepted images follow the existing marker path.
-Invalid JSON fails the call. Large images should use `path`, because
+one of `base64` or `path`. `base64` may contain whitespace. `path` must
+be a regular file inside the workspace; credential paths, directories,
+and pipes are rejected. Bytes must match the declared type and
+the 20 MiB host limit. The host opens a path only when the image will
+be attached, and that read observes cancellation. Stderr is appended to
+`text`. A non-zero exit fails the call and does not attach images. On a
+text-only turn, a result that contains images fails with "This model
+cannot accept tool images." On an image-capable turn the same tool is
+also registered as a multimodal tool, and accepted images follow the
+existing marker path. Invalid JSON fails the call and keeps a preview of
+stdout. Large images should use `path`, because
 stdout is still truncated to the tool output limit before parsing.
 
 Non-zero exit is `ToolResultStatus.Failure`. The timeout starts when the
-process starts and covers stdin writing, process exit, and output reading.
-`"timeoutSeconds": "unlimited"` disables this per-call timeout; user and
+process starts and covers stdin writing, process exit, and stdout/stderr
+reading. Image files named by content JSON are not part of that process
+timeout. `"timeoutSeconds": "unlimited"` disables this per-call timeout; user and
 turn cancellation still apply. Timeout, cancellation, and stdin failure
 kill the process tree when the OS allows it. For `output: text`, stdout
 then stderr are concatenated, truncated, and returned as `ToolOutput` text.
