@@ -10,10 +10,12 @@ namespace CrystalCode.Display.Paint;
 /// </summary>
 public static class WidgetPaint
 {
+    public const int MinimumWidth = 16;
+
     public static IReadOnlyList<PaintLine> Lines(IRenderable renderable, int width)
     {
         ArgumentNullException.ThrowIfNull(renderable);
-        width = Math.Max(width, 16);
+        width = Math.Max(width, MinimumWidth);
         var console = CreateConsole(width);
         var markup = new StringBuilder();
         var plain = new StringBuilder();

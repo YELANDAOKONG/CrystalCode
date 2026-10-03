@@ -906,16 +906,28 @@ public sealed class SessionRenderer : IDisposable
             events = _decoder.Push(burst);
         }
 
-        foreach (var item in events)
+        var index = 0;
+        while (index < events.Count)
         {
             string? submitted;
             bool pasteImage;
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
-                submitted = DispatchUnlocked(item, pageRows, togglePlan, checkSize);
-                pasteImage = _imagePasteRequested;
-                _imagePasteRequested = false;
+                submitted = null;
+                pasteImage = false;
+                while (index < events.Count)
+                {
+                    submitted = DispatchUnlocked(events[index], pageRows, togglePlan, checkSize);
+                    index++;
+                    pasteImage = _imagePasteRequested;
+                    _imagePasteRequested = false;
+                    if (submitted is not null || pasteImage)
+                    {
+                        break;
+                    }
+                }
+
                 RefreshPickerUnlocked();
                 PaintUnlocked(force: true);
             }
@@ -966,16 +978,17 @@ public sealed class SessionRenderer : IDisposable
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                var dirty = false;
                 foreach (var item in _decoder.Push(burst))
                 {
                     switch (item)
                     {
                         case InputPaste:
-                            PaintUnlocked(force: true);
+                            dirty = true;
                             break;
                         case InputWheel wheel:
                             _scrollBack = Math.Max(0, _scrollBack + wheel.Delta);
-                            PaintUnlocked(force: true);
+                            dirty = true;
                             break;
                         case InputKey key:
                             if (TryReadKeyScroll(
@@ -985,7 +998,7 @@ public sealed class SessionRenderer : IDisposable
                                 out var delta))
                             {
                                 _scrollBack = Math.Max(0, _scrollBack + delta);
-                                PaintUnlocked(force: true);
+                                dirty = true;
                                 break;
                             }
 
@@ -999,6 +1012,11 @@ public sealed class SessionRenderer : IDisposable
                     {
                         break;
                     }
+                }
+
+                if (dirty)
+                {
+                    PaintUnlocked(force: true);
                 }
             }
 

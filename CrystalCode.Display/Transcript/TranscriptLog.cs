@@ -6,14 +6,20 @@ namespace CrystalCode.Display.Transcript;
 
 /// <summary>
 /// Committed transcript plus one live streaming block.
-/// Caches rendered paint lines for committed entries to ensure smooth scrolling and frame updates.
+/// Committed rows are cached by width. A live card keeps finished rows and
+/// reflows only its open tail, so scroll and input do not rasterize the block again.
 /// </summary>
 public sealed class TranscriptLog
 {
     private const int IndentColumns = 2;
     private readonly List<TranscriptEntry> _entries = [];
     private readonly StringBuilder _live = new();
+    private readonly LivePanelCache _livePanel = new();
     private TranscriptKind? _liveKind;
+    private IReadOnlyList<PaintLine> _otherLive = [];
+    private TranscriptKind? _otherLiveKind;
+    private int _otherLiveWidth;
+    private int _otherLiveLength = -1;
 
     private int _cachedWidth;
     private readonly List<PaintLine> _committedLines = [];
@@ -101,18 +107,23 @@ public sealed class TranscriptLog
             _entries.Add(entry);
             if (_cachedWidth > 0)
             {
-                _committedLines.AddRange(RenderEntry(entry, _cachedWidth));
+                var ready = ReadyLiveLines(_cachedWidth);
+                _committedLines.AddRange(ready ?? RenderEntry(entry, _cachedWidth));
             }
         }
 
         _live.Clear();
         _liveKind = null;
+        _livePanel.Clear();
+        ClearOtherLive();
     }
 
     public void DiscardLive()
     {
         _live.Clear();
         _liveKind = null;
+        _livePanel.Clear();
+        ClearOtherLive();
     }
 
     public void Clear()
@@ -122,28 +133,32 @@ public sealed class TranscriptLog
         _cachedWidth = 0;
         _live.Clear();
         _liveKind = null;
+        _livePanel.Clear();
+        ClearOtherLive();
     }
 
     public void InvalidateCache() => _cachedWidth = 0;
 
     public IReadOnlyList<PaintLine> Viewport(int width, int rows, int scrollBack)
     {
-        var all = BuildLines(width);
-        var maxScroll = Math.Max(0, all.Count - rows);
+        EnsureCommittedLines(width);
+        var live = LiveLines(width);
+        var total = _committedLines.Count + live.Count;
+        var maxScroll = Math.Max(0, total - rows);
         var back = Math.Clamp(scrollBack, 0, maxScroll);
-        var take = Math.Min(rows, all.Count);
-        var start = Math.Max(0, all.Count - take - back);
-        var visible = new List<PaintLine>(rows);
-        var pad = rows - Math.Min(rows, all.Count - start);
+        var take = Math.Min(rows, total);
+        var start = Math.Max(0, total - take - back);
+        var visible = new List<PaintLine>(Math.Max(rows, 0));
+        var pad = rows - Math.Min(rows, total - start);
         for (var i = 0; i < pad; i++)
         {
             visible.Add(PaintLine.Blank);
         }
 
-        var end = Math.Min(all.Count, start + rows - pad);
+        var end = Math.Min(total, start + rows - pad);
         for (var i = start; i < end; i++)
         {
-            visible.Add(all[i]);
+            visible.Add(LineAt(i, live));
         }
 
         return visible;
@@ -152,31 +167,85 @@ public sealed class TranscriptLog
     public int ClampScroll(int width, int rows, int scrollBack)
     {
         EnsureCommittedLines(width);
-        var count = _committedLines.Count;
-        if (_liveKind is not null && _live.Length > 0)
-        {
-            var liveEntry = new TranscriptEntry(_liveKind.Value, _live.ToString());
-            count += RenderEntry(liveEntry, width).Count;
-        }
-
+        var count = _committedLines.Count + LiveLines(width).Count;
         return Math.Clamp(scrollBack, 0, Math.Max(0, count - rows));
     }
 
     public IReadOnlyList<PaintLine> BuildLines(int width)
     {
         EnsureCommittedLines(width);
-
-        if (_liveKind is null || _live.Length == 0)
+        var live = LiveLines(width);
+        if (live.Count == 0)
         {
             return _committedLines;
         }
 
-        var liveEntry = new TranscriptEntry(_liveKind.Value, _live.ToString());
-        var liveLines = RenderEntry(liveEntry, width);
-        var combined = new List<PaintLine>(_committedLines.Count + liveLines.Count);
+        var combined = new List<PaintLine>(_committedLines.Count + live.Count);
         combined.AddRange(_committedLines);
-        combined.AddRange(liveLines);
+        combined.AddRange(live);
         return combined;
+    }
+
+    private PaintLine LineAt(int index, IReadOnlyList<PaintLine> live) =>
+        index < _committedLines.Count
+            ? _committedLines[index]
+            : live[index - _committedLines.Count];
+
+    private IReadOnlyList<PaintLine> LiveLines(int width)
+    {
+        if (_liveKind is null || _live.Length == 0)
+        {
+            return [];
+        }
+
+        if (PanelLines.Supports(_liveKind.Value))
+        {
+            return _livePanel.Update(_liveKind.Value, _live, width);
+        }
+
+        if (_otherLiveKind == _liveKind
+            && _otherLiveWidth == width
+            && _otherLiveLength == _live.Length)
+        {
+            return _otherLive;
+        }
+
+        var entry = new TranscriptEntry(_liveKind.Value, _live.ToString());
+        _otherLive = RenderEntry(entry, width);
+        _otherLiveKind = _liveKind;
+        _otherLiveWidth = width;
+        _otherLiveLength = _live.Length;
+        return _otherLive;
+    }
+
+    private IReadOnlyList<PaintLine>? ReadyLiveLines(int width)
+    {
+        if (_liveKind is null || _live.Length == 0)
+        {
+            return null;
+        }
+
+        if (PanelLines.Supports(_liveKind.Value))
+        {
+            return _livePanel.LinesIfReady(_liveKind.Value, _live.Length, width);
+        }
+
+        if (_otherLiveKind == _liveKind
+            && _otherLiveWidth == width
+            && _otherLiveLength == _live.Length)
+        {
+            return _otherLive;
+        }
+
+        return null;
+    }
+
+    private void ClearOtherLive()
+    {
+        _otherLive = [];
+        _otherLiveKind = null;
+        _otherLiveWidth = 0;
+        _otherLiveLength = -1;
     }
 
     private void EnsureCommittedLines(int width)
@@ -236,6 +305,11 @@ public sealed class TranscriptLog
                 return lines;
             }
 
+            if (entry.Kind == TranscriptKind.Error)
+            {
+                return PanelLines.Create(entry.Kind, displayText, width);
+            }
+
             var resultCard = TranscriptCard.TryCreate(entry.Kind, displayText);
             if (resultCard is not null)
             {
@@ -244,11 +318,10 @@ public sealed class TranscriptLog
             }
         }
 
-        var panel = TranscriptCard.TryCreate(entry.Kind, entry.Text);
+        var panel = PanelLines.TryCreate(entry.Kind, entry.Text, width);
         if (panel is not null)
         {
-            lines.AddRange(WidgetPaint.Lines(panel, width));
-            return lines;
+            return panel;
         }
 
         var color = ColorFor(entry.Kind);

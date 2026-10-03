@@ -888,7 +888,9 @@ CrystalCode.Engine.Tests is the smallest correct driver.
 CrystalCode.Display is the TUI host. Spectre.Console supplies markup,
 color, panels, grids, rules, and padding as an offline rasterizer.
 `AnsiConsole.Live` is not the session shell: it fights the composer.
-Widgets are rasterized into frame rows. The shell enters the alternate
+Widgets are rasterized into frame rows. A live user, thinking, tool, or
+error card keeps rows that are already wrapped. New stream text reflows
+only the open tail, and scrolling or typing reuses those rows. The shell enters the alternate
 screen when the terminal is a TTY and paints a retained frame: transcript
 viewport, optional overlay, optional pinned todos, optional progress row,
 status bar, and multiline composer. Unchanged

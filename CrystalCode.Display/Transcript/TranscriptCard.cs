@@ -103,7 +103,7 @@ public static class TranscriptCard
         return true;
     }
 
-    private static string? Header(TranscriptKind kind) =>
+    internal static string? Header(TranscriptKind kind) =>
         kind switch
         {
             TranscriptKind.User => "You",
@@ -114,7 +114,7 @@ public static class TranscriptCard
             _ => null
         };
 
-    private static string Color(TranscriptKind kind) =>
+    internal static string Color(TranscriptKind kind) =>
         kind switch
         {
             TranscriptKind.User => Theme.User,
@@ -125,7 +125,7 @@ public static class TranscriptCard
             _ => Theme.Chrome
         };
 
-    private static string BorderColor(TranscriptKind kind) =>
+    internal static string BorderColor(TranscriptKind kind) =>
         kind switch
         {
             TranscriptKind.User => Theme.Chrome,
