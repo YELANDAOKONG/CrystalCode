@@ -1,8 +1,9 @@
+using Xunit;
+
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Events;
 using CrystalCode.Terminal;
-
-using Xunit;
 
 namespace CrystalCode.Tests.Terminal;
 
@@ -33,7 +34,22 @@ public sealed class SideQuestionWidgetTests
 
         var text = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0), 80));
 
-        Assert.Contains("Waiting for the model", text, StringComparison.Ordinal);
+        Assert.Contains(SideQuestionWidget.WaitingCaption, text, StringComparison.Ordinal);
+        Assert.Contains(ProgressSpinner.Frame(0), text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_AdvancesTheWaitingSpinner()
+    {
+        var snapshot = new SideQuestionSnapshot(true, [], true, "why", string.Empty, null);
+
+        var first = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0, 0), 80));
+        var next = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0, 1), 80));
+
+        Assert.Contains(ProgressSpinner.Frame(0), first, StringComparison.Ordinal);
+        Assert.DoesNotContain(ProgressSpinner.Frame(1), first, StringComparison.Ordinal);
+        Assert.Contains(ProgressSpinner.Frame(1), next, StringComparison.Ordinal);
+        Assert.Contains(SideQuestionWidget.WaitingCaption, next, StringComparison.Ordinal);
     }
 
     [Fact]

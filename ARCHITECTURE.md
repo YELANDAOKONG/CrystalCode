@@ -344,8 +344,11 @@ Text still streaming in the current round is not included. A tool call is not
 executed. Text that arrived with it is kept; a tool call with no text fails,
 and the question stays in the panel so it can be asked again. The question,
 the answer, and the token usage stay out of the queue, the transcript, the
-usage ledger, compaction, and the saved session. The terminal draws the answer in a panel above the composer and
-leaves the status bar, transcript, and progress row in place. Esc, Enter, or
+usage ledger, compaction, and the saved session. The terminal draws the
+answer in a panel above the composer and leaves the status bar, transcript,
+and progress row in place. Until the answer starts, that panel shows
+Waiting for the model with the same one-cell spinner as the progress row,
+and the frame keeps advancing while the panel is open. Esc, Enter, or
 Space closes the panel. Left and Right step through earlier answers. `x`
 clears the in-memory thread. While that panel is open, Ctrl+C cancels the
 side question and leaves the main turn running. `/clear`, `/resume`, and

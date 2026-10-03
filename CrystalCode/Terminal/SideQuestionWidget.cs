@@ -2,18 +2,22 @@ using Spectre.Console;
 using Spectre.Console.Rendering;
 
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Events;
 
 namespace CrystalCode.Terminal;
 
 internal static class SideQuestionWidget
 {
+    public const string WaitingCaption = "Waiting for the model";
+
     public static IRenderable Create(
         SideQuestionSnapshot snapshot,
-        int index)
+        int index,
+        int spinnerFrame = 0)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        ReadSlot(snapshot, index, out var question, out var body, out var failure);
+        ReadSlot(snapshot, index, out var question, out var body, out var failure, out var waiting);
         var count = SlotCount(snapshot);
         var title = count > 1
             ? $"Side question  {index + 1}/{count}"
@@ -22,7 +26,15 @@ internal static class SideQuestionWidget
         {
             new Markup($"[{Theme.Chrome}]{MarkupText.Escape(question)}[/]")
         };
-        if (body.Length > 0)
+        if (waiting)
+        {
+            rows.Add(Text.Empty);
+            var glyph = ProgressSpinner.Frame(spinnerFrame);
+            rows.Add(new Markup(
+                $"[{Theme.Accent}]{MarkupText.Escape(glyph)}[/]  "
+                + $"[{Theme.Muted}]{MarkupText.Escape(WaitingCaption)}[/]"));
+        }
+        else if (body.Length > 0)
         {
             rows.Add(Text.Empty);
             foreach (var line in body.Replace("\r\n", "\n").Split('\n'))
@@ -71,7 +83,8 @@ internal static class SideQuestionWidget
         int index,
         out string question,
         out string body,
-        out string? failure)
+        out string? failure,
+        out bool waiting)
     {
         var count = SlotCount(snapshot);
         if (count == 0)
@@ -79,6 +92,7 @@ internal static class SideQuestionWidget
             question = string.Empty;
             body = string.Empty;
             failure = snapshot.Failure;
+            waiting = false;
             return;
         }
 
@@ -86,9 +100,8 @@ internal static class SideQuestionWidget
         if (!string.IsNullOrEmpty(snapshot.PendingQuestion) && index >= snapshot.Exchanges.Count)
         {
             question = snapshot.PendingQuestion;
-            body = snapshot.Running && snapshot.LiveAnswer.Length == 0
-                ? "Waiting for the model"
-                : snapshot.LiveAnswer;
+            waiting = snapshot.Running && snapshot.LiveAnswer.Length == 0;
+            body = waiting ? string.Empty : snapshot.LiveAnswer;
             failure = snapshot.Running ? null : snapshot.Failure;
             return;
         }
@@ -97,5 +110,6 @@ internal static class SideQuestionWidget
         question = exchange.Question;
         body = exchange.Answer;
         failure = null;
+        waiting = false;
     }
 }

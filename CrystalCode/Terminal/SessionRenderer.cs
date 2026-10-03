@@ -68,6 +68,8 @@ public sealed class SessionRenderer : IDisposable
     private int _sideScroll;
     private bool _sideStick = true;
     private bool _sideClearRequested;
+    private int _sideSpinnerFrame;
+    private DateTimeOffset _sideSpinnerAt;
 
     public int ContextWindow { get; set; }
 
@@ -1544,6 +1546,7 @@ public sealed class SessionRenderer : IDisposable
         }
 
         _chrome.TickSpinner(now);
+        TickSideSpinner(now);
         RefreshRetryCaptionUnlocked(now);
         if (_fullPageOverlay && _overlayWidget is not null)
         {
@@ -1737,7 +1740,9 @@ public sealed class SessionRenderer : IDisposable
             return [];
         }
 
-        var lines = WidgetPaint.Lines(SideQuestionWidget.Create(_side, _sideIndex), width);
+        var lines = WidgetPaint.Lines(
+            SideQuestionWidget.Create(_side, _sideIndex, _sideSpinnerFrame),
+            width);
         var max = Math.Max(0, lines.Count - MaxSideRows);
         if (_sideStick)
         {
@@ -1844,6 +1849,41 @@ public sealed class SessionRenderer : IDisposable
     private static bool IsRetryCaption(string progress) =>
         progress.StartsWith("Retrying", StringComparison.Ordinal);
 
+    private bool SideWaiting() =>
+        _sideOpen
+        && _side is { Running: true } side
+        && side.LiveAnswer.Length == 0
+        && !string.IsNullOrEmpty(side.PendingQuestion)
+        && _sideIndex >= side.Exchanges.Count;
+
+    private bool SideSpinnerDue(DateTimeOffset now) =>
+        SideWaiting()
+        && (_sideSpinnerAt == default || now - _sideSpinnerAt >= ProgressSpinner.Interval);
+
+    private void TickSideSpinner(DateTimeOffset now)
+    {
+        if (!SideWaiting())
+        {
+            _sideSpinnerFrame = 0;
+            _sideSpinnerAt = default;
+            return;
+        }
+
+        if (_sideSpinnerAt == default)
+        {
+            _sideSpinnerAt = now;
+            return;
+        }
+
+        if (now - _sideSpinnerAt < ProgressSpinner.Interval)
+        {
+            return;
+        }
+
+        _sideSpinnerFrame++;
+        _sideSpinnerAt = now;
+    }
+
     private void RefreshTokenEstimateUnlocked()
     {
         if (!_showEstimatedTokens
@@ -1894,7 +1934,8 @@ public sealed class SessionRenderer : IDisposable
                 var haveSize = ScreenSize.TryRead(out var pollWidth, out var pollHeight);
                 tooSmall = haveSize && BelowUsableSize(pollWidth, pollHeight);
                 var sizeChanged = pollWidth != _paintedWidth || pollHeight != _paintedHeight;
-                if (sizeChanged || _chrome.SpinnerDue(DateTimeOffset.UtcNow))
+                var now = DateTimeOffset.UtcNow;
+                if (sizeChanged || _chrome.SpinnerDue(now) || SideSpinnerDue(now))
                 {
                     PaintUnlocked(force: true);
                 }
