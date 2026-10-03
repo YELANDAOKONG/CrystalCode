@@ -7,6 +7,8 @@ namespace CrystalCode.Engine.Tools;
 /// </summary>
 public sealed class Workspace
 {
+    private const int MaximumSymlinkHops = 40;
+
     private static readonly HashSet<string> IgnoredDirectoryNames = new(
         StringComparer.OrdinalIgnoreCase)
     {
@@ -368,7 +370,9 @@ public sealed class Workspace
         return IsInside(resolved, fence);
     }
 
-    internal static string Canonicalize(string fullPath)
+    internal static string Canonicalize(string fullPath) => Canonicalize(fullPath, hops: 0);
+
+    private static string Canonicalize(string fullPath, int hops)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
         var rooted = Path.GetFullPath(fullPath);
@@ -402,12 +406,14 @@ public sealed class Workspace
                 continue;
             }
 
-            if (!TryFinalTarget(current, out var target))
+            if (hops >= MaximumSymlinkHops || !TryImmediateTarget(current, out var target))
             {
                 throw new IOException($"Symbolic link could not be resolved: {current}");
             }
 
-            current = target;
+            // The link text can still name an ancestor link, such as /var
+            // pointing at /private/var. Walk that target before later segments.
+            current = Canonicalize(target, hops + 1);
         }
 
         return Path.GetFullPath(current);
@@ -439,13 +445,22 @@ public sealed class Workspace
         }
     }
 
-    private static bool TryFinalTarget(string path, out string target)
+    private static bool TryImmediateTarget(string path, out string target)
     {
         target = string.Empty;
-        FileSystemInfo? link;
         try
         {
-            link = File.ResolveLinkTarget(path, returnFinalTarget: true);
+            var attributes = File.GetAttributes(path);
+            var link = (attributes & FileAttributes.Directory) != 0
+                ? Directory.ResolveLinkTarget(path, returnFinalTarget: false)
+                : File.ResolveLinkTarget(path, returnFinalTarget: false);
+            if (link is null)
+            {
+                return false;
+            }
+
+            target = link.FullName;
+            return true;
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
@@ -454,14 +469,6 @@ public sealed class Workspace
         {
             return false;
         }
-
-        if (link is null)
-        {
-            return false;
-        }
-
-        target = link.FullName;
-        return true;
     }
 
     private static bool IsSkippableIo(Exception exception) =>

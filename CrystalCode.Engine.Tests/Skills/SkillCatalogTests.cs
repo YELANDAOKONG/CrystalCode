@@ -66,6 +66,27 @@ public sealed class SkillCatalogTests
     }
 
     [Fact]
+    public void ContainsReadablePath_MatchesThroughAnAncestorSymlink()
+    {
+        using var root = new TemporaryWorkspace();
+        var privateFolders = Path.Combine(root.Path, "private", "var", "folders");
+        Directory.CreateDirectory(privateFolders);
+        var ancestor = Path.Combine(root.Path, "var");
+        Directory.CreateSymbolicLink(ancestor, Path.Combine(root.Path, "private", "var"));
+        var real = Path.Combine(ancestor, "folders", "real-skills");
+        Directory.CreateDirectory(real);
+        var file = Path.Combine(real, "notes.md");
+        File.WriteAllText(file, "extra");
+        var link = Path.Combine(ancestor, "folders", "linked-skills");
+        Directory.CreateSymbolicLink(link, real);
+        var catalog = new SkillCatalog([], [link]);
+
+        Assert.True(catalog.ContainsReadablePath(file));
+        Assert.True(catalog.ContainsReadablePath(Path.Combine(link, "notes.md")));
+        Assert.False(catalog.ContainsReadablePath(Path.Combine(privateFolders, "other.txt")));
+    }
+
+    [Fact]
     public void ContainsReadablePath_WithoutReadRoots_IsFalse()
     {
         using var root = new TemporaryWorkspace();
