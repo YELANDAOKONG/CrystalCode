@@ -47,6 +47,8 @@ semantics. Do not copy its Demo UI into this product.
   a `SessionEvent` or flows through `SessionFrontEnd`. Terminal behavior
   belongs in `CrystalCode`; frame and composer behavior in
   `CrystalCode.Display`. Do not fork engine logic into a front end.
+  If a later desktop front end uses Avalonia, write its UI in C# markup.
+  Do not add XAML or AXAML files.
 - Public data values are immutable. One type per file. File-scoped namespaces.
 - No top-level statements. Explicit `Program.Main`.
 

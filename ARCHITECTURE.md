@@ -32,6 +32,8 @@ references only Crystal. No project in this repository modifies Crystal.
 
 A second front end (a desktop application, for example) references
 CrystalCode.Engine and supplies its own surface. It does not copy engine code.
+If that desktop front end is built with Avalonia, write the UI in C# markup.
+Do not add XAML or AXAML files.
 `EngineAssemblyTests` and `DisplayAssemblyTests` fail the build when either
 direction above is crossed.
 
@@ -908,7 +910,8 @@ equal.
 Adding a front end means referencing CrystalCode.Engine, implementing the four
 contracts above, and projecting events onto its own surface. The terminal host
 in CrystalCode is the reference implementation. The headless test in
-CrystalCode.Engine.Tests is the smallest correct driver.
+CrystalCode.Engine.Tests is the smallest correct driver. A later Avalonia
+desktop front end uses C# markup and does not add XAML or AXAML files.
 
 `crystal run` is the headless front end in this executable, not a second
 assembly. It reads one task from an argument or from stdin, applies
