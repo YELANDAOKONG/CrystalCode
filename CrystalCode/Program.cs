@@ -11,6 +11,8 @@ public static class Program
         app.Configure(static config =>
         {
             config.SetApplicationName("crystal");
+            config.AddCommand<TaskRunCommand>("run")
+                .WithDescription("Run one task without a terminal and exit.");
         });
 
         return await app.RunAsync(args);

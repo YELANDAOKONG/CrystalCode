@@ -106,7 +106,7 @@ must be on the path (Git Bash is used on Windows when available).
 - [Engineering standards](STANDARDS.md): source and verification rules
 - [Agent instructions](AGENTS.md): repository guidance for coding agents
 
-MCP servers, a headless CI runner, an operating-system sandbox, parent/child agents, audio and video input, and non-text model output are planned but not yet implemented. Image input is available for supported models and providers.
+`crystal run` executes one task without a terminal and exits. MCP servers, an operating-system sandbox, parent/child agents, audio and video input, and non-text model output are planned but not yet implemented. Image input is available for supported models and providers.
 
 ## License
 

@@ -295,6 +295,24 @@ public sealed class PromptStoreTests
         Assert.Equal("text plan", resolution.Prompts.Plan);
     }
 
+    [Fact]
+    public void ContainsSet_RequiresAHomePromptFile()
+    {
+        using var home = new TemporaryHome();
+        var store = CreateStore(home);
+
+        Assert.True(store.ContainsSet(PromptSetNames.Default));
+        Assert.False(store.ContainsSet("concise"));
+
+        WritePrompt(
+            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
+            "work.md",
+            "custom work");
+
+        Assert.True(store.ContainsSet("concise"));
+        Assert.False(store.ContainsSet("Bad_Name"));
+    }
+
     private static PromptStore CreateStore(TemporaryHome home) =>
         new(home.Home, InstructionDiscovery.Isolated(home.Home));
 

@@ -6,7 +6,8 @@ Detailed usage reference. For a shorter introduction, start with the
 A production coding TUI for local repositories. The terminal is the
 only operator surface. It runs a streaming model-and-tool loop, with
 Plan/Work modes, risk-aware approval, automatic context compaction,
-and operator data under `~/.crystal`.
+and operator data under `~/.crystal`. `crystal run` runs one task
+without a terminal; anything that would ask the operator is denied.
 
 CrystalCode consumes the [Crystal](https://github.com/YELANDAOKONG/Crystal) library. It does not modify Crystal.
 It is not a Crystal demo and not a replacement for Crystal.
@@ -70,7 +71,7 @@ or `CrystalCode` on Windows.
 ## Not yet implemented
 
 The following planned capabilities are not yet implemented in the current
-build: MCP servers, a headless CI runner, an operating-system sandbox,
+build: MCP servers, an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output, and provider
 protocols other than DeepSeek and OpenAI-compatible Chat Completions, OpenAI
 Responses, and Anthropic Messages. Image input is available for supported
@@ -80,7 +81,8 @@ models and providers.
 
 - An API key for the selected provider, supplied through configuration
   or the environment (see [Credentials](#credentials))
-- A TTY for the interactive alternate-screen UI
+- A TTY for the interactive alternate-screen UI. `crystal run` does not
+  need a TTY
 - `bash` on the `PATH` (Git Bash is used on Windows when present)
 
 Building from source also requires:
@@ -130,6 +132,66 @@ and compaction at 80% of the selected model's `contextWindow`.
 
 If the provider has more than one model and neither `config.json` nor
 `--model` picks one, the process exits and asks for `--model`.
+
+## Headless run
+
+`crystal run` runs one task and exits. It does not open the alternate
+screen. Quote the task, or omit it and pipe the task on stdin. A task
+argument wins over stdin. Slash commands are rejected.
+
+```bash
+crystal run --workspace . --approval review --duration 600 "Fix the failing test."
+echo "Summarize the repository." | crystal run --model-calls 8 --tool-calls 32
+```
+
+The process prints tool calls, tool results, errors, and the assistant
+reply as plain text. Thinking text is omitted unless `--show-thinking`
+is set. The saved session id is printed at the end. Resume that session
+with the interactive `crystal --resume <id>`.
+
+Flags override the saved configuration for this process only. They are
+not written to `config.json`. Do not put secrets on the command line.
+Omitted flags keep the saved value, or the product default when the
+saved value is also unset. `unlimited` removes that one cap.
+
+| Option | Meaning |
+| :--- | :--- |
+| `-p`, `--provider` / `-m`, `--model` | Provider and model for this process |
+| `-w`, `--workspace` / `--home` | Workspace root and data directory |
+| `--approval <mode>` | `default`, `edit`, `review`, `audit`, or `full` |
+| `--plan` / `--work` | Start in Plan or Work. The default is Work |
+| `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. An unknown value exits 1 |
+| `--prompt-set <name>` | An existing home prompt set. `default` is always valid |
+| `--skills`, `--external-tools` | `on` or `off` for this process |
+| `--model-calls <count>` | Model rounds for this turn. Default 1024 |
+| `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
+| `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
+| `--bash-timeout <seconds>` | Per-command bash cap. Default 120. `unlimited` disables that timer |
+| `--show-thinking` | Print reasoning text |
+
+There is no operator. In Review and Audit the reviewing model still
+judges calls that require review: allow runs the tool, and deny returns
+the reviewer's reason to the model. Anything that would ask the
+operator, including Default, Edit, and Full prompts, is denied with the
+usual rejection text. The `question` tool is dismissed. Plan does not
+offer write, edit, or bash. Credential paths stay forbidden.
+
+A reviewer denial is a tool error. If the model then finishes, the
+process exits 0. A denied operator prompt or a dismissed question does
+not. A call to a tool Plan does not offer fails the turn.
+
+| Exit | Meaning |
+| :--- | :--- |
+| 0 | The turn completed, and no operator prompt was denied or dismissed |
+| 1 | The command, configuration, credentials, workspace, or prompt set is invalid |
+| 2 | The model request failed |
+| 3 | A model-call, tool-call, or duration budget was reached, or the context overflowed |
+| 4 | The turn finished after an operator prompt was denied or a question was dismissed |
+| 5 | The run was interrupted |
+
+A failure or a budget stop is reported instead of a denial. An interrupt
+is reported instead of a denial. Stdout then includes `Stopped` and the
+session id.
 
 ## Credentials
 

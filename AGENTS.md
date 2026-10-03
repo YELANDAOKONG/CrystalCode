@@ -16,7 +16,11 @@ change. Implementation must never become the only source of truth.
 ## Product
 
 CrystalCode is a production coding TUI. The terminal is the only
-operator surface. It is not a Crystal demo and not a replacement for Crystal.
+operator surface. `crystal run` is the headless entry for one task. It
+is not an operator surface: anything that would ask the operator is
+denied. Do not put secrets on its command line, and do not persist its
+flags to `config.json`. It is not a Crystal demo and not a replacement
+for Crystal.
 
 Crystal is a sibling library at `../Crystal`. Consume it. Do not modify it.
 

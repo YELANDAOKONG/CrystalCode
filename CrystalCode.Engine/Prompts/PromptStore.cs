@@ -35,6 +35,29 @@ public sealed class PromptStore
         return projectText ?? text ?? TopicNamingPrompt.Text;
     }
 
+    /// <summary>
+    /// True for the default set, and for a home prompt-set directory that
+    /// contains at least one prompt file. A missing name does not fall back
+    /// to the default set.
+    /// </summary>
+    public bool ContainsSet(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var normalized = name.Trim();
+        if (string.Equals(normalized, PromptSetNames.Default, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!PromptSetNames.IsValid(normalized))
+        {
+            return false;
+        }
+
+        var notes = new List<string>();
+        return new PromptSetDiscovery(_home).Collect(notes).TryGet(normalized, out _);
+    }
+
     internal PromptResolution Resolve(string workspaceRoot, string selectedSet)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);

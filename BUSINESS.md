@@ -17,10 +17,10 @@ the Crystal library they already own.
 
 ## Current product
 
-The current product is a terminal UI application. The terminal is the only
-operator surface and the only entry. The engine behind it is a separate
-library with no terminal code, so another surface could reuse it later; no
-other surface ships today. The terminal application can:
+The current product is a terminal application. `crystal` opens the
+terminal, which is the only operator surface. `crystal run` is a headless
+entry for one task and has no operator. The engine behind both is a
+separate library with no terminal code. The product can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
 - configure per-turn model-call, tool-call, and wall-clock budgets, including
@@ -39,6 +39,12 @@ other surface ships today. The terminal application can:
   single or multiple selection, optional custom answers, and confirmation;
 - compact conversation context when usage approaches the model window,
   or when the operator runs `/compact`;
+- run one task without a terminal through `crystal run`, then exit.
+  Flags on that command override provider, model, workspace, home,
+  approval, Plan or Work, thinking, prompt set, skills, external tools,
+  and turn quotas for that process only. They are not written to
+  `config.json`. Review and Audit still use the reviewing model.
+  Anything that would ask the operator is denied;
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - recall submitted prompts from the composer with Up/Down and retain up to 200
   recent text-only entries across runs for the same workspace;
@@ -80,7 +86,6 @@ implemented in the current build:
 - loading `IPlugin` assemblies from `~/.crystal/plugins/`;
 - parent/child Agents through `Crystal.Harness.AgentHarness`;
 - MCP servers;
-- a headless CI runner;
 - an operating-system sandbox;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,

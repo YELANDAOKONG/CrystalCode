@@ -82,6 +82,11 @@
   Forbidden or Privileged. Forbidden never fully auto-passes. Review
   and Audit may deny those calls or escalate them to the
   operator.
+- `crystal run` has no operator. Review and Audit still ask the reviewing
+  model. Any call that would ask the operator is denied with the existing
+  rejection text. The `question` tool is dismissed. Credential paths stay
+  Forbidden. Flags on that command are not written to `config.json`. Do not
+  put secrets on the command line.
 - Credential files are written with owner-only access where the OS allows it.
 - New provider catalog files are created with owner-only access because
   provider definitions may contain credential references or inline keys.
@@ -139,7 +144,10 @@ Do not claim coverage a test project does not actually exercise. Session,
 approval, compaction, storage, and tool behavior is tested in
 CrystalCode.Engine.Tests, including a headless session driven by a scripted
 model through `ISessionObserver`. Terminal projection, renderer, and prompt
-surfaces are tested in CrystalCode.Tests. Frame, composer, and paint behavior
-is tested in CrystalCode.Display.Tests. Adapters are tested in
-CrystalCode.Providers.Tests. `EngineAssemblyTests` and `DisplayAssemblyTests`
+surfaces are tested in CrystalCode.Tests. `crystal run` is tested there
+with a scripted model for a completed reply, a review allow that executes
+a tool, and an operator prompt that is denied with a non-zero exit. Frame,
+composer, and paint behavior is tested in CrystalCode.Display.Tests.
+Adapters are tested in CrystalCode.Providers.Tests.
+`EngineAssemblyTests` and `DisplayAssemblyTests`
 guard the dependency direction and must not be weakened to make a change pass.

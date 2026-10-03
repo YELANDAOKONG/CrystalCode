@@ -44,12 +44,13 @@ CrystalCode.Providers.Tests references CrystalCode.Providers.
 ### CrystalCode
 
 The terminal host and the only executable. Owns CLI commands, the terminal
-host loop (alternate screen, key loop, Ctrl+C), and the projection of engine
-events onto CrystalCode.Display. It also owns the terminal surfaces for the
-engine's prompts: approval cards and keys, the question overlay, and the
-saved-session picker. It does not own session logic, approval policy, prompts,
-storage, or tools, and it does not own the frame painter, composer buffer, or
-transcript log.
+host loop (alternate screen, key loop, Ctrl+C), the headless `crystal run`
+entry, and the projection of engine events onto CrystalCode.Display. It also
+owns the terminal surfaces for the engine's prompts: approval cards and keys,
+the question overlay, and the saved-session picker. `crystal run` supplies
+its own observer, approval prompt, question prompt, and session chooser. It
+does not own session logic, approval policy, prompts, storage, or tools, and
+it does not own the frame painter, composer buffer, or transcript log.
 
 ### CrystalCode.Engine
 
@@ -103,8 +104,8 @@ layout.
 
 Terminal host tests: session renderer, event-to-slash-option mapping, status
 and tool-list widgets, tool-call and progress text, transcript replay, the
-session picker, approval cards and keys, and the image-marker contract with
-Display.
+session picker, approval cards and keys, the image-marker contract with
+Display, and `crystal run` against a scripted model.
 
 ### CrystalCode.Providers.Tests
 
@@ -121,7 +122,8 @@ CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
-| `Commands` | Spectre.Console.Cli commands |
+| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `run` is the headless task command |
+| `Run` | Unattended front end for `crystal run`: plain-text log, denied operator prompts, dismissed questions, process-only setting overrides, and exit codes |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
 
@@ -883,6 +885,31 @@ Adding a front end means referencing CrystalCode.Engine, implementing the four
 contracts above, and projecting events onto its own surface. The terminal host
 in CrystalCode is the reference implementation. The headless test in
 CrystalCode.Engine.Tests is the smallest correct driver.
+
+`crystal run` is the headless front end in this executable, not a second
+assembly. It reads one task from an argument or from stdin, applies
+process-only overrides, starts one user turn, and exits. Overrides are not
+written to `config.json`. Slash commands are rejected so they cannot change
+saved settings. Secrets are not command flags.
+
+The run supplies `RunLog`, `UnattendedApprovalPrompt`,
+`UnattendedUserPrompt`, and `UnattendedSessionChooser`. The approval prompt
+denies every call that would have asked the operator. The question prompt
+dismisses. Session choice is declined. Review and Audit still call the
+reviewing model: allow executes the tool, and deny returns the reviewer's
+reason. Plan does not offer write, edit, or bash. The approval policy
+also rejects those side effects when a catalog still contains them.
+
+Stdout is plain text: tool calls, tool results, errors, notes, and the
+assistant reply. Thinking text is omitted unless `--show-thinking` is set.
+The process then prints the saved session id. Exit 0 means the turn
+completed and no operator prompt was denied or dismissed. Exit 1 is an
+invalid command, configuration, credential, workspace, or prompt set. Exit
+2 is a failed model request. Exit 3 is a model-call, tool-call, or duration
+budget, or context overflow. Exit 4 is a finish that was not a failure,
+budget stop, or interrupt, after an operator denial or a dismissed question.
+Exit 5 is an interrupt. A failure, budget stop, or interrupt outranks a
+denial.
 
 ## Display
 
