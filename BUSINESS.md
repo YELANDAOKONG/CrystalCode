@@ -18,11 +18,14 @@ the Crystal library they already own.
 ## Current product
 
 The current product is a terminal UI application. The terminal is the only
-operator surface and the only entry. It can:
+operator surface and the only entry. The engine behind it is a separate
+library with no terminal code, so another surface could reuse it later; no
+other surface ships today. The terminal application can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
 - configure per-turn model-call, tool-call, and wall-clock budgets, including
   unlimited budgets;
+- configure the built-in bash per-command timeout, including unlimited;
 - retry a failed model round on rate limits, server errors, timeouts,
   network faults, and incomplete streams, waiting with backoff, a
   countdown on the progress row, and a transcript note;

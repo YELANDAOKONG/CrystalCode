@@ -270,7 +270,7 @@ public sealed class ComposerBuffer
 
     public ComposerView Project(int width, int maxRows)
     {
-        var mode = ModeLabel.For(PlanMode);
+        var mode = PlanMode ? "Plan" : "Work";
         var promptPlain = mode + " > ";
         var promptColumns = TextWidth.Measure(promptPlain);
         var bodyWidth = Math.Max(width - promptColumns - 1, 8);

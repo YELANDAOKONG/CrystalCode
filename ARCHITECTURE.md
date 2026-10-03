@@ -9,26 +9,33 @@ baseline.
 ## Dependency direction
 
 ```text
-CrystalCode
-    ↓
-CrystalCode.Display
-    ↓
-Spectre.Console   (rasterization; Terminal.Gui is referenced, not called)
+CrystalCode   (terminal host: the executable)
+    ↓                    ↓
+CrystalCode.Display      CrystalCode.Engine
+    ↓                        ↓
+Spectre.Console              CrystalCode.Providers
+(rasterization;                  ↓
+Terminal.Gui is              Crystal
+referenced, not called)
 
-CrystalCode
-    ↓
-CrystalCode.Providers
-    ↓
-Crystal
-
-CrystalCode also references Crystal.Tools, Crystal.Agents, and
-Crystal.Harness directly. CrystalCode.Display references Spectre.Console
-and Terminal.Gui only. It does not reference Crystal, Crystal.Tools, or
-the executable host. CrystalCode.Providers references only Crystal.
+CrystalCode.Engine also references Crystal.Tools, Crystal.Agents, and
+Crystal.Harness directly. CrystalCode references Spectre.Console and
+Spectre.Console.Cli for its commands and cards. CrystalCode.Display
+references Spectre.Console and Terminal.Gui only. It does not reference
+Crystal, Crystal.Tools, the engine, or the executable host.
+CrystalCode.Engine does not reference Spectre.Console, Terminal.Gui,
+CrystalCode.Display, or the executable host, and it never touches the
+console. CrystalCode.Providers references only Crystal.
 No project in this repository modifies Crystal.
 ```
 
+A second front end (a desktop application, for example) references
+CrystalCode.Engine and supplies its own surface. It does not copy engine code.
+`EngineAssemblyTests` and `DisplayAssemblyTests` fail the build when either
+direction above is crossed.
+
 CrystalCode.Tests references CrystalCode.
+CrystalCode.Engine.Tests references CrystalCode.Engine.
 CrystalCode.Display.Tests references CrystalCode.Display.
 CrystalCode.Providers.Tests references CrystalCode.Providers.
 
@@ -36,12 +43,29 @@ CrystalCode.Providers.Tests references CrystalCode.Providers.
 
 ### CrystalCode
 
-The executable host. Owns CLI commands, session and turn execution,
+The terminal host and the only executable. Owns CLI commands, the terminal
+host loop (alternate screen, key loop, Ctrl+C), and the projection of engine
+events onto CrystalCode.Display. It also owns the terminal surfaces for the
+engine's prompts: approval cards and keys, the question overlay, and the
+saved-session picker. It does not own session logic, approval policy, prompts,
+storage, or tools, and it does not own the frame painter, composer buffer, or
+transcript log.
+
+### CrystalCode.Engine
+
+The front-end-neutral class library. Owns session and turn execution,
 Plan/Work catalogs, approval policy, context compaction, `~/.crystal`
-storage, built-in coding tools, operator tool sets, prompts, and
-in-process plugin contracts.
-It projects session state onto CrystalCode.Display. It does not own
-the frame painter, composer buffer, or transcript log.
+storage, built-in coding tools, operator tool sets, prompts, in-process
+plugin contracts, slash commands, and the event stream a front end observes.
+It never reads a key, writes to the console, or paints. See
+[Engine contract](#engine-contract).
+
+### CrystalCode.Engine.Tests
+
+Engine tests: workspace fencing, approval classification, compaction
+selection, session serialization, command behavior, external tool sets, a
+headless session driven by a scripted model, and the dependency guard. Does not
+reference the host executable.
 
 ### CrystalCode.Display
 
@@ -64,7 +88,8 @@ static command reports remain committed transcript widgets.
 ### CrystalCode.Display.Tests
 
 Display tests: layout, chrome, input decoder, scroll policy, composer, paint,
-transcript log, and queue card. Does not reference the host executable.
+transcript log, queue card, and the dependency guard. Does not reference the
+host executable.
 
 ### CrystalCode.Providers
 
@@ -76,9 +101,10 @@ layout.
 
 ### CrystalCode.Tests
 
-Host tests: workspace fencing, approval classification, compaction
-selection, session serialization, command behavior, and external tool
-sets.
+Terminal host tests: session renderer, event-to-slash-option mapping, status
+and tool-list widgets, tool-call and progress text, transcript replay, the
+session picker, approval cards and keys, and the image-marker contract with
+Display.
 
 ### CrystalCode.Providers.Tests
 
@@ -88,17 +114,26 @@ Provider adapter tests. One folder per vendor, mirroring
 ## Namespace ownership
 
 Root identifier is `CrystalCode`, matching the existing solution. Folder
-path under a project root equals the namespace after the project name.
+path under a project root equals the namespace after the project name, so
+engine namespaces read `CrystalCode.Engine.Sessions` and so on.
 
 CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
 | `Commands` | Spectre.Console.Cli commands |
-| `Configuration` | Loaded options, defaults, thinking chrome labels |
+| `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, slash-option mapping |
+| `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
+
+CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
+
+| Folder | Owns |
+| :--- | :--- |
+| `Configuration` | Loaded options, defaults, thinking and mode labels, display-case helpers |
+| `Events` | Immutable session events, observer interface, chrome and preference snapshots |
 | `Home` | `~/.crystal` paths and file I/O |
-| `Sessions` | Transcript, ledger, streaming turn, slash commands, chat client lifetime, session renderer, replay, tool-call text, usage text, question prompt |
-| `Approvals` | Risk, authority, grants, policy, review transcript, approval cards and keys |
+| `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
+| `Approvals` | Risk, authority, grants, policy, review transcript |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
@@ -152,9 +187,10 @@ only through a Harness `ToolExceptionMapper`.
 
 ### Image input boundary
 
-CrystalCode owns terminal image attachment, MIME signature validation,
+CrystalCode.Engine owns image attachment, MIME signature validation,
 session persistence, transcript markers, and projection onto Crystal's typed
-multimodal contracts. `[Image #N]` is presentation and persistence metadata;
+multimodal contracts. A front end owns only how it presents and edits the
+markers in its composer. `[Image #N]` is presentation and persistence metadata;
 providers receive typed `ImageContent`, never a marker in place of its bytes.
 Pasted markers are atomic composer spans with a distinct color: cursor movement
 and deletion cannot leave a partial attached marker. User-entered text with the
@@ -224,15 +260,16 @@ generic tool boundary.
 One user message is one turn:
 
 1. Snapshot the transcript and current tool definitions.
-2. Stream one chat request. Render deltas as they arrive. If that
+2. Stream one chat request. Publish each delta as an event as it arrives. If that
    round fails with a retryable provider error (HTTP 429, 404, 408,
    5xx, timeout, network, or an incomplete stream), wait with
    exponential backoff (2s base, factor 2, 25% jitter, 30s cap when
    Retry-After is absent), honor Retry-After or retry-after-ms when
-   present, and repeat the same round up to five times. The progress
-   row shows `Retrying In Ns (Attempt K)` and counts the remaining
-   wait down; the transcript prints `retrying model request` plus the
-   operator message. Live stream text from the failed attempt is
+   present, and repeat the same round up to five times. The engine
+   publishes `RetryScheduled`; the terminal progress row shows
+   `Retrying In Ns (Attempt K)` and counts the remaining wait down, and
+   the transcript prints `retrying model request` plus the operator
+   message. Live stream text from the failed attempt is
    discarded. HTTP 401, 403, quota, `invalid_prompt`, and context
    overflow are not retried. User cancel still interrupts immediately.
 3. Select candidate zero.
@@ -257,10 +294,18 @@ unlimited limits still ends on model completion, user cancellation, or context
 compaction exhaustion. This host owns the live turn budget; it follows the
 nullable-limit semantics of Crystal's `AgentRunLimits` without using Agent
 for streaming UI turns.
+
+Built-in `bash` has its own per-command timer, `bashTimeoutSeconds` in
+`config.json`. Omitting it keeps 120 seconds. `null` or `"unlimited"` disables
+that timer. A positive integer up to the runtime timer limit replaces it.
+User cancellation and the turn budget still stop the command. External tool
+sets keep their own `timeoutSeconds`.
 7. After a completed turn, consider compaction from that last round's
    reported usage and the estimated transcript. `/compact` (alias
-   `/summarize`) runs the same summarizer immediately. Compaction keeps
-   the frame pumping so the spinner, resize, and composer stay live.
+   `/summarize`) runs the same summarizer immediately. Compaction runs
+   inside an engine call the front end awaits; the front end keeps its
+   own surface live meanwhile (the terminal host pumps the frame so the
+   spinner, resize, and composer stay live).
 
 The composer stays open while a turn runs. Enter with text enqueues a
 follow-up (FIFO). Queued items stay in a panel above the composer until
@@ -525,9 +570,13 @@ and model. For example, an unlimited time budget with finite call limits is:
     "maximumModelCalls": 48,
     "maximumToolCalls": 96,
     "maximumDurationSeconds": null
-  }
+  },
+  "bashTimeoutSeconds": "unlimited"
 }
 ```
+
+`bashTimeoutSeconds` is omitted when it is the 120 second default. `null` and
+`"unlimited"` both mean no per-command timer.
 
 `providers.json` stores the provider catalog as a root object keyed
 by provider name, with an array for multiple protocols under one name. The
@@ -767,6 +816,70 @@ and the regional `/openai/v1/` base URI for models that support that API.
 IAM SigV4 authentication would require a separate signing implementation;
 it is not provided by the current bearer-token transport.
 
+## Engine contract
+
+CrystalCode.Engine runs the conversation and reports what happens. A front end
+hands it a `SessionFrontEnd`, calls it, and observes events. It never reads
+engine state directly and the engine never draws, reads keys, or writes to the
+console.
+
+A front end supplies (`SessionFrontEnd`):
+
+- `Observer` (`ISessionObserver`) receives every `SessionEvent`.
+- `Approvals` (`IApprovalPrompt`) asks the operator to approve a tool call and
+  is told when a call auto-passes or is under review.
+- `Questions` (`IUserPrompt`) answers the built-in `question` tool.
+- `Sessions` (`ISessionChooser`) picks a saved session for `/resume`.
+
+A front end calls `CodingSession`: `Create`, `StartAsync`, `SubmitAsync`
+(slash commands, follow-ups while a turn runs, interrupts, and turn starts;
+returns true when the operator asked to quit), `CompleteTurnAsync` once
+`TurnTask` finishes, `FinishTurnAsync` to collect a turn before exit,
+`TryInterrupt`, `TogglePlan`, `SetVerbose`, `NotifyDraftChanged`, `Enqueue`,
+`PasteClipboardImageAsync`, and `Close`. `TurnActive`, `TurnTask`, and
+`PlanMode` report state. The usual turn is: `SubmitAsync`, await `TurnTask`,
+then `CompleteTurnAsync`.
+
+Events are immutable sealed records, one type per file under `Events`:
+
+- Lifecycle and chrome: `SessionStarted`, `ChromeChanged`,
+  `PreferencesChanged`, `SlashCommandsChanged`, `PromptHistoryLoaded`,
+  `ImageHistoryInvalidated`, `ActivityChanged`.
+- Turn: `UserMessageSent`, `TurnStarted`, `StreamReceived` (carries Crystal's
+  `ChatStreamEvent`), `ToolCallsIssued`, `ToolResultsReceived`,
+  `ModelRoundClosed`, `RetryScheduled`, `UsageChanged`, `TurnFinished`,
+  `QueueChanged`.
+- Conversation: `HistoryReplayed`, `ConversationCleared`, `TodosChanged`.
+- Text and reports: `NoteWritten`, `ErrorWritten`, `HelpRequested`,
+  `StatusReported`, `ToolsListed`.
+
+The engine publishes from whichever thread produced the change, including the
+turn thread while a model round streams. Observers must be thread-safe and
+return quickly; a front end with a UI thread marshals to it. Events carry
+engine values, not captions: the engine reports `SessionActivity` and the front
+end chooses the wording and layout.
+
+The engine owns the usage numbers. It keeps the context usage and the session
+cumulative totals, including the baseline that in-turn cumulative counts are
+added to, and reports them through `UsageChanged` and `TurnFinished`. A front
+end renders them and does not compute totals.
+
+Some engine calls take time (a turn collecting, `/compact`, a model switch).
+The front end awaits them without freezing its surface. The terminal host does
+this by pumping the frame while the call runs.
+
+Image markers cross the boundary as text. `UserMessageSent` and replayed
+transcripts carry `[Image #N]` markers, and a marker is trusted only when it
+starts with `ImageMarkerText.Prefix` (U+2063). A composer that attaches images
+prefixes exactly the attached spans. Display cannot reference the engine, so it
+holds its own copy of the prefix; `ImageMarkerContractTests` keeps the two
+equal.
+
+Adding a front end means referencing CrystalCode.Engine, implementing the four
+contracts above, and projecting events onto its own surface. The terminal host
+in CrystalCode is the reference implementation. The headless test in
+CrystalCode.Engine.Tests is the smallest correct driver.
+
 ## Display
 
 CrystalCode.Display is the TUI host. Spectre.Console supplies markup,
@@ -781,8 +894,8 @@ frame uses one terminal-size snapshot, and the composer window is projected
 again if overlays or pinned rows leave fewer rows than it requested. Composer
 tabs display as four spaces while the submitted prompt retains tab characters;
 other painted rows expand tabs by the same width. One column remains free for
-the cursor at the right edge. The executable maps turns onto that frame through
-`SessionRenderer`; it does
+the cursor at the right edge. The executable maps engine events onto that frame
+through `SessionProjection` and `SessionRenderer`; it does
 not paint rows itself. Entering the alternate screen sets the window
 title to Crystal Code when the terminal allows it, and restores the
 previous title on exit. Windows VT input mode is restored on screen disposal,

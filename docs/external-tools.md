@@ -413,8 +413,8 @@ the selected model and provider support image input. Text-only sessions ignore
 them. A type implementing both retains its ordinary `ITool` entry in a
 text-only session. `AssemblyLoadContext` is not a sandbox.
 
-Operator types must not reference `CrystalCode`, `CrystalCode.Display`,
-or `Spectre.Console`. No slash commands, client factories, or
+Operator types must not reference `CrystalCode`, `CrystalCode.Engine`,
+`CrystalCode.Display`, or `Spectre.Console`. No slash commands, client factories, or
 classifiers from the assembly.
 
 ### Publish layout

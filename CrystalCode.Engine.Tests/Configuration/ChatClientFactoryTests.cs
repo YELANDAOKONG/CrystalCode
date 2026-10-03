@@ -1,0 +1,146 @@
+using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Configuration;
+using CrystalCode.Providers.Anthropic;
+using CrystalCode.Providers.Gemini;
+using CrystalCode.Providers.Ollama;
+using CrystalCode.Providers.OpenAI;
+using CrystalCode.Providers.Responses;
+
+using Xunit;
+
+namespace CrystalCode.Engine.Tests.Configuration;
+
+public sealed class ChatClientFactoryTests
+{
+    [Fact]
+    public void Create_UsesNativeAdaptersAndKeylessOllama()
+    {
+        var defaults = HarnessSettings.CreateDefault();
+        var gemini = defaults.WithSelection(ProviderName.Gemini, "gemini-3.8-flash");
+        var ollama = defaults.WithSelection(ProviderName.Ollama, "qwen3:8b");
+
+        using var geminiClient = Assert.IsType<GeminiProvider>(
+            ChatClientFactory.Create(gemini, "test-key"));
+        using var ollamaClient = Assert.IsType<OllamaProvider>(
+            ChatClientFactory.Create(ollama, string.Empty));
+        using var geminiImages = Assert.IsType<GeminiMultimodalProvider>(
+            MultimodalChatClientFactory.Create(gemini, "test-key"));
+    }
+
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("anthropic")]
+    public void CreateMultimodal_UsesConfiguredImageAdapter(string protocolText)
+    {
+        var protocol = ProviderProtocol.Parse(protocolText);
+        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        [
+            new ProviderDefinition(
+                new ProviderName("gateway"),
+                protocol,
+                new Uri("https://example.test/v1/"),
+                new Dictionary<string, ModelSettings>
+                {
+                    ["model"] = new(200000, imageInput: true)
+                })
+        ]);
+        var settings = new HarnessSettings(
+            new ProviderName("gateway"),
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            catalog);
+
+        var client = MultimodalChatClientFactory.Create(settings, "test-key");
+        try
+        {
+            if (protocol == ProviderProtocol.OpenAI)
+            {
+                Assert.IsType<OpenAIMultimodalProvider>(client);
+            }
+            else
+            {
+                Assert.IsType<AnthropicMultimodalProvider>(client);
+            }
+        }
+        finally
+        {
+            (client as IDisposable)?.Dispose();
+        }
+    }
+
+    [Fact]
+    public void Create_UsesOpenAIAdapterForCompatibleProtocol()
+    {
+        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        [
+            new ProviderDefinition(
+                new ProviderName("groq"),
+                ProviderProtocol.OpenAI,
+                new Uri("https://api.groq.com/openai/v1/"),
+                new Dictionary<string, ModelSettings>
+                {
+                    ["llama"] = new(131072, temperature: 0.1, maxTokens: 1024)
+                },
+                tokenLimit: TokenLimitStyle.MaxTokens)
+        ]);
+        var settings = new HarnessSettings(
+            new ProviderName("groq"),
+            "llama",
+            ApprovalMode.Default,
+            0.8,
+            catalog);
+
+        var client = ChatClientFactory.Create(settings, "test-key");
+        try
+        {
+            Assert.IsType<OpenAIProvider>(client);
+        }
+        finally
+        {
+            (client as IDisposable)?.Dispose();
+        }
+    }
+
+    [Theory]
+    [InlineData("responses")]
+    [InlineData("anthropic")]
+    public void Create_UsesConfiguredWireAdapter(string protocolText)
+    {
+        var protocol = ProviderProtocol.Parse(protocolText);
+        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        [
+            new ProviderDefinition(
+                new ProviderName("gateway"),
+                protocol,
+                new Uri("https://example.test/v1/"),
+                new Dictionary<string, ModelSettings>
+                {
+                    ["model"] = new(200000, maxTokens: 4096)
+                })
+        ]);
+        var settings = new HarnessSettings(
+            new ProviderName("gateway"),
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            catalog);
+
+        var client = ChatClientFactory.Create(settings, "test-key");
+        try
+        {
+            if (protocol == ProviderProtocol.Responses)
+            {
+                Assert.IsType<ResponsesProvider>(client);
+            }
+            else
+            {
+                Assert.IsType<AnthropicProvider>(client);
+            }
+        }
+        finally
+        {
+            (client as IDisposable)?.Dispose();
+        }
+    }
+}

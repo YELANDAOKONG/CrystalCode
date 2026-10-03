@@ -24,8 +24,16 @@
 - Solution Explorer layout follows Visual Studio / Rider: `.sln` at the
   repository root, project folders beside it, tests as
   `{Project}.Tests` siblings (`CrystalCode.Tests`,
-  `CrystalCode.Display.Tests`, `CrystalCode.Providers.Tests`). No
-  `src/` or root `tests/` tree.
+  `CrystalCode.Engine.Tests`, `CrystalCode.Display.Tests`,
+  `CrystalCode.Providers.Tests`). No `src/` or root `tests/` tree.
+- Engine code never calls `Console`, never draws, and never reads keys.
+  Report through a `SessionEvent` or a `SessionFrontEnd` contract. New
+  events are sealed immutable records, one per file under
+  `CrystalCode.Engine/Events`, and carry engine values rather than display
+  captions.
+- Do not widen `InternalsVisibleTo` to give a front end engine internals.
+  Make the member public when a second front end could need it, otherwise
+  keep it out of the front end.
 
 ## C# conventions
 
@@ -50,7 +58,9 @@
 - Streams return `IAsyncEnumerable<T>`.
 - Never call `Result`, `Wait`, or `GetAwaiter().GetResult()`.
 - Library-style code in Providers uses `ConfigureAwait(false)`.
-- Application code in the executable host does not need `ConfigureAwait`.
+- Application code in the executable host and in CrystalCode.Engine does not
+  need `ConfigureAwait`. A front end awaits engine calls and never blocks on
+  them.
 - Do not create unobserved background work.
 
 ## Safety
@@ -87,23 +97,28 @@
   the remaining session unreadable.
 - Keep text and image-capable turn budgets on the same configured limits.
   A null limit is unlimited; omitted budget fields retain the finite defaults.
+- Built-in bash uses the same rule for `bashTimeoutSeconds`: omit it to keep
+  120 seconds; `null` or `"unlimited"` removes the per-command timer.
 
 ## Dependencies
 
 Authorized packages today:
 
 - Spectre.Console in CrystalCode.Display (session rasterization) and
-  CrystalCode (host cards that still build Spectre widgets).
+  CrystalCode (host cards that still build Spectre widgets). Never in
+  CrystalCode.Engine.
 - Spectre.Console.Cli in CrystalCode.
 - Terminal.Gui in CrystalCode.Display only, with a floating version
   (`*`). It is parked for supply-chain review. Production and test code
   must not import `Terminal.Gui` types. Do not add a dummy `using` to
   silence unused-package warnings; document a restore suppression if
   NU1510 is raised.
-- Newtonsoft.Json, Newtonsoft.Json.Bson, and System.Text.Json where the
-  Crystal sibling already requires them for project-reference consistency.
+- Newtonsoft.Json, Newtonsoft.Json.Bson, and System.Text.Json in
+  CrystalCode.Engine and CrystalCode.Providers, where the Crystal sibling
+  already requires them for project-reference consistency.
 - xUnit and Microsoft.NET.Test.Sdk in CrystalCode.Tests,
-  CrystalCode.Display.Tests, and CrystalCode.Providers.Tests.
+  CrystalCode.Engine.Tests, CrystalCode.Display.Tests, and
+  CrystalCode.Providers.Tests.
 
 Do not add another package without asking.
 
@@ -114,7 +129,11 @@ dotnet build CrystalCode.sln
 dotnet test CrystalCode.sln
 ```
 
-Do not claim coverage a test project does not actually exercise. Host
-behavior is tested in CrystalCode.Tests. Frame, composer, and paint
-behavior is tested in CrystalCode.Display.Tests. Adapters are tested
-in CrystalCode.Providers.Tests.
+Do not claim coverage a test project does not actually exercise. Session,
+approval, compaction, storage, and tool behavior is tested in
+CrystalCode.Engine.Tests, including a headless session driven by a scripted
+model through `ISessionObserver`. Terminal projection, renderer, and prompt
+surfaces are tested in CrystalCode.Tests. Frame, composer, and paint behavior
+is tested in CrystalCode.Display.Tests. Adapters are tested in
+CrystalCode.Providers.Tests. `EngineAssemblyTests` and `DisplayAssemblyTests`
+guard the dependency direction and must not be weakened to make a change pass.

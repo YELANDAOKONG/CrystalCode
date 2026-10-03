@@ -99,7 +99,8 @@ dotnet test CrystalCode.sln
 ```
 
 The executable project is `CrystalCode`. The Spectre application
-name is `crystal`.
+name is `crystal`. The session engine lives in the `CrystalCode.Engine`
+class library, which the executable references.
 
 ## Run
 
@@ -218,6 +219,7 @@ Top-level fields:
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
+| `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 120 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
 
 Add named endpoints and model tables in `providers.json`, not in new
 `config.json` configurations.
@@ -655,7 +657,7 @@ is the workspace root.
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `edit` | Work | Replace one unique `old_string` in a file |
 | `write` | Work | Create or overwrite a UTF-8 text file |
-| `bash` | Work | Run one shell command after approval (`bash -lc`, 120 second timeout) |
+| `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 120 seconds) |
 
 Practical limits: read up to 1,000,000 characters or 20,000 lines;
 write up to 2 MiB; grep up to 500 matches and 8 MiB per file; glob

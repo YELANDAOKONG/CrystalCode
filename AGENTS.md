@@ -37,6 +37,12 @@ semantics. Do not copy its Demo UI into this product.
   not replace those prompts. Do not invent additional prompt file names.
 - Provider adapters implement only Crystal chat contracts. They do not own
   tools, prompts, UI, or `~/.crystal` layout.
+- `CrystalCode.Engine` is front-end neutral. It must not reference
+  Spectre.Console, Terminal.Gui, `CrystalCode.Display`, or the executable,
+  and it must not touch the console. Everything a front end needs arrives as
+  a `SessionEvent` or flows through `SessionFrontEnd`. Terminal behavior
+  belongs in `CrystalCode`; frame and composer behavior in
+  `CrystalCode.Display`. Do not fork engine logic into a front end.
 - Public data values are immutable. One type per file. File-scoped namespaces.
 - No top-level statements. Explicit `Program.Main`.
 

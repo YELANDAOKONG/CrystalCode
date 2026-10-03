@@ -1,0 +1,12 @@
+namespace CrystalCode.Engine.Tools;
+
+/// <summary>
+/// Session todo item state.
+/// </summary>
+public enum TodoStatus
+{
+    Pending,
+    InProgress,
+    Completed,
+    Cancelled
+}

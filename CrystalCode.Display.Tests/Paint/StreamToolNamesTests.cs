@@ -15,7 +15,6 @@ public sealed class StreamToolNamesTests
         name = names.Apply(0, 0, "ead");
 
         Assert.Equal("read", name);
-        Assert.Equal("Read", DisplayCase.Token(name));
     }
 
     [Fact]
@@ -41,9 +40,9 @@ public sealed class StreamToolNamesTests
         name = names.Apply(0, 3, "grep");
 
         Assert.Equal("grep", name);
-        Assert.Equal("TodoWrite", DisplayCase.Token(names.Apply(0, 0, "todowrite")));
-        Assert.Equal("Bash", DisplayCase.Token(names.Apply(0, 1, "bash")));
-        Assert.Equal("Grep", DisplayCase.Token(names.Apply(0, 2, "grep")));
+        Assert.Equal("todowrite", names.Apply(0, 0, "todowrite"));
+        Assert.Equal("bash", names.Apply(0, 1, "bash"));
+        Assert.Equal("grep", names.Apply(0, 2, "grep"));
     }
 
     [Fact]

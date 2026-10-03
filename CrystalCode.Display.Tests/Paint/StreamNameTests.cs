@@ -15,7 +15,6 @@ public sealed class StreamNameTests
         name = StreamName.Apply(name, "read");
 
         Assert.Equal("read", name);
-        Assert.Equal("Read", DisplayCase.Token(name));
     }
 
     [Fact]

@@ -1,6 +1,7 @@
-using CrystalCode.Home;
-using CrystalCode.Plugins;
-using CrystalCode.Sessions;
+using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Sessions;
+using CrystalCode.Terminal;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -84,7 +85,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         }
 
         var plugins = PluginRegistry.CreateBuiltIn();
-        var session = CodingSession.Create(
+        var host = TerminalHost.Create(
             harnessSettings,
             settingsStore,
             credentials,
@@ -92,7 +93,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             workspace,
             plugins,
             resume);
-        return await session.RunAsync(cancellationToken);
+        return await host.RunAsync(cancellationToken);
     }
 
     private static string ResolveWorkspace(string? workspace)
