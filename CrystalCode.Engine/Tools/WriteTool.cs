@@ -69,9 +69,25 @@ public sealed class WriteTool : ITool
                     ToolResultStatus.Failure));
         }
 
+        if (Workspace.IsCredentialPath(path))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "Writing credential paths is not allowed.",
+                    ToolResultStatus.Failure));
+        }
+
         if (!_workspace.TryResolveWritablePath(path, out var fullPath, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
+        }
+
+        if (Workspace.IsCredentialPath(fullPath))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "Writing credential paths is not allowed.",
+                    ToolResultStatus.Failure));
         }
 
         var directory = Path.GetDirectoryName(fullPath);

@@ -65,12 +65,17 @@
 
 ## Safety
 
-- Write, edit, and bash stay inside the workspace root.
+- Write, edit, and bash stay inside the workspace root. Path checks
+  follow symbolic links to their final target. A link that leaves the
+  workspace is outside the workspace.
 - Read, glob, and grep of paths outside the workspace require
   approval. In Review or Audit the reviewing model judges them;
   otherwise the operator is asked. When Skills is enabled, any path
   inside a Skills search directory (`skill` / `skills` trees)
-  auto-passes as a workspace read. Credential paths stay Forbidden.
+  auto-passes as a workspace read. Credential paths stay Forbidden,
+  including workspace-relative `.ssh`, `.gnupg`, and
+  `.crystal/credentials.json`. Classification and execution both reject
+  them, and workspace-wide search skips those files.
 - Shell classification treats `sudo`, destructive filesystem commands,
   pipe-to-shell downloads, force-push, and credential-path writes as
   Forbidden or Privileged. Forbidden never fully auto-passes. Review

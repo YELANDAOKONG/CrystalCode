@@ -79,6 +79,33 @@ public sealed class GeminiProviderTests
     }
 
     [Fact]
+    public async Task StreamAsync_IgnoresNullFinishReasonUntilTheCandidateStops()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"candidates":[{"index":0,"content":{"parts":[{"text":"Hello"}]},"finishReason":null}]}
+
+            data: {"candidates":[{"index":0,"content":{"parts":[{"text":" world"}]},"finishReason":"STOP"}]}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("test-key", "gemini-test"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var item in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "hi")])))
+        {
+            events.Add(item);
+        }
+
+        Assert.Equal(2, events.OfType<ChatTextDelta>().Count());
+        Assert.Equal(
+            "Hello world",
+            string.Concat(events.OfType<ChatTextDelta>().Select(static delta => delta.Text)));
+        Assert.Single(events.OfType<ChatCandidateCompleted>());
+    }
+
+    [Fact]
     public async Task CompleteAsync_ReplaysNativeCallWithoutInventingWireId()
     {
         var firstHandler = new RecordingHandler(JsonResponse.Create(

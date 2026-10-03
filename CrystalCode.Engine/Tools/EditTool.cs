@@ -78,9 +78,25 @@ public sealed class EditTool : ITool
                 new ToolOutput("old_string and new_string are identical.", ToolResultStatus.Failure));
         }
 
+        if (Workspace.IsCredentialPath(path))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "Editing credential paths is not allowed.",
+                    ToolResultStatus.Failure));
+        }
+
         if (!_workspace.TryResolveExistingFile(path, out var fullPath, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
+        }
+
+        if (Workspace.IsCredentialPath(fullPath))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "Editing credential paths is not allowed.",
+                    ToolResultStatus.Failure));
         }
 
         if (Workspace.LooksBinary(fullPath))

@@ -281,7 +281,9 @@ One user message is one turn:
    the turn, or the user cancels. Before each model round, compact if the
    estimated transcript or the last model-round usage is over budget. One
    failed compact while still over budget stops the turn
-   (`context_overflow`).
+   (`context_overflow`). A provider failure that survives retry stops the
+   turn as `failed`: the error is published, the progress row clears, and
+   the transcript, including that user message, is saved.
 
 Text and image-capable turns share `executionBudget` from `config.json`.
 The default per-turn limits are 1024 model calls, 8192 tool calls, and 7 days.
@@ -502,7 +504,8 @@ Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a successful `/compact`, and on an orderly exit
 when the transcript has a user message or a compaction summary. The
 file stores the compacted model transcript (live system prompt, one
-summary, recent tail), the last usage snapshot, and cumulative provider usage.
+summary, recent tail, and reasoning items with their readable text and
+opaque provider state), the last usage snapshot, and cumulative provider usage.
 `crystal --resume` (`-r`) opens a terminal selector for this workspace;
 `crystal --resume <id>` loads a specific file at process start. A missing or empty
 session exits without entering the TTY. `/resume` opens the same selector inside

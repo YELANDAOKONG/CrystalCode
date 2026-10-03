@@ -48,10 +48,7 @@ internal sealed class PromptHistoryStore
         }
 
         entries.Add(new PromptHistoryDocument(_workspace, text));
-        if (entries.Count > MaximumEntries)
-        {
-            entries.RemoveRange(0, entries.Count - MaximumEntries);
-        }
+        TrimEachWorkspace(entries, MaximumEntries);
 
         _home.EnsureCreated();
         var temporaryPath = _home.PromptHistoryPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -117,6 +114,24 @@ internal sealed class PromptHistoryStore
             }
         }
 
-        return entries.TakeLast(MaximumEntries).ToArray();
+        return entries;
+    }
+
+    private static void TrimEachWorkspace(List<PromptHistoryDocument> entries, int maximum)
+    {
+        var kept = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = entries.Count - 1; index >= 0; index--)
+        {
+            var workspace = entries[index].Workspace;
+            kept.TryGetValue(workspace, out var count);
+            count++;
+            if (count > maximum)
+            {
+                entries.RemoveAt(index);
+                continue;
+            }
+
+            kept[workspace] = count;
+        }
     }
 }

@@ -7,11 +7,12 @@ internal static class ShellRisk
     private static readonly Regex ForbiddenPattern = new(
         """
         \bsudo\b
-        |rm\s+-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*\s+(?:/|~(?:/|$)|\$HOME(?:/|$)|\$\{HOME\}(?:/|$))
-        |(?:curl|wget)\b[\s\S]*\|\s*(?:ba)?sh\b
+        |rm\s+(?:-(?:[a-zA-Z]*r[a-zA-Z]*f|[a-zA-Z]*f[a-zA-Z]*r)[a-zA-Z]*|--recursive\b[\s\S]*--force\b|--force\b[\s\S]*--recursive\b)\s+(?:/|~(?:/|$)|\$HOME(?:/|$)|\$\{HOME\}(?:/|$))
+        |(?:curl|wget)\b[\s\S]*\|\s*(?:\S*/)?(?:ba)?sh\b
         |\bgit\s+push\b[\s\S]*\s(?:-f|--force)\b
         |(?:^|[^\w.])(?:~|/)?\.ssh(?:/|\b)
         |(?:^|[^\w.])(?:~|/)?\.gnupg(?:/|\b)
+        |(?:^|[^\w.])(?:~|/)?\.crystal/credentials\.json\b
         """,
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.IgnorePatternWhitespace,
         TimeSpan.FromSeconds(1));

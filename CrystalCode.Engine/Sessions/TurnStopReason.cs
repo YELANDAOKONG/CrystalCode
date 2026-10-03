@@ -17,6 +17,8 @@ public sealed record TurnStopReason
 
     public static TurnStopReason ContextOverflow { get; } = new("context_overflow");
 
+    public static TurnStopReason Failed { get; } = new("failed");
+
     public TurnStopReason(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);

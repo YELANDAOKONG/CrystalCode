@@ -40,4 +40,25 @@ public sealed class GrepToolTests
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("alpha", output.Text);
     }
+
+    [Fact]
+    public async Task InvokeAsync_SkipsCredentialFilesInsideWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "App.cs"), "visible\n");
+        Directory.CreateDirectory(Path.Combine(root.Path, ".crystal"));
+        File.WriteAllText(
+            Path.Combine(root.Path, ".crystal", "credentials.json"),
+            "SECRET-CRED\n");
+        Directory.CreateDirectory(Path.Combine(root.Path, ".ssh"));
+        File.WriteAllText(Path.Combine(root.Path, ".ssh", "id_rsa"), "SECRET-KEY\n");
+        var tool = new GrepTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", GrepTool.ToolName, """{"pattern":"SECRET|visible"}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains("visible", output.Text);
+        Assert.DoesNotContain("SECRET", output.Text);
+    }
 }

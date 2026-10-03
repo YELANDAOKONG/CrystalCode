@@ -83,6 +83,14 @@ public sealed class GlobTool : ITool
                 return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
             }
 
+            if (Workspace.IsCredentialPath(location))
+            {
+                return ValueTask.FromResult(
+                    new ToolOutput(
+                        "Searching credential paths is not allowed.",
+                        ToolResultStatus.Failure));
+            }
+
             if (File.Exists(location))
             {
                 return ValueTask.FromResult(
@@ -101,6 +109,11 @@ public sealed class GlobTool : ITool
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var relative = _workspace.ToRelative(file);
+                if (Workspace.IsCredentialPath(file) || Workspace.IsCredentialPath(relative))
+                {
+                    continue;
+                }
+
                 if (!glob!.IsMatch(relative)
                     && !glob.IsMatch(Path.GetRelativePath(searchRoot, file).Replace('\\', '/')))
                 {

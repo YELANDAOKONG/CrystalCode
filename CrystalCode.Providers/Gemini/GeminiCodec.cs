@@ -320,8 +320,9 @@ internal sealed class GeminiCodec : IProtocolCodec
         }
 
         var reason = candidate.TryGetProperty("finishReason", out var finish)
-            ? finish.GetString()
-            : null;
+            && finish.ValueKind == JsonValueKind.String
+                ? finish.GetString()
+                : null;
         return reason switch
         {
             "MAX_TOKENS" => FinishReason.Length,

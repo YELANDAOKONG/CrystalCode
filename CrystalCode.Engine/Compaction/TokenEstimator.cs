@@ -54,6 +54,22 @@ public static class TokenEstimator
         return total;
     }
 
+    private static int Reasoning(ChatReasoningItem item)
+    {
+        var total = 0;
+        foreach (var segment in item.Content.TextSegments)
+        {
+            total += Text(segment.Text);
+        }
+
+        if (item.Content.State is { } state)
+        {
+            total += Characters(state.Data.Length);
+        }
+
+        return total;
+    }
+
     public static int Item(ChatItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
@@ -62,6 +78,7 @@ public static class TokenEstimator
             ChatMessage message => Text(message.Text),
             ToolCall call => Text(call.Name) + Text(call.Arguments),
             ToolResult result => Text(result.Text),
+            ChatReasoningItem reasoning => Reasoning(reasoning),
             _ => 0
         };
     }

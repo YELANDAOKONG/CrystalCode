@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Home;
@@ -46,6 +47,9 @@ public static class TranscriptCodec
                             Text = result.Text,
                             Status = result.Status.Value
                         });
+                    break;
+                case ChatReasoningItem reasoning:
+                    documents.Add(WriteReasoning(reasoning));
                     break;
                 default:
                     break;
@@ -128,6 +132,8 @@ public static class TranscriptCodec
                         : new ToolResultStatus(document.Status);
                     item = new ToolResult(document.CallId, document.Text, status);
                     return true;
+                case "reasoning":
+                    return TryReadReasoning(document, out item);
                 default:
                     return false;
             }
@@ -136,5 +142,76 @@ public static class TranscriptCodec
         {
             return false;
         }
+    }
+
+    private static SessionItemDocument WriteReasoning(ChatReasoningItem reasoning)
+    {
+        var segments = new List<SessionReasoningSegment>();
+        foreach (var segment in reasoning.Content.TextSegments)
+        {
+            segments.Add(new SessionReasoningSegment
+            {
+                Text = segment.Text,
+                Kind = segment.Kind.Value
+            });
+        }
+
+        var state = reasoning.Content.State;
+        return new SessionItemDocument
+        {
+            Kind = "reasoning",
+            Segments = segments.Count == 0 ? null : segments,
+            StateFormat = state?.Format,
+            StateData = state is null ? null : Convert.ToBase64String(state.Data.Span)
+        };
+    }
+
+    private static bool TryReadReasoning(SessionItemDocument document, out ChatItem item)
+    {
+        item = null!;
+        var segments = new List<ReasoningText>();
+        if (document.Segments is not null)
+        {
+            foreach (var segment in document.Segments)
+            {
+                if (string.IsNullOrEmpty(segment.Text)
+                    || string.IsNullOrWhiteSpace(segment.Kind))
+                {
+                    continue;
+                }
+
+                segments.Add(new ReasoningText(segment.Text, new ReasoningTextKind(segment.Kind)));
+            }
+        }
+
+        OpaqueReasoningState? state = null;
+        if (!string.IsNullOrWhiteSpace(document.StateFormat)
+            && !string.IsNullOrWhiteSpace(document.StateData))
+        {
+            byte[] data;
+            try
+            {
+                data = Convert.FromBase64String(document.StateData);
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+
+            if (data.Length == 0)
+            {
+                return false;
+            }
+
+            state = new OpaqueReasoningState(document.StateFormat, data);
+        }
+
+        if (segments.Count == 0 && state is null)
+        {
+            return false;
+        }
+
+        item = new ChatReasoningItem(new ReasoningContent(segments, state));
+        return true;
     }
 }

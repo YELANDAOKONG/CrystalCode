@@ -124,6 +124,34 @@ public static class TranscriptExport
                 lines.Add("```");
                 lines.Add(string.Empty);
                 break;
+            case ChatReasoningItem reasoning:
+                var thinking = ReadableReasoning(reasoning);
+                if (thinking.Length == 0)
+                {
+                    break;
+                }
+
+                lines.Add("### Thinking");
+                lines.Add(string.Empty);
+                lines.Add(thinking);
+                lines.Add(string.Empty);
+                break;
+            default:
+                break;
         }
+    }
+
+    private static string ReadableReasoning(ChatReasoningItem item)
+    {
+        var parts = new List<string>();
+        foreach (var segment in item.Content.TextSegments)
+        {
+            if (segment.Text.Length > 0)
+            {
+                parts.Add(segment.Text);
+            }
+        }
+
+        return string.Join("\n", parts);
     }
 }

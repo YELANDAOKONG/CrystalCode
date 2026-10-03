@@ -143,7 +143,7 @@ public sealed class GrepTool : ITool
         error = string.Empty;
         if (relativePath is null)
         {
-            files.AddRange(_workspace.EnumerateFiles(_workspace.Root));
+            AddSearchable(_workspace.EnumerateFiles(_workspace.Root), files);
             return true;
         }
 
@@ -158,14 +158,31 @@ public sealed class GrepTool : ITool
             return false;
         }
 
+        if (Workspace.IsCredentialPath(location))
+        {
+            error = "Searching credential paths is not allowed.";
+            return false;
+        }
+
         if (File.Exists(location))
         {
             files.Add(location);
             return true;
         }
 
-        files.AddRange(_workspace.EnumerateFiles(location));
+        AddSearchable(_workspace.EnumerateFiles(location), files);
         return true;
+    }
+
+    private static void AddSearchable(IEnumerable<string> paths, List<string> files)
+    {
+        foreach (var path in paths)
+        {
+            if (!Workspace.IsCredentialPath(path))
+            {
+                files.Add(path);
+            }
+        }
     }
 
     private static bool TrySearchFile(

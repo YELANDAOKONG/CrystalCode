@@ -2210,10 +2210,7 @@ public sealed class CodingSession : ITurnObserver
             _nextImageNumber = Math.Max(_nextImageNumber, NextImageNumber());
         }
         BindReviewConversation();
-        if (result.ModelCallCount > 0)
-        {
-            _ledger.Record(result);
-        }
+        _ledger.Record(result);
 
         if (result.StopReason == TurnStopReason.Completed)
         {
@@ -2317,6 +2314,11 @@ public sealed class CodingSession : ITurnObserver
     {
         Publish(new ToolResultsReceived(results));
         PromoteAfterTools();
+    }
+
+    void ITurnObserver.OnFault(string message)
+    {
+        Error(message);
     }
 
     void ITurnObserver.OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage)

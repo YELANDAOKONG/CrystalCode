@@ -45,8 +45,28 @@ public static class CompactionText
             ToolResult result when result.Text == ContextCompactor.OmittedResultText =>
                 "[Tool result]: [Old tool result content cleared]",
             ToolResult result => "[Tool result]: " + Truncate(ImageMarkerText.Display(result.Text)),
+            ChatReasoningItem reasoning => ReadableReasoning(reasoning),
             _ => string.Empty
         };
+    }
+
+    private static string ReadableReasoning(ChatReasoningItem item)
+    {
+        var parts = new List<string>();
+        foreach (var segment in item.Content.TextSegments)
+        {
+            if (segment.Text.Length > 0)
+            {
+                parts.Add(segment.Text);
+            }
+        }
+
+        if (parts.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return "[Reasoning]: " + string.Join("\n", parts);
     }
 
     public static string Truncate(string value)

@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Compaction;
@@ -51,6 +52,28 @@ public sealed class TranscriptCodecTests
         Assert.Equal(ContextCompactor.OmittedResultText, ((ToolResult)restored[3]).Text);
         Assert.Equal("continue", ((ChatMessage)restored[4]).Text);
         Assert.True(TranscriptCodec.HasConversation(restored));
+    }
+
+    [Fact]
+    public void WriteThenRead_RoundTripsReasoningTextAndState()
+    {
+        var state = new OpaqueReasoningState(
+            "gemini.part",
+            System.Text.Encoding.UTF8.GetBytes("{\"thoughtSignature\":\"signed\"}"));
+        var original = new List<ChatItem>
+        {
+            new ChatMessage(ChatRole.User, "read"),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("looked", ReasoningTextKind.Summary)],
+                state))
+        };
+
+        var restored = TranscriptCodec.Read(TranscriptCodec.Write(original));
+
+        var reasoning = Assert.IsType<ChatReasoningItem>(restored[1]);
+        Assert.Equal("looked", Assert.Single(reasoning.Content.TextSegments).Text);
+        Assert.Equal(ReasoningTextKind.Summary, reasoning.Content.TextSegments[0].Kind);
+        Assert.Equal(state, reasoning.Content.State);
     }
 
     [Fact]

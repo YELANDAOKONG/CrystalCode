@@ -20,4 +20,6 @@ public interface ITurnObserver
     void OnToolResults(IReadOnlyList<ToolResult> results);
 
     void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null);
+
+    void OnFault(string message);
 }

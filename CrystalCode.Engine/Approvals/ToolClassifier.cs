@@ -161,8 +161,23 @@ public sealed class ToolClassifier
                 $"{verb} credential path");
         }
 
-        if (!_workspace.TryResolveWritablePath(path, out _, out var error)
-            && error.Contains("outside", StringComparison.OrdinalIgnoreCase))
+        if (_workspace.TryResolveWritablePath(path, out var fullPath, out var error))
+        {
+            if (Workspace.IsCredentialPath(fullPath))
+            {
+                return new ToolClassification(
+                    Risk.Forbidden,
+                    Authority.PrivilegedEscalation,
+                    $"{verb} credential path");
+            }
+
+            return new ToolClassification(
+                Risk.Write,
+                Authority.Workspace,
+                $"{verb} workspace file");
+        }
+
+        if (error.Contains("outside", StringComparison.OrdinalIgnoreCase))
         {
             return new ToolClassification(
                 Risk.Write,

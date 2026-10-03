@@ -27,4 +27,25 @@ public sealed class PromptHistoryStoreTests
             await first.LoadAsync(CancellationToken.None));
         Assert.Equal(["second prompt"], await second.LoadAsync(CancellationToken.None));
     }
+
+    [Fact]
+    public async Task AppendAsync_KeepsTwoHundredEntriesForEachWorkspace()
+    {
+        using var temporary = new TemporaryHome();
+        var first = new PromptHistoryStore(temporary.Home, "/workspace/first");
+        var second = new PromptHistoryStore(temporary.Home, "/workspace/second");
+        await second.AppendAsync("keep", CancellationToken.None);
+        for (var index = 0; index < 200; index++)
+        {
+            await first.AppendAsync($"prompt-{index}", CancellationToken.None);
+        }
+
+        await first.AppendAsync("newest", CancellationToken.None);
+
+        var loaded = await first.LoadAsync(CancellationToken.None);
+        Assert.Equal(200, loaded.Count);
+        Assert.Equal("prompt-1", loaded[0]);
+        Assert.Equal("newest", loaded[^1]);
+        Assert.Equal(["keep"], await second.LoadAsync(CancellationToken.None));
+    }
 }

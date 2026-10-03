@@ -49,7 +49,9 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
                     }
                 }
 
-                if (candidate.TryGetProperty("finishReason", out _))
+                if (candidate.TryGetProperty("finishReason", out var finish)
+                    && finish.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(finish.GetString()))
                 {
                     if (state.Completed)
                     {

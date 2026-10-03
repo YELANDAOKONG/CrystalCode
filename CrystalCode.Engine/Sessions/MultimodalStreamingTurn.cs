@@ -220,6 +220,17 @@ public sealed class MultimodalStreamingTurn
                 usage,
                 transcript);
         }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _observer?.OnModelRoundClosed();
+            _observer?.OnFault(exception.Message);
+            return Create(
+                TurnStopReason.Failed,
+                modelCallCount,
+                toolCallCount,
+                usage,
+                transcript);
+        }
     }
 
     private Task<ChatResponse> StreamModelAsync(

@@ -128,6 +128,26 @@ public sealed class CodingSessionHeadlessTests
         Assert.False(headless.Session.TryInterrupt());
     }
 
+    [Fact]
+    public async Task Turn_ProviderFailurePublishesTheErrorAndFinishes()
+    {
+        using var headless = new HeadlessSession(new ThrowingStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("hello");
+
+        var error = headless.Observer.Events.OfType<ErrorWritten>().Single();
+        Assert.Equal("The model request failed.", error.Text);
+        var finished = headless.Observer.Events.OfType<TurnFinished>().Single();
+        Assert.Equal(TurnStopReason.Failed, finished.Result.StopReason);
+        Assert.Contains(
+            finished.Result.Transcript,
+            static item => item is ChatMessage message
+                && message.Role == ChatRole.User
+                && message.Text == "hello");
+        Assert.False(headless.Session.TurnActive);
+    }
+
     [Theory]
     [InlineData("/quit")]
     [InlineData("/exit")]
@@ -179,5 +199,18 @@ public sealed class CodingSessionHeadlessTests
             new ChatToolCallDelta(0, 0, callId, name, arguments),
             new ChatCandidateCompleted(0, FinishReason.ToolCalls)
         ];
+    }
+
+    private sealed class ThrowingStreamingClient : IStreamingChatClient
+    {
+        public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("The model request failed.");
+
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("StreamingTurn uses StreamAsync.");
     }
 }

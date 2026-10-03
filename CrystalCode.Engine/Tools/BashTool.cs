@@ -97,7 +97,6 @@ public sealed class BashTool : ITool
                 ToolResultStatus.Failure);
         }
 
-        var output = ProcessOutputReader.ReadAsync(process, cancellationToken);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
         if (_timeoutSeconds is int seconds)
@@ -105,24 +104,48 @@ public sealed class BashTool : ITool
             timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
         }
 
+        var output = ProcessOutputReader.ReadAsync(process, timeout.Token);
         try
         {
             await process.WaitForExitAsync(timeout.Token);
+            var text = await output.WaitAsync(timeout.Token);
+            var status = process.ExitCode == 0
+                ? ToolResultStatus.Success
+                : ToolResultStatus.Failure;
+            return new ToolOutput($"exit {process.ExitCode}\n{text}", status);
         }
-        catch (OperationCanceledException) when (
-            _timeoutSeconds is int limit && !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            TryKill(process);
+            throw;
+        }
+        catch (OperationCanceledException) when (_timeoutSeconds is int limit)
         {
             TryKill(process);
             return new ToolOutput(
                 ToolOutputText.Timeout(limit),
                 ToolResultStatus.Failure);
         }
+        finally
+        {
+            if (!HasExited(process))
+            {
+                TryKill(process);
+            }
 
-        var text = await output;
-        var status = process.ExitCode == 0
-            ? ToolResultStatus.Success
-            : ToolResultStatus.Failure;
-        return new ToolOutput($"exit {process.ExitCode}\n{text}", status);
+            if (timeout.IsCancellationRequested)
+            {
+                try
+                {
+                    await output;
+                }
+                catch (Exception exception) when (exception is OperationCanceledException
+                    or IOException
+                    or ObjectDisposedException)
+                {
+                }
+            }
+        }
     }
 
     internal static bool IsSupported(int? timeoutSeconds) =>
@@ -208,6 +231,18 @@ public sealed class BashTool : ITool
         }
     }
 
+    private static bool HasExited(Process process)
+    {
+        try
+        {
+            return process.HasExited;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+    }
+
     private static void TryKill(Process process)
     {
         try
@@ -218,6 +253,9 @@ public sealed class BashTool : ITool
             }
         }
         catch (InvalidOperationException)
+        {
+        }
+        catch (System.ComponentModel.Win32Exception)
         {
         }
     }

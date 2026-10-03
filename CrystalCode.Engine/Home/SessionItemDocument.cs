@@ -18,4 +18,10 @@ public sealed class SessionItemDocument
     public string? Arguments { get; set; }
 
     public string? Status { get; set; }
+
+    public List<SessionReasoningSegment>? Segments { get; set; }
+
+    public string? StateFormat { get; set; }
+
+    public string? StateData { get; set; }
 }

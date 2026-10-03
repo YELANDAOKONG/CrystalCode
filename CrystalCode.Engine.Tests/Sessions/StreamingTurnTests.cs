@@ -265,19 +265,24 @@ public sealed class StreamingTurnTests
     {
         var client = new FlakyStreamingClient(
             new DeepSeekException("bad model", statusCode: 400, errorCode: "invalid_request"));
+        var observer = new TestObserver();
         var turn = new StreamingTurn(
             client,
             new ToolExecutor(
                 new ToolCatalog([new EchoTool()]),
                 new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
             new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer,
             retry: InstantRetry());
 
-        var exception = await Assert.ThrowsAsync<DeepSeekException>(
-            () => turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]));
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
 
-        Assert.Equal(400, exception.StatusCode);
+        Assert.Equal(TurnStopReason.Failed, result.StopReason);
         Assert.Equal(1, client.RequestCount);
+        Assert.Equal("bad model", observer.Fault);
+        Assert.Contains(
+            result.Transcript,
+            static item => item is ChatMessage message && message.Role == ChatRole.User);
     }
 
     [Fact]
@@ -285,18 +290,21 @@ public sealed class StreamingTurnTests
     {
         var client = new FlakyStreamingClient(
             new DeepSeekException("slow down", statusCode: 429));
+        var observer = new TestObserver();
         var turn = new StreamingTurn(
             client,
             new ToolExecutor(
                 new ToolCatalog([new EchoTool()]),
                 new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
             new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer,
             retry: InstantRetry(maximumRetries: 2));
 
-        await Assert.ThrowsAsync<DeepSeekException>(
-            () => turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]));
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
 
+        Assert.Equal(TurnStopReason.Failed, result.StopReason);
         Assert.Equal(3, client.RequestCount);
+        Assert.Equal("slow down", observer.Fault);
     }
 
     private static SessionRetryOptions InstantRetry(int maximumRetries = 5) =>
@@ -405,6 +413,10 @@ public sealed class StreamingTurnTests
 
         public void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null) =>
             UsageUpdates.Add((contextUsage, turnCumulativeUsage));
+
+        public string? Fault { get; private set; }
+
+        public void OnFault(string message) => Fault = message;
     }
 
     private sealed class FlakyStreamingClient : IStreamingChatClient

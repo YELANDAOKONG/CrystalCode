@@ -19,7 +19,7 @@ public sealed class Workspace
     public Workspace(string root)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
-        Root = Path.GetFullPath(root);
+        Root = Canonicalize(Path.GetFullPath(root));
         if (!Directory.Exists(Root))
         {
             throw new DirectoryNotFoundException(
@@ -45,9 +45,11 @@ public sealed class Workspace
         string candidate;
         try
         {
-            candidate = Path.GetFullPath(combined);
+            candidate = Canonicalize(Path.GetFullPath(combined));
         }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        catch (Exception exception) when (exception is ArgumentException
+            or NotSupportedException
+            or IOException)
         {
             error = "Directory is not a valid path.";
             return false;
@@ -121,19 +123,32 @@ public sealed class Workspace
     public static bool IsCredentialPath(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var expanded = Expand(path).Replace('\\', '/');
-        return expanded.Contains("/.ssh/", StringComparison.OrdinalIgnoreCase)
-            || expanded.EndsWith("/.ssh", StringComparison.OrdinalIgnoreCase)
-            || expanded.Contains("/.gnupg/", StringComparison.OrdinalIgnoreCase)
-            || expanded.EndsWith("/.gnupg", StringComparison.OrdinalIgnoreCase)
-            || expanded.Contains("/.crystal/credentials.json", StringComparison.OrdinalIgnoreCase);
+        var expanded = Expand(path).Replace('\\', '/').TrimEnd('/');
+        var segments = expanded.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 0; index < segments.Length; index++)
+        {
+            if (segments[index].Equals(".ssh", StringComparison.OrdinalIgnoreCase)
+                || segments[index].Equals(".gnupg", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (index + 1 < segments.Length
+                && segments[index].Equals(".crystal", StringComparison.OrdinalIgnoreCase)
+                && segments[index + 1].Equals("credentials.json", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public IEnumerable<string> EnumerateFiles(string directoryFullPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directoryFullPath);
 
-        var start = Path.GetFullPath(directoryFullPath);
+        var start = Canonicalize(Path.GetFullPath(directoryFullPath));
         var fence = IsInsideRoot(start) ? Root : start;
         var pending = new Stack<string>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -159,7 +174,12 @@ public sealed class Workspace
 
             foreach (var file in files)
             {
-                yield return file;
+                if (!TryAcceptEnumerated(file, fence, out var resolved))
+                {
+                    continue;
+                }
+
+                yield return resolved;
             }
 
             IEnumerable<string> children;
@@ -179,12 +199,7 @@ public sealed class Workspace
                     continue;
                 }
 
-                string resolved;
-                try
-                {
-                    resolved = Path.GetFullPath(child);
-                }
-                catch (Exception exception) when (IsSkippableIo(exception))
+                if (!TryAcceptEnumerated(child, fence, out var resolved))
                 {
                     continue;
                 }
@@ -293,9 +308,11 @@ public sealed class Workspace
         string candidate;
         try
         {
-            candidate = Path.GetFullPath(combined);
+            candidate = Canonicalize(Path.GetFullPath(combined));
         }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        catch (Exception exception) when (exception is ArgumentException
+            or NotSupportedException
+            or IOException)
         {
             error = "Path is not valid.";
             return false;
@@ -321,6 +338,122 @@ public sealed class Workspace
             + Path.DirectorySeparatorChar;
         return candidate.StartsWith(prefix, StringComparison.Ordinal)
             || string.Equals(fullPath, root, StringComparison.Ordinal);
+    }
+
+    private bool TryAcceptEnumerated(string path, string fence, out string resolved)
+    {
+        resolved = path;
+        if (!IsReparsePoint(path))
+        {
+            return IsInside(path, fence);
+        }
+
+        try
+        {
+            resolved = Canonicalize(path);
+        }
+        catch (Exception exception) when (IsSkippableIo(exception))
+        {
+            return false;
+        }
+
+        return IsInside(resolved, fence);
+    }
+
+    internal static string Canonicalize(string fullPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
+        var rooted = Path.GetFullPath(fullPath);
+        var root = Path.GetPathRoot(rooted);
+        if (string.IsNullOrEmpty(root))
+        {
+            return rooted;
+        }
+
+        var current = root;
+        var relative = rooted[root.Length..];
+        foreach (var segment in relative.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment == ".")
+            {
+                continue;
+            }
+
+            if (segment == "..")
+            {
+                var parent = Path.GetDirectoryName(TrimTrailingSeparator(current));
+                current = string.IsNullOrEmpty(parent) ? root : parent;
+                continue;
+            }
+
+            current = Path.Combine(TrimTrailingSeparator(current), segment);
+            if (!IsReparsePoint(current))
+            {
+                continue;
+            }
+
+            if (!TryFinalTarget(current, out var target))
+            {
+                throw new IOException($"Symbolic link could not be resolved: {current}");
+            }
+
+            current = target;
+        }
+
+        return Path.GetFullPath(current);
+    }
+
+    private static string TrimTrailingSeparator(string path)
+    {
+        var root = Path.GetPathRoot(path);
+        if (root is not null && string.Equals(path, root, StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        return path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private static bool IsReparsePoint(string path)
+    {
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryFinalTarget(string path, out string target)
+    {
+        target = string.Empty;
+        FileSystemInfo? link;
+        try
+        {
+            link = File.ResolveLinkTarget(path, returnFinalTarget: true);
+        }
+        catch (Exception exception) when (exception is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            return false;
+        }
+
+        if (link is null)
+        {
+            return false;
+        }
+
+        target = link.FullName;
+        return true;
     }
 
     private static bool IsSkippableIo(Exception exception) =>
