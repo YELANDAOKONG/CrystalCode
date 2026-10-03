@@ -10,8 +10,9 @@ using CrystalCode.Terminal;
 namespace CrystalCode.Run;
 
 /// <summary>
-/// Plain-text transcript for one unattended run. Thinking text is kept only
-/// when requested. The observer is called from the turn thread.
+/// Readable plain-text trace for one unattended run. Tool bodies are shortened.
+/// Thinking text is kept only when requested. The observer is called from the
+/// turn thread.
 /// </summary>
 internal sealed class RunLog : IRunLog
 {
@@ -20,6 +21,8 @@ internal sealed class RunLog : IRunLog
     private readonly object _gate = new();
     private readonly StringBuilder _reply = new();
     private readonly StringBuilder _thinking = new();
+    private readonly List<ToolCall> _calls = [];
+    private bool _wrote;
 
     public RunLog(TextWriter output, bool showThinking)
     {
@@ -43,7 +46,9 @@ internal sealed class RunLog : IRunLog
             Flush();
             if (status is not null)
             {
+                WriteBreak();
                 _output.WriteLine("Stopped  " + status);
+                _wrote = true;
             }
 
             _output.WriteLine();
@@ -63,34 +68,29 @@ internal sealed class RunLog : IRunLog
                     break;
                 case ToolCallsIssued issued:
                     Flush();
-                    foreach (var call in issued.Calls)
-                    {
-                        _output.WriteLine("Tool  " + Summary(call));
-                    }
-
+                    _calls.AddRange(issued.Calls);
                     break;
                 case ToolResultsReceived received:
                     Flush();
                     foreach (var result in received.Results)
                     {
-                        var label = result.Status == ToolResultStatus.Failure
-                            ? "Error"
-                            : "Result";
-                        WriteBlock(label, result.Text);
+                        WriteTool(Take(result.CallId), result);
                     }
 
                     break;
                 case ErrorWritten error:
                     Flush();
-                    WriteBlock("Error", error.Text);
+                    WriteSection("Error", error.Text);
                     break;
                 case NoteWritten note:
                     Flush();
-                    WriteBlock("Note", note.Text);
+                    WriteSection("Note", note.Text);
                     break;
                 case TurnFinished finished:
                     Flush();
                     StopReason = finished.Result.StopReason;
+                    break;
+                default:
                     break;
             }
         }
@@ -106,6 +106,8 @@ internal sealed class RunLog : IRunLog
             case ChatReasoningTextDelta reasoning when _showThinking && reasoning.Text.Length > 0:
                 _thinking.Append(reasoning.Text);
                 break;
+            default:
+                break;
         }
     }
 
@@ -113,8 +115,9 @@ internal sealed class RunLog : IRunLog
     {
         if (_thinking.Length > 0)
         {
-            WriteBlock("Thinking", _thinking.ToString());
+            var thinking = _thinking.ToString();
             _thinking.Clear();
+            WriteSection("Thinking", thinking);
         }
 
         if (_reply.Length == 0)
@@ -122,22 +125,110 @@ internal sealed class RunLog : IRunLog
             return;
         }
 
-        var text = _reply.ToString().TrimEnd();
+        var text = _reply.ToString();
         _reply.Clear();
-        if (text.Length > 0)
+        WriteParagraph(text);
+    }
+
+    private void WriteTool(ToolCall? call, ToolResult result)
+    {
+        var summary = call is null ? "Tool" : Summary(call);
+        var body = Indent(RunToolBody.Format(call?.Name, result.Status, result.Text));
+        WriteSection(summary, body);
+    }
+
+    private void WriteParagraph(string text)
+    {
+        var normalized = Normalize(text);
+        if (normalized.Length == 0)
         {
-            _output.WriteLine(text);
+            return;
+        }
+
+        WriteBreak();
+        WriteNormalized(normalized);
+        _wrote = true;
+    }
+
+    private void WriteSection(string label, string body)
+    {
+        var normalized = Normalize(body);
+        WriteBreak();
+        _output.WriteLine(label);
+        if (normalized.Length > 0)
+        {
+            WriteNormalized(normalized);
+        }
+
+        _wrote = true;
+    }
+
+    private void WriteBreak()
+    {
+        if (_wrote)
+        {
+            _output.WriteLine();
         }
     }
 
-    private void WriteBlock(string label, string text)
+    private void WriteNormalized(string text)
     {
-        var body = text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd();
-        _output.WriteLine(label);
-        if (body.Length > 0)
+        foreach (var line in text.Split('\n'))
         {
-            _output.WriteLine(body);
+            _output.WriteLine(line);
         }
+    }
+
+    private static string Normalize(string text) =>
+        text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n');
+
+    private static string Indent(string text)
+    {
+        if (text.Length == 0)
+        {
+            return text;
+        }
+
+        var lines = text.Split('\n');
+        var builder = new StringBuilder();
+        for (var index = 0; index < lines.Length; index++)
+        {
+            if (index > 0)
+            {
+                builder.Append('\n');
+            }
+
+            if (lines[index].Length > 0)
+            {
+                builder.Append("  ");
+                builder.Append(lines[index]);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private ToolCall? Take(string? callId)
+    {
+        if (!string.IsNullOrEmpty(callId))
+        {
+            var index = _calls.FindIndex(call => call.CallId == callId);
+            if (index >= 0)
+            {
+                var found = _calls[index];
+                _calls.RemoveAt(index);
+                return found;
+            }
+        }
+
+        if (_calls.Count == 0)
+        {
+            return null;
+        }
+
+        var first = _calls[0];
+        _calls.RemoveAt(0);
+        return first;
     }
 
     private static string Summary(ToolCall call)

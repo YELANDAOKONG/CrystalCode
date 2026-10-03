@@ -144,9 +144,15 @@ crystal run --workspace . --approval review --duration 600 "Fix the failing test
 echo "Summarize the repository." | crystal run --model-calls 8 --tool-calls 32
 ```
 
-`--format default` prints tool calls, tool results, errors, and the
-assistant reply as plain text. `--format json` prints one JSON object per
-line instead. Thinking text is omitted unless `--show-thinking` is set.
+`--format default` prints a readable trace: the assistant reply, then each
+tool beside its own result. `read`, `glob`, and `grep` keep a short head
+excerpt and say how many lines were omitted. `edit` and `write` keep their
+result. `bash` keeps the command, the exit status, and a short tail, with
+a longer tail when the command fails. Other successful tools use the same
+short excerpt. Failures other than `bash` keep the result text.
+`--format json` prints one JSON object per line and keeps the full tool
+output. Thinking text is omitted unless `--show-thinking` is set, and then
+it is printed before that round's reply.
 The saved session id is printed at the end. Resume that session with the
 interactive `crystal --resume <id>`.
 

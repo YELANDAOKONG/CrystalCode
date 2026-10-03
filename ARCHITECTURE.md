@@ -924,9 +924,15 @@ reviewing model: allow executes the tool, and deny returns the reviewer's
 reason. Plan does not offer write, edit, or bash. The approval policy
 also rejects those side effects when a catalog still contains them.
 
-`--format default` writes plain text: tool calls, tool results, errors,
-notes, and the assistant reply. `--format json` writes one JSON object per
-line, with `type`, a UTC `timestamp`, and `sessionID`. Event types are
+`--format default` writes a readable trace. Each model round prints thinking
+text only when `--show-thinking` is set, then the assistant reply, then each
+tool beside its own result. `read`, `glob`, `grep`, and other successful
+tools keep a short head excerpt and an omitted-line count. `edit` and `write`
+keep their result. `bash` keeps the command, the exit status, and a short
+tail, with a longer tail when the command fails. Other failures keep the
+result text. `--format json` writes one JSON object per
+line, with `type`, a UTC `timestamp`, and `sessionID`, and keeps the full
+tool output. Event types are
 `step_start`, `text`, `reasoning`, `tool_use`, `error`, `note`, `retry`,
 `step_finish`, `stopped`, and `session`. Thinking text is omitted unless
 `--show-thinking` is set. The process then prints the saved session id.
