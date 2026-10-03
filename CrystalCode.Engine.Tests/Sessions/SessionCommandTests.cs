@@ -12,6 +12,7 @@ public sealed class SessionCommandTests
     [InlineData("/approval review", SessionVerb.Approval)]
     [InlineData("/thinking high", SessionVerb.Thinking)]
     [InlineData("/think off", SessionVerb.Thinking)]
+    [InlineData("/effort low", SessionVerb.Thinking)]
     [InlineData("/resume", SessionVerb.Resume)]
     [InlineData("/quit", SessionVerb.Quit)]
     [InlineData("/new", SessionVerb.Clear)]
@@ -32,6 +33,8 @@ public sealed class SessionCommandTests
     [InlineData("/export json --system", SessionVerb.Export)]
     [InlineData("/statusline", SessionVerb.StatusLine)]
     [InlineData("/statusline on", SessionVerb.StatusLine)]
+    [InlineData("/stats", SessionVerb.Stats)]
+    [InlineData("/stats all 30d tools 5", SessionVerb.Stats)]
     [InlineData("/todos", SessionVerb.Todos)]
     [InlineData("/todo", SessionVerb.Todos)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)

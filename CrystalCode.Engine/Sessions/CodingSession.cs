@@ -455,6 +455,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Status:
                 ShowStatus(command.Argument);
                 return (true, false);
+            case SessionVerb.Stats:
+                ShowStats(command.Argument);
+                return (true, false);
             case SessionVerb.StatusLine:
                 ChangeStatusLine(command.Argument);
                 return (true, false);
@@ -1871,6 +1874,32 @@ public sealed class CodingSession : ITurnObserver
         }
 
         Note(SessionListText.Format(sessions, _sessionId, includeAll));
+    }
+
+    private void ShowStats(string argument)
+    {
+        if (!SessionStatsArguments.TryParse(argument, out var options, out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        var summaries = _sessionStore.List(options.IncludeAllWorkspaces ? null : _workspace.Root);
+        var sessions = new List<SessionDocument>(summaries.Count);
+        foreach (var summary in summaries)
+        {
+            if (_sessionStore.TryLoad(summary.Id, out var document))
+            {
+                sessions.Add(document);
+            }
+        }
+
+        var report = SessionStatsCompiler.Compile(
+            sessions,
+            DateTimeOffset.UtcNow,
+            options.WindowDays,
+            options.TopTools);
+        Note(SessionStatsText.Format(report, options.IncludeAllWorkspaces));
     }
 
     private void ApplyDocument(SessionDocument document)

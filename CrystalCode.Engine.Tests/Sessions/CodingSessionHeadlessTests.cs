@@ -163,6 +163,28 @@ public sealed class CodingSessionHeadlessTests
         Assert.DoesNotContain(headless.Observer.Events, static e => e is TurnStarted);
     }
 
+    [Fact]
+    public async Task StatsCommand_PrintsTokenAndToolSummary()
+    {
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "read", """{"path":"notes.txt"}"""),
+            TextRound("It says alpha."));
+        using var headless = new HeadlessSession(client);
+        await File.WriteAllTextAsync(Path.Combine(headless.WorkspacePath, "notes.txt"), "alpha");
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("read notes");
+        headless.Observer.Clear();
+
+        var quit = await headless.Session.SubmitAsync("/stats", CancellationToken.None);
+
+        Assert.False(quit);
+        var note = headless.Observer.Events.OfType<NoteWritten>().Single().Text;
+        Assert.Contains("Stats · This workspace", note, StringComparison.Ordinal);
+        Assert.Contains("Tokens", note, StringComparison.Ordinal);
+        Assert.Contains("Top tools", note, StringComparison.Ordinal);
+        Assert.Contains("read", note, StringComparison.Ordinal);
+    }
+
     private static int IndexOf<TEvent>(IReadOnlyList<SessionEvent> events)
         where TEvent : SessionEvent
     {
