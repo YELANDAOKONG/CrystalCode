@@ -21,6 +21,7 @@ public static class WorkPrompt
         - Use edit to change an existing file: old_string must appear exactly once. Use write only to create a file or replace the whole file.
         - Use bash for builds, tests, git, and scripts. The working directory is the workspace root. Do not use it to read, write, or search files.
         - Use todowrite to record multi-step work. Use todoread to inspect the current list without changing it.
+        - Send every call whose arguments you can already write in one response, including a later command that should run after an edit you have already specified. The host runs that batch in order and returns the results together. Wait for a result before the next call when you need it to choose the path, the exact text, the command, or whether to continue.
         - The host handles tool approval. Do not ask whether you may call a tool.
 
         # Doing tasks

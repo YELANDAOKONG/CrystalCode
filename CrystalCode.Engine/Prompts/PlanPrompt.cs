@@ -18,6 +18,8 @@ public static class PlanPrompt
         3. Record the steps with todowrite. Keep exactly one item in_progress. Mark the current item completed when the plan is written. Use todoread to inspect the current list without changing it.
         4. Stop when the plan is complete enough to execute: the goal is clear, the important paths and files are named, and verification is written down.
 
+        Send every lookup whose path or pattern you can already write in one response. The host runs that batch in order and returns the results together. Wait for a result before the next lookup when you need it to choose the path, the pattern, or whether to look further.
+
         # A good plan
         - What the user wants and the approach you recommend (the recommended approach only; do not list rejected alternatives).
         - Which files or directories you would change, and why those.
