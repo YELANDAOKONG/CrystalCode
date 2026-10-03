@@ -509,9 +509,9 @@ Grant: Once, Session, Persistent.
 
 | Mode | Behavior |
 | :--- | :--- |
-| **Default** | Workspace read auto-executes. Write, shell, and reads outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
-| **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and outside-workspace reads still ask. |
-| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including bash, reads outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
+| **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including bash and read, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
 | **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
 
@@ -636,11 +636,11 @@ custom field order.
 
 ## Built-in tools
 
-Filesystem and shell writes are fenced to the workspace root. Paths
-that escape the root are rejected for `edit`, `write`, and `bash`.
-`read`, `glob`, and `grep` may use an absolute path outside the
+`read`, `glob`, `grep`, `edit`, and `write` may use a path outside the
 workspace after approval (you, or the Review model in Review or
-Audit). Credential paths
+Audit). Workspace `write` and `edit` still follow the approval mode.
+`bash` starts in the workspace root and is approved as a side effect.
+Credential paths
 (`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob and grep
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
 files are rejected for read/edit (NUL probe). Shell working directory

@@ -1,7 +1,9 @@
 namespace CrystalCode.Engine.Tools;
 
 /// <summary>
-/// A rooted directory that tools may read or write. Paths must stay inside Root.
+/// Resolves tool paths from a workspace root. Reads and writes may leave the
+/// root after approval. Credential paths stay forbidden. Symbolic links resolve
+/// to their final target.
 /// </summary>
 public sealed class Workspace
 {
@@ -102,6 +104,12 @@ public sealed class Workspace
 
     public bool TryResolveWritablePath(string path, out string fullPath, out string error) =>
         TryResolve(path, mustExistAsFile: false, allowOutside: false, out fullPath, out error);
+
+    public bool TryResolveOutputPath(string path, out string fullPath, out string error) =>
+        TryResolve(path, mustExistAsFile: false, allowOutside: true, out fullPath, out error);
+
+    public bool TryResolveEditableFile(string path, out string fullPath, out string error) =>
+        TryResolve(path, mustExistAsFile: true, allowOutside: true, out fullPath, out error);
 
     public bool TryResolveExistingLocation(
         string path,

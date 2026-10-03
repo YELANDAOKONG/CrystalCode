@@ -262,6 +262,71 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
+    public async Task DecideAsync_Review_SendsOutsideWriteToTheReviewer()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Review);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(
+            prompt,
+            new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("the user asked for this file")));
+
+        var decision = await policy.DecideAsync(OutsideWriteCall());
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.ReviewCount);
+        Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Audit_SendsOutsideWriteToTheReviewer()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Audit);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(
+            prompt,
+            new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("the user asked for this file")));
+
+        var decision = await policy.DecideAsync(OutsideWriteCall());
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.ReviewCount);
+        Assert.Equal(ApprovalPassReason.Review, prompt.LastPassReason);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Edit_AsksForOutsideWrite()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Edit);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(prompt);
+
+        var decision = await policy.DecideAsync(OutsideWriteCall());
+
+        Assert.Equal(ToolInvocationAction.Reject, decision.Action);
+        Assert.Equal(1, prompt.Count);
+        Assert.Equal(0, prompt.ReviewCount);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Full_AsksForOutsideWrite()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Full);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(prompt);
+
+        var decision = await policy.DecideAsync(OutsideWriteCall());
+
+        Assert.Equal(ToolInvocationAction.Reject, decision.Action);
+        Assert.Equal(1, prompt.Count);
+        Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
+    }
+
+    [Fact]
     public async Task DecideAsync_Review_AllowsBashWhenReviewerAllows()
     {
         using var context = new ApprovalContext(ApprovalMode.Review);
@@ -468,6 +533,9 @@ public sealed class ApprovalPolicyTests
 
     private static ToolCall WriteCall() =>
         new("1", WriteTool.ToolName, """{"path":"src/App.cs","contents":"x"}""");
+
+    private static ToolCall OutsideWriteCall() =>
+        new("1", WriteTool.ToolName, """{"path":"../escape.txt","contents":"x"}""");
 
     private sealed class FixedApprovalClassifier : IApprovalClassifier
     {

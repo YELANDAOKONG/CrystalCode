@@ -422,15 +422,16 @@ Modes:
   tools listed for Plan keep Write + Workspace and still go through
   approval.
 - Default: Workspace Read auto-executes. Write, shell, and
-  outside-workspace reads ask the operator.
+  paths outside the workspace ask the operator.
 - Edit: workspace file changes for built-in `write` and `edit`
-  pass without review. Shell, external tools, and outside-workspace
-  reads still ask.
+  pass without review. Shell, external tools, and paths outside the
+  workspace still ask.
 - Review: workspace file changes for built-in `write` and `edit`
   pass without review, same as Edit. Another model checks
   each remaining side-effect call (Codex guardian-style), including
-  bash, reads, glob, and grep of paths outside the workspace, and
-  external Write. Workspace reads and Skills search directories still
+  bash, reads, glob, grep, write, and edit of paths outside the
+  workspace, and external Write. Workspace reads and Skills search
+  directories still
   auto-execute. A bounded transcript excerpt is attached: the first
   and latest user turns as authorization anchors, other user turns
   that fit, then recent assistant and tool evidence. A compaction

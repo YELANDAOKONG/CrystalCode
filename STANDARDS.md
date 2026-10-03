@@ -65,12 +65,13 @@
 
 ## Safety
 
-- Write, edit, and bash stay inside the workspace root. Path checks
-  follow symbolic links to their final target. A link that leaves the
-  workspace is outside the workspace.
-- Read, glob, and grep of paths outside the workspace require
-  approval. In Review or Audit the reviewing model judges them;
-  otherwise the operator is asked. When Skills is enabled, any path
+- Write, edit, read, glob, and grep of paths outside the workspace
+  require approval. In Review or Audit the reviewing model judges them;
+  otherwise the operator is asked. Edit, Review, and Full do not
+  auto-pass an outside write or edit. Path checks follow symbolic links
+  to their final target. A link that leaves the workspace is outside
+  the workspace.
+- When Skills is enabled, any path
   inside a Skills search directory (`skill` / `skills` trees)
   auto-passes as a workspace read. Credential paths stay Forbidden,
   including workspace-relative `.ssh`, `.gnupg`, and

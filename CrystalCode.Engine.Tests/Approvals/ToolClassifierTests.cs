@@ -143,6 +143,23 @@ public sealed class ToolClassifierTests
     }
 
     [Fact]
+    public void Classify_WriteThroughSymlink_UsesOutsideAuthority()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var target = Path.Combine(outside.Path, "secret.txt");
+        File.WriteAllText(target, "OUTSIDE");
+        File.CreateSymbolicLink(Path.Combine(root.Path, "link.txt"), target);
+        var classifier = new ToolClassifier(new Workspace(root.Path));
+
+        var classification = classifier.Classify(
+            new ToolCall("1", WriteTool.ToolName, """{"path":"link.txt","contents":"x"}"""));
+
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
+    }
+
+    [Fact]
     public void Classify_WriteSshPath_IsForbidden()
     {
         using var root = new TemporaryWorkspace();

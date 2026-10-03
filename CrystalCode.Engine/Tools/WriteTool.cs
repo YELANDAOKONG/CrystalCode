@@ -5,14 +5,18 @@ using Crystal.Tools;
 namespace CrystalCode.Engine.Tools;
 
 /// <summary>
-/// Creates or overwrites a workspace text file.
+/// Creates or overwrites a text file. Paths outside the workspace run only
+/// after approval.
 /// </summary>
 public sealed class WriteTool : ITool
 {
     public const string ToolName = "write";
 
     private const string ToolDescription =
-        "Creates or overwrites a workspace text file. Read an existing file first. "
+        "Creates or overwrites a text file. path may be workspace-relative or absolute. "
+        + "Paths inside the workspace follow the approval mode. "
+        + "Paths outside the workspace require approval: the Review model in Review or Audit, otherwise the operator. "
+        + "Read an existing file first. "
         + "Prefer edit; use write only to create a file or replace the whole file. "
         + "Do not create a README or other documentation unless the user asked.";
 
@@ -31,7 +35,7 @@ public sealed class WriteTool : ITool
                   "properties": {
                     "path": {
                       "type": "string",
-                      "description": "Workspace-relative file path to create or overwrite."
+                      "description": "Workspace-relative or absolute file path to create or overwrite."
                     },
                     "contents": {
                       "type": "string",
@@ -77,7 +81,7 @@ public sealed class WriteTool : ITool
                     ToolResultStatus.Failure));
         }
 
-        if (!_workspace.TryResolveWritablePath(path, out var fullPath, out var error))
+        if (!_workspace.TryResolveOutputPath(path, out var fullPath, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
         }
@@ -98,9 +102,9 @@ public sealed class WriteTool : ITool
 
         var existed = File.Exists(fullPath);
         File.WriteAllText(fullPath, contents, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        var relative = _workspace.ToRelative(fullPath);
+        var shown = _workspace.Contains(fullPath) ? _workspace.ToRelative(fullPath) : fullPath;
         var action = existed ? "Wrote" : "Created";
-        return ValueTask.FromResult(new ToolOutput($"{action} {relative} ({contents.Length} characters)."));
+        return ValueTask.FromResult(new ToolOutput($"{action} {shown} ({contents.Length} characters)."));
     }
 
     internal static bool TryRead(string arguments, out string path, out string contents)

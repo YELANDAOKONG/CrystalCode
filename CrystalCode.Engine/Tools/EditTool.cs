@@ -5,14 +5,19 @@ using Crystal.Tools;
 namespace CrystalCode.Engine.Tools;
 
 /// <summary>
-/// Replaces one unique occurrence of text in a workspace file.
+/// Replaces one unique occurrence of text in a file. Paths outside the
+/// workspace run only after approval.
 /// </summary>
 public sealed class EditTool : ITool
 {
     public const string ToolName = "edit";
 
     private const string ToolDescription =
-        "Replaces one unique old_string with new_string in an existing file. Read the file first. "
+        "Replaces one unique old_string with new_string in an existing file. "
+        + "path may be workspace-relative or absolute. "
+        + "Paths inside the workspace follow the approval mode. "
+        + "Paths outside the workspace require approval: the Review model in Review or Audit, otherwise the operator. "
+        + "Read the file first. "
         + "Preserve exact indentation; do not include line-number prefixes. "
         + "The call fails if old_string is missing or appears more than once; add surrounding lines to make it unique. "
         + "Prefer edit over rewriting the whole file with write.";
@@ -32,7 +37,7 @@ public sealed class EditTool : ITool
                   "properties": {
                     "path": {
                       "type": "string",
-                      "description": "Workspace-relative file path."
+                      "description": "Workspace-relative or absolute file path."
                     },
                     "old_string": {
                       "type": "string",
@@ -86,7 +91,7 @@ public sealed class EditTool : ITool
                     ToolResultStatus.Failure));
         }
 
-        if (!_workspace.TryResolveExistingFile(path, out var fullPath, out var error))
+        if (!_workspace.TryResolveEditableFile(path, out var fullPath, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
         }
@@ -126,8 +131,8 @@ public sealed class EditTool : ITool
             fullPath,
             updated,
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        return ValueTask.FromResult(
-            new ToolOutput($"Edited {_workspace.ToRelative(fullPath)}."));
+        var shown = _workspace.Contains(fullPath) ? _workspace.ToRelative(fullPath) : fullPath;
+        return ValueTask.FromResult(new ToolOutput($"Edited {shown}."));
     }
 
     internal static bool TryRead(

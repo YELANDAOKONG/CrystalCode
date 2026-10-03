@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Crystal.Tools;
 
 using CrystalCode.Engine.Tools;
@@ -26,19 +28,22 @@ public sealed class WriteToolTests
     }
 
     [Fact]
-    public async Task InvokeAsync_RejectsPathOutsideWorkspace()
+    public async Task InvokeAsync_WritesPathOutsideWorkspace()
     {
         using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var target = Path.Combine(outside.Path, "note.md");
         var tool = new WriteTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
             new ToolCall(
                 "1",
                 WriteTool.ToolName,
-                """{"path":"../escape.txt","contents":"no"}"""));
+                PathArguments(target, "hello")));
 
-        Assert.Equal(ToolResultStatus.Failure, output.Status);
-        Assert.Contains("outside", output.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains(target, output.Text, StringComparison.Ordinal);
+        Assert.Equal("hello", File.ReadAllText(target));
     }
 
     [Fact]
@@ -62,7 +67,7 @@ public sealed class WriteToolTests
     }
 
     [Fact]
-    public async Task InvokeAsync_RejectsSymlinkThatLeavesTheWorkspace()
+    public async Task InvokeAsync_WritesThroughSymlinkThatLeavesTheWorkspace()
     {
         using var root = new TemporaryWorkspace();
         using var outside = new TemporaryWorkspace();
@@ -77,8 +82,33 @@ public sealed class WriteToolTests
                 WriteTool.ToolName,
                 """{"path":"link.txt","contents":"PWN"}"""));
 
-        Assert.Equal(ToolResultStatus.Failure, output.Status);
-        Assert.Contains("outside", output.Text, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("OUTSIDE", File.ReadAllText(target));
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal("PWN", File.ReadAllText(target));
     }
+
+    [Fact]
+    public async Task InvokeAsync_RejectsCredentialPathOutsideWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var directory = Path.Combine(outside.Path, ".ssh");
+        Directory.CreateDirectory(directory);
+        var key = Path.Combine(directory, "id_rsa");
+        File.WriteAllText(key, "SECRET");
+        var tool = new WriteTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall(
+                "1",
+                WriteTool.ToolName,
+                PathArguments(key, "OVERWRITTEN")));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+        Assert.Equal("Writing credential paths is not allowed.", output.Text);
+        Assert.Equal("SECRET", File.ReadAllText(key));
+    }
+
+    private static string PathArguments(string path, string contents) =>
+        "{\"path\":" + JsonSerializer.Serialize(path)
+        + ",\"contents\":" + JsonSerializer.Serialize(contents) + "}";
 }

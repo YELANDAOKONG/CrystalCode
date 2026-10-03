@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Crystal.Tools;
 
 using CrystalCode.Engine.Tools;
@@ -42,5 +44,24 @@ public sealed class EditToolTests
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("old_string matches 2 times; it must be unique.", output.Text);
         Assert.Equal("old old\n", File.ReadAllText(Path.Combine(root.Path, "App.cs")));
+    }
+
+    [Fact]
+    public async Task InvokeAsync_EditsPathOutsideWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var target = Path.Combine(outside.Path, "note.md");
+        File.WriteAllText(target, "old\n");
+        var tool = new EditTool(new Workspace(root.Path));
+        var arguments = "{\"path\":" + JsonSerializer.Serialize(target)
+            + ",\"old_string\":\"old\",\"new_string\":\"new\"}";
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", EditTool.ToolName, arguments));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains(target, output.Text, StringComparison.Ordinal);
+        Assert.Equal("new\n", File.ReadAllText(target));
     }
 }
