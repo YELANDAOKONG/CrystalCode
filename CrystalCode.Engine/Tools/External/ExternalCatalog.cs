@@ -104,6 +104,7 @@ public sealed class ExternalCatalog
 
             _ = DotnetToolFactory.TryCreate(
                 workspace,
+                host,
                 set,
                 registered,
                 notes,
@@ -193,6 +194,7 @@ public sealed class ExternalCatalog
             var wrapped = new FencedExternalTool(
                 exec,
                 workspace,
+                host,
                 spec.PathArguments,
                 timeoutSeconds: null);
             classifications[spec.Name] = spec;
@@ -215,6 +217,7 @@ public sealed class ExternalCatalog
             var multimodal = new FencedExternalMultimodalTool(
                 exec,
                 workspace,
+                host,
                 spec.PathArguments,
                 timeoutSeconds: null);
             if (spec.Catalogs.Plan)

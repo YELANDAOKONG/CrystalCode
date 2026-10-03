@@ -4,11 +4,14 @@ using System.Runtime.Loader;
 using Crystal.Chat;
 using Crystal.Tools;
 
+using CrystalCode.Tools;
+
 namespace CrystalCode.Engine.Tools.External;
 
 /// <summary>
 /// Isolated load context for one tool set assembly. Shared contract types
-/// come from the host context that already loaded Crystal.Tools.
+/// come from the host context that already loaded Crystal, Crystal.Tools,
+/// and CrystalCode.Tools.
 /// </summary>
 internal sealed class ExternalLoadContext : AssemblyLoadContext
 {
@@ -93,10 +96,20 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
     private static AssemblyLoadContext HostContext =>
         GetLoadContext(typeof(ITool).Assembly) ?? Default;
 
-    private static Assembly Contract(string name) =>
-        name.Equals("Crystal.Tools", StringComparison.OrdinalIgnoreCase)
-            ? typeof(ITool).Assembly
-            : typeof(ChatMessage).Assembly;
+    private static Assembly Contract(string name)
+    {
+        if (name.Equals("Crystal.Tools", StringComparison.OrdinalIgnoreCase))
+        {
+            return typeof(ITool).Assembly;
+        }
+
+        if (name.Equals("CrystalCode.Tools", StringComparison.OrdinalIgnoreCase))
+        {
+            return typeof(IHostTool).Assembly;
+        }
+
+        return typeof(ChatMessage).Assembly;
+    }
 
     private static Assembly? FindLoaded(string name)
     {
@@ -113,7 +126,8 @@ internal sealed class ExternalLoadContext : AssemblyLoadContext
 
     private static bool IsContract(string name) =>
         name.Equals("Crystal", StringComparison.OrdinalIgnoreCase)
-        || name.Equals("Crystal.Tools", StringComparison.OrdinalIgnoreCase);
+        || name.Equals("Crystal.Tools", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("CrystalCode.Tools", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsFramework(string name) =>
         name == "System"

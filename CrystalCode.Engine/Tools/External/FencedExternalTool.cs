@@ -1,28 +1,35 @@
 using Crystal.Tools;
 
+using CrystalCode.Tools;
+
 namespace CrystalCode.Engine.Tools.External;
 
 /// <summary>
 /// Rewrites declared path arguments, then delegates to the inner tool.
+/// An <see cref="IHostTool"/> receives a <see cref="ToolHostContext"/> for the call.
 /// </summary>
 internal sealed class FencedExternalTool : ITool
 {
     private readonly ITool _inner;
     private readonly Workspace _workspace;
+    private readonly SessionToolHost _host;
     private readonly IReadOnlyList<string> _pathArguments;
     private readonly int? _timeoutSeconds;
 
     public FencedExternalTool(
         ITool inner,
         Workspace workspace,
+        SessionToolHost host,
         IReadOnlyList<string> pathArguments,
         int? timeoutSeconds)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(pathArguments);
         _inner = inner;
         _workspace = workspace;
+        _host = host;
         _pathArguments = pathArguments;
         _timeoutSeconds = timeoutSeconds;
         Definition = inner.Definition;
@@ -57,9 +64,22 @@ internal sealed class FencedExternalTool : ITool
 
         try
         {
-            var output = await _inner.InvokeAsync(next, timeout.Token)
-                .AsTask()
-                .WaitAsync(timeout.Token);
+            ToolOutput output;
+            if (_inner is IHostTool hosted)
+            {
+                output = await hosted
+                    .InvokeAsync(next, _host.CreateContext(), timeout.Token)
+                    .AsTask()
+                    .WaitAsync(timeout.Token);
+            }
+            else
+            {
+                output = await _inner
+                    .InvokeAsync(next, timeout.Token)
+                    .AsTask()
+                    .WaitAsync(timeout.Token);
+            }
+
             return new ToolOutput(ToolOutputText.Truncate(output.Text), output.Status);
         }
         catch (OperationCanceledException) when (

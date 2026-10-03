@@ -126,7 +126,11 @@ are never prompt overlays. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the
 `skill` tool when enabled. Operator tool sets live under `tools/` in
 the home and project `.crystal` trees and are loaded as extra `ITool`
-or `IMultimodalTool` entries when External Tools is enabled. Native
+or `IMultimodalTool` entries when External Tools is enabled. A dotnet
+tool may also implement `CrystalCode.Tools.IHostTool` or
+`IHostMultimodalTool` and then receives the workspace root, session id,
+and approval mode on each call. Tools that implement only Crystal's
+interfaces stay unchanged. Native
 multimodal entries are exposed only while the selected model and provider
 support image input. Whether each source's author
 approval declarations take effect is stored under `externalToolApproval`

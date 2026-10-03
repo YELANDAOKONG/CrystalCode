@@ -770,9 +770,14 @@ Runners:
   Text-only turns reject image results. Image-capable turns attach them
   through the same marker path as other tools.
 - **dotnet**: a framework-dependent class library that implements
-  `Crystal.Tools.ITool`. Every public non-abstract tool is loaded in
-  one isolated load context for that set. Shared types are `Crystal`
-  and `Crystal.Tools`; other dependencies stay private to the set.
+  `Crystal.Tools.ITool` or `Crystal.Multimodal.Tools.IMultimodalTool`.
+  A tool that implements `CrystalCode.Tools.IHostTool` or
+  `IHostMultimodalTool` receives a `ToolHostContext` on each call
+  (workspace root, session id, and approval mode). Tools that do not
+  implement those interfaces are unchanged. Every public non-abstract
+  tool is loaded in one isolated load context for that set. Shared
+  types are `Crystal`, `Crystal.Tools`, and `CrystalCode.Tools`; other
+  dependencies stay private to the set.
 
 Every external tool is at least Write + Workspace and still goes
 through `ToolInvocationPolicy` by default. Authors may set `approval` to

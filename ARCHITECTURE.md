@@ -18,15 +18,16 @@ Spectre.Console              CrystalCode.Providers
 Terminal.Gui is              Crystal
 referenced, not called)
 
-CrystalCode.Engine also references Crystal.Tools, Crystal.Agents, and
-Crystal.Harness directly. CrystalCode references Spectre.Console and
-Spectre.Console.Cli for its commands and cards. CrystalCode.Display
-references Spectre.Console and Terminal.Gui only. It does not reference
-Crystal, Crystal.Tools, the engine, or the executable host.
-CrystalCode.Engine does not reference Spectre.Console, Terminal.Gui,
-CrystalCode.Display, or the executable host, and it never touches the
-console. CrystalCode.Providers references only Crystal.
-No project in this repository modifies Crystal.
+CrystalCode.Engine also references CrystalCode.Tools, Crystal.Tools,
+Crystal.Agents, and Crystal.Harness directly. CrystalCode.Tools
+references only Crystal and Crystal.Tools. CrystalCode references
+Spectre.Console and Spectre.Console.Cli for its commands and cards.
+CrystalCode.Display references Spectre.Console and Terminal.Gui only.
+It does not reference Crystal, Crystal.Tools, CrystalCode.Tools, the
+engine, or the executable host. CrystalCode.Engine does not reference
+Spectre.Console, Terminal.Gui, CrystalCode.Display, or the executable
+host, and it never touches the console. CrystalCode.Providers
+references only Crystal. No project in this repository modifies Crystal.
 ```
 
 A second front end (a desktop application, for example) references
@@ -51,6 +52,16 @@ the question overlay, and the saved-session picker. `crystal run` supplies
 its own observer, approval prompt, question prompt, and session chooser. It
 does not own session logic, approval policy, prompts, storage, or tools, and
 it does not own the frame painter, composer buffer, or transcript log.
+
+### CrystalCode.Tools
+
+The contract external dotnet tools may reference when a call needs host
+facts. It defines `ToolHostContext`, `IHostTool`, and
+`IHostMultimodalTool`. It references only Crystal and Crystal.Tools. It
+does not reference the engine, the display, the executable, or a terminal
+library. Tools that implement only Crystal's `ITool` or `IMultimodalTool`
+do not reference it. There is no paired test project; dispatch and
+load-context identity are tested in CrystalCode.Engine.Tests.
 
 ### CrystalCode.Engine
 
@@ -139,7 +150,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
 | `Tools` | Workspace fence and built-in `ITool` types |
-| `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` / `IMultimodalTool` loaders |
+| `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` / `IMultimodalTool` loaders, and host-context dispatch |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
@@ -1115,11 +1126,15 @@ and receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, and `CRYSTAL_APPROVAL`
 on that process only. `"output": "content"` reads one JSON object from
 stdout (`text` and optional fenced images). A dotnet set uses one non-collectible
 `AssemblyLoadContext` for that directory only. Shared contract types
-(`Crystal`, `Crystal.Tools`, and already-loaded `System.*` /
-`Microsoft.*`) come from the host context that already loaded
-`Crystal.Tools`. Public `ITool` and `IMultimodalTool` implementations are
-loaded directly. A type may implement either contract or both; when it
-implements both, both definitions must match. Native multimodal tools join
+(`Crystal`, `Crystal.Tools`, `CrystalCode.Tools`, and already-loaded
+`System.*` / `Microsoft.*`) come from the host context that already
+loaded `Crystal.Tools`. Public `ITool` and `IMultimodalTool`
+implementations are loaded directly. A type may implement either contract
+or both; when it implements both, both definitions must match. A type may
+also implement `IHostTool` or `IHostMultimodalTool`. The wrapper then
+passes a `ToolHostContext` captured at the start of that call (workspace
+root, session id, approval mode). Other tools keep the original
+`InvokeAsync`. Native multimodal tools join
 the active catalog only for an image-capable model and provider. The loader
 does not implement `IPlugin` and does not scan `plugins/`.
 

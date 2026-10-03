@@ -21,7 +21,8 @@ Invocation channels:
   Logs stay on stderr.
 - **dotnet**: a class library whose public `Crystal.Tools.ITool` and
   `Crystal.Multimodal.Tools.IMultimodalTool` types are loaded in one isolated
-  `AssemblyLoadContext`.
+  `AssemblyLoadContext`. Optional `CrystalCode.Tools.IHostTool` and
+  `IHostMultimodalTool` implementations receive host facts on each call.
 
 Exec may use stdin, argv, or both. Dotnet does not use stdin or argv.
 
@@ -405,6 +406,22 @@ or both, with a public parameterless constructor. Multimodal output uses
 Crystal's native `MultimodalToolOutput`, `TextContent`, `ImageContent`, and
 media-source contracts; there is no manifest or JSON output protocol.
 
+A tool that needs the session workspace, session id, or approval mode
+also references `CrystalCode.Tools` and implements `IHostTool` or
+`IHostMultimodalTool` (a type may implement one or both). The method
+takes the model call plus a `ToolHostContext`. The host builds that
+value at the start of the call, so a later `/cd` or `/approval` shows
+up on the next call and does not change an instance the tool already
+holds. `WorkspaceRoot` is the session workspace, not the process
+current directory. `SessionId` and `Approval` are empty when the host
+has none. Known approval modes are `plan`, `default`, `edit`,
+`review`, `audit`, and `full`. The context carries no credentials and
+no home-directory path. The inherited `InvokeAsync` without a context
+fails with "This tool requires host context." The wrapper does not call
+it. Tools that implement only `ITool` or `IMultimodalTool` do not
+reference `CrystalCode.Tools` and keep the original method. Exec tools
+still receive the same three facts as child environment variables.
+
 The host loads the assembly once, then **adds every matching type**:
 
 - Public, non-abstract, non-generic class
@@ -428,8 +445,9 @@ or multimodal tool is wrapped:
 
 1. Rewrite `pathArguments` on the text or multimodal tool call (overlay or empty).
 2. Apply the set's timeout and forward user and turn cancellation.
-3. Truncate text output blocks.
-4. Run approval before `InvokeAsync`, same as every other tool.
+3. When the instance implements `IHostTool` or `IHostMultimodalTool`, call that method with a new `ToolHostContext`. Otherwise call the original `InvokeAsync`.
+4. Truncate text output blocks.
+5. Run approval before `InvokeAsync`, same as every other tool.
 
 The wrapper is the catalog entry. On timeout, the wrapper asks the tool to
 cancel and returns a failure. In-process code that ignores cancellation may
@@ -441,7 +459,8 @@ them. A type implementing both retains its ordinary `ITool` entry in a
 text-only session. `AssemblyLoadContext` is not a sandbox.
 
 Operator types must not reference `CrystalCode`, `CrystalCode.Engine`,
-`CrystalCode.Display`, or `Spectre.Console`. No slash commands, client factories, or
+`CrystalCode.Display`, or `Spectre.Console`. They may reference
+`CrystalCode.Tools`. No slash commands, client factories, or
 classifiers from the assembly.
 
 ### Publish layout
@@ -473,14 +492,16 @@ the resolved dependency graph that `publish` writes.
 
 The release host is **self-contained single-file**
 (`PublishSingleFile=true`, not trimmed, not Native AOT). Shared
-contract types (`Crystal`, `Crystal.Tools`) live in the host bundle.
-They are not files next to `CrystalCode`. Authors compile against
-`Crystal.Tools` from source or a future pack; at runtime those
+contract types (`Crystal`, `Crystal.Tools`, `CrystalCode.Tools`) live
+in the host bundle. They are not files next to `CrystalCode`. Authors
+compile against `Crystal.Tools` and, when the tool takes host facts,
+`CrystalCode.Tools`, from source or a future pack. At runtime those
 identities must come from the **host load context** that already
-loaded `Crystal.Tools` (`typeof(ITool).Assembly`), never from a DLL
-copied into the tool folder. Do not call
-`AssemblyLoadContext.Default.LoadFromAssemblyName` for those contracts:
-in testhost isolation that can load a second copy and `is ITool` fails.
+loaded `Crystal.Tools` (`typeof(ITool).Assembly`) and `CrystalCode.Tools`
+(`typeof(IHostTool).Assembly`), never from a DLL copied into the tool
+folder. Do not call `AssemblyLoadContext.Default.LoadFromAssemblyName`
+for those contracts: in testhost isolation that can load a second copy
+and `is ITool` or `is IHostTool` fails.
 
 ### Load context
 
@@ -493,10 +514,11 @@ Do not use `Assembly.LoadFrom` / `LoadFile` on the default context.
 
 Algorithm for `Load(AssemblyName name)`:
 
-1. If `name` is `Crystal` or `Crystal.Tools`, return the already-loaded
-   host assembly (`typeof(ChatMessage).Assembly` / `typeof(ITool).Assembly`).
-   Never load it from the set directory, even if `Crystal.Tools.dll` is
-   sitting there. `Resolving` repeats this step when `Load` returned null.
+1. If `name` is `Crystal`, `Crystal.Tools`, or `CrystalCode.Tools`, return
+   the already-loaded host assembly (`typeof(ChatMessage).Assembly`,
+   `typeof(ITool).Assembly`, or `typeof(IHostTool).Assembly`). Never load
+   it from the set directory, even if that DLL is sitting there.
+   `Resolving` repeats this step when `Load` returned null.
 2. If `name` is a **shared** framework assembly already loaded in the
    host context, return that instance.
 3. Otherwise call `AssemblyDependencyResolver` constructed from the
@@ -509,15 +531,19 @@ Algorithm for `Load(AssemblyName name)`:
 Unmanaged probe: `ResolvingUnmanagedDll` uses
 `resolver.ResolveUnmanagedDllToPath`. Same directory fence.
 
-**Shared** means: `Crystal`, `Crystal.Tools`, and every `System.*` /
-`Microsoft.*` assembly already loaded in the host context that owns
-`typeof(ITool).Assembly`, plus `netstandard` and `mscorlib`.
+**Shared** means: `Crystal`, `Crystal.Tools`, `CrystalCode.Tools`, and
+every `System.*` / `Microsoft.*` assembly already loaded in the host
+context that owns `typeof(ITool).Assembly`, plus `netstandard` and
+`mscorlib`.
 
 **Private** means everything else, including Newtonsoft.Json. The
-`ITool` boundary is `ToolCall` / `ToolOutput` / `JsonElement`.
+text boundary is `ToolCall` / `ToolOutput` / `JsonElement`. Host facts
+cross that boundary as `ToolHostContext` on `IHostTool` and
+`IHostMultimodalTool`.
 
-If the resolver points at `Crystal.dll` or `Crystal.Tools.dll` inside
-the set folder, ignore that path and go to step 1.
+If the resolver points at `Crystal.dll`, `Crystal.Tools.dll`, or
+`CrystalCode.Tools.dll` inside the set folder, ignore that path and go
+to step 1.
 
 Single-file implications:
 
@@ -525,7 +551,9 @@ Single-file implications:
   contracts are taken from that host context, not probed from disk.
 - Do not enable trimming or Native AOT on the host while this runner
   exists.
-- The set ALC must not try to load `CrystalCode` from the single-file.
+- The set ALC must not try to load `CrystalCode`, `CrystalCode.Engine`,
+  or `CrystalCode.Display` from the single-file bundle.
+  `CrystalCode.Tools` is a shared contract and is taken from the host.
 
 ## Catalog composition
 
@@ -545,5 +573,3 @@ is appended to the session's classifier list.
 - Loading `IPlugin` from `~/.crystal/plugins/`.
 - Collectible unload, hot reload, signing, marketplace.
 - Host-injected secrets into child processes or in-process assemblies.
-- A new contracts project. Dotnet tools compile against
-  `Crystal.Tools`.

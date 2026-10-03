@@ -2,29 +2,36 @@ using Crystal.Multimodal;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Tools;
+
 namespace CrystalCode.Engine.Tools.External;
 
 /// <summary>
 /// Rewrites declared path arguments, then delegates to an external multimodal tool.
+/// An <see cref="IHostMultimodalTool"/> receives a <see cref="ToolHostContext"/> for the call.
 /// </summary>
 internal sealed class FencedExternalMultimodalTool : IMultimodalTool
 {
     private readonly IMultimodalTool _inner;
     private readonly Workspace _workspace;
+    private readonly SessionToolHost _host;
     private readonly IReadOnlyList<string> _pathArguments;
     private readonly int? _timeoutSeconds;
 
     public FencedExternalMultimodalTool(
         IMultimodalTool inner,
         Workspace workspace,
+        SessionToolHost host,
         IReadOnlyList<string> pathArguments,
         int? timeoutSeconds)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(pathArguments);
         _inner = inner;
         _workspace = workspace;
+        _host = host;
         _pathArguments = pathArguments;
         _timeoutSeconds = timeoutSeconds;
         Definition = inner.Definition;
@@ -65,9 +72,21 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
 
         try
         {
-            var output = await _inner.InvokeAsync(next, timeout.Token)
-                .AsTask()
-                .WaitAsync(timeout.Token);
+            MultimodalToolOutput output;
+            if (_inner is IHostMultimodalTool hosted)
+            {
+                output = await hosted
+                    .InvokeAsync(next, _host.CreateContext(), timeout.Token)
+                    .AsTask()
+                    .WaitAsync(timeout.Token);
+            }
+            else
+            {
+                output = await _inner
+                    .InvokeAsync(next, timeout.Token)
+                    .AsTask()
+                    .WaitAsync(timeout.Token);
+            }
             var contents = output.Contents.Select(static content =>
                 content is TextContent text
                     ? new TextContent(ToolOutputText.Truncate(text.Text))

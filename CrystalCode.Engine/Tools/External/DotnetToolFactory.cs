@@ -17,6 +17,7 @@ internal static class DotnetToolFactory
 
     public static bool TryCreate(
         Workspace workspace,
+        SessionToolHost host,
         ParsedToolSet set,
         HashSet<string> registered,
         IList<string> notes,
@@ -28,6 +29,7 @@ internal static class DotnetToolFactory
         Dictionary<string, ParsedToolSet> origins)
     {
         ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(set);
         ArgumentNullException.ThrowIfNull(registered);
         ArgumentNullException.ThrowIfNull(notes);
@@ -171,6 +173,7 @@ internal static class DotnetToolFactory
                 var wrapped = new FencedExternalTool(
                     pair.Text,
                     workspace,
+                    host,
                     pair.Spec.PathArguments,
                     set.TimeoutSeconds);
                 AddText(pair.Spec, wrapped, plan, work);
@@ -181,6 +184,7 @@ internal static class DotnetToolFactory
                 var wrapped = new FencedExternalMultimodalTool(
                     pair.Multimodal,
                     workspace,
+                    host,
                     pair.Spec.PathArguments,
                     set.TimeoutSeconds);
                 AddMultimodal(

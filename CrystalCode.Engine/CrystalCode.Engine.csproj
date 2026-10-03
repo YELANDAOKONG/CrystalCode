@@ -13,6 +13,7 @@
     <ItemGroup>
         <ProjectReference Include="../../Crystal/Crystal/Crystal.csproj" />
         <ProjectReference Include="../../Crystal/Crystal.Tools/Crystal.Tools.csproj" />
+        <ProjectReference Include="..\CrystalCode.Tools\CrystalCode.Tools.csproj" />
         <ProjectReference Include="../../Crystal/Crystal.Agents/Crystal.Agents.csproj" />
         <ProjectReference Include="../../Crystal/Crystal.Harness/Crystal.Harness.csproj" />
         <ProjectReference Include="..\CrystalCode.Providers\CrystalCode.Providers.csproj" />

@@ -354,6 +354,92 @@ public sealed class DotnetToolFactoryTests
         Assert.Contains("timed out after 1 second", text.Text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Load_DotnetHostTool_UsesTheHostContractAssembly()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var output = Path.Combine(workspace.Path, ".crystal", "tools", "HostTools");
+        PublishFixture(
+            output,
+            """
+            using System.Text.Json;
+
+            using Crystal.Multimodal;
+            using Crystal.Multimodal.Tools;
+            using Crystal.Tools;
+
+            using CrystalCode.Tools;
+
+            namespace FixtureTools;
+
+            public sealed class HostTool : IHostTool
+            {
+                public HostTool()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                    Definition = new ToolDefinition("where", document.RootElement.Clone(), "Where.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public ValueTask<ToolOutput> InvokeAsync(
+                    ToolCall call,
+                    ToolHostContext context,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new ToolOutput(
+                        context.WorkspaceRoot + "\n" + context.SessionId + "\n" + context.Approval));
+            }
+
+            public sealed class HostImageTool : IHostMultimodalTool
+            {
+                public HostImageTool()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                    Definition = new ToolDefinition("where_image", document.RootElement.Clone(), "Where image.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public ValueTask<MultimodalToolOutput> InvokeAsync(
+                    MultimodalToolCall call,
+                    ToolHostContext context,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new MultimodalToolOutput(
+                    [
+                        new TextContent(
+                            context.WorkspaceRoot + "\n" + context.SessionId + "\n" + context.Approval)
+                    ]));
+            }
+            """,
+            referenceHostContract: true);
+        File.WriteAllText(
+            Path.Combine(output, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "types": ["HostTool", "HostImageTool"]
+            }
+            """);
+        var root = new Workspace(workspace.Path);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            root,
+            enabled: true,
+            host: new SessionToolHost(root, () => "sess-9", () => "audit"));
+
+        Assert.Empty(catalog.Notes);
+        Assert.True(File.Exists(Path.Combine(output, "CrystalCode.Tools.dll")));
+        var expected = root.Root + "\nsess-9\naudit";
+        var text = await Assert.Single(catalog.WorkTools).InvokeAsync(new ToolCall("1", "where", "{}"));
+        Assert.Equal(expected, text.Text);
+        var pictured = await Assert.Single(catalog.WorkMultimodalTools)
+            .InvokeAsync(new MultimodalToolCall("2", "where_image", "{}"));
+        var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
+        Assert.Equal(expected, content.Text);
+    }
+
     private static void WriteExecSet(string workspace, string directoryName, string toolName)
     {
         var directory = Path.Combine(workspace, ".crystal", "tools", directoryName);
@@ -375,7 +461,10 @@ public sealed class DotnetToolFactoryTests
             """);
     }
 
-    private static void PublishFixture(string outputDirectory, string? extraTypeSource = null)
+    private static void PublishFixture(
+        string outputDirectory,
+        string? extraTypeSource = null,
+        bool referenceHostContract = false)
     {
         Directory.CreateDirectory(outputDirectory);
         using var source = new TemporaryWorkspace();
@@ -385,6 +474,19 @@ public sealed class DotnetToolFactoryTests
         var crystalToolsDll = Path.Combine(AppContext.BaseDirectory, "Crystal.Tools.dll");
         Assert.True(File.Exists(crystalDll), crystalDll);
         Assert.True(File.Exists(crystalToolsDll), crystalToolsDll);
+        var hostReference = string.Empty;
+        if (referenceHostContract)
+        {
+            var hostDll = Path.Combine(AppContext.BaseDirectory, "CrystalCode.Tools.dll");
+            Assert.True(File.Exists(hostDll), hostDll);
+            hostReference = """
+                <Reference Include="CrystalCode.Tools">
+                  <HintPath>{hostDll}</HintPath>
+                </Reference>
+            """;
+            hostReference = hostReference.Replace("{hostDll}", hostDll, StringComparison.Ordinal);
+        }
+
         File.WriteAllText(
             Path.Combine(project, "FixtureTools.csproj"),
             $"""
@@ -402,6 +504,7 @@ public sealed class DotnetToolFactoryTests
                 <Reference Include="Crystal.Tools">
                   <HintPath>{crystalToolsDll}</HintPath>
                 </Reference>
+            {hostReference}
               </ItemGroup>
             </Project>
             """);
