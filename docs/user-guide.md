@@ -701,7 +701,7 @@ returns the transcript viewport to the latest output.
 | `/plan` | | Toggle Plan / Work |
 | `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model |
 | `/attach` | | Attach an image from the workspace |
-| `/thinking` | `/think` | Cycle or set the thinking gear |
+| `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |

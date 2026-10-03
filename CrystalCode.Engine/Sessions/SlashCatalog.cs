@@ -12,7 +12,7 @@ public static class SlashCatalog
         new(SessionVerb.Approval, "approval", [],
             "default | edit | review | audit | full, or model",
             ["default", "edit", "review", "audit", "full", "model"]),
-        new(SessionVerb.Thinking, "thinking", ["think"], "off | none | default | low | medium | high | maximum | max",
+        new(SessionVerb.Thinking, "thinking", ["think", "effort"], "off | none | default | low | medium | high | maximum | max",
             ["off", "none", "default", "minimal", "low", "medium", "high", "maximum", "max"]),
         new(SessionVerb.Tokens, "tokens", [], "Toggle estimated progress tokens",
             ["on", "off"]),

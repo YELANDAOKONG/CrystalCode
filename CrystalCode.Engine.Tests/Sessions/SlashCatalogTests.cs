@@ -22,6 +22,7 @@ public sealed class SlashCatalogTests
     [InlineData("/sessions", SessionVerb.Sessions)]
     [InlineData("/h", SessionVerb.Help)]
     [InlineData("/think", SessionVerb.Thinking)]
+    [InlineData("/effort", SessionVerb.Thinking)]
     [InlineData("/exit", SessionVerb.Quit)]
     [InlineData("/compact", SessionVerb.Compact)]
     [InlineData("/summarize", SessionVerb.Compact)]
