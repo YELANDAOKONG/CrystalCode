@@ -35,6 +35,8 @@ public sealed class SessionCommandTests
     [InlineData("/statusline on", SessionVerb.StatusLine)]
     [InlineData("/stats", SessionVerb.Stats)]
     [InlineData("/stats all 30d tools 5", SessionVerb.Stats)]
+    [InlineData("/btw", SessionVerb.Btw)]
+    [InlineData("/side why", SessionVerb.Btw)]
     [InlineData("/todos", SessionVerb.Todos)]
     [InlineData("/todo", SessionVerb.Todos)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)

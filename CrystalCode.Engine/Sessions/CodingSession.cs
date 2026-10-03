@@ -75,6 +75,15 @@ public sealed class CodingSession : ITurnObserver
     private CancellationTokenSource? _turnSource;
     private CancellationTokenSource? _compactSource;
     private bool _turnActive;
+    private readonly object _sideGate = new();
+    private readonly List<SideExchange> _sideExchanges = [];
+    private CancellationTokenSource? _sideSource;
+    private Task? _sideTask;
+    private long _sideGeneration;
+    private bool _sideRunning;
+    private string? _sidePending;
+    private string _sideLive = string.Empty;
+    private string? _sideFailure;
     private TokenUsage? _shownUsage;
     private TokenUsage? _shownCumulative;
     private TokenUsage? _turnCumulativeBaseline;
@@ -328,6 +337,7 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public string Close()
     {
+        CancelAndClearSide(announce: false);
         try
         {
             PruneDraftImages(string.Empty, includeQueue: false);
@@ -457,6 +467,17 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Stats:
                 ShowStats(command.Argument);
+                return (true, false);
+            case SessionVerb.Btw:
+                if (string.IsNullOrWhiteSpace(command.Argument))
+                {
+                    ShowSideQuestion();
+                }
+                else
+                {
+                    AskSide(command.Argument.Trim());
+                }
+
                 return (true, false);
             case SessionVerb.StatusLine:
                 ChangeStatusLine(command.Argument);
@@ -1752,6 +1773,7 @@ public sealed class CodingSession : ITurnObserver
     private void BeginNewSession()
     {
         DiscardQueue();
+        CancelAndClearSide(announce: true);
         Publish(new ImageHistoryInvalidated());
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
@@ -1812,6 +1834,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        CancelAndClearSide(announce: true);
         ApplyDocument(document);
         DiscardQueue();
         PresentResume();
@@ -1842,6 +1865,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        CancelAndClearSide(announce: true);
         var sourceId = source.Id!;
         var fork = SessionFork.Create(
             source,
@@ -2271,6 +2295,36 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
+    /// The side question currently in flight, if one has been started.
+    /// </summary>
+    internal Task SideQuestionTask => _sideTask ?? Task.CompletedTask;
+
+    /// <summary>
+    /// Cancels the side question without interrupting the main turn.
+    /// </summary>
+    public bool TryCancelSideQuestion()
+    {
+        lock (_sideGate)
+        {
+            if (!_sideRunning || _sideSource is null)
+            {
+                return false;
+            }
+
+            _sideSource.Cancel();
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Drops the in-memory side questions for this process.
+    /// </summary>
+    public void ClearSideQuestions()
+    {
+        CancelAndClearSide(announce: true);
+    }
+
+    /// <summary>
     /// Adds a follow-up that is sent when the current tool batch or turn ends.
     /// </summary>
     public void Enqueue(string input)
@@ -2619,6 +2673,233 @@ public sealed class CodingSession : ITurnObserver
         }
 
         ShowUsage(usage, cumulative, interim: true);
+    }
+
+    private void ShowSideQuestion()
+    {
+        var occupied = false;
+        lock (_sideGate)
+        {
+            occupied = _sideRunning
+                || _sideExchanges.Count > 0
+                || _sidePending is not null
+                || _sideFailure is not null;
+        }
+
+        if (!occupied)
+        {
+            Error(SideQuestion.NoneToShow);
+            return;
+        }
+
+        Publish(CaptureSide(announce: true));
+    }
+
+    private void AskSide(string question)
+    {
+        var transcript = ImageMarkerText.ForTextModel(_transcript).ToArray();
+        IReadOnlyList<SideExchange> prior;
+        CancellationToken token;
+        long generation;
+        var reasoning = CurrentReasoning();
+        lock (_sideGate)
+        {
+            _sideSource?.Cancel();
+            _sideSource?.Dispose();
+            _sideSource = new CancellationTokenSource();
+            token = _sideSource.Token;
+            generation = ++_sideGeneration;
+            _sidePending = question;
+            _sideLive = string.Empty;
+            _sideFailure = null;
+            _sideRunning = true;
+            prior = [.. _sideExchanges];
+        }
+
+        Publish(CaptureSide(announce: true));
+        _sideTask = RunSideAsync(transcript, prior, question, reasoning, generation, token);
+    }
+
+    private async Task RunSideAsync(
+        IReadOnlyList<ChatItem> transcript,
+        IReadOnlyList<SideExchange> prior,
+        string question,
+        ReasoningOptions? reasoning,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        IStreamingChatClient? client = null;
+        var owned = false;
+        try
+        {
+            client = CreateClient(_settings);
+            owned = !ReferenceEquals(client, _client);
+            var request = new ChatRequest(
+                SideQuestion.Compose(transcript, prior, question),
+                [],
+                reasoning);
+            var assembler = new ChatStreamAssembler();
+            var live = new StringBuilder();
+            await foreach (var streamEvent in client.StreamAsync(request, cancellationToken))
+            {
+                if (streamEvent is ChatTextDelta text)
+                {
+                    live.Append(text.Text);
+                    NoteSideLive(generation, live.ToString());
+                }
+
+                assembler.Apply(streamEvent);
+            }
+
+            ChatResponse response;
+            try
+            {
+                response = assembler.ToResponse();
+            }
+            catch (InvalidOperationException)
+            {
+                FailSide(generation, SideQuestion.NoAnswer);
+                return;
+            }
+
+            if (!SideQuestion.TryReadAnswer(response, out var answer, out var ignoredToolCall))
+            {
+                FailSide(
+                    generation,
+                    ignoredToolCall ? SideQuestion.CannotUseTools : SideQuestion.NoAnswer);
+                return;
+            }
+
+            RememberSide(generation, question, answer);
+        }
+        catch (OperationCanceledException)
+        {
+            FailSide(generation, SideQuestion.Cancelled);
+        }
+        catch (Exception exception)
+        {
+            FailSide(
+                generation,
+                string.IsNullOrWhiteSpace(exception.Message)
+                    ? "Side question failed."
+                    : exception.Message);
+        }
+        finally
+        {
+            if (owned)
+            {
+                DisposeClient(client);
+            }
+        }
+    }
+
+    private void NoteSideLive(long generation, string live)
+    {
+        var publish = false;
+        lock (_sideGate)
+        {
+            if (generation == _sideGeneration && _sideRunning)
+            {
+                _sideLive = live;
+                publish = true;
+            }
+        }
+
+        if (publish)
+        {
+            Publish(CaptureSide(announce: false));
+        }
+    }
+
+    private void RememberSide(long generation, string question, string answer)
+    {
+        var publish = false;
+        lock (_sideGate)
+        {
+            if (generation != _sideGeneration)
+            {
+                return;
+            }
+
+            _sideExchanges.Add(new SideExchange(question, answer));
+            while (_sideExchanges.Count > SideQuestion.MemoryLimit)
+            {
+                _sideExchanges.RemoveAt(0);
+            }
+
+            _sidePending = null;
+            _sideLive = string.Empty;
+            _sideFailure = null;
+            _sideRunning = false;
+            publish = true;
+        }
+
+        if (publish)
+        {
+            Publish(CaptureSide(announce: false));
+        }
+    }
+
+    private void FailSide(long generation, string message)
+    {
+        var publish = false;
+        lock (_sideGate)
+        {
+            if (generation != _sideGeneration)
+            {
+                return;
+            }
+
+            _sideFailure = message;
+            _sideRunning = false;
+            publish = true;
+        }
+
+        if (publish)
+        {
+            Publish(CaptureSide(announce: false));
+        }
+    }
+
+    private SideQuestionSnapshot CaptureSide(bool announce)
+    {
+        lock (_sideGate)
+        {
+            return new SideQuestionSnapshot(
+                announce,
+                [.. _sideExchanges],
+                _sideRunning,
+                _sidePending ?? string.Empty,
+                _sideLive,
+                _sideRunning ? null : _sideFailure);
+        }
+    }
+
+    private void CancelAndClearSide(bool announce)
+    {
+        var publish = false;
+        lock (_sideGate)
+        {
+            var occupied = _sideRunning
+                || _sideExchanges.Count > 0
+                || _sidePending is not null
+                || _sideFailure is not null;
+            _sideSource?.Cancel();
+            _sideSource?.Dispose();
+            _sideSource = null;
+            _sideGeneration++;
+            _sideExchanges.Clear();
+            _sidePending = null;
+            _sideLive = string.Empty;
+            _sideFailure = null;
+            _sideRunning = false;
+            publish = announce && occupied;
+        }
+
+        if (publish)
+        {
+            Publish(SideQuestionSnapshot.Empty);
+        }
     }
 
     private sealed class SlashOutput(CodingSession session) : ISlashOutput

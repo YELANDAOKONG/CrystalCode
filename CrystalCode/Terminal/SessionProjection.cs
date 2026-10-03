@@ -82,6 +82,9 @@ internal sealed class SessionProjection : ISessionObserver
             case StatsReported stats:
                 _renderer.ShowStatsPage(StatsPageWidget.Create(stats.Report, stats.AllWorkspaces));
                 break;
+            case SideQuestionSnapshot side:
+                _renderer.ShowSideQuestion(side);
+                break;
             case UsageChanged usage:
                 _renderer.ContextWindow = usage.ContextWindow;
                 if (usage.Interim)

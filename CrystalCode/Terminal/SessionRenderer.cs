@@ -13,6 +13,7 @@ using CrystalCode.Display.Paint;
 using CrystalCode.Display.Shell;
 using CrystalCode.Display.Transcript;
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
@@ -60,6 +61,13 @@ public sealed class SessionRenderer : IDisposable
     private bool _imagePasteRequested;
     private bool _fullPageOverlay;
     private int _pageScroll;
+    private const int MaxSideRows = 12;
+    private SideQuestionSnapshot? _side;
+    private bool _sideOpen;
+    private int _sideIndex;
+    private int _sideScroll;
+    private bool _sideStick = true;
+    private bool _sideClearRequested;
 
     public int ContextWindow { get; set; }
 
@@ -68,6 +76,19 @@ public sealed class SessionRenderer : IDisposable
     public Func<CancellationToken, Task<string?>>? OnImagePasteAsync { get; set; }
 
     public Action<string>? OnComposerEdited { get; set; }
+
+    public Action? OnSideCleared { get; set; }
+
+    internal bool SideQuestionOpen
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _sideOpen;
+            }
+        }
+    }
 
     internal bool OverlayVisible
     {
@@ -460,6 +481,47 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    internal void ShowSideQuestion(SideQuestionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        lock (_gate)
+        {
+            _side = snapshot;
+            if (SideQuestionWidget.IsEmpty(snapshot))
+            {
+                _sideOpen = false;
+                _sideIndex = 0;
+                _sideScroll = 0;
+                PaintUnlocked(force: true);
+                return;
+            }
+
+            if (_fullPageOverlay || _composerPaused)
+            {
+                return;
+            }
+
+            if (snapshot.Announce || _sideOpen)
+            {
+                if (snapshot.Announce)
+                {
+                    _sideIndex = SideQuestionWidget.LatestSlot(snapshot);
+                    _sideScroll = 0;
+                    _sideStick = true;
+                }
+                else
+                {
+                    var last = Math.Max(0, SideQuestionWidget.SlotCount(snapshot) - 1);
+                    _sideIndex = Math.Clamp(_sideIndex, 0, last);
+                }
+
+                _sideOpen = true;
+            }
+
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void WriteTurnFooter(
         TurnResult result,
         TokenUsage? usage,
@@ -711,6 +773,7 @@ public sealed class SessionRenderer : IDisposable
         {
             _fullPageOverlay = false;
             _pageScroll = 0;
+            _sideOpen = false;
             _overlayWidget = null;
             _modalOverlay.Clear();
             _modalOverlay.AddRange(lines);
@@ -725,6 +788,7 @@ public sealed class SessionRenderer : IDisposable
         {
             _fullPageOverlay = false;
             _pageScroll = 0;
+            _sideOpen = false;
             _modalOverlay.Clear();
             _overlayWidget = widget;
             PaintUnlocked(force: true);
@@ -804,6 +868,7 @@ public sealed class SessionRenderer : IDisposable
         lock (_gate)
         {
             _composerPaused = true;
+            _sideOpen = false;
         }
     }
 
@@ -948,18 +1013,22 @@ public sealed class SessionRenderer : IDisposable
         {
             string? submitted;
             bool pasteImage;
+            bool clearSide;
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
                 submitted = null;
                 pasteImage = false;
+                clearSide = false;
                 while (index < events.Count)
                 {
                     submitted = DispatchUnlocked(events[index], pageRows, togglePlan, checkSize);
                     index++;
                     pasteImage = _imagePasteRequested;
                     _imagePasteRequested = false;
-                    if (submitted is not null || pasteImage)
+                    clearSide = _sideClearRequested;
+                    _sideClearRequested = false;
+                    if (submitted is not null || pasteImage || clearSide)
                     {
                         break;
                     }
@@ -967,6 +1036,11 @@ public sealed class SessionRenderer : IDisposable
 
                 RefreshPickerUnlocked();
                 PaintUnlocked(force: true);
+            }
+
+            if (clearSide)
+            {
+                OnSideCleared?.Invoke();
             }
 
             if (pasteImage && OnImagePasteAsync is not null)
@@ -1201,6 +1275,11 @@ public sealed class SessionRenderer : IDisposable
             return DispatchFullPageUnlocked(item, pageRows);
         }
 
+        if (_sideOpen)
+        {
+            return DispatchSideUnlocked(item);
+        }
+
         switch (item)
         {
             case InputPaste paste:
@@ -1343,6 +1422,7 @@ public sealed class SessionRenderer : IDisposable
     {
         CommitLiveUnlocked();
         AddHelpUnlocked(
+            "/btw         Side question; not saved. Esc closes, x clears",
             "enter        Submit; queue while working",
             "enter        Empty while working interrupts and sends",
             "queue        Stays above the composer; sends after this tool or turn",
@@ -1502,7 +1582,7 @@ public sealed class SessionRenderer : IDisposable
             resetFrame,
             progressWanted == 0 ? null : _chrome.ProgressLine(regions.Width),
             todos,
-            showCursor: !_composerPaused);
+            showCursor: !_composerPaused && !_sideOpen);
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
         _lastPaint = now;
@@ -1588,8 +1668,108 @@ public sealed class SessionRenderer : IDisposable
         _lastPaint = now;
     }
 
+    private string? DispatchSideUnlocked(IInputEvent item)
+    {
+        switch (item)
+        {
+            case InputPaste:
+                return null;
+            case InputWheel wheel:
+                ScrollSide(-wheel.Delta);
+                return null;
+            case InputKey key when IsSideDismiss(key):
+                _sideOpen = false;
+                return null;
+            case InputKey key when IsSideClear(key):
+                _sideOpen = false;
+                _side = SideQuestionSnapshot.Empty;
+                _sideClearRequested = true;
+                return null;
+            case InputKey key when key.Modifiers == ConsoleModifiers.None && key.Key == ConsoleKey.LeftArrow:
+                MoveSide(-1);
+                return null;
+            case InputKey key when key.Modifiers == ConsoleModifiers.None && key.Key == ConsoleKey.RightArrow:
+                MoveSide(1);
+                return null;
+            case InputKey key when ScrollInput.TryKeyScroll(
+                key,
+                scrollPlainArrows: true,
+                MaxSideRows,
+                out var delta):
+                ScrollSide(-delta);
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    private static bool IsSideDismiss(InputKey key) =>
+        key.Modifiers == ConsoleModifiers.None
+        && (key.Key == ConsoleKey.Escape || key.Key == ConsoleKey.Enter || key.Key == ConsoleKey.Spacebar);
+
+    private static bool IsSideClear(InputKey key) =>
+        key.Modifiers == ConsoleModifiers.None
+        && (key.Key == ConsoleKey.X || key.KeyChar is 'x' or 'X');
+
+    private void MoveSide(int direction)
+    {
+        if (_side is null)
+        {
+            return;
+        }
+
+        var last = Math.Max(0, SideQuestionWidget.SlotCount(_side) - 1);
+        _sideIndex = Math.Clamp(_sideIndex + direction, 0, last);
+        _sideScroll = 0;
+        _sideStick = false;
+    }
+
+    private void ScrollSide(int delta)
+    {
+        _sideScroll = Math.Max(0, _sideScroll + delta);
+        _sideStick = false;
+    }
+
+    private IReadOnlyList<PaintLine> SideLines(int width)
+    {
+        if (_side is null)
+        {
+            return [];
+        }
+
+        var lines = WidgetPaint.Lines(SideQuestionWidget.Create(_side, _sideIndex), width);
+        var max = Math.Max(0, lines.Count - MaxSideRows);
+        if (_sideStick)
+        {
+            _sideScroll = max;
+        }
+        else
+        {
+            _sideScroll = Math.Clamp(_sideScroll, 0, max);
+            _sideStick = _sideScroll >= max;
+        }
+
+        if (_sideScroll == 0 && lines.Count <= MaxSideRows)
+        {
+            return lines;
+        }
+
+        var window = new PaintLine[Math.Min(MaxSideRows, lines.Count - _sideScroll)];
+        for (var row = 0; row < window.Length; row++)
+        {
+            window[row] = lines[_sideScroll + row];
+        }
+
+        return window;
+    }
+
     private IReadOnlyList<PaintLine> OverlayLines(int width)
     {
+        if (_sideOpen && _side is not null)
+        {
+            return SideLines(width);
+        }
+
         if (_overlayWidget is not null)
         {
             return WidgetPaint.Lines(_overlayWidget, width);

@@ -30,6 +30,8 @@ public sealed class SlashCatalogTests
     [InlineData("/promptset", SessionVerb.PromptSet)]
     [InlineData("/prompts", SessionVerb.PromptSet)]
     [InlineData("/stats", SessionVerb.Stats)]
+    [InlineData("/btw", SessionVerb.Btw)]
+    [InlineData("/side", SessionVerb.Btw)]
     [InlineData("/tokens", SessionVerb.Tokens)]
     [InlineData("/verbose", SessionVerb.Verbose)]
     [InlineData("/todos", SessionVerb.Todos)]

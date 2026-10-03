@@ -68,6 +68,7 @@ internal sealed class TerminalHost
         using var screen = _renderer.Open();
         _renderer.OnImagePasteAsync = _session.PasteClipboardImageAsync;
         _renderer.OnComposerEdited = _session.NotifyDraftChanged;
+        _renderer.OnSideCleared = _session.ClearSideQuestions;
         _renderer.OnVerboseToggled = PersistVerboseToggle;
         await _session.StartAsync(cancellationToken);
 
@@ -77,6 +78,12 @@ internal sealed class TerminalHost
         Console.CancelKeyPress += (_, args) =>
         {
             args.Cancel = true;
+            if (_renderer.SideQuestionOpen)
+            {
+                _session.TryCancelSideQuestion();
+                return;
+            }
+
             if (_session.TryInterrupt())
             {
                 return;

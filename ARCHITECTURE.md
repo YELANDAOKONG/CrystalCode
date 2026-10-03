@@ -337,6 +337,21 @@ interrupts immediately and sends. Interrupt (Ctrl+C or empty Enter) does
 not drop queued text. At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
 
+`/btw` (alias `/side`) asks one side question from the committed transcript
+and the newest 20 side exchanges in this process. The request uses the work
+model, the same system message, an empty tool list, and its own cancellation.
+Text still streaming in the current round is not included. A tool call is not
+executed. Text that arrived with it is kept; a tool call with no text fails,
+and the question stays in the panel so it can be asked again. The question,
+the answer, and the token usage stay out of the queue, the transcript, the
+usage ledger, compaction, and the saved session. The terminal draws the answer in a panel above the composer and
+leaves the status bar, transcript, and progress row in place. Esc, Enter, or
+Space closes the panel. Left and Right step through earlier answers. `x`
+clears the in-memory thread. While that panel is open, Ctrl+C cancels the
+side question and leaves the main turn running. `/clear`, `/resume`, and
+`/fork` drop the thread. `crystal run` rejects the command with every other
+slash command.
+
 ## Plan and Work
 
 These are product modes, not Crystal types.

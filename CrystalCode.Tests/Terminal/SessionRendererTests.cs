@@ -6,6 +6,7 @@ using Crystal.Reasoning;
 
 using CrystalCode.Display.Input;
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -298,5 +299,72 @@ public sealed class SessionRendererTests
             checkSize: false);
 
         Assert.Equal("draft", submitted);
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_SideQuestionIgnoresComposerUntilClosed()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SeedComposer("draft");
+        renderer.ShowSideQuestion(new SideQuestionSnapshot(
+            true,
+            [],
+            true,
+            "why",
+            string.Empty,
+            null));
+        Assert.True(renderer.SideQuestionOpen);
+
+        var quit = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('q', ConsoleKey.Q, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var typed = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('h', ConsoleKey.H, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var dismissed = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Null(quit);
+        Assert.Null(typed);
+        Assert.Null(dismissed);
+        Assert.False(renderer.SideQuestionOpen);
+        Assert.Equal("draft", submitted);
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_XClearsSideQuestionWithoutSubmitting()
+    {
+        var renderer = new SessionRenderer();
+        var cleared = false;
+        renderer.OnSideCleared = () => cleared = true;
+        renderer.ShowSideQuestion(new SideQuestionSnapshot(
+            true,
+            [new SideExchange("why", "Because.")],
+            false,
+            string.Empty,
+            string.Empty,
+            null));
+
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('x', ConsoleKey.X, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Null(submitted);
+        Assert.True(cleared);
+        Assert.False(renderer.SideQuestionOpen);
     }
 }
