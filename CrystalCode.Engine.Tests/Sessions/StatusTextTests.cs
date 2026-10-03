@@ -53,6 +53,43 @@ public sealed class StatusTextTests
         Assert.Contains("Latest request", text, StringComparison.Ordinal);
         Assert.Contains("Model calls      4", text, StringComparison.Ordinal);
         Assert.Contains("External loaded  2", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Approval model", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_IncludesTheApprovalModelOnlyWhenSet()
+    {
+        var status = new SessionStatus(
+            SessionId: "session-1",
+            StartedUtc: DateTimeOffset.UnixEpoch,
+            WorkspaceRoot: "/work",
+            PlanMode: false,
+            Approval: ApprovalMode.Review,
+            Thinking: "Think Medium",
+            PromptSet: "default",
+            Provider: "openai",
+            Model: "gpt-5",
+            ContextWindow: 1_000,
+            Usage: null,
+            UserTurns: 0,
+            ModelCalls: 0,
+            ToolCalls: 0,
+            QueuedMessages: 0,
+            Todos: 0,
+            SkillsEnabled: true,
+            ExternalToolsEnabled: true,
+            EstimatedTokensEnabled: false,
+            VerboseToolsEnabled: true,
+            VerboseCommandsEnabled: true,
+            PlanTools: 1,
+            WorkTools: 1,
+            ExternalTools: 0,
+            CumulativeUsage: null,
+            ApprovalModel: "openai / gpt-5.6-sol");
+
+        var text = StatusText.Format(status, full: false);
+
+        Assert.Contains("Approval model  openai / gpt-5.6-sol", text, StringComparison.Ordinal);
     }
 
     [Fact]

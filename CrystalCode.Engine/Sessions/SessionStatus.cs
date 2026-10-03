@@ -33,4 +33,5 @@ public sealed record SessionStatus(
     int WorkTools,
     int ExternalTools,
     TokenUsage? CumulativeUsage,
-    bool CustomStatusLineEnabled = false);
+    bool CustomStatusLineEnabled = false,
+    string? ApprovalModel = null);

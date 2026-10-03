@@ -37,4 +37,6 @@ internal sealed class SettingsDocument
     public System.Text.Json.JsonElement? BashTimeoutSeconds { get; set; }
 
     public System.Text.Json.JsonElement? Providers { get; set; }
+
+    public ApprovalModelDocument? ApprovalModel { get; set; }
 }

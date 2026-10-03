@@ -24,14 +24,18 @@ public static class StatusText
                 ("Approval", ApprovalLabel.For(status.Approval)),
                 ("Prompt set", status.PromptSet)
             ]);
-        AddSection(
-            lines,
-            "Model",
-            [
-                ("Provider", status.Provider),
-                ("Model", status.Model),
-                ("Thinking", ThinkingValue(status.Thinking))
-            ]);
+        var modelRows = new List<(string Label, string Value)>
+        {
+            ("Provider", status.Provider),
+            ("Model", status.Model),
+            ("Thinking", ThinkingValue(status.Thinking))
+        };
+        if (!string.IsNullOrWhiteSpace(status.ApprovalModel))
+        {
+            modelRows.Add(("Approval model", status.ApprovalModel));
+        }
+
+        AddSection(lines, "Model", modelRows);
         AddSection(
             lines,
             "Session tokens",

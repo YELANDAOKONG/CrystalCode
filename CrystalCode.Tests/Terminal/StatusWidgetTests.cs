@@ -89,5 +89,43 @@ public sealed class StatusWidgetTests
         Assert.Contains("12%", text, StringComparison.Ordinal);
         Assert.Contains("550", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Activity", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Approval model", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_ShowsTheApprovalModelWhenSet()
+    {
+        var status = new SessionStatus(
+            "session-5",
+            DateTimeOffset.UnixEpoch,
+            "/work",
+            false,
+            ApprovalMode.Review,
+            "Think Medium",
+            "default",
+            "openai",
+            "gpt-5",
+            1_000,
+            null,
+            0,
+            0,
+            0,
+            0,
+            0,
+            true,
+            true,
+            false,
+            true,
+            true,
+            5,
+            8,
+            0,
+            null,
+            ApprovalModel: "openai / gpt-5.6-sol");
+
+        var text = string.Join('\n', WidgetPaint.Plain(StatusWidget.Create(status, full: false), 88));
+
+        Assert.Contains("Approval model", text, StringComparison.Ordinal);
+        Assert.Contains("openai / gpt-5.6-sol", text, StringComparison.Ordinal);
     }
 }

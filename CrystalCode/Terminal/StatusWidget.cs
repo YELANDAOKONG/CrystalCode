@@ -47,13 +47,21 @@ internal static class StatusWidget
             ("Prompt set", status.PromptSet)
         ]);
 
-    private static Panel ModelCard(SessionStatus status) =>
-        Card("Model",
-        [
+    private static Panel ModelCard(SessionStatus status)
+    {
+        var rows = new List<(string Field, string Value)>
+        {
             ("Provider", status.Provider),
             ("Model", status.Model),
             ("Thinking", ThinkingValue(status.Thinking))
-        ]);
+        };
+        if (!string.IsNullOrWhiteSpace(status.ApprovalModel))
+        {
+            rows.Add(("Approval model", status.ApprovalModel));
+        }
+
+        return Card("Model", rows);
+    }
 
     private static Panel TokenCard(SessionStatus status, bool full)
     {

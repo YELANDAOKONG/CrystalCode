@@ -79,7 +79,8 @@ public sealed class SettingsStore
                 document.CustomStatusLine ?? false,
                 document.StatusLine),
             ExecutionBudgetMapper.Read(document.ExecutionBudget),
-            BashTimeoutMapper.Read(parsed.RootElement));
+            BashTimeoutMapper.Read(parsed.RootElement),
+            ReadApprovalModel(document.ApprovalModel));
     }
 
     public void Save(HarnessSettings settings)
@@ -127,7 +128,8 @@ public sealed class SettingsStore
             CompactionThreshold = settings.CompactionThreshold,
             ExecutionBudget = ExecutionBudgetMapper.Write(settings.ExecutionBudget),
             BashTimeoutSeconds = BashTimeoutMapper.Write(settings.BashTimeoutSeconds),
-            Providers = previous?.Providers
+            Providers = previous?.Providers,
+            ApprovalModel = WriteApprovalModel(settings.ApprovalModel)
         };
         var json = JsonSerializer.Serialize(document, HomeJson.Options);
         File.WriteAllText(_home.ConfigPath, json);
@@ -172,6 +174,43 @@ public sealed class SettingsStore
         {
             File.Delete(temporaryPath);
         }
+    }
+
+    private static ApprovalModelSettings ReadApprovalModel(ApprovalModelDocument? document)
+    {
+        if (document is null)
+        {
+            return ApprovalModelSettings.Off;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider)
+            ? null
+            : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model)
+            ? null
+            : document.Model.Trim();
+        if (document.Enabled == true && (provider is null || model is null))
+        {
+            throw new InvalidOperationException(
+                "approvalModel.enabled requires provider and model.");
+        }
+
+        return new ApprovalModelSettings(document.Enabled ?? false, provider, model);
+    }
+
+    private static ApprovalModelDocument? WriteApprovalModel(ApprovalModelSettings settings)
+    {
+        if (!settings.Enabled && !settings.HasSelection)
+        {
+            return null;
+        }
+
+        return new ApprovalModelDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            Provider = settings.Provider,
+            Model = settings.Model
+        };
     }
 
     private static ExternalToolApprovalSettings ReadExternalToolApproval(

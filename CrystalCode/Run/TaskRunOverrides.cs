@@ -38,6 +38,13 @@ internal static class TaskRunOverrides
                 next = next.WithApproval(ApprovalMode.Parse(Required(request.Approval, "Approval mode")));
             }
 
+            if (request.ApprovalModel is not null
+                || request.ApprovalProvider is not null
+                || request.ApprovalModelId is not null)
+            {
+                next = next.WithApprovalModel(ParseApprovalModel(next, request));
+            }
+
             if (request.Thinking is not null)
             {
                 next = next.WithThinkingEffort(
@@ -83,6 +90,54 @@ internal static class TaskRunOverrides
             error = exception.Message;
             return false;
         }
+    }
+
+    private static ApprovalModelSettings ParseApprovalModel(
+        HarnessSettings current,
+        TaskRunSettings request)
+    {
+        var specifiedProvider = request.ApprovalProvider is not null;
+        var specifiedModel = request.ApprovalModelId is not null;
+        var specified = specifiedProvider || specifiedModel;
+        bool? enabled = request.ApprovalModel is null
+            ? null
+            : ParseSwitch(request.ApprovalModel, "--approval-model");
+        if (enabled == false)
+        {
+            if (specified)
+            {
+                throw new ArgumentException(
+                    "Do not pass --approval-provider or --approval-model-id when --approval-model is off.");
+            }
+
+            return current.ApprovalModel.DisabledCopy();
+        }
+
+        if (enabled is null && !specified)
+        {
+            return current.ApprovalModel;
+        }
+
+        var provider = specifiedProvider
+            ? ProviderName.Parse(Required(request.ApprovalProvider!, "Approval provider"))
+            : current.ApprovalModel.Provider is string stored
+                ? ProviderName.Parse(stored)
+                : current.Provider;
+        var model = specifiedModel
+            ? Required(request.ApprovalModelId!, "Approval model")
+            : current.ApprovalModel.Model
+                ?? throw new ArgumentException("Pass --approval-model-id.");
+
+        try
+        {
+            _ = current.Catalog.GetModel(provider, model);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            throw new ArgumentException(exception.Message, exception);
+        }
+
+        return new ApprovalModelSettings(true, provider.Value, model);
     }
 
     private static TurnLimits ParseBudget(HarnessSettings current, TaskRunSettings request)

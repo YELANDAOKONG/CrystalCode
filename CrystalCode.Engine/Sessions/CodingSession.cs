@@ -28,6 +28,8 @@ namespace CrystalCode.Engine.Sessions;
 public sealed class CodingSession : ITurnObserver
 {
     private IStreamingChatClient _client;
+    private IStreamingChatClient? _approvalClient;
+    private string? _approvalClientKey;
     private IStreamingMultimodalChatClient? _multimodalClient;
     private HarnessSettings _settings;
     private readonly SettingsStore _settingsStore;
@@ -502,6 +504,18 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeApproval(string argument)
     {
+        if (ApprovalModelArguments.IsModelCommand(argument))
+        {
+            if (!ApprovalModelArguments.TryParse(argument, out var request, out var parseError))
+            {
+                Error(parseError);
+                return;
+            }
+
+            ChangeApprovalModel(request);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(argument))
         {
             _approval = ApprovalMode.Next(_approval);
@@ -525,6 +539,155 @@ public sealed class CodingSession : ITurnObserver
         ReplaceLiveSystem();
         RefreshChrome();
         Note("Approval  " + ApprovalLabel.For(_approval));
+    }
+
+    private void ChangeApprovalModel(ApprovalModelArguments.Request request)
+    {
+        if (request.Show)
+        {
+            Note(_settings.ApprovalModel.Describe());
+            return;
+        }
+
+        if (_turnActive)
+        {
+            Error("Finish the current turn before changing the approval model.");
+            return;
+        }
+
+        ApprovalModelSettings next;
+        if (request.Enabled is bool enabled)
+        {
+            if (enabled && !_settings.ApprovalModel.HasSelection)
+            {
+                Error("Set an approval model before turning it on.");
+                return;
+            }
+
+            next = enabled
+                ? _settings.ApprovalModel.EnabledCopy()
+                : _settings.ApprovalModel.DisabledCopy();
+        }
+        else if (!TrySelectApprovalModel(request.Selection ?? string.Empty, out next, out var selectError))
+        {
+            Error(selectError);
+            return;
+        }
+
+        if (!TryPrepareApprovalClient(next, out var client, out var prepareError))
+        {
+            Error(prepareError);
+            return;
+        }
+
+        HarnessSettings updated;
+        try
+        {
+            updated = _settings.WithApprovalModel(next);
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (client is not null && !ReferenceEquals(client, _client))
+            {
+                DisposeClient(client);
+            }
+
+            Error(exception.Message);
+            return;
+        }
+
+        _settings = updated;
+        _settingsStore.Save(_settings);
+        ReplaceApprovalClient(next, client);
+        RebuildExecutors();
+        Note(next.Describe());
+    }
+
+    private bool TrySelectApprovalModel(
+        string selectionText,
+        out ApprovalModelSettings settings,
+        out string error)
+    {
+        settings = ApprovalModelSettings.Off;
+        var currentProvider = _settings.ApprovalModel.Provider is string stored
+            ? new ProviderName(stored)
+            : _settings.Provider;
+        if (!ModelSelection.TryResolve(
+                _settings.Catalog,
+                currentProvider,
+                selectionText,
+                out var selection,
+                out error)
+            || selection is null)
+        {
+            error = (error ?? string.Empty).Replace(
+                "/model",
+                "/approval model",
+                StringComparison.Ordinal);
+            return false;
+        }
+
+        settings = new ApprovalModelSettings(true, selection.Provider.Value, selection.Model);
+        error = string.Empty;
+        return true;
+    }
+
+    private bool TryPrepareApprovalClient(
+        ApprovalModelSettings settings,
+        out IStreamingChatClient? client,
+        out string error)
+    {
+        client = null;
+        error = string.Empty;
+        if (!settings.Enabled)
+        {
+            return true;
+        }
+
+        HarnessSettings approvalSettings;
+        try
+        {
+            approvalSettings = _settings.WithSelection(
+                new ProviderName(settings.Provider!),
+                settings.Model!);
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or KeyNotFoundException)
+        {
+            error = exception.Message;
+            return false;
+        }
+
+        if (!_credentials.TryResolve(approvalSettings.ActiveProvider, out var apiKey, out error))
+        {
+            return false;
+        }
+
+        try
+        {
+            client = ChatClientFactory.Create(approvalSettings, apiKey, _plugins);
+            return true;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or NotSupportedException)
+        {
+            error = exception.Message;
+            return false;
+        }
+    }
+
+    private void ReplaceApprovalClient(ApprovalModelSettings settings, IStreamingChatClient? client)
+    {
+        ReleaseApprovalClient();
+        if (client is null)
+        {
+            return;
+        }
+
+        _approvalClient = client;
+        _approvalClientKey = ApprovalClientKey(settings);
     }
 
     private void ChangeThinking(string argument)
@@ -729,7 +892,11 @@ public sealed class CodingSession : ITurnObserver
         _compactor = CreateCompactor(nextClient);
         _settings = nextSettings;
         _settingsStore.Save(_settings);
-        DisposeClient(previous);
+        if (!ReferenceEquals(previous, _approvalClient))
+        {
+            DisposeClient(previous);
+        }
+
         DisposeClient(previousMultimodal);
         ReplaceLiveSystem();
         RebuildExecutors();
@@ -1275,7 +1442,10 @@ public sealed class CodingSession : ITurnObserver
                 WorkTools: workToolCount,
                 ExternalTools: _external.Tools.Count,
                 CumulativeUsage: _ledger.CumulativeUsage,
-                CustomStatusLineEnabled: _settings.StatusLine.Enabled),
+                CustomStatusLineEnabled: _settings.StatusLine.Enabled,
+                ApprovalModel: _settings.ApprovalModel.Enabled
+                    ? _settings.ApprovalModel.Provider + " / " + _settings.ApprovalModel.Model
+                    : null),
             full));
     }
 
@@ -1359,6 +1529,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void DisposeClient()
     {
+        ReleaseApprovalClient();
         DisposeClient(_client);
         DisposeClient(_multimodalClient);
     }
@@ -1794,9 +1965,9 @@ public sealed class CodingSession : ITurnObserver
         var approvalPrompt = _frontEnd.Approvals;
         var question = _frontEnd.Questions;
         var reviewer = new ModelApprovalReviewer(
-            _client,
+            ReviewerClient(),
             CurrentReviewSystemText(),
-            CurrentReasoning());
+            ReviewerReasoning());
         var policy = new ApprovalPolicy(
             _approval,
             _workspace,
@@ -1912,6 +2083,72 @@ public sealed class CodingSession : ITurnObserver
     {
         _reviewContext.Conversation = _transcript;
     }
+
+    private IChatClient ReviewerClient()
+    {
+        if (!_settings.ApprovalModel.Enabled)
+        {
+            ReleaseApprovalClient();
+            return _client;
+        }
+
+        EnsureApprovalClient();
+        return _approvalClient!;
+    }
+
+    private ReasoningOptions? ReviewerReasoning()
+    {
+        if (!_settings.ApprovalModel.Enabled)
+        {
+            return CurrentReasoning();
+        }
+
+        var model = _settings.Catalog.GetModel(
+            new ProviderName(_settings.ApprovalModel.Provider!),
+            _settings.ApprovalModel.Model!);
+        return ThinkingSelection.Default.ToReasoningOptions(model);
+    }
+
+    private void EnsureApprovalClient()
+    {
+        var key = ApprovalClientKey(_settings.ApprovalModel);
+        if (_approvalClient is not null && _approvalClientKey == key)
+        {
+            return;
+        }
+
+        if (!TryPrepareApprovalClient(_settings.ApprovalModel, out var client, out var error)
+            || client is null)
+        {
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(error)
+                    ? "The approval model could not be created."
+                    : error);
+        }
+
+        ReleaseApprovalClient();
+        _approvalClient = client;
+        _approvalClientKey = key;
+    }
+
+    private void ReleaseApprovalClient()
+    {
+        if (_approvalClient is null)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_approvalClient, _client))
+        {
+            DisposeClient(_approvalClient);
+        }
+
+        _approvalClient = null;
+        _approvalClientKey = null;
+    }
+
+    private static string ApprovalClientKey(ApprovalModelSettings settings) =>
+        settings.Provider + "\n" + settings.Model;
 
     private ReasoningOptions? CurrentReasoning() =>
         _thinkingEffort.ToReasoningOptions(_settings.ActiveModel);

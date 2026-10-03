@@ -168,6 +168,9 @@ saved value is also unset. `unlimited` removes that one cap.
 | `-p`, `--provider` / `-m`, `--model` | Provider and model for this process |
 | `-w`, `--workspace` / `--home` | Workspace root and data directory |
 | `--approval <mode>` | `default`, `edit`, `review`, `audit`, or `full` |
+| `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
+| `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
+| `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. An unknown value exits 1 |
 | `--prompt-set <name>` | An existing home prompt set. `default` is always valid |
@@ -179,12 +182,17 @@ saved value is also unset. `unlimited` removes that one cap.
 | `--show-thinking` | Print reasoning text |
 | `--format` | `default` for plain text, or `json` for one JSON object per line |
 
+`--approval-model off` cannot be combined with `--approval-provider` or
+`--approval-model-id`. `--approval-model on` needs a saved approval model
+or `--approval-model-id`.
+
 There is no operator. In Review and Audit the reviewing model still
 judges calls that require review: allow runs the tool, and deny returns
-the reviewer's reason to the model. Anything that would ask the
-operator, including Default, Edit, and Full prompts, is denied with the
-usual rejection text. The `question` tool is dismissed. Plan does not
-offer write, edit, or bash. Credential paths stay forbidden.
+the reviewer's reason to the model. That model is the session model
+unless the approval-model switch is on for this process. Anything that
+would ask the operator, including Default, Edit, and Full prompts, is
+denied with the usual rejection text. The `question` tool is dismissed.
+Plan does not offer write, edit, or bash. Credential paths stay forbidden.
 
 A reviewer denial is a tool error. If the model then finishes, the
 process exits 0. A denied operator prompt or a dismissed question does
@@ -292,6 +300,7 @@ Top-level fields:
 | `provider` | Active provider name |
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
+| `approvalModel` | Optional reviewer. `enabled`, `provider`, and `model`. Omitted means off. `enabled: false` keeps a stored provider and model unused |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
@@ -414,7 +423,7 @@ Set `OPENROUTER_API_KEY` in the shell that starts the process, then restart
 after editing `providers.json`. Select the model with `/model openrouter
 anthropic/claude-sonnet-4`, or set `provider` and `model` in `config.json`.
 CLI `--provider` and `--model` override that selection for one run;
-`/approval`, `/thinking`, and `/model` write their values to `config.json`.
+`/approval` (including `/approval model`), `/thinking`, and `/model` write their values to `config.json`.
 
 ### Example: add OpenCode Zen protocol endpoints
 
@@ -605,6 +614,22 @@ Edit, Review, Audit, and Full. `/approval review` (and the
 other names) sets one mode and writes it to `config.json`. Legacy
 values `autoedit`, `fullreview`, and `full-review` still parse.
 
+The reviewing model is the session model unless you turn on a separate
+approval model. `/approval model` shows `Approval model  Off`, or
+`Approval model  On  openai  gpt-5.6-sol` when a provider and model are
+stored. `/approval model on` and `/approval model off` persist the
+switch and leave a stored provider and model in place. `/approval model
+<model>` or `/approval model <provider> <model>` selects a catalog model
+and turns the switch on. The model must exist in `providers.json`. A
+missing credential or an unknown model is refused, and the previous
+setting stays. While the switch is on, Review and Audit call that
+model with its own credentials and its default thinking gear. `/model`
+and the work thinking gear do not change it. Compaction stays on the
+session model. While the switch is off, no separate client is created
+and Review and Audit follow `/model`. Finish the current turn before
+changing the approval model. `/status` adds an Approval model row only
+while the switch is on. The status bar does not.
+
 When you are asked, the overlay uses a two-column field grid
 (Status, Reason, Risk, Authority, and for review also Outcome plus
 rationale):
@@ -674,7 +699,7 @@ returns the transcript viewport to the latest output.
 | :--- | :--- | :--- |
 | `/help` | `/h` | Shortcuts and commands |
 | `/plan` | | Toggle Plan / Work |
-| `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full` |
+| `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model |
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think` | Cycle or set the thinking gear |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |

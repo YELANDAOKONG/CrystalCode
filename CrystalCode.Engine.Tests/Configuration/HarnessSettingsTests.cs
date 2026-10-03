@@ -108,4 +108,24 @@ public sealed class HarnessSettingsTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => settings.WithBashTimeout(0));
     }
+
+    [Fact]
+    public void ApprovalModel_RejectsAnEnabledUnknownModelAndKeepsADisabledOne()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        Assert.False(settings.ApprovalModel.Enabled);
+        Assert.Throws<ArgumentException>(() => new ApprovalModelSettings(true, "openai", " "));
+
+        var disabled = settings.WithApprovalModel(
+            new ApprovalModelSettings(false, "openai", "not-a-model"));
+
+        Assert.False(disabled.ApprovalModel.Enabled);
+        Assert.Equal("not-a-model", disabled.ApprovalModel.Model);
+        Assert.False(settings.ApprovalModel.HasSelection);
+
+        var enabled = Assert.Throws<InvalidOperationException>(() =>
+            settings.WithApprovalModel(new ApprovalModelSettings(true, "openai", "not-a-model")));
+        Assert.Contains("not-a-model", enabled.Message, StringComparison.Ordinal);
+    }
 }

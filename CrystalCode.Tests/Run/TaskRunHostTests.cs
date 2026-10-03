@@ -360,6 +360,80 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task ApprovalModelOverride_StaysProcessOnly()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(AllowReview, TextRound("Hello there."));
+        var settings = Copy(
+            fixture.Settings("Say hello"),
+            approvalModel: "on",
+            approvalModelId: "qwen3:8b");
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        fixture.AssertSettingsUnchanged();
+        Assert.False(fixture.Reload().ApprovalModel.Enabled);
+    }
+
+    [Fact]
+    public void Overrides_ConfiguresTheApprovalModelInMemory()
+    {
+        var stored = HarnessSettings.CreateDefault().WithApprovalModel(
+            new ApprovalModelSettings(true, "openai", "gpt-5.6-sol"));
+
+        var off = AssertApplied(stored, new TaskRunSettings { ApprovalModel = "off" });
+
+        Assert.False(off.ApprovalModel.Enabled);
+        Assert.Equal("openai", off.ApprovalModel.Provider);
+        Assert.Equal("gpt-5.6-sol", off.ApprovalModel.Model);
+        Assert.True(stored.ApprovalModel.Enabled);
+
+        var on = AssertApplied(
+            stored.WithApprovalModel(stored.ApprovalModel.DisabledCopy()),
+            new TaskRunSettings { ApprovalModel = "on" });
+        Assert.True(on.ApprovalModel.Enabled);
+        Assert.Equal("gpt-5.6-sol", on.ApprovalModel.Model);
+
+        var selected = AssertApplied(
+            HarnessSettings.CreateDefault(),
+            new TaskRunSettings
+            {
+                ApprovalProvider = "openai",
+                ApprovalModelId = "gpt-5.6-terra"
+            });
+        Assert.True(selected.ApprovalModel.Enabled);
+        Assert.Equal("openai", selected.ApprovalModel.Provider);
+        Assert.Equal("gpt-5.6-terra", selected.ApprovalModel.Model);
+        Assert.Equal(ProviderName.DeepSeek, selected.Provider);
+    }
+
+    [Fact]
+    public void Overrides_RejectsApprovalModelConflicts()
+    {
+        var current = HarnessSettings.CreateDefault();
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { ApprovalModel = "off", ApprovalProvider = "openai" },
+            out _,
+            out _,
+            out var combined));
+        Assert.Equal(
+            "Do not pass --approval-provider or --approval-model-id when --approval-model is off.",
+            combined);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { ApprovalModel = "on" },
+            out _,
+            out _,
+            out var missing));
+        Assert.Equal("Pass --approval-model-id.", missing);
+        Assert.False(current.ApprovalModel.Enabled);
+    }
+
+    [Fact]
     public void Overrides_RejectsAnInvalidQuotaOrModePair()
     {
         var current = HarnessSettings.CreateDefault();
@@ -428,7 +502,10 @@ public sealed class TaskRunHostTests
         string? modelCalls = null,
         string? promptSet = null,
         string? format = null,
-        bool showThinking = false) =>
+        bool showThinking = false,
+        string? approvalModel = null,
+        string? approvalProvider = null,
+        string? approvalModelId = null) =>
         new()
         {
             TaskText = settings.TaskText,
@@ -444,7 +521,10 @@ public sealed class TaskRunHostTests
             ModelCalls = modelCalls,
             PromptSet = promptSet,
             Format = format,
-            ShowThinking = showThinking
+            ShowThinking = showThinking,
+            ApprovalModel = approvalModel,
+            ApprovalProvider = approvalProvider,
+            ApprovalModelId = approvalModelId
         };
 
     private static ChatStreamEvent[] TextRound(string text, string? thinking = null)

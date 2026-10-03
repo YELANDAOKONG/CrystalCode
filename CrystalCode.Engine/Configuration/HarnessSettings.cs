@@ -42,7 +42,8 @@ public sealed record HarnessSettings
         string? exportDirectory = null,
         StatusLineSettings? statusLine = null,
         TurnLimits? executionBudget = null,
-        int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds)
+        int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
+        ApprovalModelSettings? approvalModel = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -85,6 +86,20 @@ public sealed record HarnessSettings
         StatusLine = statusLine ?? new StatusLineSettings();
         ExecutionBudget = executionBudget ?? TurnLimits.CreateDefault();
         BashTimeoutSeconds = bashTimeoutSeconds;
+        ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
+        if (ApprovalModel.Enabled)
+        {
+            try
+            {
+                _ = catalog.GetModel(
+                    new ProviderName(ApprovalModel.Provider!),
+                    ApprovalModel.Model!);
+            }
+            catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+            {
+                throw new InvalidOperationException(exception.Message, exception);
+            }
+        }
     }
 
     public ProviderName Provider { get; }
@@ -120,6 +135,8 @@ public sealed record HarnessSettings
     public TurnLimits ExecutionBudget { get; }
 
     public int? BashTimeoutSeconds { get; }
+
+    public ApprovalModelSettings ApprovalModel { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.GetModelProvider(Provider, Model);
 
@@ -218,6 +235,12 @@ public sealed record HarnessSettings
     public HarnessSettings WithBashTimeout(int? bashTimeoutSeconds) =>
         Copy(bashTimeoutSeconds: bashTimeoutSeconds, setBashTimeout: true);
 
+    public HarnessSettings WithApprovalModel(ApprovalModelSettings approvalModel)
+    {
+        ArgumentNullException.ThrowIfNull(approvalModel);
+        return Copy(approvalModel: approvalModel, setApprovalModel: true);
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -235,7 +258,9 @@ public sealed record HarnessSettings
         StatusLineSettings? statusLine = null,
         TurnLimits? executionBudget = null,
         int? bashTimeoutSeconds = null,
-        bool setBashTimeout = false) =>
+        bool setBashTimeout = false,
+        ApprovalModelSettings? approvalModel = null,
+        bool setApprovalModel = false) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -253,7 +278,8 @@ public sealed record HarnessSettings
             setExportDirectory ? exportDirectory : ExportDirectory,
             statusLine ?? StatusLine,
             executionBudget ?? ExecutionBudget,
-            setBashTimeout ? bashTimeoutSeconds : BashTimeoutSeconds);
+            setBashTimeout ? bashTimeoutSeconds : BashTimeoutSeconds,
+            setApprovalModel ? approvalModel : ApprovalModel);
 
     public override string ToString() => nameof(HarnessSettings);
 

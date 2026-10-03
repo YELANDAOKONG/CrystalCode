@@ -763,4 +763,85 @@ public sealed class SettingsStoreTests
         Assert.True(loaded.StatusLine.Enabled);
         Assert.Equal(["context-left", "session-total"], loaded.StatusLine.Fields);
     }
+
+    [Fact]
+    public void Save_RoundTripsAnEnabledApprovalModel()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithApprovalModel(
+            new ApprovalModelSettings(true, "openai", "gpt-5.6-sol"));
+
+        store.Save(settings);
+        var loaded = store.Load();
+        var json = File.ReadAllText(root.Home.ConfigPath);
+
+        Assert.True(loaded.ApprovalModel.Enabled);
+        Assert.Equal("openai", loaded.ApprovalModel.Provider);
+        Assert.Equal("gpt-5.6-sol", loaded.ApprovalModel.Model);
+        Assert.Contains("\"enabled\": true", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_KeepsADisabledApprovalModelWithoutEnablingIt()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithApprovalModel(
+            new ApprovalModelSettings(false, "openai", "not-a-model"));
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.False(loaded.ApprovalModel.Enabled);
+        Assert.Equal("openai", loaded.ApprovalModel.Provider);
+        Assert.Equal("not-a-model", loaded.ApprovalModel.Model);
+        Assert.DoesNotContain(
+            "\"enabled\"",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_OmitsAnUnsetApprovalModel()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+
+        store.Save(HarnessSettings.CreateDefault());
+        var loaded = store.Load();
+
+        Assert.False(loaded.ApprovalModel.Enabled);
+        Assert.False(loaded.ApprovalModel.HasSelection);
+        Assert.DoesNotContain(
+            "approvalModel",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsAnEnabledApprovalModelThatIsIncompleteOrUnknown()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "approvalModel": { "enabled": true } }
+            """);
+        var incomplete = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Equal(
+            "approvalModel.enabled requires provider and model.",
+            incomplete.Message);
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "approvalModel": { "enabled": true, "provider": "openai", "model": "not-a-model" } }
+            """);
+        var unknown = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Contains("not-a-model", unknown.Message, StringComparison.Ordinal);
+    }
 }

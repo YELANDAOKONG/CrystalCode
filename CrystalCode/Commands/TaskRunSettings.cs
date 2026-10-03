@@ -26,6 +26,15 @@ public sealed class TaskRunSettings : CommandSettings
     [CommandOption("--approval <MODE>")]
     public string? Approval { get; init; }
 
+    [CommandOption("--approval-model <on|off>")]
+    public string? ApprovalModel { get; init; }
+
+    [CommandOption("--approval-provider <PROVIDER>")]
+    public string? ApprovalProvider { get; init; }
+
+    [CommandOption("--approval-model-id <MODEL>")]
+    public string? ApprovalModelId { get; init; }
+
     [CommandOption("--plan")]
     public bool Plan { get; init; }
 

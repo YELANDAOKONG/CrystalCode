@@ -41,11 +41,12 @@ separate library with no terminal code. The product can:
   or when the operator runs `/compact`;
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
-  approval, Plan or Work, thinking, prompt set, skills, external tools,
-  and turn quotas for that process only. They are not written to
-  `config.json`. Stdout is a readable plain-text trace, or one JSON object
+  approval, the approval model, Plan or Work, thinking, prompt set, skills,
+  external tools, and turn quotas for that process only. They are not written
+  to `config.json`. Stdout is a readable plain-text trace, or one JSON object
   per line when `--format json` is set. Review and Audit still use the
-  reviewing model.
+  reviewing model. That model can be a separate provider and model, and
+  the choice can be turned off.
   Anything that would ask the operator is denied;
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - recall submitted prompts from the composer with Up/Down and retain up to 200
