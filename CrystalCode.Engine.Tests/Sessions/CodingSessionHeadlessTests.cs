@@ -164,7 +164,7 @@ public sealed class CodingSessionHeadlessTests
     }
 
     [Fact]
-    public async Task StatsCommand_PrintsTokenAndToolSummary()
+    public async Task StatsCommand_PublishesTokenAndToolSummaryPage()
     {
         var client = new ScriptedStreamingClient(
             ToolRound("c1", "read", """{"path":"notes.txt"}"""),
@@ -178,11 +178,11 @@ public sealed class CodingSessionHeadlessTests
         var quit = await headless.Session.SubmitAsync("/stats", CancellationToken.None);
 
         Assert.False(quit);
-        var note = headless.Observer.Events.OfType<NoteWritten>().Single().Text;
-        Assert.Contains("Stats · This workspace", note, StringComparison.Ordinal);
-        Assert.Contains("Tokens", note, StringComparison.Ordinal);
-        Assert.Contains("Top tools", note, StringComparison.Ordinal);
-        Assert.Contains("read", note, StringComparison.Ordinal);
+        var stats = headless.Observer.Events.OfType<StatsReported>().Single().Text;
+        Assert.Contains("Stats · This workspace", stats, StringComparison.Ordinal);
+        Assert.Contains("Tokens", stats, StringComparison.Ordinal);
+        Assert.Contains("Top tools", stats, StringComparison.Ordinal);
+        Assert.Contains("read", stats, StringComparison.Ordinal);
     }
 
     private static int IndexOf<TEvent>(IReadOnlyList<SessionEvent> events)

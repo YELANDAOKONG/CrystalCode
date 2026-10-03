@@ -1,6 +1,7 @@
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Spectre.Console;
 
 using CrystalCode.Display.Input;
 using CrystalCode.Engine.Approvals;
@@ -244,5 +245,22 @@ public sealed class SessionRendererTests
             checkSize: false);
 
         Assert.Equal("previous prompt", submitted);
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_QDismissesOverlayInsteadOfEditingComposer()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SetOverlay(new Text("stats"));
+        Assert.True(renderer.OverlayVisible);
+
+        var dismissed = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('q', ConsoleKey.Q, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Null(dismissed);
+        Assert.False(renderer.OverlayVisible);
     }
 }

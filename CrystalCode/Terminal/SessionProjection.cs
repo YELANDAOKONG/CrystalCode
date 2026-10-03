@@ -79,6 +79,9 @@ internal sealed class SessionProjection : ISessionObserver
             case StatusReported status:
                 _renderer.WriteStatus(status.Status, status.Full);
                 break;
+            case StatsReported stats:
+                _renderer.ShowStatsPage(stats.Text);
+                break;
             case UsageChanged usage:
                 _renderer.ContextWindow = usage.ContextWindow;
                 if (usage.Interim)

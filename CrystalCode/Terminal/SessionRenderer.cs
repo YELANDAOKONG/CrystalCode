@@ -67,6 +67,17 @@ public sealed class SessionRenderer : IDisposable
 
     public Action<string>? OnComposerEdited { get; set; }
 
+    internal bool OverlayVisible
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _overlayWidget is not null || _modalOverlay.Count > 0;
+            }
+        }
+    }
+
     public bool ShowEstimatedTokens
     {
         get
@@ -429,6 +440,18 @@ public sealed class SessionRenderer : IDisposable
                 AnsiConsole.Write(widget);
                 AnsiConsole.WriteLine();
             }
+            PaintUnlocked(force: true);
+        }
+    }
+
+    internal void ShowStatsPage(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            _modalOverlay.Clear();
+            _overlayWidget = StatsPageWidget.Create(text);
             PaintUnlocked(force: true);
         }
     }
@@ -1196,6 +1219,15 @@ public sealed class SessionRenderer : IDisposable
 
     private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> togglePlan)
     {
+        if (_overlayWidget is not null
+            && key.Modifiers == ConsoleModifiers.None
+            && (key.Key == ConsoleKey.Escape || key.Key == ConsoleKey.Q || key.KeyChar is 'q' or 'Q'))
+        {
+            _overlayWidget = null;
+            _modalOverlay.Clear();
+            return null;
+        }
+
         if (_picker is not null
             && key.Key == ConsoleKey.Tab
             && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
