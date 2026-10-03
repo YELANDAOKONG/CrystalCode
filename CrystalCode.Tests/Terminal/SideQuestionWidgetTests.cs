@@ -75,4 +75,29 @@ public sealed class SideQuestionWidgetTests
         Assert.Contains("two", text, StringComparison.Ordinal);
         Assert.Contains("second", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Create_IndentsLikeOtherCardsAndKeepsATabInsideTheBorder()
+    {
+        const int width = 80;
+        var snapshot = new SideQuestionSnapshot(
+            true,
+            [new SideExchange("q", "col1\tcol2\n" + new string('a', 72) + "\tZ")],
+            false,
+            string.Empty,
+            string.Empty,
+            null);
+
+        var lines = WidgetPaint.Lines(SideQuestionWidget.Create(snapshot, 0), width);
+
+        Assert.StartsWith("  ", lines[0].Plain, StringComparison.Ordinal);
+        Assert.Contains(lines, line => line.Plain.Contains("col1    col2", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains('Z'));
+        Assert.All(lines, line =>
+        {
+            Assert.True(TextWidth.Measure(line.Plain) <= width);
+            Assert.DoesNotContain("...", line.Plain);
+            Assert.DoesNotContain('\t', line.Plain);
+        });
+    }
 }

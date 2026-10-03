@@ -367,4 +367,87 @@ public sealed class SessionRendererTests
         Assert.True(cleared);
         Assert.False(renderer.SideQuestionOpen);
     }
+
+    [Fact]
+    public void PauseComposer_RestoresAnOpenSideQuestion()
+    {
+        var renderer = new SessionRenderer();
+        renderer.ShowSideQuestion(SampleSide());
+
+        renderer.PauseComposer();
+        Assert.False(renderer.SideQuestionOpen);
+
+        renderer.ResumeComposer();
+        Assert.True(renderer.SideQuestionOpen);
+    }
+
+    [Fact]
+    public async Task PauseComposer_LeavesADismissedSideQuestionClosed()
+    {
+        var renderer = new SessionRenderer();
+        renderer.ShowSideQuestion(SampleSide());
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        renderer.PauseComposer();
+        renderer.ResumeComposer();
+
+        Assert.False(renderer.SideQuestionOpen);
+    }
+
+    [Fact]
+    public void PauseComposer_ShowsASideQuestionThatArrivesWhilePaused()
+    {
+        var renderer = new SessionRenderer();
+        renderer.PauseComposer();
+        renderer.ShowSideQuestion(SampleSide());
+        Assert.False(renderer.SideQuestionOpen);
+
+        renderer.ResumeComposer();
+
+        Assert.True(renderer.SideQuestionOpen);
+    }
+
+    [Fact]
+    public void PauseComposer_IgnoresASideUpdateThatDoesNotAnnounce()
+    {
+        var renderer = new SessionRenderer();
+        renderer.PauseComposer();
+        renderer.ShowSideQuestion(new SideQuestionSnapshot(
+            false,
+            [new SideExchange("why", "Because.")],
+            false,
+            string.Empty,
+            string.Empty,
+            null));
+
+        renderer.ResumeComposer();
+
+        Assert.False(renderer.SideQuestionOpen);
+    }
+
+    [Fact]
+    public void PauseComposer_DoesNotReopenAfterTheSideQuestionIsCleared()
+    {
+        var renderer = new SessionRenderer();
+        renderer.ShowSideQuestion(SampleSide());
+        renderer.PauseComposer();
+        renderer.ShowSideQuestion(SideQuestionSnapshot.Empty);
+
+        renderer.ResumeComposer();
+
+        Assert.False(renderer.SideQuestionOpen);
+    }
+
+    private static SideQuestionSnapshot SampleSide() =>
+        new(
+            true,
+            [new SideExchange("why", "Because.")],
+            false,
+            string.Empty,
+            string.Empty,
+            null);
 }

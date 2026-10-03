@@ -7,8 +7,11 @@ public static class TextWidth
 {
     public const int TabColumns = 4;
 
-    internal static string ExpandTabs(string text) =>
-        text.Replace("\t", new string(' ', TabColumns), StringComparison.Ordinal);
+    public static string ExpandTabs(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return text.Replace("\t", new string(' ', TabColumns), StringComparison.Ordinal);
+    }
 
     public static int Measure(ReadOnlySpan<char> text)
     {

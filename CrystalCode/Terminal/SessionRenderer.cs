@@ -68,6 +68,7 @@ public sealed class SessionRenderer : IDisposable
     private int _sideScroll;
     private bool _sideStick = true;
     private bool _sideClearRequested;
+    private bool _sideSuspended;
     private int _sideSpinnerFrame;
     private DateTimeOffset _sideSpinnerAt;
 
@@ -492,13 +493,24 @@ public sealed class SessionRenderer : IDisposable
             if (SideQuestionWidget.IsEmpty(snapshot))
             {
                 _sideOpen = false;
+                _sideSuspended = false;
                 _sideIndex = 0;
                 _sideScroll = 0;
                 PaintUnlocked(force: true);
                 return;
             }
 
-            if (_fullPageOverlay || _composerPaused)
+            if (_composerPaused)
+            {
+                if (snapshot.Announce)
+                {
+                    _sideSuspended = true;
+                }
+
+                return;
+            }
+
+            if (_fullPageOverlay)
             {
                 return;
             }
@@ -869,6 +881,11 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
+            if (!_composerPaused)
+            {
+                _sideSuspended = _sideOpen;
+            }
+
             _composerPaused = true;
             _sideOpen = false;
         }
@@ -879,6 +896,15 @@ public sealed class SessionRenderer : IDisposable
         lock (_gate)
         {
             _composerPaused = false;
+            if (_sideSuspended
+                && _side is not null
+                && !SideQuestionWidget.IsEmpty(_side)
+                && !_fullPageOverlay)
+            {
+                _sideOpen = true;
+            }
+
+            _sideSuspended = false;
             PaintUnlocked(force: true);
         }
     }
@@ -1722,7 +1748,13 @@ public sealed class SessionRenderer : IDisposable
         }
 
         var last = Math.Max(0, SideQuestionWidget.SlotCount(_side) - 1);
-        _sideIndex = Math.Clamp(_sideIndex + direction, 0, last);
+        var next = Math.Clamp(_sideIndex + direction, 0, last);
+        if (next == _sideIndex)
+        {
+            return;
+        }
+
+        _sideIndex = next;
         _sideScroll = 0;
         _sideStick = false;
     }

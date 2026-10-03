@@ -24,7 +24,7 @@ internal static class SideQuestionWidget
             : "Side question";
         var rows = new List<IRenderable>
         {
-            new Markup($"[{Theme.Chrome}]{MarkupText.Escape(question)}[/]")
+            TextLine(Theme.Chrome, question)
         };
         if (waiting)
         {
@@ -37,23 +37,23 @@ internal static class SideQuestionWidget
         else if (body.Length > 0)
         {
             rows.Add(Text.Empty);
-            foreach (var line in body.Replace("\r\n", "\n").Split('\n'))
+            foreach (var line in body.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
             {
                 rows.Add(line.Length == 0
                     ? Text.Empty
-                    : new Markup($"[{Theme.User}]{MarkupText.Escape(line)}[/]"));
+                    : TextLine(Theme.User, line));
             }
         }
 
         if (!string.IsNullOrWhiteSpace(failure))
         {
             rows.Add(Text.Empty);
-            rows.Add(new Markup($"[{Theme.Fail}]{MarkupText.Escape(failure)}[/]"));
+            rows.Add(TextLine(Theme.Fail, failure));
         }
 
         rows.Add(Text.Empty);
         rows.Add(new Markup($"[{Theme.Muted}]Esc, Enter, or Space closes. Left and Right step. x clears.[/]"));
-        return new Panel(new Rows(rows))
+        var panel = new Panel(new Rows(rows))
         {
             Header = new PanelHeader($"[{Theme.Heading}]{MarkupText.Escape(title)}[/]"),
             Border = BoxBorder.Rounded,
@@ -61,6 +61,7 @@ internal static class SideQuestionWidget
             Padding = new Padding(1, 0, 1, 0),
             Expand = true
         };
+        return new Padder(panel, new Padding(2, 0, 0, 0));
     }
 
     public static int SlotCount(SideQuestionSnapshot snapshot) =>
@@ -112,4 +113,7 @@ internal static class SideQuestionWidget
         failure = null;
         waiting = false;
     }
+
+    private static Markup TextLine(string color, string text) =>
+        new($"[{color}]{MarkupText.Escape(TextWidth.ExpandTabs(text))}[/]");
 }

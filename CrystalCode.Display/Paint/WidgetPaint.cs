@@ -118,7 +118,7 @@ public static class WidgetPaint
         StringBuilder plain,
         int width)
     {
-        lines.Add(ToLine(markup, plain).Fit(width));
+        lines.Add(RasterLine(markup.ToString(), plain.ToString(), width));
         markup.Clear();
         plain.Clear();
     }
@@ -139,15 +139,173 @@ public static class WidgetPaint
         return console;
     }
 
-    private static PaintLine ToLine(StringBuilder markup, StringBuilder plain)
+    private static PaintLine RasterLine(string markup, string plain, int width)
     {
-        var text = plain.ToString();
-        if (text.TrimEnd().Length == 0)
+        if (!plain.Contains('\t') && !markup.Contains('\t'))
+        {
+            return ToLine(markup, plain).Fit(width);
+        }
+
+        // Spectre sizes a tab as one cell. Painted rows use four columns, so the
+        // extra width has to come back out of the panel padding or the border is clipped.
+        markup = TextWidth.ExpandTabs(markup);
+        plain = TextWidth.ExpandTabs(plain);
+        var measured = TextWidth.Measure(plain);
+        if (measured > width
+            && TryReclaimPadding(ref markup, ref plain, measured - width))
+        {
+            measured = TextWidth.Measure(plain);
+        }
+
+        if (measured <= width)
+        {
+            return ToLine(markup, plain);
+        }
+
+        return new PaintLine(markup, plain).Fit(width);
+    }
+
+    private static bool TryReclaimPadding(ref string markup, ref string plain, int overflow)
+    {
+        if (overflow < 1)
+        {
+            return true;
+        }
+
+        if (!TryTrimPlainPadding(plain, overflow, out var nextPlain)
+            || !TryTrimMarkupPadding(markup, overflow, out var nextMarkup))
+        {
+            return false;
+        }
+
+        plain = nextPlain;
+        markup = nextMarkup;
+        return true;
+    }
+
+    private static bool TryTrimPlainPadding(string plain, int overflow, out string result)
+    {
+        result = plain;
+        var border = plain.Length - 1;
+        while (border >= 0 && plain[border] == ' ')
+        {
+            border--;
+        }
+
+        if (border <= 0)
+        {
+            return false;
+        }
+
+        var spaces = 0;
+        for (var index = border - 1; index >= 0 && plain[index] == ' '; index--)
+        {
+            spaces++;
+        }
+
+        if (spaces < overflow)
+        {
+            return false;
+        }
+
+        result = plain.Remove(border - overflow, overflow);
+        return true;
+    }
+
+    private static bool TryTrimMarkupPadding(string markup, int overflow, out string result)
+    {
+        result = markup;
+        if (!TryLastLiteralSpaceRun(markup, out var start, out var length) || length < overflow)
+        {
+            return false;
+        }
+
+        result = markup.Remove(start + length - overflow, overflow);
+        return true;
+    }
+
+    private static bool TryLastLiteralSpaceRun(string markup, out int start, out int length)
+    {
+        var bestStart = -1;
+        var bestLength = 0;
+        var runStart = -1;
+        var inTag = false;
+        var index = 0;
+        while (index < markup.Length)
+        {
+            var ch = markup[index];
+            if (inTag)
+            {
+                if (ch == ']')
+                {
+                    inTag = false;
+                }
+
+                index++;
+                continue;
+            }
+
+            if (ch == '[')
+            {
+                if (index + 1 < markup.Length && markup[index + 1] == '[')
+                {
+                    CloseRun(index);
+                    index += 2;
+                    continue;
+                }
+
+                CloseRun(index);
+                inTag = true;
+                index++;
+                continue;
+            }
+
+            if (ch == ' ')
+            {
+                if (runStart < 0)
+                {
+                    runStart = index;
+                }
+
+                index++;
+                continue;
+            }
+
+            CloseRun(index);
+            index++;
+        }
+
+        CloseRun(markup.Length);
+        start = bestStart;
+        length = bestLength;
+        return start >= 0;
+
+        void CloseRun(int end)
+        {
+            if (runStart < 0)
+            {
+                return;
+            }
+
+            var run = end - runStart;
+            if (run > 0)
+            {
+                bestStart = runStart;
+                bestLength = run;
+            }
+
+            runStart = -1;
+        }
+    }
+
+    private static PaintLine ToLine(string markup, string plain)
+    {
+        if (plain.TrimEnd().Length == 0)
         {
             return PaintLine.Blank;
         }
 
-        return new PaintLine(markup.ToString(), text);
+        return new PaintLine(markup, plain);
     }
 
     private static string StyleToken(Style style)
