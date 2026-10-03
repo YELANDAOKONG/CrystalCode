@@ -1,3 +1,5 @@
+using CrystalCode.Engine.Tools;
+
 namespace CrystalCode.Engine.Skills;
 
 /// <summary>
@@ -38,12 +40,7 @@ public sealed class SkillCatalog
     public bool ContainsReadablePath(string fullPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
-        string candidate;
-        try
-        {
-            candidate = Path.GetFullPath(fullPath);
-        }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        if (!TryCanonical(fullPath, out var candidate))
         {
             return false;
         }
@@ -70,12 +67,7 @@ public sealed class SkillCatalog
         foreach (var root in readRoots)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(root);
-            string full;
-            try
-            {
-                full = Path.GetFullPath(root);
-            }
-            catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+            if (!TryCanonical(root, out var full))
             {
                 continue;
             }
@@ -97,5 +89,21 @@ public sealed class SkillCatalog
             + Path.DirectorySeparatorChar;
         return candidate.StartsWith(prefix, StringComparison.Ordinal)
             || string.Equals(fullPath, root, StringComparison.Ordinal);
+    }
+
+    private static bool TryCanonical(string path, out string full)
+    {
+        try
+        {
+            full = Workspace.Canonicalize(path);
+            return true;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or NotSupportedException
+            or IOException)
+        {
+            full = string.Empty;
+            return false;
+        }
     }
 }

@@ -464,7 +464,8 @@ Modes:
 - Plan: no built-in edit, write, or bash. Workspace reads auto-execute.
   Reads, glob, and grep of paths outside the workspace ask the operator.
   When Skills is enabled, any path inside a Skills search directory
-  (`skill` / `skills` trees) auto-executes as a workspace read. External
+  (`skill` / `skills` trees) auto-executes as a workspace read. The
+  comparison uses the final target of each symbolic link. External
   tools listed for Plan keep Write + Workspace and still go through
   approval.
 - Default: Workspace Read auto-executes. Write, shell, and
@@ -696,7 +697,8 @@ on demand through the `skill` tool. Available-skill guidance lists
 name and description only; it does not include absolute paths. When
 Skills is enabled, `read`, glob, and grep of any path inside a Skills
 search directory (`skill` / `skills` trees, including files that are
-not `SKILL.md`) auto-execute as workspace reads. Other
+not `SKILL.md`) auto-execute as workspace reads. The comparison uses
+the final target of each symbolic link. Other
 outside-workspace reads ask the operator, or go to the Review model
 in Review or Audit. They never replace Work, Plan, or Review. `config.json` field `skills`
 enables or disables the feature

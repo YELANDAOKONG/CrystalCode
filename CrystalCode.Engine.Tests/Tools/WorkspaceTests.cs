@@ -19,7 +19,7 @@ public sealed class WorkspaceTests
 
         Assert.True(found);
         Assert.Equal(string.Empty, error);
-        Assert.Equal(Path.GetFullPath(file), fullPath);
+        Assert.Equal(Workspace.Canonicalize(file), fullPath);
     }
 
     [Fact]

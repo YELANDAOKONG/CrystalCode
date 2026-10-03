@@ -291,7 +291,7 @@ public sealed class DotnetToolFactoryTests
         var text = Assert.IsType<TextContent>(result.Contents[0]);
         using var arguments = JsonDocument.Parse(text.Text);
         Assert.Equal(
-            Path.GetFullPath(Path.Combine(workspace.Path, "capture.png")),
+            Workspace.Canonicalize(Path.Combine(workspace.Path, "capture.png")),
             arguments.RootElement.GetProperty("path").GetString());
         Assert.IsType<ImageContent>(result.Contents[1]);
     }

@@ -50,6 +50,22 @@ public sealed class SkillCatalogTests
     }
 
     [Fact]
+    public void ContainsReadablePath_MatchesTheFinalSymlinkTarget()
+    {
+        using var root = new TemporaryWorkspace();
+        var real = Path.Combine(root.Path, "real-skills");
+        var link = Path.Combine(root.Path, "linked-skills");
+        Directory.CreateDirectory(real);
+        var file = Path.Combine(real, "notes.md");
+        File.WriteAllText(file, "extra");
+        Directory.CreateSymbolicLink(link, real);
+        var catalog = new SkillCatalog([], [link]);
+
+        Assert.True(catalog.ContainsReadablePath(file));
+        Assert.True(catalog.ContainsReadablePath(Path.Combine(link, "notes.md")));
+    }
+
+    [Fact]
     public void ContainsReadablePath_WithoutReadRoots_IsFalse()
     {
         using var root = new TemporaryWorkspace();
