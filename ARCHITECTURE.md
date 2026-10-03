@@ -1002,8 +1002,10 @@ terminal and input is ignored, including keys typed while the window is
 too small. The session resumes automatically once the window is large
 enough. `/stats` also replaces the frame: the status bar, composer,
 queue, todos, and progress row are not painted, and keys other than
-Esc, `q`, and scrolling are ignored. Esc, `q`, or Ctrl+C restores the
-session frame and leaves the composer draft in place. `ShellLayout.MinWidth`/`MinHeight` (16x8) remain a math floor
+Esc, `q`, and scrolling are ignored. The page is a centered column of
+Overview, Tokens, and Tools panels. Tool rows show a share bar, count,
+and percent. Esc, `q`, or Ctrl+C restores the session frame and leaves
+the composer draft in place. `ShellLayout.MinWidth`/`MinHeight` (16x8) remain a math floor
 for layout only.
 
 Terminal.Gui is referenced from CrystalCode.Display with a floating

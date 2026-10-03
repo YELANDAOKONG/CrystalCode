@@ -1,3 +1,5 @@
+using Spectre.Console;
+
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
@@ -251,7 +253,7 @@ public sealed class SessionRendererTests
     {
         var renderer = new SessionRenderer();
         renderer.SeedComposer("draft");
-        renderer.ShowStatsPage("Stats");
+        renderer.ShowStatsPage(new Markup("Stats"));
         Assert.True(renderer.OverlayVisible);
 
         var typed = await renderer.DispatchBurstAsync(
@@ -284,7 +286,7 @@ public sealed class SessionRendererTests
     {
         var renderer = new SessionRenderer();
         renderer.SeedComposer("draft");
-        renderer.ShowStatsPage("Stats");
+        renderer.ShowStatsPage(new Markup("Stats"));
 
         Assert.True(renderer.TryClearComposer());
         Assert.False(renderer.OverlayVisible);

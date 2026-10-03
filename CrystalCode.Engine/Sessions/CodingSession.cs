@@ -1899,7 +1899,7 @@ public sealed class CodingSession : ITurnObserver
             DateTimeOffset.UtcNow,
             options.WindowDays,
             options.TopTools);
-        Publish(new StatsReported(SessionStatsText.Format(report, options.IncludeAllWorkspaces)));
+        Publish(new StatsReported(report, options.IncludeAllWorkspaces));
     }
 
     private void ApplyDocument(SessionDocument document)

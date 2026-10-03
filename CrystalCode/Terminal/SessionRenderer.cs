@@ -446,16 +446,16 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
-    internal void ShowStatsPage(string text)
+    internal void ShowStatsPage(IRenderable page)
     {
-        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(page);
         lock (_gate)
         {
             CommitLiveUnlocked();
             _fullPageOverlay = true;
             _pageScroll = 0;
             _modalOverlay.Clear();
-            _overlayWidget = StatsPageWidget.Create(text);
+            _overlayWidget = page;
             PaintUnlocked(force: true);
         }
     }

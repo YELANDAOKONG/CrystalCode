@@ -706,7 +706,7 @@ returns the transcript viewport to the latest output.
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
-| `/stats` | | Replaces the session frame with a stats page (token and tool summary). Supports `all`, `<Nd>`, and `tools <count>`. Esc or `q` restores the session |
+| `/stats` | | Replaces the session frame with Overview, Tokens, and Tools panels, including a tool share bar. Supports `all`, `<Nd>`, and `tools <count>`. Esc or `q` restores the session |
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |

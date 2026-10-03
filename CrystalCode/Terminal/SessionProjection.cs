@@ -80,7 +80,7 @@ internal sealed class SessionProjection : ISessionObserver
                 _renderer.WriteStatus(status.Status, status.Full);
                 break;
             case StatsReported stats:
-                _renderer.ShowStatsPage(stats.Text);
+                _renderer.ShowStatsPage(StatsPageWidget.Create(stats.Report, stats.AllWorkspaces));
                 break;
             case UsageChanged usage:
                 _renderer.ContextWindow = usage.ContextWindow;

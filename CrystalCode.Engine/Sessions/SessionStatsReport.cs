@@ -1,6 +1,9 @@
 namespace CrystalCode.Engine.Sessions;
 
-internal sealed record SessionStatsReport(
+/// <summary>
+/// Token and tool totals for the stats page.
+/// </summary>
+public sealed record SessionStatsReport(
     int Sessions,
     int UserTurns,
     int ModelCalls,

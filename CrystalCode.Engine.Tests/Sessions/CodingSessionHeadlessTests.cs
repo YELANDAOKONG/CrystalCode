@@ -178,11 +178,10 @@ public sealed class CodingSessionHeadlessTests
         var quit = await headless.Session.SubmitAsync("/stats", CancellationToken.None);
 
         Assert.False(quit);
-        var stats = headless.Observer.Events.OfType<StatsReported>().Single().Text;
-        Assert.Contains("Stats · This workspace", stats, StringComparison.Ordinal);
-        Assert.Contains("Tokens", stats, StringComparison.Ordinal);
-        Assert.Contains("Top tools", stats, StringComparison.Ordinal);
-        Assert.Contains("read", stats, StringComparison.Ordinal);
+        var stats = headless.Observer.Events.OfType<StatsReported>().Single();
+        Assert.False(stats.AllWorkspaces);
+        Assert.True(stats.Report.Sessions >= 1);
+        Assert.Contains(stats.Report.TopTools, static tool => tool.Name == "read" && tool.Count >= 1);
     }
 
     private static int IndexOf<TEvent>(IReadOnlyList<SessionEvent> events)
