@@ -161,6 +161,11 @@ public sealed class CodingSession : ITurnObserver
     public bool PlanMode => _planMode;
 
     /// <summary>
+    /// Id of the saved session file. It stays stable for this process.
+    /// </summary>
+    public string SessionId => _sessionId;
+
+    /// <summary>
     /// Loads prompt history, publishes the opening state, and loads operator
     /// tools. Call once, after the front end is ready to receive events.
     /// </summary>

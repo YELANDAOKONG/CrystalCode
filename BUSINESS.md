@@ -43,7 +43,8 @@ separate library with no terminal code. The product can:
   Flags on that command override provider, model, workspace, home,
   approval, Plan or Work, thinking, prompt set, skills, external tools,
   and turn quotas for that process only. They are not written to
-  `config.json`. Review and Audit still use the reviewing model.
+  `config.json`. Stdout is plain text, or one JSON object per line when
+  `--format json` is set. Review and Audit still use the reviewing model.
   Anything that would ask the operator is denied;
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - recall submitted prompts from the composer with Up/Down and retain up to 200

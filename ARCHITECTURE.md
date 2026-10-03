@@ -123,7 +123,7 @@ CrystalCode (executable):
 | Folder | Owns |
 | :--- | :--- |
 | `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `run` is the headless task command |
-| `Run` | Unattended front end for `crystal run`: plain-text log, denied operator prompts, dismissed questions, process-only setting overrides, and exit codes |
+| `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, process-only setting overrides, and exit codes |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
 
@@ -842,9 +842,9 @@ A front end calls `CodingSession`: `Create`, `StartAsync`, `SubmitAsync`
 returns true when the operator asked to quit), `CompleteTurnAsync` once
 `TurnTask` finishes, `FinishTurnAsync` to collect a turn before exit,
 `TryInterrupt`, `TogglePlan`, `SetVerbose`, `NotifyDraftChanged`, `Enqueue`,
-`PasteClipboardImageAsync`, and `Close`. `TurnActive`, `TurnTask`, and
-`PlanMode` report state. The usual turn is: `SubmitAsync`, await `TurnTask`,
-then `CompleteTurnAsync`.
+`PasteClipboardImageAsync`, and `Close`. `TurnActive`, `TurnTask`,
+`PlanMode`, and `SessionId` report state. The usual turn is:
+`SubmitAsync`, await `TurnTask`, then `CompleteTurnAsync`.
 
 Events are immutable sealed records, one type per file under `Events`:
 
@@ -892,7 +892,7 @@ process-only overrides, starts one user turn, and exits. Overrides are not
 written to `config.json`. Slash commands are rejected so they cannot change
 saved settings. Secrets are not command flags.
 
-The run supplies `RunLog`, `UnattendedApprovalPrompt`,
+The run supplies `RunLog` or `RunJsonLog`, `UnattendedApprovalPrompt`,
 `UnattendedUserPrompt`, and `UnattendedSessionChooser`. The approval prompt
 denies every call that would have asked the operator. The question prompt
 dismisses. Session choice is declined. Review and Audit still call the
@@ -900,10 +900,14 @@ reviewing model: allow executes the tool, and deny returns the reviewer's
 reason. Plan does not offer write, edit, or bash. The approval policy
 also rejects those side effects when a catalog still contains them.
 
-Stdout is plain text: tool calls, tool results, errors, notes, and the
-assistant reply. Thinking text is omitted unless `--show-thinking` is set.
-The process then prints the saved session id. Exit 0 means the turn
-completed and no operator prompt was denied or dismissed. Exit 1 is an
+`--format default` writes plain text: tool calls, tool results, errors,
+notes, and the assistant reply. `--format json` writes one JSON object per
+line, with `type`, a UTC `timestamp`, and `sessionID`. Event types are
+`step_start`, `text`, `reasoning`, `tool_use`, `error`, `note`, `retry`,
+`step_finish`, `stopped`, and `session`. Thinking text is omitted unless
+`--show-thinking` is set. The process then prints the saved session id.
+Exit 0 means the turn completed and no operator prompt was denied or
+dismissed. Exit 1 is an
 invalid command, configuration, credential, workspace, or prompt set. Exit
 2 is a failed model request. Exit 3 is a model-call, tool-call, or duration
 budget, or context overflow. Exit 4 is a finish that was not a failure,

@@ -144,10 +144,11 @@ crystal run --workspace . --approval review --duration 600 "Fix the failing test
 echo "Summarize the repository." | crystal run --model-calls 8 --tool-calls 32
 ```
 
-The process prints tool calls, tool results, errors, and the assistant
-reply as plain text. Thinking text is omitted unless `--show-thinking`
-is set. The saved session id is printed at the end. Resume that session
-with the interactive `crystal --resume <id>`.
+`--format default` prints tool calls, tool results, errors, and the
+assistant reply as plain text. `--format json` prints one JSON object per
+line instead. Thinking text is omitted unless `--show-thinking` is set.
+The saved session id is printed at the end. Resume that session with the
+interactive `crystal --resume <id>`.
 
 Flags override the saved configuration for this process only. They are
 not written to `config.json`. Do not put secrets on the command line.
@@ -168,6 +169,7 @@ saved value is also unset. `unlimited` removes that one cap.
 | `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
 | `--bash-timeout <seconds>` | Per-command bash cap. Default 120. `unlimited` disables that timer |
 | `--show-thinking` | Print reasoning text |
+| `--format` | `default` for plain text, or `json` for one JSON object per line |
 
 There is no operator. In Review and Audit the reviewing model still
 judges calls that require review: allow runs the tool, and deny returns
@@ -190,8 +192,18 @@ not. A call to a tool Plan does not offer fails the turn.
 | 5 | The run was interrupted |
 
 A failure or a budget stop is reported instead of a denial. An interrupt
-is reported instead of a denial. Stdout then includes `Stopped` and the
-session id.
+is reported instead of a denial. Plain stdout then includes `Stopped` and
+the session id.
+
+Each JSON line has `type`, a UTC `timestamp`, and `sessionID`. The types
+are `step_start`, `text`, `reasoning`, `tool_use`, `error`, `note`,
+`retry`, `step_finish`, `stopped`, and `session`. `tool_use` carries
+`name`, `callId`, `arguments`, `status` (`success` or `failure`), and
+`output`. `step_finish` carries `reason`, `modelCalls`, and `toolCalls`.
+`reasoning` is present only with `--show-thinking`. `stopped` is present
+only when the process will exit non-zero. `session.text` is the same
+resume hint the plain format prints. Invalid commands and missing
+credentials are still plain text on stderr.
 
 ## Credentials
 

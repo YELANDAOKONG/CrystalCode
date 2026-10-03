@@ -13,7 +13,7 @@ namespace CrystalCode.Run;
 /// Plain-text transcript for one unattended run. Thinking text is kept only
 /// when requested. The observer is called from the turn thread.
 /// </summary>
-internal sealed class RunLog : ISessionObserver
+internal sealed class RunLog : IRunLog
 {
     private readonly TextWriter _output;
     private readonly bool _showThinking;
@@ -29,6 +29,27 @@ internal sealed class RunLog : ISessionObserver
     }
 
     public TurnStopReason? StopReason { get; private set; }
+
+    public void BindSession(string sessionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+    }
+
+    public void WriteEpilogue(string? status, string hint)
+    {
+        ArgumentNullException.ThrowIfNull(hint);
+        lock (_gate)
+        {
+            Flush();
+            if (status is not null)
+            {
+                _output.WriteLine("Stopped  " + status);
+            }
+
+            _output.WriteLine();
+            _output.WriteLine(hint);
+        }
+    }
 
     public void OnEvent(SessionEvent sessionEvent)
     {

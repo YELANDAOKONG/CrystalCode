@@ -58,4 +58,7 @@ public sealed class TaskRunSettings : CommandSettings
 
     [CommandOption("--show-thinking")]
     public bool ShowThinking { get; init; }
+
+    [CommandOption("--format <default|json>")]
+    public string? Format { get; init; }
 }

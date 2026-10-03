@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
@@ -208,6 +210,111 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task JsonFormat_PrintsOneObjectPerLine()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(
+            AllowReview,
+            TextRound("Hello there.", HiddenThinking));
+        var settings = Copy(fixture.Settings("Say hello"), format: "json");
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        Assert.Equal(string.Empty, result.Error);
+        var events = ReadEvents(result.Output);
+        Assert.Contains(events, static item => item.GetProperty("type").GetString() == "text"
+            && item.GetProperty("text").GetString() == "Hello there.");
+        Assert.Contains(events, static item => item.GetProperty("type").GetString() == "step_start");
+        Assert.Contains(events, static item =>
+            item.GetProperty("type").GetString() == "step_finish"
+            && item.GetProperty("reason").GetString() == "completed");
+        var session = Assert.Single(events, static item => item.GetProperty("type").GetString() == "session");
+        var sessionId = session.GetProperty("sessionID").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(sessionId));
+        Assert.Contains("crystal --resume " + sessionId, session.GetProperty("text").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(events, static item => item.GetProperty("type").GetString() == "reasoning");
+        Assert.DoesNotContain(events, static item => item.GetProperty("type").GetString() == "stopped");
+        Assert.All(events, item => Assert.Equal(sessionId, item.GetProperty("sessionID").GetString()));
+        Assert.DoesNotContain(HiddenThinking, result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task JsonFormat_IncludesReasoningWhenRequested()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(AllowReview, TextRound("Hello there.", HiddenThinking));
+        var settings = Copy(fixture.Settings("Say hello"), format: "json", showThinking: true);
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        var events = ReadEvents(result.Output);
+        Assert.Contains(events, static item => item.GetProperty("type").GetString() == "reasoning"
+            && item.GetProperty("text").GetString() == HiddenThinking);
+    }
+
+    [Fact]
+    public async Task JsonFormat_ReportsACompletedTool()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(
+            AllowReview,
+            ToolRound("c1", "bash", """{"command":"printf ready > ran.txt"}"""),
+            TextRound("Wrote it."));
+        var settings = Copy(fixture.Settings("Create the marker file"), approval: "review", format: "json");
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        var events = ReadEvents(result.Output);
+        var tool = Assert.Single(events, static item => item.GetProperty("type").GetString() == "tool_use");
+        Assert.Equal("bash", tool.GetProperty("name").GetString());
+        Assert.Equal("c1", tool.GetProperty("callId").GetString());
+        Assert.Equal("success", tool.GetProperty("status").GetString());
+        Assert.Equal("printf ready > ran.txt", tool.GetProperty("arguments").GetProperty("command").GetString());
+        Assert.Contains("exit 0", tool.GetProperty("output").GetString(), StringComparison.Ordinal);
+        Assert.Equal("ready", await File.ReadAllTextAsync(Path.Combine(fixture.Workspace, "ran.txt")));
+    }
+
+    [Fact]
+    public async Task JsonFormat_ReportsADeniedTool()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(
+            AllowReview,
+            ToolRound("c1", "bash", """{"command":"printf ready > ran.txt"}"""),
+            TextRound("I could not run it."));
+        var settings = Copy(fixture.Settings("Create the marker file"), format: "json");
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Denied, result.Code);
+        var events = ReadEvents(result.Output);
+        var tool = Assert.Single(events, static item => item.GetProperty("type").GetString() == "tool_use");
+        Assert.Equal("failure", tool.GetProperty("status").GetString());
+        Assert.Contains("The user declined this action.", tool.GetProperty("output").GetString(), StringComparison.Ordinal);
+        var stopped = Assert.Single(events, static item => item.GetProperty("type").GetString() == "stopped");
+        Assert.Equal("operator prompt denied", stopped.GetProperty("status").GetString());
+        Assert.False(File.Exists(Path.Combine(fixture.Workspace, "ran.txt")));
+    }
+
+    [Fact]
+    public async Task JsonFormat_RejectsAnUnknownName()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(AllowReview, TextRound("unused"));
+        var settings = Copy(fixture.Settings("hello"), format: "yaml");
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Invalid, result.Code);
+        Assert.Contains("Format must be default or json.", result.Error, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, result.Output);
+        Assert.Equal(0, client.RequestCount);
+    }
+
+    [Fact]
     public async Task SlashCommand_DoesNotChangeSettings()
     {
         using var fixture = new RunFixture();
@@ -289,6 +396,18 @@ public sealed class TaskRunHostTests
         Assert.Equal(RunExit.Interrupted, interrupted.Code);
     }
 
+    private static List<JsonElement> ReadEvents(string output)
+    {
+        var events = new List<JsonElement>();
+        foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            using var document = JsonDocument.Parse(line);
+            events.Add(document.RootElement.Clone());
+        }
+
+        return events;
+    }
+
     private static HarnessSettings AssertApplied(HarnessSettings current, TaskRunSettings request)
     {
         Assert.True(TaskRunOverrides.TryApply(
@@ -307,7 +426,9 @@ public sealed class TaskRunHostTests
         string? approval = null,
         bool plan = false,
         string? modelCalls = null,
-        string? promptSet = null) =>
+        string? promptSet = null,
+        string? format = null,
+        bool showThinking = false) =>
         new()
         {
             TaskText = settings.TaskText,
@@ -321,7 +442,9 @@ public sealed class TaskRunHostTests
             Approval = approval,
             Plan = plan,
             ModelCalls = modelCalls,
-            PromptSet = promptSet
+            PromptSet = promptSet,
+            Format = format,
+            ShowThinking = showThinking
         };
 
     private static ChatStreamEvent[] TextRound(string text, string? thinking = null)

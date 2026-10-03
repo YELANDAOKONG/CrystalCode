@@ -28,6 +28,11 @@ internal static class TaskRunHost
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+        if (!RunFormat.TryParse(settings.Format, out var format, out var formatError))
+        {
+            await error.WriteLineAsync(formatError);
+            return RunExit.Invalid;
+        }
 
         string task;
         try
@@ -94,7 +99,9 @@ internal static class TaskRunHost
 
         var approvals = new UnattendedApprovalPrompt();
         var questions = new UnattendedUserPrompt();
-        var log = new RunLog(output, settings.ShowThinking);
+        IRunLog log = format == RunFormat.Json
+            ? new RunJsonLog(output, settings.ShowThinking)
+            : new RunLog(output, settings.ShowThinking);
         CodingSession session;
         try
         {
@@ -117,6 +124,7 @@ internal static class TaskRunHost
             return RunExit.Invalid;
         }
 
+        log.BindSession(session.SessionId);
         var code = RunExit.Invalid;
         string? status = null;
         try
@@ -184,13 +192,7 @@ internal static class TaskRunHost
         finally
         {
             var hint = session.Close();
-            if (status is not null)
-            {
-                await output.WriteLineAsync("Stopped  " + status);
-            }
-
-            await output.WriteLineAsync();
-            await output.WriteLineAsync(hint);
+            log.WriteEpilogue(status, hint);
         }
 
         return code;
