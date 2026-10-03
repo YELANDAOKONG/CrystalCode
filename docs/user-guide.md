@@ -150,6 +150,8 @@ excerpt and say how many lines were omitted. `edit` and `write` keep their
 result. `bash` keeps the command, the exit status, and a short tail, with
 a longer tail when the command fails. Other successful tools use the same
 short excerpt. Failures other than `bash` keep the result text.
+Labels use square brackets, exit status uses parentheses, and omitted-line
+markers use angle brackets, so host text stays distinct from tool output.
 `--format json` prints one JSON object per line and keeps the full tool
 output. Thinking text is omitted unless `--show-thinking` is set, and then
 it is printed before that round's reply.
@@ -198,7 +200,7 @@ not. A call to a tool Plan does not offer fails the turn.
 | 5 | The run was interrupted |
 
 A failure or a budget stop is reported instead of a denial. An interrupt
-is reported instead of a denial. Plain stdout then includes `Stopped` and
+is reported instead of a denial. Plain stdout then includes `[Stopped]` and
 the session id.
 
 Each JSON line has `type`, a UTC `timestamp`, and `sessionID`. The types

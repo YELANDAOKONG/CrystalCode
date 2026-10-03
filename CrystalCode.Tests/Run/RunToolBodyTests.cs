@@ -17,7 +17,7 @@ public sealed class RunToolBodyTests
         Assert.Contains("R00", body, StringComparison.Ordinal);
         Assert.Contains("R11", body, StringComparison.Ordinal);
         Assert.DoesNotContain("R12", body, StringComparison.Ordinal);
-        Assert.Contains("... 2 lines omitted", body, StringComparison.Ordinal);
+        Assert.Contains("<2 lines omitted>", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public sealed class RunToolBodyTests
     {
         var body = RunToolBody.Format("grep", ToolResultStatus.Success, Lines("G", 13));
 
-        Assert.Contains("... 1 line omitted", body, StringComparison.Ordinal);
+        Assert.Contains("<1 line omitted>", body, StringComparison.Ordinal);
         Assert.DoesNotContain("lines omitted", body, StringComparison.Ordinal);
     }
 
@@ -55,8 +55,8 @@ public sealed class RunToolBodyTests
             ToolResultStatus.Success,
             "exit 0\n" + Lines("L", 20));
 
-        Assert.StartsWith("exit 0\n", body, StringComparison.Ordinal);
-        Assert.Contains("... 12 earlier lines omitted", body, StringComparison.Ordinal);
+        Assert.StartsWith("(exit 0)\n", body, StringComparison.Ordinal);
+        Assert.Contains("<12 earlier lines omitted>", body, StringComparison.Ordinal);
         Assert.Contains("L12", body, StringComparison.Ordinal);
         Assert.Contains("L19", body, StringComparison.Ordinal);
         Assert.DoesNotContain("L11", body, StringComparison.Ordinal);
@@ -70,8 +70,8 @@ public sealed class RunToolBodyTests
             ToolResultStatus.Failure,
             "exit 1\n" + Lines("L", 40));
 
-        Assert.StartsWith("exit 1\n", body, StringComparison.Ordinal);
-        Assert.Contains("... 8 earlier lines omitted", body, StringComparison.Ordinal);
+        Assert.StartsWith("(exit 1)\n", body, StringComparison.Ordinal);
+        Assert.Contains("<8 earlier lines omitted>", body, StringComparison.Ordinal);
         Assert.Contains("L08", body, StringComparison.Ordinal);
         Assert.Contains("L39", body, StringComparison.Ordinal);
         Assert.DoesNotContain("L07", body, StringComparison.Ordinal);
@@ -84,7 +84,7 @@ public sealed class RunToolBodyTests
 
         Assert.Contains("S00", body, StringComparison.Ordinal);
         Assert.DoesNotContain("S12", body, StringComparison.Ordinal);
-        Assert.Contains("... 2 lines omitted", body, StringComparison.Ordinal);
+        Assert.Contains("<2 lines omitted>", body, StringComparison.Ordinal);
     }
 
     private static string Lines(string prefix, int count)

@@ -85,7 +85,7 @@ internal static class RunToolBody
         var parts = new List<string>(kept + 2);
         if (exit is not null)
         {
-            parts.Add(exit);
+            parts.Add("(" + exit + ")");
         }
 
         if (omitted > 0)
@@ -105,12 +105,12 @@ internal static class RunToolBody
     {
         if (count == 1)
         {
-            return earlier ? "... 1 earlier line omitted" : "... 1 line omitted";
+            return earlier ? "<1 earlier line omitted>" : "<1 line omitted>";
         }
 
         return earlier
-            ? $"... {count} earlier lines omitted"
-            : $"... {count} lines omitted";
+            ? $"<{count} earlier lines omitted>"
+            : $"<{count} lines omitted>";
     }
 
     private static string[] Split(string text)

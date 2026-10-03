@@ -32,13 +32,13 @@ public sealed class RunLogTests
         ]));
 
         var text = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
-        var thinking = text.IndexOf("Thinking", StringComparison.Ordinal);
+        var thinking = text.IndexOf("[Thinking]", StringComparison.Ordinal);
         var reply = text.IndexOf("Looking.", StringComparison.Ordinal);
-        var missing = text.IndexOf("Read  b.cs", StringComparison.Ordinal);
-        var found = text.IndexOf("Read  a.cs", StringComparison.Ordinal);
+        var missing = text.IndexOf("[Read] b.cs", StringComparison.Ordinal);
+        var found = text.IndexOf("[Read] a.cs", StringComparison.Ordinal);
         Assert.True(thinking >= 0 && thinking < reply && reply < missing && missing < found);
-        Assert.Contains("Thinking\ntrace\n\nLooking.\n\nRead  b.cs\n  missing", text, StringComparison.Ordinal);
-        Assert.Contains("Read  a.cs\n  one\n  two", text, StringComparison.Ordinal);
+        Assert.Contains("[Thinking]\ntrace\n\nLooking.\n\n[Read] b.cs\n  missing", text, StringComparison.Ordinal);
+        Assert.Contains("[Read] a.cs\n  one\n  two", text, StringComparison.Ordinal);
         Assert.Contains("trace", text, StringComparison.Ordinal);
         Assert.DoesNotContain("\nResult", text, StringComparison.Ordinal);
     }
@@ -57,7 +57,7 @@ public sealed class RunLogTests
         var text = output.ToString();
         Assert.Contains("Hello there.", text, StringComparison.Ordinal);
         Assert.DoesNotContain("trace-not-for-ci", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("Thinking", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("[Thinking]", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -81,9 +81,9 @@ public sealed class RunLogTests
         ]));
 
         var text = output.ToString();
-        Assert.Contains("Read  notes.txt", text, StringComparison.Ordinal);
+        Assert.Contains("[Read] notes.txt", text, StringComparison.Ordinal);
         Assert.Contains("L00", text, StringComparison.Ordinal);
         Assert.DoesNotContain("L13", text, StringComparison.Ordinal);
-        Assert.Contains("... 2 lines omitted", text, StringComparison.Ordinal);
+        Assert.Contains("<2 lines omitted>", text, StringComparison.Ordinal);
     }
 }

@@ -47,7 +47,7 @@ internal sealed class RunLog : IRunLog
             if (status is not null)
             {
                 WriteBreak();
-                _output.WriteLine("Stopped  " + status);
+                _output.WriteLine("[Stopped] " + status);
                 _wrote = true;
             }
 
@@ -80,11 +80,11 @@ internal sealed class RunLog : IRunLog
                     break;
                 case ErrorWritten error:
                     Flush();
-                    WriteSection("Error", error.Text);
+                    WriteSection("[Error]", error.Text);
                     break;
                 case NoteWritten note:
                     Flush();
-                    WriteSection("Note", note.Text);
+                    WriteSection("[Note]", note.Text);
                     break;
                 case TurnFinished finished:
                     Flush();
@@ -117,7 +117,7 @@ internal sealed class RunLog : IRunLog
         {
             var thinking = _thinking.ToString();
             _thinking.Clear();
-            WriteSection("Thinking", thinking);
+            WriteSection("[Thinking]", thinking);
         }
 
         if (_reply.Length == 0)
@@ -134,7 +134,7 @@ internal sealed class RunLog : IRunLog
     {
         var summary = call is null ? "Tool" : Summary(call);
         var body = Indent(RunToolBody.Format(call?.Name, result.Status, result.Text));
-        WriteSection(summary, body);
+        WriteSection(Heading(summary), body);
     }
 
     private void WriteParagraph(string text)
@@ -229,6 +229,17 @@ internal sealed class RunLog : IRunLog
         var first = _calls[0];
         _calls.RemoveAt(0);
         return first;
+    }
+
+    private static string Heading(string summary)
+    {
+        var split = summary.IndexOf("  ", StringComparison.Ordinal);
+        if (split < 0)
+        {
+            return "[" + summary + "]";
+        }
+
+        return "[" + summary[..split] + "] " + summary[(split + 2)..];
     }
 
     private static string Summary(ToolCall call)

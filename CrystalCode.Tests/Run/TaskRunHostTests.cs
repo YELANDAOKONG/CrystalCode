@@ -114,7 +114,7 @@ public sealed class TaskRunHostTests
 
         Assert.Equal(RunExit.Denied, result.Code);
         Assert.Contains("The user declined this action.", result.Output, StringComparison.Ordinal);
-        Assert.Contains("Stopped  operator prompt denied", result.Output, StringComparison.Ordinal);
+        Assert.Contains("[Stopped] operator prompt denied", result.Output, StringComparison.Ordinal);
         Assert.Contains("I could not run it.", result.Output, StringComparison.Ordinal);
         Assert.False(File.Exists(Path.Combine(fixture.Workspace, "ran.txt")));
         fixture.AssertSettingsUnchanged();
@@ -135,7 +135,7 @@ public sealed class TaskRunHostTests
 
         Assert.Equal(RunExit.Limited, result.Code);
         Assert.Contains("alpha", result.Output, StringComparison.Ordinal);
-        Assert.Contains("Stopped  model_call_limit_reached", result.Output, StringComparison.Ordinal);
+        Assert.Contains("[Stopped] model_call_limit_reached", result.Output, StringComparison.Ordinal);
         Assert.DoesNotContain("This round should not run.", result.Output, StringComparison.Ordinal);
         Assert.Equal(
             TurnLimits.DefaultMaximumModelCalls,
@@ -155,7 +155,7 @@ public sealed class TaskRunHostTests
 
         Assert.Equal(RunExit.Failed, result.Code);
         Assert.Contains("The requested tool is not registered.", result.Output, StringComparison.Ordinal);
-        Assert.Contains("Stopped  failed", result.Output, StringComparison.Ordinal);
+        Assert.Contains("[Stopped] failed", result.Output, StringComparison.Ordinal);
         Assert.False(File.Exists(Path.Combine(fixture.Workspace, "ran.txt")));
     }
 

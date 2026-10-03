@@ -933,7 +933,8 @@ tool beside its own result. `read`, `glob`, `grep`, and other successful
 tools keep a short head excerpt and an omitted-line count. `edit` and `write`
 keep their result. `bash` keeps the command, the exit status, and a short
 tail, with a longer tail when the command fails. Other failures keep the
-result text. `--format json` writes one JSON object per
+result text. Labels use square brackets, exit status uses parentheses, and
+omitted-line markers use angle brackets. `--format json` writes one JSON object per
 line, with `type`, a UTC `timestamp`, and `sessionID`, and keeps the full
 tool output. Event types are
 `step_start`, `text`, `reasoning`, `tool_use`, `error`, `note`, `retry`,
