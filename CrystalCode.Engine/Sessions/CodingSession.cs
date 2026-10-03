@@ -52,6 +52,7 @@ public sealed class CodingSession : ITurnObserver
     private PromptResolution _promptResolution;
     private SkillCatalog? _skills;
     private ExternalCatalog _external = ExternalCatalog.Empty;
+    private readonly SessionToolHost _toolHost;
     private ApprovalMode _approval;
     private ThinkingSelection _thinkingEffort;
     private bool _planMode;
@@ -103,6 +104,10 @@ public sealed class CodingSession : ITurnObserver
         _frontEnd = frontEnd;
         _compactor = CreateCompactor(_client);
         _approval = settings.Approval;
+        _toolHost = new SessionToolHost(
+            _workspace,
+            () => _sessionId ?? string.Empty,
+            () => _approval.Value);
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
         _home = home;
@@ -1871,7 +1876,8 @@ public sealed class CodingSession : ITurnObserver
             _home,
             _workspace,
             _settings.ExternalTools,
-            _settings.ExternalToolApproval);
+            _settings.ExternalToolApproval,
+            _toolHost);
     }
 
     private void ReloadExternalToolsWithProgress()

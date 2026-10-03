@@ -58,7 +58,8 @@ public sealed class ExternalCatalog
         CrystalHome home,
         Workspace workspace,
         bool enabled,
-        ExternalToolApprovalSettings? approvalSettings = null)
+        ExternalToolApprovalSettings? approvalSettings = null,
+        SessionToolHost? host = null)
     {
         ArgumentNullException.ThrowIfNull(home);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -66,6 +67,11 @@ public sealed class ExternalCatalog
         {
             return Empty;
         }
+
+        host ??= new SessionToolHost(
+            workspace,
+            static () => string.Empty,
+            static () => string.Empty);
 
         var notes = new List<string>();
         var discovery = new ToolSetDiscovery(home);
@@ -83,11 +89,14 @@ public sealed class ExternalCatalog
             {
                 AddExec(
                     workspace,
+                    host,
                     set,
                     registered,
                     notes,
                     plan,
                     work,
+                    planMultimodal,
+                    workMultimodal,
                     classifications,
                     origins);
                 continue;
@@ -149,11 +158,14 @@ public sealed class ExternalCatalog
 
     private static void AddExec(
         Workspace workspace,
+        SessionToolHost host,
         ParsedToolSet set,
         HashSet<string> registered,
         IList<string> notes,
         List<ITool> plan,
         List<ITool> work,
+        List<IMultimodalTool> planMultimodal,
+        List<IMultimodalTool> workMultimodal,
         Dictionary<string, ExternalToolSpec> classifications,
         Dictionary<string, ParsedToolSet> origins)
     {
@@ -177,8 +189,9 @@ public sealed class ExternalCatalog
                 continue;
             }
 
+            var exec = new ExecExternalTool(workspace, set, spec, host);
             var wrapped = new FencedExternalTool(
-                new ExecExternalTool(workspace, set, spec),
+                exec,
                 workspace,
                 spec.PathArguments,
                 timeoutSeconds: null);
@@ -192,6 +205,26 @@ public sealed class ExternalCatalog
             if (spec.Catalogs.Work)
             {
                 work.Add(wrapped);
+            }
+
+            if (spec.Output != ExternalToolOutputMode.Content)
+            {
+                continue;
+            }
+
+            var multimodal = new FencedExternalMultimodalTool(
+                exec,
+                workspace,
+                spec.PathArguments,
+                timeoutSeconds: null);
+            if (spec.Catalogs.Plan)
+            {
+                planMultimodal.Add(multimodal);
+            }
+
+            if (spec.Catalogs.Work)
+            {
+                workMultimodal.Add(multimodal);
             }
         }
     }

@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Text.Json;
 using System.Text;
 
+using Crystal.Multimodal;
+using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
 namespace CrystalCode.Engine.Tools.External;
@@ -9,21 +11,28 @@ namespace CrystalCode.Engine.Tools.External;
 /// <summary>
 /// Runs one exec tool: operator argv prefix, optional model argv, optional stdin JSON.
 /// </summary>
-internal sealed class ExecExternalTool : ITool
+internal sealed class ExecExternalTool : ITool, IMultimodalTool
 {
     private static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
     private readonly Workspace _workspace;
     private readonly ParsedToolSet _set;
     private readonly ExternalToolSpec _spec;
+    private readonly SessionToolHost _host;
 
-    public ExecExternalTool(Workspace workspace, ParsedToolSet set, ExternalToolSpec spec)
+    public ExecExternalTool(
+        Workspace workspace,
+        ParsedToolSet set,
+        ExternalToolSpec spec,
+        SessionToolHost host)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(set);
         ArgumentNullException.ThrowIfNull(spec);
+        ArgumentNullException.ThrowIfNull(host);
         _workspace = workspace;
         _set = set;
         _spec = spec;
+        _host = host;
         Definition = new ToolDefinition(spec.Name, spec.Schema, spec.Description);
     }
 
@@ -35,15 +44,144 @@ internal sealed class ExecExternalTool : ITool
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(call);
-
-        if (!TryBuildArgv(call.Arguments, out var argv, out var error))
+        var finished = await RunAsync(call.Arguments, cancellationToken);
+        if (finished.Failure is not null)
         {
-            return new ToolOutput(error, ToolResultStatus.Failure);
+            return new ToolOutput(finished.Failure, ToolResultStatus.Failure);
+        }
+
+        if (_spec.Output == ExternalToolOutputMode.Content)
+        {
+            return ToText(finished);
+        }
+
+        var text = Combine(finished.Streams);
+        var status = finished.ExitCode == 0
+            ? ToolResultStatus.Success
+            : ToolResultStatus.Failure;
+        return new ToolOutput($"exit {finished.ExitCode}\n{text}", status);
+    }
+
+    public async ValueTask<MultimodalToolOutput> InvokeAsync(
+        MultimodalToolCall call,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(call);
+        var finished = await RunAsync(call.Arguments, cancellationToken);
+        if (finished.Failure is not null)
+        {
+            return Failed(finished.Failure);
+        }
+
+        if (_spec.Output != ExternalToolOutputMode.Content)
+        {
+            var text = Combine(finished.Streams);
+            var status = finished.ExitCode == 0
+                ? MultimodalToolResultStatus.Success
+                : MultimodalToolResultStatus.Failure;
+            return new MultimodalToolOutput(
+                [new TextContent($"exit {finished.ExitCode}\n{text}")],
+                status);
+        }
+
+        if (!ExecContentOutput.TryRead(
+                finished.Streams.Stdout,
+                finished.Streams.Stderr,
+                _workspace,
+                out var textBody,
+                out var images,
+                out var error))
+        {
+            return Failed(PrefixExit(finished.ExitCode, error));
+        }
+
+        if (finished.ExitCode != 0)
+        {
+            return Failed(PrefixExit(finished.ExitCode, textBody));
+        }
+
+        var contents = new List<MultimodalContent> { new TextContent(textBody) };
+        contents.AddRange(images);
+        return new MultimodalToolOutput(contents);
+    }
+
+    private ToolOutput ToText(ExecFinished finished)
+    {
+        if (!ExecContentOutput.TryRead(
+                finished.Streams.Stdout,
+                finished.Streams.Stderr,
+                _workspace,
+                out var text,
+                out var images,
+                out var error))
+        {
+            return new ToolOutput(PrefixExit(finished.ExitCode, error), ToolResultStatus.Failure);
+        }
+
+        if (finished.ExitCode != 0)
+        {
+            return new ToolOutput(PrefixExit(finished.ExitCode, text), ToolResultStatus.Failure);
+        }
+
+        if (images.Count > 0)
+        {
+            return new ToolOutput(
+                "This model cannot accept tool images.",
+                ToolResultStatus.Failure);
+        }
+
+        return new ToolOutput(text, ToolResultStatus.Success);
+    }
+
+    private void ApplyHostEnvironment(ProcessStartInfo start)
+    {
+        var workspace = string.IsNullOrWhiteSpace(_host.WorkspaceRoot)
+            ? _workspace.Root
+            : _host.WorkspaceRoot;
+        start.Environment["CRYSTAL_WORKSPACE"] = workspace;
+        start.Environment["CRYSTAL_SESSION"] = _host.SessionId;
+        start.Environment["CRYSTAL_APPROVAL"] = _host.Approval;
+    }
+
+    private static string Combine(ProcessOutputReader.Streams streams)
+    {
+        if (streams.Stderr.Length == 0)
+        {
+            return streams.Stdout;
+        }
+
+        return streams.Stdout.Length == 0
+            ? streams.Stderr
+            : streams.Stdout + Environment.NewLine + streams.Stderr;
+    }
+
+    private static string PrefixExit(int exitCode, string text) =>
+        exitCode == 0 ? text : $"exit {exitCode}\n{text}";
+
+    private static MultimodalToolOutput Failed(string text) =>
+        new([new TextContent(text)], MultimodalToolResultStatus.Failure);
+
+    private readonly record struct ExecFinished(
+        string? Failure,
+        int ExitCode,
+        ProcessOutputReader.Streams Streams)
+    {
+        public static ExecFinished Fail(string failure) => new(failure, 0, default);
+    }
+
+    private async Task<ExecFinished> RunAsync(
+        string arguments,
+        CancellationToken cancellationToken)
+    {
+        if (!TryBuildArgv(arguments, out var argv, out var error))
+        {
+            return ExecFinished.Fail(error);
         }
 
         if (!TryResolveFileName(argv[0], out var fileName, out error))
         {
-            return new ToolOutput(error, ToolResultStatus.Failure);
+            return ExecFinished.Fail(error);
         }
 
         using var process = new Process();
@@ -67,20 +205,19 @@ internal sealed class ExecExternalTool : ITool
             process.StartInfo.ArgumentList.Add(argv[index]);
         }
 
+        ApplyHostEnvironment(process.StartInfo);
+
         try
         {
             if (!process.Start())
             {
-                return new ToolOutput(
-                    "The external process failed to start.",
-                    ToolResultStatus.Failure);
+                return ExecFinished.Fail("The external process failed to start.");
             }
         }
         catch (Exception exception)
         {
-            return new ToolOutput(
-                "The external process failed to start: " + exception.Message,
-                ToolResultStatus.Failure);
+            return ExecFinished.Fail(
+                "The external process failed to start: " + exception.Message);
         }
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -89,22 +226,19 @@ internal sealed class ExecExternalTool : ITool
             timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
         }
 
-        var outputTask = ProcessOutputReader.ReadAsync(process, timeout.Token);
+        var outputTask = ProcessOutputReader.ReadStreamsAsync(process, timeout.Token);
         try
         {
             if (_set.Stdin)
             {
-                await process.StandardInput.WriteAsync(call.Arguments.AsMemory(), timeout.Token);
+                await process.StandardInput.WriteAsync(arguments.AsMemory(), timeout.Token);
                 await process.StandardInput.FlushAsync(timeout.Token);
             }
 
             process.StandardInput.Close();
             await process.WaitForExitAsync(timeout.Token);
-            var text = await outputTask.WaitAsync(timeout.Token);
-            var status = process.ExitCode == 0
-                ? ToolResultStatus.Success
-                : ToolResultStatus.Failure;
-            return new ToolOutput($"exit {process.ExitCode}\n{text}", status);
+            var streams = await outputTask.WaitAsync(timeout.Token);
+            return new ExecFinished(null, process.ExitCode, streams);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -114,17 +248,14 @@ internal sealed class ExecExternalTool : ITool
         catch (OperationCanceledException) when (_set.TimeoutSeconds is int limit)
         {
             TryKill(process);
-            return new ToolOutput(
-                ToolOutputText.Timeout(limit),
-                ToolResultStatus.Failure);
+            return ExecFinished.Fail(ToolOutputText.Timeout(limit));
         }
         catch (Exception exception) when (exception is IOException or ObjectDisposedException)
         {
             timeout.Cancel();
             TryKill(process);
-            return new ToolOutput(
-                "The external process stdin or output failed: " + exception.Message,
-                ToolResultStatus.Failure);
+            return ExecFinished.Fail(
+                "The external process stdin or output failed: " + exception.Message);
         }
         finally
         {

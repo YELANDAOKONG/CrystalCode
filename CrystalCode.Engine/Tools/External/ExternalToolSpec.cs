@@ -15,7 +15,8 @@ public sealed record ExternalToolSpec
         IReadOnlyList<string>? commandSuffix = null,
         IReadOnlyDictionary<string, string>? argv = null,
         IReadOnlyList<string>? pathArguments = null,
-        ExternalApprovalMode? approval = null)
+        ExternalApprovalMode? approval = null,
+        ExternalToolOutputMode? output = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -33,6 +34,7 @@ public sealed record ExternalToolSpec
         Argv = argv ?? new Dictionary<string, string>(StringComparer.Ordinal);
         PathArguments = pathArguments ?? [];
         Approval = approval ?? ExternalApprovalMode.Inherit;
+        Output = output ?? ExternalToolOutputMode.Text;
     }
 
     public string Name { get; }
@@ -50,6 +52,8 @@ public sealed record ExternalToolSpec
     public IReadOnlyList<string> PathArguments { get; }
 
     public ExternalApprovalMode Approval { get; }
+
+    public ExternalToolOutputMode Output { get; }
 
     public override string ToString() => Name;
 }

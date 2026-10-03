@@ -16,6 +16,9 @@ Invocation channels:
   written to the child stdin, then stdin is closed.
 - **exec + argv**: listed scalar properties become extra process
   arguments. Operator-authored command arrays are never interpolated.
+- **exec content**: when a tool sets `"output": "content"`, stdout is
+  one JSON object (`text`, optional `images`) instead of plain text.
+  Logs stay on stderr.
 - **dotnet**: a class library whose public `Crystal.Tools.ITool` and
   `Crystal.Multimodal.Tools.IMultimodalTool` types are loaded in one isolated
   `AssemblyLoadContext`.
@@ -236,6 +239,7 @@ Tool names come from `Definition.Name`:
 | `stdin` | Set | Exec only. Boolean, default `true`. Applies to every exec tool in the set. |
 | `argv` | Tool (or shorthand root) | Map of schema property name to one flag string. |
 | `pathArguments` | Tool (or shorthand root) | Property names treated as filesystem paths. |
+| `output` | Exec tool (or shorthand root) | `text` (default) or `content`. `content` reads a JSON object from stdout. Dotnet rejects this field. |
 | `timeoutSeconds` | Set | Positive integer up to 4,294,967, or `"unlimited"`; default 120. Applies to exec and dotnet. |
 | `catalogs` | Set default, tool override | `plan` and/or `work`. Default `["plan", "work"]`. Both members means both catalogs. |
 | `description` / `schema` | Each exec tool | Required for exec. Dotnet takes these from the native tool `Definition`. Overlay does not replace them. |
@@ -328,7 +332,16 @@ retained. The combined result is truncated to
 
 The host starts the process with `ProcessStartInfo.ArgumentList` (no
 `bash -lc`, no one-line command string). Working directory is the
-workspace root.
+workspace root. The child environment inherits the host process and
+also receives three variables, rewritten for that process only:
+
+| Variable | Value |
+| :--- | :--- |
+| `CRYSTAL_WORKSPACE` | Absolute workspace root |
+| `CRYSTAL_SESSION` | Current session id |
+| `CRYSTAL_APPROVAL` | Current approval mode (`plan`, `default`, `edit`, `review`, `audit`, or `full`) |
+
+Secrets are not added. `CRYSTAL_HOME` is not set for the tool.
 
 A bare executable name is resolved inside the set directory when that
 file exists; otherwise it may PATH-search. A relative path that
@@ -356,12 +369,26 @@ suffix, and mapped scalars.
 **Stdin off**: stdin is still redirected and closed so the child does
 not block.
 
+**Content output** (`"output": "content"`, default `text`): stdout must
+be one UTF-8 JSON object. `text` is an optional string. `images` is an
+optional array of at most 8 objects. Each image sets `mimeType`
+(`image/png`, `image/jpeg`, `image/gif`, or `image/webp`) and exactly
+one of `base64` or `path`. `path` must stay inside the workspace;
+credential paths are rejected. Bytes must match the declared type and
+the 20 MiB host limit. Stderr is appended to `text`. A non-zero exit
+fails the call and does not attach images. On a text-only turn, a
+result that contains images fails with "This model cannot accept tool
+images." On an image-capable turn the same tool is also registered as
+a multimodal tool, and accepted images follow the existing marker path.
+Invalid JSON fails the call. Large images should use `path`, because
+stdout is still truncated to the tool output limit before parsing.
+
 Non-zero exit is `ToolResultStatus.Failure`. The timeout starts when the
 process starts and covers stdin writing, process exit, and output reading.
 `"timeoutSeconds": "unlimited"` disables this per-call timeout; user and
 turn cancellation still apply. Timeout, cancellation, and stdin failure
-kill the process tree when the OS allows it. stdout then stderr are
-concatenated, truncated, and returned as `ToolOutput` text.
+kill the process tree when the OS allows it. For `output: text`, stdout
+then stderr are concatenated, truncated, and returned as `ToolOutput` text.
 
 Several exec tools should live in one set when they share a binary.
 That is the same unit as a multi-`ITool` assembly: one install, one

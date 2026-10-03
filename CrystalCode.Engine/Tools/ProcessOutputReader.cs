@@ -12,21 +12,30 @@ internal static class ProcessOutputReader
         Process process,
         CancellationToken cancellationToken)
     {
+        var streams = await ReadStreamsAsync(process, cancellationToken);
+        if (streams.Stderr.Length == 0)
+        {
+            return ToolOutputText.Truncate(streams.Stdout);
+        }
+
+        return ToolOutputText.Truncate(
+            streams.Stdout.Length == 0
+                ? streams.Stderr
+                : streams.Stdout + Environment.NewLine + streams.Stderr);
+    }
+
+    public static async Task<Streams> ReadStreamsAsync(
+        Process process,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(process);
         var stdoutTask = ReadStreamAsync(process.StandardOutput, cancellationToken);
         var stderrTask = ReadStreamAsync(process.StandardError, cancellationToken);
         await Task.WhenAll(stdoutTask, stderrTask);
-
-        var stdout = await stdoutTask;
-        var stderr = await stderrTask;
-        if (stderr.Length == 0)
-        {
-            return ToolOutputText.Truncate(stdout);
-        }
-
-        return ToolOutputText.Truncate(
-            stdout.Length == 0 ? stderr : stdout + Environment.NewLine + stderr);
+        return new Streams(await stdoutTask, await stderrTask);
     }
+
+    internal readonly record struct Streams(string Stdout, string Stderr);
 
     private static async Task<string> ReadStreamAsync(
         StreamReader reader,

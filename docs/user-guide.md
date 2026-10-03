@@ -764,7 +764,11 @@ Runners:
 - **exec**: `ProcessStartInfo.ArgumentList`, no shell templates. Stdin
   is the fenced arguments object (default on). An `argv` map turns
   scalar properties into flags. Working directory is the workspace
-  root.
+  root. Each child receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, and
+  `CRYSTAL_APPROVAL`. `"output": "content"` makes stdout a JSON object
+  with `text` and optional `images` (`base64` or a workspace `path`).
+  Text-only turns reject image results. Image-capable turns attach them
+  through the same marker path as other tools.
 - **dotnet**: a framework-dependent class library that implements
   `Crystal.Tools.ITool`. Every public non-abstract tool is loaded in
   one isolated load context for that set. Shared types are `Crystal`

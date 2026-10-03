@@ -1,3 +1,5 @@
+using Crystal.Multimodal;
+using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Configuration;
@@ -301,6 +303,84 @@ public sealed class ExternalCatalogTests
         Assert.Empty(catalog.AutomaticTools);
     }
 
+    [Fact]
+    public async Task Load_ExecHostEnvironment_ReachesTheChild()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "showenv");
+        Directory.CreateDirectory(directory);
+        var script = WriteEnvScript(directory);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            $$"""
+            {
+              "runner": "exec",
+              "description": "Print host facts.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["{{script.Replace("\\", "/")}}"],
+              "stdin": false
+            }
+            """);
+        var root = new Workspace(workspace.Path);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            root,
+            enabled: true,
+            host: new SessionToolHost(root, () => "sess-9", () => "audit"));
+
+        var output = await catalog.WorkTools[0].InvokeAsync(
+            new ToolCall("1", "showenv", "{}"));
+
+        Assert.True(output.Status == ToolResultStatus.Success, output.Text);
+        Assert.Contains(root.Root, output.Text, StringComparison.Ordinal);
+        Assert.Contains("sess-9", output.Text, StringComparison.Ordinal);
+        Assert.Contains("audit", output.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Load_ExecContent_ReturnsTextAndImage()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var png = new byte[] { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a };
+        File.WriteAllBytes(Path.Combine(workspace.Path, "chart.png"), png);
+        var directory = Path.Combine(workspace.Path, ".crystal", "tools", "render");
+        Directory.CreateDirectory(directory);
+        var payload = Path.Combine(directory, "payload.json");
+        File.WriteAllText(
+            payload,
+            """{"text":"rendered","images":[{"mimeType":"image/png","path":"chart.png"}]}""");
+        var script = WriteFileScript(directory, payload);
+        File.WriteAllText(
+            Path.Combine(directory, ExternalFiles.FileName),
+            $$"""
+            {
+              "runner": "exec",
+              "description": "Render a chart.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["{{script.Replace("\\", "/")}}"],
+              "stdin": false,
+              "output": "content"
+            }
+            """);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+
+        var text = await catalog.WorkTools[0].InvokeAsync(
+            new ToolCall("1", "render", "{}"));
+        Assert.Equal(ToolResultStatus.Failure, text.Status);
+        Assert.Contains("cannot accept tool images", text.Text, StringComparison.Ordinal);
+
+        var imageTool = Assert.Single(catalog.WorkMultimodalTools);
+        var image = await imageTool.InvokeAsync(new MultimodalToolCall("2", "render", "{}"));
+        Assert.Equal(MultimodalToolResultStatus.Success, image.Status);
+        Assert.Equal("rendered", Assert.IsType<TextContent>(image.Contents[0]).Text);
+        Assert.Equal("image/png", Assert.IsType<ImageContent>(image.Contents[1]).Image.MimeType.Value);
+    }
+
     private static void WriteManifest(string workspace, string name, string commandJson)
     {
         var directory = Path.Combine(workspace, ".crystal", "tools", name);
@@ -390,6 +470,50 @@ public sealed class ExternalCatalogTests
             | UnixFileMode.OtherExecute);
         return path;
     }
+
+    private static string WriteEnvScript(string directory)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var script = Path.Combine(directory, "show-env.cmd");
+            File.WriteAllText(
+                script,
+                "@echo off\r\necho %CRYSTAL_WORKSPACE%\r\necho %CRYSTAL_SESSION%\r\necho %CRYSTAL_APPROVAL%\r\n");
+            return script;
+        }
+
+        var path = Path.Combine(directory, "show-env.sh");
+        File.WriteAllText(
+            path,
+            "#!/bin/sh\nprintf '%s\\n' \"$CRYSTAL_WORKSPACE\" \"$CRYSTAL_SESSION\" \"$CRYSTAL_APPROVAL\"\n");
+        File.SetUnixFileMode(path, ExecutableMode());
+        return path;
+    }
+
+    private static string WriteFileScript(string directory, string payloadPath)
+    {
+        var quoted = payloadPath.Replace("\"", "\\\"");
+        if (OperatingSystem.IsWindows())
+        {
+            var script = Path.Combine(directory, "print-file.cmd");
+            File.WriteAllText(script, "@echo off\r\ntype \"" + quoted + "\"\r\n");
+            return script;
+        }
+
+        var path = Path.Combine(directory, "print-file.sh");
+        File.WriteAllText(path, "#!/bin/sh\ncat \"" + quoted + "\"\n");
+        File.SetUnixFileMode(path, ExecutableMode());
+        return path;
+    }
+
+    private static UnixFileMode ExecutableMode() =>
+        UnixFileMode.UserRead
+        | UnixFileMode.UserWrite
+        | UnixFileMode.UserExecute
+        | UnixFileMode.GroupRead
+        | UnixFileMode.GroupExecute
+        | UnixFileMode.OtherRead
+        | UnixFileMode.OtherExecute;
 
     private static string WriteDelayedMarkerScript(string directory)
     {

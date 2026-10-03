@@ -221,8 +221,10 @@ not depend on Home media files. If a referenced media file is unavailable, its
 metadata remains in the export but bytes cannot be included. The store does
 not automatically delete unreferenced media files.
 Inline image bytes and absolute image URIs are supported. Images returned by
-an in-process plugin or dotnet operator tool's native `IMultimodalTool` path
-are assigned the same markers and become input on the following model round.
+an in-process plugin, a dotnet operator tool's native `IMultimodalTool` path,
+or an exec tool with `"output": "content"` are assigned the same markers and
+become input on the following model round. A text-only turn rejects exec
+image results instead of dropping them.
 Clipboard paste reserves its image number before waiting for the OS reader.
 Tool images reserve numbers through the same session lock, which also protects
 image lookup and mutation. A failed paste leaves a gap rather than reusing its
@@ -1108,7 +1110,10 @@ protocol adapters register through the same table. `PluginRegistry` does
 not load assemblies from disk. `~/.crystal/plugins/` stays reserved.
 
 Operator tool sets are not plugins. They are discovered from `tools/` and
-wrapped by `ExternalCatalog`. A dotnet set uses one non-collectible
+wrapped by `ExternalCatalog`. An exec child starts in the workspace root
+and receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, and `CRYSTAL_APPROVAL`
+on that process only. `"output": "content"` reads one JSON object from
+stdout (`text` and optional fenced images). A dotnet set uses one non-collectible
 `AssemblyLoadContext` for that directory only. Shared contract types
 (`Crystal`, `Crystal.Tools`, and already-loaded `System.*` /
 `Microsoft.*`) come from the host context that already loaded

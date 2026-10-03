@@ -140,6 +140,12 @@ public static class ToolsManifestParser
             && toolsElement.ValueKind is JsonValueKind.Array or JsonValueKind.Object;
         var hasShorthand = HasShorthandFields(root);
 
+        if (runner == ExternalRunnerKind.Dotnet && root.TryGetProperty("output", out _))
+        {
+            error = "output is only valid for exec.";
+            return false;
+        }
+
         if (runner == ExternalRunnerKind.Exec)
         {
             if (hasTools && toolsElement.ValueKind != JsonValueKind.Array)
@@ -254,7 +260,8 @@ public static class ToolsManifestParser
         HasNonNull(root, "description")
         || HasSchema(root)
         || HasNonNull(root, "argv")
-        || HasNonNull(root, "pathArguments");
+        || HasNonNull(root, "pathArguments")
+        || HasNonNull(root, "output");
 
     private static bool HasNonNull(JsonElement root, string name) =>
         root.TryGetProperty(name, out var property)
@@ -419,6 +426,12 @@ public static class ToolsManifestParser
                 return false;
             }
 
+            if (!TryReadOutput(element, out var output, out error))
+            {
+                error = $"Tool '{name}' has invalid output: {error}";
+                return false;
+            }
+
             spec = new ExternalToolSpec(
                 name,
                 description,
@@ -427,7 +440,8 @@ public static class ToolsManifestParser
                 suffix,
                 argv,
                 pathArguments,
-                approval);
+                approval,
+                output);
         return true;
     }
 
@@ -451,6 +465,12 @@ public static class ToolsManifestParser
             if (property.Value.ValueKind != JsonValueKind.Object)
             {
                 error = $"Overlay '{property.Name}' must be a JSON object.";
+                return false;
+            }
+
+            if (property.Value.TryGetProperty("output", out _))
+            {
+                error = $"Overlay '{property.Name}' cannot set output.";
                 return false;
             }
 
@@ -496,6 +516,29 @@ public static class ToolsManifestParser
                     catalogs,
                     pathArguments: pathArguments,
                     approval: approval));
+        }
+
+        return true;
+    }
+
+    private static bool TryReadOutput(
+        JsonElement element,
+        out ExternalToolOutputMode output,
+        out string error)
+    {
+        output = ExternalToolOutputMode.Text;
+        error = string.Empty;
+        if (!element.TryGetProperty("output", out var property))
+        {
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.String
+            || property.GetString() is not string value
+            || !ExternalToolOutputMode.TryParse(value, out output))
+        {
+            error = "output must be text or content.";
+            return false;
         }
 
         return true;

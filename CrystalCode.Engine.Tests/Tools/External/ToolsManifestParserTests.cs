@@ -303,4 +303,77 @@ public sealed class ToolsManifestParserTests
         Assert.False(parsed);
         Assert.Contains("enabled must be a boolean", error, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void TryParse_ContentOutput_IsRecorded()
+    {
+        using var root = new TemporaryWorkspace();
+        var directory = Path.Combine(root.Path, "render");
+        Directory.CreateDirectory(directory);
+
+        var parsed = ToolsManifestParser.TryParse(
+            directory,
+            """
+            {
+              "runner": "exec",
+              "description": "Render.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["render"],
+              "output": "content"
+            }
+            """,
+            out var set,
+            out var error);
+
+        Assert.True(parsed, error);
+        Assert.Equal(ExternalToolOutputMode.Content, set!.Tools[0].Output);
+    }
+
+    [Fact]
+    public void TryParse_InvalidOutput_Fails()
+    {
+        using var root = new TemporaryWorkspace();
+        var directory = Path.Combine(root.Path, "render");
+        Directory.CreateDirectory(directory);
+
+        var parsed = ToolsManifestParser.TryParse(
+            directory,
+            """
+            {
+              "runner": "exec",
+              "description": "Render.",
+              "schema": { "type": "object", "properties": {} },
+              "command": ["render"],
+              "output": "json"
+            }
+            """,
+            out _,
+            out var error);
+
+        Assert.False(parsed);
+        Assert.Contains("output must be text or content", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TryParse_DotnetOutput_Fails()
+    {
+        using var root = new TemporaryWorkspace();
+        var directory = Path.Combine(root.Path, "render");
+        Directory.CreateDirectory(directory);
+
+        var parsed = ToolsManifestParser.TryParse(
+            directory,
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "Tools.dll",
+              "output": "content"
+            }
+            """,
+            out _,
+            out var error);
+
+        Assert.False(parsed);
+        Assert.Contains("output is only valid for exec", error, StringComparison.Ordinal);
+    }
 }
