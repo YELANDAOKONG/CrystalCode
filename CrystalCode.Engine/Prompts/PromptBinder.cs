@@ -70,6 +70,15 @@ public static partial class PromptBinder
             case PromptPlaceholder.Date:
                 value = context.Date;
                 return true;
+            case PromptPlaceholder.Time:
+                value = context.Time;
+                return true;
+            case PromptPlaceholder.Os:
+                value = context.Os;
+                return true;
+            case PromptPlaceholder.Architecture:
+                value = context.Architecture;
+                return true;
             case PromptPlaceholder.Provider:
                 value = context.Provider;
                 return true;
@@ -84,6 +93,12 @@ public static partial class PromptBinder
                 return true;
             case PromptPlaceholder.ProductName:
                 value = context.ProductName;
+                return true;
+            case PromptPlaceholder.SessionId:
+                value = context.SessionId;
+                return true;
+            case PromptPlaceholder.Approval:
+                value = context.Approval;
                 return true;
             default:
                 value = string.Empty;

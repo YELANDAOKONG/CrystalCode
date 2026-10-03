@@ -50,12 +50,17 @@ public static class PromptTemplateExport
         - {{workspace}}
         - {{is_git_repo}}
         - {{platform}}
+        - {{os}}
+        - {{architecture}}
         - {{date}}
+        - {{time}}
         - {{provider}}
         - {{model}}
         - {{model_line}}
         - {{mode}}
         - {{product_name}}
+        - {{session_id}}
+        - {{approval}}
 
         ## Review user
 

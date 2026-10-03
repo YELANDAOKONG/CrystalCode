@@ -7,6 +7,11 @@ public sealed record PromptEnvironmentSnapshot(
     string Workspace,
     string IsGitRepo,
     string Platform,
+    string Os,
+    string Architecture,
     string Date,
+    string Time,
     string Provider,
-    string Model);
+    string Model,
+    string SessionId,
+    string Approval);

@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tests.Tools;
 
@@ -23,7 +25,15 @@ public sealed class PromptEnvironmentTests
         Assert.Contains(Path.GetFullPath(workspace.Path), text, StringComparison.Ordinal);
         Assert.Contains("Is git repo: no", text, StringComparison.Ordinal);
         Assert.Contains("Today's date: Monday Aug 31, 2026", text, StringComparison.Ordinal);
+        Assert.Contains("Local time: 12:00:00 +00:00", text, StringComparison.Ordinal);
+        Assert.Contains("OS: " + RuntimeInformation.OSDescription.Trim(), text, StringComparison.Ordinal);
+        Assert.Contains(
+            "Architecture: " + RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(),
+            text,
+            StringComparison.Ordinal);
         Assert.Contains("Model: deepseek / deepseek-v4-flash", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Session:", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Approval:", text, StringComparison.Ordinal);
         Assert.True(
             text.Contains("Platform: linux", StringComparison.Ordinal)
             || text.Contains("Platform: windows", StringComparison.Ordinal)

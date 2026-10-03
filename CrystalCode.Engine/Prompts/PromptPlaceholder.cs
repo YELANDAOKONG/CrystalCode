@@ -22,6 +22,12 @@ public static class PromptPlaceholder
 
     public const string Date = "date";
 
+    public const string Time = "time";
+
+    public const string Os = "os";
+
+    public const string Architecture = "architecture";
+
     public const string Provider = "provider";
 
     public const string Model = "model";
@@ -31,6 +37,10 @@ public static class PromptPlaceholder
     public const string Mode = "mode";
 
     public const string ProductName = "product_name";
+
+    public const string SessionId = "session_id";
+
+    public const string Approval = "approval";
 
     public const string Conversation = "conversation";
 
@@ -62,11 +72,16 @@ public static class PromptPlaceholder
         IsGitRepo,
         Platform,
         Date,
+        Time,
+        Os,
+        Architecture,
         Provider,
         Model,
         ModelLine,
         Mode,
         ProductName,
+        SessionId,
+        Approval,
         Conversation,
         ToolName,
         ToolArguments,

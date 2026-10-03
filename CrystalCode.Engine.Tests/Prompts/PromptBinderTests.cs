@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 using CrystalCode.Engine.Prompts;
 
 using Xunit;
@@ -88,6 +90,36 @@ public sealed class PromptBinderTests
             "Workspace=" + Path.GetFullPath("/tmp/demo")
                 + " git=no date=Monday Aug 31, 2026 model=deepseek / deepseek-v4-flash mode=work product=Crystal Code",
             text);
+    }
+
+    [Fact]
+    public void Apply_SubstitutesSessionAndSystemPlaceholders()
+    {
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "deepseek",
+            "deepseek-v4-flash",
+            "work",
+            string.Empty,
+            string.Empty,
+            new DateTimeOffset(2026, 8, 31, 15, 4, 5, TimeSpan.FromHours(8)),
+            "sess-1",
+            "audit");
+
+        var text = PromptBinder.Apply(
+            "{{session_id}}|{{approval}}|{{time}}|{{os}}|{{architecture}}\n{{env}}",
+            context);
+
+        Assert.StartsWith(
+            "sess-1|audit|15:04:05 +08:00|"
+                + RuntimeInformation.OSDescription.Trim()
+                + "|"
+                + RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(),
+            text,
+            StringComparison.Ordinal);
+        Assert.Contains("Session: sess-1", text, StringComparison.Ordinal);
+        Assert.Contains("Approval: audit", text, StringComparison.Ordinal);
+        Assert.Contains("Local time: 15:04:05 +08:00", text, StringComparison.Ordinal);
     }
 
     [Fact]

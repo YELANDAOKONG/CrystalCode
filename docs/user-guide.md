@@ -823,9 +823,19 @@ The built-in Work and Plan assistant name is Crystal Code. Work, Plan,
 Review, and compaction templates use host-owned placeholders (`{{name}}`).
 Composite session slots are `{{env}}`, `{{skills}}`, and
 `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
-include `{{workspace}}`, `{{is_git_repo}}`, `{{platform}}`, `{{date}}`,
-`{{provider}}`, `{{model}}`, `{{model_line}}`, `{{mode}}`, and
-`{{product_name}}`. Review user templates add `{{conversation}}`,
+include `{{workspace}}`, `{{is_git_repo}}`, `{{platform}}`, `{{os}}`,
+`{{architecture}}`, `{{date}}`, `{{time}}`, `{{provider}}`, `{{model}}`,
+`{{model_line}}`, `{{mode}}`, `{{product_name}}`, `{{session_id}}`, and
+`{{approval}}`. `{{os}}` is the operating system name and version.
+`{{architecture}}` is the process architecture, such as `x64` or `arm64`.
+`{{time}}` is the local time with a numeric offset, captured when that
+system message is composed. `{{session_id}}` is the saved session id.
+`{{approval}}` is the approval mode (`plan`, `default`, `edit`, `review`,
+`audit`, or `full`). `{{mode}}` stays `plan` or `work`. The `{{env}}` block
+includes the operating system, architecture, and local time, and adds
+session and approval lines when the host has them. These values refresh
+on `/cd`, `/model`, `/approval`, and whenever the live system message is
+replaced. Review user templates add `{{conversation}}`,
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,

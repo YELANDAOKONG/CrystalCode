@@ -110,9 +110,9 @@ public sealed class CodingSession : ITurnObserver
         _promptResolution = _promptStore.Resolve(workspace.Root, settings.PromptSet);
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
-        _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
+        _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _replayOnStart = resume is not null;
         if (resume is not null)
         {
@@ -517,6 +517,7 @@ public sealed class CodingSession : ITurnObserver
         _settings = _settings.WithApproval(_approval);
         _settingsStore.Save(_settings);
         RebuildExecutors();
+        ReplaceLiveSystem();
         RefreshChrome();
         Note("Approval  " + ApprovalLabel.For(_approval));
     }
@@ -1397,7 +1398,9 @@ public sealed class CodingSession : ITurnObserver
             _settings.Model,
             _planMode ? "plan" : "work",
             _skills is null ? string.Empty : SkillGuidance.Render(_skills),
-            _prompts.Instructions);
+            _prompts.Instructions,
+            sessionId: _sessionId,
+            approval: _approval.Value);
 
     private string CurrentSystemText() =>
         _planMode
@@ -1571,6 +1574,8 @@ public sealed class CodingSession : ITurnObserver
     {
         DiscardQueue();
         Publish(new ImageHistoryInvalidated());
+        _sessionId = SessionStore.NewId();
+        _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         lock (_imagesGate)
         {
@@ -1583,8 +1588,6 @@ public sealed class CodingSession : ITurnObserver
         _ledger.Clear();
         _todos.Clear();
         BindReviewConversation();
-        _sessionId = SessionStore.NewId();
-        _sessionCreatedUtc = DateTimeOffset.UtcNow;
         SaveSession();
         ShowTodos();
     }

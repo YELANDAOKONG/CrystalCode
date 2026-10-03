@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
@@ -13,22 +11,32 @@ public sealed record PromptContext
         string workspace,
         string isGitRepo,
         string platform,
+        string os,
+        string architecture,
         string date,
+        string time,
         string provider,
         string model,
         string mode,
         string productName,
+        string sessionId,
+        string approval,
         string skills,
         string instructions)
     {
         Workspace = workspace;
         IsGitRepo = isGitRepo;
         Platform = platform;
+        Os = os;
+        Architecture = architecture;
         Date = date;
+        Time = time;
         Provider = provider;
         Model = model;
         Mode = mode;
         ProductName = productName;
+        SessionId = sessionId;
+        Approval = approval;
         Skills = skills;
         Instructions = instructions;
     }
@@ -39,7 +47,13 @@ public sealed record PromptContext
 
     public string Platform { get; }
 
+    public string Os { get; }
+
+    public string Architecture { get; }
+
     public string Date { get; }
+
+    public string Time { get; }
 
     public string Provider { get; }
 
@@ -48,6 +62,10 @@ public sealed record PromptContext
     public string Mode { get; }
 
     public string ProductName { get; }
+
+    public string SessionId { get; }
+
+    public string Approval { get; }
 
     public string Skills { get; }
 
@@ -72,7 +90,9 @@ public sealed record PromptContext
         string mode,
         string skills,
         string instructions,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        string sessionId = "",
+        string approval = "")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -80,17 +100,30 @@ public sealed record PromptContext
         ArgumentException.ThrowIfNullOrWhiteSpace(mode);
         ArgumentNullException.ThrowIfNull(skills);
         ArgumentNullException.ThrowIfNull(instructions);
+        ArgumentNullException.ThrowIfNull(sessionId);
+        ArgumentNullException.ThrowIfNull(approval);
 
-        var snapshot = PromptEnvironment.CreateSnapshot(workspaceRoot, provider, model, now);
+        var snapshot = PromptEnvironment.CreateSnapshot(
+            workspaceRoot,
+            provider,
+            model,
+            now,
+            sessionId,
+            approval);
         return new PromptContext(
             snapshot.Workspace,
             snapshot.IsGitRepo,
             snapshot.Platform,
+            snapshot.Os,
+            snapshot.Architecture,
             snapshot.Date,
+            snapshot.Time,
             snapshot.Provider,
             snapshot.Model,
             mode.Trim(),
             DefaultProductName,
+            snapshot.SessionId,
+            snapshot.Approval,
             skills.Trim(),
             instructions.Trim());
     }
@@ -106,7 +139,12 @@ public sealed record PromptContext
             string.Empty,
             string.Empty,
             string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
             DefaultProductName,
+            string.Empty,
+            string.Empty,
             string.Empty,
             instructions.Trim());
     }
@@ -118,11 +156,16 @@ public sealed record PromptContext
             Workspace,
             IsGitRepo,
             Platform,
+            Os,
+            Architecture,
             Date,
+            Time,
             Provider,
             Model,
             mode.Trim(),
             ProductName,
+            SessionId,
+            Approval,
             Skills,
             Instructions);
     }
