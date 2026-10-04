@@ -140,6 +140,13 @@ dotnet build CrystalCode.sln
 dotnet test CrystalCode.sln
 ```
 
+Tests run on Windows, macOS, and Linux (the release workflow runs the
+suite on each), so they stay portable. Do not hardcode a single-platform
+path such as `/tmp` or a Windows drive root in a test that touches the
+real filesystem; derive it from `Path.GetTempPath()`, `Path.Combine`, or an
+existing temporary-directory helper. A test that only compares path strings
+and never reads or writes the disk is not constrained.
+
 Do not claim coverage a test project does not actually exercise. Session,
 approval, compaction, storage, and tool behavior is tested in
 CrystalCode.Engine.Tests, including a headless session driven by a scripted
