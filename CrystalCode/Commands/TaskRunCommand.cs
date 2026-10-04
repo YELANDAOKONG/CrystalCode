@@ -9,7 +9,7 @@ namespace CrystalCode.Commands;
 /// </summary>
 public sealed class TaskRunCommand : AsyncCommand<TaskRunSettings>
 {
-    protected override Task<int> ExecuteAsync(
+    public override Task<int> ExecuteAsync(
         CommandContext context,
         TaskRunSettings settings,
         CancellationToken cancellationToken)
