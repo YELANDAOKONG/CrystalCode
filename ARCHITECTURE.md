@@ -1094,7 +1094,9 @@ shows or changes the same settings (`tools`, `commands`, `approvals`,
 `thinking`, `on`, `off`). Thinking panels honor `verboseThinking`
 (default on). When it is off, live and committed Thinking cards are
 omitted, including cards restored with a session; turning it back on
-shows the stored text again. The progress row, the thinking gear, and
+shows the stored text again. Inline output, used when the alternate
+screen is unavailable, applies the same switches to restored thinking,
+tool results, and approval text. The progress row, the thinking gear, and
 export stay. `crystal run --show-thinking` remains a separate one-shot
 flag and does not read this setting.
 Approval is a Spectre panel with a two-column Title Case field grid

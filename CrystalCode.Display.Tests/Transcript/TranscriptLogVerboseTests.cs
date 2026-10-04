@@ -117,4 +117,32 @@ public sealed class TranscriptLogVerboseTests
 
         Assert.Contains("live thought more", shown, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void InlineText_HidesThinkingReadResultsAndCompactsCommands()
+    {
+        var log = new TranscriptLog
+        {
+            VerboseThinking = false,
+            VerboseTools = false,
+            VerboseCommands = false,
+            VerboseApprovals = false
+        };
+
+        Assert.Null(log.InlineText(TranscriptKind.Thinking, "hidden thought"));
+        Assert.Null(log.InlineText(TranscriptKind.Result, "hello", "read"));
+        Assert.Null(log.InlineText(TranscriptKind.Approval, "Status Allowed"));
+        Assert.Equal("Glob  *.cs", log.InlineText(TranscriptKind.Tool, "Glob  *.cs"));
+
+        var command = log.InlineText(
+            TranscriptKind.Result,
+            "exit 0\nline1\nline2\npassed",
+            "bash");
+        Assert.NotNull(command);
+        Assert.Contains("passed", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("line1", command, StringComparison.Ordinal);
+
+        log.VerboseThinking = true;
+        Assert.Equal("hidden thought", log.InlineText(TranscriptKind.Thinking, "hidden thought"));
+    }
 }

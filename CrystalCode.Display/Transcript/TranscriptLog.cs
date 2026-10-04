@@ -88,6 +88,41 @@ public sealed class TranscriptLog
         }
     }
 
+    /// <summary>
+    /// Inline row text when the alternate screen is off. Null when a verbose
+    /// switch hides the row. Command results stay, compacted when that switch is off.
+    /// </summary>
+    public string? InlineText(TranscriptKind kind, string text, string? toolName = null)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (HidesThinking(kind) || (kind == TranscriptKind.Approval && !_verboseApprovals))
+        {
+            return null;
+        }
+
+        if (kind is not (TranscriptKind.Result or TranscriptKind.Error))
+        {
+            return text;
+        }
+
+        if (!TranscriptResultDisplay.ShouldRender(
+            kind,
+            toolName,
+            _verboseTools,
+            _verboseCommands))
+        {
+            return null;
+        }
+
+        var display = TranscriptResultDisplay.Text(
+            kind,
+            text,
+            toolName,
+            _verboseTools,
+            _verboseCommands);
+        return display.Length == 0 ? null : display;
+    }
+
     public void Add(
         TranscriptKind kind,
         string text,
@@ -327,22 +362,8 @@ public sealed class TranscriptLog
 
         if (entry.Kind is TranscriptKind.Result or TranscriptKind.Error)
         {
-            if (!TranscriptResultDisplay.ShouldRender(
-                entry.Kind,
-                entry.ToolName,
-                _verboseTools,
-                _verboseCommands))
-            {
-                return lines;
-            }
-
-            var displayText = TranscriptResultDisplay.Text(
-                entry.Kind,
-                entry.Text,
-                entry.ToolName,
-                _verboseTools,
-                _verboseCommands);
-            if (displayText.Length == 0)
+            var displayText = InlineText(entry.Kind, entry.Text, entry.ToolName);
+            if (displayText is null)
             {
                 return lines;
             }

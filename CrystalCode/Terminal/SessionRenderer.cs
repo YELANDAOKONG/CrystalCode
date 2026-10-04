@@ -642,7 +642,7 @@ public sealed class SessionRenderer : IDisposable
             foreach (var line in TranscriptReplay.Lines(items))
             {
                 _log.Add(line.Kind, line.Text, toolName: line.ToolName);
-                WriteFallback(line.Kind, line.Text);
+                WriteFallback(line.Kind, line.Text, line.ToolName);
             }
 
             PaintUnlocked(force: true);
@@ -776,7 +776,7 @@ public sealed class SessionRenderer : IDisposable
                     : null;
                 _toolCallNames.Remove(result.CallId);
                 _log.Add(kind, body, toolName: toolName);
-                WriteFallback(kind, body);
+                WriteFallback(kind, body, toolName);
             }
 
             _chrome.ToolCount += results.Count;
@@ -1976,12 +1976,20 @@ public sealed class SessionRenderer : IDisposable
 
     private bool Framed => _screen is { IsActive: true };
 
-    private void WriteFallback(TranscriptKind kind, string text)
+    private void WriteFallback(TranscriptKind kind, string text, string? toolName = null)
     {
-        if (!Framed)
+        if (Framed)
         {
-            TranscriptFallback.Write(kind, text);
+            return;
         }
+
+        var visible = _log.InlineText(kind, text, toolName);
+        if (visible is null)
+        {
+            return;
+        }
+
+        TranscriptFallback.Write(kind, visible);
     }
 
     private void WriteFallbackDelta(TranscriptKind kind, string text)
