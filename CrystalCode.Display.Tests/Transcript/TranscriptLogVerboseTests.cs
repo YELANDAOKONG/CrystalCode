@@ -80,4 +80,41 @@ public sealed class TranscriptLogVerboseTests
 
         Assert.Contains("Allowed", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void BuildLines_OmitsThinkingWhileTextStaysAvailable()
+    {
+        var log = new TranscriptLog { VerboseThinking = false };
+        log.AppendLive(TranscriptKind.Thinking, "hidden thought");
+
+        var hidden = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.DoesNotContain("hidden thought", hidden, StringComparison.Ordinal);
+        Assert.DoesNotContain("Thinking", hidden, StringComparison.Ordinal);
+
+        log.CommitLive();
+        log.VerboseThinking = true;
+        var shown = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.Contains("Thinking", shown, StringComparison.Ordinal);
+        Assert.Contains("hidden thought", shown, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_HidesLiveThinkingUntilTheSwitchTurnsOn()
+    {
+        var log = new TranscriptLog();
+        log.AppendLive(TranscriptKind.Thinking, "live thought");
+        log.VerboseThinking = false;
+
+        var hidden = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.DoesNotContain("live thought", hidden, StringComparison.Ordinal);
+
+        log.AppendLive(TranscriptKind.Thinking, " more");
+        log.VerboseThinking = true;
+        var shown = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.Contains("live thought more", shown, StringComparison.Ordinal);
+    }
 }

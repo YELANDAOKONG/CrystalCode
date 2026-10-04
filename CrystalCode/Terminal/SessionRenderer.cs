@@ -181,6 +181,25 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    public bool VerboseThinking
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _log.VerboseThinking;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _log.VerboseThinking = value;
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
     internal string ChromeWorkspaceRoot
     {
         get
@@ -657,7 +676,10 @@ public sealed class SessionRenderer : IDisposable
                     _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
                     _streamedCharacters += reasoning.Text.Length;
                     SetTurnActivityUnlocked("Thinking", ProgressText.Thinking);
-                    WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
+                    if (_log.VerboseThinking)
+                    {
+                        WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
+                    }
                     PaintUnlocked(force: false);
                     break;
                 case ChatTextDelta text when text.Text.Length > 0:
@@ -1548,7 +1570,7 @@ public sealed class SessionRenderer : IDisposable
 
     private void CommitLiveUnlocked()
     {
-        if (_streamKind is not null && !Framed)
+        if (_streamKind is not null && !Framed && FallbackStreamVisible(_streamKind))
         {
             Console.WriteLine();
         }
@@ -1948,6 +1970,10 @@ public sealed class SessionRenderer : IDisposable
         _chrome.TokenEstimate = UsageText.FormatEstimate(
             TokenEstimator.Characters(_streamedCharacters));
     }
+
+    private bool FallbackStreamVisible(string streamKind) =>
+        !string.Equals(streamKind, nameof(TranscriptKind.Thinking), StringComparison.Ordinal)
+        || _log.VerboseThinking;
 
     private bool Framed => _screen is { IsActive: true };
 

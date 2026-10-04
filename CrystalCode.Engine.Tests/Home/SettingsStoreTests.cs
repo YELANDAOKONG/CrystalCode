@@ -650,7 +650,8 @@ public sealed class SettingsStoreTests
               "model": "deepseek-v4-flash",
               "verboseTools": false,
               "verboseCommands": false,
-              "verboseApprovals": false
+              "verboseApprovals": false,
+              "verboseThinking": false
             }
             """);
 
@@ -659,12 +660,14 @@ public sealed class SettingsStoreTests
         Assert.False(settings.VerboseTools);
         Assert.False(settings.VerboseCommands);
         Assert.False(settings.VerboseApprovals);
-        store.Save(settings.WithVerboseApprovals(true));
-        Assert.DoesNotContain(
-            "verboseApprovals",
-            File.ReadAllText(root.Home.ConfigPath),
-            StringComparison.Ordinal);
-        Assert.True(store.Load().VerboseApprovals);
+        Assert.False(settings.VerboseThinking);
+        store.Save(settings.WithVerboseApprovals(true).WithVerboseThinking(true));
+        var saved = File.ReadAllText(root.Home.ConfigPath);
+        Assert.DoesNotContain("verboseApprovals", saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("verboseThinking", saved, StringComparison.Ordinal);
+        var loaded = store.Load();
+        Assert.True(loaded.VerboseApprovals);
+        Assert.True(loaded.VerboseThinking);
     }
 
     [Fact]

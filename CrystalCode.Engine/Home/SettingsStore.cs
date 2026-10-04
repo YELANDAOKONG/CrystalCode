@@ -69,6 +69,7 @@ public sealed class SettingsStore
             document.VerboseTools ?? defaults.VerboseTools,
             document.VerboseCommands ?? defaults.VerboseCommands,
             document.VerboseApprovals ?? defaults.VerboseApprovals,
+            document.VerboseThinking ?? defaults.VerboseThinking,
             string.IsNullOrWhiteSpace(document.PromptSet)
                 ? defaults.PromptSet
                 : document.PromptSet.Trim(),
@@ -114,6 +115,7 @@ public sealed class SettingsStore
             VerboseTools = settings.VerboseTools ? null : false,
             VerboseCommands = settings.VerboseCommands ? null : false,
             VerboseApprovals = settings.VerboseApprovals ? null : false,
+            VerboseThinking = settings.VerboseThinking ? null : false,
             PromptSet = string.Equals(
                 settings.PromptSet,
                 HarnessSettings.DefaultPromptSet,

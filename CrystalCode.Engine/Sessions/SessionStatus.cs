@@ -35,4 +35,5 @@ public sealed record SessionStatus(
     TokenUsage? CumulativeUsage,
     bool CustomStatusLineEnabled = false,
     string? ApprovalModel = null,
-    bool VerboseApprovalsEnabled = true);
+    bool VerboseApprovalsEnabled = true,
+    bool VerboseThinkingEnabled = true);

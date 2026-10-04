@@ -179,7 +179,7 @@ saved value is also unset. `unlimited` removes that one cap.
 | `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
 | `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
 | `--bash-timeout <seconds>` | Per-command bash cap. Default 120. `unlimited` disables that timer |
-| `--show-thinking` | Print reasoning text |
+| `--show-thinking` | Print reasoning text for this run. Independent of `verboseThinking` |
 | `--format` | `default` for plain text, or `json` for one JSON object per line |
 
 `--approval-model off` cannot be combined with `--approval-provider` or
@@ -309,6 +309,7 @@ Top-level fields:
 | `verboseTools` | Show read, search, and skill result panels (default `true`; omitted when on) |
 | `verboseCommands` | Show full bash output (default `true`; omitted when on). Off keeps a hidden-line hint and the last line |
 | `verboseApprovals` | Show auto-pass approval cards (default `true`; omitted when on). Off hides Status, Reason, Risk, Authority, and review Outcome cards already on screen. The ask overlay stays |
+| `verboseThinking` | Show Thinking panels in the interactive transcript (default `true`; omitted when on). Off hides live and restored cards. The gear, progress row, and export stay. `crystal run --show-thinking` is separate |
 | `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
@@ -670,6 +671,13 @@ If the selected model does not support thinking, the command reports
 that and does nothing. The status bar shows `Think Off`, or `Think`
 plus the resolved gear when thinking is on.
 
+`/verbose thinking` hides or shows the Thinking panel in the interactive
+transcript. It stays on unless `verboseThinking` is `false` in
+`config.json`. Cards already in this session, including ones restored
+from a saved session, follow the switch. The gear, the progress row,
+and `/export` stay. `crystal run --show-thinking` does not use this
+setting.
+
 ## Model
 
 `/model` lists configured models, or selects one for the next idle
@@ -709,7 +717,7 @@ returns the transcript viewport to the latest output.
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
-| `/verbose` | | Show or set tool, command, or approval detail: `tools`, `commands`, `approvals`, then `on` or `off` |
+| `/verbose` | | Show or set tool, command, approval, or thinking detail: `tools`, `commands`, `approvals`, `thinking`, then `on` or `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |

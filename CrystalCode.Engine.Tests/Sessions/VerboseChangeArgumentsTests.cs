@@ -31,6 +31,14 @@ public sealed class VerboseChangeArgumentsTests
     }
 
     [Fact]
+    public void TryParse_ReadsThinkingOff()
+    {
+        Assert.True(VerboseChangeArguments.TryParse("thinking off", out var target, out var enabled, out _));
+        Assert.Equal(VerboseTarget.Thinking, target);
+        Assert.False(enabled);
+    }
+
+    [Fact]
     public void TryParse_ReadsApprovalsOff()
     {
         Assert.True(VerboseChangeArguments.TryParse("approvals off", out var target, out var enabled, out _));

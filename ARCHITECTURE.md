@@ -1091,7 +1091,12 @@ allow cards already in the transcript; turning it back on shows them
 again. The ask overlay still appears. Ctrl+O toggles tool verbose and
 Ctrl+G toggles command verbose when the composer is empty; `/verbose`
 shows or changes the same settings (`tools`, `commands`, `approvals`,
-`on`, `off`).
+`thinking`, `on`, `off`). Thinking panels honor `verboseThinking`
+(default on). When it is off, live and committed Thinking cards are
+omitted, including cards restored with a session; turning it back on
+shows the stored text again. The progress row, the thinking gear, and
+export stay. `crystal run --show-thinking` remains a separate one-shot
+flag and does not read this setting.
 Approval is a Spectre panel with a two-column Title Case field grid
 (`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Question panels show
 header tabs, described choices, selection state, custom input, and a final
@@ -1125,11 +1130,11 @@ Status abbreviations are CTX, IN, and OUT. The status
 bar includes a queued count while follow-ups wait. Auto-pass prints a
 panel with Status, Reason, Risk, Authority, and, for review, Outcome
 plus rationale, while `verboseApprovals` is on. Reasoning streams into the
-transcript. Built-in slash verbs live in `SlashCatalog` and include
+transcript while `verboseThinking` is on. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
 `/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`,
-`/verbose` toggles tool, command, or approval detail). `/export`
+`/verbose` toggles tool, command, approval, or thinking detail). `/export`
 writes markdown or json for the current conversation; `/prompts export`
 writes built-in prompt templates. Export roots default to
 `~/.crystal/exports/` (`exportDirectory` omitted or `home`) and are

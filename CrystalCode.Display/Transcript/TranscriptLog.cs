@@ -26,6 +26,7 @@ public sealed class TranscriptLog
     private bool _verboseTools = true;
     private bool _verboseCommands = true;
     private bool _verboseApprovals = true;
+    private bool _verboseThinking = true;
 
     public bool VerboseTools
     {
@@ -68,6 +69,21 @@ public sealed class TranscriptLog
             }
 
             _verboseApprovals = value;
+            InvalidateCache();
+        }
+    }
+
+    public bool VerboseThinking
+    {
+        get => _verboseThinking;
+        set
+        {
+            if (_verboseThinking == value)
+            {
+                return;
+            }
+
+            _verboseThinking = value;
             InvalidateCache();
         }
     }
@@ -209,7 +225,7 @@ public sealed class TranscriptLog
 
     private IReadOnlyList<PaintLine> LiveLines(int width)
     {
-        if (_liveKind is null || _live.Length == 0)
+        if (_liveKind is null || _live.Length == 0 || HidesThinking(_liveKind.Value))
         {
             return [];
         }
@@ -236,7 +252,7 @@ public sealed class TranscriptLog
 
     private IReadOnlyList<PaintLine>? ReadyLiveLines(int width)
     {
-        if (_liveKind is null || _live.Length == 0)
+        if (_liveKind is null || _live.Length == 0 || HidesThinking(_liveKind.Value))
         {
             return null;
         }
@@ -288,6 +304,11 @@ public sealed class TranscriptLog
         var lines = new List<PaintLine>();
 
         if (entry.Kind == TranscriptKind.Approval && !_verboseApprovals)
+        {
+            return lines;
+        }
+
+        if (HidesThinking(entry.Kind))
         {
             return lines;
         }
@@ -359,6 +380,9 @@ public sealed class TranscriptLog
 
         return lines;
     }
+
+    private bool HidesThinking(TranscriptKind kind) =>
+        kind == TranscriptKind.Thinking && !_verboseThinking;
 
     private static string ColorFor(TranscriptKind kind) =>
         kind switch
