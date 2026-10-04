@@ -11,7 +11,7 @@ if ! command -v "$CMD" >/dev/null 2>&1; then
     exit 127
 fi
 
-BASE_MSG="Generate commit messages and commit, do not build, test, or push."
+BASE_MSG="Generate commit messages and commit, do not build, test, or push. Don't do anything else. If there is any uncertainty, suspend the execution and do not continue!"
 TASK="$BASE_MSG"
 for arg in "$@"; do
     TASK+=$'\n'"$arg"
