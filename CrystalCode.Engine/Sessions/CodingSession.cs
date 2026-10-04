@@ -312,6 +312,7 @@ public sealed class CodingSession : ITurnObserver
         {
             VerboseTarget.Tools => _settings.WithVerboseTools(enabled),
             VerboseTarget.Commands => _settings.WithVerboseCommands(enabled),
+            VerboseTarget.Approvals => _settings.WithVerboseApprovals(enabled),
             _ => _settings
         };
         _settingsStore.Save(_settings);
@@ -794,7 +795,9 @@ public sealed class CodingSession : ITurnObserver
             Note(
                 "Verbose tools  " + (_settings.VerboseTools ? "On" : "Off")
                 + "  ·  Verbose commands  "
-                + (_settings.VerboseCommands ? "On" : "Off"));
+                + (_settings.VerboseCommands ? "On" : "Off")
+                + "  ·  Verbose approvals  "
+                + (_settings.VerboseApprovals ? "On" : "Off"));
             return;
         }
 
@@ -811,6 +814,12 @@ public sealed class CodingSession : ITurnObserver
                     VerboseTarget.Commands,
                     enabled is bool commandsEnabled ? commandsEnabled : !_settings.VerboseCommands);
                 Note("Verbose commands  " + (_settings.VerboseCommands ? "On" : "Off"));
+                break;
+            case VerboseTarget.Approvals:
+                SetVerbose(
+                    VerboseTarget.Approvals,
+                    enabled is bool approvalsEnabled ? approvalsEnabled : !_settings.VerboseApprovals);
+                Note("Verbose approvals  " + (_settings.VerboseApprovals ? "On" : "Off"));
                 break;
             default:
                 return;
@@ -1462,6 +1471,7 @@ public sealed class CodingSession : ITurnObserver
                 EstimatedTokensEnabled: _settings.EstimatedTokens,
                 VerboseToolsEnabled: _settings.VerboseTools,
                 VerboseCommandsEnabled: _settings.VerboseCommands,
+                VerboseApprovalsEnabled: _settings.VerboseApprovals,
                 PlanTools: planToolCount,
                 WorkTools: workToolCount,
                 ExternalTools: _external.Tools.Count,
@@ -2256,6 +2266,7 @@ public sealed class CodingSession : ITurnObserver
             _settings.EstimatedTokens,
             _settings.VerboseTools,
             _settings.VerboseCommands,
+            _settings.VerboseApprovals,
             _settings.StatusLine.Enabled,
             _settings.StatusLine.Fields);
 

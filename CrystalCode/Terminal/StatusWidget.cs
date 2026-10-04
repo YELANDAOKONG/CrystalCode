@@ -108,7 +108,8 @@ internal static class StatusWidget
             ("Token estimate", Toggle(status.EstimatedTokensEnabled)),
             ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
             ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
-            ("Verbose commands", Toggle(status.VerboseCommandsEnabled))
+            ("Verbose commands", Toggle(status.VerboseCommandsEnabled)),
+            ("Verbose approvals", Toggle(status.VerboseApprovalsEnabled))
         ]);
 
     private static Panel ActivityCard(SessionStatus status) =>

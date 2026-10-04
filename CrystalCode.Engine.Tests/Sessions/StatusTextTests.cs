@@ -34,6 +34,7 @@ public sealed class StatusTextTests
             EstimatedTokensEnabled: false,
             VerboseToolsEnabled: true,
             VerboseCommandsEnabled: false,
+            VerboseApprovalsEnabled: false,
             PlanTools: 7,
             WorkTools: 8,
             ExternalTools: 2,
@@ -53,6 +54,10 @@ public sealed class StatusTextTests
         Assert.Contains("Latest request", text, StringComparison.Ordinal);
         Assert.Contains("Model calls      4", text, StringComparison.Ordinal);
         Assert.Contains("External loaded  2", text, StringComparison.Ordinal);
+        Assert.Contains(
+            text.Split('\n'),
+            line => line.Contains("Verbose approvals", StringComparison.Ordinal)
+                && line.TrimEnd().EndsWith("Off", StringComparison.Ordinal));
         Assert.DoesNotContain("Approval model", text, StringComparison.Ordinal);
     }
 

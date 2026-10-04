@@ -1085,9 +1085,13 @@ result panels honor independent verbose toggles (`verboseTools` and
 off, read/search/skill result panels are omitted while the Tool card
 remains; `edit` and `write` results always stay visible. When command
 verbose is off, bash results collapse to a hidden-line hint plus the
-last output line. Ctrl+O toggles tool verbose and Ctrl+G toggles
-command verbose when the composer is empty; `/verbose` shows or changes
-the same settings (`tools`, `commands`, `on`, `off`).
+last output line. Auto-pass approval cards honor `verboseApprovals`
+(default on). When it is off, those cards are omitted, including review
+allow cards already in the transcript; turning it back on shows them
+again. The ask overlay still appears. Ctrl+O toggles tool verbose and
+Ctrl+G toggles command verbose when the composer is empty; `/verbose`
+shows or changes the same settings (`tools`, `commands`, `approvals`,
+`on`, `off`).
 Approval is a Spectre panel with a two-column Title Case field grid
 (`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Question panels show
 header tabs, described choices, selection state, custom input, and a final
@@ -1120,12 +1124,12 @@ argument, Enter submits normally.
 Status abbreviations are CTX, IN, and OUT. The status
 bar includes a queued count while follow-ups wait. Auto-pass prints a
 panel with Status, Reason, Risk, Authority, and, for review, Outcome
-plus rationale. Reasoning streams into the
+plus rationale, while `verboseApprovals` is on. Reasoning streams into the
 transcript. Built-in slash verbs live in `SlashCatalog` and include
 aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
 `/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`,
-`/verbose` toggles tool or command output detail). `/export`
+`/verbose` toggles tool, command, or approval detail). `/export`
 writes markdown or json for the current conversation; `/prompts export`
 writes built-in prompt templates. Export roots default to
 `~/.crystal/exports/` (`exportDirectory` omitted or `home`) and are

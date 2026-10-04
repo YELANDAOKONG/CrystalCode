@@ -60,7 +60,8 @@ public static class StatusText
                 ("Estimated tokens", Toggle(status.EstimatedTokensEnabled)),
                 ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
                 ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
-                ("Verbose commands", Toggle(status.VerboseCommandsEnabled))
+                ("Verbose commands", Toggle(status.VerboseCommandsEnabled)),
+                ("Verbose approvals", Toggle(status.VerboseApprovalsEnabled))
             ],
             trailingBlankLine: full);
 

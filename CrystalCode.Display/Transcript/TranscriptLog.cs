@@ -25,6 +25,7 @@ public sealed class TranscriptLog
     private readonly List<PaintLine> _committedLines = [];
     private bool _verboseTools = true;
     private bool _verboseCommands = true;
+    private bool _verboseApprovals = true;
 
     public bool VerboseTools
     {
@@ -52,6 +53,21 @@ public sealed class TranscriptLog
             }
 
             _verboseCommands = value;
+            InvalidateCache();
+        }
+    }
+
+    public bool VerboseApprovals
+    {
+        get => _verboseApprovals;
+        set
+        {
+            if (_verboseApprovals == value)
+            {
+                return;
+            }
+
+            _verboseApprovals = value;
             InvalidateCache();
         }
     }
@@ -270,6 +286,11 @@ public sealed class TranscriptLog
         var bodyWidth = Math.Max(width - IndentColumns, 1);
         var indent = new string(' ', IndentColumns);
         var lines = new List<PaintLine>();
+
+        if (entry.Kind == TranscriptKind.Approval && !_verboseApprovals)
+        {
+            return lines;
+        }
 
         if (entry.Widget is not null)
         {

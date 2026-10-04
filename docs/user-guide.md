@@ -306,6 +306,9 @@ Top-level fields:
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
+| `verboseTools` | Show read, search, and skill result panels (default `true`; omitted when on) |
+| `verboseCommands` | Show full bash output (default `true`; omitted when on). Off keeps a hidden-line hint and the last line |
+| `verboseApprovals` | Show auto-pass approval cards (default `true`; omitted when on). Off hides Status, Reason, Risk, Authority, and review Outcome cards already on screen. The ask overlay stays |
 | `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
@@ -525,7 +528,7 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, `/model`, or `/tokens`) |
+| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
 | Up / Down | Composer history, or slash-picker navigation when the prompt has text; empty Up/Down scroll the transcript |
@@ -645,7 +648,10 @@ Persistent grants are stored in `~/.crystal/permissions.json`.
 
 When a call auto-passes (policy, remembered grant, or review allow),
 the shell prints a panel with Status, Reason, Risk, and Authority,
-plus the classifier summary.
+plus the classifier summary. `/verbose approvals` hides or shows that
+panel. It stays on unless `verboseApprovals` is `false` in
+`config.json`. Cards already printed in this session follow the
+switch. Asking you still uses the overlay.
 
 Shell classification treats `sudo`, destructive filesystem commands,
 pipe-to-shell downloads, force-push, and credential-path writes as
@@ -703,6 +709,7 @@ returns the transcript viewport to the latest output.
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
+| `/verbose` | | Show or set tool, command, or approval detail: `tools`, `commands`, `approvals`, then `on` or `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |

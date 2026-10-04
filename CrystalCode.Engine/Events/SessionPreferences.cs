@@ -7,5 +7,6 @@ public sealed record SessionPreferences(
     bool EstimatedTokens,
     bool VerboseTools,
     bool VerboseCommands,
+    bool VerboseApprovals,
     bool StatusLineEnabled,
     IReadOnlyList<string> StatusLineFields);

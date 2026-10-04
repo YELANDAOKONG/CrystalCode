@@ -34,4 +34,5 @@ public sealed record SessionStatus(
     int ExternalTools,
     TokenUsage? CumulativeUsage,
     bool CustomStatusLineEnabled = false,
-    string? ApprovalModel = null);
+    string? ApprovalModel = null,
+    bool VerboseApprovalsEnabled = true);

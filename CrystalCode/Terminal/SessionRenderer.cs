@@ -162,6 +162,25 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    public bool VerboseApprovals
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _log.VerboseApprovals;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _log.VerboseApprovals = value;
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
     internal string ChromeWorkspaceRoot
     {
         get
@@ -389,7 +408,7 @@ public sealed class SessionRenderer : IDisposable
         {
             CommitLiveUnlocked();
             _log.Add(TranscriptKind.Approval, string.Empty, card);
-            if (!Framed)
+            if (!Framed && _log.VerboseApprovals)
             {
                 AnsiConsole.Write(card);
                 AnsiConsole.WriteLine();

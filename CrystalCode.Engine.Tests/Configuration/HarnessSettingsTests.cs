@@ -55,6 +55,18 @@ public sealed class HarnessSettingsTests
     }
 
     [Fact]
+    public void WithVerboseApprovals_SetsHostFlag()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithVerboseApprovals(false);
+
+        Assert.False(next.VerboseApprovals);
+        Assert.True(settings.VerboseApprovals);
+        Assert.True(next.VerboseTools);
+    }
+
+    [Fact]
     public void WithPromptSet_SetsGlobalSelection()
     {
         var settings = HarnessSettings.CreateDefault();

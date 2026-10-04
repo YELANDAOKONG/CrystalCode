@@ -68,6 +68,7 @@ public sealed class SettingsStore
             document.EstimatedTokens ?? defaults.EstimatedTokens,
             document.VerboseTools ?? defaults.VerboseTools,
             document.VerboseCommands ?? defaults.VerboseCommands,
+            document.VerboseApprovals ?? defaults.VerboseApprovals,
             string.IsNullOrWhiteSpace(document.PromptSet)
                 ? defaults.PromptSet
                 : document.PromptSet.Trim(),
@@ -112,6 +113,7 @@ public sealed class SettingsStore
             EstimatedTokens = settings.EstimatedTokens ? true : null,
             VerboseTools = settings.VerboseTools ? null : false,
             VerboseCommands = settings.VerboseCommands ? null : false,
+            VerboseApprovals = settings.VerboseApprovals ? null : false,
             PromptSet = string.Equals(
                 settings.PromptSet,
                 HarnessSettings.DefaultPromptSet,

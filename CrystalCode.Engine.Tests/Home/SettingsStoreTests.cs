@@ -649,7 +649,8 @@ public sealed class SettingsStoreTests
               "provider": "deepseek",
               "model": "deepseek-v4-flash",
               "verboseTools": false,
-              "verboseCommands": false
+              "verboseCommands": false,
+              "verboseApprovals": false
             }
             """);
 
@@ -657,6 +658,13 @@ public sealed class SettingsStoreTests
 
         Assert.False(settings.VerboseTools);
         Assert.False(settings.VerboseCommands);
+        Assert.False(settings.VerboseApprovals);
+        store.Save(settings.WithVerboseApprovals(true));
+        Assert.DoesNotContain(
+            "verboseApprovals",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+        Assert.True(store.Load().VerboseApprovals);
     }
 
     [Fact]

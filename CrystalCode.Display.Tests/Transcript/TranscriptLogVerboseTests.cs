@@ -1,3 +1,5 @@
+using Spectre.Console;
+
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Transcript;
 
@@ -50,5 +52,32 @@ public sealed class TranscriptLogVerboseTests
         var text = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
 
         Assert.Contains("Edited src/App.cs.", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_OmitsApprovalCardWhenApprovalVerboseIsOff()
+    {
+        var log = new TranscriptLog { VerboseApprovals = false };
+        log.Add(TranscriptKind.Tool, "Glob  *.cs");
+        log.Add(TranscriptKind.Approval, string.Empty, new Markup("Status Allowed"));
+
+        var text = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.Contains("Glob", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Allowed", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_RestoresApprovalCardWhenApprovalVerboseTurnsOn()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.Approval, string.Empty, new Markup("Status Allowed"));
+        log.BuildLines(60);
+        log.VerboseApprovals = false;
+        log.VerboseApprovals = true;
+
+        var text = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.Contains("Allowed", text, StringComparison.Ordinal);
     }
 }

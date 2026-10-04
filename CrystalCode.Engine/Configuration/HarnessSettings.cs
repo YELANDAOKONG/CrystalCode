@@ -23,6 +23,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultVerboseCommands = true;
 
+    public const bool DefaultVerboseApprovals = true;
+
     public const string DefaultPromptSet = "default";
 
     public HarnessSettings(
@@ -37,6 +39,7 @@ public sealed record HarnessSettings
         bool estimatedTokens = DefaultEstimatedTokens,
         bool verboseTools = DefaultVerboseTools,
         bool verboseCommands = DefaultVerboseCommands,
+        bool verboseApprovals = DefaultVerboseApprovals,
         string promptSet = DefaultPromptSet,
         ExternalToolApprovalSettings? externalToolApproval = null,
         string? exportDirectory = null,
@@ -80,6 +83,7 @@ public sealed record HarnessSettings
         EstimatedTokens = estimatedTokens;
         VerboseTools = verboseTools;
         VerboseCommands = verboseCommands;
+        VerboseApprovals = verboseApprovals;
         PromptSet = promptSet.Trim();
         ExternalToolApproval = externalToolApproval ?? ExternalToolApprovalSettings.Default;
         ExportDirectory = string.IsNullOrWhiteSpace(exportDirectory) ? null : exportDirectory.Trim();
@@ -123,6 +127,8 @@ public sealed record HarnessSettings
     public bool VerboseTools { get; }
 
     public bool VerboseCommands { get; }
+
+    public bool VerboseApprovals { get; }
 
     public string PromptSet { get; }
 
@@ -201,6 +207,9 @@ public sealed record HarnessSettings
     public HarnessSettings WithVerboseCommands(bool verboseCommands) =>
         Copy(verboseCommands: verboseCommands);
 
+    public HarnessSettings WithVerboseApprovals(bool verboseApprovals) =>
+        Copy(verboseApprovals: verboseApprovals);
+
     public HarnessSettings WithPromptSet(string promptSet)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(promptSet);
@@ -251,6 +260,7 @@ public sealed record HarnessSettings
         bool? estimatedTokens = null,
         bool? verboseTools = null,
         bool? verboseCommands = null,
+        bool? verboseApprovals = null,
         string? promptSet = null,
         ExternalToolApprovalSettings? externalToolApproval = null,
         string? exportDirectory = null,
@@ -273,6 +283,7 @@ public sealed record HarnessSettings
             estimatedTokens ?? EstimatedTokens,
             verboseTools ?? VerboseTools,
             verboseCommands ?? VerboseCommands,
+            verboseApprovals ?? VerboseApprovals,
             promptSet ?? PromptSet,
             externalToolApproval ?? ExternalToolApproval,
             setExportDirectory ? exportDirectory : ExportDirectory,

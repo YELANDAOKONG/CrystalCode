@@ -22,6 +22,8 @@ internal sealed class SettingsDocument
 
     public bool? VerboseCommands { get; set; }
 
+    public bool? VerboseApprovals { get; set; }
+
     public string? PromptSet { get; set; }
 
     public string? ExportDirectory { get; set; }

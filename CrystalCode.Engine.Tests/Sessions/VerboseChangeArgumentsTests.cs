@@ -31,6 +31,14 @@ public sealed class VerboseChangeArgumentsTests
     }
 
     [Fact]
+    public void TryParse_ReadsApprovalsOff()
+    {
+        Assert.True(VerboseChangeArguments.TryParse("approvals off", out var target, out var enabled, out _));
+        Assert.Equal(VerboseTarget.Approvals, target);
+        Assert.False(enabled);
+    }
+
+    [Fact]
     public void TryParse_RejectsUnknownTarget()
     {
         Assert.False(VerboseChangeArguments.TryParse("all on", out _, out _, out var error));
