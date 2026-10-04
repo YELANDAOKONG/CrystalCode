@@ -608,6 +608,11 @@ Self-contained release archives are named
 `CrystalCode-<operating-system>-<architecture>.zip`. The supported values
 are `linux-x64`, `linux-arm64`, `macos-arm64`, and `windows-x64`. The platform
 installers replace the full platform release contents under `binaries/code/`.
+Developers install the current checkout with `scripts/install-local.sh` or
+`scripts/install-local.ps1`. Those scripts publish Release into `build/`
+using the release workflow arguments (`--self-contained true`,
+`PublishSingleFile=true`, and the matching runtime), then replace the full
+contents of `binaries/code/`.
 
 ```text
 ~/.crystal/

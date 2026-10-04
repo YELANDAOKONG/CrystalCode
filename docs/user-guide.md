@@ -100,6 +100,37 @@ dotnet build CrystalCode.sln
 dotnet test CrystalCode.sln
 ```
 
+To install this checkout for local development:
+
+```bash
+sh scripts/install-local.sh
+```
+
+On Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1
+```
+
+The script checks the .NET 10 SDK, the sibling Crystal checkout, and the
+current platform. It then publishes Release into `build/` with the same
+arguments as the release workflow:
+
+```text
+dotnet publish CrystalCode/CrystalCode.csproj
+  --configuration Release
+  --runtime <rid>
+  --self-contained true
+  -p:PublishSingleFile=true
+  --output build
+```
+
+The workflow writes `./publish` for the GitHub asset. This script writes
+`build/`, which is gitignored. It replaces `~/.crystal/binaries/code/`
+and leaves configuration, credentials, and prompts in place. Each check
+is printed before the script continues. The script locates the repository
+from its own path.
+
 The executable project is `CrystalCode`. The Spectre application
 name is `crystal`. The session engine lives in the `CrystalCode.Engine`
 class library, which the executable references.

@@ -92,7 +92,21 @@ dotnet test CrystalCode.sln
 dotnet run --project CrystalCode -- --provider deepseek --model deepseek-flash
 ```
 
-Run these commands from the Crystal Code repository root. To work on a
+To install this checkout as `crystal`:
+
+```bash
+sh scripts/install-local.sh
+```
+
+On Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1
+```
+
+The script checks the .NET 10 SDK, the sibling Crystal checkout, and the current platform, then publishes Release into `build/` with the release workflow arguments (`--self-contained true`, `-p:PublishSingleFile=true`, and the matching runtime). It replaces `~/.crystal/binaries/code/` and leaves configuration, credentials, and prompts in place. The script locates the repository from its own path.
+
+Run `dotnet build`, `dotnet test`, and `dotnet run` from the Crystal Code repository root. To work on a
 different repository, add `--workspace <path>` after the final `--` in the
 `dotnet run` command. A TTY is required for the interactive UI, and `bash`
 must be on the path (Git Bash is used on Windows when available).
