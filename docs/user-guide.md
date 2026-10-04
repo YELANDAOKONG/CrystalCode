@@ -533,7 +533,7 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
 | Up / Down | Composer history, or slash-picker navigation when the prompt has text; empty Up/Down scroll the transcript |
-| PageUp / PageDown, mouse wheel, Ctrl+Up/Down | Scroll the transcript |
+| PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |
 | Ctrl+C during a turn | Cancel the turn |
 | Ctrl+C at idle | Clear the composer |
 | Ctrl+C twice on an empty composer | Exit |
@@ -554,7 +554,9 @@ move, Enter to select, Space to toggle multiple choices, Left/Right or Tab to
 navigate questions, and Escape to dismiss the request. While a custom answer is
 being edited, its text and cursor appear inside the question panel; Enter saves
 it and Escape returns to the choices without changing the answer. PageUp,
-PageDown, the wheel, and Ctrl+Up/Down remain available for transcript scrolling.
+PageDown, and Ctrl+Up/Down remain available for transcript scrolling. A
+mouse-wheel report still scrolls; alternate scroll turns the wheel into
+Up/Down.
 
 ### Follow-up queue
 

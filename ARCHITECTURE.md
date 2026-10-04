@@ -1156,14 +1156,13 @@ stored by workspace in `~/.crystal/prompt-history.jsonl` with an
 owner-only file mode where supported. Image-bearing prompts remain in
 memory only and are forgotten when the session changes, since their
 markers do not carry image bytes or a stable cross-session attachment.
-PageUp/PageDown and the wheel are the primary transcript scroll controls;
+PageUp/PageDown are the primary transcript scroll controls;
 Ctrl+Up/Down also scroll when the terminal passes those keys through.
-The alternate screen enables mouse reporting (1000/1006) so wheel reports
-remain distinct from Up/Down keys, including a single Windows wheel notch.
-Plain Up/Down always stays with the composer or active selection. Shift-drag
-selects and copies in terminals that reserve mouse input for applications.
-Bracketed paste (2004) is also enabled. SGR and X10 wheel reports are drained
-without waiting. Escape is held only
+The alternate screen enables alternate scroll (1007) and bracketed paste
+(2004). Mouse tracking stays off so left-drag selects and copies. A wheel
+the terminal still reports as SGR or X10 scrolls the transcript and is
+drained without waiting. Alternate scroll turns the wheel into Up/Down,
+and plain Up/Down stay with the composer or active selection. Escape is held only
 when no further bytes are available or the sequence is still incomplete.
 
 `KeyBurst` collects one `ReadKey` drain. `InputDecoder` turns that burst

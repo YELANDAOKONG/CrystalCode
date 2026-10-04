@@ -1504,8 +1504,7 @@ public sealed class SessionRenderer : IDisposable
             "ctrl+o       Toggle verbose tool results",
             "ctrl+g       Toggle verbose command output",
             "up/down      Move cursor; at edge, browse prompt history",
-            "pageup       Scroll transcript (also pagedown and wheel)",
-            "shift+drag   Select terminal text while mouse input is active");
+            "pageup       Scroll transcript (also pagedown and wheel)");
         foreach (var option in _slashOptions)
         {
             var aliases = option.Keys
