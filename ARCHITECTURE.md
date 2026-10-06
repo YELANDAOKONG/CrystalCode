@@ -1181,10 +1181,12 @@ VT input leaves `Key` empty, so Tab, Enter, letters, and CSI arrive as
 `KeyChar`. The shell restores the prior Windows console input mode on exit.
 macOS Option-as-Meta is `ESC` plus a letter or Backspace and
 becomes Alt; a native Alt modifier on a parsed key is kept. A CR+LF drain
-is one Enter, not paste. Paste is the text between CSI `200~` and `201~`;
-a printable key burst is still treated as paste when those markers are
-absent. Escape sequences that are not a bracketed-paste wrap are not
-treated as paste. The host does not parse VT. The frame polls terminal
+is one Enter, not paste. Paste is the text between CSI `200~` and `201~`.
+A printable burst with an internal newline is still paste when those
+markers are absent, so it is inserted and does not submit. A burst whose
+only newline is one trailing CR or CRLF stays keys, and so does a burst
+that contains Backspace or Delete. Escape sequences that are not a
+bracketed-paste wrap are not treated as paste. The host does not parse VT. The frame polls terminal
 size and repaints when the window is resized. Redirected output stays
 sequential.
 

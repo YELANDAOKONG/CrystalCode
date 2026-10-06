@@ -189,6 +189,34 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_TrailingEnter_StaysAKey()
+    {
+        var events = new InputDecoder().Push(WindowsVt("thanks\r"));
+
+        Assert.Equal(7, events.Count);
+        Assert.Equal(ConsoleKey.Enter, Assert.IsType<InputKey>(events[^1]).Key);
+    }
+
+    [Fact]
+    public void Push_ShortPrintableBurst_StaysPaste()
+    {
+        AssertPaste(new InputDecoder().Push(WindowsVt("ab")), "ab");
+    }
+
+    [Fact]
+    public void Push_BackspaceInBurst_StaysKeys()
+    {
+        var burst = Linux(
+            new ConsoleKeyInfo('a', ConsoleKey.A, false, false, false),
+            new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false),
+            new ConsoleKeyInfo('b', ConsoleKey.B, false, false, false));
+        var events = new InputDecoder().Push(burst);
+
+        Assert.Equal(3, events.Count);
+        Assert.Equal(ConsoleKey.Backspace, Assert.IsType<InputKey>(events[1]).Key);
+    }
+
+    [Fact]
     public void Push_HeuristicPaste_StripsControlsAndKeepsText()
     {
         var burst = Linux(

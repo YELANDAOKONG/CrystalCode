@@ -45,7 +45,8 @@ public sealed class InputDecoder
                 && !burst.Any(static key => key.KeyChar == '\u0016'
                     || key.Key == ConsoleKey.V && key.Modifiers.HasFlag(ConsoleModifiers.Control))
                 && HasPrintable(flat)
-                && !IsOnlyEdits(burst))
+                && !IsOnlyEdits(burst)
+                && !IsComposerBurst(burst, flat))
             {
                 return [new InputPaste(NormalizePaste(flat))];
             }
@@ -518,6 +519,61 @@ public sealed class InputDecoder
         }
 
         return false;
+    }
+
+    private static bool IsComposerBurst(IReadOnlyList<ConsoleKeyInfo> burst, string flat)
+    {
+        if (HasEditKey(burst))
+        {
+            return true;
+        }
+
+        return IsSingleTrailingNewline(flat);
+    }
+
+    private static bool HasEditKey(IReadOnlyList<ConsoleKeyInfo> burst)
+    {
+        foreach (var key in burst)
+        {
+            if (key.Key is ConsoleKey.Backspace or ConsoleKey.Delete)
+            {
+                return true;
+            }
+
+            if (key.KeyChar is '\b' or '\u007f')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSingleTrailingNewline(string flat)
+    {
+        var end = flat.Length;
+        if (end >= 2 && flat[end - 2] == '\r' && flat[end - 1] == '\n')
+        {
+            end -= 2;
+        }
+        else if (end > 0 && flat[end - 1] is '\n' or '\r')
+        {
+            end--;
+        }
+        else
+        {
+            return false;
+        }
+
+        for (var i = 0; i < end; i++)
+        {
+            if (flat[i] is '\n' or '\r')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsOnlyEdits(IReadOnlyList<ConsoleKeyInfo> burst)
