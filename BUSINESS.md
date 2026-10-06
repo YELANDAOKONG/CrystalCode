@@ -55,6 +55,8 @@ separate library with no terminal code. The product can:
   subdirectory follows the ordinary rule unless `space` itself is the git
   root. `crystal space` creates the directory when it is missing.
   `/space` switches the open session there and creates it the same way.
+  `/cd` with a path and `/space` are refused while a turn is running.
+  `/cd` with no path still prints the current workspace.
   `crystal run --space` runs one task there and creates it the same way.
   That flag cannot be combined with `--workspace`;
 - run one task without a terminal through `crystal run`, then exit.

@@ -86,6 +86,8 @@ internal sealed class HeadlessSession : IDisposable
 
     public string WorkspacePath => _workspace.Path;
 
+    public string SpaceDirectory => OperatorSpace.Resolve(_home.Home);
+
     /// <summary>
     /// Submits one prompt and drives the turn to its end, the way any front
     /// end does: submit, await the turn, then complete it.

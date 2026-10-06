@@ -706,6 +706,7 @@ not remove that trust or a separate parent grant. A child of `space`
 follows the ordinary rule unless `space` is the git root. `crystal space`
 creates the directory and opens the terminal there. `/space` switches an
 open session to that directory and creates it when it is missing.
+`/cd` with a path and `/space` are refused while a turn is running.
 `crystal run --space`
 uses that directory and creates it when it is missing. It cannot be
 combined with `--workspace`. `crystal run`

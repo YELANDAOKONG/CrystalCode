@@ -3,6 +3,7 @@ using Crystal.Chat;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 using Xunit;
 
@@ -126,6 +127,41 @@ public sealed class CodingSessionHeadlessTests
         Assert.Equal(TurnStopReason.Interrupted, finished.Result.StopReason);
         Assert.False(headless.Session.TurnActive);
         Assert.False(headless.Session.TryInterrupt());
+    }
+
+    [Fact]
+    public async Task Submit_WorkspaceChangeWhileWorkingStaysPut()
+    {
+        var client = new BlockingStreamingClient();
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        var root = new Workspace(headless.WorkspacePath).Root;
+
+        var quit = await headless.Session.SubmitAsync("long task", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        var cd = await headless.Session.SubmitAsync("/cd " + root, CancellationToken.None);
+        var space = await headless.Session.SubmitAsync("/space", CancellationToken.None);
+        var shown = await headless.Session.SubmitAsync("/cd", CancellationToken.None);
+
+        Assert.False(quit);
+        Assert.False(cd);
+        Assert.False(space);
+        Assert.False(shown);
+        Assert.True(headless.Session.TurnActive);
+        Assert.Equal(
+            2,
+            headless.Observer.Events.OfType<ErrorWritten>().Count(
+                error => error.Text == "Finish the current turn before changing workspace."));
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text == root);
+        Assert.DoesNotContain(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text.StartsWith("Workspace  ", StringComparison.Ordinal));
+        Assert.False(Directory.Exists(headless.SpaceDirectory));
+
+        Assert.True(headless.Session.TryInterrupt());
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
     }
 
     [Fact]

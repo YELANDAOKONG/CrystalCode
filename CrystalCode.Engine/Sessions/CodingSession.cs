@@ -1760,6 +1760,11 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        if (WorkspaceChangeBlocked())
+        {
+            return;
+        }
+
         if (!_workspace.TryResolve(argument, out var candidate, out var error))
         {
             Error(error);
@@ -1774,6 +1779,11 @@ public sealed class CodingSession : ITurnObserver
         if (!string.IsNullOrWhiteSpace(argument))
         {
             Error("Space command must be /space.");
+            return;
+        }
+
+        if (WorkspaceChangeBlocked())
+        {
             return;
         }
 
@@ -1795,6 +1805,17 @@ public sealed class CodingSession : ITurnObserver
         }
 
         await EnterWorkspaceAsync(space, cancellationToken);
+    }
+
+    private bool WorkspaceChangeBlocked()
+    {
+        if (!_turnActive && _compactSource is null)
+        {
+            return false;
+        }
+
+        Error("Finish the current turn before changing workspace.");
+        return true;
     }
 
     /// <summary>
