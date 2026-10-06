@@ -114,6 +114,7 @@ public sealed class PluginHookPipelineTests
             PluginModelPurpose.Work,
             items,
             new Dictionary<int, string> { [1] = "image/png", [2] = "image/png" },
+            acceptsImages: true,
             CancellationToken.None);
 
         var result = Assert.IsType<ToolResult>(sent[2]);
@@ -123,7 +124,7 @@ public sealed class PluginHookPipelineTests
     }
 
     [Fact]
-    public async Task PrepareModel_RejectsAToolResultWithoutItsCall()
+    public async Task PrepareModel_RawHookMaySplitACallFromItsResult()
     {
         var notes = new List<string>();
         IReadOnlyList<ChatItem> items =
@@ -132,16 +133,236 @@ public sealed class PluginHookPipelineTests
             new ToolCall("c1", "screen", "{}"),
             new ToolResult("c1", "shot")
         ];
-        var pipeline = new PluginHookPipeline([new DropCallsHook()], notes.Add);
+        var pipeline = new PluginHookPipeline([], notes.Add, [new DropCallsHook()]);
 
         var sent = await pipeline.PrepareModelAsync(
             PluginModelPurpose.Work,
             items,
             new Dictionary<int, string>(),
+            acceptsImages: false,
             CancellationToken.None);
 
-        Assert.Equal(3, sent.Count);
-        Assert.Contains(notes, note => note.Contains("split a tool call", StringComparison.Ordinal));
+        Assert.Equal(2, sent.Count);
+        Assert.IsType<ToolResult>(sent[1]);
+        Assert.Empty(notes);
+    }
+
+    [Fact]
+    public async Task PrepareModel_RawHookMayRewriteTheSystemPromptAndRolesWithoutTouchingTheStoredItems()
+    {
+        IReadOnlyList<ChatItem> items =
+        [
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "hello")
+        ];
+        var pipeline = new PluginHookPipeline([], rawHooks: [new RewriteMessagesHook()]);
+
+        var sent = await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string>(),
+            acceptsImages: false,
+            CancellationToken.None);
+
+        var system = Assert.IsType<ChatMessage>(sent[0]);
+        Assert.Equal(ChatRole.System, system.Role);
+        Assert.Equal("replaced prompt", system.Text);
+        var user = Assert.IsType<ChatMessage>(sent[1]);
+        Assert.Equal(ChatRole.Assistant, user.Role);
+        Assert.Equal("hello", user.Text);
+        Assert.Equal("work", Assert.IsType<ChatMessage>(items[0]).Text);
+        Assert.Equal(ChatRole.User, Assert.IsType<ChatMessage>(items[1]).Role);
+    }
+
+    [Fact]
+    public async Task PrepareModel_RawHookCanAddItemsOfEveryKind()
+    {
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
+        var pipeline = new PluginHookPipeline([], rawHooks: [new AddItemsHook()]);
+
+        var sent = await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string>(),
+            acceptsImages: false,
+            CancellationToken.None);
+
+        Assert.Equal(5, sent.Count);
+        Assert.Equal("note", Assert.IsType<ChatMessage>(sent[1]).Text);
+        var call = Assert.IsType<ToolCall>(sent[2]);
+        Assert.Equal("c9", call.CallId);
+        Assert.Equal("read", call.Name);
+        var result = Assert.IsType<ToolResult>(sent[3]);
+        Assert.Equal("c9", result.CallId);
+        Assert.Equal(ToolResultStatus.Failure, result.Status);
+        var reasoning = Assert.IsType<ChatReasoningItem>(sent[4]);
+        Assert.Equal("thought", Assert.Single(reasoning.Content.TextSegments).Text);
+    }
+
+    [Fact]
+    public async Task PrepareModel_RawHookRunsBeforeTransformAndTransformSeesItsItems()
+    {
+        var seen = new List<string>();
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
+        var pipeline = new PluginHookPipeline(
+            [new RecordingTransformHook(seen)],
+            rawHooks: [new AddItemsHook()]);
+
+        await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string>(),
+            acceptsImages: false,
+            CancellationToken.None);
+
+        Assert.Equal(["0", "note", "call", "result", "think"], seen);
+    }
+
+    [Fact]
+    public async Task PrepareModel_RawHookSeesWhetherTheRequestAcceptsImages()
+    {
+        var accepts = new List<bool>();
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
+        var pipeline = new PluginHookPipeline([], rawHooks: [new RecordingAcceptsHook(accepts)]);
+        var media = new Dictionary<int, string>();
+
+        await pipeline.PrepareModelAsync(PluginModelPurpose.Work, items, media, true, CancellationToken.None);
+        await pipeline.PrepareModelAsync(PluginModelPurpose.Side, items, media, false, CancellationToken.None);
+
+        Assert.Equal([true, false], accepts);
+    }
+
+    [Fact]
+    public async Task PrepareModel_RawHookIsSkippedWhenItRepeatsAnItemId()
+    {
+        var notes = new List<string>();
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
+        var pipeline = new PluginHookPipeline([], notes.Add, [new RepeatIdHook()]);
+
+        var sent = await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string>(),
+            acceptsImages: false,
+            CancellationToken.None);
+
+        Assert.Single(sent);
+        var note = Assert.Single(notes);
+        Assert.Equal("Raw hook 'RepeatIdHook' model-items was skipped: it repeated an item.", note);
+        Assert.True(char.IsUpper(note[0]));
+    }
+
+    [Fact]
+    public async Task PrepareModel_RawHookCannotNameAnImageTheSessionDoesNotHold()
+    {
+        var notes = new List<string>();
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
+        var pipeline = new PluginHookPipeline([], notes.Add, [new AddImageHook(7)]);
+
+        var sent = await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string> { [1] = "image/png" },
+            acceptsImages: true,
+            CancellationToken.None);
+
+        Assert.Single(sent);
+        Assert.Contains(notes, note => note.EndsWith("it added an image.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PrepareModel_RawHookMayMoveAnAttachedImageOnlyWhenTheRequestCarriesImages()
+    {
+        var marker = ImageMarkerText.Tag(1);
+        IReadOnlyList<ChatItem> items =
+        [
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "look " + marker)
+        ];
+        var media = new Dictionary<int, string> { [1] = "image/png" };
+
+        var carrying = await new PluginHookPipeline([], rawHooks: [new AddImageHook(1)]).PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            media,
+            acceptsImages: true,
+            CancellationToken.None);
+        var notes = new List<string>();
+        var textOnly = await new PluginHookPipeline([], notes.Add, [new AddImageHook(1)]).PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            media,
+            acceptsImages: false,
+            CancellationToken.None);
+
+        Assert.Equal(3, carrying.Count);
+        var moved = Assert.IsType<ChatMessage>(carrying[2]);
+        Assert.Equal(marker, moved.Text);
+        Assert.Equal(2, textOnly.Count);
+        var note = Assert.Single(notes);
+        Assert.EndsWith("it added an image to a request that cannot carry images.", note, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TakeRawNote_DescribesAChangedTurnRequestOnceAndIgnoresOtherPurposes()
+    {
+        IReadOnlyList<ChatItem> items =
+        [
+            new ChatMessage(ChatRole.System, "work"),
+            new ToolCall("c1", "screen", "{}"),
+            new ToolResult("c1", "shot")
+        ];
+        var pipeline = new PluginHookPipeline([], rawHooks: [new DropCallsHook()]);
+        var media = new Dictionary<int, string>();
+
+        await pipeline.PrepareModelAsync(PluginModelPurpose.Side, items, media, false, CancellationToken.None);
+        Assert.Null(pipeline.TakeRawNote());
+
+        await pipeline.PrepareModelAsync(PluginModelPurpose.Work, items, media, false, CancellationToken.None);
+        var note = pipeline.TakeRawNote();
+
+        Assert.Equal("Raw hook 'DropCallsHook' changed this model request. The failure may be related.", note);
+        Assert.True(char.IsUpper(note[0]));
+        Assert.Null(pipeline.TakeRawNote());
+    }
+
+    [Fact]
+    public async Task TakeRawNote_IsClearWhenTheRawHookKeptTheRequest()
+    {
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
+        var pipeline = new PluginHookPipeline([], rawHooks: [new KeepHook()]);
+
+        await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string>(),
+            acceptsImages: false,
+            CancellationToken.None);
+
+        Assert.Null(pipeline.TakeRawNote());
+    }
+
+    [Fact]
+    public async Task PrepareModel_TransformStillRejectsAReorder()
+    {
+        var notes = new List<string>();
+        IReadOnlyList<ChatItem> items =
+        [
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "one"),
+            new ChatMessage(ChatRole.User, "two")
+        ];
+        var pipeline = new PluginHookPipeline([new ReverseTransformHook()], notes.Add);
+
+        var sent = await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string>(),
+            acceptsImages: false,
+            CancellationToken.None);
+
+        Assert.Equal("one", Assert.IsType<ChatMessage>(sent[1]).Text);
+        Assert.Contains(notes, note => note.Contains("model-request", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -257,7 +478,7 @@ public sealed class PluginHookPipelineTests
         }
     }
 
-    private sealed class DropCallsHook : IPluginHook
+    private sealed class DropCallsHook : IPluginRawHook
     {
         public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
             PluginModelRequest request,
@@ -265,6 +486,116 @@ public sealed class PluginHookPipelineTests
         {
             IReadOnlyList<PluginModelItem> next =
                 [.. request.Items.Where(item => item is not PluginModelToolCall)];
+            return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
+        }
+    }
+
+    private sealed class KeepHook : IPluginRawHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(request.Items);
+    }
+
+    private sealed class RewriteMessagesHook : IPluginRawHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<PluginModelItem> next =
+            [
+                .. request.Items.Select(item => item switch
+                {
+                    PluginModelMessage { Role.Value: "system" } message =>
+                        new PluginModelMessage(message.Id, message.Role, "replaced prompt"),
+                    PluginModelMessage message =>
+                        new PluginModelMessage(message.Id, ChatRole.Assistant, message.Text),
+                    _ => item
+                })
+            ];
+            return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
+        }
+    }
+
+    private sealed class AddItemsHook : IPluginRawHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<PluginModelItem> next =
+            [
+                .. request.Items,
+                new PluginModelMessage("note", ChatRole.User, "note"),
+                new PluginModelToolCall("call", "c9", "read", "{}"),
+                new PluginModelToolResult("result", "c9", "read", "failed", success: false),
+                new PluginModelReasoning("think", "thought")
+            ];
+            return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
+        }
+    }
+
+    private sealed class RecordingTransformHook(List<string> seen) : IPluginHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> TransformModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            seen.AddRange(request.Items.Select(item => item.Id));
+            return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(null);
+        }
+    }
+
+    private sealed class RecordingAcceptsHook(List<bool> accepts) : IPluginRawHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            accepts.Add(request.AcceptsImages);
+            return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(null);
+        }
+    }
+
+    private sealed class RepeatIdHook : IPluginRawHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<PluginModelItem> next = [.. request.Items, .. request.Items];
+            return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
+        }
+    }
+
+    private sealed class AddImageHook(int number) : IPluginRawHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<PluginModelItem> next =
+            [
+                .. request.Items,
+                new PluginModelMessage(
+                    "image",
+                    ChatRole.User,
+                    string.Empty,
+                    [new PluginModelImage(number, "image/png")])
+            ];
+            return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
+        }
+    }
+
+    private sealed class ReverseTransformHook : IPluginHook
+    {
+        public ValueTask<IReadOnlyList<PluginModelItem>?> TransformModelAsync(
+            PluginModelRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<PluginModelItem> next = [.. request.Items.Reverse()];
             return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
         }
     }

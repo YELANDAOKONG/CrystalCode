@@ -1,11 +1,14 @@
 using System.Diagnostics;
 
+using Crystal.Chat;
+
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Plugins.Hooks;
 
 using Xunit;
 
@@ -112,14 +115,27 @@ public sealed class PluginCatalogTests
 
         var catalog = PluginCatalog.Load(home.Home, new Workspace(workspace.Path), enabled: true);
 
-        Assert.Empty(catalog.Notes);
-        Assert.Single(catalog.Plugins);
+        Assert.Equal("Plugin 'Fixture' registered a raw hook.", Assert.Single(catalog.Notes));
+        var info = Assert.Single(catalog.Plugins);
+        Assert.Equal(1, info.Hooks);
+        Assert.Equal(1, info.RawHooks);
+        Assert.Single(catalog.RawHooks);
         Assert.Equal("sample", catalog.WorkTools[0].Definition.Name);
         Assert.Empty(catalog.PlanTools);
         var output = await catalog.WorkTools[0].InvokeAsync(new Crystal.Tools.ToolCall("1", "sample", "{}"));
         Assert.Equal("sample-ok", output.Text);
-        var pipeline = new PluginHookPipeline(catalog.Hooks);
+        var pipeline = new PluginHookPipeline(catalog.Hooks, rawHooks: catalog.RawHooks);
         Assert.Equal("hook-line", pipeline.OnPrompt("work", string.Empty));
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
+        var sent = await pipeline.PrepareModelAsync(
+            PluginModelPurpose.Work,
+            items,
+            new Dictionary<int, string>(),
+            acceptsImages: false,
+            CancellationToken.None);
+        var added = Assert.IsType<ChatMessage>(sent[^1]);
+        Assert.Equal(ChatRole.User, added.Role);
+        Assert.Equal("raw-line", added.Text);
     }
 
     [Fact]
@@ -180,7 +196,10 @@ public sealed class PluginCatalogTests
             {
                 public string Name => "Sample";
 
-                public PluginContribution Contribute() => new(tools: [new SampleTool()], hooks: [new SampleHook()]);
+                public PluginContribution Contribute() => new(
+                    tools: [new SampleTool()],
+                    hooks: [new SampleHook()],
+                    rawHooks: [new SampleRawHook()]);
             }
 
             public sealed class SampleTool : IPluginTool
@@ -209,6 +228,21 @@ public sealed class PluginCatalogTests
             public sealed class SampleHook : IPluginHook
             {
                 public string? OnPrompt(PluginPrompt prompt) => "hook-line";
+            }
+
+            public sealed class SampleRawHook : IPluginRawHook
+            {
+                public ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
+                    PluginModelRequest request,
+                    CancellationToken cancellationToken = default)
+                {
+                    IReadOnlyList<PluginModelItem> next =
+                    [
+                        .. request.Items,
+                        new PluginModelMessage("raw-1", Crystal.Chat.ChatRole.User, "raw-line")
+                    ];
+                    return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
+                }
             }
             """);
         var start = new ProcessStartInfo

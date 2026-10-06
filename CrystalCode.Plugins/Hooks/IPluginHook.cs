@@ -46,19 +46,10 @@ public interface IPluginHook
         ValueTask.CompletedTask;
 
     /// <summary>
-    /// Returns a reordered or reduced item list for this model call, or null
-    /// to keep the current list. The host rejects a replacement that changes
-    /// the live system prompt, adds a tool call, or splits a call from its result.
-    /// </summary>
-    ValueTask<IReadOnlyList<PluginModelItem>?> RebuildModelAsync(
-        PluginModelRequest request,
-        CancellationToken cancellationToken = default) =>
-        ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(null);
-
-    /// <summary>
     /// Returns the same items with revised text or fewer images, or null to
     /// keep the current list. The host rejects a replacement that reorders
-    /// items, changes roles, or edits the system prompt.
+    /// items, changes roles, or edits the system prompt. Structural changes
+    /// belong to <see cref="IPluginRawHook"/>.
     /// </summary>
     ValueTask<IReadOnlyList<PluginModelItem>?> TransformModelAsync(
         PluginModelRequest request,

@@ -2346,7 +2346,7 @@ public sealed class CodingSession : ITurnObserver
     private void ReloadPlugins()
     {
         _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins);
-        _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note);
+        _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note, _loadedPlugins.RawHooks);
     }
 
     private void ReloadPluginsWithProgress()
@@ -2755,6 +2755,7 @@ public sealed class CodingSession : ITurnObserver
             CurrentModelPurpose(),
             items,
             ImageMediaTypes(),
+            _multimodalClient is not null,
             cancellationToken);
 
     private Task ReportModelResponseAsync(
@@ -3059,6 +3060,7 @@ public sealed class CodingSession : ITurnObserver
                 PluginModelPurpose.Compaction,
                 items,
                 ImageMediaTypes(),
+                false,
                 token),
             (response, token) => ReportModelResponseAsync(
                 PluginModelPurpose.Compaction,
@@ -3229,6 +3231,11 @@ public sealed class CodingSession : ITurnObserver
     {
         _turnFault = message;
         Error(message);
+        var rawNote = _hooks.TakeRawNote();
+        if (rawNote is not null)
+        {
+            Note(rawNote);
+        }
     }
 
     void ITurnObserver.OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage)
@@ -3356,6 +3363,7 @@ public sealed class CodingSession : ITurnObserver
                 PluginModelPurpose.Side,
                 conversation,
                 ImageMediaTypes(),
+                false,
                 cancellationToken);
             var request = new ChatRequest(ImageMarkerText.ForTextModel(prepared), [], reasoning);
             var assembler = new ChatStreamAssembler();

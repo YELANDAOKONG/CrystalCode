@@ -3,7 +3,7 @@
 Operators add in-process extensions as **plugins**. A plugin is one
 directory, one `plugin.json`, and one assembly in its own load context.
 It can contribute tools, a protocol client, approval classifiers, slash
-commands, and hooks.
+commands, hooks, and raw hooks.
 
 The host owns catalog registration, approval, workspace fencing, output
 truncation, and timeouts. Plugin code does not bypass
@@ -72,8 +72,8 @@ Reference `CrystalCode.Plugins`. Reference `CrystalCode.Tools` only when
 a tool needs `ToolHostContext`. Do not reference `CrystalCode.Engine`,
 `CrystalCode`, `CrystalCode.Display`, or `CrystalCode.Providers`.
 
-`Contribute` returns tools, client factories, classifiers, commands, and
-hooks. A null entry is omitted with a note. One bad plugin does not
+`Contribute` returns tools, client factories, classifiers, commands,
+hooks, and raw hooks. A null entry is omitted with a note. One bad plugin does not
 stop the others.
 
 ### Tools
@@ -134,8 +134,7 @@ external tools. A hook that throws is skipped with an English note.
 | `OnPrompt` | Append text to the instruction block | Replace Work, Plan, or Review |
 | `OnUserMessageAsync` | Replace the user message before it is stored | Leave the stored message blank, or run for a side question |
 | `OnTurnStartedAsync` / `OnTurnFinishedAsync` | Read the stored user text, mode, and, when the turn ends, the stop reason | Change the transcript |
-| `RebuildModelAsync` | Drop or reorder items for one outbound call, including the text summarized during compaction | Change the live system prompt, add a tool call, split a call from its result, or write the archive |
-| `TransformModelAsync` | Change user, assistant, or tool-result text for that same call, or drop image references already on an item | Reorder items, edit a system message, add an image, or write the archive |
+| `TransformModelAsync` | Change user, assistant, or tool-result text for one outbound call, or drop image references already on an item | Reorder, add, or drop items, edit a system message, add an image, or write the archive |
 | `OnModelResponseAsync` | Read the purpose, finish reason, returned items, and usage of one completed work, plan, side, or compaction call | Change the transcript, the archive, or the response the host uses |
 | `OnToolCallAsync` | Replace the name or arguments | Change the call id, skip the call, or skip approval |
 | `OnToolResultAsync` | Replace the text result and, on an image-capable turn, its images | Mark an approval as passed |
@@ -146,32 +145,76 @@ A rewritten tool call is classified and approved again before it runs.
 Text-only turns ignore images returned by `OnToolResultAsync`. Image
 types are `image/png`, `image/jpeg`, `image/gif`, and `image/webp`.
 
-`RebuildModelAsync` runs before `TransformModelAsync`. Both see the model
-transcript for a work, plan, or side request, and the older turns about to
-be summarized. They do not see the approval review. Returned image lists
-may only name attachments already on that item. The stored transcript and
-the archive stay as they were, except for text replaced by
+`TransformModelAsync` sees the model transcript for a work, plan, or side
+request, and the older turns about to be summarized, after every raw hook
+has run. It does not see the approval review. Returned image lists may only
+name attachments already on that item. The stored transcript and the
+archive stay as they were, except for text replaced by
 `OnUserMessageAsync`.
 
 `OnModelResponseAsync` runs after one of those calls returns and before the
 host commits that candidate or runs its tools. Approval review does not
 call it. The host keeps the candidate it received.
 
-All of these methods belong to one `IPluginHook`. A plugin registers that
-hook once, on `PluginContribution`. There is no second list for model
+`TransformModelAsync` changes only the items sent on that one call. The
+stored transcript and the archive stay as they were. Rewriting user,
+assistant, or tool-result text can make the model answer from a
+conversation the operator did not store. A replacement that reorders,
+adds, or drops items, changes a role or a tool call, or edits a system
+message is skipped with an English note. Structural changes belong to raw
 hooks.
-
-`RebuildModelAsync` and `TransformModelAsync` change only the items sent
-on that one call. The stored transcript and the archive stay as they were.
-Dropping an earlier turn, or rewriting user, assistant, or tool-result
-text, can make the model answer from a conversation the operator did not
-store. The live system prompt is still sent. A replacement that changes
-that prompt, adds an item, edits a tool call from `TransformModelAsync`,
-or splits a call from its result is skipped with an English note.
 
 Session start runs after the plugin load. Session end runs when the
 session closes and before a `/cd` reload. `crystal run` closes the
 session when the process finishes.
+
+## Raw hooks
+
+A raw hook is a privileged, low-level extension point. `IPluginRawHook`
+is a separate interface. A plugin registers raw hooks on
+`PluginContribution.RawHooks`, apart from `Hooks`. The operator does not
+approve them. The host writes one note for each plugin that registers
+one, for example `Plugin 'Acme' registered a raw hook.`
+
+Raw hooks run in plugin load order. The next raw hook sees the previous
+replacement. A raw hook that throws is skipped with an English note. The
+host does not hold a raw hook to the rules that bind ordinary hooks. It
+refuses only what it cannot represent.
+
+| Raw hook | May | May not |
+| :--- | :--- | :--- |
+| `RebuildModelAsync` | For one outbound call, drop, reorder, add, or rewrite items of any kind. That includes the live system prompt, roles, tool calls, tool results, and reasoning, and it may split a call from its result | Repeat an item id, return empty reasoning text, name an image the session does not hold, add an image to a request that cannot carry images, or write the archive |
+
+`RebuildModelAsync` sees the same requests as `TransformModelAsync` and
+runs first. The stored transcript and the archive stay as they were.
+
+- **Ids.** An item keeps the id the host gave it. A new item needs an id
+  the request does not use. An id that returns with a different kind of
+  item is a new item.
+- **New items.** A new tool result ignores its `Name`, which the host
+  derives from the call. New reasoning carries text only, with no
+  provider state. Rewriting the text of existing reasoning drops that
+  state too.
+- **Images.** The host stores image bytes in the session and references
+  them by marker. A raw hook can keep, drop, or move an attachment that is
+  already in the request, with the same media type. It cannot create an
+  image. `PluginModelImage` carries no bytes. Support for new images is
+  planned. Only user messages and tool results carry images to the model.
+  Images on assistant and system messages become plain text.
+  `PluginModelRequest.AcceptsImages` is true only for a work or plan call
+  on an image-capable model. Text-only turns, side questions, and
+  compaction never send images, so the host skips a replacement that adds
+  one there.
+- **Provider rules.** The host does not check what a provider accepts. A
+  request that splits a tool call from its result, or moves the system
+  prompt, can be rejected by the provider. When a work or plan call fails
+  after a raw hook changed its request, the host writes a note such as
+  `Raw hook 'Acme' changed this model request. The failure may be related.`
+  The note is a hint, not a diagnosis.
+- **Prompt text.** `OnPrompt` still only appends. A raw hook that must
+  replace the system prompt does so for one call through
+  `RebuildModelAsync`, so Work, Plan, and Review stay the prompts the
+  operator chose.
 
 ## Load context
 

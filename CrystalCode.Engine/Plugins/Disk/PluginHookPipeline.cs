@@ -10,17 +10,25 @@ namespace CrystalCode.Engine.Plugins.Disk;
 
 /// <summary>
 /// Runs plugin hooks in load order. A hook that throws is skipped and reported.
+/// Raw hooks run before ordinary model hooks and are not held to their rules.
 /// </summary>
 internal sealed class PluginHookPipeline
 {
     private readonly IReadOnlyList<IPluginHook> _hooks;
+    private readonly IReadOnlyList<IPluginRawHook> _rawHooks;
     private readonly Action<string>? _report;
     private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
+    private readonly object _rawGate = new();
+    private string? _rawNote;
 
-    public PluginHookPipeline(IReadOnlyList<IPluginHook> hooks, Action<string>? report = null)
+    public PluginHookPipeline(
+        IReadOnlyList<IPluginHook> hooks,
+        Action<string>? report = null,
+        IReadOnlyList<IPluginRawHook>? rawHooks = null)
     {
         ArgumentNullException.ThrowIfNull(hooks);
         _hooks = hooks;
+        _rawHooks = rawHooks ?? [];
         _report = report;
     }
 
@@ -167,37 +175,45 @@ internal sealed class PluginHookPipeline
         PluginModelPurpose purpose,
         IReadOnlyList<ChatItem> items,
         IReadOnlyDictionary<int, string> mediaTypes,
+        bool acceptsImages,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(mediaTypes);
-        if (_hooks.Count == 0)
+        if (IsTurnModel(purpose))
+        {
+            SetRawNote(null);
+        }
+
+        if (_hooks.Count == 0 && _rawHooks.Count == 0)
         {
             return items;
         }
 
         var projection = ModelHookTranscript.Project(items, mediaTypes);
         var current = projection.Items;
-        foreach (var hook in _hooks)
+        var rawNames = new List<string>();
+        foreach (var hook in _rawHooks)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 var next = await hook.RebuildModelAsync(
-                    new PluginModelRequest(purpose, current),
+                    new PluginModelRequest(purpose, current, acceptsImages),
                     cancellationToken);
                 if (next is null)
                 {
                     continue;
                 }
 
-                if (!ModelHookTranscript.TryAcceptRebuild(projection, current, next, out var reason))
+                if (!ModelHookTranscript.TryAcceptRaw(projection, next, acceptsImages, out var reason))
                 {
-                    Report(hook, "model-items", reason);
+                    ReportRaw(hook, "model-items", reason);
                     continue;
                 }
 
                 current = next;
+                rawNames.Add(hook.GetType().Name);
             }
             catch (OperationCanceledException)
             {
@@ -205,7 +221,7 @@ internal sealed class PluginHookPipeline
             }
             catch (Exception exception)
             {
-                Report(hook, "model-items", exception.Message);
+                ReportRaw(hook, "model-items", exception.Message);
             }
         }
 
@@ -215,7 +231,7 @@ internal sealed class PluginHookPipeline
             try
             {
                 var next = await hook.TransformModelAsync(
-                    new PluginModelRequest(purpose, current),
+                    new PluginModelRequest(purpose, current, acceptsImages),
                     cancellationToken);
                 if (next is null)
                 {
@@ -240,7 +256,28 @@ internal sealed class PluginHookPipeline
             }
         }
 
-        return ModelHookTranscript.Apply(projection, current);
+        var applied = ModelHookTranscript.Apply(projection, current);
+        if (rawNames.Count > 0 && IsTurnModel(purpose) && Differs(items, applied))
+        {
+            SetRawNote(DescribeRaw(rawNames));
+        }
+
+        return applied;
+    }
+
+    /// <summary>
+    /// Returns a hedged note when a raw hook changed the latest work or plan
+    /// request, then clears it. The host cannot prove a failure came from the
+    /// raw hook, so the note only says it may be related.
+    /// </summary>
+    public string? TakeRawNote()
+    {
+        lock (_rawGate)
+        {
+            var note = _rawNote;
+            _rawNote = null;
+            return note;
+        }
     }
 
     public async ValueTask OnModelResponseAsync(
@@ -453,15 +490,58 @@ internal sealed class PluginHookPipeline
         _report?.Invoke("Plugin images were ignored because this turn returns text only.");
     }
 
-    private void Report(IPluginHook hook, string stage, string detail)
+    private static bool IsTurnModel(PluginModelPurpose purpose) =>
+        purpose == PluginModelPurpose.Work || purpose == PluginModelPurpose.Plan;
+
+    private static bool Differs(IReadOnlyList<ChatItem> original, IReadOnlyList<ChatItem> applied)
+    {
+        if (original.Count != applied.Count)
+        {
+            return true;
+        }
+
+        for (var index = 0; index < original.Count; index++)
+        {
+            if (!ReferenceEquals(original[index], applied[index]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string DescribeRaw(IReadOnlyList<string> names)
+    {
+        var quoted = string.Join(", ", names.Distinct(StringComparer.Ordinal).Select(name => $"'{name}'"));
+        return names.Distinct(StringComparer.Ordinal).Count() == 1
+            ? $"Raw hook {quoted} changed this model request. The failure may be related."
+            : $"Raw hooks {quoted} changed this model request. The failure may be related.";
+    }
+
+    private void SetRawNote(string? note)
+    {
+        lock (_rawGate)
+        {
+            _rawNote = note;
+        }
+    }
+
+    private void Report(IPluginHook hook, string stage, string detail) =>
+        Write("Plugin hook", hook, stage, detail);
+
+    private void ReportRaw(IPluginRawHook hook, string stage, string detail) =>
+        Write("Raw hook", hook, stage, detail);
+
+    private void Write(string label, object hook, string stage, string detail)
     {
         var name = hook.GetType().Name;
         var message = string.IsNullOrWhiteSpace(detail) ? "it failed." : detail.Trim();
-        if (!_seen.Add(name + "|" + stage + "|" + message))
+        if (!_seen.Add(label + "|" + name + "|" + stage + "|" + message))
         {
             return;
         }
 
-        _report?.Invoke($"Plugin hook '{name}' {stage} was skipped: {message}");
+        _report?.Invoke($"{label} '{name}' {stage} was skipped: {message}");
     }
 }

@@ -79,7 +79,7 @@ load-context identity are tested in CrystalCode.Engine.Tests.
 ### CrystalCode.Plugins
 
 The contract a disk plugin references. It defines `IPlugin`, contribution
-lists, and the hook context types. It references only Crystal and
+lists, the hook and raw hook interfaces, and the hook context types. It references only Crystal and
 Crystal.Tools. It does not reference the engine, the display, the
 executable, or a terminal library. There is no paired test project;
 discovery, the load context, and hook order are tested in
@@ -1326,16 +1326,34 @@ each plugin. Shared contracts (`Crystal`, `Crystal.Tools`,
 `CrystalCode.Providers` are refused. A disk plugin may contribute tools,
 a protocol factory for a protocol the built-in adapters do not own,
 classifiers for unknown tools, slash commands that do not reuse a
-built-in verb, and hooks. Hooks append prompt and compaction text,
-rewrite a user message before it is stored, project one outbound model
-request without writing the archive. That projection can omit items or
-rewrite user, assistant, and tool-result text for the one call, so the
-model can see a conversation the archive does not store. Hooks also read
+built-in verb, hooks, and raw hooks. Hooks append prompt and compaction text,
+rewrite a user message before it is stored, and revise the text of one
+outbound model request without writing the archive, so the model can see
+text the archive does not store. Hooks also read
 one returned model response
 without changing the candidate the host uses, rewrite a tool call before
 approval runs again, replace a tool result, and raise approval risk or
 require another prompt. They do not lower risk, skip approval, or replace
-Work, Plan, or Review. Catalog order is
+Work, Plan, or Review.
+
+Authority is decided per method, and a method with extra authority lives
+on its own interface with its own registration list. `IPluginRawHook` is
+that interface. A plugin registers it on `PluginContribution.RawHooks`,
+apart from `Hooks`, so the host can tell which plugins hold privileged
+methods without inspecting types. The host announces each such plugin
+with a note and asks the operator for nothing. Raw hooks run before
+ordinary model hooks, in plugin load order. Today the only raw method is
+`RebuildModelAsync`. It rebuilds one outbound request in any way the host can
+represent: drop, reorder, add, or rewrite items of any kind, including the
+live system prompt. The host refuses only what it cannot represent: a
+repeated item id, empty reasoning text, or an image the session does not
+hold, which includes any added image on a request that cannot carry
+images (`PluginModelRequest.AcceptsImages`). It does not check provider
+validity. When a work or plan call fails after a raw hook changed its
+request, the engine writes a hedged note naming the hook. The stored
+transcript, the archive, approval, and the prompts chosen through
+`~/.crystal/prompts` are untouched. New raw methods join this interface and
+never ordinary hooks. Catalog order is
 built-in tools, disk plugin tools, external tools, then `skill`.
 
 Operator tool sets are not plugins. They are discovered from `tools/` and

@@ -45,6 +45,7 @@ public sealed class PluginCatalog
         IReadOnlyList<IApprovalClassifier> classifiers,
         IReadOnlyList<ISlashCommand> commands,
         IReadOnlyList<IPluginHook> hooks,
+        IReadOnlyList<IPluginRawHook> rawHooks,
         IReadOnlyList<IPluginClientFactory> clients,
         IReadOnlyList<PluginInfo> plugins,
         IReadOnlyList<string> notes,
@@ -57,6 +58,7 @@ public sealed class PluginCatalog
         Classifiers = classifiers;
         Commands = commands;
         Hooks = hooks;
+        RawHooks = rawHooks;
         Plugins = plugins;
         Notes = notes;
         ToolNames = toolNames;
@@ -64,6 +66,7 @@ public sealed class PluginCatalog
     }
 
     public static PluginCatalog Empty { get; } = new(
+        [],
         [],
         [],
         [],
@@ -90,6 +93,8 @@ public sealed class PluginCatalog
 
     public IReadOnlyList<IPluginHook> Hooks { get; }
 
+    public IReadOnlyList<IPluginRawHook> RawHooks { get; }
+
     public IReadOnlyList<PluginInfo> Plugins { get; }
 
     public IReadOnlyList<string> Notes { get; }
@@ -114,6 +119,7 @@ public sealed class PluginCatalog
         var classifiers = new List<IApprovalClassifier>();
         var commands = new List<ISlashCommand>();
         var hooks = new List<IPluginHook>();
+        var rawHooks = new List<IPluginRawHook>();
         var clients = new List<IPluginClientFactory>();
         var plugins = new List<PluginInfo>();
         var toolNames = new HashSet<string>(StringComparer.Ordinal);
@@ -157,6 +163,7 @@ public sealed class PluginCatalog
             var clientCount = AddClients(item.DirectoryName, contribution, notes, clients);
             var classifierCount = AddClassifiers(item.DirectoryName, contribution, notes, classifiers);
             var hookCount = AddHooks(item.DirectoryName, contribution, notes, hooks);
+            var rawHookCount = AddRawHooks(item.DirectoryName, contribution, notes, rawHooks);
             plugins.Add(new PluginInfo(
                 item.DirectoryName,
                 item.Source,
@@ -164,6 +171,7 @@ public sealed class PluginCatalog
                 toolCount,
                 commandCount,
                 hookCount,
+                rawHookCount,
                 clientCount,
                 classifierCount));
         }
@@ -176,6 +184,7 @@ public sealed class PluginCatalog
             classifiers,
             commands,
             hooks,
+            rawHooks,
             clients,
             plugins,
             notes,
@@ -258,7 +267,8 @@ public sealed class PluginCatalog
             var source = plugin.Source == PluginSource.Home ? "Home" : "Project";
             yield return
                 $"  {source}  {plugin.DirectoryName}  {plugin.Name}  "
-                + $"tools {plugin.Tools}, commands {plugin.Commands}, hooks {plugin.Hooks}";
+                + $"tools {plugin.Tools}, commands {plugin.Commands}, hooks {plugin.Hooks}, "
+                + $"raw hooks {plugin.RawHooks}";
         }
     }
 
@@ -495,6 +505,36 @@ public sealed class PluginCatalog
 
             hooks.Add(hook);
             added++;
+        }
+
+        return added;
+    }
+
+    private static int AddRawHooks(
+        string directoryName,
+        DiskContribution contribution,
+        IList<string> notes,
+        List<IPluginRawHook> rawHooks)
+    {
+        var added = 0;
+        foreach (var hook in contribution.RawHooks)
+        {
+            if (hook is null)
+            {
+                notes.Add($"Plugin '{directoryName}' omitted a missing raw hook.");
+                continue;
+            }
+
+            rawHooks.Add(hook);
+            added++;
+        }
+
+        if (added > 0)
+        {
+            notes.Add(
+                added == 1
+                    ? $"Plugin '{directoryName}' registered a raw hook."
+                    : $"Plugin '{directoryName}' registered {added} raw hooks.");
         }
 
         return added;

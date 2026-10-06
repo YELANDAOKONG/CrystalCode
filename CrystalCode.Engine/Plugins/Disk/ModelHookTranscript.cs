@@ -5,7 +5,6 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
 
-using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Plugins.Hooks;
 
@@ -27,7 +26,7 @@ internal static class ModelHookTranscript
         var projected = new List<PluginModelItem>(items.Count);
         var origins = new Dictionary<string, ChatItem>(items.Count, StringComparer.Ordinal);
         var byId = new Dictionary<string, PluginModelItem>(items.Count, StringComparer.Ordinal);
-        string? liveSystemId = null;
+        var known = new Dictionary<int, string>();
         for (var index = 0; index < items.Count; index++)
         {
             var id = index.ToString(CultureInfo.InvariantCulture);
@@ -35,143 +34,71 @@ internal static class ModelHookTranscript
             projected.Add(item);
             origins.Add(id, items[index]);
             byId.Add(id, item);
-            if (index == 0
-                && items[0] is ChatMessage system
-                && system.Role == ChatRole.System
-                && !CompactionSelection.IsSummary(system))
+            foreach (var image in ImagesOf(item))
             {
-                liveSystemId = id;
+                known[image.Number] = image.MediaType;
             }
         }
 
-        return new Projection(projected, origins, byId, liveSystemId);
+        return new Projection(projected, origins, byId, known);
     }
 
-    public static bool TryAcceptRebuild(
+    /// <summary>
+    /// Accepts any replacement the host can represent. A raw hook may reorder,
+    /// drop, add, and rewrite items of any kind. It cannot repeat an id,
+    /// return empty reasoning text, or name an image that is not attached to
+    /// the session. It cannot add an image to a request that does not carry
+    /// images.
+    /// </summary>
+    public static bool TryAcceptRaw(
         Projection origin,
-        IReadOnlyList<PluginModelItem> current,
         IReadOnlyList<PluginModelItem> next,
+        bool acceptsImages,
         out string reason)
     {
         ArgumentNullException.ThrowIfNull(origin);
-        ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(next);
-        var currentById = Index(current);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var item in next)
         {
-            if (!origin.ById.ContainsKey(item.Id) || !seen.Add(item.Id))
+            if (!seen.Add(item.Id))
             {
-                reason = seen.Contains(item.Id) ? "it repeated an item." : "it added an item.";
+                reason = "it repeated an item.";
                 return false;
             }
 
-            if (!SameKind(origin.ById[item.Id], item))
-            {
-                reason = "it changed an item.";
-                return false;
-            }
-        }
-
-        if (origin.LiveSystemId is string liveId)
-        {
-            if (next.Count == 0 || !string.Equals(next[0].Id, liveId, StringComparison.Ordinal))
-            {
-                reason = "it changed the system prompt.";
-                return false;
-            }
-
-            if (origin.ById[liveId] is not PluginModelMessage live
-                || next[0] is not PluginModelMessage returned
-                || returned.Role != live.Role
-                || !string.Equals(returned.Text, live.Text, StringComparison.Ordinal)
-                || !SameImages(live.Images, returned.Images))
-            {
-                reason = "it changed the system prompt.";
-                return false;
-            }
-        }
-
-        var calls = new List<string>();
-        var results = new List<string>();
-        var callIndex = new Dictionary<string, int>(StringComparer.Ordinal);
-        for (var index = 0; index < next.Count; index++)
-        {
-            var item = next[index];
-            var source = origin.ById[item.Id];
-            if (!currentById.TryGetValue(item.Id, out var allowed))
-            {
-                reason = "it added an item.";
-                return false;
-            }
-
+            origin.ById.TryGetValue(item.Id, out var source);
             switch (item)
             {
-                case PluginModelMessage message when source is PluginModelMessage original:
-                    if (message.Role != original.Role)
-                    {
-                        reason = "it changed a message role.";
-                        return false;
-                    }
-
-                    if (!ImagesAllowed(ImagesOf(allowed), message.Images, out reason))
+                case PluginModelMessage message:
+                    if (!RawImagesAllowed(origin, source, message.Images, acceptsImages, out reason))
                     {
                         return false;
                     }
 
                     break;
-                case PluginModelToolCall call when source is PluginModelToolCall original:
-                    if (!string.Equals(call.CallId, original.CallId, StringComparison.Ordinal)
-                        || !string.Equals(call.Name, original.Name, StringComparison.Ordinal)
-                        || !string.Equals(call.Arguments, original.Arguments, StringComparison.Ordinal))
+                case PluginModelToolResult result:
+                    if (!RawImagesAllowed(origin, source, result.Images, acceptsImages, out reason))
                     {
-                        reason = "it changed a tool call.";
-                        return false;
-                    }
-
-                    calls.Add(call.CallId);
-                    callIndex[call.CallId] = index;
-                    break;
-                case PluginModelToolResult result when source is PluginModelToolResult original:
-                    if (!string.Equals(result.CallId, original.CallId, StringComparison.Ordinal)
-                        || !string.Equals(result.Name, original.Name, StringComparison.Ordinal)
-                        || result.Success != original.Success)
-                    {
-                        reason = "it changed a tool result.";
-                        return false;
-                    }
-
-                    if (!ImagesAllowed(ImagesOf(allowed), result.Images, out reason))
-                    {
-                        return false;
-                    }
-
-                    results.Add(result.CallId);
-                    if (!callIndex.TryGetValue(result.CallId, out var callAt))
-                    {
-                        reason = "it split a tool call from its result.";
-                        return false;
-                    }
-
-                    if (callAt > index)
-                    {
-                        reason = "it reordered a tool result ahead of its call.";
                         return false;
                     }
 
                     break;
-                case PluginModelReasoning:
+                case PluginModelReasoning reasoning:
+                    if (reasoning.Text.Length == 0
+                        && !(source is PluginModelReasoning { Text.Length: 0 }))
+                    {
+                        reason = "it returned empty reasoning text.";
+                        return false;
+                    }
+
+                    break;
+                case PluginModelToolCall:
                     break;
                 default:
-                    reason = "it changed an item.";
+                    reason = "it returned an unknown item.";
                     return false;
             }
-        }
-
-        if (!SameSet(calls, results))
-        {
-            reason = "it split a tool call from its result.";
-            return false;
         }
 
         reason = string.Empty;
@@ -249,7 +176,13 @@ internal static class ModelHookTranscript
                     }
 
                     break;
-                case PluginModelReasoning:
+                case PluginModelReasoning reasoning when source is PluginModelReasoning originalReasoning:
+                    if (reasoning.Text.Length == 0 && originalReasoning.Text.Length != 0)
+                    {
+                        reason = "it returned empty reasoning text.";
+                        return false;
+                    }
+
                     break;
                 default:
                     reason = "it changed an item.";
@@ -270,7 +203,16 @@ internal static class ModelHookTranscript
         var applied = new List<ChatItem>(items.Count);
         foreach (var item in items)
         {
-            applied.Add(ApplyItem(origin.Origins[item.Id], origin.ById[item.Id], item));
+            // An item that keeps the id and kind of a projected item rewrites
+            // that item. Anything else is new and is built from the plugin value.
+            if (origin.Origins.TryGetValue(item.Id, out var chat)
+                && SameKind(origin.ById[item.Id], item))
+            {
+                applied.Add(ApplyItem(chat, origin.ById[item.Id], item));
+                continue;
+            }
+
+            applied.Add(CreateItem(item));
         }
 
         return applied;
@@ -307,12 +249,27 @@ internal static class ModelHookTranscript
     {
         PluginModelMessage message when origin is ChatMessage chat && projected is PluginModelMessage source =>
             ApplyMessage(chat, source, message),
-        PluginModelToolCall when origin is ToolCall call => call,
+        PluginModelToolCall call when origin is ToolCall source => ApplyCall(source, call),
         PluginModelToolResult result when origin is ToolResult tool && projected is PluginModelToolResult source =>
             ApplyResult(tool, source, result),
         PluginModelReasoning reasoning when origin is ChatReasoningItem item && projected is PluginModelReasoning source =>
             ApplyReasoning(item, source, reasoning),
         _ => throw new InvalidOperationException("Model hook item does not match its origin.")
+    };
+
+    private static ChatItem CreateItem(PluginModelItem item) => item switch
+    {
+        PluginModelMessage message => new ChatMessage(
+            message.Role,
+            Compose(message.Text, [], message.Images)),
+        PluginModelToolCall call => new ToolCall(call.CallId, call.Name, call.Arguments),
+        PluginModelToolResult result => new ToolResult(
+            result.CallId,
+            Compose(result.Text, [], result.Images),
+            result.Success ? ToolResultStatus.Success : ToolResultStatus.Failure),
+        PluginModelReasoning reasoning => new ChatReasoningItem(
+            new ReasoningContent([new ReasoningText(reasoning.Text, ReasoningTextKind.Summary)])),
+        _ => throw new InvalidOperationException("Model hook returned an item the host cannot build.")
     };
 
     private static ChatItem ApplyMessage(
@@ -321,10 +278,17 @@ internal static class ModelHookTranscript
         PluginModelMessage final)
     {
         var text = ApplyText(origin.Text, projected.Text, projected.Images, final.Text, final.Images);
-        return string.Equals(text, origin.Text, StringComparison.Ordinal)
+        return final.Role == origin.Role && string.Equals(text, origin.Text, StringComparison.Ordinal)
             ? origin
-            : new ChatMessage(origin.Role, text);
+            : new ChatMessage(final.Role, text);
     }
+
+    private static ChatItem ApplyCall(ToolCall origin, PluginModelToolCall final) =>
+        string.Equals(final.CallId, origin.CallId, StringComparison.Ordinal)
+        && string.Equals(final.Name, origin.Name, StringComparison.Ordinal)
+        && string.Equals(final.Arguments, origin.Arguments, StringComparison.Ordinal)
+            ? origin
+            : new ToolCall(final.CallId, final.Name, final.Arguments);
 
     private static ChatItem ApplyResult(
         ToolResult origin,
@@ -332,9 +296,14 @@ internal static class ModelHookTranscript
         PluginModelToolResult final)
     {
         var text = ApplyText(origin.Text, projected.Text, projected.Images, final.Text, final.Images);
-        return string.Equals(text, origin.Text, StringComparison.Ordinal)
-            ? origin
-            : new ToolResult(origin.CallId, text, origin.Status);
+        var status = final.Success == projected.Success
+            ? origin.Status
+            : final.Success ? ToolResultStatus.Success : ToolResultStatus.Failure;
+        return string.Equals(final.CallId, origin.CallId, StringComparison.Ordinal)
+            && string.Equals(text, origin.Text, StringComparison.Ordinal)
+            && status == origin.Status
+                ? origin
+                : new ToolResult(final.CallId, text, status);
     }
 
     private static ChatItem ApplyReasoning(
@@ -358,15 +327,28 @@ internal static class ModelHookTranscript
         string returnedDisplay,
         IReadOnlyList<PluginModelImage> returnedImages)
     {
+        var text = string.Equals(returnedDisplay, projectedDisplay, StringComparison.Ordinal)
+            ? originalRaw
+            : returnedDisplay;
+        return Compose(text, originalImages, returnedImages);
+    }
+
+    /// <summary>
+    /// Makes the text match its image list. A marker for an image that is no
+    /// longer listed is removed. A listed image gets the trusted marker, which
+    /// is the only spelling that references an attachment.
+    /// </summary>
+    private static string Compose(
+        string text,
+        IReadOnlyList<PluginModelImage> originalImages,
+        IReadOnlyList<PluginModelImage> returnedImages)
+    {
         var kept = new HashSet<int>();
         foreach (var image in returnedImages)
         {
             kept.Add(image.Number);
         }
 
-        var text = string.Equals(returnedDisplay, projectedDisplay, StringComparison.Ordinal)
-            ? originalRaw
-            : returnedDisplay;
         foreach (var image in originalImages)
         {
             if (kept.Contains(image.Number))
@@ -378,13 +360,8 @@ internal static class ModelHookTranscript
             text = text.Replace(DisplayMarker(image.Number), string.Empty, StringComparison.Ordinal);
         }
 
-        foreach (var image in originalImages)
+        foreach (var image in returnedImages)
         {
-            if (!kept.Contains(image.Number))
-            {
-                continue;
-            }
-
             var trusted = ImageMarkerText.Tag(image.Number);
             if (text.Contains(trusted, StringComparison.Ordinal))
             {
@@ -456,26 +433,55 @@ internal static class ModelHookTranscript
         return string.Join("\n", parts);
     }
 
-    private static Dictionary<string, PluginModelItem> Index(IReadOnlyList<PluginModelItem> items)
-    {
-        var byId = new Dictionary<string, PluginModelItem>(items.Count, StringComparer.Ordinal);
-        foreach (var item in items)
-        {
-            byId[item.Id] = item;
-        }
-
-        return byId;
-    }
-
     private static bool SameKind(PluginModelItem left, PluginModelItem right) =>
         left.GetType() == right.GetType();
 
-    private static IReadOnlyList<PluginModelImage> ImagesOf(PluginModelItem item) => item switch
+    private static IReadOnlyList<PluginModelImage> ImagesOf(PluginModelItem? item) => item switch
     {
         PluginModelMessage message => message.Images,
         PluginModelToolResult result => result.Images,
         _ => []
     };
+
+    /// <summary>
+    /// A raw hook may keep an image its item already carried. It may also name
+    /// any other attachment already present in the request, with the same media
+    /// type. It cannot name one the session does not hold.
+    /// </summary>
+    private static bool RawImagesAllowed(
+        Projection origin,
+        PluginModelItem? source,
+        IReadOnlyList<PluginModelImage> returned,
+        bool acceptsImages,
+        out string reason)
+    {
+        var onItem = new HashSet<int>();
+        foreach (var image in ImagesOf(source))
+        {
+            onItem.Add(image.Number);
+        }
+
+        var seen = new HashSet<int>();
+        foreach (var image in returned)
+        {
+            if (!origin.KnownImages.TryGetValue(image.Number, out var mediaType)
+                || !string.Equals(mediaType, image.MediaType, StringComparison.Ordinal)
+                || !seen.Add(image.Number))
+            {
+                reason = "it added an image.";
+                return false;
+            }
+
+            if (!acceptsImages && !onItem.Contains(image.Number))
+            {
+                reason = "it added an image to a request that cannot carry images.";
+                return false;
+            }
+        }
+
+        reason = string.Empty;
+        return true;
+    }
 
     private static bool ImagesAllowed(
         IReadOnlyList<PluginModelImage> allowed,
@@ -525,30 +531,11 @@ internal static class ModelHookTranscript
         return true;
     }
 
-    private static bool SameSet(List<string> calls, List<string> results)
-    {
-        if (calls.Count != results.Count)
-        {
-            return false;
-        }
-
-        var remaining = new HashSet<string>(calls, StringComparer.Ordinal);
-        foreach (var callId in results)
-        {
-            if (!remaining.Remove(callId))
-            {
-                return false;
-            }
-        }
-
-        return remaining.Count == 0;
-    }
-
     internal sealed class Projection(
         IReadOnlyList<PluginModelItem> items,
         Dictionary<string, ChatItem> origins,
         Dictionary<string, PluginModelItem> byId,
-        string? liveSystemId)
+        IReadOnlyDictionary<int, string> knownImages)
     {
         public IReadOnlyList<PluginModelItem> Items { get; } = items;
 
@@ -556,6 +543,7 @@ internal static class ModelHookTranscript
 
         public Dictionary<string, PluginModelItem> ById { get; } = byId;
 
-        public string? LiveSystemId { get; } = liveSystemId;
+        /// <summary>Every attachment the request already references, by number.</summary>
+        public IReadOnlyDictionary<int, string> KnownImages { get; } = knownImages;
     }
 }

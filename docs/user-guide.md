@@ -949,12 +949,16 @@ of the same name replaces the home plugin. `"enabled": false` in
 field is omitted from the written file.
 
 A plugin can add tools, a protocol client, approval classifiers, slash
-commands, and hooks. Hooks may append prompt and compaction text, rewrite
-a user message before it is stored, project one outbound model request
-without changing the stored transcript, read one completed model response,
-rewrite a tool call (approval runs
+commands, hooks, and raw hooks. Hooks may append prompt and compaction text,
+rewrite a user message before it is stored, revise the text of one outbound
+model request without changing the stored transcript, read one completed
+model response, rewrite a tool call (approval runs
 again), replace a tool result, and raise approval risk. They cannot lower
-risk or replace Work, Plan, or Review.
+risk or replace Work, Plan, or Review. A raw hook is a privileged
+extension point. It may rebuild one outbound model request in any way the
+host can represent, including its system prompt, without changing the
+stored transcript. A plugin that registers one is named in a note at load
+time.
 `/plugins` lists them. `/plugins on|off|reload` controls discovery.
 Details are in [Plugins](plugins.md).
 

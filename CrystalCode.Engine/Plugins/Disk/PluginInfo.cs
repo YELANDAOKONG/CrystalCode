@@ -8,5 +8,6 @@ public sealed record PluginInfo(
     int Tools,
     int Commands,
     int Hooks,
+    int RawHooks,
     int Clients,
     int Classifiers);
