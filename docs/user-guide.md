@@ -184,8 +184,8 @@ short excerpt. Failures other than `bash` keep the result text.
 Labels use square brackets, exit status uses parentheses, and omitted-line
 markers use angle brackets, so host text stays distinct from tool output.
 `--format json` prints one JSON object per line and keeps the full tool
-output. Thinking text is omitted unless `--show-thinking` is set, and then
-it is printed before that round's reply.
+output. Thinking text is omitted unless `--show-thinking` is set. With that
+flag, thinking is printed under `[Thinking]` and the reply under `[Assistant]`.
 The saved session id is printed at the end. Resume that session with the
 interactive `crystal --resume <id>`.
 
@@ -210,7 +210,7 @@ saved value is also unset. `unlimited` removes that one cap.
 | `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
 | `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
 | `--bash-timeout <seconds>` | Per-command bash cap. Default 120. `unlimited` disables that timer |
-| `--show-thinking` | Print reasoning text for this run. Independent of `verboseThinking` |
+| `--show-thinking` | Print reasoning text for this run, and label each reply `[Assistant]`. Independent of `verboseThinking` |
 | `--format` | `default` for plain text, or `json` for one JSON object per line |
 
 `--approval-model off` cannot be combined with `--approval-provider` or

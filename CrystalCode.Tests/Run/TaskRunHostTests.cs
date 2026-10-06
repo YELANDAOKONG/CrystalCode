@@ -74,7 +74,8 @@ public sealed class TaskRunHostTests
         var result = await fixture.RunAsync(client, settings);
 
         Assert.Equal(RunExit.Completed, result.Code);
-        Assert.Contains("Thinking", result.Output, StringComparison.Ordinal);
+        Assert.Contains("[Thinking]", result.Output, StringComparison.Ordinal);
+        Assert.Contains("[Assistant]", result.Output, StringComparison.Ordinal);
         Assert.Contains(HiddenThinking, result.Output, StringComparison.Ordinal);
         Assert.Contains("Hello there.", result.Output, StringComparison.Ordinal);
     }

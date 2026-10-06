@@ -11,8 +11,9 @@ namespace CrystalCode.Run;
 
 /// <summary>
 /// Readable plain-text trace for one unattended run. Tool bodies are shortened.
-/// Thinking text is kept only when requested. The observer is called from the
-/// turn thread.
+/// Thinking text is kept only when requested. With that request, each assistant
+/// reply is labeled so a blank line inside the thinking cannot hide the reply.
+/// The observer is called from the turn thread.
 /// </summary>
 internal sealed class RunLog : IRunLog
 {
@@ -127,6 +128,12 @@ internal sealed class RunLog : IRunLog
 
         var text = _reply.ToString();
         _reply.Clear();
+        if (_showThinking && Normalize(text).Length > 0)
+        {
+            WriteSection("[Assistant]", text);
+            return;
+        }
+
         WriteParagraph(text);
     }
 

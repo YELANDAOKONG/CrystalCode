@@ -33,11 +33,12 @@ public sealed class RunLogTests
 
         var text = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
         var thinking = text.IndexOf("[Thinking]", StringComparison.Ordinal);
+        var assistant = text.IndexOf("[Assistant]", StringComparison.Ordinal);
         var reply = text.IndexOf("Looking.", StringComparison.Ordinal);
         var missing = text.IndexOf("[Read] b.cs", StringComparison.Ordinal);
         var found = text.IndexOf("[Read] a.cs", StringComparison.Ordinal);
-        Assert.True(thinking >= 0 && thinking < reply && reply < missing && missing < found);
-        Assert.Contains("[Thinking]\ntrace\n\nLooking.\n\n[Read] b.cs\n  missing", text, StringComparison.Ordinal);
+        Assert.True(thinking >= 0 && thinking < assistant && assistant < reply && reply < missing && missing < found);
+        Assert.Contains("[Thinking]\ntrace\n\n[Assistant]\nLooking.\n\n[Read] b.cs\n  missing", text, StringComparison.Ordinal);
         Assert.Contains("[Read] a.cs\n  one\n  two", text, StringComparison.Ordinal);
         Assert.Contains("trace", text, StringComparison.Ordinal);
         Assert.DoesNotContain("\nResult", text, StringComparison.Ordinal);
@@ -58,6 +59,55 @@ public sealed class RunLogTests
         Assert.Contains("Hello there.", text, StringComparison.Ordinal);
         Assert.DoesNotContain("trace-not-for-ci", text, StringComparison.Ordinal);
         Assert.DoesNotContain("[Thinking]", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("[Assistant]", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OnEvent_SeparatesAMultiParagraphThinkingBlockFromTheReply()
+    {
+        var output = new StringWriter();
+        var log = new RunLog(output, showThinking: true);
+        log.OnEvent(new StreamReceived(
+            new ChatReasoningTextDelta(
+                0,
+                0,
+                0,
+                ReasoningTextKind.Trace,
+                "Look at the file.\n\nThe function returns early.")));
+        log.OnEvent(new StreamReceived(
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "The function returns early.")));
+        log.OnEvent(new ToolCallsIssued([]));
+
+        var text = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+        const string expected = """
+            [Thinking]
+            Look at the file.
+
+            The function returns early.
+
+            [Assistant]
+            The function returns early.
+            """;
+        Assert.Contains(expected, text, StringComparison.Ordinal);
+        Assert.Equal(
+            text.IndexOf("[Assistant]", StringComparison.Ordinal),
+            text.LastIndexOf("[Assistant]", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void OnEvent_LabelsAReplyWhenThinkingIsShownButAbsent()
+    {
+        var output = new StringWriter();
+        var log = new RunLog(output, showThinking: true);
+        log.OnEvent(new StreamReceived(
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "Done.")));
+        log.OnEvent(new ToolCallsIssued([]));
+        log.OnEvent(new StreamReceived(
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "\n")));
+        log.OnEvent(new ToolCallsIssued([]));
+
+        var text = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Equal("[Assistant]\nDone.\n", text);
     }
 
     [Fact]
