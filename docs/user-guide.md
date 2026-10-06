@@ -955,10 +955,13 @@ model request without changing the stored transcript, read one completed
 model response, rewrite a tool call (approval runs
 again), replace a tool result, and raise approval risk. They cannot lower
 risk or replace Work, Plan, or Review. A raw hook is a privileged
-extension point. It may rebuild one outbound model request in any way the
-host can represent, including its system prompt, without changing the
-stored transcript. A plugin that registers one is named in a note at load
-time.
+extension point and is not held to those limits. It may rebuild one
+outbound model request, replace composed prompt and compaction text with
+any string, and replace an approval classification with any risk,
+authority, summary, and prompt requirement. A plugin that registers one is
+named in a note at load time. A later module system may sit below plugins
+and reach the host through reflection or another mechanism. It is not in
+this build.
 `/plugins` lists them. `/plugins on|off|reload` controls discovery.
 Details are in [Plugins](plugins.md).
 

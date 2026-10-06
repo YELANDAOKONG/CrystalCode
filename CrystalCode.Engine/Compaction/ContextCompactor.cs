@@ -17,7 +17,7 @@ public sealed class ContextCompactor
     private readonly Func<string> _systemText;
     private readonly SessionRetryOptions _retry;
     private readonly Action<SessionRetryAttempt>? _onRetry;
-    private readonly Func<PluginCompactionPhase, string, string?>? _amend;
+    private readonly Func<PluginCompactionPhase, string, string?>? _finish;
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
         _prepareHead;
     private readonly Func<ChatResponse, CancellationToken, Task>? _reportResponse;
@@ -27,7 +27,7 @@ public sealed class ContextCompactor
         SessionRetryOptions? retry = null,
         Action<SessionRetryAttempt>? onRetry = null,
         Func<string>? systemText = null,
-        Func<PluginCompactionPhase, string, string?>? amend = null,
+        Func<PluginCompactionPhase, string, string?>? finish = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareHead = null,
         Func<ChatResponse, CancellationToken, Task>? reportResponse = null)
     {
@@ -35,7 +35,7 @@ public sealed class ContextCompactor
         _client = client;
         _retry = retry ?? SessionRetryOptions.Default;
         _onRetry = onRetry;
-        _amend = amend;
+        _finish = finish;
         _prepareHead = prepareHead;
         _reportResponse = reportResponse;
         _systemText = systemText
@@ -82,7 +82,7 @@ public sealed class ContextCompactor
         }
 
         var prompt = CompactionPrompt.UserText(conversation, todos, split.PreviousSummary);
-        prompt = Append(PluginCompactionPhase.Prompt, prompt);
+        prompt = Finish(PluginCompactionPhase.Prompt, prompt);
         var systemText = _systemText();
         var promptTokens = TokenEstimator.Text(systemText) + TokenEstimator.Text(prompt);
         if (promptTokens > limits.SummaryPromptBudget())
@@ -114,9 +114,9 @@ public sealed class ContextCompactor
                 return FinishWithoutSummary(pruned, prunedChanged);
             }
 
-            summary = Append(PluginCompactionPhase.Summary, summary.Trim());
+            summary = Finish(PluginCompactionPhase.Summary, summary.Trim());
             return new CompactionOutcome(
-                Rebuild(pruned, split, summary.Trim(), todos),
+                Rebuild(pruned, split, summary, todos),
                 CompactionKind.Applied);
         }
         catch (OperationCanceledException)
@@ -185,15 +185,14 @@ public sealed class ContextCompactor
         return text;
     }
 
-    private string Append(PluginCompactionPhase phase, string text)
+    private string Finish(PluginCompactionPhase phase, string text)
     {
-        var extra = _amend?.Invoke(phase, text);
-        if (string.IsNullOrWhiteSpace(extra))
+        if (_finish is null)
         {
             return text;
         }
 
-        return text + "\n\n" + extra.Trim();
+        return _finish(phase, text) ?? text;
     }
 
     private static string ReadAssistantText(ChatResponse response)

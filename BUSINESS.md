@@ -77,9 +77,12 @@ separate library with no terminal code. The product can:
   tools, protocol clients, classifiers, slash commands, hooks, and raw
   hooks. Hooks may revise a user message before it is stored and may
   revise the text of the outbound model request without changing the saved
-  archive. A raw hook is a privileged extension point that may rebuild that
-  request in any way the host can represent, and the session names each
-  plugin that registers one;
+  archive. A raw hook is a privileged extension point. It may rebuild one
+  outbound request, replace composed prompt and compaction text with any
+  string, and replace an approval classification with any risk, authority,
+  summary, and prompt requirement. The session names each plugin that
+  registers one. Ordinary hooks stay append-only for those prompts and
+  cannot lower approval risk;
 - honor an author-declared `approval: always` in a tool set for ordinary
   workspace-bounded calls, with the operator choosing per source whether
   declarations take effect through `externalToolApproval` in
@@ -113,6 +116,8 @@ implemented in the current build:
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
   and Ollama Chat;
 - audio and video input, and image, audio, or video model output;
+- a module system below plugins and raw hooks, reached through reflection
+  or another mechanism, once its behavior and ownership are defined;
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. TODO: add

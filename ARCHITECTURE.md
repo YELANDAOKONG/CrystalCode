@@ -1341,19 +1341,35 @@ on its own interface with its own registration list. `IPluginRawHook` is
 that interface. A plugin registers it on `PluginContribution.RawHooks`,
 apart from `Hooks`, so the host can tell which plugins hold privileged
 methods without inspecting types. The host announces each such plugin
-with a note and asks the operator for nothing. Raw hooks run before
-ordinary model hooks, in plugin load order. Today the only raw method is
-`RebuildModelAsync`. It rebuilds one outbound request in any way the host can
-represent: drop, reorder, add, or rewrite items of any kind, including the
-live system prompt. The host refuses only what it cannot represent: a
-repeated item id, empty reasoning text, or an image the session does not
-hold, which includes any added image on a request that cannot carry
-images (`PluginModelRequest.AcceptsImages`). It does not check provider
-validity. When a work or plan call fails after a raw hook changed its
-request, the engine writes a hedged note naming the hook. The stored
-transcript, the archive, approval, and the prompts chosen through
-`~/.crystal/prompts` are untouched. New raw methods join this interface and
-never ordinary hooks. Catalog order is
+with a note and asks the operator for nothing. `RebuildModelAsync` runs
+before ordinary model hooks, in plugin load order. It rebuilds one outbound
+request in any way the host can represent: drop, reorder, add, or rewrite
+items of any kind, including the live system prompt. The host refuses only
+what it cannot represent: a repeated item id, empty reasoning text, or an
+image the session does not hold, which includes any added image on a request
+that cannot carry images (`PluginModelRequest.AcceptsImages`). It does not
+check provider validity. When a work or plan call fails after a raw hook
+changed its request, the engine writes a hedged note naming the hook. That
+rebuild does not write the archive.
+
+`RewritePrompt` and `RewriteCompaction` run after the ordinary append for
+that text. Each may replace the full string with any text, including an
+empty string. `RewritePrompt` replaces the composed system text for work,
+plan, review, and compaction. Work and plan text becomes the live system
+message and is archived; the files under `~/.crystal/prompts` are not
+written. `RewriteCompaction` replaces the compaction user prompt, or the
+summary body that is stored. It does not choose which history is folded.
+`RewriteApproval` runs after ordinary approval hooks and may set any risk,
+any authority, any summary, and either prompt requirement. The approval
+policy then uses that classification. Ordinary hooks still cannot lower
+risk or replace those prompts. A raw hook is not held to those rules. A
+throwing raw hook is skipped. New raw methods join this interface and never
+ordinary hooks.
+
+A later module system may sit below plugins and raw hooks and reach the
+host through reflection or another mechanism. It is not in this build. Its
+behavior and ownership are not defined, and this build does not reserve
+types for it. Catalog order is
 built-in tools, disk plugin tools, external tools, then `skill`.
 
 Operator tool sets are not plugins. They are discovered from `tools/` and

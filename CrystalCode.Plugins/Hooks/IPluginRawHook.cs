@@ -1,12 +1,14 @@
+using Crystal.Tools;
+
 namespace CrystalCode.Plugins.Hooks;
 
 /// <summary>
 /// Privileged extension points. A plugin registers raw hooks separately from
 /// <see cref="IPluginHook"/>, on <see cref="PluginContribution.RawHooks"/>.
-/// The host does not hold a raw hook to the safety rules that bind ordinary
-/// hooks. It refuses only what it cannot represent. Raw hooks run in plugin
-/// load order and each one sees the previous replacement. A raw hook that
-/// throws is skipped.
+/// The host does not hold a raw hook to the rules that bind ordinary hooks.
+/// It refuses only what it cannot represent. Raw hooks run in plugin load
+/// order and each one sees the previous replacement. A raw hook that throws
+/// is skipped.
 /// </summary>
 public interface IPluginRawHook
 {
@@ -33,4 +35,35 @@ public interface IPluginRawHook
         PluginModelRequest request,
         CancellationToken cancellationToken = default) =>
         ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(null);
+
+    /// <summary>
+    /// Returns the composed system text for this mode, or null to keep it.
+    /// <paramref name="composed"/> already includes text from ordinary prompt
+    /// hooks. Any returned string is used, including an empty one. This does
+    /// not write the operator's prompt files. Work and plan text becomes the
+    /// live system message and is archived with the session.
+    /// </summary>
+    string? RewritePrompt(PluginPrompt prompt, string composed) => null;
+
+    /// <summary>
+    /// Returns the compaction text for this phase, or null to keep it.
+    /// <paramref name="text"/> already includes text from ordinary compaction
+    /// hooks. Any returned string is used, including an empty one.
+    /// <see cref="PluginCompactionPhase.Prompt"/> is the user prompt sent to
+    /// the compaction model. <see cref="PluginCompactionPhase.Summary"/> is
+    /// the summary body stored in the session. The host still chooses which
+    /// history is folded.
+    /// </summary>
+    string? RewriteCompaction(PluginCompactionPhase phase, string text) => null;
+
+    /// <summary>
+    /// Returns the approval classification, or null to keep the current one.
+    /// Runs after ordinary approval hooks. The replacement may set any risk,
+    /// any authority, any summary, and either prompt requirement. The
+    /// approval policy then uses that classification.
+    /// </summary>
+    PluginRawApproval? RewriteApproval(
+        ToolCall call,
+        PluginApprovalFacts facts,
+        bool requirePrompt) => null;
 }

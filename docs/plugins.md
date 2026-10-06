@@ -184,6 +184,9 @@ refuses only what it cannot represent.
 | Raw hook | May | May not |
 | :--- | :--- | :--- |
 | `RebuildModelAsync` | For one outbound call, drop, reorder, add, or rewrite items of any kind. That includes the live system prompt, roles, tool calls, tool results, and reasoning, and it may split a call from its result | Repeat an item id, return empty reasoning text, name an image the session does not hold, add an image to a request that cannot carry images, or write the archive |
+| `RewritePrompt` | Replace the composed system text for `work`, `plan`, `review`, or `compaction` with any string, including an empty one. Work and plan text becomes the live system message and is archived | Write `~/.crystal/prompts` |
+| `RewriteCompaction` | Replace the compaction user prompt, or the summary body that is stored, with any string, including an empty one | Choose which history is folded, or replace the compactor |
+| `RewriteApproval` | After ordinary approval hooks, set any risk, any authority, any summary, and either prompt requirement. The approval policy then uses that classification | Skip that policy |
 
 `RebuildModelAsync` sees the same requests as `TransformModelAsync` and
 runs first. The stored transcript and the archive stay as they were.
@@ -211,10 +214,19 @@ runs first. The stored transcript and the archive stay as they were.
   after a raw hook changed its request, the host writes a note such as
   `Raw hook 'Acme' changed this model request. The failure may be related.`
   The note is a hint, not a diagnosis.
-- **Prompt text.** `OnPrompt` still only appends. A raw hook that must
-  replace the system prompt does so for one call through
-  `RebuildModelAsync`, so Work, Plan, and Review stay the prompts the
-  operator chose.
+- **Prompt text.** `OnPrompt` still only appends. `RewritePrompt` then
+  replaces the composed system text for that mode. Any returned string is
+  used, including an empty one. Work and plan text is what the session
+  stores. The files under `~/.crystal/prompts` stay as the operator saved
+  them. `RebuildModelAsync` can still change the system item of one outbound
+  call after that, without writing the archive.
+- **Compaction text.** `OnCompaction` still only appends. `RewriteCompaction`
+  then replaces the full compaction user prompt or the stored summary body.
+  An empty replacement is kept.
+- **Approval.** `OnApproval` can still only raise risk or require another
+  prompt. `RewriteApproval` then replaces the classification and may lower
+  risk, change authority, change the summary, or clear the prompt
+  requirement. The approval policy uses the result.
 
 ## Load context
 
@@ -236,3 +248,6 @@ or marketplace.
 - Collectible unload and hot reload.
 - Replacing a built-in protocol, built-in tool, or built-in slash verb.
 - Hooks on external tool sets.
+- A module system below plugins and raw hooks. A later one may reach the
+  host through reflection or another mechanism. Its behavior and ownership
+  are not defined, and this build does not reserve types for it.

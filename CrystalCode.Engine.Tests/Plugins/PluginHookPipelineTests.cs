@@ -72,6 +72,108 @@ public sealed class PluginHookPipelineTests
     }
 
     [Fact]
+    public void FinishPrompt_AppendsThenLetsARawHookReplaceTheFullText()
+    {
+        var notes = new List<string>();
+        var seen = new List<string>();
+        var pipeline = new PluginHookPipeline(
+            [new TextHook("extra")],
+            notes.Add,
+            [
+                new PromptRawHook("  "),
+                new ThrowingPromptRawHook(),
+                new RecordingPromptRawHook(seen),
+                new PromptRawHook("replaced")
+            ]);
+
+        var text = pipeline.FinishPrompt("work", "instructions", "composed");
+
+        Assert.Equal("replaced", text);
+        Assert.Equal(["  "], seen);
+        Assert.Contains(notes, note => note.Contains("prompt", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FinishPrompt_KeepsTheAppendWhenTheRawHookReturnsNull()
+    {
+        var pipeline = new PluginHookPipeline(
+            [new TextHook("extra")],
+            rawHooks: [new PromptRawHook(null)]);
+
+        Assert.Equal("composed\n\nextra", pipeline.FinishPrompt("plan", "instructions", "composed"));
+    }
+
+    [Fact]
+    public void FinishCompaction_AppendsThenLetsARawHookReplaceTheFullText()
+    {
+        var notes = new List<string>();
+        var seen = new List<string>();
+        var pipeline = new PluginHookPipeline(
+            [new CompactionHook("keep this fact")],
+            notes.Add,
+            [
+                new CompactionRawHook(string.Empty),
+                new ThrowingCompactionRawHook(),
+                new RecordingCompactionRawHook(seen),
+                new CompactionRawHook("replaced summary")
+            ]);
+
+        var text = pipeline.FinishCompaction(PluginCompactionPhase.Summary, "summary");
+
+        Assert.Equal("replaced summary", text);
+        Assert.Equal([string.Empty], seen);
+        Assert.Contains(notes, note => note.Contains("compaction", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FinishCompaction_KeepsTheAppendWhenTheRawHookReturnsNull()
+    {
+        var pipeline = new PluginHookPipeline(
+            [new CompactionHook("keep this fact")],
+            rawHooks: [new CompactionRawHook(null)]);
+
+        var text = pipeline.FinishCompaction(PluginCompactionPhase.Prompt, "fold this");
+
+        Assert.Equal("fold this\n\nkeep this fact", text);
+    }
+
+    [Fact]
+    public void OnApproval_RawHookMayReplaceTheClassificationInAnyDirection()
+    {
+        var notes = new List<string>();
+        var seen = new List<string>();
+        var pipeline = new PluginHookPipeline(
+            [new AdviceHook(PluginRisk.Privileged, requirePrompt: true)],
+            notes.Add,
+            [
+                new ThrowingApprovalRawHook(),
+                new ApprovalRawHook(
+                    PluginRisk.Read,
+                    PluginAuthority.Workspace,
+                    "read file",
+                    prompt: false),
+                new RecordingApprovalRawHook(seen),
+                new ApprovalRawHook(
+                    PluginRisk.Forbidden,
+                    PluginAuthority.Network,
+                    string.Empty,
+                    prompt: true)
+            ]);
+        var call = new ToolCall("1", "bash", "{}");
+        var classification = new ToolClassification(Risk.Write, Authority.OutsideWorkspace, "Run command");
+
+        var advised = pipeline.OnApproval(call, classification);
+
+        Assert.Equal(Risk.Forbidden, advised.Risk);
+        Assert.Equal(Authority.Network, advised.Authority);
+        Assert.Equal(string.Empty, advised.Summary);
+        Assert.True(advised.RequirePrompt);
+        Assert.Equal(["read"], seen);
+        Assert.Contains(notes, note => note.Contains("approval", StringComparison.Ordinal));
+        Assert.DoesNotContain(notes, note => note.Contains("lower risk", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Executor_ApprovesTheRewrittenCall()
     {
         var inner = new RecordingExecutor();
@@ -587,6 +689,80 @@ public sealed class PluginHookPipelineTests
             ];
             return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
         }
+    }
+
+    private sealed class PromptRawHook(string? text) : IPluginRawHook
+    {
+        public string? RewritePrompt(PluginPrompt prompt, string composed) => text;
+    }
+
+    private sealed class RecordingPromptRawHook(List<string> seen) : IPluginRawHook
+    {
+        public string? RewritePrompt(PluginPrompt prompt, string composed)
+        {
+            seen.Add(composed);
+            return null;
+        }
+    }
+
+    private sealed class ThrowingPromptRawHook : IPluginRawHook
+    {
+        public string? RewritePrompt(PluginPrompt prompt, string composed) =>
+            throw new InvalidOperationException("prompt raw hook failed.");
+    }
+
+    private sealed class CompactionRawHook(string? replacement) : IPluginRawHook
+    {
+        public string? RewriteCompaction(PluginCompactionPhase phase, string text) => replacement;
+    }
+
+    private sealed class RecordingCompactionRawHook(List<string> seen) : IPluginRawHook
+    {
+        public string? RewriteCompaction(PluginCompactionPhase phase, string text)
+        {
+            seen.Add(text);
+            return null;
+        }
+    }
+
+    private sealed class ThrowingCompactionRawHook : IPluginRawHook
+    {
+        public string? RewriteCompaction(PluginCompactionPhase phase, string text) =>
+            throw new InvalidOperationException("compaction raw hook failed.");
+    }
+
+    private sealed class ApprovalRawHook(
+        PluginRisk risk,
+        PluginAuthority authority,
+        string summary,
+        bool prompt) : IPluginRawHook
+    {
+        public PluginRawApproval? RewriteApproval(
+            ToolCall call,
+            PluginApprovalFacts facts,
+            bool requirePrompt) =>
+            new(risk, authority, summary, prompt);
+    }
+
+    private sealed class RecordingApprovalRawHook(List<string> seen) : IPluginRawHook
+    {
+        public PluginRawApproval? RewriteApproval(
+            ToolCall call,
+            PluginApprovalFacts facts,
+            bool requirePrompt)
+        {
+            seen.Add(facts.Risk);
+            return null;
+        }
+    }
+
+    private sealed class ThrowingApprovalRawHook : IPluginRawHook
+    {
+        public PluginRawApproval? RewriteApproval(
+            ToolCall call,
+            PluginApprovalFacts facts,
+            bool requirePrompt) =>
+            throw new InvalidOperationException("approval raw hook failed.");
     }
 
     private sealed class ReverseTransformHook : IPluginHook

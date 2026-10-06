@@ -101,6 +101,23 @@ internal sealed class PluginHookPipeline
         return string.Join("\n\n", parts);
     }
 
+    /// <summary>
+    /// Appends ordinary prompt text, then lets each raw hook replace the full
+    /// system text. A raw replacement is kept as returned, including blank text.
+    /// </summary>
+    public string FinishPrompt(string mode, string instructions, string composed)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mode);
+        ArgumentNullException.ThrowIfNull(instructions);
+        ArgumentNullException.ThrowIfNull(composed);
+        var extra = OnPrompt(mode, instructions);
+        var current = extra.Length == 0 ? composed : composed + "\n\n" + extra;
+        return ReplaceText(
+            current,
+            "prompt",
+            (hook, text) => hook.RewritePrompt(new PluginPrompt(mode, instructions), text));
+    }
+
     public async ValueTask<string> OnUserMessageAsync(string text, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -389,11 +406,10 @@ internal sealed class PluginHookPipeline
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
         var risk = classification.Risk;
+        var authority = classification.Authority;
+        var summary = classification.Summary;
         var requirePrompt = classification.RequirePrompt;
-        var facts = new PluginApprovalFacts(
-            risk.Value,
-            classification.Authority.Value,
-            classification.Summary);
+        var facts = new PluginApprovalFacts(risk.Value, authority.Value, summary);
         foreach (var hook in _hooks)
         {
             try
@@ -428,16 +444,37 @@ internal sealed class PluginHookPipeline
             }
         }
 
-        if (risk == classification.Risk && requirePrompt == classification.RequirePrompt)
+        foreach (var hook in _rawHooks)
+        {
+            try
+            {
+                var next = hook.RewriteApproval(call, facts, requirePrompt);
+                if (next is null)
+                {
+                    continue;
+                }
+
+                risk = PluginRiskMap.ToRisk(next.Risk);
+                authority = PluginRiskMap.ToAuthority(next.Authority);
+                summary = next.Summary;
+                requirePrompt = next.RequirePrompt;
+                facts = new PluginApprovalFacts(risk.Value, authority.Value, summary);
+            }
+            catch (Exception exception)
+            {
+                ReportRaw(hook, "approval", exception.Message);
+            }
+        }
+
+        if (risk == classification.Risk
+            && authority == classification.Authority
+            && summary == classification.Summary
+            && requirePrompt == classification.RequirePrompt)
         {
             return classification;
         }
 
-        return new ToolClassification(
-            risk,
-            classification.Authority,
-            classification.Summary,
-            requirePrompt);
+        return new ToolClassification(risk, authority, summary, requirePrompt);
     }
 
     public string OnCompaction(PluginCompactionPhase phase, string text)
@@ -464,6 +501,21 @@ internal sealed class PluginHookPipeline
         return string.Join("\n\n", parts);
     }
 
+    /// <summary>
+    /// Appends ordinary compaction text, then lets each raw hook replace the
+    /// full text. A raw replacement is kept as returned, including blank text.
+    /// </summary>
+    public string FinishCompaction(PluginCompactionPhase phase, string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var extra = OnCompaction(phase, text);
+        var current = string.IsNullOrWhiteSpace(extra) ? text : text + "\n\n" + extra.Trim();
+        return ReplaceText(
+            current,
+            "compaction",
+            (hook, value) => hook.RewriteCompaction(phase, value));
+    }
+
     public void ReportDetail(string detail)
     {
         if (string.IsNullOrWhiteSpace(detail))
@@ -488,6 +540,32 @@ internal sealed class PluginHookPipeline
         }
 
         _report?.Invoke("Plugin images were ignored because this turn returns text only.");
+    }
+
+    private string ReplaceText(
+        string current,
+        string stage,
+        Func<IPluginRawHook, string, string?> replace)
+    {
+        foreach (var hook in _rawHooks)
+        {
+            try
+            {
+                var next = replace(hook, current);
+                if (next is null)
+                {
+                    continue;
+                }
+
+                current = next;
+            }
+            catch (Exception exception)
+            {
+                ReportRaw(hook, stage, exception.Message);
+            }
+        }
+
+        return current;
     }
 
     private static bool IsTurnModel(PluginModelPurpose purpose) =>

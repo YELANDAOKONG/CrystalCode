@@ -1784,22 +1784,19 @@ public sealed class CodingSession : ITurnObserver
             approval: _approval.Value);
 
     private string CurrentSystemText() =>
-        AppendPluginPrompt(
+        ApplyPluginPrompt(
             _planMode
                 ? _prompts.ComposePlan(CurrentPromptContext())
                 : _prompts.ComposeWork(CurrentPromptContext()),
             _planMode ? "plan" : "work");
 
     private string CurrentReviewSystemText() =>
-        AppendPluginPrompt(
+        ApplyPluginPrompt(
             _prompts.ComposeReview(CurrentPromptContext().WithMode("review")),
             "review");
 
-    private string AppendPluginPrompt(string text, string mode)
-    {
-        var extra = _hooks.OnPrompt(mode, _prompts.Instructions);
-        return extra.Length == 0 ? text : text + "\n\n" + extra;
-    }
+    private string ApplyPluginPrompt(string text, string mode) =>
+        _hooks.FinishPrompt(mode, _prompts.Instructions, text);
 
     private void ReloadPrompts()
     {
@@ -3052,10 +3049,10 @@ public sealed class CodingSession : ITurnObserver
             client,
             SessionRetryOptions.Default,
             attempt => Publish(new RetryScheduled(attempt)),
-            () => AppendPluginPrompt(
+            () => ApplyPluginPrompt(
                 CompactionPrompt.ComposeSystem(CurrentPromptContext().WithMode("compaction")),
                 "compaction"),
-            (phase, text) => _hooks.OnCompaction(phase, text),
+            (phase, text) => _hooks.FinishCompaction(phase, text),
             (items, token) => _hooks.PrepareModelAsync(
                 PluginModelPurpose.Compaction,
                 items,
