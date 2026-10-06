@@ -71,6 +71,27 @@ public sealed class AnthropicMultimodalProviderTests
             ])));
     }
 
+    [Fact]
+    public async Task CompleteAsync_RejectsJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicMultimodalProvider(
+            new AnthropicOptions(
+                "test-key",
+                "claude-test",
+                new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new MultimodalChatRequest(
+                [new MultimodalMessage(MultimodalChatRole.User, [new TextContent("json")])],
+                jsonOutput: JsonResponse.OutputSchema())));
+
+        Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
+    }
+
     private static ImageContent InlineImage(byte[] data) =>
         new(new ImageMedia(
             new InlineMediaSource(data),

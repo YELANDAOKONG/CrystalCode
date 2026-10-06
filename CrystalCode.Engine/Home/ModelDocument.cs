@@ -15,4 +15,6 @@ internal sealed class ModelDocument
     public List<string>? ThinkingEfforts { get; set; }
 
     public bool? ImageInput { get; set; }
+
+    public bool? ThinkingCanDisable { get; set; }
 }

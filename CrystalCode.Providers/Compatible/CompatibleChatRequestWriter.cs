@@ -18,6 +18,7 @@ internal static class CompatibleChatRequestWriter
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(request);
 
+        JsonOutputGuard.Reject(request.JsonOutput, profile.VendorName);
         if (request.Items.Count == 0)
         {
             throw new ArgumentException(
@@ -106,7 +107,7 @@ internal static class CompatibleChatRequestWriter
                     {
                         FlushAssistant(writer, ref assistant);
                     }
-                    FlushPendingToolCalls(writer, pendingToolCallIds);
+                    FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
                     WriteChatMessage(writer, profile, ref assistant, message);
                     break;
                 case ChatReasoningItem reasoning:
@@ -114,7 +115,7 @@ internal static class CompatibleChatRequestWriter
                     {
                         FlushAssistant(writer, ref assistant);
                     }
-                    FlushPendingToolCalls(writer, pendingToolCallIds);
+                    FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
                     AppendReasoning(writer, profile, ref assistant, reasoning);
                     break;
                 case ToolCall toolCall:
@@ -134,27 +135,22 @@ internal static class CompatibleChatRequestWriter
         }
 
         FlushAssistant(writer, ref assistant);
-        FlushPendingToolCalls(writer, pendingToolCallIds);
+        FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
         writer.WriteEndArray();
     }
 
-    private static void FlushPendingToolCalls(Utf8JsonWriter writer, List<string> pendingToolCallIds)
+    private static void FlushPendingToolCalls(
+        Utf8JsonWriter writer,
+        string vendorName,
+        List<string> pendingToolCallIds)
     {
         if (pendingToolCallIds.Count == 0)
         {
             return;
         }
 
-        foreach (var callId in pendingToolCallIds)
-        {
-            writer.WriteStartObject();
-            writer.WriteString("role", "tool");
-            writer.WriteString("tool_call_id", callId);
-            writer.WriteString("content", "Tool execution was cancelled.");
-            writer.WriteEndObject();
-        }
-
-        pendingToolCallIds.Clear();
+        throw new NotSupportedException(
+            $"{vendorName} is missing a tool result for '{pendingToolCallIds[0]}'.");
     }
 
     private static void WriteChatMessage(

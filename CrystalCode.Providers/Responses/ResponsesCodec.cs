@@ -13,6 +13,10 @@ namespace CrystalCode.Providers.Responses;
 internal sealed class ResponsesCodec : IProtocolCodec
 {
     internal const string ReasoningStateFormat = "openai.responses.reasoning";
+
+    // Summary parts and raw reasoning text use separate provider indexes.
+    // Crystal segment indexes are one sequence, so traces stay after summaries.
+    private const int ReasoningTraceSegmentOffset = 1_000_000;
     private readonly string _vendorName;
 
     public ResponsesCodec(string vendorName) => _vendorName = vendorName;
@@ -29,6 +33,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {
+        JsonOutputGuard.Reject(request.JsonOutput, _vendorName);
         if (request.Items.Count == 0)
         {
             throw new ArgumentException($"{_vendorName} requires at least one transcript item.", nameof(request));
@@ -78,20 +83,32 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
     public ChatResponse ReadResponse(JsonElement root)
     {
+        if (root.TryGetProperty("status", out var status)
+            && status.ValueKind == JsonValueKind.String
+            && status.GetString() == "failed")
+        {
+            throw ReadFailure(root);
+        }
+
         if (!root.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array)
         {
             throw CreateException($"{_vendorName} response is missing output items.");
         }
 
         var items = new List<ChatItem>();
+        var refused = false;
         foreach (var item in output.EnumerateArray())
         {
-            ReadOutputItem(item, items);
+            ReadOutputItem(item, items, ref refused);
         }
 
-        return new ChatResponse(
-            [new ChatCandidate(items, ReadFinishReason(root, items))],
-            ReadUsage(root));
+        var finish = ReadFinishReason(root, items, refused);
+        if (finish != FinishReason.ToolCalls)
+        {
+            items.RemoveAll(static item => item is ToolCall);
+        }
+
+        return new ChatResponse([new ChatCandidate(items, finish)], ReadUsage(root));
     }
 
     public IProtocolStreamParser CreateStreamParser() => new StreamParser(this);
@@ -243,40 +260,19 @@ internal sealed class ResponsesCodec : IProtocolCodec
         }
     }
 
-    private void ReadOutputItem(JsonElement item, List<ChatItem> items)
+    private void ReadOutputItem(JsonElement item, List<ChatItem> items, ref bool refused)
     {
         var type = item.GetProperty("type").GetString();
         switch (type)
         {
             case "reasoning":
                 var texts = new List<ReasoningText>();
-                if (item.TryGetProperty("summary", out var summary) && summary.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var part in summary.EnumerateArray())
-                    {
-                        if (part.TryGetProperty("text", out var text))
-                        {
-                            texts.Add(new ReasoningText(text.GetString() ?? "", ReasoningTextKind.Summary));
-                        }
-                    }
-                }
-
+                AppendReasoningTexts(item, "summary", ReasoningTextKind.Summary, texts);
+                AppendReasoningTexts(item, "content", ReasoningTextKind.Trace, texts);
                 items.Add(new ChatReasoningItem(new ReasoningContent(texts, CreateState(item))));
                 break;
             case "message":
-                if (item.TryGetProperty("content", out var content))
-                {
-                    foreach (var part in content.EnumerateArray())
-                    {
-                        if (part.TryGetProperty("type", out var partType)
-                            && partType.GetString() == "output_text"
-                            && part.TryGetProperty("text", out var text))
-                        {
-                            items.Add(new ChatMessage(ChatRole.Assistant, text.GetString() ?? ""));
-                        }
-                    }
-                }
-
+                ReadMessage(item, items, ref refused);
                 break;
             case "function_call":
                 items.Add(new ToolCall(
@@ -287,22 +283,148 @@ internal sealed class ResponsesCodec : IProtocolCodec
         }
     }
 
+    private static void ReadMessage(JsonElement item, List<ChatItem> items, ref bool refused)
+    {
+        if (!item.TryGetProperty("content", out var content))
+        {
+            return;
+        }
+
+        if (content.ValueKind == JsonValueKind.String)
+        {
+            items.Add(new ChatMessage(ChatRole.Assistant, content.GetString() ?? string.Empty));
+            return;
+        }
+
+        if (content.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var part in content.EnumerateArray())
+        {
+            var partType = part.TryGetProperty("type", out var typeElement)
+                ? typeElement.GetString()
+                : null;
+            if (partType == "output_text"
+                && part.TryGetProperty("text", out var text))
+            {
+                items.Add(new ChatMessage(ChatRole.Assistant, text.GetString() ?? string.Empty));
+            }
+            else if (partType == "refusal")
+            {
+                refused = true;
+                var refusal = part.TryGetProperty("refusal", out var refusalText)
+                    ? refusalText.GetString()
+                    : null;
+                if (!string.IsNullOrEmpty(refusal))
+                {
+                    items.Add(new ChatMessage(ChatRole.Assistant, refusal));
+                }
+            }
+        }
+    }
+
+    private static void AppendReasoningTexts(
+        JsonElement item,
+        string propertyName,
+        ReasoningTextKind kind,
+        List<ReasoningText> texts)
+    {
+        if (!item.TryGetProperty(propertyName, out var parts)
+            || parts.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        foreach (var part in parts.EnumerateArray())
+        {
+            string? text = null;
+            if (part.ValueKind == JsonValueKind.String)
+            {
+                text = part.GetString();
+            }
+            else if (part.ValueKind == JsonValueKind.Object
+                && part.TryGetProperty("text", out var textElement)
+                && textElement.ValueKind == JsonValueKind.String)
+            {
+                text = textElement.GetString();
+            }
+
+            if (!string.IsNullOrEmpty(text))
+            {
+                texts.Add(new ReasoningText(text, kind));
+            }
+        }
+    }
+
     private static OpaqueReasoningState CreateState(JsonElement item) =>
         new(ReasoningStateFormat, Encoding.UTF8.GetBytes(item.GetRawText()));
 
-    private static FinishReason ReadFinishReason(JsonElement root, IReadOnlyList<ChatItem> items)
+    private static FinishReason ReadFinishReason(
+        JsonElement root,
+        IReadOnlyList<ChatItem> items,
+        bool refused)
     {
+        if (refused)
+        {
+            return FinishReason.ContentFilter;
+        }
+
+        if (root.TryGetProperty("status", out var status) && status.GetString() == "incomplete")
+        {
+            return ReadIncomplete(root);
+        }
+
         if (items.Any(static item => item is ToolCall))
         {
             return FinishReason.ToolCalls;
         }
 
-        if (root.TryGetProperty("status", out var status) && status.GetString() == "incomplete")
+        return FinishReason.Stop;
+    }
+
+    private static FinishReason ReadIncomplete(JsonElement response)
+    {
+        string? reason = null;
+        if (response.TryGetProperty("incomplete_details", out var details)
+            && details.ValueKind == JsonValueKind.Object
+            && details.TryGetProperty("reason", out var reasonElement)
+            && reasonElement.ValueKind == JsonValueKind.String)
         {
-            return FinishReason.Length;
+            reason = reasonElement.GetString();
         }
 
-        return FinishReason.Stop;
+        return reason switch
+        {
+            "content_filter" => FinishReason.ContentFilter,
+            "max_output_tokens" => FinishReason.Length,
+            null or "" => new FinishReason("incomplete"),
+            _ => new FinishReason(reason!)
+        };
+    }
+
+    private Exception ReadFailure(JsonElement root)
+    {
+        var message = $"{_vendorName} generation failed.";
+        string? code = null;
+        if (root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
+        {
+            if (error.TryGetProperty("message", out var messageElement)
+                && messageElement.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(messageElement.GetString()))
+            {
+                message = messageElement.GetString()!;
+            }
+
+            if (error.TryGetProperty("code", out var codeElement)
+                && codeElement.ValueKind == JsonValueKind.String)
+            {
+                code = codeElement.GetString();
+            }
+        }
+
+        return CreateException(message, errorCode: code);
     }
 
     private static TokenUsage? ReadUsage(JsonElement root)
@@ -328,6 +450,8 @@ internal sealed class ResponsesCodec : IProtocolCodec
     {
         private readonly ResponsesCodec _codec;
         private bool _hasTools;
+        private bool _refused;
+        private bool _refusalTextEmitted;
 
         public StreamParser(ResponsesCodec codec) => _codec = codec;
 
@@ -348,11 +472,32 @@ internal sealed class ResponsesCodec : IProtocolCodec
             switch (type)
             {
                 case "response.reasoning_summary_text.delta":
+                    events.Add(new ChatReasoningTextDelta(
+                        0,
+                        outputIndex,
+                        ReadIndex(root, "summary_index"),
+                        ReasoningTextKind.Summary,
+                        root.GetProperty("delta").GetString() ?? ""));
+                    break;
                 case "response.reasoning_text.delta":
-                    events.Add(new ChatReasoningTextDelta(0, outputIndex, 0, ReasoningTextKind.Summary, root.GetProperty("delta").GetString() ?? ""));
+                    events.Add(new ChatReasoningTextDelta(
+                        0,
+                        outputIndex,
+                        checked(ReadIndex(root, "content_index") + ReasoningTraceSegmentOffset),
+                        ReasoningTextKind.Trace,
+                        root.GetProperty("delta").GetString() ?? ""));
                     break;
                 case "response.output_text.delta":
                     events.Add(new ChatTextDelta(0, outputIndex, ChatRole.Assistant, root.GetProperty("delta").GetString() ?? ""));
+                    break;
+                case "response.refusal.delta":
+                    _refused = true;
+                    _refusalTextEmitted = true;
+                    events.Add(new ChatTextDelta(
+                        0,
+                        outputIndex,
+                        ChatRole.Assistant,
+                        root.GetProperty("delta").GetString() ?? ""));
                     break;
                 case "response.output_item.added":
                     ReadAddedItem(root, outputIndex, events);
@@ -372,7 +517,14 @@ internal sealed class ResponsesCodec : IProtocolCodec
                         events.Add(new ChatUsageReceived(usage));
                     }
 
-                    events.Add(new ChatCandidateCompleted(0, _hasTools ? FinishReason.ToolCalls : type == "response.incomplete" ? FinishReason.Length : FinishReason.Stop));
+                    var finish = type == "response.incomplete"
+                        ? ReadIncomplete(response)
+                        : _refused
+                            ? FinishReason.ContentFilter
+                            : _hasTools
+                                ? FinishReason.ToolCalls
+                                : FinishReason.Stop;
+                    events.Add(new ChatCandidateCompleted(0, finish));
                     IsComplete = true;
                     break;
                 case "response.failed":
@@ -404,13 +556,52 @@ internal sealed class ResponsesCodec : IProtocolCodec
             }
         }
 
-        private static void ReadDoneItem(JsonElement root, int outputIndex, List<ChatStreamEvent> events)
+        private void ReadDoneItem(JsonElement root, int outputIndex, List<ChatStreamEvent> events)
         {
             var item = root.GetProperty("item");
-            if (item.GetProperty("type").GetString() == "reasoning")
+            var type = item.GetProperty("type").GetString();
+            if (type == "reasoning")
             {
                 events.Add(new ChatReasoningStateReceived(0, outputIndex, CreateState(item)));
+                return;
             }
+
+            if (type != "message" || _refusalTextEmitted || !item.TryGetProperty("content", out var content))
+            {
+                return;
+            }
+
+            if (content.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var part in content.EnumerateArray())
+            {
+                if (part.TryGetProperty("type", out var partType)
+                    && partType.GetString() == "refusal"
+                    && part.TryGetProperty("refusal", out var refusal)
+                    && !string.IsNullOrEmpty(refusal.GetString()))
+                {
+                    _refused = true;
+                    _refusalTextEmitted = true;
+                    events.Add(new ChatTextDelta(
+                        0,
+                        outputIndex,
+                        ChatRole.Assistant,
+                        refusal.GetString()!));
+                }
+            }
+        }
+
+        private static int ReadIndex(JsonElement root, string name)
+        {
+            if (root.TryGetProperty(name, out var index) && index.ValueKind == JsonValueKind.Number)
+            {
+                return index.GetInt32();
+            }
+
+            return 0;
         }
     }
 }

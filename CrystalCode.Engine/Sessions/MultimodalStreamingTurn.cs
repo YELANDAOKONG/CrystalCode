@@ -156,6 +156,22 @@ public sealed class MultimodalStreamingTurn
                 _observer?.OnUsageUpdated(response.Usage ?? usage.Last, usage.Build());
 
                 var candidate = response.Candidates[0];
+                if (CandidateRound.TryStop(candidate, transcript, out var stopReason, out var fault))
+                {
+                    if (fault is not null)
+                    {
+                        _observer?.OnFault(fault);
+                    }
+
+                    _observer?.OnModelRoundClosed();
+                    return Create(
+                        stopReason,
+                        modelCallCount,
+                        toolCallCount,
+                        usage,
+                        transcript);
+                }
+
                 transcript.AddRange(candidate.Items);
                 var toolCalls = candidate.Items.OfType<ToolCall>().ToArray();
                 if (toolCalls.Length == 0)

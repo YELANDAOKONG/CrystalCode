@@ -768,6 +768,12 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
+            if (selection == ThinkingSelection.Off && !model.ThinkingCanDisable)
+            {
+                Error("The selected model cannot disable thinking.");
+                return;
+            }
+
             if (selection != ThinkingSelection.Default
                 && selection != ThinkingSelection.Off
                 && !model.AllowsEffort(selection.Value))

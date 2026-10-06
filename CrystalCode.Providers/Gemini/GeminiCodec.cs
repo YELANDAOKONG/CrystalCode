@@ -33,6 +33,7 @@ internal sealed class GeminiCodec : IProtocolCodec
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {
+        JsonOutputGuard.Reject(request.JsonOutput, "Gemini");
         if (request.Items.Count == 0)
         {
             throw new ArgumentException("Gemini requires at least one transcript item.", nameof(request));
@@ -52,7 +53,7 @@ internal sealed class GeminiCodec : IProtocolCodec
                     lastPart = null;
                     break;
                 case ChatMessage message:
-                    FlushPending(contents, pending);
+                    FlushPending(pending);
                     lastPart = new JsonObject { ["text"] = message.Text };
                     AddPart(contents, message.Role == ChatRole.Assistant ? "model" : "user", lastPart);
                     break;
@@ -107,15 +108,15 @@ internal sealed class GeminiCodec : IProtocolCodec
                     lastPart = null;
                     break;
                 case ChatReasoningItem:
-                    lastPart = null;
-                    break;
+                    throw new NotSupportedException(
+                        "Gemini requires its signed part state to replay reasoning.");
                 default:
                     throw new NotSupportedException(
                         $"Gemini does not support chat item type {item.GetType().Name}.");
             }
         }
 
-        FlushPending(contents, pending);
+        FlushPending(pending);
         var root = new JsonObject { ["contents"] = contents };
         if (systemParts.Count > 0)
         {
@@ -178,19 +179,19 @@ internal sealed class GeminiCodec : IProtocolCodec
         var result = new List<ChatCandidate>();
         foreach (var candidate in candidates.EnumerateArray())
         {
+            var hasTools = CandidateHasFunctionCall(candidate);
+            var finish = ReadFinish(candidate, hasTools);
             var items = new List<ChatItem>();
             if (candidate.TryGetProperty("content", out var content)
                 && content.TryGetProperty("parts", out var parts))
             {
                 foreach (var part in parts.EnumerateArray())
                 {
-                    ReadPart(part, items);
+                    ReadPart(part, items, finish == FinishReason.ToolCalls);
                 }
             }
 
-            result.Add(new ChatCandidate(items, ReadFinish(
-                candidate,
-                items.Any(static item => item is ToolCall))));
+            result.Add(new ChatCandidate(items, finish));
         }
 
         return new ChatResponse(result, ReadUsage(root));
@@ -255,10 +256,15 @@ internal sealed class GeminiCodec : IProtocolCodec
             && currentText.GetValue<string>() == replayText.GetValue<string>();
     }
 
-    internal static void ReadPart(JsonElement part, List<ChatItem> items)
+    internal static void ReadPart(JsonElement part, List<ChatItem> items, bool includeTools = true)
     {
         if (part.TryGetProperty("functionCall", out var function))
         {
+            if (!includeTools)
+            {
+                return;
+            }
+
             var name = function.GetProperty("name").GetString() ?? string.Empty;
             var id = function.TryGetProperty("id", out var identifier)
                 ? identifier.GetString()
@@ -314,22 +320,60 @@ internal sealed class GeminiCodec : IProtocolCodec
 
     internal static FinishReason ReadFinish(JsonElement candidate, bool hasTools)
     {
-        if (hasTools)
-        {
-            return FinishReason.ToolCalls;
-        }
-
         var reason = candidate.TryGetProperty("finishReason", out var finish)
             && finish.ValueKind == JsonValueKind.String
                 ? finish.GetString()
                 : null;
-        return reason switch
+        if (IsContentFilter(reason))
         {
-            "MAX_TOKENS" => FinishReason.Length,
-            "SAFETY" or "RECITATION" => FinishReason.ContentFilter,
-            _ => FinishReason.Stop
-        };
+            return FinishReason.ContentFilter;
+        }
+
+        if (reason == "MAX_TOKENS")
+        {
+            return FinishReason.Length;
+        }
+
+        if (hasTools && reason is null or "STOP")
+        {
+            return FinishReason.ToolCalls;
+        }
+
+        if (reason is null or "STOP")
+        {
+            return FinishReason.Stop;
+        }
+
+        return new FinishReason(reason);
     }
+
+    private static bool CandidateHasFunctionCall(JsonElement candidate)
+    {
+        if (!candidate.TryGetProperty("content", out var content)
+            || !content.TryGetProperty("parts", out var parts)
+            || parts.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (var part in parts.EnumerateArray())
+        {
+            if (part.TryGetProperty("functionCall", out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsContentFilter(string? reason) =>
+        reason is "SAFETY"
+            or "RECITATION"
+            or "BLOCKLIST"
+            or "PROHIBITED_CONTENT"
+            or "SPII"
+            or "IMAGE_SAFETY";
 
     internal static TokenUsage? ReadUsage(JsonElement root)
     {
@@ -350,14 +394,21 @@ internal sealed class GeminiCodec : IProtocolCodec
         return new TokenUsage(input, output + thoughts, thoughts);
     }
 
-    private static void FlushPending(JsonArray contents, Dictionary<string, string> pending)
+    private static void FlushPending(Dictionary<string, string> pending)
     {
-        foreach (var (id, name) in pending)
+        if (pending.Count == 0)
         {
-            AddPart(contents, "user", CreateResult(id, name, "Tool execution was cancelled.", true));
+            return;
         }
 
-        pending.Clear();
+        var callId = string.Empty;
+        foreach (var id in pending.Keys)
+        {
+            callId = id;
+            break;
+        }
+
+        throw new NotSupportedException($"Gemini is missing a tool result for '{callId}'.");
     }
 
     private void WriteReasoning(JsonObject generation, ReasoningOptions? reasoning)
@@ -367,14 +418,17 @@ internal sealed class GeminiCodec : IProtocolCodec
             return;
         }
 
-        if (reasoning.TokenBudget is not null)
+        var disabled = reasoning.Mode == ReasoningMode.Disabled
+            || reasoning.Output == ReasoningOutput.None;
+        if (disabled)
         {
-            throw new NotSupportedException("Gemini does not support a reasoning token budget here.");
-        }
+            if (reasoning.Effort is not null || reasoning.TokenBudget is not null)
+            {
+                throw new NotSupportedException(
+                    "Gemini does not apply reasoning effort or a token budget when thinking is disabled.");
+            }
 
-        if (reasoning.Mode == ReasoningMode.Disabled || reasoning.Output == ReasoningOutput.None)
-        {
-            if (_model.StartsWith("gemini-3", StringComparison.Ordinal))
+            if (IsGemini3)
             {
                 throw new NotSupportedException("Gemini 3 thinking cannot be disabled.");
             }
@@ -383,31 +437,44 @@ internal sealed class GeminiCodec : IProtocolCodec
             return;
         }
 
-        if (reasoning.Effort is not { } effort)
+        if (reasoning.Effort is not null && reasoning.TokenBudget is not null)
         {
+            throw new NotSupportedException(
+                "Gemini does not accept a reasoning effort and a token budget together.");
+        }
+
+        if (reasoning.Effort is { } effort)
+        {
+            if (!IsGemini3)
+            {
+                throw new NotSupportedException(
+                    "This Gemini model does not accept a reasoning effort. Set a reasoning token budget instead.");
+            }
+
+            if (effort.Value is not ("low" or "medium" or "high"))
+            {
+                throw new NotSupportedException(
+                    $"Gemini does not support reasoning effort '{effort.Value}'.");
+            }
+
+            generation["thinkingConfig"] = new JsonObject
+            {
+                ["thinkingLevel"] = effort.Value.ToUpperInvariant()
+            };
             return;
         }
 
-        var level = effort == ReasoningEffort.Maximum ? "high" : effort.Value;
-        if (_model.StartsWith("gemini-2.5", StringComparison.Ordinal))
+        if (reasoning.TokenBudget is { } budget)
         {
-            var budget = level switch
+            if (IsGemini3)
             {
-                "minimal" or "low" => 1024,
-                "medium" => 8192,
-                "high" => 24576,
-                _ => throw new NotSupportedException("Gemini reasoning effort is unsupported.")
-            };
-            generation["thinkingConfig"] = new JsonObject { ["thinkingBudget"] = budget };
-        }
-        else
-        {
-            if (level == "minimal")
-            {
-                throw new NotSupportedException("This Gemini model does not support minimal thinking.");
+                throw new NotSupportedException(
+                    "Gemini 3 does not accept a reasoning token budget.");
             }
 
-            generation["thinkingConfig"] = new JsonObject { ["thinkingLevel"] = level.ToUpperInvariant() };
+            generation["thinkingConfig"] = new JsonObject { ["thinkingBudget"] = budget };
         }
     }
+
+    private bool IsGemini3 => _model.StartsWith("gemini-3", StringComparison.Ordinal);
 }

@@ -51,6 +51,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         MultimodalChatRequest request,
         bool stream)
     {
+        JsonOutputGuard.Reject(request.JsonOutput, _vendorName);
         if (request.Items.Count == 0)
         {
             throw new ArgumentException(
@@ -391,7 +392,9 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 reasoning.Content.TextSegments.Select(static text =>
                     new MultimodalReasoningPart(
                         new TextContent(text.Text),
-                        MultimodalReasoningKind.Summary)),
+                        text.Kind == ReasoningTextKind.Trace
+                            ? MultimodalReasoningKind.Trace
+                            : MultimodalReasoningKind.Summary)),
                 reasoning.Content.State)),
         ToolCall call => new MultimodalToolCall(
             call.CallId,
@@ -448,7 +451,9 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 reasoning.CandidateIndex,
                 reasoning.ItemIndex,
                 reasoning.TextSegmentIndex,
-                MultimodalReasoningKind.Summary,
+                reasoning.Kind == ReasoningTextKind.Trace
+                    ? MultimodalReasoningKind.Trace
+                    : MultimodalReasoningKind.Summary,
                 reasoning.Text),
             ChatReasoningStateReceived reasoning =>
                 new MultimodalReasoningStateReceived(

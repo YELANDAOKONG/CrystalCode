@@ -307,6 +307,68 @@ public sealed class StreamingTurnTests
         Assert.Equal("slow down", observer.Fault);
     }
 
+    [Fact]
+    public async Task RunAsync_LengthStopsBeforeToolExecution()
+    {
+        var client = new ScriptedStreamingClient(
+        [
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "cut"),
+            new ChatToolCallDelta(0, 1, "c1", "echo", "{}"),
+            new ChatCandidateCompleted(0, FinishReason.Length)
+        ]);
+        var turn = CreateTurn(client);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.OutputTruncated, result.StopReason);
+        Assert.Equal(0, result.ToolCallCount);
+        Assert.DoesNotContain(result.Transcript, static item => item is ToolCall);
+        Assert.Equal("cut", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    [Fact]
+    public async Task RunAsync_ContentFilterStopsBeforeToolExecution()
+    {
+        var client = new ScriptedStreamingClient(
+        [
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "blocked"),
+            new ChatToolCallDelta(0, 1, "c1", "echo", "{}"),
+            new ChatCandidateCompleted(0, FinishReason.ContentFilter)
+        ]);
+        var turn = CreateTurn(client);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.ContentFiltered, result.StopReason);
+        Assert.Equal(0, result.ToolCallCount);
+        Assert.DoesNotContain(result.Transcript, static item => item is ToolCall or ToolResult);
+        Assert.Equal("blocked", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    [Fact]
+    public async Task RunAsync_UnknownFinishReasonFailsTheTurn()
+    {
+        var observer = new TestObserver();
+        var client = new ScriptedStreamingClient(
+        [
+            new ChatCandidateCompleted(0, new FinishReason("MALFORMED_FUNCTION_CALL"))
+        ]);
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.Failed, result.StopReason);
+        Assert.Equal(
+            "Model stopped with finish reason 'MALFORMED_FUNCTION_CALL'.",
+            observer.Fault);
+    }
+
     private static SessionRetryOptions InstantRetry(int maximumRetries = 5) =>
         new(
             maximumRetries,

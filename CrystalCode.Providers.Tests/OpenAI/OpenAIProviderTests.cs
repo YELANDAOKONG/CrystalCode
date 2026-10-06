@@ -1,5 +1,7 @@
+using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Crystal.Tools;
 
 using CrystalCode.Providers.OpenAI;
 
@@ -133,5 +135,23 @@ public sealed class OpenAIProviderTests
             ]));
 
         Assert.Contains("\"reasoning_content\":\"thought\"", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsUnmatchedToolCall()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(new OpenAIOptions("test-key", "gpt-test"), http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+            [
+                new ChatMessage(ChatRole.User, "read"),
+                new ToolCall("call_1", "read", "{}")
+            ])));
+
+        Assert.Contains("missing a tool result for 'call_1'", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
     }
 }

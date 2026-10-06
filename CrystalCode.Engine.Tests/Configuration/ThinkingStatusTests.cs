@@ -46,4 +46,16 @@ public sealed class ThinkingStatusTests
 
         Assert.Equal("Think Default", ThinkingStatus.For(model, ThinkingSelection.Parse("medium")));
     }
+
+    [Fact]
+    public void For_ShowsDefaultWhenOffCannotBeDisabled()
+    {
+        var model = new ModelSettings(
+            1000,
+            thinking: true,
+            thinkingEfforts: ["low", "high"],
+            thinkingCanDisable: false);
+
+        Assert.Equal("Think Default", ThinkingStatus.For(model, ThinkingSelection.Off));
+    }
 }

@@ -35,6 +35,7 @@ internal sealed class OllamaMultimodalCodec : IMultimodalProtocolCodec
         MultimodalChatRequest request,
         bool stream)
     {
+        JsonOutputGuard.Reject(request.JsonOutput, "Ollama");
         var bridge = new NativeMultimodalRequest();
         var body = _text.WriteRequest(options, bridge.Convert(request), stream);
         if (bridge.Images.Count == 0)

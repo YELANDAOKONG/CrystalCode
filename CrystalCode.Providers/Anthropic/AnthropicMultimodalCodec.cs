@@ -17,9 +17,12 @@ namespace CrystalCode.Providers.Anthropic;
 internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
 {
     private readonly AnthropicCodec _textCodec;
+    private readonly string _vendorName;
 
     public AnthropicMultimodalCodec(string vendorName)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
+        _vendorName = vendorName;
         _textCodec = new AnthropicCodec(vendorName);
     }
 
@@ -42,6 +45,7 @@ internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
         bool stream)
     {
         ArgumentNullException.ThrowIfNull(request);
+        JsonOutputGuard.Reject(request.JsonOutput, _vendorName);
         var images = new Dictionary<string, ImageContent>(StringComparer.Ordinal);
         var items = request.Items.Select(item => ConvertItem(item, images)).ToArray();
         var bytes = _textCodec.WriteRequest(

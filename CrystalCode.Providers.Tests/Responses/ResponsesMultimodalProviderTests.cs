@@ -161,4 +161,20 @@ public sealed class ResponsesMultimodalProviderTests
         new(new ImageMedia(
             new UriMediaSource(uri),
             new MediaMimeType(mimeType)));
+
+    [Fact]
+    public async Task CompleteAsync_RejectsJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = CreateProvider(http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new MultimodalChatRequest(
+                [new MultimodalMessage(MultimodalChatRole.User, [new TextContent("json")])],
+                jsonOutput: JsonResponse.OutputSchema())));
+
+        Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
+    }
 }

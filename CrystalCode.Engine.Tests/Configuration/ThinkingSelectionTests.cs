@@ -102,4 +102,24 @@ public sealed class ThinkingSelectionTests
 
         Assert.Equal(ThinkingSelection.Default, next);
     }
+
+    [Fact]
+    public void ToReasoningOptions_UsesAutomaticWhenThinkingCannotBeDisabled()
+    {
+        var model = new ModelSettings(
+            1000,
+            thinking: true,
+            thinkingEfforts: ["low", "high"],
+            thinkingCanDisable: false);
+
+        var options = ThinkingSelection.Off.ToReasoningOptions(model);
+        var choices = ThinkingSelection.ChoicesFor(model);
+
+        Assert.NotNull(options);
+        Assert.Equal(ReasoningMode.Automatic, options.Mode);
+        Assert.DoesNotContain(ThinkingSelection.Off, choices);
+        Assert.Equal(
+            new ThinkingSelection("low"),
+            ThinkingSelection.Next(ThinkingSelection.Default, model));
+    }
 }

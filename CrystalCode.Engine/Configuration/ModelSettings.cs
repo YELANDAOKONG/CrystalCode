@@ -13,7 +13,8 @@ public sealed record ModelSettings
         int? maxTokens = null,
         bool thinking = false,
         IReadOnlyList<string>? thinkingEfforts = null,
-        bool imageInput = false)
+        bool imageInput = false,
+        bool thinkingCanDisable = true)
     {
         if (contextWindow <= 0)
         {
@@ -54,6 +55,7 @@ public sealed record ModelSettings
         Thinking = thinking;
         ThinkingEfforts = NormalizeEfforts(thinking, thinkingEfforts);
         ImageInput = imageInput;
+        ThinkingCanDisable = thinkingCanDisable;
     }
 
     public int ContextWindow { get; }
@@ -70,6 +72,12 @@ public sealed record ModelSettings
 
     /// <summary>Gets whether the configured model accepts image input.</summary>
     public bool ImageInput { get; }
+
+    /// <summary>
+    /// Gets whether the host may ask this model to disable thinking.
+    /// Gemini 3 models reject that request.
+    /// </summary>
+    public bool ThinkingCanDisable { get; }
 
     public bool AllowsEffort(string effort)
     {

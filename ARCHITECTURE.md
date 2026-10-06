@@ -314,11 +314,16 @@ One user message is one turn:
    discarded. HTTP 401, 403, quota, `invalid_prompt`, and context
    overflow are not retried. User cancel still interrupts immediately.
 3. Select candidate zero.
-4. If the candidate has tool calls, execute the full batch through
+4. Stop before tools when the finish reason is not a normal stop or a tool
+   request. `length` keeps the assistant text, drops tool calls, and stops
+   as `output_truncated`. A content filter keeps the text and stops as
+   `content_filtered`. Any other reason stops as `failed` and publishes
+   `Model stopped with finish reason '<value>'.` These stops do not compact.
+5. If the candidate has tool calls, execute the full batch through
    `ToolExecutor`, or the multimodal bridge for an image-capable turn
    (approval runs first in either case).
-5. Append exact `ToolResult` values.
-6. Repeat until the candidate has no tool calls, a configured limit stops
+6. Append exact `ToolResult` values.
+7. Repeat until the candidate has no tool calls, a configured limit stops
    the turn, or the user cancels. Before each model round, compact if the
    estimated transcript or the last model-round usage is over budget. One
    failed compact while still over budget stops the turn
@@ -879,7 +884,11 @@ For a mixed-protocol gateway, `providers.openrouter` may instead be an array:
 thinking and which Crystal effort names it accepts (`minimal`, `low`,
 `medium`, `high`, `maximum`). `max` is accepted as `maximum`. Built-in
 DeepSeek V4 models enable thinking with `low`, `high`, and `maximum`. An empty `thinkingEfforts`
-list is on/off only.
+list is on/off only. `thinkingCanDisable` defaults to true. Set it to
+false when the model rejects a request to turn thinking off. Built-in
+Gemini 3 models do. `/thinking` then omits Off. A stored Off gear falls
+back to the provider default and the status bar shows `Think Default`.
+An explicit `/thinking off` is refused.
 
 `thinkingEffort` is the operator choice: `default`, `off` (`none` is
 the same), or a Crystal effort name. It is not stored on the model. `/thinking` (alias

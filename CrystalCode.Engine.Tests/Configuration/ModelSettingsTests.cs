@@ -76,4 +76,14 @@ public sealed class ModelSettingsTests
 
         Assert.True(model.ImageInput);
     }
+
+    [Fact]
+    public void Constructor_DefaultsThinkingCanDisableToTrue()
+    {
+        Assert.True(new ModelSettings(1000, thinking: true).ThinkingCanDisable);
+        Assert.False(new ModelSettings(
+            1000,
+            thinking: true,
+            thinkingCanDisable: false).ThinkingCanDisable);
+    }
 }

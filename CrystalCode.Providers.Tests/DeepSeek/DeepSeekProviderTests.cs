@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
+using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
@@ -65,43 +66,27 @@ public sealed class DeepSeekProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_OrphanedToolCall_FlushesSyntheticToolMessage()
+    public async Task CompleteAsync_RejectsUnmatchedToolCall()
     {
-        var handler = new RecordingHandler(
-            JsonResponse.Create(
-                """
-                {
-                  "choices": [
-                    {
-                      "message": { "role": "assistant", "content": "recovered" },
-                      "finish_reason": "stop"
-                    }
-                  ]
-                }
-                """));
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
         using var http = new HttpClient(handler);
         using var provider = new DeepSeekProvider(
             new DeepSeekOptions("test-key", "deepseek-v4-flash"),
             http);
 
-        // Transcript has tool call with no following tool result before next user message
-        var response = await provider.CompleteAsync(
-            new ChatRequest(
-                [
-                    new ChatMessage(ChatRole.System, "system"),
-                    new ToolCall("call_dangling", "bash", "{\"command\":\"ls\"}"),
-                    new ChatMessage(ChatRole.User, "next user message")
-                ]));
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+            [
+                new ChatMessage(ChatRole.System, "system"),
+                new ToolCall("call_dangling", "bash", "{\"command\":\"ls\"}"),
+                new ChatMessage(ChatRole.User, "next user message")
+            ])));
 
-        Assert.NotNull(handler.Body);
-        Assert.Contains("\"role\":\"tool\"", handler.Body, StringComparison.Ordinal);
-        Assert.Contains("\"tool_call_id\":\"call_dangling\"", handler.Body, StringComparison.Ordinal);
-        using var body = System.Text.Json.JsonDocument.Parse(handler.Body);
-        var messages = body.RootElement.GetProperty("messages");
-        Assert.Equal("assistant", messages[1].GetProperty("role").GetString());
-        Assert.Equal("tool", messages[2].GetProperty("role").GetString());
-        Assert.Equal("user", messages[3].GetProperty("role").GetString());
-        Assert.Equal("recovered", Assert.IsType<ChatMessage>(response.Candidates[0].Items[0]).Text);
+        Assert.Contains(
+            "missing a tool result for 'call_dangling'",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.Null(handler.Body);
     }
 
     [Fact]
@@ -150,5 +135,23 @@ public sealed class DeepSeekProviderTests
         Assert.Equal(429, exception.StatusCode);
         Assert.Equal("rate_limit_exceeded", exception.ErrorCode);
         Assert.Equal(TimeSpan.FromSeconds(8), exception.RetryAfter);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "json")],
+                jsonOutput: JsonResponse.OutputSchema())));
+
+        Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
     }
 }

@@ -17,6 +17,10 @@ public sealed record TurnStopReason
 
     public static TurnStopReason ContextOverflow { get; } = new("context_overflow");
 
+    public static TurnStopReason OutputTruncated { get; } = new("output_truncated");
+
+    public static TurnStopReason ContentFiltered { get; } = new("content_filtered");
+
     public static TurnStopReason Failed { get; } = new("failed");
 
     public TurnStopReason(string value)

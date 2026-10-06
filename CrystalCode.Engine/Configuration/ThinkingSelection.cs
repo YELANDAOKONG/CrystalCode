@@ -86,6 +86,11 @@ public sealed record ThinkingSelection
 
         if (this == Off)
         {
+            if (!model.ThinkingCanDisable)
+            {
+                return new ReasoningOptions(ReasoningMode.Automatic);
+            }
+
             return new ReasoningOptions(ReasoningMode.Disabled);
         }
 
@@ -105,7 +110,12 @@ public sealed record ThinkingSelection
             return [];
         }
 
-        var choices = new List<ThinkingSelection> { Default, Off };
+        var choices = new List<ThinkingSelection> { Default };
+        if (model.ThinkingCanDisable)
+        {
+            choices.Add(Off);
+        }
+
         foreach (var effort in model.ThinkingEfforts)
         {
             choices.Add(new ThinkingSelection(effort));

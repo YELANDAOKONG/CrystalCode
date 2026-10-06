@@ -22,6 +22,7 @@ internal static class CompatibleMultimodalRequestWriter
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(request);
+        JsonOutputGuard.Reject(request.JsonOutput, profile.VendorName);
 
         var replacements = new Dictionary<string, ImageContent>(StringComparer.Ordinal);
         var items = request.Items.Select(item => ConvertItem(item, replacements)).ToArray();

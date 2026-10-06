@@ -67,12 +67,14 @@ public sealed class ProviderCatalog
                     1_048_576,
                     thinking: true,
                     thinkingEfforts: ["low", "medium", "high"],
-                    imageInput: true),
+                    imageInput: true,
+                    thinkingCanDisable: false),
                 ["gemini-3.1-pro-preview"] = new(
                     1_048_576,
                     thinking: true,
                     thinkingEfforts: ["low", "medium", "high"],
-                    imageInput: true)
+                    imageInput: true,
+                    thinkingCanDisable: false)
             }),
         new ProviderDefinition(
             ProviderName.Ollama,

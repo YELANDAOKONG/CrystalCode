@@ -31,6 +31,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {
+        JsonOutputGuard.Reject(request.JsonOutput, _vendorName);
         if (request.Items.Count == 0)
         {
             throw new ArgumentException($"{_vendorName} requires at least one transcript item.", nameof(request));

@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Crystal;
 using Crystal.Media;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
@@ -81,5 +82,23 @@ public sealed class GeminiMultimodalProviderTests
         Assert.Equal("image/png", inline.GetProperty("mimeType").GetString());
         Assert.Equal("AQID", inline.GetProperty("data").GetString());
         Assert.DoesNotContain("crystal-image", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiMultimodalProvider(
+            new GeminiOptions("test-key", "gemini-test"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new MultimodalChatRequest(
+                [new MultimodalMessage(MultimodalChatRole.User, [new TextContent("json")])],
+                jsonOutput: JsonResponse.OutputSchema())));
+
+        Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
     }
 }

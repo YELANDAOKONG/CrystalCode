@@ -134,33 +134,36 @@ public sealed class ChatStreamAssembler
 
     private sealed class ItemBuffer
     {
-        private readonly Dictionary<int, StringBuilder> _reasoningSegments = [];
+        private readonly Dictionary<int, SegmentBuffer> _reasoningSegments = [];
         private readonly StringBuilder _text = new();
         private readonly StringBuilder _callId = new();
         private readonly StringBuilder _name = new();
         private readonly StringBuilder _arguments = new();
         private ItemKind _kind;
         private ChatRole? _role;
-        private ReasoningTextKind? _reasoningKind;
         private OpaqueReasoningState? _state;
 
         public void AppendReasoning(int textSegmentIndex, ReasoningTextKind kind, string text)
         {
             SetKind(ItemKind.Reasoning);
-            _reasoningKind ??= kind;
-            if (_reasoningKind != kind)
-            {
-                throw new InvalidOperationException(
-                    "A streamed reasoning item changed its text classification.");
-            }
-
             if (!_reasoningSegments.TryGetValue(textSegmentIndex, out var segment))
             {
-                segment = new StringBuilder();
+                segment = new SegmentBuffer();
                 _reasoningSegments[textSegmentIndex] = segment;
             }
 
-            segment.Append(text);
+            if (!segment.HasKind)
+            {
+                segment.Kind = kind;
+                segment.HasKind = true;
+            }
+            else if (segment.Kind != kind)
+            {
+                throw new InvalidOperationException(
+                    "A streamed reasoning segment changed its text classification.");
+            }
+
+            segment.Text.Append(text);
         }
 
         public void AppendText(ChatRole role, string text)
@@ -213,12 +216,13 @@ public sealed class ChatStreamAssembler
 
         private ChatReasoningItem? TryToReasoningItem()
         {
-            var kind = _reasoningKind ?? ReasoningTextKind.Trace;
             var segments = _reasoningSegments
                 .OrderBy(static pair => pair.Key)
-                .Select(static pair => pair.Value.ToString())
-                .Where(static text => text.Length > 0)
-                .Select(text => new ReasoningText(text, kind))
+                .Select(static pair => pair.Value)
+                .Where(static segment => segment.Text.Length > 0)
+                .Select(static segment => new ReasoningText(
+                    segment.Text.ToString(),
+                    segment.Kind))
                 .ToArray();
             if (segments.Length == 0 && _state is null)
             {
@@ -226,6 +230,15 @@ public sealed class ChatStreamAssembler
             }
 
             return new ChatReasoningItem(new ReasoningContent(segments, _state));
+        }
+
+        private sealed class SegmentBuffer
+        {
+            public ReasoningTextKind Kind { get; set; } = ReasoningTextKind.Trace;
+
+            public bool HasKind { get; set; }
+
+            public StringBuilder Text { get; } = new();
         }
 
         private void SetKind(ItemKind kind)

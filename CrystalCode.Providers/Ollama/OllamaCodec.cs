@@ -26,6 +26,7 @@ internal sealed class OllamaCodec : IProtocolCodec
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {
+        JsonOutputGuard.Reject(request.JsonOutput, "Ollama");
         if (request.Items.Count == 0)
         {
             throw new ArgumentException("Ollama requires at least one transcript item.", nameof(request));
@@ -34,12 +35,13 @@ internal sealed class OllamaCodec : IProtocolCodec
         var messages = new JsonArray();
         var callNames = new Dictionary<string, string>(StringComparer.Ordinal);
         var pending = new Dictionary<string, string>(StringComparer.Ordinal);
+        var reasoned = new HashSet<JsonObject>();
         foreach (var item in request.Items)
         {
             switch (item)
             {
                 case ChatMessage message:
-                    FlushPending(messages, pending);
+                    FlushPending(pending);
                     if (message.Role == ChatRole.Assistant)
                     {
                         var target = Assistant(messages);
@@ -57,17 +59,24 @@ internal sealed class OllamaCodec : IProtocolCodec
 
                     break;
                 case ChatReasoningItem reasoning:
-                    FlushPending(messages, pending);
+                {
+                    FlushPending(pending);
+                    var reasoningMessage = Assistant(messages);
+                    if (!reasoned.Add(reasoningMessage))
+                    {
+                        throw new NotSupportedException(
+                            "Ollama accepts one reasoning block per assistant message.");
+                    }
+
                     var thinking = string.Concat(
                         reasoning.Content.TextSegments.Select(static part => part.Text));
                     if (thinking.Length > 0)
                     {
-                        var target = Assistant(messages);
-                        target["thinking"] = (target["thinking"]?.GetValue<string>() ?? string.Empty)
-                            + thinking;
+                        reasoningMessage["thinking"] = thinking;
                     }
 
                     break;
+                }
                 case ToolCall call:
                     var args = JsonNode.Parse(call.Arguments) as JsonObject
                         ?? throw new JsonException("Ollama tool arguments must be a JSON object.");
@@ -112,7 +121,7 @@ internal sealed class OllamaCodec : IProtocolCodec
             }
         }
 
-        FlushPending(messages, pending);
+        FlushPending(pending);
         var root = new JsonObject
         {
             ["model"] = options.Model,
@@ -171,11 +180,16 @@ internal sealed class OllamaCodec : IProtocolCodec
             throw CreateException("Ollama response is missing a message.");
         }
 
-        var items = ReadMessage(message);
+        var items = ReadMessage(message).ToList();
+        var hasTools = items.Any(static item => item is ToolCall);
+        var finish = ReadFinish(root, hasTools);
+        if (finish != FinishReason.ToolCalls)
+        {
+            items.RemoveAll(static item => item is ToolCall);
+        }
+
         return new ChatResponse(
-            [new ChatCandidate(items, items.Any(static item => item is ToolCall)
-                ? FinishReason.ToolCalls
-                : FinishReason.Stop)],
+            [new ChatCandidate(items, finish)],
             ReadUsage(root));
     }
 
@@ -229,6 +243,30 @@ internal sealed class OllamaCodec : IProtocolCodec
         return new ToolCall($"ollama_{Guid.NewGuid():N}", name, arguments);
     }
 
+    internal static FinishReason ReadFinish(JsonElement root, bool hasTools)
+    {
+        var reason = root.TryGetProperty("done_reason", out var done)
+            && done.ValueKind == JsonValueKind.String
+                ? done.GetString()
+                : null;
+        if (reason == "length")
+        {
+            return FinishReason.Length;
+        }
+
+        if (hasTools && reason is null or "stop")
+        {
+            return FinishReason.ToolCalls;
+        }
+
+        if (reason is null or "stop")
+        {
+            return FinishReason.Stop;
+        }
+
+        return new FinishReason(reason);
+    }
+
     internal static TokenUsage? ReadUsage(JsonElement root)
     {
         if (!root.TryGetProperty("prompt_eval_count", out var input)
@@ -254,19 +292,21 @@ internal sealed class OllamaCodec : IProtocolCodec
         return assistant;
     }
 
-    private static void FlushPending(JsonArray messages, Dictionary<string, string> pending)
+    private static void FlushPending(Dictionary<string, string> pending)
     {
-        foreach (var name in pending.Values)
+        if (pending.Count == 0)
         {
-            messages.Add(new JsonObject
-            {
-                ["role"] = "tool",
-                ["tool_name"] = name,
-                ["content"] = "Tool execution was cancelled."
-            });
+            return;
         }
 
-        pending.Clear();
+        var name = string.Empty;
+        foreach (var pendingName in pending.Values)
+        {
+            name = pendingName;
+            break;
+        }
+
+        throw new NotSupportedException($"Ollama is missing a tool result for '{name}'.");
     }
 
     private static void WriteThinking(JsonObject root, ReasoningOptions? reasoning)

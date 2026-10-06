@@ -39,4 +39,22 @@ public sealed class OpenAIMultimodalProviderTests
         var message = Assert.IsType<MultimodalMessage>(response.Candidates[0].Items[0]);
         Assert.Equal("done", Assert.IsType<TextContent>(message.Contents[0]).Text);
     }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIMultimodalProvider(
+            new OpenAIOptions("test-key", "gpt-test"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new MultimodalChatRequest(
+                [new MultimodalMessage(MultimodalChatRole.User, [new TextContent("json")])],
+                jsonOutput: JsonResponse.OutputSchema())));
+
+        Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
+    }
 }

@@ -90,7 +90,7 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
             : null;
         if (part.TryGetProperty("functionCall", out var function))
         {
-            state.ActiveTextIndex = null;
+            ResetText(state);
             state.HasTools = true;
             var itemIndex = state.NextItemIndex++;
             var id = function.TryGetProperty("id", out var identifier)
@@ -124,7 +124,7 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
             opaque ??= new OpaqueReasoningState(
                 GeminiCodec.PartStateFormat,
                 Encoding.UTF8.GetBytes(part.GetRawText()));
-            state.ActiveTextIndex = null;
+            ResetText(state);
             var itemIndex = state.NextItemIndex++;
             events.Add(new ChatReasoningTextDelta(
                 candidateIndex,
@@ -140,15 +140,14 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
             return;
         }
 
-        if (hasSignature)
-        {
-            state.ActiveTextIndex = null;
-        }
-
+        var signature = hasSignature
+            ? part.GetProperty("thoughtSignature").GetString() ?? string.Empty
+            : null;
         if (value.Length == 0)
         {
             if (opaque is not null)
             {
+                ResetText(state);
                 events.Add(new ChatReasoningStateReceived(
                     candidateIndex,
                     state.NextItemIndex++,
@@ -159,21 +158,39 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
         }
 
         var textIndex = state.ActiveTextIndex ??= state.NextItemIndex++;
+        state.PartText.Append(value);
         events.Add(new ChatTextDelta(candidateIndex, textIndex, ChatRole.Assistant, value));
-        if (opaque is not null)
+        if (signature is not null)
         {
             events.Add(new ChatReasoningStateReceived(
                 candidateIndex,
                 state.NextItemIndex++,
-                opaque));
-            state.ActiveTextIndex = null;
+                SignedText(state.PartText.ToString(), signature)));
+            ResetText(state);
         }
+    }
+
+    private static void ResetText(CandidateState state)
+    {
+        state.ActiveTextIndex = null;
+        state.PartText.Clear();
+    }
+
+    private static OpaqueReasoningState SignedText(string text, string signature)
+    {
+        var part = JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            text,
+            thoughtSignature = signature
+        });
+        return new OpaqueReasoningState(GeminiCodec.PartStateFormat, part);
     }
 
     private sealed class CandidateState
     {
         public int NextItemIndex { get; set; }
         public int? ActiveTextIndex { get; set; }
+        public StringBuilder PartText { get; } = new();
         public bool HasTools { get; set; }
         public bool Completed { get; set; }
     }

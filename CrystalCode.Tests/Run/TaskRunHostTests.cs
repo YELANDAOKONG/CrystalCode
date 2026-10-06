@@ -559,8 +559,15 @@ public sealed class TaskRunHostTests
         var denied = RunExit.From(TurnStopReason.Completed, operatorDenied: true);
         var interrupted = RunExit.From(TurnStopReason.Interrupted, operatorDenied: true);
 
+        var filtered = RunExit.From(TurnStopReason.ContentFiltered, operatorDenied: true);
+        var truncated = RunExit.From(TurnStopReason.OutputTruncated, operatorDenied: true);
+
         Assert.Equal(RunExit.Failed, failed.Code);
+        Assert.Equal(RunExit.Failed, filtered.Code);
+        Assert.Equal("content_filtered", filtered.Status);
         Assert.Equal(RunExit.Limited, limited.Code);
+        Assert.Equal(RunExit.Limited, truncated.Code);
+        Assert.Equal("output_truncated", truncated.Status);
         Assert.Equal(RunExit.Denied, denied.Code);
         Assert.Equal("operator prompt denied", denied.Status);
         Assert.Equal(RunExit.Interrupted, interrupted.Code);

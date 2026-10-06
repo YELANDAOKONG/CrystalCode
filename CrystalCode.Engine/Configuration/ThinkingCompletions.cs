@@ -17,9 +17,12 @@ public static class ThinkingCompletions
 
         var options = new List<SlashCompletion>
         {
-            new("off", "Disable thinking", ["off", "none"]),
             new("default", "Provider default", ["default"])
         };
+        if (model.ThinkingCanDisable)
+        {
+            options.Insert(0, new("off", "Disable thinking", ["off", "none"]));
+        }
 
         foreach (var effort in model.ThinkingEfforts)
         {

@@ -137,7 +137,8 @@ internal static class SettingsMapper
                     modelEntry.MaxTokens,
                     modelEntry.Thinking ?? false,
                     modelEntry.ThinkingEfforts,
-                    modelEntry.ImageInput ?? false);
+                    modelEntry.ImageInput ?? false,
+                    modelEntry.ThinkingCanDisable ?? true);
             }
         }
 
@@ -172,7 +173,8 @@ internal static class SettingsMapper
                 ThinkingEfforts = settings.ThinkingEfforts.Count == 0
                     ? null
                     : [.. settings.ThinkingEfforts],
-                ImageInput = settings.ImageInput ? true : null
+                ImageInput = settings.ImageInput ? true : null,
+                ThinkingCanDisable = settings.ThinkingCanDisable ? null : false
             };
         }
 

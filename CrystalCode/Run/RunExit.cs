@@ -23,15 +23,16 @@ internal static class RunExit
     public static (int Code, string? Status) From(TurnStopReason reason, bool operatorDenied)
     {
         ArgumentNullException.ThrowIfNull(reason);
-        if (reason == TurnStopReason.Failed)
+        if (reason == TurnStopReason.Failed || reason == TurnStopReason.ContentFiltered)
         {
-            return (Failed, "failed");
+            return (Failed, reason.Value);
         }
 
         if (reason == TurnStopReason.ModelCallLimitReached
             || reason == TurnStopReason.ToolCallLimitReached
             || reason == TurnStopReason.DurationLimitReached
-            || reason == TurnStopReason.ContextOverflow)
+            || reason == TurnStopReason.ContextOverflow
+            || reason == TurnStopReason.OutputTruncated)
         {
             return (Limited, reason.Value);
         }

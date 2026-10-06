@@ -16,7 +16,7 @@ public static class ThinkingStatus
 
         if (selection == ThinkingSelection.Off)
         {
-            return "Think Off";
+            return model.ThinkingCanDisable ? "Think Off" : "Think Default";
         }
 
         if (selection == ThinkingSelection.Default || !model.AllowsEffort(selection.Value))

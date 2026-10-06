@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Crystal;
 using Crystal.Media;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
@@ -72,5 +73,21 @@ public sealed class OllamaMultimodalProviderTests
         Assert.Equal("rendered", found.GetProperty("content").GetString());
         Assert.Equal("BAUG", found.GetProperty("images")[0].GetString());
         Assert.DoesNotContain("crystal-image", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaMultimodalProvider(new OllamaOptions("vision-test"), http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new MultimodalChatRequest(
+                [new MultimodalMessage(MultimodalChatRole.User, [new TextContent("json")])],
+                jsonOutput: JsonResponse.OutputSchema())));
+
+        Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
     }
 }

@@ -270,8 +270,8 @@ not. A call to a tool Plan does not offer fails the turn.
 | :--- | :--- |
 | 0 | The turn completed, and no operator prompt was denied or dismissed |
 | 1 | The command, configuration, credentials, workspace, or prompt set is invalid |
-| 2 | The model request failed |
-| 3 | A model-call, tool-call, or duration budget was reached, or the context overflowed |
+| 2 | The model request failed, or the model stopped because of a content filter |
+| 3 | A model-call, tool-call, or duration budget was reached, the context overflowed, or the model output was truncated |
 | 4 | The turn finished after an operator prompt was denied or a question was dismissed |
 | 5 | The run was interrupted |
 
@@ -463,6 +463,7 @@ are not supported by the current adapter.
 | `maxTokens` | Optional positive output-token cap |
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Crystal effort names this model accepts: `minimal`, `low`, `medium`, `high`, `maximum` (`max` is stored as `maximum`) |
+| `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 
 Gemini and Ollama native adapters accept inline images in user messages.
@@ -474,7 +475,10 @@ multimodal function responses.
 models never fails: if the model does not support thinking, requests
 omit reasoning hints; if the stored gear is not in that model's list,
 the request uses the provider default and the stored choice is
-unchanged. An empty `thinkingEfforts` list is on/off only.
+unchanged. An empty `thinkingEfforts` list is on/off only. When
+`thinkingCanDisable` is false, Off is left out of the gear. A stored
+Off choice uses the provider default and the status bar shows
+`Think Default`.
 
 ### Example: add an OpenAI-compatible provider
 
@@ -656,14 +660,18 @@ drop queued text.
 
 1. Snapshot the transcript and current tool definitions.
 2. Stream one chat request. Render deltas as they arrive.
-3. If the candidate has tool calls, run the full batch through the
+3. Stop before tools when the model did not finish normally. Truncated
+   output keeps the text and ends the turn. A content filter keeps the
+   text and ends the turn. Any other unusual finish reason fails the
+   turn. These stops do not run tools and do not compact.
+4. If the candidate has tool calls, run the full batch through the
    executor (approval first).
-4. Append exact tool results.
-5. Repeat until there are no tool calls, a limit stops the turn, or
+5. Append exact tool results.
+6. Repeat until there are no tool calls, a limit stops the turn, or
    you cancel. The host may compact before a model round when the
    estimated transcript or the last model-round usage is over budget;
    if compaction cannot reduce further, the turn stops.
-6. After a completed turn, consider compaction from that last round
+7. After a completed turn, consider compaction from that last round
    and the estimated transcript. `/compact` summarizes older context
    immediately.
 
@@ -755,7 +763,10 @@ selected model lists. The choice is written to `config.json`.
 
 If the selected model does not support thinking, the command reports
 that and does nothing. The status bar shows `Think Off`, or `Think`
-plus the resolved gear when thinking is on.
+plus the resolved gear when thinking is on. Models that cannot disable
+thinking omit Off from Tab completion. `/thinking off` then reports
+`The selected model cannot disable thinking.` and leaves the gear
+unchanged.
 
 `/verbose thinking` hides or shows the Thinking panel in the interactive
 transcript. It stays on unless `verboseThinking` is `false` in

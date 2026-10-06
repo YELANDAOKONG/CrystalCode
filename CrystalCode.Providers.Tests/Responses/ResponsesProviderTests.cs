@@ -125,4 +125,148 @@ public sealed class ResponsesProviderTests
 
         Assert.Contains("\"reasoning\":{\"effort\":\"none\"}", handler.Body, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task CompleteAsync_KeepsRefusalTextAsContentFilter()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"status":"completed","output":[
+              {"type":"message","content":[{"type":"refusal","refusal":"no"}]}
+            ]}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var response = await provider.CompleteAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
+
+        Assert.Equal(FinishReason.ContentFilter, response.Candidates[0].FinishReason);
+        Assert.Equal("no", Assert.IsType<ChatMessage>(response.Candidates[0].Items[0]).Text);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsIncompleteReasons()
+    {
+        var filtered = await ReadIncomplete(
+            """
+            {"status":"incomplete","incomplete_details":{"reason":"content_filter"},"output":[{"type":"message","content":[{"type":"output_text","text":"x"}]}]}
+            """);
+        var truncated = await ReadIncomplete(
+            """
+            {"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"message","content":[{"type":"output_text","text":"x"}]}]}
+            """);
+        var unspecified = await ReadIncomplete(
+            """
+            {"status":"incomplete","output":[{"type":"message","content":[{"type":"output_text","text":"x"}]}]}
+            """);
+
+        Assert.Equal(FinishReason.ContentFilter, filtered);
+        Assert.Equal(FinishReason.Length, truncated);
+        Assert.Equal("incomplete", unspecified.Value);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ThrowsWhenGenerationFailed()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"status":"failed","error":{"message":"boom","code":"server_error"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<ResponsesException>(
+            () => provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])));
+
+        Assert.Contains("boom", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReadsReasoningContentAsTrace()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"status":"completed","output":[
+              {"type":"reasoning","id":"rs_1","summary":[{"text":"sum"}],"content":[{"text":"raw"}]}
+            ]}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var response = await provider.CompleteAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
+
+        var reasoning = Assert.IsType<ChatReasoningItem>(response.Candidates[0].Items[0]);
+        Assert.Equal(ReasoningTextKind.Summary, reasoning.Content.TextSegments[0].Kind);
+        Assert.Equal("sum", reasoning.Content.TextSegments[0].Text);
+        Assert.Equal(ReasoningTextKind.Trace, reasoning.Content.TextSegments[1].Kind);
+        Assert.Equal("raw", reasoning.Content.TextSegments[1].Text);
+    }
+
+    [Fact]
+    public async Task StreamAsync_SeparatesSummaryIndexesFromReasoningText()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"response.reasoning_summary_text.delta","output_index":0,"summary_index":0,"delta":"one"}
+
+            data: {"type":"response.reasoning_summary_text.delta","output_index":0,"summary_index":1,"delta":"two"}
+
+            data: {"type":"response.reasoning_text.delta","output_index":0,"content_index":0,"delta":"trace"}
+
+            data: {"type":"response.completed","response":{"status":"completed"}}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        var deltas = events.OfType<ChatReasoningTextDelta>().ToArray();
+        Assert.Equal(3, deltas.Length);
+        Assert.Equal((0, ReasoningTextKind.Summary, "one"), (deltas[0].TextSegmentIndex, deltas[0].Kind, deltas[0].Text));
+        Assert.Equal((1, ReasoningTextKind.Summary, "two"), (deltas[1].TextSegmentIndex, deltas[1].Kind, deltas[1].Text));
+        Assert.Equal((1_000_000, ReasoningTextKind.Trace, "trace"), (deltas[2].TextSegmentIndex, deltas[2].Kind, deltas[2].Text));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "json")],
+                jsonOutput: JsonResponse.OutputSchema())));
+
+        Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
+    }
+
+    private static async Task<FinishReason> ReadIncomplete(string json)
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(json));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+        var response = await provider.CompleteAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
+        return response.Candidates[0].FinishReason;
+    }
 }

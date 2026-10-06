@@ -83,7 +83,7 @@ internal sealed class OllamaStreamParser : IProtocolStreamParser
 
             events.Add(new ChatCandidateCompleted(
                 0,
-                _hasTools ? FinishReason.ToolCalls : FinishReason.Stop));
+                OllamaCodec.ReadFinish(root, _hasTools)));
             IsComplete = true;
         }
 

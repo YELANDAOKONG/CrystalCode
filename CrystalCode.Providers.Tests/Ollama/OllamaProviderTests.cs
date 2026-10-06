@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Crystal;
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Providers.Ollama;
 
@@ -70,5 +71,112 @@ public sealed class OllamaProviderTests
         Assert.Contains(events, item => item is ChatTextDelta { Text: "hello" });
         Assert.Contains(events, item => item is ChatUsageReceived);
         Assert.Contains(events, item => item is ChatCandidateCompleted);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsLengthAndDropsToolCalls()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"message":{"role":"assistant","content":"partial","tool_calls":[
+              {"function":{"name":"read","arguments":{}}}
+            ]},"done":true,"done_reason":"length"}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        var response = await provider.CompleteAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "read")]));
+
+        Assert.Equal(FinishReason.Length, response.Candidates[0].FinishReason);
+        Assert.Equal("partial", Assert.IsType<ChatMessage>(Assert.Single(response.Candidates[0].Items)).Text);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ConcatenatesOneReasoningBlock()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"message":{"role":"assistant","content":"done"},"done":true}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "hi"),
+            new ChatReasoningItem(new ReasoningContent(
+            [
+                new ReasoningText("one", ReasoningTextKind.Trace),
+                new ReasoningText("two", ReasoningTextKind.Summary)
+            ]))
+        ]));
+
+        Assert.Contains("\"thinking\":\"onetwo\"", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsASecondReasoningBlock()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+            [
+                new ChatMessage(ChatRole.User, "hi"),
+                new ChatReasoningItem(new ReasoningContent(
+                    [new ReasoningText("one", ReasoningTextKind.Trace)])),
+                new ChatReasoningItem(new ReasoningContent(
+                    [new ReasoningText("two", ReasoningTextKind.Trace)]))
+            ])));
+
+        Assert.Contains("one reasoning block", exception.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
+    }
+
+    [Fact]
+    public async Task StreamAsync_MapsLengthDoneReason()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"message":{"role":"assistant","content":"hi"},"done":false}
+            {"done":true,"done_reason":"length"}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var item in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "hi")])))
+        {
+            events.Add(item);
+        }
+
+        Assert.Contains(
+            events,
+            item => item is ChatCandidateCompleted { FinishReason: var reason }
+                && reason == FinishReason.Length);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsUnmatchedToolCallAndJsonOutput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        var missing = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+            [
+                new ChatMessage(ChatRole.User, "read"),
+                new ToolCall("call_1", "read", "{}")
+            ])));
+        Assert.Contains("missing a tool result for 'read'", missing.Message, StringComparison.Ordinal);
+
+        var json = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "json")],
+                jsonOutput: JsonResponse.OutputSchema())));
+        Assert.Contains("does not support a JSON output schema", json.Message, StringComparison.Ordinal);
+        Assert.Null(handler.Body);
     }
 }
