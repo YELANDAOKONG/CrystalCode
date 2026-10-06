@@ -24,4 +24,18 @@ public sealed class SessionPickerTests
         Assert.Equal(["newest", "older"], matches.Select(session => session.Id));
         Assert.Equal("oldest", Assert.Single(byId).Id);
     }
+
+    [Fact]
+    public void Filter_MatchesWorkspacePath()
+    {
+        SessionSummary[] sessions =
+        [
+            new("one", "/tmp/alpha", false, null, DateTimeOffset.UtcNow, 1, "Fix"),
+            new("two", "/tmp/beta", false, null, DateTimeOffset.UtcNow, 1, "Fix")
+        ];
+
+        var matches = SessionPicker.Filter(sessions, "beta");
+
+        Assert.Equal("two", Assert.Single(matches).Id);
+    }
 }

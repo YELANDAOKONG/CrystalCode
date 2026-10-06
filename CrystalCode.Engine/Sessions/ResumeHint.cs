@@ -17,5 +17,7 @@ public static class ResumeHint
     public static string ForWorkspace() =>
         "Choose a session in this workspace with /resume"
         + Environment.NewLine
+        + "List every workspace with /resume all"
+        + Environment.NewLine
         + "Resume a specific id with crystal --resume <id>";
 }

@@ -12,6 +12,7 @@ namespace CrystalCode.Terminal;
 internal sealed class SessionPicker : ISessionChooser
 {
     private const int MaximumVisibleRows = 8;
+    private const int MaximumWorkspaceLabel = 36;
     private readonly SessionRenderer _renderer;
 
     public SessionPicker(SessionRenderer renderer)
@@ -23,6 +24,7 @@ internal sealed class SessionPicker : ISessionChooser
     public async Task<string?> ChooseAsync(
         IReadOnlyList<SessionSummary> sessions,
         string? currentId,
+        bool listWorkspace,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sessions);
@@ -42,7 +44,7 @@ internal sealed class SessionPicker : ISessionChooser
                 cancellationToken.ThrowIfCancellationRequested();
                 var matches = Filter(sessions, query);
                 selected = Math.Clamp(selected, 0, Math.Max(0, matches.Count - 1));
-                _renderer.SetOverlay(Render(matches, query, selected, currentId));
+                _renderer.SetOverlay(Render(matches, query, selected, currentId, listWorkspace));
                 var key = await _renderer.ReadKeyAsync(
                     scrollPlainArrows: false,
                     cancellationToken);
@@ -94,15 +96,33 @@ internal sealed class SessionPicker : ISessionChooser
 
         return sessions.Where(session =>
             session.Id.Contains(query, StringComparison.OrdinalIgnoreCase)
-            || session.Preview.Contains(query, StringComparison.OrdinalIgnoreCase))
+            || session.Preview.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || ContainsWorkspace(session, query))
             .ToArray();
+    }
+
+    private static bool ContainsWorkspace(SessionSummary session, string query)
+    {
+        if (string.IsNullOrWhiteSpace(session.Workspace))
+        {
+            return false;
+        }
+
+        if (session.Workspace.Contains(query, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return PathDisplay.Shorten(session.Workspace)
+            .Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
     private static IRenderable Render(
         IReadOnlyList<SessionSummary> matches,
         string query,
         int selected,
-        string? currentId)
+        string? currentId,
+        bool listWorkspace)
     {
         var rows = new List<IRenderable>
         {
@@ -129,10 +149,11 @@ internal sealed class SessionPicker : ISessionChooser
                 var current = string.Equals(session.Id, currentId, StringComparison.Ordinal)
                     ? "  current"
                     : string.Empty;
+                var workspace = WorkspaceLabel(session, listWorkspace);
                 var preview = TextWidth.Truncate(
                     session.Preview,
-                    Math.Max(8, ScreenSize.Width - 48));
-                var label = $"{time}  {session.UserTurns} turns{current}  {preview}";
+                    Math.Max(8, ScreenSize.Width - 48 - workspace.Length));
+                var label = $"{time}  {session.UserTurns} turns{current}{workspace}  {preview}";
                 var color = index == selected ? Theme.Selected : Theme.User;
                 rows.Add(new Markup($"[{color}]{(index == selected ? "> " : "  ")}{MarkupText.Escape(label)}[/]"));
                 rows.Add(new Markup($"[{Theme.Muted}]  {MarkupText.Escape(session.Id)}[/]"));
@@ -148,6 +169,16 @@ internal sealed class SessionPicker : ISessionChooser
             Expand = true
         };
         return new Padder(panel, new Padding(2, 0, 0, 0));
+    }
+
+    private static string WorkspaceLabel(SessionSummary session, bool listWorkspace)
+    {
+        if (!listWorkspace || string.IsNullOrWhiteSpace(session.Workspace))
+        {
+            return string.Empty;
+        }
+
+        return "  " + TextWidth.Truncate(PathDisplay.Shorten(session.Workspace), MaximumWorkspaceLabel);
     }
 
     private static int VisibleRows() =>

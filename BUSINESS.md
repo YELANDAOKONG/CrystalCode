@@ -65,8 +65,9 @@ separate library with no terminal code. The product can:
   recent text-only entries across runs for the same workspace;
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace;
-- list saved sessions for the current workspace or every workspace, choose a
-  saved conversation by recent update time, and fork into a new independent session;
+- list saved sessions for the current workspace or every workspace; resume the
+  current workspace, a named directory, or every workspace, entering that
+  directory when the choice names one; and fork into a new independent session;
 - discover OpenCode-compatible agent skills and load them through the
   `skill` tool when Skills is enabled;
 - discover operator tool sets under `~/.crystal/tools` and

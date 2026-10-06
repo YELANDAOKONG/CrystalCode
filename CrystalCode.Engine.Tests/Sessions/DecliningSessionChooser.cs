@@ -8,6 +8,7 @@ internal sealed class DecliningSessionChooser : ISessionChooser
     public Task<string?> ChooseAsync(
         IReadOnlyList<SessionSummary> sessions,
         string? currentId,
+        bool listWorkspace,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -11,6 +11,7 @@ internal sealed class UnattendedSessionChooser : ISessionChooser
     public Task<string?> ChooseAsync(
         IReadOnlyList<SessionSummary> sessions,
         string? currentId,
+        bool listWorkspace,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sessions);

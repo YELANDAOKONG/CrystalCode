@@ -63,7 +63,7 @@ Inside the app, type `/help` for commands and shortcuts. Use Tab or `/plan` to s
 | `/model` | List or select a configured provider and model |
 | `/approval` | View or change the approval mode |
 | `/attach <path>` | Attach a supported image from the workspace |
-| `/resume` | Continue the latest session for this workspace |
+| `/resume` | Choose a saved session for this workspace, another directory, or every workspace |
 | `/fork` | Branch the current conversation into a new session |
 | `/compact` | Summarize older context now |
 | `/help` | Show all commands and shortcuts |

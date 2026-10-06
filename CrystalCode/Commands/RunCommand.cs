@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
@@ -22,55 +23,6 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         cancellationToken.ThrowIfCancellationRequested();
 
         var home = CrystalHome.Resolve(settings.Home);
-        var workspace = ResolveWorkspace(settings.Workspace);
-        SessionDocument? resume = null;
-        if (settings.Resume.IsSet)
-        {
-            var sessions = new SessionStore(home);
-            var id = settings.Resume.Value;
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                var available = sessions.List(workspace);
-                if (available.Count == 0)
-                {
-                    AnsiConsole.MarkupLine("[red]No session for this workspace[/]");
-                    return 1;
-                }
-
-                if (Console.IsInputRedirected)
-                {
-                    AnsiConsole.MarkupLine(
-                        "[red]Interactive resume requires a terminal. Pass --resume <id>.[/]");
-                    return 1;
-                }
-
-                using var pickerRenderer = new SessionRenderer();
-                using (pickerRenderer.Open())
-                {
-                    id = await new SessionPicker(pickerRenderer).ChooseAsync(
-                        available,
-                        currentId: null,
-                        cancellationToken);
-                }
-
-                if (id is null)
-                {
-                    return 0;
-                }
-            }
-
-            if (!SessionResume.TryLoad(
-                    sessions,
-                    workspace,
-                    id,
-                    out resume,
-                    out var resumeError))
-            {
-                AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
-                return 1;
-            }
-        }
-
         var settingsStore = new SettingsStore(home);
         var harnessSettings = settingsStore
             .LoadOrCreate()
@@ -85,33 +37,135 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return 1;
         }
 
-        if (harnessSettings.WorkspaceTrust && Directory.Exists(workspace))
+        var workspace = ResolveWorkspace(settings.Workspace);
+        SessionDocument? resume = null;
+        if (settings.Resume.IsSet)
         {
-            var root = new Workspace(workspace).Root;
-            var trustRoot = GitRoot.TrustRoot(root);
-            var trust = new WorkspaceTrustStore(home);
-            if (!trust.Contains(trustRoot))
+            var sessions = new SessionStore(home);
+            if (!ResumeRequest.TryParse(
+                    settings.Resume.Value,
+                    Environment.CurrentDirectory,
+                    sessions,
+                    out var request,
+                    out var resumeError))
             {
-                if (Console.IsInputRedirected)
-                {
-                    AnsiConsole.MarkupLine("[red]Trusting this directory requires a terminal.[/]");
-                    return 1;
-                }
-
-                using var trustRenderer = new SessionRenderer();
-                using (trustRenderer.Open())
-                {
-                    var accepted = await new TrustPrompt(trustRenderer).ConfirmAsync(
-                        new WorkspaceTrustRequest(root, trustRoot),
-                        cancellationToken);
-                    if (!accepted)
-                    {
-                        return 0;
-                    }
-                }
-
-                trust.Remember(trustRoot);
+                AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
+                return 1;
             }
+
+            switch (request.Target)
+            {
+                case ResumeRequest.Kind.Session:
+                    if (!TryLoadResume(sessions, workspace, request.Value, out resume, out resumeError))
+                    {
+                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
+                        return 1;
+                    }
+
+                    break;
+                case ResumeRequest.Kind.CurrentWorkspace:
+                {
+                    var picked = await PickResumeAsync(
+                        sessions.List(workspace),
+                        listWorkspace: false,
+                        "No session for this workspace",
+                        cancellationToken);
+                    if (picked.ExitCode is int currentExit)
+                    {
+                        return currentExit;
+                    }
+
+                    if (!TryLoadResume(sessions, workspace, picked.Id, out resume, out resumeError))
+                    {
+                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
+                        return 1;
+                    }
+
+                    break;
+                }
+                case ResumeRequest.Kind.Workspace:
+                {
+                    if (!string.IsNullOrWhiteSpace(settings.Workspace)
+                        && !ResumeRequest.SameDirectory(settings.Workspace, request.Value!))
+                    {
+                        AnsiConsole.MarkupLine("[red]Workspace and --resume path differ.[/]");
+                        return 1;
+                    }
+
+                    workspace = request.Value!;
+                    var namedTrust = await EnsureTrustedAsync(
+                        home,
+                        harnessSettings,
+                        workspace,
+                        cancellationToken);
+                    if (!namedTrust.Ready)
+                    {
+                        return namedTrust.ExitCode;
+                    }
+
+                    var picked = await PickResumeAsync(
+                        sessions.List(workspace),
+                        listWorkspace: false,
+                        "No session for this workspace",
+                        cancellationToken);
+                    if (picked.ExitCode is int namedExit)
+                    {
+                        return namedExit;
+                    }
+
+                    if (!TryLoadResume(sessions, workspace, picked.Id, out resume, out resumeError))
+                    {
+                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
+                        return 1;
+                    }
+
+                    break;
+                }
+                case ResumeRequest.Kind.AllWorkspaces:
+                {
+                    var picked = await PickResumeAsync(
+                        sessions.List(workspaceRoot: null),
+                        listWorkspace: true,
+                        "No sessions",
+                        cancellationToken);
+                    if (picked.ExitCode is int allExit)
+                    {
+                        return allExit;
+                    }
+
+                    if (!TryLoadResume(sessions, workspace, picked.Id, out resume, out resumeError))
+                    {
+                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
+                        return 1;
+                    }
+
+                    if (!ResumeRequest.TryCanonicalWorkspace(
+                            resume.Workspace,
+                            out workspace,
+                            out resumeError))
+                    {
+                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
+                        return 1;
+                    }
+
+                    break;
+                }
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(settings),
+                        request.Target,
+                        "Resume target is not supported.");
+            }
+        }
+
+        var trust = await EnsureTrustedAsync(
+            home,
+            harnessSettings,
+            workspace,
+            cancellationToken);
+        if (!trust.Ready)
+        {
+            return trust.ExitCode;
         }
 
         var plugins = PluginRegistry.CreateBuiltIn();
@@ -124,6 +178,94 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             plugins,
             resume);
         return await host.RunAsync(cancellationToken);
+    }
+
+    private static bool TryLoadResume(
+        SessionStore sessions,
+        string workspace,
+        string? id,
+        out SessionDocument document,
+        out string error) =>
+        SessionResume.TryLoad(sessions, workspace, id, out document, out error);
+
+    private static async Task<(int? ExitCode, string? Id)> PickResumeAsync(
+        IReadOnlyList<SessionSummary> available,
+        bool listWorkspace,
+        string emptyMessage,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(available);
+        if (available.Count == 0)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(emptyMessage)}[/]");
+            return (1, null);
+        }
+
+        if (Console.IsInputRedirected)
+        {
+            AnsiConsole.MarkupLine(
+                "[red]Interactive resume requires a terminal. Pass --resume <id>.[/]");
+            return (1, null);
+        }
+
+        using var pickerRenderer = new SessionRenderer();
+        using (pickerRenderer.Open())
+        {
+            var id = await new SessionPicker(pickerRenderer).ChooseAsync(
+                available,
+                currentId: null,
+                listWorkspace,
+                cancellationToken);
+            if (id is null)
+            {
+                return (0, null);
+            }
+
+            return (null, id);
+        }
+    }
+
+    private readonly record struct TrustDecision(bool Ready, int ExitCode);
+
+    private static async Task<TrustDecision> EnsureTrustedAsync(
+        CrystalHome home,
+        HarnessSettings harnessSettings,
+        string workspace,
+        CancellationToken cancellationToken)
+    {
+        if (!harnessSettings.WorkspaceTrust || !Directory.Exists(workspace))
+        {
+            return new TrustDecision(true, 0);
+        }
+
+        var root = new Workspace(workspace).Root;
+        var trustRoot = GitRoot.TrustRoot(root);
+        var trust = new WorkspaceTrustStore(home);
+        if (trust.Contains(trustRoot))
+        {
+            return new TrustDecision(true, 0);
+        }
+
+        if (Console.IsInputRedirected)
+        {
+            AnsiConsole.MarkupLine("[red]Trusting this directory requires a terminal.[/]");
+            return new TrustDecision(false, 1);
+        }
+
+        using var trustRenderer = new SessionRenderer();
+        using (trustRenderer.Open())
+        {
+            var accepted = await new TrustPrompt(trustRenderer).ConfirmAsync(
+                new WorkspaceTrustRequest(root, trustRoot),
+                cancellationToken);
+            if (!accepted)
+            {
+                return new TrustDecision(false, 0);
+            }
+        }
+
+        trust.Remember(trustRoot);
+        return new TrustDecision(true, 0);
     }
 
     private static string ResolveWorkspace(string? workspace)

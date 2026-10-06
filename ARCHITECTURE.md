@@ -621,15 +621,23 @@ when the transcript has a user message or a compaction summary. The
 file stores the compacted model transcript (live system prompt, one
 summary, recent tail, and reasoning items with their readable text and
 opaque provider state), the last usage snapshot, and cumulative provider usage.
-`crystal --resume` (`-r`) opens a terminal selector for this workspace;
-`crystal --resume <id>` loads a specific file at process start. A missing or empty
-session exits without entering the TTY. `/resume` opens the same selector inside
-the running session; `/resume <id>` restores a specific
-transcript from inside a running session: the live system prompt is
-refreshed from current Plan/Work text; the summary and tail are kept.
-The selector lists resumable sessions newest first by update time, supports
-typing to filter by id or preview, and leaves the current session untouched on
-Escape. Usage is restored so the status bar, `/status`, and the next compact decision
+`crystal --resume` (`-r`) opens a terminal selector for this workspace.
+`crystal --resume <id>` loads that file and stays in the process workspace.
+`crystal --resume <path>` lists that directory, asks for trust before the
+selector, and enters the directory after a session is chosen. Escape leaves
+the process workspace unchanged. `crystal --resume all` lists every workspace,
+shows each path, and enters the chosen session's workspace after trust.
+`--workspace` and `--resume <path>` must name the same directory when both
+are set. A missing or empty session exits without entering the TTY.
+`/resume`, `/resume <path>`, and `/resume all` use the same rules inside a
+running session. `/resume <id>` restores that transcript and stays in the
+current workspace. The word `all` is reserved. A value that is both an
+existing directory and a session id is rejected. After a workspace change,
+the live system prompt is refreshed from that directory's Plan/Work text;
+the summary and tail are kept. The selector lists resumable sessions newest
+first by update time, supports typing to filter by id, preview, or workspace
+path, and leaves the current session untouched on Escape. Usage is restored
+so the status bar, `/status`, and the next compact decision
 have a baseline. Sessions saved before cumulative usage was introduced retain
 an unknown cumulative value rather than treating their last request as the
 whole session. `/clear` starts a new id.
@@ -977,7 +985,8 @@ A front end supplies (`SessionFrontEnd`):
 - `Approvals` (`IApprovalPrompt`) asks the operator to approve a tool call and
   is told when a call auto-passes or is under review.
 - `Questions` (`IUserPrompt`) answers the built-in `question` tool.
-- `Sessions` (`ISessionChooser`) picks a saved session for `/resume`.
+- `Sessions` (`ISessionChooser`) picks a saved session for `/resume`, including
+  one workspace or every workspace.
 - `Trust` (`IWorkspaceTrustPrompt`) asks whether to trust a directory.
   A front end that cannot ask returns false.
 

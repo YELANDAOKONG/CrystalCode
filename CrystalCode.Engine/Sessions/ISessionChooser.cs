@@ -9,9 +9,12 @@ public interface ISessionChooser
 {
     /// <summary>
     /// Returns the chosen session id, or null when the operator declines.
+    /// When <paramref name="listWorkspace"/> is true, the surface shows each
+    /// session's workspace.
     /// </summary>
     Task<string?> ChooseAsync(
         IReadOnlyList<SessionSummary> sessions,
         string? currentId,
+        bool listWorkspace,
         CancellationToken cancellationToken);
 }

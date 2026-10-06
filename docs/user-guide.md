@@ -154,7 +154,7 @@ CLI options:
 | `-m`, `--model <id>` | Model id listed under that provider |
 | `-w`, `--workspace <path>` | Workspace root (default: current directory) |
 | `--home <path>` | Data directory (default: `CRYSTAL_HOME`, then `~/.crystal`) |
-| `-r`, `--resume <id>` | Replay that session file under `~/.crystal/sessions` |
+| `-r`, `--resume [id]` | Choose a saved session. Omit the value to list this workspace. An id loads that file and stays here. A directory lists that workspace and enters it. `all` lists every workspace and enters the chosen session's directory |
 
 `--help` prints the same options.
 
@@ -830,7 +830,7 @@ returns the transcript viewport to the latest output.
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here |
 | `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry |
-| `/resume` | `/continue` | Replay the latest session for this workspace, or `/resume <id>` |
+| `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
@@ -1107,9 +1107,9 @@ Project, walking from the workspace up to the git root:
 4. `.crystal/{skill,skills}/<name>/SKILL.md`
 
 `/cd` reloads skills and external tool sets from the new workspace. `/cd`
-and resume also reload prompts from the current workspace. Resume
-refreshes the first system message from the current prompt files, the
-current `<env>` block, and current skill guidance.
+and a resume that enters another directory reload prompts from that
+workspace. Resume refreshes the first system message from the current
+prompt files, the current `<env>` block, and current skill guidance.
 
 ## Sessions
 
@@ -1120,15 +1120,32 @@ cumulative provider-reported token usage, and turn counts.
 
 `/quit` and two Ctrl+C presses on an empty composer leave the
 alternate screen, then print the session id and `crystal --resume <id>`.
-`--resume` loads that file before the alternate screen. A missing or
-empty session exits without entering the TTY. `/resume` still replays
-from inside a running session.
+`--resume` without a value opens a selector for this workspace before the
+alternate screen. `--resume <id>` loads that file and stays in the process
+workspace. `--resume <path>` lists that directory and, after a session is
+chosen, enters it. `--resume all` lists every workspace and enters the
+chosen session's directory. `--workspace` and `--resume <path>` must name
+the same directory when both are set. A missing or empty session exits
+without entering the TTY. A redirected terminal cannot open the selector
+and must pass `--resume <id>`.
+
+`/resume`, `/resume <path>`, and `/resume all` use those same rules inside
+a running session. Trust is confirmed before a named directory's selector
+opens. Escape leaves the current workspace unchanged. Choosing a session
+from `/resume all` asks for trust before entering that session's directory.
+Declining trust does not restore the session. `/resume <id>` restores that
+transcript and stays in the current workspace.
 
 | Command | Effect |
 | :--- | :--- |
-| `crystal --resume <id>` | Load that file under `~/.crystal/sessions` at process start |
-| `/resume` | Load the latest session for this workspace and replay the transcript |
-| `/resume <id>` | Load that file under `~/.crystal/sessions` |
+| `crystal --resume` | Choose a session for this workspace at process start |
+| `crystal --resume <id>` | Load that file under `~/.crystal/sessions` and stay in this workspace |
+| `crystal --resume <path>` | Choose a session from that directory, then enter it |
+| `crystal --resume all` | Choose a session from any workspace, then enter its directory |
+| `/resume` | Choose a session for this workspace and replay the transcript |
+| `/resume <path>` | Choose a session from that directory, then enter it |
+| `/resume all` | Choose a session from any workspace, then enter its directory |
+| `/resume <id>` | Load that file under `~/.crystal/sessions` and stay in this workspace |
 | `/fork` | Save the current session and continue from an independent new id |
 | `/fork <id>` | Branch that saved session into a new id in the current workspace |
 | `/sessions` | List resumable sessions for the current workspace, newest first |

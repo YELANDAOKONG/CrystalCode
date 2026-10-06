@@ -1763,10 +1763,26 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        await EnterWorkspaceAsync(candidate, cancellationToken);
+    }
+
+    /// <summary>
+    /// Switches to <paramref name="candidate"/> with the same trust and reload
+    /// path as <c>/cd</c>. The current workspace returns without a reload.
+    /// </summary>
+    private async Task<bool> EnterWorkspaceAsync(
+        string candidate,
+        CancellationToken cancellationToken)
+    {
+        if (string.Equals(candidate, _workspace.Root, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         if (!await ConfirmWorkspaceAsync(candidate, cancellationToken))
         {
             Note("Staying in " + _workspace.Root);
-            return;
+            return false;
         }
 
         _workspace.SetRoot(candidate);
@@ -1781,6 +1797,7 @@ public sealed class CodingSession : ITurnObserver
         await OpenPluginSessionAsync(cancellationToken);
         RefreshChrome();
         Note("Workspace  " + _workspace.Root);
+        return true;
     }
 
     private async Task<bool> ChangeTrustAsync(string argument, CancellationToken cancellationToken)
@@ -2089,36 +2106,85 @@ public sealed class CodingSession : ITurnObserver
         string argument,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(argument))
+        if (!ResumeRequest.TryParse(
+                argument,
+                _workspace.Root,
+                _sessionStore,
+                out var request,
+                out var error))
         {
-            if (HasConversation())
-            {
-                SaveSession();
-            }
+            Error(error);
+            return;
+        }
 
-            var available = _sessionStore.List(_workspace.Root);
-            if (available.Count == 0)
-            {
-                Error("No session for this workspace");
+        switch (request.Target)
+        {
+            case ResumeRequest.Kind.Session:
+                ResumeLoaded(request.Value);
                 return;
-            }
-
-            var chosen = await _frontEnd.Sessions.ChooseAsync(
-                available,
-                _sessionId,
-                cancellationToken);
-            if (chosen is null)
-            {
+            case ResumeRequest.Kind.CurrentWorkspace:
+                await ResumeListedAsync(
+                    _workspace.Root,
+                    listWorkspace: false,
+                    "No session for this workspace",
+                    adoptWorkspace: false,
+                    cancellationToken);
                 return;
-            }
+            case ResumeRequest.Kind.Workspace:
+                await ResumeNamedWorkspaceAsync(request.Value!, cancellationToken);
+                return;
+            case ResumeRequest.Kind.AllWorkspaces:
+                await ResumeListedAsync(
+                    workspaceRoot: null,
+                    listWorkspace: true,
+                    "No sessions",
+                    adoptWorkspace: true,
+                    cancellationToken);
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(argument),
+                    request.Target,
+                    "Resume target is not supported.");
+        }
+    }
 
-            argument = chosen;
+    private async Task ResumeNamedWorkspaceAsync(
+        string workspaceRoot,
+        CancellationToken cancellationToken)
+    {
+        if (HasConversation())
+        {
+            SaveSession();
+        }
+
+        if (!await ConfirmWorkspaceAsync(workspaceRoot, cancellationToken))
+        {
+            Note("Staying in " + _workspace.Root);
+            return;
+        }
+
+        var available = _sessionStore.List(workspaceRoot);
+        if (available.Count == 0)
+        {
+            Error("No session for this workspace");
+            return;
+        }
+
+        var chosen = await _frontEnd.Sessions.ChooseAsync(
+            available,
+            _sessionId,
+            listWorkspace: false,
+            cancellationToken);
+        if (chosen is null)
+        {
+            return;
         }
 
         if (!SessionResume.TryLoad(
                 _sessionStore,
-                _workspace.Root,
-                argument,
+                workspaceRoot,
+                chosen,
                 out var document,
                 out var error))
         {
@@ -2126,6 +2192,95 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        if (!await EnterWorkspaceAsync(workspaceRoot, cancellationToken))
+        {
+            return;
+        }
+
+        FinishResume(document);
+    }
+
+    private async Task ResumeListedAsync(
+        string? workspaceRoot,
+        bool listWorkspace,
+        string emptyMessage,
+        bool adoptWorkspace,
+        CancellationToken cancellationToken)
+    {
+        if (HasConversation())
+        {
+            SaveSession();
+        }
+
+        var available = _sessionStore.List(workspaceRoot);
+        if (available.Count == 0)
+        {
+            Error(emptyMessage);
+            return;
+        }
+
+        var chosen = await _frontEnd.Sessions.ChooseAsync(
+            available,
+            _sessionId,
+            listWorkspace,
+            cancellationToken);
+        if (chosen is null)
+        {
+            return;
+        }
+
+        if (!SessionResume.TryLoad(
+                _sessionStore,
+                _workspace.Root,
+                chosen,
+                out var document,
+                out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        if (adoptWorkspace
+            && !await AdoptSessionWorkspaceAsync(document, cancellationToken))
+        {
+            return;
+        }
+
+        FinishResume(document);
+    }
+
+    private async Task<bool> AdoptSessionWorkspaceAsync(
+        SessionDocument document,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(document.Workspace)
+            || !_workspace.TryResolve(document.Workspace, out var candidate, out _))
+        {
+            Error("Session workspace is not a directory.");
+            return false;
+        }
+
+        return await EnterWorkspaceAsync(candidate, cancellationToken);
+    }
+
+    private void ResumeLoaded(string? id)
+    {
+        if (!SessionResume.TryLoad(
+                _sessionStore,
+                _workspace.Root,
+                id,
+                out var document,
+                out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        FinishResume(document);
+    }
+
+    private void FinishResume(SessionDocument document)
+    {
         CancelAndClearSide(announce: true);
         ApplyDocument(document);
         DiscardQueue();

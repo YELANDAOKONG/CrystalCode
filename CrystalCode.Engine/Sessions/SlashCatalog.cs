@@ -29,7 +29,7 @@ public static class SlashCatalog
         new(SessionVerb.Cd, "cd", [], "Show or set workspace"),
         new(SessionVerb.Trust, "trust", [], "Show workspace trust or turn it on or off",
             ["on", "off", "forget"]),
-        new(SessionVerb.Resume, "resume", ["continue"], "Choose saved session or ID"),
+        new(SessionVerb.Resume, "resume", ["continue"], "Choose a session, workspace, or all", ["all"]),
         new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
         new(SessionVerb.Sessions, "sessions", [], "List workspace sessions or all", ["all"]),
         new(SessionVerb.Compact, "compact", ["summarize"], "Summarize older context now"),
