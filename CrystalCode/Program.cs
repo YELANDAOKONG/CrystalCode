@@ -19,6 +19,8 @@ public static class Program
             config.SetApplicationName("crystal");
             config.AddCommand<TaskRunCommand>("run")
                 .WithDescription("Run one task without a terminal and exit.");
+            config.AddCommand<SpaceCommand>("space")
+                .WithDescription("Open the operator space and start the terminal.");
             config.AddBranch<ExtensionSettings>("plugins", plugins =>
             {
                 plugins.SetDescription("List, show, enable, or disable one plugin directory.");

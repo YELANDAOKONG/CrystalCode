@@ -111,6 +111,25 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task OperatorSpace_RunsWithoutRecordingTrust()
+    {
+        using var fixture = new RunFixture();
+        Directory.CreateDirectory(Path.Combine(fixture.Home, ".git"));
+        var space = OperatorSpace.EnsureCreated(new CrystalHome(fixture.Home));
+        var before = File.ReadAllText(Path.Combine(fixture.Home, "trusted.json"));
+
+        var result = await fixture.RunAsync(
+            new ScriptedRunClient(AllowReview, TextRound("Hello there.")),
+            WorkspaceSettings(fixture, space, workspaceTrust: "on"));
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        Assert.Contains("Hello there.", result.Output, StringComparison.Ordinal);
+        Assert.Equal(before, File.ReadAllText(Path.Combine(fixture.Home, "trusted.json")));
+        Assert.DoesNotContain(space, before, StringComparison.Ordinal);
+        fixture.AssertSettingsUnchanged();
+    }
+
+    [Fact]
     public async Task WorkspaceTrustOff_RunsWithoutRecordingTheDirectory()
     {
         using var fixture = new RunFixture();

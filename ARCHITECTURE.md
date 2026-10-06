@@ -155,7 +155,7 @@ CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
-| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `run` is the headless task command. `version` prints the build identity |
+| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `version` prints the build identity |
 | `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, process-only setting overrides, and exit codes |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
@@ -691,16 +691,24 @@ contents of `binaries/code/`.
   media/<sha256>
   logs/
   plugins/
+  space/
 ```
 
 `config.json` stores mutable operator preferences such as the selected provider
 and model. `workspaceTrust` asks before the first interactive entry into a
 directory (default on; omitted when on, `false` when off). A yes is stored
 in `trusted.json` as the git root, or the workspace path when there is no
-git repository. That file is not written by the workspace. `crystal run`
+git repository. That file is not written by the workspace. The operator
+space `{home}/space` is trusted without a prompt and without a ledger
+entry. Its trust root is that directory even when a parent is a git
+repository, so opening it does not grant the parent. `/trust forget` does
+not remove that trust or a separate parent grant. A child of `space`
+follows the ordinary rule unless `space` is the git root. `crystal space`
+creates the directory and opens the terminal there. `crystal run`
 does not read `workspaceTrust`. `--workspace-trust on|off` is process-only:
 omitted or `on` denies an untrusted directory before the session exists,
-and `off` skips the check without recording trust.
+and `off` skips the check without recording trust. The operator space
+passes that check.
 
 For example, an unlimited time budget with finite call limits is:
 

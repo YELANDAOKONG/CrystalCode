@@ -104,6 +104,72 @@ public sealed class WorkspaceTrustSessionTests
     }
 
     [Fact]
+    public async Task ChangeDirectory_OperatorSpaceDoesNotAskOrRecordTheParent()
+    {
+        using var home = new TemporaryHome();
+        Directory.CreateDirectory(Path.Combine(home.Root, ".git"));
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        using var current = new TemporaryWorkspace();
+        var prompt = new ScriptedTrustPrompt(accept: false);
+        var opened = Open(home, current.Path, prompt);
+
+        var quit = await opened.Session.SubmitAsync("/cd " + space, CancellationToken.None);
+
+        Assert.False(quit);
+        Assert.Equal(0, prompt.Asked);
+        Assert.Contains(
+            Notes(opened.Observer),
+            text => text == "Workspace  " + space);
+        Assert.False(File.Exists(home.Home.TrustedPath));
+        opened.Session.Close();
+    }
+
+    [Fact]
+    public async Task ChangeDirectory_ChildOfOperatorSpaceStillAsks()
+    {
+        using var home = new TemporaryHome();
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        var child = Path.Combine(space, "notes");
+        Directory.CreateDirectory(child);
+        var prompt = new ScriptedTrustPrompt(accept: false);
+        var opened = Open(home, space, prompt);
+
+        var quit = await opened.Session.SubmitAsync("/cd " + child, CancellationToken.None);
+
+        Assert.False(quit);
+        Assert.Equal(1, prompt.Asked);
+        Assert.Contains(
+            Notes(opened.Observer),
+            text => text == "Staying in " + new Workspace(space).Root);
+        opened.Session.Close();
+    }
+
+    [Fact]
+    public async Task TrustForget_OperatorSpaceStaysTrusted()
+    {
+        using var home = new TemporaryHome();
+        Directory.CreateDirectory(Path.Combine(home.Root, ".git"));
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        var store = new WorkspaceTrustStore(home.Home);
+        store.Remember(home.Root);
+        var prompt = new ScriptedTrustPrompt(accept: true);
+        var opened = Open(home, space, prompt);
+
+        var shown = await opened.Session.SubmitAsync("/trust", CancellationToken.None);
+        var forgotten = await opened.Session.SubmitAsync("/trust forget", CancellationToken.None);
+
+        Assert.False(shown);
+        Assert.False(forgotten);
+        Assert.Equal(0, prompt.Asked);
+        Assert.Contains(Notes(opened.Observer), text => text == "Trust root  " + space);
+        Assert.Contains(Notes(opened.Observer), text => text == "Trusted  yes");
+        Assert.Contains(Notes(opened.Observer), text => text == "The operator space stays trusted.");
+        Assert.True(store.Contains(home.Root));
+        Assert.DoesNotContain(space, File.ReadAllText(home.Home.TrustedPath), StringComparison.Ordinal);
+        opened.Session.Close();
+    }
+
+    [Fact]
     public async Task TrustForget_DropsTheCurrentRoot()
     {
         using var home = new TemporaryHome();

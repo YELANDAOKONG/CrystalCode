@@ -6,7 +6,6 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
-using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Run;
 
@@ -89,7 +88,7 @@ internal static class TaskRunHost
             }
 
             if (checkWorkspaceTrust
-                && !new WorkspaceTrustStore(home).Contains(GitRoot.TrustRoot(workspace)))
+                && !new WorkspaceTrustStore(home).Contains(workspace))
             {
                 await error.WriteLineAsync(
                     "This directory is not trusted. Open it in the terminal and trust it, or pass --workspace-trust off for this process.");

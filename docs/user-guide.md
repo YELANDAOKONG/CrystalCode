@@ -176,6 +176,23 @@ current workspace.
 If the provider has more than one model and neither `config.json` nor
 `--model` picks one, the process exits and asks for `--model`.
 
+## Operator space
+
+`crystal space` creates `~/.crystal/space` when it is missing and opens the
+terminal there. `--home` selects the data directory, so the space is
+`{home}/space`. The command accepts `--provider`, `--model`, and `--resume`.
+It does not accept `--workspace`.
+
+That directory is trusted without a prompt and without a `trusted.json`
+entry. `/cd` to it does not ask. Trust does not climb to a parent git
+repository, and `/trust forget` does not remove it. A subdirectory follows
+the ordinary trust rule. If `space` itself is a git repository, its children
+share that trust root. Sessions there are saved under the absolute path,
+the same way as any other workspace.
+
+`crystal run --workspace ~/.crystal/space` accepts the directory. It does
+not write a trust entry.
+
 ## Version
 
 `crystal version` and `crystal --version` print the build identity and exit.
@@ -257,7 +274,8 @@ or `--approval-model-id`.
 setting. Leaving it out checks the directory even when `workspaceTrust`
 is false in `config.json`. An untrusted directory exits 4 before a
 session starts. Trust it from the interactive terminal, or pass
-`--workspace-trust off` for that process.
+`--workspace-trust off` for that process. The operator space at
+`{home}/space` is already trusted.
 
 There is no operator. In Review and Audit the reviewing model still
 judges calls that require review: allow runs the tool, and deny returns
@@ -828,8 +846,8 @@ returns the transcript viewport to the latest output.
 | `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. While the model has not started, the panel shows the same spinner as the progress row. Once reasoning starts, the caption changes to Thinking until answer text arrives. An empty `/btw` reopens it. Esc, Enter, Space, or Ctrl+C closes it. Ctrl+C also cancels a side question that is still running and leaves the main turn running. Left and Right step through earlier answers. `x` clears them |
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
-| `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here |
-| `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry |
+| `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here. The operator space does not ask |
+| `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry. `forget` leaves the operator space trusted |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |

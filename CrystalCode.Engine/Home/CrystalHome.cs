@@ -6,6 +6,7 @@ namespace CrystalCode.Engine.Home;
 public sealed class CrystalHome
 {
     public const string EnvironmentVariableName = "CRYSTAL_HOME";
+    public const string SpaceDirectoryName = "space";
     private const string DirectoryName = ".crystal";
 
     public CrystalHome(string root)
@@ -43,6 +44,8 @@ public sealed class CrystalHome
     public string PromptSetsDirectory => Path.Combine(Root, "promptsets");
 
     public string InstructionsPath => Path.Combine(Root, "instructions.md");
+
+    public string SpaceDirectory => Path.Combine(Root, SpaceDirectoryName);
 
     public static CrystalHome Resolve(string? root = null)
     {

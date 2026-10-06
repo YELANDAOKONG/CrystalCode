@@ -1803,12 +1803,12 @@ public sealed class CodingSession : ITurnObserver
     private async Task<bool> ChangeTrustAsync(string argument, CancellationToken cancellationToken)
     {
         var command = argument.Trim().ToLowerInvariant();
-        var trustRoot = GitRoot.TrustRoot(_workspace.Root);
+        var trustRoot = _trust.TrustRoot(_workspace.Root);
         if (command.Length == 0)
         {
             Note("Workspace trust  " + (_settings.WorkspaceTrust ? "on" : "off"));
             Note("Trust root  " + trustRoot);
-            Note("Trusted  " + (_trust.Contains(trustRoot) ? "yes" : "no"));
+            Note("Trusted  " + (_trust.Contains(_workspace.Root) ? "yes" : "no"));
             return false;
         }
 
@@ -1820,7 +1820,13 @@ public sealed class CodingSession : ITurnObserver
 
         if (command == "forget")
         {
-            _trust.Forget(trustRoot);
+            if (OperatorSpace.Is(_home, trustRoot))
+            {
+                Note("The operator space stays trusted.");
+                return false;
+            }
+
+            _trust.Forget(_workspace.Root);
             Note("Forgot  " + trustRoot);
             return false;
         }
@@ -1829,7 +1835,7 @@ public sealed class CodingSession : ITurnObserver
         _settings = _settings.WithWorkspaceTrust(enabled);
         _settingsStore.Save(_settings);
         Note("Workspace trust  " + (enabled ? "on" : "off"));
-        if (!enabled || _trust.Contains(trustRoot))
+        if (!enabled || _trust.Contains(_workspace.Root))
         {
             return false;
         }
@@ -1842,7 +1848,7 @@ public sealed class CodingSession : ITurnObserver
             return true;
         }
 
-        _trust.Remember(trustRoot);
+        _trust.Remember(_workspace.Root);
         Note("Trusted  " + trustRoot);
         return false;
     }
@@ -1859,8 +1865,8 @@ public sealed class CodingSession : ITurnObserver
             return true;
         }
 
-        var trustRoot = GitRoot.TrustRoot(workspaceRoot);
-        if (_trust.Contains(trustRoot))
+        var trustRoot = _trust.TrustRoot(workspaceRoot);
+        if (_trust.Contains(workspaceRoot))
         {
             return true;
         }
@@ -1873,7 +1879,7 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        _trust.Remember(trustRoot);
+        _trust.Remember(workspaceRoot);
         return true;
     }
 

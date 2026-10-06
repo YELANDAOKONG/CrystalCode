@@ -45,6 +45,73 @@ public sealed class WorkspaceTrustStoreTests
     }
 
     [Fact]
+    public void Contains_TrustsTheOperatorSpaceWithoutALedgerEntry()
+    {
+        using var home = new TemporaryHome();
+        Directory.CreateDirectory(Path.Combine(home.Root, ".git"));
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        var store = new WorkspaceTrustStore(home.Home);
+
+        Assert.True(store.Contains(space));
+        Assert.Equal(space, store.TrustRoot(space));
+        Assert.False(store.Contains(home.Root));
+        Assert.False(File.Exists(home.Home.TrustedPath));
+
+        store.Remember(space);
+        store.Forget(space);
+
+        Assert.False(File.Exists(home.Home.TrustedPath));
+        Assert.True(store.Contains(space));
+    }
+
+    [Fact]
+    public void Forget_OperatorSpaceLeavesASeparateParentGrant()
+    {
+        using var home = new TemporaryHome();
+        Directory.CreateDirectory(Path.Combine(home.Root, ".git"));
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        var store = new WorkspaceTrustStore(home.Home);
+        store.Remember(home.Root);
+
+        store.Forget(space);
+
+        Assert.True(store.Contains(home.Root));
+        Assert.True(store.Contains(space));
+        var json = File.ReadAllText(home.Home.TrustedPath);
+        Assert.Contains(new Workspace(home.Root).Root, json, StringComparison.Ordinal);
+        Assert.DoesNotContain(space, json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Contains_TrustsAChildWhenTheOperatorSpaceIsTheGitRoot()
+    {
+        using var home = new TemporaryHome();
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        Directory.CreateDirectory(Path.Combine(space, ".git"));
+        var child = Path.Combine(space, "src");
+        Directory.CreateDirectory(child);
+        var store = new WorkspaceTrustStore(home.Home);
+
+        Assert.Equal(space, store.TrustRoot(child));
+        Assert.True(store.Contains(child));
+        store.Remember(child);
+        Assert.False(File.Exists(home.Home.TrustedPath));
+    }
+
+    [Fact]
+    public void Contains_DoesNotTrustAChildOfTheOperatorSpace()
+    {
+        using var home = new TemporaryHome();
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        var child = Path.Combine(space, "notes");
+        Directory.CreateDirectory(child);
+        var store = new WorkspaceTrustStore(home.Home);
+
+        Assert.Equal(new Workspace(child).Root, store.TrustRoot(child));
+        Assert.False(store.Contains(child));
+    }
+
+    [Fact]
     public void Forget_RemovesOnlyThatTrustRoot()
     {
         using var home = new TemporaryHome();

@@ -18,15 +18,42 @@ public sealed class WorkspaceTrustStore
         _home = home;
     }
 
+    /// <summary>
+    /// Directory a trust decision applies to. The operator space is its own
+    /// root even when a parent directory is a git repository. Otherwise this
+    /// is <see cref="GitRoot.TrustRoot"/>.
+    /// </summary>
+    public string TrustRoot(string workspaceRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
+        var canonical = Workspace.Canonicalize(Path.GetFullPath(workspaceRoot));
+        if (OperatorSpace.Is(_home, canonical))
+        {
+            return OperatorSpace.Resolve(_home);
+        }
+
+        return GitRoot.TrustRoot(canonical);
+    }
+
     public bool Contains(string workspaceRoot)
     {
-        var trustRoot = GitRoot.TrustRoot(workspaceRoot);
+        var trustRoot = TrustRoot(workspaceRoot);
+        if (OperatorSpace.Is(_home, trustRoot))
+        {
+            return true;
+        }
+
         return Read().Directories.Any(path => Same(path, trustRoot));
     }
 
     public void Remember(string workspaceRoot)
     {
-        var trustRoot = GitRoot.TrustRoot(workspaceRoot);
+        var trustRoot = TrustRoot(workspaceRoot);
+        if (OperatorSpace.Is(_home, trustRoot))
+        {
+            return;
+        }
+
         var document = Read();
         if (document.Directories.Any(path => Same(path, trustRoot)))
         {
@@ -39,7 +66,12 @@ public sealed class WorkspaceTrustStore
 
     public void Forget(string workspaceRoot)
     {
-        var trustRoot = GitRoot.TrustRoot(workspaceRoot);
+        var trustRoot = TrustRoot(workspaceRoot);
+        if (OperatorSpace.Is(_home, trustRoot))
+        {
+            return;
+        }
+
         var document = Read();
         var removed = document.Directories.RemoveAll(path => Same(path, trustRoot));
         if (removed == 0)

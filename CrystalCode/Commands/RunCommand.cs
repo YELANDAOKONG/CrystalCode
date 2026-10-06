@@ -14,8 +14,16 @@ namespace CrystalCode.Commands;
 /// </summary>
 public sealed class RunCommand : AsyncCommand<RunSettings>
 {
-    public override async Task<int> ExecuteAsync(
+    public override Task<int> ExecuteAsync(
         CommandContext context,
+        RunSettings settings,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return RunAsync(settings, cancellationToken);
+    }
+
+    internal static async Task<int> RunAsync(
         RunSettings settings,
         CancellationToken cancellationToken)
     {
@@ -247,9 +255,9 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         }
 
         var root = new Workspace(workspace).Root;
-        var trustRoot = GitRoot.TrustRoot(root);
         var trust = new WorkspaceTrustStore(home);
-        if (trust.Contains(trustRoot))
+        var trustRoot = trust.TrustRoot(root);
+        if (trust.Contains(root))
         {
             return new TrustDecision(true, 0);
         }
@@ -280,7 +288,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return new TrustDecision(false, 0);
         }
 
-        trust.Remember(trustRoot);
+        trust.Remember(root);
         return new TrustDecision(true, 0);
     }
 
