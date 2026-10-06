@@ -19,12 +19,14 @@ public sealed class BuildIdentityTextTests
             ".NET 10.0.4"));
 
         Assert.Equal(
-            """
-            Crystal Code  3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a
-            Crystal       1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d
-            SDK           10.0.201
-            Runtime       .NET 10.0.4
-            """.Replace("\n", Environment.NewLine, StringComparison.Ordinal),
+            string.Join(
+                Environment.NewLine,
+                [
+                    "Crystal Code  " + Product,
+                    "Crystal       " + Library,
+                    "SDK           10.0.201",
+                    "Runtime       .NET 10.0.4"
+                ]),
             text);
     }
 
@@ -38,10 +40,12 @@ public sealed class BuildIdentityTextTests
             ".NET 10.0.4"));
 
         Assert.Equal(
-            """
-            Crystal Code  3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a
-            Runtime       .NET 10.0.4
-            """.Replace("\n", Environment.NewLine, StringComparison.Ordinal),
+            string.Join(
+                Environment.NewLine,
+                [
+                    "Crystal Code  " + Product,
+                    "Runtime       .NET 10.0.4"
+                ]),
             text);
         Assert.DoesNotContain("1.0.0", text, StringComparison.Ordinal);
     }

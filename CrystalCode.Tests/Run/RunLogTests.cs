@@ -79,7 +79,7 @@ public sealed class RunLogTests
         log.OnEvent(new ToolCallsIssued([]));
 
         var text = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
-        const string expected = """
+        var expected = """
             [Thinking]
             Look at the file.
 
@@ -87,7 +87,7 @@ public sealed class RunLogTests
 
             [Assistant]
             The function returns early.
-            """;
+            """.Replace("\r\n", "\n", StringComparison.Ordinal);
         Assert.Contains(expected, text, StringComparison.Ordinal);
         Assert.Equal(
             text.IndexOf("[Assistant]", StringComparison.Ordinal),
