@@ -56,7 +56,7 @@ public sealed class ResumeWorkspaceTests
         Assert.False(chooser.ListWorkspace);
         Assert.Equal(original, opened.Session.SessionId);
         Assert.DoesNotContain(Notes(opened.Observer), text => text.StartsWith("Workspace  ", StringComparison.Ordinal));
-        Assert.Contains(Root(other.Path), File.ReadAllText(home.Home.TrustedPath), StringComparison.Ordinal);
+        Assert.Equal([Root(other.Path)], TrustedDirectories.Read(home.Home.TrustedPath));
         opened.Session.Close();
     }
 

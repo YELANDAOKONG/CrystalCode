@@ -19,9 +19,23 @@ internal sealed class TemporaryHome : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(Root))
+        if (!Directory.Exists(Root))
+        {
+            return;
+        }
+
+        try
         {
             Directory.Delete(Root, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Loaded plugin assemblies stay mapped in a non-collectible
+            // AssemblyLoadContext until process exit. Recursive delete then
+            // fails (Windows access denied; Unix EBUSY or directory not empty).
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 }

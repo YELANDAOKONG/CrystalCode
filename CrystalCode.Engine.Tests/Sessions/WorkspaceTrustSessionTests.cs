@@ -55,10 +55,9 @@ public sealed class WorkspaceTrustSessionTests
         Assert.NotNull(prompt.Last);
         Assert.True(prompt.Last.CoversRepository);
         Assert.Equal(GitRoot.TrustRoot(repo.Path), prompt.Last.TrustRoot);
-        Assert.Contains(
-            GitRoot.TrustRoot(repo.Path),
-            File.ReadAllText(home.Home.TrustedPath),
-            StringComparison.Ordinal);
+        Assert.Equal(
+            [GitRoot.TrustRoot(repo.Path)],
+            TrustedDirectories.Read(home.Home.TrustedPath));
         Assert.Contains(Notes(opened.Observer), text => text.StartsWith("Workspace  ", StringComparison.Ordinal));
         opened.Session.Close();
     }
@@ -220,7 +219,9 @@ public sealed class WorkspaceTrustSessionTests
         Assert.Contains(Notes(opened.Observer), text => text == "Trusted  yes");
         Assert.Contains(Notes(opened.Observer), text => text == "The operator space stays trusted.");
         Assert.True(store.Contains(home.Root));
-        Assert.DoesNotContain(space, File.ReadAllText(home.Home.TrustedPath), StringComparison.Ordinal);
+        var recorded = TrustedDirectories.Read(home.Home.TrustedPath);
+        Assert.Equal([new Workspace(home.Root).Root], recorded);
+        Assert.DoesNotContain(space, recorded);
         opened.Session.Close();
     }
 

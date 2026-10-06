@@ -15,7 +15,7 @@ public sealed class GitRootTests
         Directory.CreateDirectory(child);
 
         Assert.Equal(Path.GetFullPath(root.Path), GitRoot.Find(child));
-        Assert.Equal(Path.GetFullPath(root.Path), GitRoot.TrustRoot(child));
+        Assert.Equal(Workspace.Canonicalize(root.Path), GitRoot.TrustRoot(child));
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public sealed class GitRootTests
         Directory.CreateDirectory(child);
 
         Assert.Null(GitRoot.Find(child));
-        Assert.Equal(Path.GetFullPath(child), GitRoot.TrustRoot(child));
+        Assert.Equal(Workspace.Canonicalize(child), GitRoot.TrustRoot(child));
         Assert.NotEqual(GitRoot.TrustRoot(root.Path), GitRoot.TrustRoot(child));
     }
 }

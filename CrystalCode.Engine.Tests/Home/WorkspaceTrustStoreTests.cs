@@ -34,8 +34,8 @@ public sealed class WorkspaceTrustStoreTests
 
         Assert.True(store.Contains(child));
         Assert.True(store.Contains(workspace.Path));
-        var json = File.ReadAllText(home.Home.TrustedPath);
-        Assert.Equal(1, Count(json, GitRoot.TrustRoot(workspace.Path)));
+        var recorded = TrustedDirectories.Read(home.Home.TrustedPath);
+        Assert.Equal([GitRoot.TrustRoot(workspace.Path)], recorded);
         if (!OperatingSystem.IsWindows())
         {
             Assert.Equal(
@@ -77,9 +77,9 @@ public sealed class WorkspaceTrustStoreTests
 
         Assert.True(store.Contains(home.Root));
         Assert.True(store.Contains(space));
-        var json = File.ReadAllText(home.Home.TrustedPath);
-        Assert.Contains(new Workspace(home.Root).Root, json, StringComparison.Ordinal);
-        Assert.DoesNotContain(space, json, StringComparison.Ordinal);
+        var recorded = TrustedDirectories.Read(home.Home.TrustedPath);
+        Assert.Equal([new Workspace(home.Root).Root], recorded);
+        Assert.DoesNotContain(space, recorded);
     }
 
     [Fact]
@@ -127,7 +127,4 @@ public sealed class WorkspaceTrustStoreTests
         Assert.False(store.Contains(first.Path));
         Assert.True(store.Contains(second.Path));
     }
-
-    private static int Count(string json, string path) =>
-        json.Split(path, StringSplitOptions.None).Length - 1;
 }
