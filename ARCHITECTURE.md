@@ -372,8 +372,10 @@ Images stay when either transcript still mentions them. `/clear` drops both.
 The composer stays open while a turn runs. Enter with text enqueues a
 follow-up (FIFO). Queued items stay in a panel above the composer until
 they are sent. The queue is sent when the current tool batch finishes or
-when the turn (thinking or conversation) ends. Empty Enter while working
-does not stop the turn. Ctrl+C interrupts and does not drop queued text.
+when the turn (thinking or conversation) ends. Empty Enter while a
+follow-up is queued interrupts the turn so the queue is sent now. Empty
+Enter with nothing queued does not stop the turn. Ctrl+C interrupts and
+does not drop queued text.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
 
@@ -1259,8 +1261,9 @@ above the composer.
 
 Composer keys: Enter submits when idle and queues while a turn is
 running. Queued text stays above the composer and is sent when the
-current tool batch or turn ends. Empty Enter while working does not
-stop the turn. Backspace deletes one character on every
+current tool batch or turn ends. Empty Enter while a follow-up is
+queued interrupts the turn so the queue is sent now. Empty Enter with
+nothing queued does not stop the turn. Backspace deletes one character on every
 platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
 plain Backspace as Control; that is still one character. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.

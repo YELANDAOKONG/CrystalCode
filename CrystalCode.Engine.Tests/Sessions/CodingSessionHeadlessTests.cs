@@ -187,6 +187,33 @@ public sealed class CodingSessionHeadlessTests
     }
 
     [Fact]
+    public async Task Submit_EmptyWhileQueuedInterruptsTheTurn()
+    {
+        var client = new BlockingStreamingClient();
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        var quit = await headless.Session.SubmitAsync("long task", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        var queued = await headless.Session.SubmitAsync("follow up", CancellationToken.None);
+        var empty = await headless.Session.SubmitAsync(string.Empty, CancellationToken.None);
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+
+        Assert.False(quit);
+        Assert.False(queued);
+        Assert.False(empty);
+        var finished = headless.Observer.Events.OfType<TurnFinished>().Single();
+        Assert.Equal(TurnStopReason.Interrupted, finished.Result.StopReason);
+        Assert.Contains(
+            headless.Observer.Events.OfType<UserMessageSent>(),
+            static user => user.Text == "follow up");
+        Assert.True(headless.Session.TurnActive);
+
+        Assert.True(headless.Session.TryInterrupt());
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Turn_ProviderFailurePublishesTheErrorAndFinishes()
     {
         using var headless = new HeadlessSession(new ThrowingStreamingClient());

@@ -228,7 +228,8 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Handles one submitted prompt: a slash command, a follow-up while a turn
-    /// runs, or the start of a turn. Empty text while a turn runs is ignored.
+    /// runs, or the start of a turn. Empty text while a turn runs interrupts
+    /// when a follow-up is queued, and is ignored otherwise.
     /// Returns true when the operator asked to quit.
     /// </summary>
     public async Task<bool> SubmitAsync(string text, CancellationToken cancellationToken)
@@ -255,6 +256,11 @@ public sealed class CodingSession : ITurnObserver
 
                 Enqueue(input);
                 return false;
+            }
+
+            if (_queue.Count > 0)
+            {
+                _turnSource?.Cancel();
             }
 
             return false;
