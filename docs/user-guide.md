@@ -87,7 +87,7 @@ models and providers.
 
 Building from source also requires:
 
-- .NET 10 SDK
+- .NET 10 or .NET 11 SDK
 - A sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal` (relative to this
   repository root)
 
@@ -112,9 +112,9 @@ On Windows:
 powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1
 ```
 
-The script checks the .NET 10 SDK, the sibling Crystal checkout, and the
-current platform. It then publishes Release into `build/` with the same
-arguments as the release workflow:
+The script checks for the .NET 10 or .NET 11 SDK, the sibling Crystal
+checkout, and the current platform. It then publishes Release into `build/`
+with the same arguments as the release workflow:
 
 ```text
 dotnet publish CrystalCode/CrystalCode.csproj

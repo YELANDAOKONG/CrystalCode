@@ -244,10 +244,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 $sdkVersion = "$sdkVersion".Trim()
 Detail "Version: $sdkVersion"
-if ($sdkVersion -notlike "10.*") {
-    Fail "The release workflow uses the .NET 10 SDK. This machine selected $sdkVersion."
+if ($sdkVersion -notlike "10.*" -and $sdkVersion -notlike "11.*") {
+    Fail "Crystal Code requires the .NET 10 or .NET 11 SDK. This machine selected $sdkVersion."
 }
-Detail "Check passed: SDK major version is 10."
+Detail "Check passed: SDK major version is $($sdkVersion.Split('.')[0])."
 
 Step "check" "Crystal sibling"
 if (-not (Test-Path -LiteralPath $crystalRoot -PathType Container)) {

@@ -290,11 +290,11 @@ sdk_version=$(printf '%s' "$sdk_version" | tr -d '[:space:]')
 detail "Version: ${sdk_version}"
 
 case "$sdk_version" in
-    10.*)
-        detail "Check passed: SDK major version is 10."
+    10.* | 11.*)
+        detail "Check passed: SDK major version is ${sdk_version%%.*}."
         ;;
     *)
-        fail "The release workflow uses the .NET 10 SDK. This machine selected ${sdk_version}."
+        fail "Crystal Code requires the .NET 10 or .NET 11 SDK. This machine selected ${sdk_version}."
         ;;
 esac
 
