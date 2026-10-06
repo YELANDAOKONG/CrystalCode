@@ -17,10 +17,9 @@ license: MIT
 
 This skill constrains **where types live and what they are called** in any
 .NET project: class libraries, consoles, workers, WPF, MAUI, ASP.NET, test
-projects. It does not own statement-level style. Pair it with
-[C# Clean Code](https://github.com/YELANDAOKONG/CSharpCleanCodeSkill)
-for file-scoped namespaces, braces, async, and one-type-per-file at the
-syntax level.
+projects. It does not own statement-level style. Pair it with the
+sibling C# Clean Code skill for file-scoped namespaces, braces, async,
+and one-type-per-file at the syntax level.
 
 Solution Explorer is the first reading surface. Names and folders are the
 map of the system. Inventing a clever layout without asking produces code
