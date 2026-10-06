@@ -157,6 +157,18 @@ the archive stay as they were, except for text replaced by
 host commits that candidate or runs its tools. Approval review does not
 call it. The host keeps the candidate it received.
 
+All of these methods belong to one `IPluginHook`. A plugin registers that
+hook once, on `PluginContribution`. There is no second list for model
+hooks.
+
+`RebuildModelAsync` and `TransformModelAsync` change only the items sent
+on that one call. The stored transcript and the archive stay as they were.
+Dropping an earlier turn, or rewriting user, assistant, or tool-result
+text, can make the model answer from a conversation the operator did not
+store. The live system prompt is still sent. A replacement that changes
+that prompt, adds an item, edits a tool call from `TransformModelAsync`,
+or splits a call from its result is skipped with an English note.
+
 Session start runs after the plugin load. Session end runs when the
 session closes and before a `/cd` reload. `crystal run` closes the
 session when the process finishes.

@@ -950,8 +950,9 @@ field is omitted from the written file.
 
 A plugin can add tools, a protocol client, approval classifiers, slash
 commands, and hooks. Hooks may append prompt and compaction text, rewrite
-a user message before it is stored, project one outbound model request,
-read one completed model response, rewrite a tool call (approval runs
+a user message before it is stored, project one outbound model request
+without changing the stored transcript, read one completed model response,
+rewrite a tool call (approval runs
 again), replace a tool result, and raise approval risk. They cannot lower
 risk or replace Work, Plan, or Review.
 `/plugins` lists them. `/plugins on|off|reload` controls discovery.
