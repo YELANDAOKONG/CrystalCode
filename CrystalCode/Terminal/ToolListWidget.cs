@@ -64,6 +64,8 @@ internal static class ToolListWidget
             new Markup(
                 $"[{Theme.Chrome}]Commands[/]\n"
                 + $"[{Theme.User}]  /tools on|off|reload\n"
+                + "  /tools enable|disable|show <directory>\n"
+                + "  /tools home|project enable|disable|show <directory>\n"
                 + "  /tools home|project author|host[/]"));
         return new Padder(new Rows(blocks), new Padding(2, 0, 0, 0));
     }

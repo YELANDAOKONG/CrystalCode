@@ -1376,6 +1376,14 @@ behavior and ownership are not defined, and this build does not reserve
 types for it. Catalog order is
 built-in tools, disk plugin tools, external tools, then `skill`.
 
+`/plugins enable|disable|show` and `/tools enable|disable|show` change one
+directory. `home` or `project` selects the tree; otherwise a project
+directory wins. `crystal plugins` and `crystal tools` perform the same
+manifest edit outside a session. Their default output is a Spectre.Console
+table. `--format text` prints aligned plain text. They write `enabled` on
+that manifest and do not write `config.json` or start a session. The
+global discovery switches stay separate.
+
 Operator tool sets are not plugins. They are discovered from `tools/` and
 wrapped by `ExternalCatalog`. An exec child starts in the workspace root
 and receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, and `CRYSTAL_APPROVAL`

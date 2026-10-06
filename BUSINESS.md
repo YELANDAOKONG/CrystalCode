@@ -82,7 +82,12 @@ separate library with no terminal code. The product can:
   string, and replace an approval classification with any risk, authority,
   summary, and prompt requirement. The session names each plugin that
   registers one. Ordinary hooks stay append-only for those prompts and
-  cannot lower approval risk;
+  cannot lower approval risk. One plugin or one external tool set can be
+  enabled or disabled by directory name from the session or from
+  `crystal plugins` and `crystal tools`. Those commands write that
+  manifest's `enabled` field and do not write `config.json`. Their default
+  output is a Spectre.Console table; `--format text` prints aligned plain
+  text;
 - honor an author-declared `approval: always` in a tool set for ordinary
   workspace-bounded calls, with the operator choosing per source whether
   declarations take effect through `externalToolApproval` in

@@ -100,6 +100,18 @@ A project set can disable a home set of the same directory name this
 way. The manifest is still parsed; an invalid disabled file is skipped
 with a note.
 
+`/tools enable|disable|show <directory>` changes or shows one set. Prefix
+`home` or `project` to choose that tree. Without a prefix, a project
+directory wins over Home. A change reloads the catalog. It does not create
+a directory, and a broken manifest is left unchanged. `/tools on|off|reload`
+remains the discovery switch for every set.
+
+`crystal tools list`, `show`, `enable`, and `disable` do the same outside
+a session. `--source home|project` chooses the tree. The default output is
+a Spectre.Console table. `--format text` prints the same fields as aligned
+plain text. These commands write `enabled` in `tools.json` and do not write
+`config.json`. Turning one set on does not turn discovery on.
+
 A missing, unreadable, or invalid manifest skips that **set** and
 records an English operator note. The session still starts. A set that
 loads with several tools and fails one name omits only that name when

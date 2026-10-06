@@ -181,6 +181,10 @@ If the provider has more than one model and neither `config.json` nor
 `crystal version` and `crystal --version` print the build identity and exit.
 They do not open the terminal and do not read configuration.
 
+`crystal plugins` and `crystal tools` list, show, enable, or disable one
+directory. They print a Spectre.Console table unless `--format text` is
+set. They do not open a session and do not write `config.json`.
+
 ```text
 Crystal Code  3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a
 Crystal       1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d
@@ -936,7 +940,11 @@ through `ToolInvocationPolicy` by default. Authors may set `approval` to
 `always`; Home tools follow that declaration by default, while Project tools
 use host policy unless configured otherwise. `/tools` lists the effective
 catalog and approval, `/tools home|project author|host` changes source trust,
-and `/tools on|off|reload` controls discovery. Full auto-passes a
+and `/tools on|off|reload` controls discovery.
+`/tools enable|disable|show <directory>` changes one tool set.
+`crystal tools list|show|enable|disable` does the same outside a session
+and prints a Spectre.Console table unless `--format text` is set.
+Full auto-passes a
 workspace-bounded external write; Edit does not. Details, manifest fields,
 and the
 dotnet publish layout are in
@@ -967,6 +975,9 @@ and is not decided. A later module system may sit below plugins
 and reach the host through reflection or another mechanism. It is not in
 this build.
 `/plugins` lists them. `/plugins on|off|reload` controls discovery.
+`/plugins enable|disable|show <directory>` changes one plugin.
+`crystal plugins list|show|enable|disable` does the same outside a session
+and prints a Spectre.Console table unless `--format text` is set.
 Details are in [Plugins](plugins.md).
 
 ## Prompts and instructions

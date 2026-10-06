@@ -47,8 +47,22 @@ switch for one process and is not written back.
 operator note. A missing, unreadable, or invalid manifest skips that
 plugin and records an English note. The session still starts.
 
-`/plugins` lists loaded plugins. `/plugins on`, `/plugins off`, and
-`/plugins reload` persist the switch when it changes and reload catalogs.
+`/plugins` lists loaded plugins and any directory that is not loaded.
+`/plugins on`, `/plugins off`, and `/plugins reload` persist the discovery
+switch when it changes and reload catalogs. `/plugins enable <directory>`,
+`/plugins disable <directory>`, and `/plugins show <directory>` change or
+show one manifest. Prefix `home` or `project` to choose that tree. Without
+a prefix, a project directory wins over Home. The command reloads catalogs
+after a change. It does not create a directory. A broken manifest is left
+unchanged.
+
+`crystal plugins list`, `show`, `enable`, and `disable` do the same outside
+a session. `--source home|project` chooses the tree. `--workspace` chooses
+the project root. `--home` chooses the data directory. The default output
+is a Spectre.Console table. `--format text` prints the same fields as
+aligned plain text. These commands write `enabled` in `plugin.json` and
+do not write `config.json`. Turning one plugin on does not turn discovery
+on. `crystal run --plugins` remains a process-only override.
 
 ## Manifest
 

@@ -1295,7 +1295,19 @@ public sealed class CodingSession : ITurnObserver
 
         if (command is "home" or "project")
         {
+            if (CatalogCommand.LooksLike(parts))
+            {
+                ChangeToolSet(parts);
+                return;
+            }
+
             ChangeToolApproval(command, parts);
+            return;
+        }
+
+        if (CatalogCommand.LooksLike(parts))
+        {
+            ChangeToolSet(parts);
             return;
         }
 
@@ -1578,7 +1590,83 @@ public sealed class CodingSession : ITurnObserver
     {
         Error(
             "Tools command must be /tools, /tools approval, /tools on|off|reload, "
+            + "/tools enable|disable|show <directory>, "
+            + "/tools home|project enable|disable|show <directory>, "
             + "/tools home author|host, or /tools project author|host.");
+    }
+
+    private void ChangeToolSet(IReadOnlyList<string> parts)
+    {
+        if (!CatalogCommand.TryParse(parts, out var command, out var error) || command is null)
+        {
+            Error(error);
+            return;
+        }
+
+        if (_turnActive && command.Verb != "show")
+        {
+            Error("Finish the current turn before reloading tools.");
+            return;
+        }
+
+        var source = command.Source switch
+        {
+            "home" => ExternalToolSource.Home,
+            "project" => ExternalToolSource.Project,
+            _ => (ExternalToolSource?)null
+        };
+        if (command.Verb == "show")
+        {
+            if (!ToolSetInventory.TryFind(_home, _workspace.Root, command.DirectoryName, source, out var entry, out error)
+                || entry is null)
+            {
+                Error(error);
+                return;
+            }
+
+            foreach (var line in ToolSetInventory.Format(entry))
+            {
+                Note(line);
+            }
+
+            if (!_settings.ExternalTools)
+            {
+                Note(ToolSetInventory.DiscoveryOff);
+            }
+
+            return;
+        }
+
+        var enabled = command.Verb == "enable";
+        if (!ToolSetInventory.TrySetEnabled(
+                _home,
+                _workspace.Root,
+                command.DirectoryName,
+                source,
+                enabled,
+                out var updated,
+                out var changed,
+                out error)
+            || updated is null)
+        {
+            Error(error);
+            return;
+        }
+
+        if (changed)
+        {
+            ReloadExternalToolsWithProgress();
+            RebuildExecutors();
+            WriteExternalNotes();
+        }
+
+        Note(changed
+            ? $"Tool set {updated.DirectoryName}  {(enabled ? "Enabled" : "Disabled")}"
+            : $"Tool set {updated.DirectoryName} is already {(enabled ? "enabled" : "disabled")}.");
+        if (enabled && !_settings.ExternalTools)
+        {
+            Note(ToolSetInventory.DiscoveryOff);
+        }
     }
 
     private static string Title(string value) =>
@@ -2401,20 +2489,50 @@ public sealed class CodingSession : ITurnObserver
 
     private async Task ChangePluginsAsync(string argument, CancellationToken cancellationToken)
     {
-        var command = argument.Trim().ToLowerInvariant();
-        if (command.Length == 0)
+        var parts = argument.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
         {
             foreach (var line in _loadedPlugins.Describe(_settings.Plugins))
             {
                 Note(line);
             }
 
+            var hidden = PluginInventory.List(_home, _workspace.Root)
+                .Where(entry => !_loadedPlugins.Plugins.Any(plugin =>
+                    plugin.Source == entry.Source
+                    && ExternalToolNames.OverlayComparer.Equals(
+                        plugin.DirectoryName,
+                        entry.DirectoryName)))
+                .ToArray();
+            if (hidden.Length > 0)
+            {
+                foreach (var line in PluginInventory.Format(hidden))
+                {
+                    Note(line);
+                }
+            }
+
+            if (!_settings.Plugins)
+            {
+                Note(PluginInventory.DiscoveryOff);
+            }
+
             return;
         }
 
-        if (command is not ("on" or "off" or "reload"))
+        if (CatalogCommand.LooksLike(parts))
         {
-            Error("Plugins command must be /plugins, /plugins on|off|reload.");
+            await ChangePluginDirectoryAsync(parts, cancellationToken);
+            return;
+        }
+
+        var command = parts[0].ToLowerInvariant();
+        if (parts.Length != 1 || command is not ("on" or "off" or "reload"))
+        {
+            Error(
+                "Plugins command must be /plugins, /plugins on|off|reload, "
+                + "/plugins enable|disable|show <directory>, "
+                + "or /plugins home|project enable|disable|show <directory>.");
             return;
         }
 
@@ -2449,6 +2567,97 @@ public sealed class CodingSession : ITurnObserver
         RefreshSlashCommands();
         await OpenPluginSessionAsync(cancellationToken);
         Note(command == "reload" ? "Plugins reloaded" : "Plugins  " + Title(command));
+    }
+
+    private async Task ChangePluginDirectoryAsync(
+        IReadOnlyList<string> parts,
+        CancellationToken cancellationToken)
+    {
+        if (!CatalogCommand.TryParse(parts, out var command, out var error) || command is null)
+        {
+            Error(error);
+            return;
+        }
+
+        if (_turnActive && command.Verb != "show")
+        {
+            Error("Finish the current turn before reloading plugins.");
+            return;
+        }
+
+        var source = command.Source switch
+        {
+            "home" => PluginSource.Home,
+            "project" => PluginSource.Project,
+            _ => (PluginSource?)null
+        };
+        if (command.Verb == "show")
+        {
+            if (!PluginInventory.TryFind(_home, _workspace.Root, command.DirectoryName, source, out var entry, out error)
+                || entry is null)
+            {
+                Error(error);
+                return;
+            }
+
+            foreach (var line in PluginInventory.Format(entry))
+            {
+                Note(line);
+            }
+
+            if (!_settings.Plugins)
+            {
+                Note(PluginInventory.DiscoveryOff);
+            }
+
+            return;
+        }
+
+        var enabled = command.Verb == "enable";
+        if (!PluginInventory.TrySetEnabled(
+                _home,
+                _workspace.Root,
+                command.DirectoryName,
+                source,
+                enabled,
+                out var updated,
+                out var changed,
+                out error)
+            || updated is null)
+        {
+            Error(error);
+            return;
+        }
+
+        if (changed)
+        {
+            await ClosePluginSessionAsync(cancellationToken);
+            ReloadPluginsWithProgress();
+            ReloadExternalToolsWithProgress();
+            try
+            {
+                ReplaceClients();
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                Error(exception.Message);
+            }
+
+            RebuildExecutors();
+            ReplaceLiveSystem();
+            WritePluginNotes();
+            WriteExternalNotes();
+            RefreshSlashCommands();
+            await OpenPluginSessionAsync(cancellationToken);
+        }
+
+        Note(changed
+            ? $"Plugin {updated.DirectoryName}  {(enabled ? "Enabled" : "Disabled")}"
+            : $"Plugin {updated.DirectoryName} is already {(enabled ? "enabled" : "disabled")}.");
+        if (enabled && !_settings.Plugins)
+        {
+            Note(PluginInventory.DiscoveryOff);
+        }
     }
 
     private IReadOnlyList<ISlashCommand> PluginCommands()
