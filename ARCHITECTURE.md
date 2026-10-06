@@ -363,7 +363,9 @@ text, reasoning, tool calls, and tool results as they are committed, and
 compaction does not change it. The model context is the list sent to the
 model. Compaction replaces that list with the live system prompt, a summary,
 and a recent tail. Usage, approval review, and later model calls read the
-model context. Resume, fork replay, and export read the archive. A session
+model context. Resume, fork replay, and export read the archive. `/stats`
+tool share reads the archive, and a session file with no archive counts tools
+from its saved items. A session
 file written before the archive existed loads its saved items as the archive.
 Images stay when either transcript still mentions them. `/clear` drops both.
 

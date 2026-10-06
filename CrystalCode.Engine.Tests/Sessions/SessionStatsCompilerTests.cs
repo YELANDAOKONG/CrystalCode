@@ -90,6 +90,34 @@ public sealed class SessionStatsCompilerTests
         Assert.Equal("read", report.TopTools[0].Name);
     }
 
+    [Fact]
+    public void Compile_CountsToolsFromTheArchiveWhenTheModelContextIsCompacted()
+    {
+        var now = new DateTimeOffset(2026, 10, 4, 0, 0, 0, TimeSpan.Zero);
+        var session = Session(
+            created: now.AddDays(-1),
+            updated: now,
+            userTurns: 4,
+            modelCalls: 6,
+            toolCalls: 3,
+            input: 20,
+            output: 10,
+            reasoning: 0,
+            tools: ["read"]);
+        session.Archive =
+        [
+            Tool("bash"),
+            Tool("read"),
+            Tool("glob")
+        ];
+
+        var report = SessionStatsCompiler.Compile([session], now, windowDays: null, topTools: 5);
+
+        Assert.Equal(3, report.ToolCalls);
+        Assert.Equal(["bash", "glob", "read"], report.TopTools.Select(static tool => tool.Name));
+        Assert.All(report.TopTools, static tool => Assert.Equal(1, tool.Count));
+    }
+
     private static SessionDocument Session(
         DateTimeOffset created,
         DateTimeOffset updated,
@@ -125,5 +153,14 @@ public sealed class SessionStatsCompilerTests
                     Arguments = "{}"
                 })
             ]
+        };
+
+    private static SessionItemDocument Tool(string name) =>
+        new()
+        {
+            Kind = "tool_call",
+            Name = name,
+            CallId = Guid.NewGuid().ToString("N"),
+            Arguments = "{}"
         };
 }

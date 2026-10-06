@@ -44,7 +44,7 @@ internal static class SessionStatsCompiler
             userTurns += Math.Max(0, session.UserTurns);
             modelCalls += Math.Max(0, session.ModelCalls);
             toolCalls += Math.Max(0, session.ToolCalls);
-            foreach (var item in session.Items)
+            foreach (var item in session.Archive ?? session.Items)
             {
                 if (!string.Equals(item.Kind, "tool_call", StringComparison.OrdinalIgnoreCase)
                     || string.IsNullOrWhiteSpace(item.Name))
