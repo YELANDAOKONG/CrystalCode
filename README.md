@@ -113,6 +113,8 @@ different repository, add `--workspace <path>` after the final `--` in the
 `dotnet run` command. A TTY is required for the interactive UI, and `bash`
 must be on the path (Git Bash is used on Windows when available).
 
+Maintainers can write a commit message and commit the current change with [`commit.sh`](commit.sh). It runs `crystal run` in this repository. Extra arguments are appended to the task. The run skips external tools and the directory trust check, and it does not record the directory as trusted.
+
 ## Documentation
 
 - [User guide](docs/user-guide.md): installation, configuration, commands, tools, sessions, and prompts
