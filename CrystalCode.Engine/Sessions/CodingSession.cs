@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Crystal;
 using Crystal.Chat;
 using Crystal.Multimodal.Chat;
@@ -1935,21 +1936,30 @@ public sealed class CodingSession : ITurnObserver
         _sessionStore.Save(CreateDocument());
     }
 
-    private SessionDocument CreateDocument() =>
-        new()
+    private SessionDocument CreateDocument()
+    {
+        var (archiveSnapshot, archiveCount) = ArchiveSnapshotWithCount();
+        var referencedMarkers = ReferencedImageMarkers(archiveSnapshot);
+        if (ArchiveCount() != archiveCount)
+        {
+            archiveSnapshot = ArchiveSnapshot();
+            referencedMarkers = ReferencedImageMarkers(archiveSnapshot);
+        }
+
+        return new SessionDocument
         {
             Id = _sessionId,
             Workspace = _workspace.Root,
             PlanMode = _planMode,
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_transcript),
-            Archive = TranscriptCodec.Write(ArchiveSnapshot()),
+            Archive = TranscriptCodec.Write(archiveSnapshot),
             ImageMarkersTagged = true,
             Images =
             [
-                .. SessionMapper.WriteImages(ImageSnapshot().Values.Where(IsReferencedInTranscript)),
-                .. _unavailableImages.Where(image => IsReferencedInTranscript(
-                    ImageMarkerText.Tag(image.Number)))
+                .. SessionMapper.WriteImages(
+                    ImageSnapshot().Values.Where(image => referencedMarkers.Contains(image.TrustedMarker))),
+                .. _unavailableImages.Where(image => referencedMarkers.Contains(ImageMarkerText.Tag(image.Number)))
             ],
             Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
             UserTurns = _ledger.UserTurns,
@@ -1958,6 +1968,7 @@ public sealed class CodingSession : ITurnObserver
             Usage = SessionMapper.WriteUsage(_ledger.Usage),
             CumulativeUsage = SessionMapper.WriteUsage(_ledger.CumulativeUsage)
         };
+    }
 
     private void BeginNewSession()
     {
@@ -2779,9 +2790,6 @@ public sealed class CodingSession : ITurnObserver
         });
     }
 
-    private bool IsReferencedInTranscript(ImageAttachment image) =>
-        IsReferencedInTranscript(image.TrustedMarker);
-
     private void CommitArchive(IReadOnlyList<ChatItem> items)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -2810,6 +2818,22 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    private (List<ChatItem> Snapshot, int Count) ArchiveSnapshotWithCount()
+    {
+        lock (_archiveGate)
+        {
+            return ([.. _archive], _archive.Count);
+        }
+    }
+
+    private int ArchiveCount()
+    {
+        lock (_archiveGate)
+        {
+            return _archive.Count;
+        }
+    }
+
     private IReadOnlyList<ChatItem> SideConversation(IReadOnlyList<ChatItem> archive)
     {
         var body = archive;
@@ -2824,8 +2848,8 @@ public sealed class CodingSession : ITurnObserver
         return [new ChatMessage(ChatRole.System, CurrentSystemText()), .. body];
     }
 
-    private bool IsReferencedInTranscript(string marker) =>
-        ContainsMarker(_transcript, marker) || ContainsMarker(ArchiveSnapshot(), marker);
+    private bool IsReferencedInTranscript(string marker, IReadOnlyList<ChatItem> archiveSnapshot) =>
+        ContainsMarker(_transcript, marker) || ContainsMarker(archiveSnapshot, marker);
 
     private static bool ContainsMarker(IReadOnlyList<ChatItem> items, string marker) =>
         items.Any(item => item switch
@@ -2834,6 +2858,38 @@ public sealed class CodingSession : ITurnObserver
             ToolResult result => result.Text.Contains(marker, StringComparison.Ordinal),
             _ => false
         });
+
+    private HashSet<string> ReferencedImageMarkers(IReadOnlyList<ChatItem> archiveSnapshot)
+    {
+        var referenced = new HashSet<string>(StringComparer.Ordinal);
+        AddReferencedImageMarkers(referenced, _transcript);
+        AddReferencedImageMarkers(referenced, archiveSnapshot);
+        return referenced;
+    }
+
+    private static void AddReferencedImageMarkers(
+        HashSet<string> markers,
+        IReadOnlyList<ChatItem> items)
+    {
+        foreach (var item in items)
+        {
+            var text = item switch
+            {
+                ChatMessage message => message.Text,
+                ToolResult result => result.Text,
+                _ => null
+            };
+            if (string.IsNullOrEmpty(text))
+            {
+                continue;
+            }
+
+            foreach (Match match in ImageMarkerText.Matches(text))
+            {
+                markers.Add(match.Value);
+            }
+        }
+    }
 
     private static IReadOnlyList<ChatItem> ReconcilePendingToolCalls(IReadOnlyList<ChatItem> items)
     {
@@ -2892,6 +2948,12 @@ public sealed class CodingSession : ITurnObserver
         }
 
         IReadOnlyList<string> queued = includeQueue ? _queue.Snapshot() : [];
+        var (archiveSnapshot, archiveCount) = ArchiveSnapshotWithCount();
+        if (ArchiveCount() != archiveCount)
+        {
+            archiveSnapshot = ArchiveSnapshot();
+        }
+
         var images = ImageSnapshot();
         foreach (var number in _draftImages.ToArray())
         {
@@ -2903,7 +2965,7 @@ public sealed class CodingSession : ITurnObserver
             }
 
             _draftImages.Remove(number);
-            if (!IsReferencedInTranscript(image))
+            if (!IsReferencedInTranscript(image.TrustedMarker, archiveSnapshot))
             {
                 lock (_imagesGate)
                 {
