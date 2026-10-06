@@ -58,10 +58,15 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
                         throw new GeminiException("Gemini completed a candidate more than once.");
                     }
 
+                    var finishReason = GeminiCodec.ReadFinish(candidate, state.HasTools);
+                    if (finishReason == FinishReason.ToolCalls)
+                    {
+                        events.AddRange(state.HeldToolEvents);
+                    }
+
+                    state.HeldToolEvents.Clear();
                     state.Completed = true;
-                    events.Add(new ChatCandidateCompleted(
-                        index,
-                        GeminiCodec.ReadFinish(candidate, state.HasTools)));
+                    events.Add(new ChatCandidateCompleted(index, finishReason));
                 }
             }
         }
@@ -90,6 +95,8 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
             : null;
         if (part.TryGetProperty("functionCall", out var function))
         {
+            // The finish reason decides whether this call is a tool request.
+            // Hold it, and its signature, until that reason arrives.
             ResetText(state);
             state.HasTools = true;
             var itemIndex = state.NextItemIndex++;
@@ -101,10 +108,10 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
             var args = function.TryGetProperty("args", out var arguments)
                 ? arguments.GetRawText()
                 : "{}";
-            events.Add(new ChatToolCallDelta(candidateIndex, itemIndex, id, name, args));
+            state.HeldToolEvents.Add(new ChatToolCallDelta(candidateIndex, itemIndex, id, name, args));
             if (opaque is not null)
             {
-                events.Add(new ChatReasoningStateReceived(
+                state.HeldToolEvents.Add(new ChatReasoningStateReceived(
                     candidateIndex,
                     state.NextItemIndex++,
                     opaque));
@@ -191,6 +198,7 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
         public int NextItemIndex { get; set; }
         public int? ActiveTextIndex { get; set; }
         public StringBuilder PartText { get; } = new();
+        public List<ChatStreamEvent> HeldToolEvents { get; } = [];
         public bool HasTools { get; set; }
         public bool Completed { get; set; }
     }

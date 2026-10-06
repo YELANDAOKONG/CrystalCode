@@ -326,13 +326,131 @@ public sealed class GeminiProviderTests
         var older = new RecordingHandler(JsonResponse.Create("{}"));
         using var olderHttp = new HttpClient(older);
         using var olderProvider = new GeminiProvider(
-            new GeminiOptions("key", "gemini-2.5-flash"),
+            new GeminiOptions("key", "gemini-2.0-flash"),
             olderHttp);
         var effort = await Assert.ThrowsAsync<NotSupportedException>(
             () => olderProvider.CompleteAsync(new ChatRequest(
                 [new ChatMessage(ChatRole.User, "hi")],
                 reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.High))));
         Assert.Contains("token budget", effort.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsGemini25EffortToThinkingBudget()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"candidates":[{"content":{"parts":[{"text":"done"}]},"finishReason":"STOP"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(
+            new GeminiOptions("key", "gemini-2.5-flash"),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "hi")],
+            reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.High)));
+
+        Assert.Contains("\"thinkingBudget\":24576", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("thinkingLevel", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_DropsSignedFunctionCallsThatAreNotToolRequests()
+    {
+        await AssertDroppedSignedCall("MAX_TOKENS", FinishReason.Length);
+        await AssertDroppedSignedCall("MALFORMED_FUNCTION_CALL", new FinishReason("MALFORMED_FUNCTION_CALL"));
+    }
+
+    [Fact]
+    public async Task StreamAsync_EmitsHeldToolCallWhenFinishArrivesLater()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"candidates":[{"index":0,"content":{"parts":[{"functionCall":{"id":"call_1","name":"read","args":{}},"thoughtSignature":"signed"}]}}]}
+
+            data: {"candidates":[{"index":0,"finishReason":"STOP"}]}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var item in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "hi")])))
+        {
+            events.Add(item);
+        }
+
+        Assert.Contains(events, item => item is ChatToolCallDelta { CallIdDelta: "call_1" });
+        Assert.Contains(events, item => item is ChatReasoningStateReceived);
+        var completed = Assert.Single(events.OfType<ChatCandidateCompleted>());
+        Assert.Equal(FinishReason.ToolCalls, completed.FinishReason);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_SkipsFunctionCallSignatureWithoutAToolCall()
+    {
+        var state = new OpaqueReasoningState(
+            GeminiCodec.PartStateFormat,
+            Encoding.UTF8.GetBytes(
+                """{"functionCall":{"name":"read","args":{}},"thoughtSignature":"sig"}"""));
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"candidates":[{"content":{"parts":[{"text":"next"}]},"finishReason":"STOP"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "hi"),
+            new ChatMessage(ChatRole.Assistant, "cut"),
+            new ChatReasoningItem(new ReasoningContent(state: state)),
+            new ChatMessage(ChatRole.User, "next")
+        ]));
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        var parts = sent.RootElement.GetProperty("contents")[1].GetProperty("parts");
+        Assert.Equal(1, parts.GetArrayLength());
+        Assert.Equal("cut", parts[0].GetProperty("text").GetString());
+        Assert.DoesNotContain("functionCall", handler.Body, StringComparison.Ordinal);
+    }
+
+    private static async Task AssertDroppedSignedCall(string wireReason, FinishReason expected)
+    {
+        var payload = """
+            data: {"candidates":[{"index":0,"content":{"parts":[{"text":"cut"}]}}]}
+
+            data: {"candidates":[{"index":0,"content":{"parts":[{"functionCall":{"name":"read","args":{}},"thoughtSignature":"sig"}]}}]}
+
+            data: {"candidates":[{"index":0,"finishReason":"WIRE_REASON"}]}
+
+            """.Replace("WIRE_REASON", wireReason, StringComparison.Ordinal);
+        var handler = new RecordingHandler(JsonResponse.CreateStream(payload));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var item in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "hi")])))
+        {
+            events.Add(item);
+        }
+
+        Assert.DoesNotContain(events, static item => item is ChatToolCallDelta);
+        Assert.DoesNotContain(events, static item => item is ChatReasoningStateReceived);
+        Assert.Equal("cut", string.Concat(events.OfType<ChatTextDelta>().Select(static delta => delta.Text)));
+        Assert.Equal(expected, Assert.Single(events.OfType<ChatCandidateCompleted>()).FinishReason);
+
+        var replay = new RecordingHandler(JsonResponse.Create(
+            """{"candidates":[{"content":{"parts":[{"text":"next"}]},"finishReason":"STOP"}]}"""));
+        using var replayHttp = new HttpClient(replay);
+        using var replayProvider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), replayHttp);
+        var items = new List<ChatItem>
+        {
+            new ChatMessage(ChatRole.User, "hi"),
+            new ChatMessage(ChatRole.Assistant, "cut")
+        };
+        items.AddRange(events.OfType<ChatReasoningStateReceived>().Select(static state =>
+            new ChatReasoningItem(new ReasoningContent(state: state.State))));
+        items.Add(new ChatMessage(ChatRole.User, "next"));
+        await replayProvider.CompleteAsync(new ChatRequest(items));
+        Assert.DoesNotContain("functionCall", replay.Body, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -26,15 +26,7 @@ internal static class CandidateRound
             return false;
         }
 
-        foreach (var item in candidate.Items)
-        {
-            if (item is ToolCall)
-            {
-                continue;
-            }
-
-            transcript.Add(item);
-        }
+        AppendWithoutToolCalls(transcript, candidate.Items);
 
         if (reason == FinishReason.Length)
         {
@@ -51,5 +43,23 @@ internal static class CandidateRound
         stopReason = TurnStopReason.Failed;
         fault = $"Model stopped with finish reason '{reason.Value}'.";
         return true;
+    }
+
+    /// <summary>
+    /// Keeps text and reasoning from a model round and leaves its tool calls out.
+    /// </summary>
+    internal static void AppendWithoutToolCalls(
+        List<ChatItem> transcript,
+        IReadOnlyList<ChatItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(transcript);
+        ArgumentNullException.ThrowIfNull(items);
+        foreach (var item in items)
+        {
+            if (item is not ToolCall)
+            {
+                transcript.Add(item);
+            }
+        }
     }
 }

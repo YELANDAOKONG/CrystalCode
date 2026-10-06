@@ -321,7 +321,10 @@ One user message is one turn:
    `Model stopped with finish reason '<value>'.` These stops do not compact.
 5. If the candidate has tool calls, execute the full batch through
    `ToolExecutor`, or the multimodal bridge for an image-capable turn
-   (approval runs first in either case).
+   (approval runs first in either case). A batch that does not fit the
+   remaining tool-call budget stops as `tool_call_limit_reached`, keeps
+   the assistant text and reasoning, and leaves those calls out of the
+   transcript.
 6. Append exact `ToolResult` values.
 7. Repeat until the candidate has no tool calls, a configured limit stops
    the turn, or the user cancels. Before each model round, compact if the

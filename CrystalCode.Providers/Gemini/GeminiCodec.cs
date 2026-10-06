@@ -13,6 +13,9 @@ namespace CrystalCode.Providers.Gemini;
 internal sealed class GeminiCodec : IProtocolCodec
 {
     internal const string PartStateFormat = "gemini.part";
+    private const int Gemini25LowThinkingBudget = 1024;
+    private const int Gemini25MediumThinkingBudget = 8192;
+    private const int Gemini25HighThinkingBudget = 24576;
     private readonly string _model;
 
     public GeminiCodec(string model) => _model = model;
@@ -91,21 +94,7 @@ internal sealed class GeminiCodec : IProtocolCodec
                 case ChatReasoningItem reasoning when reasoning.Content.State?.Format == PartStateFormat:
                     var raw = JsonNode.Parse(reasoning.Content.State.Data.Span) as JsonObject
                         ?? throw new JsonException("Gemini part state is invalid.");
-                    if (raw["thought"]?.GetValue<bool>() == true)
-                    {
-                        AddPart(contents, "model", raw);
-                    }
-                    else if (lastPart is not null && SamePart(lastPart, raw))
-                    {
-                        var parts = (JsonArray)((JsonObject)contents[^1]!)["parts"]!;
-                        parts[^1] = raw;
-                    }
-                    else
-                    {
-                        AddPart(contents, "model", raw);
-                    }
-
-                    lastPart = null;
+                    ApplyPartState(contents, ref lastPart, raw);
                     break;
                 case ChatReasoningItem:
                     throw new NotSupportedException(
@@ -243,6 +232,43 @@ internal sealed class GeminiCodec : IProtocolCodec
 
     private static bool IsSyntheticCallId(string callId) =>
         callId.StartsWith("gemini_", StringComparison.Ordinal);
+
+    private static void ApplyPartState(JsonArray contents, ref JsonObject? lastPart, JsonObject raw)
+    {
+        // A function-call signature only replaces a call this request already
+        // wrote. Inserting it alone would replay a call that was not kept.
+        if (raw["functionCall"] is not null)
+        {
+            if (lastPart is not null && SamePart(lastPart, raw))
+            {
+                ReplaceLastPart(contents, raw);
+            }
+
+            lastPart = null;
+            return;
+        }
+
+        if (raw["thought"]?.GetValue<bool>() == true)
+        {
+            AddPart(contents, "model", raw);
+        }
+        else if (lastPart is not null && SamePart(lastPart, raw))
+        {
+            ReplaceLastPart(contents, raw);
+        }
+        else
+        {
+            AddPart(contents, "model", raw);
+        }
+
+        lastPart = null;
+    }
+
+    private static void ReplaceLastPart(JsonArray contents, JsonObject raw)
+    {
+        var parts = (JsonArray)((JsonObject)contents[^1]!)["parts"]!;
+        parts[^1] = raw;
+    }
 
     private static bool SamePart(JsonObject current, JsonObject replay)
     {
@@ -445,22 +471,37 @@ internal sealed class GeminiCodec : IProtocolCodec
 
         if (reasoning.Effort is { } effort)
         {
-            if (!IsGemini3)
+            if (IsGemini3)
+            {
+                if (effort.Value is not ("low" or "medium" or "high"))
+                {
+                    throw new NotSupportedException(
+                        $"Gemini does not support reasoning effort '{effort.Value}'.");
+                }
+
+                generation["thinkingConfig"] = new JsonObject
+                {
+                    ["thinkingLevel"] = effort.Value.ToUpperInvariant()
+                };
+                return;
+            }
+
+            if (!IsGemini25)
             {
                 throw new NotSupportedException(
                     "This Gemini model does not accept a reasoning effort. Set a reasoning token budget instead.");
             }
 
-            if (effort.Value is not ("low" or "medium" or "high"))
+            var level = effort == ReasoningEffort.Maximum ? "high" : effort.Value;
+            var thinkingBudget = level switch
             {
-                throw new NotSupportedException(
-                    $"Gemini does not support reasoning effort '{effort.Value}'.");
-            }
-
-            generation["thinkingConfig"] = new JsonObject
-            {
-                ["thinkingLevel"] = effort.Value.ToUpperInvariant()
+                "minimal" or "low" => Gemini25LowThinkingBudget,
+                "medium" => Gemini25MediumThinkingBudget,
+                "high" => Gemini25HighThinkingBudget,
+                _ => throw new NotSupportedException(
+                    $"Gemini does not support reasoning effort '{effort.Value}'.")
             };
+            generation["thinkingConfig"] = new JsonObject { ["thinkingBudget"] = thinkingBudget };
             return;
         }
 
@@ -477,4 +518,6 @@ internal sealed class GeminiCodec : IProtocolCodec
     }
 
     private bool IsGemini3 => _model.StartsWith("gemini-3", StringComparison.Ordinal);
+
+    private bool IsGemini25 => _model.StartsWith("gemini-2.5", StringComparison.Ordinal);
 }

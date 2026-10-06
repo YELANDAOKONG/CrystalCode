@@ -67,13 +67,20 @@ public sealed class StreamingTurnTests
     [Fact]
     public async Task RunAsync_ZeroToolBudgetStopsBeforeExecution()
     {
-        var client = new ScriptedStreamingClient(ToolRound("c1", "echo", "{}"));
+        var client = new ScriptedStreamingClient(
+        [
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "partial"),
+            new ChatToolCallDelta(0, 1, "c1", "echo", "{}"),
+            new ChatCandidateCompleted(0, FinishReason.ToolCalls)
+        ]);
         var turn = CreateTurn(client, new TurnLimits(2, 0, TimeSpan.FromSeconds(5)));
 
         var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "echo")]);
 
         Assert.Equal(TurnStopReason.ToolCallLimitReached, result.StopReason);
         Assert.Equal(0, result.ToolCallCount);
+        Assert.DoesNotContain(result.Transcript, static item => item is ToolCall or ToolResult);
+        Assert.Equal("partial", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
     }
 
     [Fact]

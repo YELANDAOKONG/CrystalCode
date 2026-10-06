@@ -101,6 +101,48 @@ public sealed class MultimodalStreamingTurnTests
         Assert.Equal([1, 2], images.Keys.Order());
     }
 
+    [Fact]
+    public async Task RunAsync_ZeroToolBudgetKeepsTextAndDropsTheCall()
+    {
+        var turn = new MultimodalStreamingTurn(
+            new BudgetClient(),
+            new ImageToolExecutor(),
+            new TurnLimits(2, 0, TimeSpan.FromSeconds(5)),
+            new Dictionary<int, ImageAttachment>());
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "render")]);
+
+        Assert.Equal(TurnStopReason.ToolCallLimitReached, result.StopReason);
+        Assert.Equal(0, result.ToolCallCount);
+        Assert.DoesNotContain(result.Transcript, static item => item is ToolCall or ToolResult);
+        Assert.Equal("partial", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    private sealed class BudgetClient : IStreamingMultimodalChatClient
+    {
+        public MultimodalChatCapabilities Capabilities { get; } = new(
+            [new MultimodalContentCapability(ContentModality.Text)],
+            [new MultimodalContentCapability(ContentModality.Text)],
+            supportsTools: true);
+
+        public Task<MultimodalChatResponse> CompleteAsync(
+            MultimodalChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async IAsyncEnumerable<MultimodalChatStreamEvent> StreamAsync(
+            MultimodalChatRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return new MultimodalMessageStarted(0, 0, MultimodalChatRole.Assistant);
+            yield return new MultimodalMessageTextDelta(0, 0, 0, "partial");
+            yield return new MultimodalToolCallDelta(0, 1, "call_1", "render", "{}");
+            yield return new MultimodalChatCandidateCompleted(0, FinishReason.ToolCalls);
+        }
+    }
+
     private sealed class ScriptedClient : IStreamingMultimodalChatClient
     {
         public MultimodalChatCapabilities Capabilities { get; } = new(

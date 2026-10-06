@@ -172,10 +172,10 @@ public sealed class MultimodalStreamingTurn
                         transcript);
                 }
 
-                transcript.AddRange(candidate.Items);
                 var toolCalls = candidate.Items.OfType<ToolCall>().ToArray();
                 if (toolCalls.Length == 0)
                 {
+                    transcript.AddRange(candidate.Items);
                     _observer?.OnModelRoundClosed();
                     return Create(
                         TurnStopReason.Completed,
@@ -188,6 +188,7 @@ public sealed class MultimodalStreamingTurn
                 if (_limits.MaximumToolCalls is int maximumToolCalls
                     && toolCalls.Length > maximumToolCalls - toolCallCount)
                 {
+                    CandidateRound.AppendWithoutToolCalls(transcript, candidate.Items);
                     _observer?.OnModelRoundClosed();
                     return Create(
                         TurnStopReason.ToolCallLimitReached,
@@ -196,6 +197,8 @@ public sealed class MultimodalStreamingTurn
                         usage,
                         transcript);
                 }
+
+                transcript.AddRange(candidate.Items);
 
                 toolCallCount += toolCalls.Length;
                 _observer?.OnModelRoundClosed();
