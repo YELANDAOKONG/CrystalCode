@@ -13,6 +13,7 @@ using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Hooks;
+using CrystalCode.Plugins.Tools;
 
 using DiskContribution = CrystalCode.Plugins.PluginContribution;
 
@@ -350,8 +351,20 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            work.Add(tool);
-            if (contributionTool.IncludeInPlan)
+            var catalogs = contributionTool.Catalogs;
+            if (catalogs is null)
+            {
+                names.Remove(name);
+                notes.Add($"Plugin '{directoryName}' omitted tool '{name}' because it has no catalogs.");
+                continue;
+            }
+
+            if (catalogs.Contains(PluginToolCatalog.Work))
+            {
+                work.Add(tool);
+            }
+
+            if (catalogs.Contains(PluginToolCatalog.Plan))
             {
                 plan.Add(tool);
             }
@@ -361,8 +374,12 @@ public sealed class PluginCatalog
             {
                 if (string.Equals(multimodal.Definition.Name, name, StringComparison.Ordinal))
                 {
-                    workMultimodal.Add(multimodal);
-                    if (contributionTool.IncludeInPlan)
+                    if (catalogs.Contains(PluginToolCatalog.Work))
+                    {
+                        workMultimodal.Add(multimodal);
+                    }
+
+                    if (catalogs.Contains(PluginToolCatalog.Plan))
                     {
                         planMultimodal.Add(multimodal);
                     }

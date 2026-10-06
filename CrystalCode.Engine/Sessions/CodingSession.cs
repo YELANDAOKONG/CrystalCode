@@ -2156,20 +2156,20 @@ public sealed class CodingSession : ITurnObserver
         _workMultimodalExecutor = new PluginMultimodalExecutor(
             new HybridMultimodalToolExecutor(
                 workExecutor,
-                CreateMultimodalTools(question, plan: false),
+                CreateMultimodalTools(question, HostToolCatalog.Work),
                 policy),
             _hooks);
         _planMultimodalExecutor = new PluginMultimodalExecutor(
             new HybridMultimodalToolExecutor(
                 planExecutor,
-                CreateMultimodalTools(question, plan: true),
+                CreateMultimodalTools(question, HostToolCatalog.Plan),
                 policy),
             _hooks);
     }
 
     private IReadOnlyList<IMultimodalTool> CreateMultimodalTools(
         IUserPrompt prompt,
-        bool plan)
+        HostToolCatalog catalog)
     {
         if (_multimodalClient is null)
         {
@@ -2181,15 +2181,21 @@ public sealed class CodingSession : ITurnObserver
                 _workspace,
                 _todos,
                 prompt,
-                plan));
-        tools.AddRange(
-            plan
-                ? _loadedPlugins.PlanMultimodalTools
-                : _loadedPlugins.WorkMultimodalTools);
-        tools.AddRange(
-            plan
-                ? _external.PlanMultimodalTools
-                : _external.WorkMultimodalTools);
+                catalog));
+        switch (catalog)
+        {
+            case HostToolCatalog.Plan:
+                tools.AddRange(_loadedPlugins.PlanMultimodalTools);
+                tools.AddRange(_external.PlanMultimodalTools);
+                break;
+            case HostToolCatalog.Work:
+                tools.AddRange(_loadedPlugins.WorkMultimodalTools);
+                tools.AddRange(_external.WorkMultimodalTools);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(catalog));
+        }
+
         return tools;
     }
 

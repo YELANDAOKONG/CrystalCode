@@ -102,15 +102,20 @@ public sealed class PluginRegistry
         Workspace workspace,
         TodoList todos,
         IUserPrompt prompt,
-        bool plan)
+        HostToolCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
         ArgumentNullException.ThrowIfNull(prompt);
+        if (!Enum.IsDefined(catalog))
+        {
+            throw new ArgumentOutOfRangeException(nameof(catalog));
+        }
+
         var tools = new List<ITool>();
         foreach (var contribution in _tools)
         {
-            if (plan && !contribution.IncludeInPlan)
+            if (!contribution.Catalogs.Contains(catalog))
             {
                 continue;
             }
@@ -125,15 +130,20 @@ public sealed class PluginRegistry
         Workspace workspace,
         TodoList todos,
         IUserPrompt prompt,
-        bool plan)
+        HostToolCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
         ArgumentNullException.ThrowIfNull(prompt);
+        if (!Enum.IsDefined(catalog))
+        {
+            throw new ArgumentOutOfRangeException(nameof(catalog));
+        }
+
         var tools = new List<IMultimodalTool>();
         foreach (var contribution in _tools)
         {
-            if (plan && !contribution.IncludeInPlan)
+            if (!contribution.Catalogs.Contains(catalog))
             {
                 continue;
             }

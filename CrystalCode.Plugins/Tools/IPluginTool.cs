@@ -12,8 +12,8 @@ public interface IPluginTool
     /// <summary>Gets the model-facing name. It must match <see cref="ITool.Definition"/>.</summary>
     string Name { get; }
 
-    /// <summary>Gets whether the tool is also registered in the Plan catalog.</summary>
-    bool IncludeInPlan { get; }
+    /// <summary>Gets the catalogs that register this tool.</summary>
+    PluginToolCatalogs Catalogs { get; }
 
     /// <summary>Gets the text tool.</summary>
     ITool Tool { get; }

@@ -1,5 +1,6 @@
 using Crystal.Tools;
 using Crystal.Multimodal.Tools;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Plugins.Interfaces;
@@ -11,7 +12,7 @@ public interface IToolContribution
 {
     string Name { get; }
 
-    bool IncludeInPlan { get; }
+    HostToolCatalogs Catalogs { get; }
 
     ITool Create(Workspace workspace, TodoList todos, IUserPrompt prompt);
 

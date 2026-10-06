@@ -51,6 +51,36 @@ public sealed class PluginRegistryTests
     }
 
     [Fact]
+    public void CreateTools_AddsPluginToolToPlanOnly()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var registry = new PluginRegistry();
+        registry.Add(new PlanEchoPlugin());
+
+        var plan = WorkspaceCatalog.CreatePlan(
+            new Workspace(workspace.Path),
+            new TodoList(),
+            new FixedUserPrompt("ok"),
+            registry);
+        var work = WorkspaceCatalog.CreateWork(
+            new Workspace(workspace.Path),
+            new TodoList(),
+            new FixedUserPrompt("ok"),
+            registry);
+
+        Assert.NotNull(plan.Find("echo"));
+        Assert.Null(work.Find("echo"));
+    }
+
+    [Fact]
+    public void HostToolCatalogs_RejectsNoCatalog()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new HostToolCatalogs());
+
+        Assert.Contains("at least one catalog", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Add_ThrowsOnDuplicateToolName()
     {
         var registry = PluginRegistry.CreateBuiltIn();
@@ -98,7 +128,22 @@ public sealed class PluginRegistryTests
                 [
                     new FactoryToolContribution(
                         "echo",
-                        false,
+                        HostToolCatalogs.Work,
+                        (_, _, _) => new EchoTool())
+                ]);
+    }
+
+    private sealed class PlanEchoPlugin : IPlugin
+    {
+        public string Name => "plan-echo";
+
+        public PluginContribution Contribute() =>
+            new(
+                tools:
+                [
+                    new FactoryToolContribution(
+                        "echo",
+                        HostToolCatalogs.Plan,
                         (_, _, _) => new EchoTool())
                 ]);
     }
@@ -113,7 +158,7 @@ public sealed class PluginRegistryTests
                 [
                     new FactoryToolContribution(
                         ReadTool.ToolName,
-                        true,
+                        HostToolCatalogs.PlanAndWork,
                         (workspace, _, _) => new ReadTool(workspace))
                 ]);
     }

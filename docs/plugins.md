@@ -78,9 +78,11 @@ stop the others.
 
 ### Tools
 
-A tool implements `IPluginTool`: a model-facing `Name`, `IncludeInPlan`,
+A tool implements `IPluginTool`: a model-facing `Name`, `Catalogs`,
 an `ITool`, and an optional `IMultimodalTool` with the same name.
-`IncludeInPlan` false registers the tool in Work only.
+`Catalogs` is `PluginToolCatalogs.Plan`, `Work`, or `PlanAndWork`.
+A tool must name at least one catalog. The same choice applies to its
+multimodal tool.
 
 Names match `^[A-Za-z][A-Za-z0-9_-]*$` (1–64 characters) and must not be
 a built-in name. The definition name must match `Name`. Later duplicates

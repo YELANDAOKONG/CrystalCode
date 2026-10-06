@@ -154,7 +154,8 @@ tool is installed. Approval still runs. Plan + Full can auto-pass a
 workspace-bounded write from an external tool. Authors who want
 Work-only set `"catalogs": ["work"]`.
 
-First-party `IncludeInPlan` on `IToolContribution` stays as it is.
+First-party tools declare `HostToolCatalogs` on `IToolContribution`.
+Disk plugins declare `PluginToolCatalogs`. Each is Plan, Work, or both.
 External sets do not go through `PluginRegistry`.
 
 ## Manifest

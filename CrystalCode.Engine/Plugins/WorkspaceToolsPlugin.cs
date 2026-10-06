@@ -16,39 +16,39 @@ public sealed class WorkspaceToolsPlugin : IPlugin
             [
                 new FactoryToolContribution(
                     ReadTool.ToolName,
-                    true,
+                    HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new ReadTool(workspace)),
                 new FactoryToolContribution(
                     GlobTool.ToolName,
-                    true,
+                    HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new GlobTool(workspace)),
                 new FactoryToolContribution(
                     GrepTool.ToolName,
-                    true,
+                    HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new GrepTool(workspace)),
                 new FactoryToolContribution(
                     TodoWriteTool.ToolName,
-                    true,
+                    HostToolCatalogs.PlanAndWork,
                     (_, todos, _) => new TodoWriteTool(todos)),
                 new FactoryToolContribution(
                     TodoReadTool.ToolName,
-                    true,
+                    HostToolCatalogs.PlanAndWork,
                     (_, todos, _) => new TodoReadTool(todos)),
                 new FactoryToolContribution(
                     QuestionTool.ToolName,
-                    true,
+                    HostToolCatalogs.PlanAndWork,
                     (_, _, prompt) => new QuestionTool(prompt)),
                 new FactoryToolContribution(
                     EditTool.ToolName,
-                    false,
+                    HostToolCatalogs.Work,
                     (workspace, _, _) => new EditTool(workspace)),
                 new FactoryToolContribution(
                     WriteTool.ToolName,
-                    false,
+                    HostToolCatalogs.Work,
                     (workspace, _, _) => new WriteTool(workspace)),
                 new FactoryToolContribution(
                     BashTool.ToolName,
-                    false,
+                    HostToolCatalogs.Work,
                     (workspace, _, _) => new BashTool(workspace))
             ]);
 }

@@ -24,7 +24,15 @@ public static class WorkspaceCatalog
         ArgumentNullException.ThrowIfNull(todos);
         ArgumentNullException.ThrowIfNull(prompt);
         return new ToolCatalog(
-            CreateTools(workspace, todos, prompt, registry, skills, external, plan: true, disk: disk));
+            CreateTools(
+                workspace,
+                todos,
+                prompt,
+                registry,
+                skills,
+                external,
+                HostToolCatalog.Plan,
+                disk: disk));
     }
 
     public static ToolCatalog CreateWork(
@@ -56,7 +64,7 @@ public static class WorkspaceCatalog
                 registry,
                 skills,
                 external,
-                plan: false,
+                HostToolCatalog.Work,
                 bashTimeoutSeconds,
                 disk));
     }
@@ -68,26 +76,26 @@ public static class WorkspaceCatalog
         PluginRegistry? registry,
         SkillCatalog? skills,
         ExternalCatalog? external,
-        bool plan,
+        HostToolCatalog catalog,
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
         PluginCatalog? disk = null)
     {
         var tools = new List<ITool>(
             (registry ?? PluginRegistry.CreateBuiltIn())
-                .CreateTools(workspace, todos, prompt, plan));
-        if (!plan)
+                .CreateTools(workspace, todos, prompt, catalog));
+        if (catalog == HostToolCatalog.Work)
         {
             ApplyBashTimeout(tools, workspace, bashTimeoutSeconds);
         }
 
         if (disk is not null)
         {
-            tools.AddRange(plan ? disk.PlanTools : disk.WorkTools);
+            tools.AddRange(ToolsFor(catalog, disk.PlanTools, disk.WorkTools));
         }
 
         if (external is not null)
         {
-            tools.AddRange(plan ? external.PlanTools : external.WorkTools);
+            tools.AddRange(ToolsFor(catalog, external.PlanTools, external.WorkTools));
         }
 
         if (skills is not null)
@@ -97,6 +105,17 @@ public static class WorkspaceCatalog
 
         return tools;
     }
+
+    private static IReadOnlyList<ITool> ToolsFor(
+        HostToolCatalog catalog,
+        IReadOnlyList<ITool> plan,
+        IReadOnlyList<ITool> work) =>
+        catalog switch
+        {
+            HostToolCatalog.Plan => plan,
+            HostToolCatalog.Work => work,
+            _ => throw new ArgumentOutOfRangeException(nameof(catalog))
+        };
 
     private static void ApplyBashTimeout(
         List<ITool> tools,

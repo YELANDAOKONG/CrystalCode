@@ -186,7 +186,7 @@ public sealed class PluginCatalogTests
             public sealed class SampleTool : IPluginTool
             {
                 public string Name => "sample";
-                public bool IncludeInPlan => false;
+                public PluginToolCatalogs Catalogs => PluginToolCatalogs.Work;
                 public ITool Tool { get; } = new Inner();
 
                 private sealed class Inner : ITool

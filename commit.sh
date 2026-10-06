@@ -11,7 +11,7 @@ if ! command -v "$CMD" >/dev/null 2>&1; then
     exit 127
 fi
 
-BASE_MSG="Generate commit messages and commit, do not build, test, or push. Don't do anything else. If there is any uncertainty, suspend the execution and do not continue! Re-executing 'commit.sh' is strictly prohibited. \n\n"
+BASE_MSG="Generate commit messages and commit the current change. Do not modify file contents. Do not build or test. Do not run any command other than git status, git diff, git log, git add, and git commit. Do not push. Do not re-execute commit.sh. Do not ask questions. If staged and unstaged edits belong to the same change, stage the rest and make one commit.\n\n"
 TASK="$BASE_MSG"
 for arg in "$@"; do
     TASK+=$'\n'"$arg"

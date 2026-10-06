@@ -16,22 +16,23 @@ public sealed class FactoryToolContribution : IToolContribution
 
     public FactoryToolContribution(
         string name,
-        bool includeInPlan,
+        HostToolCatalogs catalogs,
         Func<Workspace, TodoList, IUserPrompt, ITool> create,
         Func<Workspace, TodoList, IUserPrompt, IMultimodalTool?>?
             createMultimodal = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(catalogs);
         ArgumentNullException.ThrowIfNull(create);
         Name = name.Trim();
-        IncludeInPlan = includeInPlan;
+        Catalogs = catalogs;
         _create = create;
         _createMultimodal = createMultimodal;
     }
 
     public string Name { get; }
 
-    public bool IncludeInPlan { get; }
+    public HostToolCatalogs Catalogs { get; }
 
     public ITool Create(Workspace workspace, TodoList todos, IUserPrompt prompt)
     {
