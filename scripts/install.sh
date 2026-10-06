@@ -6,9 +6,48 @@ repository="YELANDAOKONG/CrystalCode"
 install_directory="${HOME:?HOME must be set}/.crystal/binaries/code"
 binary_name="CrystalCode"
 
+# Mineral palette from CrystalCode.Display Theme: grey42, lightsteelblue, indianred.
+# A non-terminal, NO_COLOR, or TERM=dumb keeps the plain status lines.
+styled=false
+MUTED=
+ACCENT=
+FAIL=
+NC=
+cursor_hidden=false
+download_pid=
+card_primary=
+card_secondary=
+
+if [ -t 1 ] && [ -t 2 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+    styled=true
+    MUTED=$(printf '\033[38;5;242m')
+    NC=$(printf '\033[0m')
+    if [ "${COLORTERM:-}" = "truecolor" ] || [ "${COLORTERM:-}" = "24bit" ]; then
+        ACCENT=$(printf '\033[38;2;176;196;222m')
+        FAIL=$(printf '\033[38;2;205;92;92m')
+    else
+        ACCENT=$(printf '\033[38;5;152m')
+        FAIL=$(printf '\033[38;5;167m')
+    fi
+fi
+
 fail() {
-    printf '%s\n' "$1" >&2
+    restore_cursor
+    if [ "$styled" = true ] && [ -t 2 ]; then
+        printf '%s%s%s\n' "$FAIL" "$1" "$NC" >&2
+    else
+        printf '%s\n' "$1" >&2
+    fi
     exit 1
+}
+
+# Dash has no RETURN trap. The EXIT cleanup also restores the cursor when a
+# download is interrupted while it is hidden.
+restore_cursor() {
+    if [ "${cursor_hidden:-false}" = true ]; then
+        printf '\033[?25h\n' >&2
+        cursor_hidden=false
+    fi
 }
 
 require_command() {
@@ -40,6 +79,12 @@ configure_path() {
     esac
 
     if [ -z "$profile_path" ]; then
+        if [ "$styled" = true ]; then
+            card_primary="Installed to ${install_directory}."
+            card_secondary="Start it with: ${install_directory}/${binary_name}"
+            return
+        fi
+
         printf 'Installed %s. Start Crystal Code with: %s\n' "$binary_name" "${install_directory}/${binary_name}"
         return
     fi
@@ -63,6 +108,12 @@ configure_path() {
     fi
 
     if [ "$comment_exists" = true ] && [ "$path_exists" = true ] && [ "$alias_exists" = true ]; then
+        if [ "$styled" = true ]; then
+            card_primary="Configured in ${profile_path}."
+            card_secondary="Crystal Code is ready."
+            return
+        fi
+
         printf 'Crystal Code is already configured in %s.\n' "$profile_path"
         printf 'Start Crystal Code with: crystal\n'
         return
@@ -78,11 +129,28 @@ configure_path() {
     printf '%s\n' "$profile_comment" >> "$profile_path"
     printf '%s\n' "$path_export" >> "$profile_path"
     printf '%s\n' "$command_alias" >> "$profile_path"
-
     printf '\n\n' >> "$profile_path"
+
+    if [ "$styled" = true ]; then
+        card_primary="Configured in ${profile_path}."
+        card_secondary="Open a new terminal, then run crystal."
+        return
+    fi
+
     printf 'Configured Crystal Code in %s.\n' "$profile_path"
     printf 'Open a new terminal or run: . %s\n' "$profile_path"
     printf 'Start Crystal Code with: crystal\n'
+}
+
+print_card() {
+    printf '\n'
+    printf '%s┌─────────┐%s\n' "$MUTED" "$NC"
+    printf '%s│ %scrystal%s │%s\n' "$MUTED" "$ACCENT" "$MUTED" "$NC"
+    printf '%s└─────────┘%s\n' "$MUTED" "$NC"
+    printf '\n'
+    printf '%s%s%s\n' "$MUTED" "$card_primary" "$NC"
+    printf '%s%s%s\n' "$MUTED" "$card_secondary" "$NC"
+    printf '\n'
 }
 
 detect_asset() {
@@ -126,6 +194,130 @@ detect_asset() {
     esac
 }
 
+# GNU sed flushes with -u. BSD sed flushes with -l. The padded fallback
+# forces a flush where neither flag exists.
+unbuffered_sed() {
+    if echo | sed -u -e '' >/dev/null 2>&1; then
+        sed -nu "$@"
+    elif echo | sed -l -e '' >/dev/null 2>&1; then
+        sed -nl "$@"
+    else
+        pad=$(printf '\n%512s' '')
+        sed -ne "s/\$/${pad}/" "$@"
+    fi
+}
+
+is_uint() {
+    case "$1" in
+        '' | *[!0-9]*)
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+render_bar() {
+    received=$1
+    total=$2
+    if ! is_uint "$received" || ! is_uint "$total" || [ "$total" -le 0 ]; then
+        return 0
+    fi
+
+    width=50
+    percent=$((received * 100 / total))
+    if [ "$percent" -gt 100 ]; then
+        percent=100
+    fi
+    if [ "$percent" -eq "${last_percent:--1}" ]; then
+        return 0
+    fi
+    last_percent=$percent
+
+    on=$((percent * width / 100))
+    off=$((width - on))
+    filled=
+    empty=
+    i=0
+    while [ "$i" -lt "$on" ]; do
+        filled="${filled}━"
+        i=$((i + 1))
+    done
+    i=0
+    while [ "$i" -lt "$off" ]; do
+        empty="${empty}─"
+        i=$((i + 1))
+    done
+
+    # stderr is unbuffered, so a carriage return redraws the same line.
+    printf '\r%s%s%s %3d%%%s' "$ACCENT" "$filled" "$empty" "$percent" "$NC" >&2
+}
+
+# curl's ascii trace reports Content-Length and each received block.
+# sed keeps only those lines, and the shell redraws one bar from them.
+download_with_progress() {
+    if [ "$styled" != true ] || ! command -v mkfifo >/dev/null 2>&1 || ! command -v sed >/dev/null 2>&1; then
+        return 1
+    fi
+
+    trace_path="${working_directory}/download.trace"
+    rm -f "$trace_path"
+    if ! mkfifo "$trace_path"; then
+        return 1
+    fi
+
+    printf '\033[?25l' >&2
+    cursor_hidden=true
+
+    curl --fail --location --silent --trace-ascii "$trace_path" --output "$archive_path" "$download_url" &
+    download_pid=$!
+
+    length=0
+    bytes=0
+    last_percent=-1
+    unbuffered_sed \
+        -e 'y/ACDEGHLNORTV/acdeghlnortv/' \
+        -e '/^0000: content-length:/p' \
+        -e '/^<= recv data/p' \
+        "$trace_path" | while IFS= read -r line; do
+        case "$line" in
+            "0000: content-length:"*)
+                length=${line#0000: content-length:}
+                length=${length# }
+                length=${length%%[!0-9]*}
+                bytes=0
+                ;;
+            "<= recv data,"*)
+                size=${line#<= recv data,}
+                size=${size# }
+                size=${size%%[!0-9]*}
+                if is_uint "$size" && is_uint "$length" && [ "$length" -gt 0 ]; then
+                    bytes=$((bytes + size))
+                    render_bar "$bytes" "$length"
+                fi
+                ;;
+        esac
+    done || true
+
+    download_status=0
+    wait "$download_pid" || download_status=$?
+    download_pid=
+
+    if [ "$download_status" -ne 0 ]; then
+        restore_cursor
+        return 1
+    fi
+
+    final_size=$(wc -c < "$archive_path" | tr -d '[:space:]') || final_size=0
+    if is_uint "$final_size" && [ "$final_size" -gt 0 ]; then
+        last_percent=-1
+        render_bar "$final_size" "$final_size"
+    fi
+    printf '\n' >&2
+    printf '\033[?25h' >&2
+    cursor_hidden=false
+    return 0
+}
+
 require_command curl
 require_command unzip
 require_command mktemp
@@ -140,17 +332,37 @@ archive_path="${working_directory}/${archive_name}"
 extraction_directory="${working_directory}/extracted"
 
 cleanup() {
-    rm -rf -- "$working_directory"
+    restore_cursor
+    if [ -n "${download_pid:-}" ]; then
+        kill "$download_pid" 2>/dev/null || true
+        download_pid=
+    fi
+    if [ -n "${working_directory:-}" ]; then
+        rm -rf -- "$working_directory"
+    fi
 }
 
 trap cleanup EXIT HUP INT TERM
 
-printf 'Downloading %s...\n' "$archive_name"
-if ! curl --fail --location --show-error --output "$archive_path" "$download_url"; then
-    fail "Could not download ${archive_name} from the latest release."
+if [ "$styled" = true ]; then
+    printf '%s...%s\n' "$MUTED" "$NC"
+    printf '%sInstalling Crystal Code%s\n\n' "$MUTED" "$NC"
+    if ! download_with_progress; then
+        if ! curl -# --fail --location --output "$archive_path" "$download_url"; then
+            fail "Could not download ${archive_name} from the latest release."
+        fi
+        printf '\n'
+    fi
+else
+    printf 'Downloading %s...\n' "$archive_name"
+    if ! curl --fail --location --show-error --output "$archive_path" "$download_url"; then
+        fail "Could not download ${archive_name} from the latest release."
+    fi
 fi
 
-printf 'Extracting %s...\n' "$archive_name"
+if [ "$styled" != true ]; then
+    printf 'Extracting %s...\n' "$archive_name"
+fi
 mkdir -p "$extraction_directory"
 if ! unzip -q "$archive_path" -d "$extraction_directory"; then
     fail "Could not extract ${archive_name}."
@@ -162,11 +374,18 @@ if [ -z "$published_binary" ]; then
 fi
 
 published_directory="$(dirname "$published_binary")"
-printf 'Installing Crystal Code files...\n'
+if [ "$styled" != true ]; then
+    printf 'Installing Crystal Code files...\n'
+fi
 mkdir -p "$install_directory"
 cp -R "$published_directory"/. "$install_directory"/
 chmod 755 "${install_directory}/${binary_name}"
 
-printf 'Installed %s to %s\n' "$archive_name" "$install_directory"
-printf 'Configuring PATH...\n'
-configure_path
+if [ "$styled" = true ]; then
+    configure_path
+    print_card
+else
+    printf 'Installed %s to %s\n' "$archive_name" "$install_directory"
+    printf 'Configuring PATH...\n'
+    configure_path
+fi
