@@ -121,4 +121,29 @@ public sealed class TranscriptLogTests
         Assert.Contains("a    b", plain, StringComparison.Ordinal);
         Assert.Contains("│", plain, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Add_StripsAnsiAndKeepsTheVisibleText()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.Note, "\u001b[31mhello\u001b[0m");
+
+        var text = string.Join('\n', log.BuildLines(40).Select(line => line.Plain));
+
+        Assert.Contains("hello", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("\u001b", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AppendLive_JoinsASplitEscapeWithoutRewritingEarlierText()
+    {
+        var log = new TranscriptLog();
+        log.AppendLive(TranscriptKind.Thinking, "keep\u001b[3");
+        log.AppendLive(TranscriptKind.Thinking, "1m");
+
+        var plain = string.Join('\n', log.BuildLines(40).Select(line => line.Plain));
+
+        Assert.Contains("keep", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("\u001b", plain, StringComparison.Ordinal);
+    }
 }

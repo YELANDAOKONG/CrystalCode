@@ -49,4 +49,22 @@ public sealed class ToolResultTextTests
 
         Assert.Equal("only line", compact);
     }
+
+    [Fact]
+    public void Body_CollapsesCarriageReturnProgress()
+    {
+        var body = ToolResultText.Body("exit 0\n10%\r20%\r30%");
+
+        Assert.Contains("30%", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("10%", body, StringComparison.Ordinal);
+        Assert.DoesNotContain('\r', body);
+    }
+
+    [Fact]
+    public void Body_StripsAnsiColor()
+    {
+        var body = ToolResultText.Body("exit 0\n\u001b[31mred\u001b[0m");
+
+        Assert.Equal("red", body);
+    }
 }

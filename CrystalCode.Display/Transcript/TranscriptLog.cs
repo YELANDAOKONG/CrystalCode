@@ -20,6 +20,7 @@ public sealed class TranscriptLog
     private TranscriptKind? _otherLiveKind;
     private int _otherLiveWidth;
     private int _otherLiveLength = -1;
+    private TerminalText.StreamState _streamState;
 
     private int _cachedWidth;
     private readonly List<PaintLine> _committedLines = [];
@@ -131,6 +132,7 @@ public sealed class TranscriptLog
     {
         ArgumentNullException.ThrowIfNull(text);
         CommitLive();
+        text = TerminalText.Sanitize(text);
         if (text.Length == 0 && widget is null)
         {
             return;
@@ -144,12 +146,12 @@ public sealed class TranscriptLog
         }
     }
 
-    public void AppendLive(TranscriptKind kind, string text)
+    public string AppendLive(TranscriptKind kind, string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (text.Length == 0)
         {
-            return;
+            return string.Empty;
         }
 
         if (_liveKind != kind)
@@ -158,11 +160,21 @@ public sealed class TranscriptLog
             _liveKind = kind;
         }
 
+        // Scan the delta only. Clean text is returned unchanged, and a control
+        // sequence is removed without rewriting characters already in _live.
+        text = TerminalText.SanitizeStream(text, ref _streamState);
+        if (text.Length == 0)
+        {
+            return string.Empty;
+        }
+
         _live.Append(text);
+        return text;
     }
 
     public void CommitLive()
     {
+        _streamState.Reset();
         if (_liveKind is null)
         {
             return;
@@ -187,6 +199,7 @@ public sealed class TranscriptLog
 
     public void DiscardLive()
     {
+        _streamState.Reset();
         _live.Clear();
         _liveKind = null;
         _livePanel.Clear();
@@ -198,6 +211,7 @@ public sealed class TranscriptLog
         _entries.Clear();
         _committedLines.Clear();
         _cachedWidth = 0;
+        _streamState.Reset();
         _live.Clear();
         _liveKind = null;
         _livePanel.Clear();

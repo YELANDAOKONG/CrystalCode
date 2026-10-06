@@ -673,21 +673,24 @@ public sealed class SessionRenderer : IDisposable
             {
                 case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Thinking);
-                    _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
+                    var reasoningText = _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
                     _streamedCharacters += reasoning.Text.Length;
                     SetTurnActivityUnlocked("Thinking", ProgressText.Thinking);
-                    if (_log.VerboseThinking)
+                    if (_log.VerboseThinking && reasoningText.Length > 0)
                     {
-                        WriteFallbackDelta(TranscriptKind.Thinking, reasoning.Text);
+                        WriteFallbackDelta(TranscriptKind.Thinking, reasoningText);
                     }
                     PaintUnlocked(force: false);
                     break;
                 case ChatTextDelta text when text.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Assistant);
-                    _log.AppendLive(TranscriptKind.Assistant, text.Text);
+                    var assistantText = _log.AppendLive(TranscriptKind.Assistant, text.Text);
                     _streamedCharacters += text.Text.Length;
                     SetTurnActivityUnlocked("Writing", ProgressText.Writing);
-                    WriteFallbackDelta(TranscriptKind.Assistant, text.Text);
+                    if (assistantText.Length > 0)
+                    {
+                        WriteFallbackDelta(TranscriptKind.Assistant, assistantText);
+                    }
                     PaintUnlocked(force: false);
                     break;
                 case ChatToolCallDelta toolCall:

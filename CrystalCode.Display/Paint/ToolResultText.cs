@@ -28,6 +28,7 @@ public static class ToolResultText
     public static string Body(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        text = TerminalText.Sanitize(text);
         var lines = new List<string>();
         var totalNonEmptyLines = 0;
         foreach (var raw in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
@@ -94,6 +95,7 @@ public static class ToolResultText
 
     private static List<string> ContentLines(string text)
     {
+        text = TerminalText.Sanitize(text);
         var lines = new List<string>();
         foreach (var raw in text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
@@ -116,7 +118,7 @@ public static class ToolResultText
 
     private static string FirstContentLine(string text)
     {
-        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+        var normalized = TerminalText.Sanitize(text).Replace("\r\n", "\n", StringComparison.Ordinal);
         string? exit = null;
         foreach (var raw in normalized.Split('\n'))
         {
