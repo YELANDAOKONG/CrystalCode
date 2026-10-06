@@ -762,8 +762,9 @@ and never replace Work, Plan, or Review.
   `CONTEXT.md`). Every file of that name on the walk is appended.
   `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
 
-`credentials.json` is created with owner-only permissions and is keyed by
-provider name. Environment variables override file credentials.
+`credentials.json` is the persistent API-key store. Values are plain text,
+keyed by provider name, and the file is created with owner-only
+permissions. Process environment variables override those file credentials.
 
 Operator tool sets live under `tools/`. A project directory of the same
 name replaces the home set as a whole. `tools.json` field `enabled`
@@ -815,7 +816,8 @@ Repeated JSON provider keys are rejected; the array form preserves both
 endpoints. Repeated model keys within one endpoint are also rejected.
 Context size and sampling live on each model, not
 on the host. Thinking capability also lives on the model. The current thinking
-gear is a host setting.
+gear is a host setting. The API key for `openrouter` belongs in
+`credentials.json` under that provider name.
 
 ```json
 {
@@ -829,8 +831,6 @@ gear is a host setting.
       "baseUri": "https://openrouter.ai/api/v1/",
       "replayReasoningContent": true,
       "tokenLimit": "max_tokens",
-      "apiKey": "{env:OPENROUTER_API_KEY}",
-      "apiKeyEnvironment": "OPENROUTER_API_KEY",
       "models": {
         "anthropic/claude-sonnet-4": {
           "contextWindow": 200000,
@@ -909,9 +909,11 @@ label is prefixed with `~` so it is not mistaken for provider usage.
 `protocol` is `deepseek`, `openai`, `responses`, `anthropic`, `gemini`, or `ollama`. Models that are not listed cannot be
 selected. There is no global context window.
 
-`apiKey` may be a literal secret, `{env:NAME}`, or `{file:path}` (relative
-to `~/.crystal` or absolute, with `~` expanded). Process environment
-variables still override. `credentials.json` remains a fallback store.
+A persistent key belongs in `credentials.json` as plain text, keyed by
+provider name. `apiKey` on a provider definition may be a literal secret,
+`{env:NAME}`, or `{file:path}` (relative to `~/.crystal` or absolute, with
+`~` expanded). Process environment variables override both the definition
+and the file. That override is for one launch or a CI runner.
 `requiresApiKey` defaults to `true`, except for the native `ollama` protocol.
 When false, a missing key resolves to empty text and the adapter omits its
 authentication header. Provider-specific environment variables and explicit
@@ -1310,4 +1312,5 @@ Environment variables:
 
 - `CRYSTAL_HOME` overrides the data directory.
 - `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `CRYSTAL_API_KEY` override
-  `credentials.json`. A provider-specific variable wins over `CRYSTAL_API_KEY`.
+  `credentials.json` for that process. A provider-specific variable wins over
+  `CRYSTAL_API_KEY`. The persistent store is `credentials.json`.

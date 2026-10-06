@@ -80,8 +80,8 @@ another protocol. Image input is available for supported models and providers.
 
 ## Requirements
 
-- An API key for the selected provider, supplied through configuration
-  or the environment (see [Credentials](#credentials))
+- An API key for the selected provider in `~/.crystal/credentials.json`,
+  or in the process environment for one launch (see [Credentials](#credentials))
 - A TTY for the interactive alternate-screen UI. `crystal run` does not
   need a TTY
 - `bash` on the `PATH` (Git Bash is used on Windows when present)
@@ -275,8 +275,17 @@ credentials are still plain text on stderr.
 
 Do not put secrets in the workspace, in this repository, or in commit
 contents. CrystalCode never writes secrets into the project tree.
-`credentials.json` is created with owner-only permissions where the
-operating system allows it.
+
+Store a persistent API key in `~/.crystal/credentials.json`, keyed by
+provider name. The value is plain text. Where the operating system
+allows it, the file is created with owner-only permissions. Child
+processes do not inherit this file. Use it for an interactive install.
+
+A process environment variable overrides the file. Set one for a single
+launch or for a CI runner that injects the key into that process. A key
+written into a shell startup file is loaded by login shells, including
+the login shell the product starts for model-invoked commands, and those
+files are often readable by users other than the owner.
 
 Resolution order for the active provider:
 
@@ -307,8 +316,10 @@ A provider-specific variable wins over `CRYSTAL_API_KEY`.
 | `{file:path}` | Read a file (relative to `~/.crystal`, or absolute; `~` is expanded) |
 | a literal string | Used as-is (avoid this in shared files) |
 
-Prefer `{env:NAME}` or `{file:path}` so the provider definition can be copied
-without embedding a secret.
+Keep the secret out of `providers.json`. A key that stays on this machine
+belongs in `credentials.json`. `{env:NAME}` fits a launch or CI job that
+already exports the variable. `{file:path}` fits a key that already lives
+in another owner-only file.
 
 `credentials.json` shape:
 
@@ -321,8 +332,7 @@ without embedding a secret.
 ```
 
 Leave the value empty in examples and in any file that might be
-shared. Put the real secret only in the local environment or in a
-file that is not committed.
+shared. Put the real secret in the local `credentials.json`.
 
 If no key is found, the process prints an English error and exits
 with status 1. It does not print the secret.
@@ -402,7 +412,7 @@ the Ollama model to match it. Other local or cloud model IDs may be added there.
 | `project` | Optional OpenAI project for the `openai` protocol |
 | `replayReasoningContent` | Replay provider reasoning content (DeepSeek always does this) |
 | `tokenLimit` | Chat Completions output field: `max_tokens` or `max_completion_tokens` (ignored by `responses` and `anthropic`) |
-| `apiKeyEnvironment` | Preferred environment variable name for this provider |
+| `apiKeyEnvironment` | Environment variable name checked first for this provider |
 | `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |
 | `requiresApiKey` | Whether a missing key is an error (default `true`, except `ollama`; set `false` for an unauthenticated endpoint) |
 | `models` | Table of selectable model ids |
@@ -449,8 +459,8 @@ unchanged. An empty `thinkingEfforts` list is on/off only.
 
 ### Example: add an OpenAI-compatible provider
 
-Add this entry to `~/.crystal/providers.json`. Do not put a secret in `apiKey`;
-point at an environment variable.
+Add this entry to `~/.crystal/providers.json`. Keep the secret out of this
+file. Write it in `~/.crystal/credentials.json` under `openrouter`.
 
 ```json
 {
@@ -459,8 +469,6 @@ point at an environment variable.
     "baseUri": "https://openrouter.ai/api/v1/",
     "replayReasoningContent": true,
     "tokenLimit": "max_tokens",
-    "apiKey": "{env:OPENROUTER_API_KEY}",
-    "apiKeyEnvironment": "OPENROUTER_API_KEY",
     "models": {
       "anthropic/claude-sonnet-4": {
         "contextWindow": 200000,
@@ -474,16 +482,19 @@ point at an environment variable.
 }
 ```
 
-Set `OPENROUTER_API_KEY` in the shell that starts the process, then restart
-after editing `providers.json`. Select the model with `/model openrouter
-anthropic/claude-sonnet-4`, or set `provider` and `model` in `config.json`.
+`OPENROUTER_API_KEY` overrides that file when the process environment sets
+it. Restart after editing `providers.json`. Select the model with
+`/model openrouter anthropic/claude-sonnet-4`, or set `provider` and
+`model` in `config.json`.
 CLI `--provider` and `--model` override that selection for one run;
 `/approval` (including `/approval model`), `/thinking`, and `/model` write their values to `config.json`.
 
 ### Example: add OpenCode Zen protocol endpoints
 
 One gateway can group models that use different wire protocols under one
-provider name. Put this example in `providers.json`:
+provider name. Put this example in `providers.json`. The key for both
+endpoints belongs in `credentials.json` under `opencode-zen`.
+`OPENCODE_ZEN_API_KEY` overrides that file for one process.
 
 ```json
 {
@@ -491,7 +502,6 @@ provider name. Put this example in `providers.json`:
     {
       "protocol": "responses",
       "baseUri": "https://opencode.ai/zen/v1/",
-      "apiKey": "{env:OPENCODE_ZEN_API_KEY}",
       "models": {
         "gpt-5.6-sol": {
           "contextWindow": 1050000,
@@ -505,7 +515,6 @@ provider name. Put this example in `providers.json`:
     {
       "protocol": "anthropic",
       "baseUri": "https://opencode.ai/zen/v1/",
-      "apiKey": "{env:OPENCODE_ZEN_API_KEY}",
       "models": {
         "claude-sonnet-5": {
           "contextWindow": 1000000,
@@ -1161,14 +1170,16 @@ sets still load class libraries from the tool-set directory only. See
 | Variable | Meaning |
 | :--- | :--- |
 | `CRYSTAL_HOME` | Data directory instead of `~/.crystal` |
-| `DEEPSEEK_API_KEY` | DeepSeek key (overrides `credentials.json`) |
-| `OPENAI_API_KEY` | OpenAI key (overrides `credentials.json`) |
+| `DEEPSEEK_API_KEY` | DeepSeek key for this process (overrides `credentials.json`) |
+| `OPENAI_API_KEY` | OpenAI key for this process (overrides `credentials.json`) |
 | `<PROVIDER>_API_KEY` | Key for a named provider (hyphens become underscores) |
-| `CRYSTAL_API_KEY` | Shared fallback key |
+| `CRYSTAL_API_KEY` | Shared key for this process when no provider-specific variable is set |
 | `XDG_CONFIG_HOME` | Base for the global OpenCode `AGENTS.md` fallback |
 
-Do not pass secrets on the command line. They appear in process
-lists.
+Provider key variables override `credentials.json` for the process that
+receives them. A lasting install stores the key in that file. A single
+launch or a CI runner sets the variable. Do not pass secrets on the
+command line. They appear in process lists.
 
 ## Safety
 

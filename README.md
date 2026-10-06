@@ -40,7 +40,9 @@ The installer places the application under `~/.crystal/binaries/code/` and adds 
 
 ### 2. Set an API key
 
-For the default DeepSeek provider, set `DEEPSEEK_API_KEY` in the environment of the terminal that will run Crystal Code. For OpenAI, use `OPENAI_API_KEY`. Other providers can use `<PROVIDER>_API_KEY` or a configured key reference. See [Credentials](docs/user-guide.md#credentials) for the full lookup order.
+Write the key in `~/.crystal/credentials.json` under the provider name. For the default DeepSeek provider the entry is `deepseek`. The value is plain text. Where the operating system allows it, the file is limited to the owner.
+
+`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, or `<PROVIDER>_API_KEY` overrides that file for the process that receives it. Use an environment variable for a single launch or a CI runner. See [Credentials](docs/user-guide.md#credentials) for the full lookup order.
 
 ### 3. Start in your repository
 
@@ -76,7 +78,7 @@ Preferences and provider definitions are separate:
 | :--- | :--- |
 | `~/.crystal/config.json` | Active provider and model, approval mode, and session preferences |
 | `~/.crystal/providers.json` | Additional provider endpoints and model definitions |
-| `~/.crystal/credentials.json` | Local API keys, if you do not use environment variables |
+| `~/.crystal/credentials.json` | Plain-text API keys, one entry per provider |
 
 The built-in catalog includes DeepSeek and OpenAI. You can select any model listed in the effective catalog with `/model`, or use `--provider` and `--model` when starting the app. [Provider configuration](docs/user-guide.md#configuration) explains protocols, model fields, and examples.
 
