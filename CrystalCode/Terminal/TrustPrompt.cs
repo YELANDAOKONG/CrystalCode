@@ -85,7 +85,15 @@ internal sealed class TrustPrompt : IWorkspaceTrustPrompt
         blocks.Add(Choice(selected == 0, "Yes"));
         blocks.Add(Choice(selected == 1, "No"));
         blocks.Add(new Markup($"[{Theme.Muted}]Enter confirms  Esc cancels[/]"));
-        return new Rows(blocks);
+        var panel = new Panel(new Rows(blocks))
+        {
+            Header = new PanelHeader("Trust"),
+            Border = BoxBorder.Rounded,
+            BorderStyle = Style.Parse(Theme.Chrome),
+            Padding = new Padding(1, 0, 1, 0),
+            Expand = true
+        };
+        return new Padder(panel, new Padding(2, 0, 0, 0));
     }
 
     private static IRenderable Choice(bool selected, string label)
