@@ -204,6 +204,12 @@ public static class TextWidth
             return 1;
         }
 
+        // Spectre counts a soft hyphen as one cell, so never measure it narrower.
+        if (value == 0xAD)
+        {
+            return 1;
+        }
+
         var category = Rune.GetUnicodeCategory(rune);
         if (category is UnicodeCategory.NonSpacingMark
             or UnicodeCategory.EnclosingMark
@@ -220,21 +226,5 @@ public static class TextWidth
         return IsWide(value) ? 2 : 1;
     }
 
-    private static bool IsWide(int value) =>
-        value is (>= 0x1100 and <= 0x115F)
-            or (>= 0x2329 and <= 0x232A)
-            or (>= 0x2E80 and <= 0xA4CF)
-            or (>= 0xA960 and <= 0xA97C)
-            or (>= 0xAC00 and <= 0xD7A3)
-            or (>= 0xF900 and <= 0xFAFF)
-            or (>= 0xFE10 and <= 0xFE19)
-            or (>= 0xFE30 and <= 0xFE6F)
-            or (>= 0xFF00 and <= 0xFF60)
-            or (>= 0xFFE0 and <= 0xFFE6)
-            or (>= 0x1F300 and <= 0x1F64F)
-            or (>= 0x1F680 and <= 0x1F6FF)
-            or (>= 0x1F7E0 and <= 0x1F7FF)
-            or (>= 0x1F900 and <= 0x1F9FF)
-            or (>= 0x1FA00 and <= 0x1FAFF)
-            or (>= 0x20000 and <= 0x3FFFD);
+    private static bool IsWide(int value) => WideRanges.Contains(value);
 }

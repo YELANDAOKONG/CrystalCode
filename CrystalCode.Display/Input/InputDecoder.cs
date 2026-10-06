@@ -1,5 +1,7 @@
 using System.Text;
 
+using CrystalCode.Display.Paint;
+
 namespace CrystalCode.Display.Input;
 
 /// <summary>
@@ -464,7 +466,11 @@ public sealed class InputDecoder
         var builder = new StringBuilder(normalized.Length);
         foreach (var ch in normalized)
         {
-            if (!char.IsControl(ch) || ch is '\n' or '\t')
+            if (ch is '\n' or '\t')
+            {
+                builder.Append(ch);
+            }
+            else if (!char.IsControl(ch) && !TerminalText.NeedsReveal(ch))
             {
                 builder.Append(ch);
             }

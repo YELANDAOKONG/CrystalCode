@@ -12,11 +12,11 @@ public sealed class AlternateScreenTests
         var codes = AlternateScreen.RecoverySequences(
             alternateBuffer: true,
             bracketedPaste: true,
-            alternateScroll: true,
+            mouseReporting: true,
             titlePushed: true);
 
         Assert.Equal(
-            ["\u001b[23;0t", "\u001b[?1007l", "\u001b[?2004l", "\u001b[?1049l"],
+            ["\u001b[23;0t", "\u001b[?1006l", "\u001b[?1000l", "\u001b[?2004l", "\u001b[?1049l"],
             codes);
     }
 
@@ -26,7 +26,7 @@ public sealed class AlternateScreenTests
         var codes = AlternateScreen.RecoverySequences(
             alternateBuffer: true,
             bracketedPaste: true,
-            alternateScroll: false,
+            mouseReporting: false,
             titlePushed: false);
 
         Assert.Equal(["\u001b[?2004l", "\u001b[?1049l"], codes);

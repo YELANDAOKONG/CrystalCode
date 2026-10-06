@@ -1021,7 +1021,7 @@ not paint rows itself. Entering the alternate screen sets the window
 title to Crystal Code when the terminal allows it, and restores the
 previous title on exit. If setup fails after the alternate buffer is
 entered, the shell leaves that buffer, turns off bracketed paste and
-alternate scroll when those were enabled, and restores the title when
+mouse reporting when those were enabled, and restores the title when
 it was changed. Windows VT input mode is restored on screen disposal,
 with a process-exit retry if the first restoration fails. When the terminal
 drops below the usable minimum
@@ -1036,6 +1036,36 @@ Overview, Tokens, and Tools panels. Tool rows show a share bar, count,
 and percent. Esc, `q`, or Ctrl+C restores the session frame and leaves
 the composer draft in place. `ShellLayout.MinWidth`/`MinHeight` (16x8) remain a math floor
 for layout only.
+
+Text that came from a model, a tool, or a file never reaches the terminal as
+control bytes. `TerminalText.Sanitize` removes C0 and C1 controls, DEL, and
+escape introducers from streamed and committed text. `PaintLine.Fit` strips
+controls again from every row after tab expansion, so no producer can leak an
+escape sequence into a frame. Todo content, activity and progress text, and
+widget segments go through the same path. Approval cards are different: the
+operator must see what is being approved, so control and bidirectional
+characters in commands, diffs, rationale, and tool summaries are shown as
+visible `\xNN` and `\uNNNN` escapes through `TerminalText.Reveal` instead of
+being dropped.
+
+Width policy: `TextWidth.Measure` must never be narrower than Spectre's
+`Segment.CellCount()`. `WideRanges` is generated from Spectre's own widths,
+and a test compares every code point. Each row is rasterized by `FrameRow`
+at a very wide virtual width and cropped at a cell boundary, so Spectre can
+never re-wrap a row and emit a line feed into the frame. Known limits:
+variation-selector emoji sequences are measured as one cell, and ambiguous
+width characters assume a narrow terminal.
+
+`ScreenPainter` wraps every paint in DEC 2026 synchronized output
+(`?2026h` and `?2026l`), which terminals that lack the mode ignore.
+`WidgetPaint` keeps foreground, background, bold, dim, italic, underline,
+strikethrough, and invert when it rasterizes Spectre widgets. Links and
+blinking are dropped on purpose.
+
+`ScrollAnchor` keeps the transcript where the operator left it. The scroll
+position is a distance from the bottom, so growth at an unchanged width is
+added to that distance while it is above zero; at the bottom the view
+follows new rows. A width change keeps the distance and re-clamps it.
 
 Terminal.Gui is referenced from CrystalCode.Display with a floating
 version and is not used. Do not call `Application.Init` or mix a second
@@ -1169,11 +1199,15 @@ memory only and are forgotten when the session changes, since their
 markers do not carry image bytes or a stable cross-session attachment.
 PageUp/PageDown are the primary transcript scroll controls;
 Ctrl+Up/Down also scroll when the terminal passes those keys through.
-The alternate screen enables alternate scroll (1007) and bracketed paste
-(2004). Mouse tracking stays off so left-drag selects and copies. A wheel
-the terminal still reports as SGR or X10 scrolls the transcript and is
-drained without waiting. Alternate scroll turns the wheel into Up/Down,
-and plain Up/Down stay with the composer or active selection. Escape is held only
+The alternate screen enables bracketed paste (2004) and mouse reporting
+(1000 with SGR encoding 1006). A wheel report scrolls the transcript and is
+drained without waiting; other mouse reports are swallowed. The wheel is
+never converted to Up/Down, so plain Up/Down stay with the composer, prompt
+history, or the active selection. Terminal text selection needs Shift
+(Option or Fn on some macOS terminals) while mouse reporting is on, and the
+help list says so. Escape clears the composer. Pasted text is normalized to
+LF and tabs, and control, invisible, and bidirectional formatting characters
+are dropped. Escape is held only
 when no further bytes are available or the sequence is still incomplete.
 
 `KeyBurst` collects one `ReadKey` drain. `InputDecoder` turns that burst

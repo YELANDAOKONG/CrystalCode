@@ -121,10 +121,10 @@ public static class ApprovalCard
     public static string CompactArguments(string arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-        var flat = arguments
+        var flat = TerminalText.Reveal(arguments
             .Replace('\r', ' ')
             .Replace('\n', ' ')
-            .Trim();
+            .Trim());
         if (flat is "{}" or "")
         {
             return string.Empty;
@@ -176,7 +176,7 @@ public static class ApprovalCard
 
         var panel = new Panel(new Rows(blocks))
         {
-            Header = new PanelHeader(MarkupText.Escape(header)),
+            Header = new PanelHeader(MarkupText.Escape(TerminalText.Reveal(header))),
             Border = BoxBorder.Rounded,
             BorderStyle = Style.Parse(Theme.Chrome),
             Padding = new Padding(1, 0, 1, 0),
@@ -218,5 +218,5 @@ public static class ApprovalCard
     }
 
     private static Markup Prose(string text, string color) =>
-        new($"[{color}]{MarkupText.Escape(text)}[/]");
+        new($"[{color}]{MarkupText.Escape(TerminalText.Reveal(text))}[/]");
 }

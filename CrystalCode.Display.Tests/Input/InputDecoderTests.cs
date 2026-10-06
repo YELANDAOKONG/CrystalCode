@@ -228,6 +228,14 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_BracketedPaste_DropsInvisibleAndBidiControls()
+    {
+        var unix = UnixCsi("\u001b[200~a\u2063b\u202ec\u200bd\u0085e\u001b[201~");
+
+        AssertPaste(new InputDecoder().Push(unix), "abcde");
+    }
+
+    [Fact]
     public void Push_CtrlVInBurst_PreservesKeyOrder()
     {
         var ctrlV = new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true);

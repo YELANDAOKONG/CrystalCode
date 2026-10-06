@@ -40,7 +40,8 @@ public static class TodoBar
     {
         var mark = item.Mark.Length == 0 ? " " : item.Mark[..1];
         var color = TodoMarks.Color(mark[0]) ?? Theme.Chrome;
-        var plain = $"  [{mark}] {item.Content}";
+        var content = TerminalText.SanitizeLine(item.Content);
+        var plain = $"  [{mark}] {content}";
         if (TextWidth.Measure(plain) > Math.Max(width, 1))
         {
             plain = TextWidth.Truncate(plain, Math.Max(width, 1));

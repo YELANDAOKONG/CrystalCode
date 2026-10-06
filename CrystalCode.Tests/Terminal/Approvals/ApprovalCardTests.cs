@@ -117,4 +117,33 @@ public sealed class ApprovalCardTests
         Assert.Contains("+b", text, StringComparison.Ordinal);
         Assert.Contains("Y Once", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AskWidget_ShowsHiddenCharactersAsTextAndPaintsNoControls()
+    {
+        var classification = new ToolClassification(
+            Risk.Privileged,
+            Authority.Workspace,
+            "Runs a shell command\u001b[2K");
+        var review = new ApprovalReviewVerdict(
+            "ask",
+            ReviewRiskLevel.High,
+            ReviewAuthorization.Low,
+            "Needs a look\u001b]0;x\u0007");
+        var call = new ToolCall(
+            "1",
+            BashTool.ToolName,
+            """{"command":"echo safe\u001b[1G\u001b[2Kls"}""");
+
+        var lines = WidgetPaint.Lines(ApprovalCard.AskWidget(call, classification, review), 100);
+
+        var all = string.Join('\n', lines.Select(static line => line.Plain));
+        Assert.Contains("echo safe\\x1b[1G\\x1b[2Kls", all, StringComparison.Ordinal);
+        Assert.Contains("Runs a shell command\\x1b[2K", all, StringComparison.Ordinal);
+        foreach (var line in lines)
+        {
+            Assert.False(TerminalText.HasControls(line.Markup));
+            Assert.False(TerminalText.HasControls(line.Plain));
+        }
+    }
 }

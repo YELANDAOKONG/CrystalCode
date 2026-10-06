@@ -67,4 +67,32 @@ public sealed class ToolResultTextTests
 
         Assert.Equal("red", body);
     }
+
+    [Fact]
+    public void Summary_DoesNotSplitASurrogatePairWhenClipping()
+    {
+        var text = new string('a', ToolResultText.MaximumLength - 4) + "\U0001F600tail";
+
+        var line = ToolResultText.Summary(text);
+
+        Assert.EndsWith("...", line, StringComparison.Ordinal);
+        for (var i = 0; i < line.Length; i++)
+        {
+            if (char.IsHighSurrogate(line[i]))
+            {
+                Assert.True(i + 1 < line.Length && char.IsLowSurrogate(line[i + 1]));
+            }
+        }
+    }
+
+    [Fact]
+    public void Body_DoesNotSplitASurrogatePairWhenClipping()
+    {
+        var text = new string('a', ToolResultText.MaximumBodyLength - 4) + "\U0001F600tail";
+
+        var body = ToolResultText.Body(text);
+
+        Assert.EndsWith("...", body, StringComparison.Ordinal);
+        Assert.False(char.IsHighSurrogate(body[^4]));
+    }
 }

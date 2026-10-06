@@ -11,6 +11,7 @@ public sealed class ShellChrome
     private int _spinnerFrame;
     private DateTimeOffset _lastSpinner;
     private string _progress = string.Empty;
+    private string _activity = string.Empty;
     private DateTimeOffset _progressStarted;
     private string _elapsedLabel = string.Empty;
 
@@ -52,14 +53,22 @@ public sealed class ShellChrome
 
     public string SessionTotal { get; set; } = string.Empty;
 
-    public string Activity { get; set; } = string.Empty;
+    /// <summary>
+    /// Status-bar activity. Tool names come from the model, so the text is
+    /// reduced to one clean line.
+    /// </summary>
+    public string Activity
+    {
+        get => _activity;
+        set => _activity = TerminalText.SanitizeLine(value ?? string.Empty);
+    }
 
     public string Progress
     {
         get => _progress;
         set
         {
-            var next = value ?? string.Empty;
+            var next = TerminalText.SanitizeLine(value ?? string.Empty);
             if (string.Equals(_progress, next, StringComparison.Ordinal))
             {
                 return;
@@ -75,7 +84,7 @@ public sealed class ShellChrome
 
     public void ReplaceProgress(string progress)
     {
-        _progress = progress ?? string.Empty;
+        _progress = TerminalText.SanitizeLine(progress ?? string.Empty);
     }
 
     public string TokenEstimate { get; set; } = string.Empty;

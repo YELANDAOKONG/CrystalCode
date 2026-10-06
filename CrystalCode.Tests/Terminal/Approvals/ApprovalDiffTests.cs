@@ -68,4 +68,17 @@ public sealed class ApprovalDiffTests
 
         Assert.Empty(ApprovalDiff.Lines(call));
     }
+
+    [Fact]
+    public void Lines_SpellOutControlCharactersInPreviewText()
+    {
+        var call = new ToolCall(
+            "1",
+            WriteTool.ToolName,
+            """{"path":"x","contents":"safe\u001b[2Kline"}""");
+
+        var lines = ApprovalDiff.Lines(call);
+
+        Assert.Equal([(Theme.DiffAdded, "+safe\\x1b[2Kline")], lines);
+    }
 }

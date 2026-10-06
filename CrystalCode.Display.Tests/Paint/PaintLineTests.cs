@@ -26,4 +26,22 @@ public sealed class PaintLineTests
         Assert.True(TextWidth.Measure(fitted.Plain) <= 8);
         Assert.StartsWith("hello", fitted.Plain, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Colored_RemovesEscapeSequencesAndBreaks()
+    {
+        var line = PaintLine.Colored(Theme.Chrome, "a\u001b[2Jb\nc");
+
+        Assert.Equal("abc", line.Plain);
+        Assert.False(TerminalText.HasControls(line.Markup));
+    }
+
+    [Fact]
+    public void Fit_StripsControlsFromHandBuiltRows()
+    {
+        var line = new PaintLine("[red]a\u001bb\n[/]", "a\u001bb\n").Fit(20);
+
+        Assert.Equal("ab", line.Plain);
+        Assert.Equal("[red]ab[/]", line.Markup);
+    }
 }

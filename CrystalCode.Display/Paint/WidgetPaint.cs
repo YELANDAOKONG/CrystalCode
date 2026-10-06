@@ -80,7 +80,13 @@ public static class WidgetPaint
 
             if (end > start)
             {
-                AppendStyled(markup, plain, text[start..end], segment.Style);
+                // Widget text can carry model or tool output. Nothing a terminal
+                // would act on may reach the row.
+                var piece = TerminalText.StripControls(TerminalText.Sanitize(text[start..end]));
+                if (piece.Length > 0)
+                {
+                    AppendStyled(markup, plain, piece, segment.Style);
+                }
             }
 
             if (newline < 0)
@@ -123,7 +129,7 @@ public static class WidgetPaint
         plain.Clear();
     }
 
-    private static IAnsiConsole CreateConsole(int width)
+    internal static IAnsiConsole CreateConsole(int width)
     {
         var console = AnsiConsole.Create(
             new AnsiConsoleSettings
@@ -308,19 +314,43 @@ public static class WidgetPaint
         return new PaintLine(markup, plain);
     }
 
-    private static string StyleToken(Style style)
+    /// <summary>
+    /// Markup for the parts of a Spectre style that survive into a frame row:
+    /// foreground and background color and the text decorations. Links and
+    /// blinking are dropped on purpose. A link would open a second terminal
+    /// channel for model-controlled text, and blinking is not wanted in the shell.
+    /// </summary>
+    internal static string StyleToken(Style style)
     {
         var parts = new List<string>();
-        if ((style.Decoration & Decoration.Bold) != 0)
-        {
-            parts.Add("bold");
-        }
-
+        AddDecoration(parts, style.Decoration, Decoration.Bold, "bold");
+        AddDecoration(parts, style.Decoration, Decoration.Dim, "dim");
+        AddDecoration(parts, style.Decoration, Decoration.Italic, "italic");
+        AddDecoration(parts, style.Decoration, Decoration.Underline, "underline");
+        AddDecoration(parts, style.Decoration, Decoration.Strikethrough, "strikethrough");
+        AddDecoration(parts, style.Decoration, Decoration.Invert, "invert");
         if (style.Foreground != Color.Default)
         {
-            parts.Add(style.Foreground.ToString().ToLowerInvariant());
+            parts.Add(style.Foreground.ToMarkup());
+        }
+
+        if (style.Background != Color.Default)
+        {
+            parts.Add("on " + style.Background.ToMarkup());
         }
 
         return string.Join(' ', parts);
+    }
+
+    private static void AddDecoration(
+        List<string> parts,
+        Decoration decoration,
+        Decoration flag,
+        string name)
+    {
+        if ((decoration & flag) != 0)
+        {
+            parts.Add(name);
+        }
     }
 }

@@ -49,6 +49,125 @@ public static class TerminalText
         return stripped.IndexOf('\r') < 0 ? stripped : CollapseCarriageReturns(stripped);
     }
 
+    /// <summary>
+    /// One display line: control sequences are removed, and line breaks and tabs
+    /// become single spaces. For chrome fields that must never span rows.
+    /// </summary>
+    public static string SanitizeLine(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var clean = Sanitize(text);
+        if (clean.AsSpan().IndexOfAny('\n', '\t') < 0)
+        {
+            return clean;
+        }
+
+        return clean.Replace('\n', ' ').Replace('\t', ' ');
+    }
+
+    /// <summary>
+    /// True when the text holds a character that a terminal could act on:
+    /// C0 controls other than tab, DEL, or a C1 control.
+    /// </summary>
+    public static bool HasControls(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        foreach (var ch in text)
+        {
+            if (IsControl(ch))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Character-level backstop. Removes every control character except tab but
+    /// does not parse sequences, so it is cheap enough to run on every painted row.
+    /// </summary>
+    public static string StripControls(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (!HasControls(text))
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        foreach (var ch in text)
+        {
+            if (!IsControl(ch))
+            {
+                builder.Append(ch);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Makes hidden characters visible as plain-text escapes (<c>\x1b</c>,
+    /// <c>\u202e</c>) for text an operator must judge, such as an approval
+    /// card. Tabs and line feeds stay; CR+LF becomes LF. Zero-width and
+    /// bidirectional formatting characters are revealed as well, because they
+    /// can reorder or hide what the operator reads.
+    /// </summary>
+    public static string Reveal(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var needsWork = false;
+        foreach (var ch in text)
+        {
+            if (NeedsReveal(ch))
+            {
+                needsWork = true;
+                break;
+            }
+        }
+
+        if (!needsWork)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length + 8);
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (ch == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+            {
+                continue;
+            }
+
+            if (!NeedsReveal(ch))
+            {
+                builder.Append(ch);
+                continue;
+            }
+
+            builder.Append(ch < 0x100 ? "\\x" : "\\u");
+            builder.Append(((int)ch).ToString(ch < 0x100 ? "x2" : "x4", System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool IsControl(char ch) =>
+        ch is (< ' ' and not '\t') or '\u007f' or (>= '\u0080' and <= '\u009f');
+
+    internal static bool NeedsReveal(char ch) =>
+        (ch < ' ' && ch is not ('\t' or '\n'))
+        || ch == '\u007f'
+        || ch is >= '\u0080' and <= '\u009f'
+        || ch == '\u200b'
+        || ch is '\u200e' or '\u200f' or '\u061c'
+        || ch is >= '\u2028' and <= '\u202e'
+        || ch is >= '\u2060' and <= '\u2064'
+        || ch is >= '\u2066' and <= '\u2069'
+        || ch == '\ufeff';
+
     public static string SanitizeStream(string text, ref StreamState state)
     {
         ArgumentNullException.ThrowIfNull(text);
@@ -158,7 +277,9 @@ public static class TerminalText
                 continue;
             }
 
-            if (ch == '\u007f' || (ch < ' ' && ch is not ('\n' or '\t')))
+            if (ch == '\u007f'
+                || ch is >= '\u0080' and <= '\u009f'
+                || (ch < ' ' && ch is not ('\n' or '\t')))
             {
                 continue;
             }
@@ -193,7 +314,7 @@ public static class TerminalText
                 return false;
             }
 
-            if (ch < ' ' || ch == '\u007f')
+            if (ch < ' ' || ch == '\u007f' || ch is >= '\u0080' and <= '\u009f')
             {
                 return false;
             }
@@ -222,7 +343,9 @@ public static class TerminalText
                 continue;
             }
 
-            if (ch == '\u007f' || (ch < ' ' && ch is not ('\n' or '\t' or '\r')))
+            if (ch == '\u007f'
+                || ch is >= '\u0080' and <= '\u009f'
+                || (ch < ' ' && ch is not ('\n' or '\t' or '\r')))
             {
                 i++;
                 continue;

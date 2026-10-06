@@ -51,7 +51,7 @@ public static class ApprovalDiff
                 continue;
             }
 
-            lines.Add((color, prefix + line));
+            lines.Add((color, prefix + TerminalText.Reveal(line)));
             shown++;
         }
 

@@ -323,4 +323,23 @@ public sealed class ShellChromeTests
 
         Assert.Contains("Thinking · 0s · ~12 Tokens", line.Plain, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ActivityAndProgress_AreReducedToOneCleanLine()
+    {
+        var chrome = new ShellChrome
+        {
+            Model = "m",
+            Activity = "Bad\nTool\u001b[2J",
+            Progress = "Calling Bad\nTool\u001b]0;x\u0007"
+        };
+
+        var status = chrome.StatusLine(120);
+        var progress = chrome.ProgressLine(120);
+
+        Assert.False(TerminalText.HasControls(status.Markup));
+        Assert.False(TerminalText.HasControls(progress.Markup));
+        Assert.Contains("• Bad Tool", status.Plain, StringComparison.Ordinal);
+        Assert.Contains("Calling Bad Tool", progress.Plain, StringComparison.Ordinal);
+    }
 }

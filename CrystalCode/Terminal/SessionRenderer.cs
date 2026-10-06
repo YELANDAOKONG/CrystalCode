@@ -40,6 +40,7 @@ public sealed class SessionRenderer : IDisposable
     private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
     private readonly ScreenPainter _painter = new();
+    private readonly ScrollAnchor _scrollAnchor = new();
     private readonly InputDecoder _decoder = new();
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
@@ -454,7 +455,8 @@ public sealed class SessionRenderer : IDisposable
                 "ctrl+o       Toggle verbose tool results",
                 "ctrl+g       Toggle verbose command output",
                 "pageup       Scroll transcript (also pagedown and wheel)",
-                "up/down      Move cursor; at edge, browse prompt history");
+                "up/down      Move cursor; at edge, browse prompt history",
+                "shift+drag   Select terminal text (option or fn on some macOS terminals)");
             foreach (var spec in SlashCatalog.BuiltIn)
             {
                 var names = "/" + spec.Name;
@@ -611,6 +613,7 @@ public sealed class SessionRenderer : IDisposable
             CommitLiveUnlocked();
             _log.Clear();
             _scrollBack = 0;
+            _scrollAnchor.Reset();
             PaintUnlocked(force: true);
         }
     }
@@ -639,6 +642,7 @@ public sealed class SessionRenderer : IDisposable
             CommitLiveUnlocked();
             _log.Clear();
             _scrollBack = 0;
+            _scrollAnchor.Reset();
             foreach (var line in TranscriptReplay.Lines(items))
             {
                 _log.Add(line.Kind, line.Text, toolName: line.ToolName);
@@ -1507,7 +1511,8 @@ public sealed class SessionRenderer : IDisposable
             "ctrl+o       Toggle verbose tool results",
             "ctrl+g       Toggle verbose command output",
             "up/down      Move cursor; at edge, browse prompt history",
-            "pageup       Scroll transcript (also pagedown and wheel)");
+            "pageup       Scroll transcript (also pagedown and wheel)",
+            "shift+drag   Select terminal text (option or fn on some macOS terminals)");
         foreach (var option in _slashOptions)
         {
             var aliases = option.Keys
@@ -1641,6 +1646,7 @@ public sealed class SessionRenderer : IDisposable
             composerView = _composer.Project(width, regions.ComposerRows);
         }
 
+        _scrollBack = _scrollAnchor.Resolve(regions.Width, _log.RowCount(regions.Width), _scrollBack);
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
         var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;
@@ -1676,6 +1682,7 @@ public sealed class SessionRenderer : IDisposable
 
         _painter.PaintFrame(
             frame,
+            width,
             height,
             resetFrame: width != _paintedWidth || height != _paintedHeight);
         _paintedWidth = width;
@@ -1733,6 +1740,7 @@ public sealed class SessionRenderer : IDisposable
         var paintHeight = Math.Max(1, height);
         _painter.PaintFrame(
             FrameRows.Notice(paintWidth, paintHeight, message),
+            paintWidth,
             paintHeight,
             resetFrame: width != _paintedWidth || height != _paintedHeight);
         _paintedWidth = width;

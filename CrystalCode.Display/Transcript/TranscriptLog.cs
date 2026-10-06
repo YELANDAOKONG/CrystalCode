@@ -245,6 +245,13 @@ public sealed class TranscriptLog
         return visible;
     }
 
+    /// <summary>Committed rows plus the live block at this width.</summary>
+    public int RowCount(int width)
+    {
+        EnsureCommittedLines(width);
+        return _committedLines.Count + LiveLines(width).Count;
+    }
+
     public int ClampScroll(int width, int rows, int scrollBack)
     {
         EnsureCommittedLines(width);

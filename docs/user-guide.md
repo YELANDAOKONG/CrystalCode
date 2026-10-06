@@ -563,17 +563,23 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
-| Up / Down | Composer history, or slash-picker navigation when the prompt has text; empty Up/Down scroll the transcript |
-| PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |
+| Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open |
+| Escape | Clear the composer |
+| Mouse wheel, PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |
 | Ctrl+C during a turn | Cancel the turn |
 | Ctrl+C at idle | Clear the composer |
 | Ctrl+C twice on an empty composer | Exit |
 
-The alternate screen enables alternate-scroll arrows and bracketed
-paste. Mouse tracking stays off so left-drag selects and copies. Wheel
-reports that a terminal still sends are drained without waiting. The
-frame repaints when the terminal is resized. Escape sequences that are
-not a paste wrap are not treated as paste. Overlay prompts (approval
+The alternate screen enables bracketed paste and mouse reporting (1000
+with SGR encoding 1006). The wheel scrolls the transcript on its own and
+never becomes Up/Down, so prompt history stays on the arrow keys. While
+mouse reporting is on, the terminal's own selection needs Shift held
+while you drag (Option or Fn in some macOS terminals). Rows that arrive
+while you are scrolled back do not move what you are reading; scroll to
+the bottom to follow new output again. Pasted text drops control,
+invisible, and bidirectional formatting characters. The frame repaints
+when the terminal is resized. Escape sequences that are not a paste wrap
+are not treated as paste. Overlay prompts (approval
 and questions) keep using that same input loop, so scroll and resize
 still work while they are open.
 
@@ -585,9 +591,8 @@ move, Enter to select, Space to toggle multiple choices, Left/Right or Tab to
 navigate questions, and Escape to dismiss the request. While a custom answer is
 being edited, its text and cursor appear inside the question panel; Enter saves
 it and Escape returns to the choices without changing the answer. PageUp,
-PageDown, and Ctrl+Up/Down remain available for transcript scrolling. A
-mouse-wheel report still scrolls; alternate scroll turns the wheel into
-Up/Down.
+PageDown, and Ctrl+Up/Down remain available for transcript scrolling. The
+mouse wheel scrolls the transcript.
 
 ### Follow-up queue
 

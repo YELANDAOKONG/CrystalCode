@@ -10,7 +10,18 @@ namespace CrystalCode.Terminal;
 /// </summary>
 public static class ToolCallText
 {
-    public static string Summary(string name, string arguments)
+    /// <summary>
+    /// Model-supplied names, paths, and commands are shown with hidden
+    /// characters spelled out, so an escape sequence or a bidirectional
+    /// override cannot alter what an operator reads in an approval card.
+    /// </summary>
+    public static string Summary(string name, string arguments) =>
+        TerminalText.Reveal(Flatten(SummaryCore(name, arguments)));
+
+    private static string Flatten(string text) =>
+        text.Replace("\r\n", " ", StringComparison.Ordinal).Replace('\r', ' ').Replace('\n', ' ');
+
+    private static string SummaryCore(string name, string arguments)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(arguments);

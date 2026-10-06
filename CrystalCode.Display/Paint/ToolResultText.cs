@@ -65,7 +65,7 @@ public static class ToolResultText
         var joined = string.Join('\n', lines);
         return joined.Length <= MaximumBodyLength
             ? joined
-            : joined[..(MaximumBodyLength - 3)] + "...";
+            : TruncateAt(joined, MaximumBodyLength - 3) + "...";
     }
 
     public static string CompactCommandBody(string text)
@@ -141,5 +141,16 @@ public static class ToolResultText
     }
 
     private static string Clip(string line) =>
-        line.Length <= MaximumLength ? line : line[..(MaximumLength - 3)] + "...";
+        line.Length <= MaximumLength ? line : TruncateAt(line, MaximumLength - 3) + "...";
+
+    /// <summary>Cuts at a UTF-16 length without splitting a surrogate pair.</summary>
+    private static string TruncateAt(string text, int length)
+    {
+        if (length > 0 && length < text.Length && char.IsHighSurrogate(text[length - 1]))
+        {
+            length--;
+        }
+
+        return text[..length];
+    }
 }

@@ -4,8 +4,10 @@ namespace CrystalCode.Display.Shell;
 
 /// <summary>
 /// Alternate buffer for the session shell. Not AnsiConsole.Live.
-/// Alternate scroll turns the wheel into arrows. Bracketed paste is on.
-/// Mouse tracking stays off so left-drag still selects text.
+/// Bracketed paste is on. Mouse reporting (1000 with SGR encoding 1006) is on
+/// so the wheel scrolls the transcript by itself and Up/Down stay with input
+/// history. The terminal's own text selection needs Shift (Option or Fn on
+/// some macOS terminals) while the button is held.
 /// </summary>
 public sealed class AlternateScreen : IDisposable
 {
@@ -32,7 +34,7 @@ public sealed class AlternateScreen : IDisposable
         var inputMode = WindowsConsole.EnableVirtualInput();
         var entered = false;
         var bracketedPaste = false;
-        var alternateScroll = false;
+        var mouseReporting = false;
         AlternateScreen? screen = null;
         try
         {
@@ -40,8 +42,9 @@ public sealed class AlternateScreen : IDisposable
             entered = true;
             AnsiConsole.Write(new ControlCode("\u001b[?2004h"));
             bracketedPaste = true;
-            AnsiConsole.Write(new ControlCode("\u001b[?1007h"));
-            alternateScroll = true;
+            AnsiConsole.Write(new ControlCode("\u001b[?1000h"));
+            mouseReporting = true;
+            AnsiConsole.Write(new ControlCode("\u001b[?1006h"));
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
             screen = new AlternateScreen(true);
@@ -59,7 +62,7 @@ public sealed class AlternateScreen : IDisposable
             foreach (var code in RecoverySequences(
                 entered,
                 bracketedPaste,
-                alternateScroll,
+                mouseReporting,
                 screen is not null && screen._titlePushed))
             {
                 try
@@ -83,18 +86,19 @@ public sealed class AlternateScreen : IDisposable
     internal static IReadOnlyList<string> RecoverySequences(
         bool alternateBuffer,
         bool bracketedPaste,
-        bool alternateScroll,
+        bool mouseReporting,
         bool titlePushed)
     {
-        var codes = new List<string>(4);
+        var codes = new List<string>(5);
         if (titlePushed)
         {
             codes.Add("\u001b[23;0t");
         }
 
-        if (alternateScroll)
+        if (mouseReporting)
         {
-            codes.Add("\u001b[?1007l");
+            codes.Add("\u001b[?1006l");
+            codes.Add("\u001b[?1000l");
         }
 
         if (bracketedPaste)
@@ -121,7 +125,8 @@ public sealed class AlternateScreen : IDisposable
         {
             RestoreWindowTitle();
             AnsiConsole.Cursor.Show();
-            AnsiConsole.Write(new ControlCode("\u001b[?1007l"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1006l"));
+            AnsiConsole.Write(new ControlCode("\u001b[?1000l"));
             AnsiConsole.Write(new ControlCode("\u001b[?2004l"));
             AnsiConsole.Write(new ControlCode("\u001b[?1049l"));
         }

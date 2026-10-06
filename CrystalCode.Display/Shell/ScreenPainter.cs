@@ -10,7 +10,10 @@ namespace CrystalCode.Display.Shell;
 /// </summary>
 public sealed class ScreenPainter
 {
+    private const string BeginSynchronizedUpdate = "\u001b[?2026h";
+    private const string EndSynchronizedUpdate = "\u001b[?2026l";
     private PaintLine[]? _previous;
+    private IAnsiConsole? _raster;
 
     public void Clear()
     {
@@ -42,34 +45,53 @@ public sealed class ScreenPainter
             composer,
             progress,
             todos);
-        WriteFrame(frame, regions.Height, resetFrame);
-        if (showCursor)
+        // One synchronized update per frame, so a terminal that supports mode
+        // 2026 presents rows and cursor together. Others ignore the mode.
+        AnsiConsole.Write(new ControlCode(BeginSynchronizedUpdate));
+        try
         {
-            var cursorLine = Math.Clamp(
-                regions.ComposerTop + composer.CursorRow + 1,
-                1,
-                regions.Height);
-            var cursorColumn = Math.Clamp(composer.CursorColumn + 1, 1, regions.Width);
-            AnsiConsole.Cursor.SetPosition(cursorColumn, cursorLine);
-            AnsiConsole.Cursor.Show();
+            WriteFrame(frame, regions.Width, regions.Height, resetFrame);
+            if (showCursor)
+            {
+                var cursorLine = Math.Clamp(
+                    regions.ComposerTop + composer.CursorRow + 1,
+                    1,
+                    regions.Height);
+                var cursorColumn = Math.Clamp(composer.CursorColumn + 1, 1, regions.Width);
+                AnsiConsole.Cursor.SetPosition(cursorColumn, cursorLine);
+                AnsiConsole.Cursor.Show();
+            }
+            else
+            {
+                AnsiConsole.Cursor.Hide();
+            }
         }
-        else
+        finally
         {
-            AnsiConsole.Cursor.Hide();
+            AnsiConsole.Write(new ControlCode(EndSynchronizedUpdate));
         }
 
         _previous = [.. frame];
     }
 
-    public void PaintFrame(IReadOnlyList<PaintLine> frame, int height, bool resetFrame)
+    public void PaintFrame(IReadOnlyList<PaintLine> frame, int width, int height, bool resetFrame)
     {
         ArgumentNullException.ThrowIfNull(frame);
-        WriteFrame(frame, height, resetFrame);
-        AnsiConsole.Cursor.Hide();
+        AnsiConsole.Write(new ControlCode(BeginSynchronizedUpdate));
+        try
+        {
+            WriteFrame(frame, width, height, resetFrame);
+            AnsiConsole.Cursor.Hide();
+        }
+        finally
+        {
+            AnsiConsole.Write(new ControlCode(EndSynchronizedUpdate));
+        }
+
         _previous = [.. frame];
     }
 
-    private void WriteFrame(IReadOnlyList<PaintLine> frame, int height, bool resetFrame)
+    private void WriteFrame(IReadOnlyList<PaintLine> frame, int width, int height, bool resetFrame)
     {
         var rewriteAll = resetFrame || _previous is null || _previous.Length != frame.Count;
         var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame);
@@ -87,14 +109,14 @@ public sealed class ScreenPainter
             {
                 for (var row = 0; row < frame.Count; row++)
                 {
-                    WriteLine(frame[row], row, height);
+                    WriteLine(frame[row], row, height, width);
                 }
             }
             else
             {
                 foreach (var row in dirty!)
                 {
-                    WriteLine(frame[row], row, height);
+                    WriteLine(frame[row], row, height, width);
                 }
             }
         }
@@ -104,7 +126,7 @@ public sealed class ScreenPainter
         }
     }
 
-    private static void WriteLine(PaintLine line, int row, int height)
+    private void WriteLine(PaintLine line, int row, int height, int width)
     {
         if (row < 0 || row >= height)
         {
@@ -112,9 +134,10 @@ public sealed class ScreenPainter
         }
 
         AnsiConsole.Write(new ControlCode($"\u001b[{row + 1};1H\u001b[2K"));
-        if (!string.IsNullOrEmpty(line.Markup))
+        var rendered = FrameRow.Create(line, width, _raster ??= FrameRow.CreateRaster());
+        if (!rendered.IsEmpty)
         {
-            AnsiConsole.Markup(line.Markup);
+            AnsiConsole.Write(rendered);
         }
     }
 }

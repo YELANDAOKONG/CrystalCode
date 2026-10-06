@@ -126,4 +126,67 @@ public sealed class WidgetPaintTests
 
         return text.ToString();
     }
+
+    [Fact]
+    public void Lines_RemoveEscapeSequencesFromWidgetText()
+    {
+        var panel = new Panel(new Markup(MarkupText.Escape("body \u001b[2J\u001b]52;c;QUJD\u0007 end")))
+        {
+            Header = new PanelHeader(MarkupText.Escape("Bash  echo safe\u001b[1G\u001b[2Kls")),
+            Border = BoxBorder.Rounded,
+            Expand = true
+        };
+
+        var lines = WidgetPaint.Lines(new Padder(panel, new Padding(2, 0, 0, 0)), 60);
+
+        foreach (var line in lines)
+        {
+            Assert.False(TerminalText.HasControls(line.Markup));
+            Assert.False(TerminalText.HasControls(line.Plain));
+        }
+
+        Assert.Contains("body  end", lines[1].Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Lines_KeepDecorationsAndBackground()
+    {
+        var markup = new Markup("[italic dim underline strikethrough invert on red]abc[/] [bold blue]def[/]");
+
+        var line = Assert.Single(WidgetPaint.Lines(markup, 40));
+
+        Assert.Equal("abc def", line.Plain);
+        Assert.Contains("bold", line.Markup, StringComparison.Ordinal);
+        Assert.Contains("dim", line.Markup, StringComparison.Ordinal);
+        Assert.Contains("italic", line.Markup, StringComparison.Ordinal);
+        Assert.Contains("underline", line.Markup, StringComparison.Ordinal);
+        Assert.Contains("strikethrough", line.Markup, StringComparison.Ordinal);
+        Assert.Contains("invert", line.Markup, StringComparison.Ordinal);
+        Assert.Contains("on red", line.Markup, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("[#ff8800]x[/]")]
+    [InlineData("[rgb(10,20,30) on #102030]x[/]")]
+    [InlineData("[grey50]x[/]")]
+    [InlineData("[orange1]x[/]")]
+    public void StyleToken_RoundTripsThroughMarkup(string source)
+    {
+        var original = Assert.Single(WidgetPaint.Lines(new Markup(source), 20));
+        var again = Assert.Single(WidgetPaint.Lines(new Markup(original.Markup), 20));
+
+        Assert.Equal(original.Markup, again.Markup);
+        Assert.NotEqual("x", original.Markup);
+    }
+
+    [Fact]
+    public void Lines_DropLinksAndBlinking()
+    {
+        var markup = new Markup("[link=https://example.test slowblink]x[/]");
+
+        var line = Assert.Single(WidgetPaint.Lines(markup, 20));
+
+        Assert.DoesNotContain("link", line.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("blink", line.Markup, StringComparison.Ordinal);
+    }
 }

@@ -50,4 +50,24 @@ public sealed class TodoBarTests
         Assert.Equal(1 + TodoBar.MaximumVisible + 1, lines.Count);
         Assert.Contains("+2 more", lines[^1].Plain, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Lines_NeverCarryControlCharacters()
+    {
+        var lines = TodoBar.Lines(
+            [
+                new TodoBarItem("~", "first\nsecond"),
+                new TodoBarItem(" ", "clear \u001b[2J\u001b]52;c;QUJD\u0007 done")
+            ],
+            80);
+
+        foreach (var line in lines)
+        {
+            Assert.False(TerminalText.HasControls(line.Markup));
+            Assert.False(TerminalText.HasControls(line.Plain));
+        }
+
+        Assert.Equal("  [~] first second", lines[1].Plain);
+        Assert.Equal("  [ ] clear  done", lines[2].Plain);
+    }
 }
