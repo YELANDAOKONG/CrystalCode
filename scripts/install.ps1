@@ -96,15 +96,29 @@ function Write-ProgressBar([long]$received, [long]$total) {
     [Console]::Write("`r" + $bar)
 }
 
-function Write-Card([string]$primary, [string]$secondary) {
+function Write-Card([bool]$addedToPath, [string]$archiveName, [string]$installDirectory) {
     $rule = $script:GlyphEmpty * 9
+    $docsUrl = "https://github.com/$repository/blob/master/docs/user-guide.md"
     Write-Host ""
     Write-Host ($script:Muted + $script:GlyphDownRight + $rule + $script:GlyphDownLeft + $script:Reset)
     Write-Host ($script:Muted + $script:GlyphVertical + " " + $script:Accent + "crystal" + $script:Muted + " " + $script:GlyphVertical + $script:Reset)
     Write-Host ($script:Muted + $script:GlyphUpRight + $rule + $script:GlyphUpLeft + $script:Reset)
     Write-Host ""
-    Write-Host ($script:Muted + $primary + $script:Reset)
-    Write-Host ($script:Muted + $secondary + $script:Reset)
+    Write-Host ("Installed $archiveName to " + $script:Accent + $installDirectory + $script:Reset)
+    if ($addedToPath) {
+        Write-Host ("Added " + $script:Accent + $installDirectory + $script:Reset + " to the user PATH.")
+    }
+    else {
+        Write-Host ($script:Accent + $installDirectory + $script:Reset + " is already configured in the user PATH.")
+    }
+
+    Write-Host "Open a new terminal to use CrystalCode from any directory."
+    Write-Host ("Start Crystal Code with: " + $script:Accent + "CrystalCode" + $script:Reset)
+    Write-Host ""
+    Write-Host ($script:Accent + "cd <project>" + $script:Reset + "  " + $script:Muted + "# Open a repository" + $script:Reset)
+    Write-Host ($script:Accent + "CrystalCode" + $script:Reset + "   " + $script:Muted + "# Start Crystal Code" + $script:Reset)
+    Write-Host ""
+    Write-Host ($script:Muted + "For more information visit " + $script:Reset + $docsUrl)
     Write-Host ""
 }
 
@@ -316,8 +330,7 @@ try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     if ($Styled) {
         Enable-VirtualTerminal
-        Write-Host ($Muted + "..." + $Reset)
-        Write-Host ($Muted + "Installing Crystal Code" + $Reset)
+        Write-Host ($Muted + "Installing Crystal Code..." + $Reset)
         Write-Host ""
         Receive-CrystalArchive $downloadUrl $archivePath $archiveName
     }
@@ -354,12 +367,7 @@ try {
 
     if ($Styled) {
         $addedToPath = Add-UserPath $installDirectory
-        if ($addedToPath) {
-            Write-Card "Configured in the user PATH." "Open a new terminal, then run CrystalCode."
-        }
-        else {
-            Write-Card "Configured in the user PATH." "Crystal Code is ready."
-        }
+        Write-Card -addedToPath $addedToPath -archiveName $archiveName -installDirectory $installDirectory
     }
     else {
         Write-Host "Installed $archiveName to $installDirectory"

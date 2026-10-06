@@ -15,8 +15,8 @@ FAIL=
 NC=
 cursor_hidden=false
 download_pid=
-card_primary=
-card_secondary=
+card_kind=
+docs_url="https://github.com/${repository}/blob/master/docs/user-guide.md"
 
 if [ -t 1 ] && [ -t 2 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
     styled=true
@@ -80,8 +80,7 @@ configure_path() {
 
     if [ -z "$profile_path" ]; then
         if [ "$styled" = true ]; then
-            card_primary="Installed to ${install_directory}."
-            card_secondary="Start it with: ${install_directory}/${binary_name}"
+            card_kind="direct"
             return
         fi
 
@@ -109,8 +108,7 @@ configure_path() {
 
     if [ "$comment_exists" = true ] && [ "$path_exists" = true ] && [ "$alias_exists" = true ]; then
         if [ "$styled" = true ]; then
-            card_primary="Configured in ${profile_path}."
-            card_secondary="Crystal Code is ready."
+            card_kind="ready"
             return
         fi
 
@@ -132,8 +130,7 @@ configure_path() {
     printf '\n\n' >> "$profile_path"
 
     if [ "$styled" = true ]; then
-        card_primary="Configured in ${profile_path}."
-        card_secondary="Open a new terminal, then run crystal."
+        card_kind="configured"
         return
     fi
 
@@ -148,8 +145,37 @@ print_card() {
     printf '%s│ %scrystal%s │%s\n' "$MUTED" "$ACCENT" "$MUTED" "$NC"
     printf '%s└─────────┘%s\n' "$MUTED" "$NC"
     printf '\n'
-    printf '%s%s%s\n' "$MUTED" "$card_primary" "$NC"
-    printf '%s%s%s\n' "$MUTED" "$card_secondary" "$NC"
+    printf 'Installed %s to %s%s%s\n' "$archive_name" "$ACCENT" "$install_directory" "$NC"
+
+    case "$card_kind" in
+        ready)
+            printf 'Crystal Code is already configured in %s%s%s.\n' "$ACCENT" "$profile_path" "$NC"
+            printf 'Start Crystal Code with: %scrystal%s\n' "$ACCENT" "$NC"
+            start_command="crystal"
+            ;;
+        configured)
+            printf 'Configured Crystal Code in %s%s%s.\n' "$ACCENT" "$profile_path" "$NC"
+            printf 'Open a new terminal or run: %s. %s%s\n' "$ACCENT" "$profile_path" "$NC"
+            printf 'Start Crystal Code with: %scrystal%s\n' "$ACCENT" "$NC"
+            start_command="crystal"
+            ;;
+        *)
+            printf 'Installed %s. Start Crystal Code with: %s%s%s\n' \
+                "$binary_name" "$ACCENT" "${install_directory}/${binary_name}" "$NC"
+            start_command="${install_directory}/${binary_name}"
+            ;;
+    esac
+
+    printf '\n'
+    printf '%scd <project>%s  %s# Open a repository%s\n' "$ACCENT" "$NC" "$MUTED" "$NC"
+    if [ "$start_command" = "crystal" ]; then
+        # Pad to the same column as "cd <project>".
+        printf '%scrystal%s       %s# Start Crystal Code%s\n' "$ACCENT" "$NC" "$MUTED" "$NC"
+    else
+        printf '%s%s%s  %s# Start Crystal Code%s\n' "$ACCENT" "$start_command" "$NC" "$MUTED" "$NC"
+    fi
+    printf '\n'
+    printf '%sFor more information visit %s%s\n' "$MUTED" "$NC" "$docs_url"
     printf '\n'
 }
 
@@ -268,7 +294,9 @@ download_with_progress() {
     printf '\033[?25l' >&2
     cursor_hidden=true
 
-    curl --fail --location --silent --trace-ascii "$trace_path" --output "$archive_path" "$download_url" &
+    # stderr stays quiet here. A failed attempt falls back to curl, and an
+    # interrupt must not print a write error after the temp directory is gone.
+    curl --fail --location --silent --trace-ascii "$trace_path" --output "$archive_path" "$download_url" 2>/dev/null &
     download_pid=$!
 
     length=0
@@ -299,11 +327,20 @@ download_with_progress() {
     done || true
 
     download_status=0
-    wait "$download_pid" || download_status=$?
-    download_pid=
+    if [ -n "${download_pid:-}" ]; then
+        wait "$download_pid" || download_status=$?
+        download_pid=
+    else
+        # The interrupt trap already reaped the downloader.
+        download_status=130
+    fi
 
     if [ "$download_status" -ne 0 ]; then
         restore_cursor
+        # 128+signal means the download was interrupted. Do not start another curl.
+        if [ "$download_status" -gt 128 ]; then
+            exit "$download_status"
+        fi
         return 1
     fi
 
@@ -335,18 +372,24 @@ cleanup() {
     restore_cursor
     if [ -n "${download_pid:-}" ]; then
         kill "$download_pid" 2>/dev/null || true
+        wait "$download_pid" 2>/dev/null || true
         download_pid=
     fi
     if [ -n "${working_directory:-}" ]; then
         rm -rf -- "$working_directory"
+        working_directory=
     fi
 }
 
-trap cleanup EXIT HUP INT TERM
+# A signal trap that returns lets the script continue into wait and a second
+# curl against the directory cleanup just removed.
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+trap 'cleanup; exit 129' HUP
 
 if [ "$styled" = true ]; then
-    printf '%s...%s\n' "$MUTED" "$NC"
-    printf '%sInstalling Crystal Code%s\n\n' "$MUTED" "$NC"
+    printf '%sInstalling Crystal Code...%s\n\n' "$MUTED" "$NC"
     if ! download_with_progress; then
         if ! curl -# --fail --location --output "$archive_path" "$download_url"; then
             fail "Could not download ${archive_name} from the latest release."
