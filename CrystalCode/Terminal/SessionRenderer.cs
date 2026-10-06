@@ -445,7 +445,6 @@ public sealed class SessionRenderer : IDisposable
             CommitLiveUnlocked();
             AddHelpUnlocked(
                 "enter        Submit; queue while working",
-                "enter        Empty while working interrupts and sends",
                 "queue        Stays above the composer; sends after this tool or turn",
                 "ctrl+j       Newline",
                 "\\ enter      Newline",
@@ -1500,7 +1499,6 @@ public sealed class SessionRenderer : IDisposable
         AddHelpUnlocked(
             "/btw         Side question; not saved. Esc closes, x clears",
             "enter        Submit; queue while working",
-            "enter        Empty while working interrupts and sends",
             "queue        Stays above the composer; sends after this tool or turn",
             "ctrl+j       Newline",
             "ctrl+v       Paste clipboard image",

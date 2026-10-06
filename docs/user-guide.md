@@ -608,7 +608,7 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Key | Action |
 | :--- | :--- |
 | Enter | Submit when idle; queue a follow-up while a turn is running |
-| Empty Enter while working | Interrupt immediately and send the queue |
+| Empty Enter while working | Does nothing. The turn keeps going |
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
