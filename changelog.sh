@@ -47,4 +47,4 @@ for arg in "$@"; do
     TASK+=$'\n'"$arg"
 done
 
-"$CMD" run --workspace . --approval review --work --show-thinking --external-tools off --workspace-trust off --duration 600 "$TASK"
+"$CMD" run --workspace . --approval review --work --show-thinking --external-tools off --workspace-trust off --duration 1200 "$TASK"
