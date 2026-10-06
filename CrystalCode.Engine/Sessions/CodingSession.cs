@@ -65,6 +65,8 @@ public sealed class CodingSession : ITurnObserver
     private ThinkingSelection _thinkingEffort;
     private bool _planMode;
     private List<ChatItem> _transcript;
+    private readonly object _archiveGate = new();
+    private List<ChatItem> _archive = [];
     private Dictionary<int, ImageAttachment> _images = [];
     private readonly object _imagesGate = new();
     private List<SessionImageDocument> _unavailableImages = [];
@@ -1036,7 +1038,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var metadata = CreateExportMetadata();
-        var items = TranscriptExport.ConversationItems(_transcript);
+        var items = TranscriptExport.ConversationItems(ArchiveSnapshot());
         var systemText = includeSystem ? CurrentSystemText() : null;
         var markdown = TranscriptExport.RenderMarkdown(
             metadata,
@@ -1179,7 +1181,7 @@ public sealed class CodingSession : ITurnObserver
     private SessionDocument CreateExportDocument()
     {
         var document = CreateDocument();
-        document.Items = TranscriptCodec.Write(TranscriptExport.ConversationItems(_transcript));
+        document.Items = TranscriptCodec.Write(TranscriptExport.ConversationItems(ArchiveSnapshot()));
         document.UpdatedUtc = DateTimeOffset.UtcNow;
         return document;
     }
@@ -1941,6 +1943,7 @@ public sealed class CodingSession : ITurnObserver
             PlanMode = _planMode,
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_transcript),
+            Archive = TranscriptCodec.Write(ArchiveSnapshot()),
             ImageMarkersTagged = true,
             Images =
             [
@@ -1964,6 +1967,11 @@ public sealed class CodingSession : ITurnObserver
         _sessionId = SessionStore.NewId();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
+        lock (_archiveGate)
+        {
+            _archive = [];
+        }
+
         lock (_imagesGate)
         {
             _images.Clear();
@@ -2062,7 +2070,7 @@ public sealed class CodingSession : ITurnObserver
         SaveSession();
         RefreshChrome();
         ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
-        Publish(new HistoryReplayed([.. _transcript]));
+        Publish(new HistoryReplayed(ArchiveSnapshot()));
         ShowTodos();
         Note($"Forked  {sourceId}  ->  {_sessionId}");
     }
@@ -2120,13 +2128,23 @@ public sealed class CodingSession : ITurnObserver
         _sessionId = document.Id!;
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         _planMode = document.PlanMode;
+        var imageNumbers = document.Images.Where(static image => image is not null)
+            .Select(static image => image.Number)
+            .ToHashSet();
         _transcript = document.ImageMarkersTagged
             ? items
-            : ImageMarkerText.TagLegacy(
-                items,
-                document.Images.Where(static image => image is not null)
-                    .Select(static image => image.Number)
-                    .ToHashSet());
+            : ImageMarkerText.TagLegacy(items, imageNumbers);
+        var archive = document.Archive is null
+            ? null
+            : TranscriptCodec.Read(document.Archive);
+        lock (_archiveGate)
+        {
+            _archive = archive is null
+                ? [.. _transcript]
+                : document.ImageMarkersTagged
+                    ? [.. archive]
+                    : ImageMarkerText.TagLegacy(archive, imageNumbers);
+        }
         lock (_imagesGate)
         {
             _images = new Dictionary<int, ImageAttachment>(
@@ -2163,7 +2181,7 @@ public sealed class CodingSession : ITurnObserver
     {
         RefreshChrome();
         ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
-        Publish(new HistoryReplayed([.. _transcript]));
+        Publish(new HistoryReplayed(ArchiveSnapshot()));
         Note("Resumed  " + _sessionId);
         if (_unavailableImages.Count > 0)
         {
@@ -2197,7 +2215,9 @@ public sealed class CodingSession : ITurnObserver
         ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
     }
 
-    private bool HasConversation() => TranscriptCodec.HasConversation(_transcript);
+    private bool HasConversation() =>
+        TranscriptCodec.HasConversation(_transcript)
+        || TranscriptCodec.HasConversation(ArchiveSnapshot());
 
     private void RebuildExecutors()
     {
@@ -2673,7 +2693,9 @@ public sealed class CodingSession : ITurnObserver
     {
         var message = AttachPendingImages(input);
         Publish(new UserMessageSent(message));
-        _transcript.Add(new ChatMessage(ChatRole.User, message));
+        var user = new ChatMessage(ChatRole.User, message);
+        _transcript.Add(user);
+        CommitArchive([user]);
         var images = ImageSnapshot();
         _draftImages.RemoveWhere(number => message.Contains(
             images[number].TrustedMarker,
@@ -2704,7 +2726,8 @@ public sealed class CodingSession : ITurnObserver
                 SessionRetryOptions.Default,
                 ReserveImageNumber,
                 AddImage,
-                ImageSnapshot);
+                ImageSnapshot,
+                CommitArchive);
             return multimodalTurn.RunAsync(_transcript, cancellationToken);
         }
 
@@ -2715,7 +2738,8 @@ public sealed class CodingSession : ITurnObserver
             this,
             CurrentReasoning(),
             CompactRoundAsync,
-            SessionRetryOptions.Default);
+            SessionRetryOptions.Default,
+            CommitArchive);
         return turn.RunAsync(_transcript, cancellationToken);
     }
 
@@ -2758,8 +2782,50 @@ public sealed class CodingSession : ITurnObserver
     private bool IsReferencedInTranscript(ImageAttachment image) =>
         IsReferencedInTranscript(image.TrustedMarker);
 
+    private void CommitArchive(IReadOnlyList<ChatItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        lock (_archiveGate)
+        {
+            foreach (var item in items)
+            {
+                if (item is ChatMessage message && message.Role == ChatRole.System)
+                {
+                    continue;
+                }
+
+                _archive.Add(item);
+            }
+        }
+    }
+
+    private List<ChatItem> ArchiveSnapshot()
+    {
+        lock (_archiveGate)
+        {
+            return [.. _archive];
+        }
+    }
+
+    private IReadOnlyList<ChatItem> SideConversation(IReadOnlyList<ChatItem> archive)
+    {
+        var body = archive;
+        if (body.Count > 0
+            && body[0] is ChatMessage system
+            && system.Role == ChatRole.System
+            && !CompactionSelection.IsSummary(system))
+        {
+            body = body.Skip(1).ToArray();
+        }
+
+        return [new ChatMessage(ChatRole.System, CurrentSystemText()), .. body];
+    }
+
     private bool IsReferencedInTranscript(string marker) =>
-        _transcript.Any(item => item switch
+        ContainsMarker(_transcript, marker) || ContainsMarker(ArchiveSnapshot(), marker);
+
+    private static bool ContainsMarker(IReadOnlyList<ChatItem> items, string marker) =>
+        items.Any(item => item switch
         {
             ChatMessage message => message.Text.Contains(marker, StringComparison.Ordinal),
             ToolResult result => result.Text.Contains(marker, StringComparison.Ordinal),
@@ -3026,7 +3092,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void AskSide(string question)
     {
-        var transcript = ImageMarkerText.ForTextModel(_transcript).ToArray();
+        var archive = ArchiveSnapshot();
         IReadOnlyList<SideExchange> prior;
         CancellationToken token;
         long generation;
@@ -3047,11 +3113,44 @@ public sealed class CodingSession : ITurnObserver
         }
 
         Publish(CaptureSide(announce: true));
-        _sideTask = RunSideAsync(transcript, prior, question, reasoning, generation, token);
+        _sideTask = RunSideAsync(archive, prior, question, reasoning, generation, token);
+    }
+
+    private async Task<IReadOnlyList<ChatItem>?> PrepareSideConversationAsync(
+        IReadOnlyList<ChatItem> archive,
+        IReadOnlyList<SideExchange> prior,
+        string question,
+        CancellationToken cancellationToken)
+    {
+        var conversation = SideConversation(archive);
+        var composed = SideQuestion.Compose(
+            ImageMarkerText.ForTextModel(conversation),
+            prior,
+            question);
+        if (!NeedsCompaction(composed, null))
+        {
+            return composed;
+        }
+
+        var outcome = await _compactor.CompactAsync(
+            conversation,
+            _todos.Format(),
+            CurrentLimits(),
+            cancellationToken);
+        if (outcome.Kind == CompactionKind.Applied)
+        {
+            conversation = outcome.Transcript;
+        }
+
+        composed = SideQuestion.Compose(
+            ImageMarkerText.ForTextModel(conversation),
+            prior,
+            question);
+        return NeedsCompaction(composed, null) ? null : composed;
     }
 
     private async Task RunSideAsync(
-        IReadOnlyList<ChatItem> transcript,
+        IReadOnlyList<ChatItem> archive,
         IReadOnlyList<SideExchange> prior,
         string question,
         ReasoningOptions? reasoning,
@@ -3062,12 +3161,20 @@ public sealed class CodingSession : ITurnObserver
         var owned = false;
         try
         {
+            var conversation = await PrepareSideConversationAsync(
+                archive,
+                prior,
+                question,
+                cancellationToken);
+            if (conversation is null)
+            {
+                FailSide(generation, SideQuestion.TooLarge);
+                return;
+            }
+
             client = CreateClient(_settings);
             owned = !ReferenceEquals(client, _client);
-            var request = new ChatRequest(
-                SideQuestion.Compose(transcript, prior, question),
-                [],
-                reasoning);
+            var request = new ChatRequest(conversation, [], reasoning);
             var assembler = new ChatStreamAssembler();
             var live = new StringBuilder();
             await foreach (var streamEvent in client.StreamAsync(request, cancellationToken))

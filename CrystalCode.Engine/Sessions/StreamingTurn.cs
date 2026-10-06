@@ -18,6 +18,7 @@ public sealed class StreamingTurn
     private readonly ReasoningOptions? _reasoning;
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? _compactBeforeRound;
     private readonly SessionRetryOptions _retry;
+    private readonly Action<IReadOnlyList<ChatItem>>? _commit;
 
     public StreamingTurn(
         IStreamingChatClient client,
@@ -26,7 +27,8 @@ public sealed class StreamingTurn
         ITurnObserver? observer = null,
         ReasoningOptions? reasoning = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? compactBeforeRound = null,
-        SessionRetryOptions? retry = null)
+        SessionRetryOptions? retry = null,
+        Action<IReadOnlyList<ChatItem>>? commit = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(executor);
@@ -38,6 +40,7 @@ public sealed class StreamingTurn
         _reasoning = reasoning;
         _compactBeforeRound = compactBeforeRound;
         _retry = retry ?? SessionRetryOptions.Default;
+        _commit = commit;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -104,8 +107,10 @@ public sealed class StreamingTurn
                 _observer?.OnUsageUpdated(response.Usage ?? usage.Last, usage.Build());
 
                 var candidate = response.Candidates[0];
+                var marked = transcript.Count;
                 if (CandidateRound.TryStop(candidate, transcript, out var stopReason, out var fault))
                 {
+                    Commit(transcript, marked);
                     if (fault is not null)
                     {
                         _observer?.OnFault(fault);
@@ -124,6 +129,7 @@ public sealed class StreamingTurn
                 if (toolCalls.Length == 0)
                 {
                     transcript.AddRange(candidate.Items);
+                    Commit(transcript, marked);
                     _observer?.OnModelRoundClosed();
                     return Create(
                         TurnStopReason.Completed,
@@ -137,6 +143,7 @@ public sealed class StreamingTurn
                     && toolCalls.Length > maximumToolCalls - toolCallCount)
                 {
                     CandidateRound.AppendWithoutToolCalls(transcript, candidate.Items);
+                    Commit(transcript, marked);
                     _observer?.OnModelRoundClosed();
                     return Create(
                         TurnStopReason.ToolCallLimitReached,
@@ -147,12 +154,15 @@ public sealed class StreamingTurn
                 }
 
                 transcript.AddRange(candidate.Items);
+                Commit(transcript, marked);
 
                 toolCallCount += toolCalls.Length;
                 _observer?.OnModelRoundClosed();
                 _observer?.OnToolCalls(toolCalls);
                 var toolResults = await _executor.ExecuteAsync(toolCalls, linked.Token);
+                marked = transcript.Count;
                 transcript.AddRange(toolResults);
+                Commit(transcript, marked);
                 _observer?.OnToolResults(toolResults);
                 _observer?.OnUsageUpdated(
                     new TokenUsage(TokenEstimator.Items(transcript), 0),
@@ -226,14 +236,16 @@ public sealed class StreamingTurn
         return assembler.ToResponse();
     }
 
-    private static TurnResult Create(
+    private TurnResult Create(
         TurnStopReason stopReason,
         int modelCallCount,
         int toolCallCount,
         UsageAccumulator usage,
         List<ChatItem> transcript)
     {
+        var marked = transcript.Count;
         ReconcilePendingToolCalls(transcript);
+        Commit(transcript, marked);
         return new(
             stopReason,
             modelCallCount,
@@ -260,5 +272,15 @@ public sealed class StreamingTurn
         }
 
         transcript.AddRange(missing);
+    }
+
+    private void Commit(List<ChatItem> transcript, int marked)
+    {
+        if (_commit is null || transcript.Count <= marked)
+        {
+            return;
+        }
+
+        _commit(transcript.GetRange(marked, transcript.Count - marked));
     }
 }

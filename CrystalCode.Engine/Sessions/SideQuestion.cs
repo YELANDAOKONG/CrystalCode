@@ -25,6 +25,8 @@ internal static class SideQuestion
 
     public const string NoneToShow = "No side question to show.";
 
+    public const string TooLarge = "Side question is too large to send.";
+
     public static List<ChatItem> Compose(
         IReadOnlyList<ChatItem> transcript,
         IReadOnlyList<SideExchange> prior,

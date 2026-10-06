@@ -17,6 +17,12 @@ public sealed class SessionDocument
 
     public List<SessionItemDocument> Items { get; set; } = [];
 
+    /// <summary>
+    /// Operator history. Null means a session saved before the archive existed;
+    /// the host then copies <see cref="Items"/>.
+    /// </summary>
+    public List<SessionItemDocument>? Archive { get; set; }
+
     public List<SessionImageDocument> Images { get; set; } = [];
 
     public bool ImageMarkersTagged { get; set; }

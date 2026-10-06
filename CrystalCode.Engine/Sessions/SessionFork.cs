@@ -23,6 +23,7 @@ internal static class SessionFork
             PlanMode = source.PlanMode,
             CreatedUtc = createdUtc,
             Items = source.Items.Select(CloneItem).ToList(),
+            Archive = source.Archive?.Select(CloneItem).ToList(),
             Images = source.Images.OfType<SessionImageDocument>().Select(CloneImage).ToList(),
             Todos = source.Todos.Select(CloneTodo).ToList(),
             UserTurns = Math.Max(0, source.UserTurns),

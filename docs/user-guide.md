@@ -1114,10 +1114,10 @@ Resume also restores the last usage snapshot and cumulative usage so the
 status bar, `/status`, and compaction have the correct baselines before the
 next model call. Older session files without cumulative usage show an unknown
 cumulative value rather than a partial total. A compacted
-session restores the summary and recent tail; only the live system
-prompt is refreshed.
+session restores the full conversation on screen. The model continues from
+the summary and recent tail, and only the live system prompt is refreshed.
 
-Fork preserves the transcript, compacted summary, todos, Plan/Work mode,
+Fork preserves the full conversation, the model context, todos, Plan/Work mode,
 turn counters, and usage baseline. The source session remains unchanged. The
 new branch receives a new creation time, uses the current workspace, and
 refreshes its live system prompt. Session lists mark the current id and retain
@@ -1141,8 +1141,9 @@ The transcript prints `compacting context...` and the progress row
 shows `Compacting` while this runs; the frame keeps painting so the
 terminal does not freeze. `/compact` (alias `/summarize`) runs this
 immediately. It is refused while a turn is running. A successful
-compact is written to the session file; `/resume` restores the summary
-and tail, and refreshes only the live system prompt.
+compact is written to the session file. The screen keeps the earlier lines.
+`/resume` restores that full conversation, while the model continues from
+the summary and tail, and refreshes only the live system prompt.
 
 ## Data directory
 

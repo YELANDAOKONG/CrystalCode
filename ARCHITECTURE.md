@@ -243,7 +243,7 @@ image bytes live in owner-only, content-addressed files under
 `~/.crystal/media/<sha256>`. Session JSON stores the hash and MIME type, not
 Base64 bytes. The media file is written before the session references it, and
 both writes use a temporary file followed by an atomic replacement. Sessions
-persist only images referenced by the transcript. A missing, truncated, or
+persist only images referenced by the archive or the model context. A missing, truncated, or
 modified media file is skipped on resume while the text and other attachments
 remain available; the operator receives a note, and its reference is retained
 on later saves so restoring the file can repair the session. Inline `data` is
@@ -352,11 +352,20 @@ that timer. A positive integer up to the runtime timer limit replaces it.
 User cancellation and the turn budget still stop the command. External tool
 sets keep their own `timeoutSeconds`.
 7. After a completed turn, consider compaction from that last round's
-   reported usage and the estimated transcript. `/compact` (alias
+   reported usage and the estimated model context. `/compact` (alias
    `/summarize`) runs the same summarizer immediately. Compaction runs
    inside an engine call the front end awaits; the front end keeps its
    own surface live meanwhile (the terminal host pumps the frame so the
    spinner, resize, and composer stay live).
+
+The session keeps two transcripts. The archive appends user text, assistant
+text, reasoning, tool calls, and tool results as they are committed, and
+compaction does not change it. The model context is the list sent to the
+model. Compaction replaces that list with the live system prompt, a summary,
+and a recent tail. Usage, approval review, and later model calls read the
+model context. Resume, fork replay, and export read the archive. A session
+file written before the archive existed loads its saved items as the archive.
+Images stay when either transcript still mentions them. `/clear` drops both.
 
 The composer stays open while a turn runs. Enter with text enqueues a
 follow-up (FIFO). Queued items stay in a panel above the composer until
@@ -366,9 +375,12 @@ does not stop the turn. Ctrl+C interrupts and does not drop queued text.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
 
-`/btw` (alias `/side`) asks one side question from the committed transcript
+`/btw` (alias `/side`) asks one side question from the archive
 and the newest 20 side exchanges in this process. The request uses the work
-model, the same system message, an empty tool list, and its own cancellation.
+model, the current system message, an empty tool list, and its own cancellation.
+When that request does not fit the window, the host compacts a copy and does
+not write the summary back. If the copy still does not fit, the side question
+fails.
 Text still streaming in the current round is not included. A tool call is not
 executed. Text that arrived with it is kept; a tool call with no text fails,
 and the question stays in the panel so it can be asked again. The question,

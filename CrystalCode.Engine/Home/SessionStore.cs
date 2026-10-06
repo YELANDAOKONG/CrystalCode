@@ -206,13 +206,16 @@ public sealed class SessionStore
 
     private static string FirstUserText(SessionDocument document)
     {
-        var text = document.Items.FirstOrDefault(
-            item => string.Equals(item.Kind, "message", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(item.Role, "user", StringComparison.OrdinalIgnoreCase))?.Text;
+        var text = FirstUserMessage(document.Archive) ?? FirstUserMessage(document.Items);
         return string.IsNullOrWhiteSpace(text)
             ? "compacted conversation"
             : string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
+
+    private static string? FirstUserMessage(IReadOnlyList<SessionItemDocument>? items) =>
+        items?.FirstOrDefault(
+            item => string.Equals(item.Kind, "message", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.Role, "user", StringComparison.OrdinalIgnoreCase))?.Text;
 
     private static bool IsWorkspace(string candidate, string workspace)
     {
@@ -294,6 +297,8 @@ public sealed class SessionStore
         CreatedUtc = source.CreatedUtc,
         UpdatedUtc = source.UpdatedUtc,
         Items = source.Items,
+        Archive = source.Archive,
+        ImageMarkersTagged = source.ImageMarkersTagged,
         Images = images,
         Todos = source.Todos,
         UserTurns = source.UserTurns,

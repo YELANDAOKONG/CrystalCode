@@ -24,6 +24,7 @@ public sealed class MultimodalStreamingTurn
     private readonly Func<int> _reserveImageNumber;
     private readonly Action<ImageAttachment> _addImage;
     private readonly Func<IDictionary<int, ImageAttachment>> _imageSnapshot;
+    private readonly Action<IReadOnlyList<ChatItem>>? _commit;
 
     public MultimodalStreamingTurn(
         IStreamingMultimodalChatClient client,
@@ -84,12 +85,14 @@ public sealed class MultimodalStreamingTurn
         SessionRetryOptions? retry,
         Func<int> reserveImageNumber,
         Action<ImageAttachment> addImage,
-        Func<IDictionary<int, ImageAttachment>> imageSnapshot)
+        Func<IDictionary<int, ImageAttachment>> imageSnapshot,
+        Action<IReadOnlyList<ChatItem>>? commit = null)
         : this(client, executor, limits, images, observer, reasoning, compactBeforeRound, retry)
     {
         _reserveImageNumber = reserveImageNumber;
         _addImage = addImage;
         _imageSnapshot = imageSnapshot;
+        _commit = commit;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -156,8 +159,10 @@ public sealed class MultimodalStreamingTurn
                 _observer?.OnUsageUpdated(response.Usage ?? usage.Last, usage.Build());
 
                 var candidate = response.Candidates[0];
+                var marked = transcript.Count;
                 if (CandidateRound.TryStop(candidate, transcript, out var stopReason, out var fault))
                 {
+                    Commit(transcript, marked);
                     if (fault is not null)
                     {
                         _observer?.OnFault(fault);
@@ -176,6 +181,7 @@ public sealed class MultimodalStreamingTurn
                 if (toolCalls.Length == 0)
                 {
                     transcript.AddRange(candidate.Items);
+                    Commit(transcript, marked);
                     _observer?.OnModelRoundClosed();
                     return Create(
                         TurnStopReason.Completed,
@@ -189,6 +195,7 @@ public sealed class MultimodalStreamingTurn
                     && toolCalls.Length > maximumToolCalls - toolCallCount)
                 {
                     CandidateRound.AppendWithoutToolCalls(transcript, candidate.Items);
+                    Commit(transcript, marked);
                     _observer?.OnModelRoundClosed();
                     return Create(
                         TurnStopReason.ToolCallLimitReached,
@@ -199,6 +206,7 @@ public sealed class MultimodalStreamingTurn
                 }
 
                 transcript.AddRange(candidate.Items);
+                Commit(transcript, marked);
 
                 toolCallCount += toolCalls.Length;
                 _observer?.OnModelRoundClosed();
@@ -212,7 +220,9 @@ public sealed class MultimodalStreamingTurn
                     multimodalCalls,
                     linked.Token);
                 var toolResults = ConvertToolResults(multimodalResults);
+                marked = transcript.Count;
                 transcript.AddRange(toolResults);
+                Commit(transcript, marked);
                 _observer?.OnToolResults(toolResults);
                 _observer?.OnUsageUpdated(
                     new TokenUsage(TokenEstimator.Items(transcript), 0),
@@ -290,14 +300,16 @@ public sealed class MultimodalStreamingTurn
         return assembler.ToResponse();
     }
 
-    private static TurnResult Create(
+    private TurnResult Create(
         TurnStopReason stopReason,
         int modelCallCount,
         int toolCallCount,
         UsageAccumulator usage,
         List<ChatItem> transcript)
     {
+        var marked = transcript.Count;
         ReconcilePendingToolCalls(transcript);
+        Commit(transcript, marked);
         return new TurnResult(
             stopReason,
             modelCallCount,
@@ -389,5 +401,15 @@ public sealed class MultimodalStreamingTurn
                     ToolResultStatus.Failure));
             }
         }
+    }
+
+    private void Commit(List<ChatItem> transcript, int marked)
+    {
+        if (_commit is null || transcript.Count <= marked)
+        {
+            return;
+        }
+
+        _commit(transcript.GetRange(marked, transcript.Count - marked));
     }
 }

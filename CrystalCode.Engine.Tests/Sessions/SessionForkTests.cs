@@ -38,6 +38,7 @@ public sealed class SessionForkTests
         Assert.Equal(4, fork.ModelCalls);
         Assert.Equal(5, fork.ToolCalls);
         Assert.Equal("hello", fork.Items[0].Text);
+        Assert.Null(fork.Archive);
         Assert.Equal("work", fork.Todos[0].Content);
         Assert.Equal(10, fork.Usage?.InputTokenCount);
         Assert.Equal(30, fork.CumulativeUsage?.InputTokenCount);
@@ -45,5 +46,23 @@ public sealed class SessionForkTests
         Assert.NotSame(source.Todos[0], fork.Todos[0]);
         Assert.NotSame(source.Usage, fork.Usage);
         Assert.NotSame(source.CumulativeUsage, fork.CumulativeUsage);
+    }
+
+    [Fact]
+    public void Create_CopiesTheArchive()
+    {
+        var source = new SessionDocument
+        {
+            Id = "source",
+            Workspace = "/tmp/source",
+            Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "tail" }],
+            Archive = [new SessionItemDocument { Kind = "message", Role = "user", Text = "original" }]
+        };
+
+        var fork = SessionFork.Create(source, "branch", "/tmp/current", DateTimeOffset.UnixEpoch);
+
+        var archived = Assert.Single(fork.Archive!);
+        Assert.Equal("original", archived.Text);
+        Assert.NotSame(source.Archive![0], archived);
     }
 }

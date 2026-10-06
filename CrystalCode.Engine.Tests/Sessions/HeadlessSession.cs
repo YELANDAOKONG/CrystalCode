@@ -20,7 +20,7 @@ internal sealed class HeadlessSession : IDisposable
     private readonly TemporaryHome _home = new();
     private readonly TemporaryWorkspace _workspace = new();
 
-    public HeadlessSession(IStreamingChatClient client)
+    public HeadlessSession(IStreamingChatClient client, SessionDocument? resume = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -42,6 +42,15 @@ internal sealed class HeadlessSession : IDisposable
         plugins.Add(new WorkspaceToolsPlugin());
         plugins.Add(new ScriptedChatPlugin(client));
 
+        if (resume is not null)
+        {
+            resume.Workspace = _workspace.Path;
+            if (string.IsNullOrWhiteSpace(resume.Id))
+            {
+                resume.Id = SessionStore.NewId();
+            }
+        }
+
         Session = CodingSession.Create(
             settings,
             new SettingsStore(_home.Home),
@@ -54,7 +63,19 @@ internal sealed class HeadlessSession : IDisposable
                 new FixedUserPrompt("unused"),
                 new DecliningSessionChooser(),
                 new ScriptedTrustPrompt(accept: false)),
-            plugins);
+            plugins,
+            resume);
+    }
+
+    public SessionDocument ReadSaved()
+    {
+        var store = new SessionStore(_home.Home);
+        if (!store.TryLoad(Session.SessionId, out var document))
+        {
+            throw new InvalidOperationException("Session was not saved.");
+        }
+
+        return document;
     }
 
     public CodingSession Session { get; }
