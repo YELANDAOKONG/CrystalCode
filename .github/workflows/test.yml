@@ -1,0 +1,52 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - test
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-x64
+          - os: ubuntu-latest
+            artifact: linux-x64
+          - os: ubuntu-24.04-arm
+            artifact: linux-arm64
+          - os: macos-latest
+            artifact: macos-arm64
+
+    steps:
+      # Sibling layout matches project references: ../../Crystal/...
+      - name: Checkout CrystalCode
+        uses: actions/checkout@v4
+        with:
+          path: CrystalCode
+
+      - name: Checkout Crystal
+        uses: actions/checkout@v4
+        with:
+          repository: YELANDAOKONG/Crystal
+          path: Crystal
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        working-directory: CrystalCode
+        run: dotnet restore CrystalCode.sln
+
+      - name: Test
+        working-directory: CrystalCode
+        run: dotnet test CrystalCode.sln --configuration Release --no-restore
