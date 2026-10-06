@@ -959,7 +959,9 @@ extension point and is not held to those limits. It may rebuild one
 outbound model request, replace composed prompt and compaction text with
 any string, and replace an approval classification with any risk,
 authority, summary, and prompt requirement. A plugin that registers one is
-named in a note at load time. A later module system may sit below plugins
+named in a note at load time. More hook methods will be added later.
+Whether plugins declare dependencies on one another is under consideration
+and is not decided. A later module system may sit below plugins
 and reach the host through reflection or another mechanism. It is not in
 this build.
 `/plugins` lists them. `/plugins on|off|reload` controls discovery.

@@ -1364,7 +1364,10 @@ any authority, any summary, and either prompt requirement. The approval
 policy then uses that classification. Ordinary hooks still cannot lower
 risk or replace those prompts. A raw hook is not held to those rules. A
 throwing raw hook is skipped. New raw methods join this interface and never
-ordinary hooks.
+ordinary hooks. More hook methods will be added later on these interfaces.
+They are not reserved as empty types in advance. Whether plugins declare
+dependencies on one another, and related loading questions, are under
+consideration and are not decided.
 
 A later module system may sit below plugins and raw hooks and reach the
 host through reflection or another mechanism. It is not in this build. Its

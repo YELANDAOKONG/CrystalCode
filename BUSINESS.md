@@ -128,6 +128,12 @@ infrastructure to support them safely; they are not excluded from the product.
 Implement each capability only when its behavior and ownership are defined, and
 do not reserve empty public types in advance.
 
+More hook methods will be added later on the existing hook interfaces, and
+are not reserved as empty types in advance. Whether plugins declare
+dependencies on one another, and related loading questions, are under
+consideration and are not decided. They are not part of the deferred list
+above until a decision is made.
+
 ## Relationship to Crystal
 
 Crystal is provider-neutral, prompt-neutral, and tool-neutral. It does not

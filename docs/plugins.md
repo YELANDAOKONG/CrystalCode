@@ -228,6 +228,11 @@ runs first. The stored transcript and the archive stay as they were.
   risk, change authority, change the summary, or clear the prompt
   requirement. The approval policy uses the result.
 
+More hook methods will be added later. A new method joins `IPluginHook` or
+`IPluginRawHook` when its behavior is defined. This build does not reserve
+empty methods for them. Whether plugins declare dependencies on one another,
+and related loading questions, are under consideration and are not decided.
+
 ## Load context
 
 Each plugin gets one non-collectible `AssemblyLoadContext`.
