@@ -29,8 +29,8 @@ Use a lowercase type and exactly one space after the colon. Allowed types:
 - chore
 - refactor
 - test
-- perfs
-- builds
+- perf
+- build
 - ci
 - revert
 
