@@ -25,6 +25,8 @@ public sealed class MultimodalStreamingTurn
     private readonly Action<ImageAttachment> _addImage;
     private readonly Func<IDictionary<int, ImageAttachment>> _imageSnapshot;
     private readonly Action<IReadOnlyList<ChatItem>>? _commit;
+    private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
+        _prepareModel;
 
     public MultimodalStreamingTurn(
         IStreamingMultimodalChatClient client,
@@ -86,13 +88,15 @@ public sealed class MultimodalStreamingTurn
         Func<int> reserveImageNumber,
         Action<ImageAttachment> addImage,
         Func<IDictionary<int, ImageAttachment>> imageSnapshot,
-        Action<IReadOnlyList<ChatItem>>? commit = null)
+        Action<IReadOnlyList<ChatItem>>? commit = null,
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null)
         : this(client, executor, limits, images, observer, reasoning, compactBeforeRound, retry)
     {
         _reserveImageNumber = reserveImageNumber;
         _addImage = addImage;
         _imageSnapshot = imageSnapshot;
         _commit = commit;
+        _prepareModel = prepareModel;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -150,8 +154,9 @@ public sealed class MultimodalStreamingTurn
                 }
 
                 modelCallCount++;
+                var outbound = await PrepareOutboundAsync(transcript, linked.Token);
                 var request = new MultimodalChatRequest(
-                    MultimodalTranscript.Convert(transcript, _imageSnapshot()),
+                    MultimodalTranscript.Convert(outbound, _imageSnapshot()),
                     _executor.Definitions,
                     _reasoning);
                 var response = await StreamModelAsync(request, usage, linked.Token);
@@ -260,6 +265,20 @@ public sealed class MultimodalStreamingTurn
                 usage,
                 transcript);
         }
+    }
+
+    private async Task<IReadOnlyList<ChatItem>> PrepareOutboundAsync(
+        IReadOnlyList<ChatItem> transcript,
+        CancellationToken cancellationToken)
+    {
+        if (_prepareModel is null)
+        {
+            return transcript;
+        }
+
+        var prepared = await _prepareModel(transcript, cancellationToken);
+        ArgumentNullException.ThrowIfNull(prepared);
+        return prepared;
     }
 
     private Task<ChatResponse> StreamModelAsync(

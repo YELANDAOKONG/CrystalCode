@@ -19,6 +19,8 @@ public sealed class StreamingTurn
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? _compactBeforeRound;
     private readonly SessionRetryOptions _retry;
     private readonly Action<IReadOnlyList<ChatItem>>? _commit;
+    private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
+        _prepareModel;
 
     public StreamingTurn(
         IStreamingChatClient client,
@@ -28,7 +30,8 @@ public sealed class StreamingTurn
         ReasoningOptions? reasoning = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? compactBeforeRound = null,
         SessionRetryOptions? retry = null,
-        Action<IReadOnlyList<ChatItem>>? commit = null)
+        Action<IReadOnlyList<ChatItem>>? commit = null,
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(executor);
@@ -41,6 +44,7 @@ public sealed class StreamingTurn
         _compactBeforeRound = compactBeforeRound;
         _retry = retry ?? SessionRetryOptions.Default;
         _commit = commit;
+        _prepareModel = prepareModel;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -98,8 +102,9 @@ public sealed class StreamingTurn
                 }
 
                 modelCallCount++;
+                var outbound = await PrepareOutboundAsync(transcript, linked.Token);
                 var request = new ChatRequest(
-                    ImageMarkerText.ForTextModel(transcript),
+                    ImageMarkerText.ForTextModel(outbound),
                     _executor.Definitions,
                     _reasoning);
                 var response = await StreamModelAsync(request, usage, linked.Token);
@@ -200,6 +205,20 @@ public sealed class StreamingTurn
                 usage,
                 transcript);
         }
+    }
+
+    private async Task<IReadOnlyList<ChatItem>> PrepareOutboundAsync(
+        IReadOnlyList<ChatItem> transcript,
+        CancellationToken cancellationToken)
+    {
+        if (_prepareModel is null)
+        {
+            return transcript;
+        }
+
+        var prepared = await _prepareModel(transcript, cancellationToken);
+        ArgumentNullException.ThrowIfNull(prepared);
+        return prepared;
     }
 
     private Task<ChatResponse> StreamModelAsync(

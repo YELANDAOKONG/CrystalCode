@@ -30,7 +30,7 @@ internal sealed class PluginMultimodalExecutor : IMultimodalToolExecutor
         foreach (var call in calls)
         {
             ArgumentNullException.ThrowIfNull(call);
-            var next = await _hooks.BeforeToolAsync(
+            var next = await _hooks.OnToolCallAsync(
                 new ToolCall(call.CallId, call.Name, call.Arguments),
                 cancellationToken);
             rewritten.Add(new MultimodalToolCall(next.CallId, next.Name, next.Arguments, call.Contents));
@@ -46,7 +46,7 @@ internal sealed class PluginMultimodalExecutor : IMultimodalToolExecutor
         for (var index = 0; index < results.Count; index++)
         {
             var call = new ToolCall(rewritten[index].CallId, rewritten[index].Name, rewritten[index].Arguments);
-            var next = await _hooks.AfterToolAsync(
+            var next = await _hooks.OnToolResultAsync(
                 call,
                 PluginToolResults.From(results[index]),
                 cancellationToken);

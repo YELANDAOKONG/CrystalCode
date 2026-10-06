@@ -1,3 +1,4 @@
+using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Approvals;
@@ -66,7 +67,7 @@ internal sealed class PluginHookPipeline
         }
     }
 
-    public string AppendPrompt(string mode, string instructions)
+    public string OnPrompt(string mode, string instructions)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mode);
         ArgumentNullException.ThrowIfNull(instructions);
@@ -76,7 +77,7 @@ internal sealed class PluginHookPipeline
         {
             try
             {
-                var text = hook.AppendPrompt(prompt);
+                var text = hook.OnPrompt(prompt);
                 if (!string.IsNullOrWhiteSpace(text))
                 {
                     parts.Add(text.Trim());
@@ -91,24 +92,107 @@ internal sealed class PluginHookPipeline
         return string.Join("\n\n", parts);
     }
 
-    public async ValueTask<ToolCall> BeforeToolAsync(ToolCall call, CancellationToken cancellationToken)
+    public async ValueTask<string> OnUserMessageAsync(string text, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(call);
-        var current = call;
+        ArgumentNullException.ThrowIfNull(text);
+        var current = text;
         foreach (var hook in _hooks)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var next = await hook.BeforeToolAsync(current, cancellationToken);
+                var next = await hook.OnUserMessageAsync(new PluginUserMessage(current), cancellationToken);
+                if (!string.IsNullOrWhiteSpace(next))
+                {
+                    current = next.Trim();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Report(hook, "user-message", exception.Message);
+            }
+        }
+
+        return current;
+    }
+
+    public async ValueTask OnTurnStartedAsync(PluginTurn turn, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turn);
+        foreach (var hook in _hooks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await hook.OnTurnStartedAsync(turn, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Report(hook, "turn-start", exception.Message);
+            }
+        }
+    }
+
+    public async ValueTask OnTurnFinishedAsync(PluginTurn turn, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(turn);
+        foreach (var hook in _hooks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await hook.OnTurnFinishedAsync(turn, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Report(hook, "turn-end", exception.Message);
+            }
+        }
+    }
+
+    public async Task<IReadOnlyList<ChatItem>> PrepareModelAsync(
+        PluginModelPurpose purpose,
+        IReadOnlyList<ChatItem> items,
+        IReadOnlyDictionary<int, string> mediaTypes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(mediaTypes);
+        if (_hooks.Count == 0)
+        {
+            return items;
+        }
+
+        var projection = ModelHookTranscript.Project(items, mediaTypes);
+        var current = projection.Items;
+        foreach (var hook in _hooks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var next = await hook.RebuildModelAsync(
+                    new PluginModelRequest(purpose, current),
+                    cancellationToken);
                 if (next is null)
                 {
                     continue;
                 }
 
-                if (!string.Equals(next.CallId, current.CallId, StringComparison.Ordinal))
+                if (!ModelHookTranscript.TryAcceptRebuild(projection, current, next, out var reason))
                 {
-                    Report(hook, "before-tool", "it returned a different call id.");
+                    Report(hook, "model-items", reason);
                     continue;
                 }
 
@@ -120,14 +204,81 @@ internal sealed class PluginHookPipeline
             }
             catch (Exception exception)
             {
-                Report(hook, "before-tool", exception.Message);
+                Report(hook, "model-items", exception.Message);
+            }
+        }
+
+        foreach (var hook in _hooks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var next = await hook.TransformModelAsync(
+                    new PluginModelRequest(purpose, current),
+                    cancellationToken);
+                if (next is null)
+                {
+                    continue;
+                }
+
+                if (!ModelHookTranscript.TryAcceptTransform(current, next, out var reason))
+                {
+                    Report(hook, "model-request", reason);
+                    continue;
+                }
+
+                current = next;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Report(hook, "model-request", exception.Message);
+            }
+        }
+
+        return ModelHookTranscript.Apply(projection, current);
+    }
+
+    public async ValueTask<ToolCall> OnToolCallAsync(ToolCall call, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        var current = call;
+        foreach (var hook in _hooks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var next = await hook.OnToolCallAsync(current, cancellationToken);
+                if (next is null)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(next.CallId, current.CallId, StringComparison.Ordinal))
+                {
+                    Report(hook, "tool-call", "it returned a different call id.");
+                    continue;
+                }
+
+                current = next;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Report(hook, "tool-call", exception.Message);
             }
         }
 
         return current;
     }
 
-    public async ValueTask<PluginToolResult> AfterToolAsync(
+    public async ValueTask<PluginToolResult> OnToolResultAsync(
         ToolCall call,
         PluginToolResult result,
         CancellationToken cancellationToken)
@@ -140,7 +291,7 @@ internal sealed class PluginHookPipeline
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                var next = await hook.AfterToolAsync(call, current, cancellationToken);
+                var next = await hook.OnToolResultAsync(call, current, cancellationToken);
                 if (next is not null)
                 {
                     current = next;
@@ -152,14 +303,14 @@ internal sealed class PluginHookPipeline
             }
             catch (Exception exception)
             {
-                Report(hook, "after-tool", exception.Message);
+                Report(hook, "tool-result", exception.Message);
             }
         }
 
         return current;
     }
 
-    public ToolClassification Advise(ToolCall call, ToolClassification classification)
+    public ToolClassification OnApproval(ToolCall call, ToolClassification classification)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
@@ -173,7 +324,7 @@ internal sealed class PluginHookPipeline
         {
             try
             {
-                var advice = hook.AdviseApproval(call, facts);
+                var advice = hook.OnApproval(call, facts);
                 if (advice is null)
                 {
                     continue;
@@ -215,7 +366,7 @@ internal sealed class PluginHookPipeline
             requirePrompt);
     }
 
-    public string AppendCompaction(PluginCompactionPhase phase, string text)
+    public string OnCompaction(PluginCompactionPhase phase, string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         var compaction = new PluginCompaction(phase, text);
@@ -224,7 +375,7 @@ internal sealed class PluginHookPipeline
         {
             try
             {
-                var extra = hook.AppendCompaction(compaction);
+                var extra = hook.OnCompaction(compaction);
                 if (!string.IsNullOrWhiteSpace(extra))
                 {
                     parts.Add(extra.Trim());

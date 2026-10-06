@@ -119,7 +119,7 @@ public sealed class PluginCatalogTests
         var output = await catalog.WorkTools[0].InvokeAsync(new Crystal.Tools.ToolCall("1", "sample", "{}"));
         Assert.Equal("sample-ok", output.Text);
         var pipeline = new PluginHookPipeline(catalog.Hooks);
-        Assert.Equal("hook-line", pipeline.AppendPrompt("work", string.Empty));
+        Assert.Equal("hook-line", pipeline.OnPrompt("work", string.Empty));
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public sealed class PluginCatalogTests
 
             public sealed class SampleHook : IPluginHook
             {
-                public string? AppendPrompt(PluginPrompt prompt) => "hook-line";
+                public string? OnPrompt(PluginPrompt prompt) => "hook-line";
             }
             """);
         var start = new ProcessStartInfo

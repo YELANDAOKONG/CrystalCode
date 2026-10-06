@@ -74,7 +74,9 @@ separate library with no terminal code. The product can:
   when External Tools is enabled;
 - load operator plugins from `~/.crystal/plugins` and
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
-  tools, protocol clients, classifiers, slash commands, and hooks;
+  tools, protocol clients, classifiers, slash commands, and hooks.
+  Hooks may revise a user message before it is stored and may project
+  the outbound model request without changing the saved archive;
 - honor an author-declared `approval: always` in a tool set for ordinary
   workspace-bounded calls, with the operator choosing per source whether
   declarations take effect through `externalToolApproval` in

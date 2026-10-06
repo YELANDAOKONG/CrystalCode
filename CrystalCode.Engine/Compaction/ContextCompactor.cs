@@ -18,19 +18,23 @@ public sealed class ContextCompactor
     private readonly SessionRetryOptions _retry;
     private readonly Action<SessionRetryAttempt>? _onRetry;
     private readonly Func<PluginCompactionPhase, string, string?>? _amend;
+    private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
+        _prepareHead;
 
     public ContextCompactor(
         IChatClient client,
         SessionRetryOptions? retry = null,
         Action<SessionRetryAttempt>? onRetry = null,
         Func<string>? systemText = null,
-        Func<PluginCompactionPhase, string, string?>? amend = null)
+        Func<PluginCompactionPhase, string, string?>? amend = null,
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareHead = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
         _retry = retry ?? SessionRetryOptions.Default;
         _onRetry = onRetry;
         _amend = amend;
+        _prepareHead = prepareHead;
         _systemText = systemText
             ?? (() => CompactionPrompt.ComposeSystem(
                 PromptContext.InstructionsOnly(string.Empty).WithMode("compaction")));
@@ -61,7 +65,14 @@ public sealed class ContextCompactor
                 : new CompactionOutcome(transcript, CompactionKind.Unchanged);
         }
 
-        var conversation = CompactionText.Conversation(split.Head);
+        var head = split.Head;
+        if (_prepareHead is not null && head.Count > 0)
+        {
+            head = await _prepareHead(head, cancellationToken);
+            ArgumentNullException.ThrowIfNull(head);
+        }
+
+        var conversation = CompactionText.Conversation(head);
         if (conversation.Length == 0)
         {
             return FinishWithoutSummary(pruned, prunedChanged);

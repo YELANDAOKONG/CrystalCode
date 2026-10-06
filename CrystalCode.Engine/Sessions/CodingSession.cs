@@ -84,6 +84,8 @@ public sealed class CodingSession : ITurnObserver
     private CancellationTokenSource? _turnSource;
     private CancellationTokenSource? _compactSource;
     private bool _turnActive;
+    private string? _turnUserText;
+    private string? _turnFault;
     private readonly object _sideGate = new();
     private readonly List<SideExchange> _sideExchanges = [];
     private CancellationTokenSource? _sideSource;
@@ -269,7 +271,7 @@ public sealed class CodingSession : ITurnObserver
             return command.Exit;
         }
 
-        StartTurn(input);
+        await StartTurnAsync(input, cancellationToken);
         return false;
     }
 
@@ -279,7 +281,7 @@ public sealed class CodingSession : ITurnObserver
     public async Task CompleteTurnAsync(CancellationToken cancellationToken)
     {
         await FinishTurnAsync(cancellationToken);
-        StartTurnIfQueued();
+        await StartTurnIfQueuedAsync(cancellationToken);
     }
 
     /// <summary>
@@ -437,7 +439,7 @@ public sealed class CodingSession : ITurnObserver
                 Note("Compaction cancelled");
             }
 
-            StartTurnIfQueued();
+            await StartTurnIfQueuedAsync(cancellationToken);
             PruneDraftImages(string.Empty);
             return (true, false);
         }
@@ -1795,7 +1797,7 @@ public sealed class CodingSession : ITurnObserver
 
     private string AppendPluginPrompt(string text, string mode)
     {
-        var extra = _hooks.AppendPrompt(mode, _prompts.Instructions);
+        var extra = _hooks.OnPrompt(mode, _prompts.Instructions);
         return extra.Length == 0 ? text : text + "\n\n" + extra;
     }
 
@@ -2248,7 +2250,7 @@ public sealed class CodingSession : ITurnObserver
             [.. _plugins.Classifiers, .. _loadedPlugins.Classifiers, _external.Classifier],
             _skills,
             _external.AutomaticTools,
-            (call, classification) => _hooks.Advise(call, classification));
+            (call, classification) => _hooks.OnApproval(call, classification));
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         var workExecutor = new ToolExecutor(
             WorkspaceCatalog.CreateWork(
@@ -2690,19 +2692,20 @@ public sealed class CodingSession : ITurnObserver
         ShowQueue();
     }
 
-    private void StartTurnIfQueued()
+    private async Task StartTurnIfQueuedAsync(CancellationToken cancellationToken)
     {
         var next = _queue.Drain();
         ShowQueue();
         if (next is not null)
         {
-            StartTurn(next);
+            await StartTurnAsync(next, cancellationToken);
         }
     }
 
-    private void StartTurn(string input)
+    private async Task StartTurnAsync(string input, CancellationToken cancellationToken)
     {
         var message = AttachPendingImages(input);
+        message = await _hooks.OnUserMessageAsync(message, cancellationToken);
         Publish(new UserMessageSent(message));
         var user = new ChatMessage(ChatRole.User, message);
         _transcript.Add(user);
@@ -2711,15 +2714,56 @@ public sealed class CodingSession : ITurnObserver
         _draftImages.RemoveWhere(number => message.Contains(
             images[number].TrustedMarker,
             StringComparison.Ordinal));
-        _turnSource = new CancellationTokenSource();
+        var turnSource = new CancellationTokenSource();
+        _turnSource = turnSource;
         _turnActive = true;
         lock (_usageGate)
         {
             _turnCumulativeBaseline = _shownCumulative;
         }
 
+        _turnUserText = message;
+        _turnFault = null;
+        try
+        {
+            await _hooks.OnTurnStartedAsync(
+                new PluginTurn(_sessionId, CurrentModeName(), message),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _turnActive = false;
+            turnSource.Dispose();
+            _turnSource = null;
+            _turnUserText = null;
+            throw;
+        }
+
         Publish(new TurnStarted());
-        _turnTask = ExecuteTurnAsync(_turnSource.Token);
+        _turnTask = ExecuteTurnAsync(turnSource.Token);
+    }
+
+    private string CurrentModeName() => _planMode ? "plan" : "work";
+
+    private Task<IReadOnlyList<ChatItem>> PrepareOutboundAsync(
+        IReadOnlyList<ChatItem> items,
+        CancellationToken cancellationToken) =>
+        _hooks.PrepareModelAsync(
+            _planMode ? PluginModelPurpose.Plan : PluginModelPurpose.Work,
+            items,
+            ImageMediaTypes(),
+            cancellationToken);
+
+    private Dictionary<int, string> ImageMediaTypes()
+    {
+        var images = ImageSnapshot();
+        var mediaTypes = new Dictionary<int, string>(images.Count);
+        foreach (var pair in images)
+        {
+            mediaTypes.Add(pair.Key, pair.Value.MimeType);
+        }
+
+        return mediaTypes;
     }
 
     private Task<TurnResult> ExecuteTurnAsync(CancellationToken cancellationToken)
@@ -2738,7 +2782,8 @@ public sealed class CodingSession : ITurnObserver
                 ReserveImageNumber,
                 AddImage,
                 ImageSnapshot,
-                CommitArchive);
+                CommitArchive,
+                PrepareOutboundAsync);
             return multimodalTurn.RunAsync(_transcript, cancellationToken);
         }
 
@@ -2750,7 +2795,8 @@ public sealed class CodingSession : ITurnObserver
             CurrentReasoning(),
             CompactRoundAsync,
             SessionRetryOptions.Default,
-            CommitArchive);
+            CommitArchive,
+            PrepareOutboundAsync);
         return turn.RunAsync(_transcript, cancellationToken);
     }
 
@@ -2983,7 +3029,12 @@ public sealed class CodingSession : ITurnObserver
             () => AppendPluginPrompt(
                 CompactionPrompt.ComposeSystem(CurrentPromptContext().WithMode("compaction")),
                 "compaction"),
-            (phase, text) => _hooks.AppendCompaction(phase, text));
+            (phase, text) => _hooks.OnCompaction(phase, text),
+            (items, token) => _hooks.PrepareModelAsync(
+                PluginModelPurpose.Compaction,
+                items,
+                ImageMediaTypes(),
+                token));
 
     /// <summary>
     /// Collects the finished turn: records its transcript, compacts when over
@@ -2997,12 +3048,14 @@ public sealed class CodingSession : ITurnObserver
         }
 
         TurnResult? result = null;
+        string? failure = null;
         try
         {
             result = await _turnTask;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            failure = exception.Message;
             Error(exception.Message);
         }
         finally
@@ -3012,6 +3065,19 @@ public sealed class CodingSession : ITurnObserver
             _turnSource?.Dispose();
             _turnSource = null;
         }
+
+        var stop = result?.StopReason ?? TurnStopReason.Failed;
+        var error = string.IsNullOrWhiteSpace(failure) ? _turnFault : failure;
+        await _hooks.OnTurnFinishedAsync(
+            new PluginTurn(
+                _sessionId,
+                CurrentModeName(),
+                _turnUserText ?? string.Empty,
+                stop.Value,
+                error),
+            cancellationToken);
+        _turnUserText = null;
+        _turnFault = null;
 
         if (result is null)
         {
@@ -3132,6 +3198,7 @@ public sealed class CodingSession : ITurnObserver
 
     void ITurnObserver.OnFault(string message)
     {
+        _turnFault = message;
         Error(message);
     }
 
@@ -3209,10 +3276,7 @@ public sealed class CodingSession : ITurnObserver
         CancellationToken cancellationToken)
     {
         var conversation = SideConversation(ReconcilePendingToolCalls(sideBase));
-        var composed = SideQuestion.Compose(
-            ImageMarkerText.ForTextModel(conversation),
-            prior,
-            question);
+        var composed = SideQuestion.Compose(conversation, prior, question);
         if (!NeedsCompaction(composed, null))
         {
             return composed;
@@ -3228,10 +3292,7 @@ public sealed class CodingSession : ITurnObserver
             conversation = outcome.Transcript;
         }
 
-        composed = SideQuestion.Compose(
-            ImageMarkerText.ForTextModel(conversation),
-            prior,
-            question);
+        composed = SideQuestion.Compose(conversation, prior, question);
         return NeedsCompaction(composed, null) ? null : composed;
     }
 
@@ -3262,7 +3323,12 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
-            var request = new ChatRequest(conversation, [], reasoning);
+            var prepared = await _hooks.PrepareModelAsync(
+                PluginModelPurpose.Side,
+                conversation,
+                ImageMediaTypes(),
+                cancellationToken);
+            var request = new ChatRequest(ImageMarkerText.ForTextModel(prepared), [], reasoning);
             var assembler = new ChatStreamAssembler();
             var live = new StringBuilder();
             await foreach (var streamEvent in client.StreamAsync(request, cancellationToken))

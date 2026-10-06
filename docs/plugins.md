@@ -130,16 +130,27 @@ external tools. A hook that throws is skipped with an English note.
 
 | Hook | May | May not |
 | :--- | :--- | :--- |
-| Session start / end | Read workspace root, session id, and approval mode | Prompt the operator, or write `config.json` |
-| Prompt | Append text to the instruction block | Replace Work, Plan, or Review |
-| Before tool | Replace the name or arguments | Change the call id, skip the call, or skip approval |
-| After tool | Replace the text result and, on an image-capable turn, its images | Mark an approval as passed |
-| Approval | Raise risk, or require another prompt | Lower the host risk, or auto-pass |
-| Compaction | Append facts to the summary prompt or the summary body | Drop history, or replace the compactor |
+| `OnSessionStartedAsync` / `OnSessionEndedAsync` | Read workspace root, session id, and approval mode | Prompt the operator, or write `config.json` |
+| `OnPrompt` | Append text to the instruction block | Replace Work, Plan, or Review |
+| `OnUserMessageAsync` | Replace the user message before it is stored | Leave the stored message blank, or run for a side question |
+| `OnTurnStartedAsync` / `OnTurnFinishedAsync` | Read the stored user text, mode, and, when the turn ends, the stop reason | Change the transcript |
+| `RebuildModelAsync` | Drop or reorder items for one outbound call, including the text summarized during compaction | Change the live system prompt, add a tool call, split a call from its result, or write the archive |
+| `TransformModelAsync` | Change user, assistant, or tool-result text for that same call, or drop image references already on an item | Reorder items, edit a system message, add an image, or write the archive |
+| `OnToolCallAsync` | Replace the name or arguments | Change the call id, skip the call, or skip approval |
+| `OnToolResultAsync` | Replace the text result and, on an image-capable turn, its images | Mark an approval as passed |
+| `OnApproval` | Raise risk, or require another prompt | Lower the host risk, or auto-pass |
+| `OnCompaction` | Append facts to the summary prompt or the summary body | Drop history, or replace the compactor |
 
 A rewritten tool call is classified and approved again before it runs.
-Text-only turns ignore images returned by an after-tool hook. Image
+Text-only turns ignore images returned by `OnToolResultAsync`. Image
 types are `image/png`, `image/jpeg`, `image/gif`, and `image/webp`.
+
+`RebuildModelAsync` runs before `TransformModelAsync`. Both see the model
+transcript for a work, plan, or side request, and the older turns about to
+be summarized. They do not see the approval review. Returned image lists
+may only name attachments already on that item. The stored transcript and
+the archive stay as they were, except for text replaced by
+`OnUserMessageAsync`.
 
 Session start runs after the plugin load. Session end runs when the
 session closes and before a `/cd` reload. `crystal run` closes the

@@ -31,7 +31,7 @@ internal sealed class PluginToolExecutor : IToolExecutor
         foreach (var call in calls)
         {
             ArgumentNullException.ThrowIfNull(call);
-            rewritten.Add(await _hooks.BeforeToolAsync(call, cancellationToken));
+            rewritten.Add(await _hooks.OnToolCallAsync(call, cancellationToken));
         }
 
         var results = await _inner.ExecuteAsync(rewritten, cancellationToken);
@@ -44,7 +44,7 @@ internal sealed class PluginToolExecutor : IToolExecutor
         for (var index = 0; index < results.Count; index++)
         {
             var current = PluginToolResults.From(results[index]);
-            var next = await _hooks.AfterToolAsync(rewritten[index], current, cancellationToken);
+            var next = await _hooks.OnToolResultAsync(rewritten[index], current, cancellationToken);
             if (next.Images.Count > 0)
             {
                 _hooks.ReportIgnoredImages();
