@@ -28,6 +28,8 @@ public static class ProgressText
 
     public const string LoadingTools = "Loading Tools";
 
+    public const string LoadingPlugins = "Loading Plugins";
+
     public static string Retrying(int attempt, TimeSpan delay)
     {
         if (attempt <= 0)

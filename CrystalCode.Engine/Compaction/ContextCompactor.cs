@@ -1,6 +1,8 @@
 using Crystal.Chat;
+
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Plugins.Hooks;
 
 namespace CrystalCode.Engine.Compaction;
 
@@ -15,17 +17,20 @@ public sealed class ContextCompactor
     private readonly Func<string> _systemText;
     private readonly SessionRetryOptions _retry;
     private readonly Action<SessionRetryAttempt>? _onRetry;
+    private readonly Func<PluginCompactionPhase, string, string?>? _amend;
 
     public ContextCompactor(
         IChatClient client,
         SessionRetryOptions? retry = null,
         Action<SessionRetryAttempt>? onRetry = null,
-        Func<string>? systemText = null)
+        Func<string>? systemText = null,
+        Func<PluginCompactionPhase, string, string?>? amend = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
         _retry = retry ?? SessionRetryOptions.Default;
         _onRetry = onRetry;
+        _amend = amend;
         _systemText = systemText
             ?? (() => CompactionPrompt.ComposeSystem(
                 PromptContext.InstructionsOnly(string.Empty).WithMode("compaction")));
@@ -63,6 +68,7 @@ public sealed class ContextCompactor
         }
 
         var prompt = CompactionPrompt.UserText(conversation, todos, split.PreviousSummary);
+        prompt = Append(PluginCompactionPhase.Prompt, prompt);
         var systemText = _systemText();
         var promptTokens = TokenEstimator.Text(systemText) + TokenEstimator.Text(prompt);
         if (promptTokens > limits.SummaryPromptBudget())
@@ -89,6 +95,7 @@ public sealed class ContextCompactor
                 return FinishWithoutSummary(pruned, prunedChanged);
             }
 
+            summary = Append(PluginCompactionPhase.Summary, summary.Trim());
             return new CompactionOutcome(
                 Rebuild(pruned, split, summary.Trim(), todos),
                 CompactionKind.Applied);
@@ -157,6 +164,17 @@ public sealed class ContextCompactor
         }
 
         return text;
+    }
+
+    private string Append(PluginCompactionPhase phase, string text)
+    {
+        var extra = _amend?.Invoke(phase, text);
+        if (string.IsNullOrWhiteSpace(extra))
+        {
+            return text;
+        }
+
+        return text + "\n\n" + extra.Trim();
     }
 
     private static string ReadAssistantText(ChatResponse response)

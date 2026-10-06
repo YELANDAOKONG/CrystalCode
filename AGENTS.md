@@ -56,10 +56,12 @@ semantics. Do not copy its Demo UI into this product.
 
 - Ask before adding a project, a public architectural boundary, or a new
   provider family. Extra first-party tools and protocols go through
-  `IPlugin` / `PluginRegistry`. Operator tools go through tool sets under
-  `~/.crystal/tools` and `<workspace>/.crystal/tools` (`ExternalCatalog`).
-  Do not load `IPlugin` assemblies from disk. Dotnet tool sets load class
-  libraries from the set directory only.
+  `IPlugin` / `PluginRegistry`. Operator plugins load from `plugins/`
+  through `CrystalCode.Plugins` (`PluginCatalog`), one load context per
+  plugin. Do not load `CrystalCode.Engine` into that context. Operator
+  tools go through tool sets under `~/.crystal/tools` and
+  `<workspace>/.crystal/tools` (`ExternalCatalog`). Dotnet tool sets load
+  class libraries from the set directory only.
 - Keep assembly ownership consistent with ARCHITECTURE.md.
 - Write, edit, read, glob, and grep of paths outside the workspace
   require approval (the Review model in Review or Audit, otherwise the

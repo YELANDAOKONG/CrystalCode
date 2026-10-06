@@ -53,6 +53,9 @@ public sealed class TaskRunSettings : CommandSettings
     [CommandOption("--external-tools <on|off>")]
     public string? ExternalTools { get; init; }
 
+    [CommandOption("--plugins <on|off>")]
+    public string? Plugins { get; init; }
+
     [CommandOption("--model-calls <COUNT>")]
     public string? ModelCalls { get; init; }
 

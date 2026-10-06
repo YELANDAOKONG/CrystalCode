@@ -34,7 +34,8 @@ public sealed class ApprovalPolicy
         IApprovalReviewContext? reviewContext = null,
         IReadOnlyList<IApprovalClassifier>? classifiers = null,
         SkillCatalog? skills = null,
-        IReadOnlySet<string>? automaticTools = null)
+        IReadOnlySet<string>? automaticTools = null,
+        Func<ToolCall, ToolClassification, ToolClassification>? advise = null)
     {
         ArgumentNullException.ThrowIfNull(mode);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -42,7 +43,7 @@ public sealed class ApprovalPolicy
         ArgumentNullException.ThrowIfNull(prompt);
         _mode = mode;
         _workspace = workspace;
-        _classifier = new ToolClassifier(workspace, classifiers, skills);
+        _classifier = new ToolClassifier(workspace, classifiers, skills, advise);
         _grants = grants;
         _prompt = prompt;
         _reviewer = reviewer;
@@ -150,6 +151,11 @@ public sealed class ApprovalPolicy
 
     private bool CanPassWithoutReview(string toolName, ToolClassification classification)
     {
+        if (classification.RequirePrompt)
+        {
+            return false;
+        }
+
         if (classification.Risk == Risk.Forbidden
             || classification.Risk == Risk.Privileged
             || classification.Authority != Authority.Workspace)

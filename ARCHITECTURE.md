@@ -18,9 +18,10 @@ Spectre.Console              CrystalCode.Providers
 Terminal.Gui is              Crystal
 referenced, not called)
 
-CrystalCode.Engine also references CrystalCode.Tools, Crystal.Tools,
-Crystal.Agents, and Crystal.Harness directly. CrystalCode.Tools
-references only Crystal and Crystal.Tools. CrystalCode references
+CrystalCode.Engine also references CrystalCode.Tools, CrystalCode.Plugins,
+Crystal.Tools, Crystal.Agents, and Crystal.Harness directly.
+CrystalCode.Tools and CrystalCode.Plugins each reference only Crystal and
+Crystal.Tools. CrystalCode references
 Spectre.Console and Spectre.Console.Cli for its commands and cards.
 CrystalCode.Display references Spectre.Console and Terminal.Gui only.
 It does not reference Crystal, Crystal.Tools, CrystalCode.Tools, the
@@ -75,12 +76,21 @@ library. Tools that implement only Crystal's `ITool` or `IMultimodalTool`
 do not reference it. There is no paired test project; dispatch and
 load-context identity are tested in CrystalCode.Engine.Tests.
 
+### CrystalCode.Plugins
+
+The contract a disk plugin references. It defines `IPlugin`, contribution
+lists, and the hook context types. It references only Crystal and
+Crystal.Tools. It does not reference the engine, the display, the
+executable, or a terminal library. There is no paired test project;
+discovery, the load context, and hook order are tested in
+CrystalCode.Engine.Tests.
+
 ### CrystalCode.Engine
 
 The front-end-neutral class library. Owns session and turn execution,
 Plan/Work catalogs, approval policy, context compaction, `~/.crystal`
-storage, built-in coding tools, operator tool sets, prompts, in-process
-plugin contracts, slash commands, and the event stream a front end observes.
+storage, built-in coding tools, operator tool sets, operator plugins,
+prompts, in-process plugin contracts, slash commands, and the event stream a front end observes.
 It never reads a key, writes to the console, or paints. See
 [Engine contract](#engine-contract).
 
@@ -785,8 +795,12 @@ tool-catalog totals. The persistent chrome remains the smallest live summary.
 request breakdown for `/status full`; its output does not depend on status-line
 customization.
 
-The `plugins` directory is reserved. The current product does not load
-`IPlugin` assemblies from that directory. Dotnet tool sets load class
+Operator plugins live under `plugins/`. A project directory of the same
+name replaces the home plugin as a whole. `plugin.json` field `enabled`
+(default `true`) omits a plugin without deleting it. `config.json` field
+`plugins` enables discovery (default `true`). See
+[docs/plugins.md](docs/plugins.md).
+Dotnet tool sets load class
 libraries from the set directory only, in one `AssemblyLoadContext` per
 set.
 
@@ -870,6 +884,10 @@ uses the provider default and the stored choice is unchanged.
 
 `externalTools` enables operator tool set discovery (default `true`).
 Set it to `false` to skip `tools/` manifests.
+
+`plugins` enables operator plugin discovery (default `true`).
+Set it to `false` to skip `plugins/` manifests. See
+[docs/plugins.md](docs/plugins.md).
 
 `externalToolApproval` selects whether author `approval` declarations
 in `tools.json` take effect, independently for the Home and Project
@@ -1248,13 +1266,27 @@ sequential.
 
 ## Plugins
 
-`IPlugin` contributes tools, chat-client factories, approval classifiers, or
-slash commands through `PluginContribution`. A tool contribution always has a
-text `ITool` implementation and may additionally provide an `IMultimodalTool`
-with the same definition name; the latter may return generic image content
-while reusing the host approval policy. Built-in tools and all six wire
-protocol adapters register through the same table. `PluginRegistry` does
-not load assemblies from disk. `~/.crystal/plugins/` stays reserved.
+First-party `IPlugin` contributes tools, chat-client factories, approval
+classifiers, or slash commands through `PluginContribution`. A tool
+contribution always has a text `ITool` implementation and may additionally
+provide an `IMultimodalTool` with the same definition name; the latter may
+return generic image content while reusing the host approval policy.
+Built-in tools and all six wire protocol adapters register through that
+table. `PluginRegistry` does not load assemblies from disk.
+
+Disk plugins use `CrystalCode.Plugins.IPlugin` and are loaded by
+`PluginCatalog` from `plugins/`. One non-collectible load context serves
+each plugin. Shared contracts (`Crystal`, `Crystal.Tools`,
+`CrystalCode.Tools`, and `CrystalCode.Plugins`) come from the host.
+`CrystalCode`, `CrystalCode.Engine`, `CrystalCode.Display`, and
+`CrystalCode.Providers` are refused. A disk plugin may contribute tools,
+a protocol factory for a protocol the built-in adapters do not own,
+classifiers for unknown tools, slash commands that do not reuse a
+built-in verb, and hooks. Hooks append prompt and compaction text,
+rewrite a tool call before approval runs again, replace a tool result,
+and raise approval risk or require another prompt. They do not lower
+risk, skip approval, or replace Work, Plan, or Review. Catalog order is
+built-in tools, disk plugin tools, external tools, then `skill`.
 
 Operator tool sets are not plugins. They are discovered from `tools/` and
 wrapped by `ExternalCatalog`. An exec child starts in the workspace root
@@ -1271,8 +1303,8 @@ also implement `IHostTool` or `IHostMultimodalTool`. The wrapper then
 passes a `ToolHostContext` captured at the start of that call (workspace
 root, session id, approval mode). Other tools keep the original
 `InvokeAsync`. Native multimodal tools join
-the active catalog only for an image-capable model and provider. The loader
-does not implement `IPlugin` and does not scan `plugins/`.
+the active catalog only for an image-capable model and provider. The external-tool loader does not implement `CrystalCode.Plugins.IPlugin`
+and does not scan `plugins/`.
 
 Environment variables:
 

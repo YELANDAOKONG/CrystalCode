@@ -59,7 +59,7 @@ internal sealed class TerminalHost
         }
         finally
         {
-            Console.WriteLine(_session.Close());
+            Console.WriteLine(await _session.CloseAsync());
         }
     }
 

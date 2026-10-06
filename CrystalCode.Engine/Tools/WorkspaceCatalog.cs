@@ -1,5 +1,6 @@
 using Crystal.Tools;
 using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Engine.Tools.External;
 
@@ -16,13 +17,14 @@ public static class WorkspaceCatalog
         IUserPrompt prompt,
         PluginRegistry? registry = null,
         SkillCatalog? skills = null,
-        ExternalCatalog? external = null)
+        ExternalCatalog? external = null,
+        PluginCatalog? disk = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
         ArgumentNullException.ThrowIfNull(prompt);
         return new ToolCatalog(
-            CreateTools(workspace, todos, prompt, registry, skills, external, plan: true));
+            CreateTools(workspace, todos, prompt, registry, skills, external, plan: true, disk: disk));
     }
 
     public static ToolCatalog CreateWork(
@@ -32,7 +34,8 @@ public static class WorkspaceCatalog
         PluginRegistry? registry = null,
         SkillCatalog? skills = null,
         ExternalCatalog? external = null,
-        int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds)
+        int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
+        PluginCatalog? disk = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -54,7 +57,8 @@ public static class WorkspaceCatalog
                 skills,
                 external,
                 plan: false,
-                bashTimeoutSeconds));
+                bashTimeoutSeconds,
+                disk));
     }
 
     private static IReadOnlyList<ITool> CreateTools(
@@ -65,7 +69,8 @@ public static class WorkspaceCatalog
         SkillCatalog? skills,
         ExternalCatalog? external,
         bool plan,
-        int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds)
+        int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
+        PluginCatalog? disk = null)
     {
         var tools = new List<ITool>(
             (registry ?? PluginRegistry.CreateBuiltIn())
@@ -73,6 +78,11 @@ public static class WorkspaceCatalog
         if (!plan)
         {
             ApplyBashTimeout(tools, workspace, bashTimeoutSeconds);
+        }
+
+        if (disk is not null)
+        {
+            tools.AddRange(plan ? disk.PlanTools : disk.WorkTools);
         }
 
         if (external is not null)

@@ -105,6 +105,7 @@ internal static class StatusWidget
         [
             ("Skills", Toggle(status.SkillsEnabled)),
             ("External tools", Toggle(status.ExternalToolsEnabled)),
+            ("Plugins", Toggle(status.PluginsEnabled)),
             ("Token estimate", Toggle(status.EstimatedTokensEnabled)),
             ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
             ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
@@ -132,7 +133,8 @@ internal static class StatusWidget
         [
             ("Plan", Number(status.PlanTools)),
             ("Work", Number(status.WorkTools)),
-            ("External", Number(status.ExternalTools))
+            ("External", Number(status.ExternalTools)),
+            ("Plugins", Number(status.Plugins))
         ]);
 
     private static Markup ContextProgress(SessionStatus status)

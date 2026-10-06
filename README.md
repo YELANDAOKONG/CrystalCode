@@ -115,6 +115,7 @@ must be on the path (Git Bash is used on Windows when available).
 
 - [User guide](docs/user-guide.md): installation, configuration, commands, tools, sessions, and prompts
 - [External tools](docs/external-tools.md): tool-set format and runners
+- [Plugins](docs/plugins.md): plugin contract, tools, and hooks
 - [Product definition](BUSINESS.md): scope and terminology
 - [Architecture](ARCHITECTURE.md): components and runtime behavior
 - [Engineering standards](STANDARDS.md): source and verification rules

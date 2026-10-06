@@ -82,7 +82,8 @@ public sealed class SettingsStore
                 document.StatusLine),
             ExecutionBudgetMapper.Read(document.ExecutionBudget),
             BashTimeoutMapper.Read(parsed.RootElement),
-            ReadApprovalModel(document.ApprovalModel));
+            ReadApprovalModel(document.ApprovalModel),
+            document.Plugins ?? defaults.Plugins);
     }
 
     public void Save(HarnessSettings settings)
@@ -110,6 +111,7 @@ public sealed class SettingsStore
                 : settings.ThinkingEffort.Value,
             Skills = settings.Skills ? null : false,
             ExternalTools = settings.ExternalTools ? null : false,
+            Plugins = settings.Plugins ? null : false,
             ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
             EstimatedTokens = settings.EstimatedTokens ? true : null,
             VerboseTools = settings.VerboseTools ? null : false,

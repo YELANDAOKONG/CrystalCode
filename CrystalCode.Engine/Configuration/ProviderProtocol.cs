@@ -28,19 +28,63 @@ public sealed record ProviderProtocol
     public static ProviderProtocol Parse(string value)
     {
         var protocol = new ProviderProtocol(value);
-        if (protocol == DeepSeek
-            || protocol == OpenAI
-            || protocol == Responses
-            || protocol == Anthropic
-            || protocol == Gemini
-            || protocol == Ollama)
+        if (protocol == DeepSeek)
+        {
+            return DeepSeek;
+        }
+
+        if (protocol == OpenAI)
+        {
+            return OpenAI;
+        }
+
+        if (protocol == Responses)
+        {
+            return Responses;
+        }
+
+        if (protocol == Anthropic)
+        {
+            return Anthropic;
+        }
+
+        if (protocol == Gemini)
+        {
+            return Gemini;
+        }
+
+        if (protocol == Ollama)
+        {
+            return Ollama;
+        }
+
+        if (IsPluginToken(protocol.Value))
         {
             return protocol;
         }
 
         throw new ArgumentException(
-            "Provider protocol must be deepseek, openai, responses, anthropic, gemini, or ollama.",
+            "Provider protocol must be deepseek, openai, responses, anthropic, gemini, ollama, or a plugin protocol token.",
             nameof(value));
+    }
+
+    private static bool IsPluginToken(string value)
+    {
+        if (value.Length is < 1 or > 64 || !char.IsAsciiLetter(value[0]))
+        {
+            return false;
+        }
+
+        for (var index = 1; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (!char.IsAsciiLetterOrDigit(character) && character is not '_' and not '-')
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public override string ToString() => Value;

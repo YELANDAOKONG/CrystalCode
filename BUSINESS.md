@@ -61,6 +61,9 @@ separate library with no terminal code. The product can:
 - discover operator tool sets under `~/.crystal/tools` and
   `<workspace>/.crystal/tools` and register them as extra catalog tools
   when External Tools is enabled;
+- load operator plugins from `~/.crystal/plugins` and
+  `<workspace>/.crystal/plugins` when Plugins is enabled, including
+  tools, protocol clients, classifiers, slash commands, and hooks;
 - honor an author-declared `approval: always` in a tool set for ordinary
   workspace-bounded calls, with the operator choosing per source whether
   declarations take effect through `externalToolApproval` in
@@ -87,7 +90,6 @@ separate library with no terminal code. The product can:
 The following capabilities are part of the product direction but are not yet
 implemented in the current build:
 
-- loading `IPlugin` assemblies from `~/.crystal/plugins/`;
 - parent/child Agents through `Crystal.Harness.AgentHarness`;
 - MCP servers;
 - an operating-system sandbox;

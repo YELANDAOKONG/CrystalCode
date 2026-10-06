@@ -6,4 +6,5 @@ namespace CrystalCode.Engine.Approvals;
 public sealed record ToolClassification(
     Risk Risk,
     Authority Authority,
-    string Summary);
+    string Summary,
+    bool RequirePrompt = false);

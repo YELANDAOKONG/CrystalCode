@@ -155,6 +155,7 @@ internal sealed class SessionProjection : ISessionObserver
         activity switch
         {
             SessionActivity.LoadingTools => ProgressText.LoadingTools,
+            SessionActivity.LoadingPlugins => ProgressText.LoadingPlugins,
             SessionActivity.Compacting => ProgressText.Compacting,
             SessionActivity.WaitingForModel => ProgressText.WaitingForModel,
             _ => string.Empty

@@ -34,6 +34,23 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
+    public async Task DecideAsync_RequirePrompt_AsksBeforeARead()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Default);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
+        var policy = context.CreatePolicy(
+            prompt,
+            advise: static (_, classification) => classification with { RequirePrompt = true });
+
+        var decision = await policy.DecideAsync(
+            new ToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(1, prompt.Count);
+        Assert.Equal(0, prompt.PassCount);
+    }
+
+    [Fact]
     public async Task DecideAsync_Default_AsksForOutsideRead()
     {
         using var context = new ApprovalContext(ApprovalMode.Default);
@@ -578,7 +595,8 @@ public sealed class ApprovalPolicyTests
             IReadOnlyList<ChatItem>? conversation = null,
             SkillCatalog? skills = null,
             IReadOnlyList<IApprovalClassifier>? classifiers = null,
-            IReadOnlySet<string>? automaticTools = null) =>
+            IReadOnlySet<string>? automaticTools = null,
+            Func<ToolCall, ToolClassification, ToolClassification>? advise = null) =>
             new(
                 _mode,
                 new Workspace(_workspace.Path),
@@ -590,7 +608,8 @@ public sealed class ApprovalPolicyTests
                     : new StaticApprovalReviewContext(conversation),
                 classifiers,
                 skills,
-                automaticTools);
+                automaticTools,
+                advise);
 
         public void Dispose()
         {

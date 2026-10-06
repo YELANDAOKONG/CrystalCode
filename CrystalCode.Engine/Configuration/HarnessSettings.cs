@@ -17,6 +17,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultExternalTools = true;
 
+    public const bool DefaultPlugins = true;
+
     public const bool DefaultEstimatedTokens = false;
 
     public const bool DefaultVerboseTools = true;
@@ -49,7 +51,8 @@ public sealed record HarnessSettings
         StatusLineSettings? statusLine = null,
         TurnLimits? executionBudget = null,
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
-        ApprovalModelSettings? approvalModel = null)
+        ApprovalModelSettings? approvalModel = null,
+        bool plugins = DefaultPlugins)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -95,6 +98,7 @@ public sealed record HarnessSettings
         ExecutionBudget = executionBudget ?? TurnLimits.CreateDefault();
         BashTimeoutSeconds = bashTimeoutSeconds;
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
+        Plugins = plugins;
         if (ApprovalModel.Enabled)
         {
             try
@@ -125,6 +129,8 @@ public sealed record HarnessSettings
     public bool Skills { get; }
 
     public bool ExternalTools { get; }
+
+    public bool Plugins { get; }
 
     public bool EstimatedTokens { get; }
 
@@ -204,6 +210,8 @@ public sealed record HarnessSettings
     public HarnessSettings WithExternalTools(bool externalTools) =>
         Copy(externalTools: externalTools);
 
+    public HarnessSettings WithPlugins(bool plugins) => Copy(plugins: plugins);
+
     public HarnessSettings WithEstimatedTokens(bool estimatedTokens) =>
         Copy(estimatedTokens: estimatedTokens);
 
@@ -280,7 +288,8 @@ public sealed record HarnessSettings
         int? bashTimeoutSeconds = null,
         bool setBashTimeout = false,
         ApprovalModelSettings? approvalModel = null,
-        bool setApprovalModel = false) =>
+        bool setApprovalModel = false,
+        bool? plugins = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -301,7 +310,8 @@ public sealed record HarnessSettings
             statusLine ?? StatusLine,
             executionBudget ?? ExecutionBudget,
             setBashTimeout ? bashTimeoutSeconds : BashTimeoutSeconds,
-            setApprovalModel ? approvalModel : ApprovalModel);
+            setApprovalModel ? approvalModel : ApprovalModel,
+            plugins ?? Plugins);
 
     public override string ToString() => nameof(HarnessSettings);
 

@@ -13,21 +13,30 @@ public sealed class ToolClassifier
     private readonly Workspace _workspace;
     private readonly IReadOnlyList<IApprovalClassifier> _classifiers;
     private readonly SkillCatalog? _skills;
+    private readonly Func<ToolCall, ToolClassification, ToolClassification>? _advise;
 
     public ToolClassifier(
         Workspace workspace,
         IReadOnlyList<IApprovalClassifier>? classifiers = null,
-        SkillCatalog? skills = null)
+        SkillCatalog? skills = null,
+        Func<ToolCall, ToolClassification, ToolClassification>? advise = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         _workspace = workspace;
         _classifiers = classifiers ?? [];
         _skills = skills;
+        _advise = advise;
     }
 
     public ToolClassification Classify(ToolCall call)
     {
         ArgumentNullException.ThrowIfNull(call);
+        var classification = ClassifyCore(call);
+        return _advise?.Invoke(call, classification) ?? classification;
+    }
+
+    private ToolClassification ClassifyCore(ToolCall call)
+    {
         var builtIn = ClassifyBuiltIn(call);
         if (builtIn is not null)
         {

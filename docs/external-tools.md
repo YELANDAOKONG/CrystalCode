@@ -30,8 +30,8 @@ Exec may use stdin, argv, or both. Dotnet does not use stdin or argv.
 
 | Mechanism | Role |
 | :--- | :--- |
-| `IPlugin` / `PluginRegistry` | First-party in-process contributions (built-in tools, DeepSeek, OpenAI). Unchanged. |
-| `~/.crystal/plugins/` | Reserved. External tools do not live there and do not implement `IPlugin`. |
+| `IPlugin` / `PluginRegistry` | First-party in-process contributions (built-in tools and the six wire protocols). |
+| `~/.crystal/plugins/` | Operator plugins. They use `CrystalCode.Plugins`, not this manifest. See [plugins.md](plugins.md). |
 | Skills | Markdown instructions loaded through the `skill` tool. They do not become extra `ITool` entries. |
 | MCP | A separate, deferred integration; it is not an external-tool runner. |
 
@@ -402,7 +402,7 @@ ALC or one executable, many catalog entries.
 ## Dotnet: native text and multimodal tools
 
 The assembly is a **framework-dependent class library**, not a second
-self-contained runtime and not `IPlugin`.
+self-contained runtime and not `CrystalCode.Plugins.IPlugin`.
 
 Compile against `Crystal.Tools` (and the `Crystal` reference it requires).
 Implement `Crystal.Tools.ITool`, `Crystal.Multimodal.Tools.IMultimodalTool`,
@@ -561,12 +561,14 @@ Single-file implications:
 
 ## Catalog composition
 
-The text `WorkspaceCatalog` is: built-in plugin tools, then every contributed
-external `ITool` whose `catalogs` contains Plan or Work respectively, then
-`skill` when enabled. For an image-capable turn, the multimodal executor adds
-plugin and external `IMultimodalTool` definitions to that catalog. External
-tools are not registered through `PluginRegistry.Add`. The external classifier
-is appended to the session's classifier list.
+The text `WorkspaceCatalog` is: built-in plugin tools, then disk plugin
+tools, then every contributed external `ITool` whose `catalogs` contains
+Plan or Work respectively, then `skill` when enabled. For an image-capable
+turn, the multimodal executor adds built-in, disk, and external
+`IMultimodalTool` definitions in that order. External tools are not
+registered through `PluginRegistry.Add`. A disk plugin tool name is
+reserved before external registration. The external classifier is appended
+after disk classifiers.
 
 ## Not included
 
@@ -574,6 +576,5 @@ is appended to the session's classifier list.
   envelopes.
 - Qualified model-facing names (`Set/tool` or automatic `Set_tool`
   prefixes).
-- Loading `IPlugin` from `~/.crystal/plugins/`.
 - Collectible unload, hot reload, signing, marketplace.
 - Host-injected secrets into child processes or in-process assemblies.

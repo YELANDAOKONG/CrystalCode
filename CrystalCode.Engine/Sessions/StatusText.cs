@@ -57,6 +57,7 @@ public static class StatusText
             [
                 ("Skills", Toggle(status.SkillsEnabled)),
                 ("External tools", Toggle(status.ExternalToolsEnabled)),
+                ("Plugins", Toggle(status.PluginsEnabled)),
                 ("Estimated tokens", Toggle(status.EstimatedTokensEnabled)),
                 ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
                 ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
@@ -94,7 +95,8 @@ public static class StatusText
                 [
                     ("Plan tools", Number(status.PlanTools)),
                     ("Work tools", Number(status.WorkTools)),
-                    ("External loaded", Number(status.ExternalTools))
+                    ("External loaded", Number(status.ExternalTools)),
+                    ("Plugins loaded", Number(status.Plugins))
                 ],
                 trailingBlankLine: false);
         }

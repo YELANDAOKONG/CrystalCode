@@ -582,6 +582,32 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsPluginsDisabled()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "plugins": false
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.Plugins);
+        store.Save(settings);
+        Assert.Contains(
+            "\"plugins\": false",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_RoundTripsExternalToolApprovalPolicies()
     {
         using var root = new TemporaryHome();

@@ -61,6 +61,11 @@ internal static class TaskRunOverrides
                 next = next.WithExternalTools(ParseSwitch(request.ExternalTools, "--external-tools"));
             }
 
+            if (request.Plugins is not null)
+            {
+                next = next.WithPlugins(ParseSwitch(request.Plugins, "--plugins"));
+            }
+
             if (request.PromptSet is not null)
             {
                 next = next.WithPromptSet(Required(request.PromptSet, "Prompt set"));

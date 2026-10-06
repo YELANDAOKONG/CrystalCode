@@ -36,6 +36,7 @@ public sealed class EngineAssemblyTests
         Assert.Contains("Crystal", referenced);
         Assert.Contains("CrystalCode.Providers", referenced);
         Assert.Contains("CrystalCode.Tools", referenced);
+        Assert.Contains("CrystalCode.Plugins", referenced);
     }
 
     [Fact]

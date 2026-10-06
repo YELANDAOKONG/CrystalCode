@@ -25,6 +25,7 @@ public enum SessionVerb
     Compact,
     Todos,
     Tools,
+    Plugins,
     Attach,
     Export,
     Verbose,

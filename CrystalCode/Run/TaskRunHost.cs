@@ -191,7 +191,7 @@ internal static class TaskRunHost
         }
         finally
         {
-            var hint = session.Close();
+            var hint = await session.CloseAsync();
             log.WriteEpilogue(status, hint);
         }
 

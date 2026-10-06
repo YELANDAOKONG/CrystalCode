@@ -59,7 +59,8 @@ public sealed class ExternalCatalog
         Workspace workspace,
         bool enabled,
         ExternalToolApprovalSettings? approvalSettings = null,
-        SessionToolHost? host = null)
+        SessionToolHost? host = null,
+        IReadOnlySet<string>? reservedNames = null)
     {
         ArgumentNullException.ThrowIfNull(home);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -77,6 +78,13 @@ public sealed class ExternalCatalog
         var discovery = new ToolSetDiscovery(home);
         var sets = discovery.Collect(workspace.Root, notes);
         var registered = new HashSet<string>(StringComparer.Ordinal);
+        if (reservedNames is not null)
+        {
+            foreach (var name in reservedNames)
+            {
+                registered.Add(name);
+            }
+        }
         var plan = new List<ITool>();
         var work = new List<ITool>();
         var planMultimodal = new List<IMultimodalTool>();

@@ -11,9 +11,11 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Skills;
+using CrystalCode.Plugins.Hooks;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 
@@ -54,6 +56,9 @@ public sealed class CodingSession : ITurnObserver
     private PromptResolution _promptResolution;
     private SkillCatalog? _skills;
     private ExternalCatalog _external = ExternalCatalog.Empty;
+    private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
+    private PluginHookPipeline _hooks = PluginHookPipeline.Empty;
+    private bool _pluginSessionOpen;
     private readonly SessionToolHost _toolHost;
     private ApprovalMode _approval;
     private ThinkingSelection _thinkingEffort;
@@ -110,10 +115,7 @@ public sealed class CodingSession : ITurnObserver
         _promptHistoryStore = new PromptHistoryStore(home, workspace.Root);
         _workspace = workspace;
         _plugins = plugins;
-        _client = CreateClient(settings);
-        _multimodalClient = CreateMultimodalClient(settings);
         _frontEnd = frontEnd;
-        _compactor = CreateCompactor(_client);
         _approval = settings.Approval;
         _toolHost = new SessionToolHost(
             _workspace,
@@ -123,6 +125,10 @@ public sealed class CodingSession : ITurnObserver
         _grants = new GrantStore(home);
         _home = home;
         _skillDiscovery = SkillDiscovery.Create(home);
+        ReloadPlugins();
+        _client = CreateClient(settings);
+        _multimodalClient = CreateMultimodalClient(settings);
+        _compactor = CreateCompactor(_client);
         _promptResolution = _promptStore.Resolve(workspace.Root, settings.PromptSet);
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
@@ -204,7 +210,10 @@ public sealed class CodingSession : ITurnObserver
 
         ReloadExternalToolsWithProgress();
         RebuildExecutors();
+        ReplaceLiveSystem();
+        WritePluginNotes();
         WriteExternalNotes();
+        await OpenPluginSessionAsync(cancellationToken);
         ShowTodos();
     }
 
@@ -337,6 +346,12 @@ public sealed class CodingSession : ITurnObserver
     /// Persists a conversation that has content, releases the model clients,
     /// and returns the copy that tells the operator how to resume.
     /// </summary>
+    public async Task<string> CloseAsync(CancellationToken cancellationToken = default)
+    {
+        await ClosePluginSessionAsync(cancellationToken);
+        return Close();
+    }
+
     public string Close()
     {
         CancelAndClearSide(announce: false);
@@ -430,17 +445,19 @@ public sealed class CodingSession : ITurnObserver
             return (true, false);
         }
 
-        var handled = HandleCommand(parsed);
+        var handled = await HandleCommandAsync(parsed, cancellationToken);
         PruneDraftImages(string.Empty);
         return handled;
     }
 
-    private (bool Handled, bool Exit) HandleCommand(SessionCommand command)
+    private async Task<(bool Handled, bool Exit)> HandleCommandAsync(
+        SessionCommand command,
+        CancellationToken cancellationToken)
     {
         switch (command.Verb)
         {
             case SessionVerb.Help:
-                Publish(new HelpRequested(_plugins.Commands));
+                Publish(new HelpRequested(PluginCommands()));
                 return (true, false);
             case SessionVerb.Plan:
                 TogglePlan();
@@ -491,7 +508,7 @@ public sealed class CodingSession : ITurnObserver
                 Note("New conversation");
                 return (true, false);
             case SessionVerb.Cd:
-                ChangeDirectory(command.Argument);
+                await ChangeDirectoryAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Fork:
                 ForkSession(command.Argument);
@@ -507,6 +524,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Tools:
                 ChangeTools(command.Argument);
                 return (true, false);
+            case SessionVerb.Plugins:
+                await ChangePluginsAsync(command.Argument, cancellationToken);
+                return (true, false);
             case SessionVerb.Attach:
                 AttachImage(command.Argument);
                 return (true, false);
@@ -516,7 +536,8 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Quit:
                 return (true, true);
             case SessionVerb.Unknown:
-                if (_plugins.TryExecute(command.Argument, new SlashOutput(this)))
+                if (_plugins.TryExecute(command.Argument, new SlashOutput(this))
+                    || _loadedPlugins.TryExecute(command.Argument, new SlashOutput(this)))
                 {
                     return (true, false);
                 }
@@ -895,7 +916,7 @@ public sealed class CodingSession : ITurnObserver
         var nextSettings = _settings.WithSelection(selection.Provider, selection.Model);
         if (!_credentials.TryResolve(
                 nextSettings.ActiveProvider,
-                out var apiKey,
+                out _,
                 out var credentialError))
         {
             Error(credentialError);
@@ -906,11 +927,8 @@ public sealed class CodingSession : ITurnObserver
         IStreamingMultimodalChatClient? nextMultimodalClient;
         try
         {
-            nextClient = ChatClientFactory.Create(nextSettings, apiKey, _plugins);
-            nextMultimodalClient = MultimodalChatClientFactory.Create(
-                nextSettings,
-                apiKey,
-                _plugins);
+            nextClient = CreateClient(nextSettings);
+            nextMultimodalClient = CreateMultimodalClient(nextSettings);
             if ((_pendingImages.Count > 0 || HasReferencedImages())
                 && nextMultimodalClient is null)
             {
@@ -1485,6 +1503,8 @@ public sealed class CodingSession : ITurnObserver
                 PlanTools: planToolCount,
                 WorkTools: workToolCount,
                 ExternalTools: _external.Tools.Count,
+                PluginsEnabled: _settings.Plugins,
+                Plugins: _loadedPlugins.Plugins.Count,
                 CumulativeUsage: _ledger.CumulativeUsage,
                 CustomStatusLineEnabled: _settings.StatusLine.Enabled,
                 ApprovalModel: _settings.ApprovalModel.Enabled
@@ -1550,6 +1570,26 @@ public sealed class CodingSession : ITurnObserver
     private static string Title(string value) =>
         char.ToUpperInvariant(value[0]) + value[1..].ToLowerInvariant();
 
+    private void ReplaceClients()
+    {
+        var next = CreateClient(_settings);
+        IStreamingMultimodalChatClient? multimodal;
+        try
+        {
+            multimodal = CreateMultimodalClient(_settings);
+        }
+        catch
+        {
+            DisposeClient(next);
+            throw;
+        }
+
+        DisposeClient();
+        _client = next;
+        _multimodalClient = multimodal;
+        _compactor = CreateCompactor(_client);
+    }
+
     private IStreamingChatClient CreateClient(HarnessSettings settings)
     {
         if (!_credentials.TryResolve(settings.ActiveProvider, out var apiKey, out var error))
@@ -1557,7 +1597,15 @@ public sealed class CodingSession : ITurnObserver
             throw new InvalidOperationException(error);
         }
 
-        return ChatClientFactory.Create(settings, apiKey, _plugins);
+        try
+        {
+            return ChatClientFactory.Create(settings, apiKey, _plugins);
+        }
+        catch (NotSupportedException) when (
+            _loadedPlugins.TryCreateClient(settings, apiKey, out var client) && client is not null)
+        {
+            return client;
+        }
     }
 
     private IStreamingMultimodalChatClient? CreateMultimodalClient(
@@ -1568,7 +1616,18 @@ public sealed class CodingSession : ITurnObserver
             throw new InvalidOperationException(error);
         }
 
-        return MultimodalChatClientFactory.Create(settings, apiKey, _plugins);
+        if (!settings.ActiveModel.ImageInput)
+        {
+            return null;
+        }
+
+        var protocol = settings.ActiveProvider.Protocol;
+        if (_plugins.Clients.Any(factory => factory.CanCreate(protocol)))
+        {
+            return MultimodalChatClientFactory.Create(settings, apiKey, _plugins);
+        }
+
+        return _loadedPlugins.CreateMultimodal(settings, apiKey);
     }
 
     private void DisposeClient()
@@ -1588,7 +1647,7 @@ public sealed class CodingSession : ITurnObserver
         (client as IDisposable)?.Dispose();
     }
 
-    private void ChangeDirectory(string argument)
+    private async Task ChangeDirectoryAsync(string argument, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(argument))
         {
@@ -1598,11 +1657,15 @@ public sealed class CodingSession : ITurnObserver
 
         if (_workspace.TrySetRoot(argument, out var error))
         {
+            await ClosePluginSessionAsync(cancellationToken);
             ReloadSkills();
+            ReloadPluginsWithProgress();
             ReloadExternalToolsWithProgress();
             ReloadPrompts();
             RebuildExecutors();
+            WritePluginNotes();
             WriteExternalNotes();
+            await OpenPluginSessionAsync(cancellationToken);
             RefreshChrome();
             Note("Workspace  " + _workspace.Root);
             return;
@@ -1623,12 +1686,22 @@ public sealed class CodingSession : ITurnObserver
             approval: _approval.Value);
 
     private string CurrentSystemText() =>
-        _planMode
-            ? _prompts.ComposePlan(CurrentPromptContext())
-            : _prompts.ComposeWork(CurrentPromptContext());
+        AppendPluginPrompt(
+            _planMode
+                ? _prompts.ComposePlan(CurrentPromptContext())
+                : _prompts.ComposeWork(CurrentPromptContext()),
+            _planMode ? "plan" : "work");
 
     private string CurrentReviewSystemText() =>
-        _prompts.ComposeReview(CurrentPromptContext().WithMode("review"));
+        AppendPluginPrompt(
+            _prompts.ComposeReview(CurrentPromptContext().WithMode("review")),
+            "review");
+
+    private string AppendPluginPrompt(string text, string mode)
+    {
+        var extra = _hooks.AppendPrompt(mode, _prompts.Instructions);
+        return extra.Length == 0 ? text : text + "\n\n" + extra;
+    }
 
     private void ReloadPrompts()
     {
@@ -2048,11 +2121,12 @@ public sealed class CodingSession : ITurnObserver
             approvalPrompt,
             reviewer,
             _reviewContext,
-            [.. _plugins.Classifiers, _external.Classifier],
+            [.. _plugins.Classifiers, .. _loadedPlugins.Classifiers, _external.Classifier],
             _skills,
-            _external.AutomaticTools);
+            _external.AutomaticTools,
+            (call, classification) => _hooks.Advise(call, classification));
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
-        _workExecutor = new ToolExecutor(
+        var workExecutor = new ToolExecutor(
             WorkspaceCatalog.CreateWork(
                 _workspace,
                 _todos,
@@ -2060,29 +2134,37 @@ public sealed class CodingSession : ITurnObserver
                 _plugins,
                 _skills,
                 _external,
-                _settings.BashTimeoutSeconds),
+                _settings.BashTimeoutSeconds,
+                _loadedPlugins),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
-        _planExecutor = new ToolExecutor(
+        var planExecutor = new ToolExecutor(
             WorkspaceCatalog.CreatePlan(
                 _workspace,
                 _todos,
                 question,
                 _plugins,
                 _skills,
-                _external),
+                _external,
+                _loadedPlugins),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
-        _workMultimodalExecutor = new HybridMultimodalToolExecutor(
-            _workExecutor,
-            CreateMultimodalTools(question, plan: false),
-            policy);
-        _planMultimodalExecutor = new HybridMultimodalToolExecutor(
-            _planExecutor,
-            CreateMultimodalTools(question, plan: true),
-            policy);
+        _workExecutor = new PluginToolExecutor(workExecutor, _hooks);
+        _planExecutor = new PluginToolExecutor(planExecutor, _hooks);
+        _workMultimodalExecutor = new PluginMultimodalExecutor(
+            new HybridMultimodalToolExecutor(
+                workExecutor,
+                CreateMultimodalTools(question, plan: false),
+                policy),
+            _hooks);
+        _planMultimodalExecutor = new PluginMultimodalExecutor(
+            new HybridMultimodalToolExecutor(
+                planExecutor,
+                CreateMultimodalTools(question, plan: true),
+                policy),
+            _hooks);
     }
 
     private IReadOnlyList<IMultimodalTool> CreateMultimodalTools(
@@ -2100,6 +2182,10 @@ public sealed class CodingSession : ITurnObserver
                 _todos,
                 prompt,
                 plan));
+        tools.AddRange(
+            plan
+                ? _loadedPlugins.PlanMultimodalTools
+                : _loadedPlugins.WorkMultimodalTools);
         tools.AddRange(
             plan
                 ? _external.PlanMultimodalTools
@@ -2121,7 +2207,126 @@ public sealed class CodingSession : ITurnObserver
             _workspace,
             _settings.ExternalTools,
             _settings.ExternalToolApproval,
-            _toolHost);
+            _toolHost,
+            _loadedPlugins.ToolNames);
+    }
+
+    private void ReloadPlugins()
+    {
+        _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins);
+        _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note);
+    }
+
+    private void ReloadPluginsWithProgress()
+    {
+        if (_settings.Plugins)
+        {
+            SetActivity(SessionActivity.LoadingPlugins);
+        }
+
+        try
+        {
+            ReloadPlugins();
+        }
+        finally
+        {
+            if (_settings.Plugins)
+            {
+                SetActivity(SessionActivity.Idle);
+            }
+        }
+    }
+
+    private void WritePluginNotes()
+    {
+        foreach (var note in _loadedPlugins.Notes)
+        {
+            Note(note);
+        }
+    }
+
+    private async Task OpenPluginSessionAsync(CancellationToken cancellationToken)
+    {
+        if (_pluginSessionOpen || _loadedPlugins.Hooks.Count == 0)
+        {
+            return;
+        }
+
+        _pluginSessionOpen = true;
+        await _hooks.StartAsync(CurrentPluginSession(), cancellationToken);
+    }
+
+    private async Task ClosePluginSessionAsync(CancellationToken cancellationToken)
+    {
+        if (!_pluginSessionOpen)
+        {
+            return;
+        }
+
+        _pluginSessionOpen = false;
+        await _hooks.EndAsync(CurrentPluginSession(), cancellationToken);
+    }
+
+    private PluginSession CurrentPluginSession() =>
+        new(_workspace.Root, _sessionId, _approval.Value);
+
+    private async Task ChangePluginsAsync(string argument, CancellationToken cancellationToken)
+    {
+        var command = argument.Trim().ToLowerInvariant();
+        if (command.Length == 0)
+        {
+            foreach (var line in _loadedPlugins.Describe(_settings.Plugins))
+            {
+                Note(line);
+            }
+
+            return;
+        }
+
+        if (command is not ("on" or "off" or "reload"))
+        {
+            Error("Plugins command must be /plugins, /plugins on|off|reload.");
+            return;
+        }
+
+        if (_turnActive)
+        {
+            Error("Finish the current turn before reloading plugins.");
+            return;
+        }
+
+        await ClosePluginSessionAsync(cancellationToken);
+        if (command != "reload")
+        {
+            _settings = _settings.WithPlugins(command == "on");
+            _settingsStore.Save(_settings);
+        }
+
+        ReloadPluginsWithProgress();
+        ReloadExternalToolsWithProgress();
+        try
+        {
+            ReplaceClients();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Error(exception.Message);
+        }
+
+        RebuildExecutors();
+        ReplaceLiveSystem();
+        WritePluginNotes();
+        WriteExternalNotes();
+        RefreshSlashCommands();
+        await OpenPluginSessionAsync(cancellationToken);
+        Note(command == "reload" ? "Plugins reloaded" : "Plugins  " + Title(command));
+    }
+
+    private IReadOnlyList<ISlashCommand> PluginCommands()
+    {
+        var commands = new List<ISlashCommand>(_plugins.Commands);
+        commands.AddRange(_loadedPlugins.Commands);
+        return commands;
     }
 
     private void ReloadExternalToolsWithProgress()
@@ -2248,7 +2453,7 @@ public sealed class CodingSession : ITurnObserver
     private void RefreshSlashCommands()
     {
         var menu = SlashMenu.Create(
-            _plugins.Commands,
+            PluginCommands(),
             ThinkingCompletions.For(_settings.ActiveModel),
             ModelCompletions.For(_settings.Catalog, _settings.Provider),
             PromptSetCompletions.For(_promptResolution),
@@ -2525,7 +2730,10 @@ public sealed class CodingSession : ITurnObserver
             client,
             SessionRetryOptions.Default,
             attempt => Publish(new RetryScheduled(attempt)),
-            () => CompactionPrompt.ComposeSystem(CurrentPromptContext().WithMode("compaction")));
+            () => AppendPluginPrompt(
+                CompactionPrompt.ComposeSystem(CurrentPromptContext().WithMode("compaction")),
+                "compaction"),
+            (phase, text) => _hooks.AppendCompaction(phase, text));
 
     /// <summary>
     /// Collects the finished turn: records its transcript, compacts when over

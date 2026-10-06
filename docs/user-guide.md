@@ -34,7 +34,8 @@ From a workspace you want the agent to inspect or change, CrystalCode:
 Built-in tools and all provider adapters register through the same in-process
 plugin table. Operators add extra catalog tools as
 tool sets under `~/.crystal/tools` and `<workspace>/.crystal/tools`.
-`IPlugin` assemblies are not loaded from `plugins/`.
+Operators add plugins under `~/.crystal/plugins` and
+`<workspace>/.crystal/plugins`.
 
 ## Install
 
@@ -72,10 +73,10 @@ or `CrystalCode` on Windows.
 
 The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
-parent/child Agents, audio and video input, non-text model output, and provider
-protocols other than DeepSeek and OpenAI-compatible Chat Completions, OpenAI
-Responses, and Anthropic Messages. Image input is available for supported
-models and providers.
+parent/child Agents, audio and video input, and non-text model output.
+Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
+OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
+another protocol. Image input is available for supported models and providers.
 
 ## Requirements
 
@@ -223,7 +224,7 @@ saved value is also unset. `unlimited` removes that one cap.
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. An unknown value exits 1 |
 | `--prompt-set <name>` | An existing home prompt set. `default` is always valid |
-| `--skills`, `--external-tools` | `on` or `off` for this process |
+| `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
 | `--model-calls <count>` | Model rounds for this turn. Default 1024 |
 | `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
 | `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
@@ -353,6 +354,7 @@ Top-level fields:
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
+| `plugins` | Enable operator plugin discovery (default `true`) |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `verboseTools` | Show read, search, and skill result panels (default `true`; omitted when on) |
@@ -898,6 +900,21 @@ and the
 dotnet publish layout are in
 [External tools](external-tools.md).
 
+## Plugins
+
+Operators add in-process extensions under `plugins/`. A project directory
+of the same name replaces the home plugin. `"enabled": false` in
+`plugin.json` leaves the directory in place without loading it.
+`"plugins": false` in `config.json` skips discovery. When `true`, the
+field is omitted from the written file.
+
+A plugin can add tools, a protocol client, approval classifiers, slash
+commands, and hooks. Hooks may append prompt and compaction text, rewrite
+a tool call (approval runs again), replace a tool result, and raise
+approval risk. They cannot lower risk or replace Work, Plan, or Review.
+`/plugins` lists them. `/plugins on|off|reload` controls discovery.
+Details are in [Plugins](plugins.md).
+
 ## Prompts and instructions
 
 Crystal is prompt-neutral. Every model-bound string this product
@@ -1114,11 +1131,11 @@ Override with `CRYSTAL_HOME` or `--home`.
   tools/<directory>/tools.json
   sessions/<id>.json
   logs/
-  plugins/
+  plugins/<directory>/plugin.json
 ```
 
-Project overlay (named prompts, Crystal skills, and tool sets of the
-same directory name win over home):
+Project overlay (named prompts, Crystal skills, tool sets, and plugins of
+the same directory name win over home):
 
 ```text
 <workspace>/.crystal/
@@ -1130,13 +1147,14 @@ same directory name win over home):
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
+  plugins/<directory>/plugin.json
 <workspace>/.crystal.md
 <workspace>/AGENTS.md
 ```
 
-`plugins/` is reserved. The current product does not load `IPlugin`
-assemblies from that directory. Dotnet tool sets load class libraries
-from the set directory only.
+`plugins/<directory>/plugin.json` loads one operator plugin. Dotnet tool
+sets still load class libraries from the tool-set directory only. See
+[Plugins](plugins.md).
 
 ## Environment variables
 
@@ -1172,3 +1190,4 @@ lists.
 - [STANDARDS.md](../STANDARDS.md) — engineering rules
 - [AGENTS.md](../AGENTS.md) — instructions for coding agents
 - [external-tools.md](external-tools.md) — operator tool sets
+- [plugins.md](plugins.md) — operator plugins and hooks

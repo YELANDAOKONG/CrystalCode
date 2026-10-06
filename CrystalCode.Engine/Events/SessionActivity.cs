@@ -7,6 +7,7 @@ public enum SessionActivity
 {
     Idle,
     LoadingTools,
+    LoadingPlugins,
     Compacting,
     WaitingForModel
 }

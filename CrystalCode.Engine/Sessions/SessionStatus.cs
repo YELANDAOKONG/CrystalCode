@@ -36,4 +36,6 @@ public sealed record SessionStatus(
     bool CustomStatusLineEnabled = false,
     string? ApprovalModel = null,
     bool VerboseApprovalsEnabled = true,
-    bool VerboseThinkingEnabled = true);
+    bool VerboseThinkingEnabled = true,
+    bool PluginsEnabled = true,
+    int Plugins = 0);
