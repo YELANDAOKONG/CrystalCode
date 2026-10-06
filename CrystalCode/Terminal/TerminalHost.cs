@@ -178,7 +178,8 @@ internal sealed class TerminalHost
 
     /// <summary>
     /// Keeps the frame, spinner, and composer alive while the session works,
-    /// and queues anything submitted meanwhile.
+    /// and queues anything submitted meanwhile. Blank Enter is forwarded too,
+    /// so a waiting follow-up can interrupt the turn or compaction.
     /// </summary>
     private async Task PumpAsync(Task work, CancellationToken cancellationToken)
     {

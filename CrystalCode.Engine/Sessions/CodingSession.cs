@@ -258,11 +258,7 @@ public sealed class CodingSession : ITurnObserver
                 return false;
             }
 
-            if (_queue.Count > 0)
-            {
-                _turnSource?.Cancel();
-            }
-
+            ReleaseQueuedFollowUp();
             return false;
         }
 
@@ -3120,11 +3116,28 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Adds a follow-up that is sent when the current tool batch or turn ends.
+    /// Blank text does not enqueue; when a follow-up is already waiting it
+    /// interrupts the turn or compaction so that follow-up is sent now.
     /// </summary>
     public void Enqueue(string input)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            ReleaseQueuedFollowUp();
+            return;
+        }
+
         _queue.Enqueue(input);
         ShowQueue();
+    }
+
+    private void ReleaseQueuedFollowUp()
+    {
+        if (_queue.Count > 0)
+        {
+            TryInterrupt();
+        }
     }
 
     private async Task StartTurnIfQueuedAsync(CancellationToken cancellationToken)

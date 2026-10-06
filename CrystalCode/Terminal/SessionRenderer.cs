@@ -931,11 +931,7 @@ public sealed class SessionRenderer : IDisposable
 
             if (submitted is not null)
             {
-                var text = submitted.Trim();
-                if (text.Length > 0)
-                {
-                    onSubmit?.Invoke(text);
-                }
+                onSubmit?.Invoke(submitted.Trim());
             }
         }
 

@@ -636,7 +636,7 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Key | Action |
 | :--- | :--- |
 | Enter | Submit when idle; queue a follow-up while a turn is running |
-| Empty Enter while a follow-up is queued | Interrupt the turn and send the queue now |
+| Empty Enter while a follow-up is queued | Interrupt the turn, or compaction if that is still running, and send the queue now |
 | Empty Enter while working, queue empty | Does nothing. The turn keeps going |
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
@@ -681,8 +681,9 @@ The composer stays open while a turn runs. Enter with text enqueues
 a follow-up (FIFO). Queued items stay in a `Queued` panel above the
 composer. The queue is sent when the current tool batch finishes or
 when the turn (thinking or conversation) ends. Empty Enter while a
-follow-up is queued interrupts the turn so the queue is sent now.
-Interrupt does not drop queued text.
+follow-up is queued interrupts the turn, or compaction if that is
+still running, so the queue is sent now. Interrupt does not drop
+queued text.
 
 `/quit`, `/clear`, `/resume`, and `/fork` stop a busy turn before they run.
 
