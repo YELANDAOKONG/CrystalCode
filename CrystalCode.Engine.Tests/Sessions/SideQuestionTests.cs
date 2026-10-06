@@ -1,8 +1,10 @@
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Crystal.Tools;
 
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -221,6 +223,39 @@ public sealed class SideQuestionTests
         Assert.Equal(SideQuestion.Cancelled, finished.Failure);
     }
 
+    [Fact]
+    public async Task Btw_UsesStableConversationWhileTurnRuns()
+    {
+        var marker = "__dangling_call__";
+        var resume = new SessionDocument
+        {
+            ImageMarkersTagged = true,
+            Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "stable" }],
+            Archive =
+            [
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "stable" },
+                new SessionItemDocument { Kind = "tool_call", CallId = marker, Name = "read", Arguments = "{}" }
+            ]
+        };
+        var client = new SideStabilityStreamingClient(marker);
+        using var headless = new HeadlessSession(client, resume);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("work", CancellationToken.None);
+        await client.Started;
+
+        await headless.Session.SubmitAsync("/btw why", CancellationToken.None);
+        await headless.Session.SideQuestionTask;
+
+        var finished = headless.Observer.Events.OfType<SideQuestionSnapshot>().Last();
+        Assert.Equal("Stable answer.", finished.Exchanges[0].Answer);
+        Assert.Null(finished.Failure);
+
+        headless.Session.TryInterrupt();
+        await headless.Session.TurnTask!;
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+    }
+
     private static ChatStreamEvent[] TextRound(string text, TokenUsage? usage = null)
     {
         var events = new List<ChatStreamEvent>
@@ -253,5 +288,77 @@ public sealed class SideQuestionTests
             ChatRequest request,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException("StreamingTurn uses StreamAsync.");
+    }
+
+    private sealed class SideStabilityStreamingClient : IStreamingChatClient
+    {
+        private readonly TaskCompletionSource _started =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public SideStabilityStreamingClient(string _)
+        {
+        }
+
+        public Task Started => _started.Task;
+
+        public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (IsSideQuestion(request))
+            {
+                if (request.Items.OfType<ToolCall>().Any(static call => call.CallId.Length > 0))
+                {
+                    throw new InvalidOperationException("Side question received a dangling tool call.");
+                }
+
+                return EnumerateAsync(
+                [
+                    new ChatTextDelta(0, 0, ChatRole.Assistant, "Stable answer."),
+                    new ChatCandidateCompleted(0, FinishReason.Stop)
+                ],
+                cancellationToken);
+            }
+
+            return WaitUntilCancelled(cancellationToken);
+        }
+
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException("StreamingTurn uses StreamAsync.");
+
+        private static bool IsSideQuestion(ChatRequest request)
+        {
+            if (request.Items.Count == 0 || request.Items[^1] is not ChatMessage message)
+            {
+                return false;
+            }
+
+            return message.Role == ChatRole.User
+                && message.Text.Contains(SideQuestion.Instruction, StringComparison.Ordinal);
+        }
+
+        private async IAsyncEnumerable<ChatStreamEvent> WaitUntilCancelled(
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            _started.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+
+        private static async IAsyncEnumerable<ChatStreamEvent> EnumerateAsync(
+            IReadOnlyList<ChatStreamEvent> events,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            foreach (var streamEvent in events)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return streamEvent;
+                await Task.Yield();
+            }
+        }
     }
 }

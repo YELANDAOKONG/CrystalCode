@@ -2799,6 +2799,9 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    private IReadOnlyList<ChatItem> SideBaseSnapshot() =>
+        _turnActive ? [.. _transcript] : ArchiveSnapshot();
+
     private List<ChatItem> ArchiveSnapshot()
     {
         lock (_archiveGate)
@@ -2831,6 +2834,26 @@ public sealed class CodingSession : ITurnObserver
             ToolResult result => result.Text.Contains(marker, StringComparison.Ordinal),
             _ => false
         });
+
+    private static IReadOnlyList<ChatItem> ReconcilePendingToolCalls(IReadOnlyList<ChatItem> items)
+    {
+        var completedToolCalls = new HashSet<string>(
+            items.OfType<ToolResult>().Select(static result => result.CallId),
+            StringComparer.Ordinal);
+        var reconciled = new List<ChatItem>(items);
+        foreach (var call in items.OfType<ToolCall>())
+        {
+            if (completedToolCalls.Contains(call.CallId))
+            {
+                continue;
+            }
+
+            reconciled.Add(new ToolResult(call.CallId, "Tool execution was interrupted by user.", ToolResultStatus.Failure));
+            completedToolCalls.Add(call.CallId);
+        }
+
+        return reconciled;
+    }
 
     private int NextImageNumber() =>
         ImageSnapshot().Keys.Concat(_unavailableImages.Select(static image => image.Number))
@@ -3092,7 +3115,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void AskSide(string question)
     {
-        var archive = ArchiveSnapshot();
+        var sideBase = SideBaseSnapshot();
         IReadOnlyList<SideExchange> prior;
         CancellationToken token;
         long generation;
@@ -3113,16 +3136,17 @@ public sealed class CodingSession : ITurnObserver
         }
 
         Publish(CaptureSide(announce: true));
-        _sideTask = RunSideAsync(archive, prior, question, reasoning, generation, token);
+        _sideTask = RunSideAsync(sideBase, prior, question, reasoning, generation, token);
     }
 
     private async Task<IReadOnlyList<ChatItem>?> PrepareSideConversationAsync(
-        IReadOnlyList<ChatItem> archive,
+        IReadOnlyList<ChatItem> sideBase,
         IReadOnlyList<SideExchange> prior,
         string question,
+        ContextCompactor compactor,
         CancellationToken cancellationToken)
     {
-        var conversation = SideConversation(archive);
+        var conversation = SideConversation(ReconcilePendingToolCalls(sideBase));
         var composed = SideQuestion.Compose(
             ImageMarkerText.ForTextModel(conversation),
             prior,
@@ -3132,7 +3156,7 @@ public sealed class CodingSession : ITurnObserver
             return composed;
         }
 
-        var outcome = await _compactor.CompactAsync(
+        var outcome = await compactor.CompactAsync(
             conversation,
             _todos.Format(),
             CurrentLimits(),
@@ -3150,7 +3174,7 @@ public sealed class CodingSession : ITurnObserver
     }
 
     private async Task RunSideAsync(
-        IReadOnlyList<ChatItem> archive,
+        IReadOnlyList<ChatItem> sideBase,
         IReadOnlyList<SideExchange> prior,
         string question,
         ReasoningOptions? reasoning,
@@ -3161,10 +3185,14 @@ public sealed class CodingSession : ITurnObserver
         var owned = false;
         try
         {
+            client = CreateClient(_settings);
+            owned = !ReferenceEquals(client, _client);
+            var compactor = CreateCompactor(client);
             var conversation = await PrepareSideConversationAsync(
-                archive,
+                sideBase,
                 prior,
                 question,
+                compactor,
                 cancellationToken);
             if (conversation is null)
             {
@@ -3172,8 +3200,6 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
-            client = CreateClient(_settings);
-            owned = !ReferenceEquals(client, _client);
             var request = new ChatRequest(conversation, [], reasoning);
             var assembler = new ChatStreamAssembler();
             var live = new StringBuilder();
