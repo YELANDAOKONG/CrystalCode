@@ -73,7 +73,8 @@ or `CrystalCode` on Windows.
 
 The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
-parent/child Agents, audio and video input, and non-text model output.
+parent/child Agents, audio and video input, non-text model output, and
+editing provider definitions in the TUI.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.
@@ -361,6 +362,7 @@ Host settings live in `~/.crystal/config.json`. Provider and model definitions
 live in `~/.crystal/providers.json`; the built-in DeepSeek and OpenAI catalog
 is available even when this file is absent. Operator definitions overlay that
 catalog. Edit the file you changed, then restart for the changes to take effect.
+Editing provider definitions in the TUI is deferred.
 
 When `providers.json` exists, it supplies the operator catalog, and the legacy
 `config.json.providers` field is not read. When `providers.json` is absent,

@@ -116,6 +116,7 @@ implemented in the current build:
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
   and Ollama Chat;
 - audio and video input, and image, audio, or video model output;
+- editing provider definitions in the TUI;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
 

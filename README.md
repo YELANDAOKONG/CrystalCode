@@ -125,7 +125,7 @@ Maintainers can write a commit message and commit the current change with [`comm
 - [Engineering standards](STANDARDS.md): source and verification rules
 - [Agent instructions](AGENTS.md): repository guidance for coding agents
 
-`crystal run` executes one task without a terminal and exits. MCP servers, an operating-system sandbox, parent/child agents, audio and video input, and non-text model output are planned but not yet implemented. Image input is available for supported models and providers.
+`crystal run` executes one task without a terminal and exits. MCP servers, an operating-system sandbox, parent/child agents, audio and video input, non-text model output, and editing provider definitions in the TUI are planned but not yet implemented. Image input is available for supported models and providers. `/model` selects a configured provider and model; it does not edit the catalog.
 
 ## License
 

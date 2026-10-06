@@ -718,7 +718,8 @@ read. Saving preferences copies legacy provider definitions to `providers.json`
 if needed, then preserves the legacy field in `config.json` so an older running
 version can continue reading it. Preference saves do not rewrite an existing
 `providers.json`. Duplicate model ids across protocols under one provider are
-rejected.
+rejected. Editing provider definitions in the TUI is deferred product work.
+The catalog changes by editing this file, then restarting.
 
 Project overlay (wins over home for named prompts, Crystal skills, and
 tool sets of the same directory name):
