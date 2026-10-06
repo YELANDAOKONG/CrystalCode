@@ -1,0 +1,13 @@
+<Project>
+
+  <!--
+    crystal version reads this metadata from the executable. It is the SDK
+    that compiled the assembly, not a product version. Projects outside this
+    repository, including Crystal, do not import this file.
+    The item name must match BuildIdentityReader.SdkMetadataKey.
+  -->
+  <ItemGroup Condition="'$(NETCoreSdkVersion)' != ''">
+    <AssemblyMetadata Include="NETCoreSdkVersion" Value="$(NETCoreSdkVersion)" />
+  </ItemGroup>
+
+</Project>

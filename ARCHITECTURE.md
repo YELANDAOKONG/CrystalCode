@@ -54,6 +54,16 @@ the question overlay, and the saved-session picker. `crystal run` supplies
 its own observer, approval prompt, question prompt, and session chooser. It
 does not own session logic, approval policy, prompts, storage, or tools, and
 it does not own the frame painter, composer buffer, or transcript log.
+`crystal version` and `crystal --version` print the build identity as plain
+text and exit: `Crystal Code` (this repository's commit), `Crystal` (the Crystal
+library repository's commit), `SDK` (the .NET SDK that compiled the
+executable), and `Runtime` (the shared framework hosting the process). A
+line is omitted when that value was not recorded. Commits are the
+40-character source revision the SDK appends to the assembly informational
+version. The assembly version placeholder is left unread. `SDK` is the
+`NETCoreSdkVersion` assembly metadata stamped by `Directory.Build.targets`
+for projects in this repository. The outbound `User-Agent` stays
+`Crystal Code`.
 
 ### CrystalCode.Tools
 
@@ -135,7 +145,7 @@ CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
-| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `run` is the headless task command |
+| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `run` is the headless task command. `version` prints the build identity |
 | `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, process-only setting overrides, and exit codes |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
@@ -158,6 +168,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
 | `Plugins/Providers` | Built-in DeepSeek, OpenAI-compatible, Responses, Anthropic, Gemini, and Ollama client factories |
+| `Version` | Build identity for `crystal version`: product commit, Crystal commit, compiling SDK, and host runtime |
 
 CrystalCode.Display:
 

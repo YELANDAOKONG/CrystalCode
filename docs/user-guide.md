@@ -164,6 +164,24 @@ and compaction at 80% of the selected model's `contextWindow`.
 If the provider has more than one model and neither `config.json` nor
 `--model` picks one, the process exits and asks for `--model`.
 
+## Version
+
+`crystal version` and `crystal --version` print the build identity and exit.
+They do not open the terminal and do not read configuration.
+
+```text
+Crystal Code  3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a
+Crystal       1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d
+SDK           10.0.201
+Runtime       .NET 10.0.4
+```
+
+`Crystal Code` is the commit of this repository. `Crystal` is the commit of
+the Crystal library repository. `SDK` is the .NET SDK that compiled the
+executable. `Runtime` is the shared framework hosting this process. A line
+is omitted when that value was not recorded. The commits and SDK version
+above are examples.
+
 ## Headless run
 
 `crystal run` runs one task and exits. It does not open the alternate

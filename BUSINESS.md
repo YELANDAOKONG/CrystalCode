@@ -19,7 +19,8 @@ the Crystal library they already own.
 
 The current product is a terminal application. `crystal` opens the
 terminal, which is the only operator surface. `crystal run` is a headless
-entry for one task and has no operator. The engine behind both is a
+entry for one task and has no operator. `crystal version` prints the build
+identity and exits. The engine behind the terminal and `crystal run` is a
 separate library with no terminal code. The product can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;
