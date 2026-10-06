@@ -33,8 +33,9 @@ public sealed class Workspace
 
     public string Root { get; private set; }
 
-    public bool TrySetRoot(string path, out string error)
+    public bool TryResolve(string path, out string candidate, out string error)
     {
+        candidate = string.Empty;
         error = string.Empty;
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -46,7 +47,6 @@ public sealed class Workspace
         var combined = Path.IsPathRooted(expanded)
             ? expanded
             : Path.Combine(Root, expanded);
-        string candidate;
         try
         {
             candidate = Canonicalize(Path.GetFullPath(combined));
@@ -62,6 +62,23 @@ public sealed class Workspace
         if (!Directory.Exists(candidate))
         {
             error = "Directory not found.";
+            candidate = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
+    public void SetRoot(string canonicalRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(canonicalRoot);
+        Root = canonicalRoot;
+    }
+
+    public bool TrySetRoot(string path, out string error)
+    {
+        if (!TryResolve(path, out var candidate, out error))
+        {
             return false;
         }
 

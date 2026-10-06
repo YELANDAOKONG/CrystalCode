@@ -52,7 +52,8 @@ internal sealed class HeadlessSession : IDisposable
                 Observer,
                 Approvals,
                 new FixedUserPrompt("unused"),
-                new DecliningSessionChooser()),
+                new DecliningSessionChooser(),
+                new ScriptedTrustPrompt(accept: false)),
             plugins);
     }
 

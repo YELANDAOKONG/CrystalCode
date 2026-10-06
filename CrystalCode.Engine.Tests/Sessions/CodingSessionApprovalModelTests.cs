@@ -266,7 +266,8 @@ public sealed class CodingSessionApprovalModelTests
                 observer,
                 approvals,
                 new FixedUserPrompt("unused"),
-                new DecliningSessionChooser()),
+                new DecliningSessionChooser(),
+                new ScriptedTrustPrompt(accept: false)),
             plugins);
     }
 

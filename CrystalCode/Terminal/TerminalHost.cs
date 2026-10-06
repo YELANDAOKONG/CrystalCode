@@ -38,7 +38,8 @@ internal sealed class TerminalHost
             new SessionProjection(renderer),
             new ApprovalPrompt(renderer),
             new QuestionPrompt(renderer),
-            new SessionPicker(renderer));
+            new SessionPicker(renderer),
+            new TrustPrompt(renderer));
         var session = CodingSession.Create(
             settings,
             settingsStore,

@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Prompts;
 
@@ -108,7 +109,7 @@ public sealed class InstructionDiscovery
     private static IReadOnlyList<string> EnumerateToGitRoot(string start)
     {
         var directories = new List<string>();
-        var gitRoot = FindGitRoot(start);
+        var gitRoot = GitRoot.Find(start);
         var current = start;
         while (true)
         {
@@ -128,27 +129,6 @@ public sealed class InstructionDiscovery
         }
 
         return directories;
-    }
-
-    private static string? FindGitRoot(string start)
-    {
-        var current = start;
-        while (true)
-        {
-            var git = Path.Combine(current, ".git");
-            if (Directory.Exists(git) || File.Exists(git))
-            {
-                return current;
-            }
-
-            var parent = Directory.GetParent(current);
-            if (parent is null)
-            {
-                return null;
-            }
-
-            current = parent.FullName;
-        }
     }
 
     private static bool TryAdd(List<string> parts, string path)

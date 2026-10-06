@@ -162,6 +162,16 @@ writes a starter `config.json` if one is missing. Defaults are
 provider `deepseek`, model `deepseek-flash`, approval `default`,
 and compaction at 80% of the selected model's `contextWindow`.
 
+The first interactive launch in a directory asks whether you trust it
+when `workspaceTrust` is on (the default). Inside a git repository the
+question names the repository root, and trusting it covers later
+launches in that repository. Outside a repository only that directory
+is trusted. Yes is written to `~/.crystal/trusted.json`. No exits
+without writing that file, so the next launch asks again. A redirected
+terminal cannot ask and exits with an error. `/trust off` skips later
+prompts. `/cd` into an untrusted root asks again; No stays in the
+current workspace.
+
 If the provider has more than one model and neither `config.json` nor
 `--model` picks one, the process exits and asks for `--model`.
 
@@ -211,7 +221,8 @@ interactive `crystal --resume <id>`.
 Flags override the saved configuration for this process only. They are
 not written to `config.json`. Do not put secrets on the command line.
 Omitted flags keep the saved value, or the product default when the
-saved value is also unset. `unlimited` removes that one cap.
+saved value is also unset. `--workspace-trust` does not: omitting it
+checks the directory. `unlimited` removes that one cap.
 
 | Option | Meaning |
 | :--- | :--- |
@@ -225,6 +236,7 @@ saved value is also unset. `unlimited` removes that one cap.
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. An unknown value exits 1 |
 | `--prompt-set <name>` | An existing home prompt set. `default` is always valid |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--workspace-trust <on\|off>` | Directory trust for this process only. Omitted and `on` refuse an untrusted directory. `off` skips the check and does not record trust. This does not follow `workspaceTrust` |
 | `--model-calls <count>` | Model rounds for this turn. Default 1024 |
 | `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
 | `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
@@ -235,6 +247,12 @@ saved value is also unset. `unlimited` removes that one cap.
 `--approval-model off` cannot be combined with `--approval-provider` or
 `--approval-model-id`. `--approval-model on` needs a saved approval model
 or `--approval-model-id`.
+
+`--workspace-trust` is not one of the flags that inherit the saved
+setting. Leaving it out checks the directory even when `workspaceTrust`
+is false in `config.json`. An untrusted directory exits 4 before a
+session starts. Trust it from the interactive terminal, or pass
+`--workspace-trust off` for that process.
 
 There is no operator. In Review and Audit the reviewing model still
 judges calls that require review: allow runs the tool, and deny returns
@@ -365,6 +383,7 @@ Top-level fields:
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `plugins` | Enable operator plugin discovery (default `true`) |
+| `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `verboseTools` | Show read, search, and skill result panels (default `true`; omitted when on) |
@@ -792,7 +811,8 @@ returns the transcript viewport to the latest output.
 | `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. While the model has not started, the panel shows the same spinner as the progress row. An empty `/btw` reopens it. Esc, Enter, or Space closes it. Left and Right step through earlier answers. `x` clears them |
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
-| `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded) |
+| `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here |
+| `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry |
 | `/resume` | `/continue` | Replay the latest session for this workspace, or `/resume <id>` |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
@@ -1124,6 +1144,7 @@ Override with `CRYSTAL_HOME` or `--home`.
   providers.json
   credentials.json
   permissions.json
+  trusted.json
   instructions.md
   AGENTS.md
   prompts/

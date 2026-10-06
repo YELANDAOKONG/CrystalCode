@@ -40,6 +40,13 @@ separate library with no terminal code. The product can:
   single or multiple selection, optional custom answers, and confirmation;
 - compact conversation context when usage approaches the model window,
   or when the operator runs `/compact`;
+- ask before the first interactive session in a directory, when workspace
+  trust is on (the default). Trust is the git root when the workspace is
+  inside a repository, and the workspace itself otherwise. A yes is
+  remembered under `~/.crystal/trusted.json`. A no exits without recording
+  a denial. `/cd` into an untrusted root asks again and stays put on no.
+  `/trust` shows the switch, turns it on or off, or forgets the current
+  root. Turning the switch off skips later prompts and keeps the ledger;
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model, Plan or Work, thinking, prompt set, skills,
@@ -48,7 +55,10 @@ separate library with no terminal code. The product can:
   per line when `--format json` is set. Review and Audit still use the
   reviewing model. That model can be a separate provider and model, and
   the choice can be turned off.
-  Anything that would ask the operator is denied;
+  Anything that would ask the operator is denied. Directory trust for that
+  command is its own switch, `--workspace-trust on|off`. Omitting it checks
+  trust even when the interactive switch is off. `off` skips the check for
+  that process and does not record the directory;
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - recall submitted prompts from the composer with Up/Down and retain up to 200
   recent text-only entries across runs for the same workspace;

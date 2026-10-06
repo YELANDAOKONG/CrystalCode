@@ -582,6 +582,47 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_OmitsWorkspaceTrustWhenEnabled()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+
+        var settings = store.LoadOrCreate();
+
+        Assert.True(settings.WorkspaceTrust);
+        Assert.DoesNotContain(
+            "workspaceTrust",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_ReadsWorkspaceTrustDisabled()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "workspaceTrust": false
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.WorkspaceTrust);
+        store.Save(settings);
+        Assert.Contains(
+            "\"workspaceTrust\": false",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_ReadsPluginsDisabled()
     {
         using var root = new TemporaryHome();

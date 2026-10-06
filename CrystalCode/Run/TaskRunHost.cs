@@ -6,6 +6,7 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Run;
 
@@ -77,6 +78,23 @@ internal static class TaskRunHost
                 await error.WriteLineAsync(applyError);
                 return RunExit.Invalid;
             }
+
+            if (!TaskRunOverrides.TryReadWorkspaceTrust(
+                    settings.WorkspaceTrust,
+                    out var checkWorkspaceTrust,
+                    out var trustError))
+            {
+                await error.WriteLineAsync(trustError);
+                return RunExit.Invalid;
+            }
+
+            if (checkWorkspaceTrust
+                && !new WorkspaceTrustStore(home).Contains(GitRoot.TrustRoot(workspace)))
+            {
+                await error.WriteLineAsync(
+                    "This directory is not trusted. Open it in the terminal and trust it, or pass --workspace-trust off for this process.");
+                return RunExit.Denied;
+            }
         }
         catch (Exception exception) when (IsSetupFailure(exception))
         {
@@ -115,7 +133,8 @@ internal static class TaskRunHost
                     log,
                     approvals,
                     questions,
-                    new UnattendedSessionChooser()),
+                    new UnattendedSessionChooser(),
+                    new UnattendedTrustPrompt()),
                 plugins ?? PluginRegistry.CreateBuiltIn());
         }
         catch (Exception exception) when (IsSetupFailure(exception))

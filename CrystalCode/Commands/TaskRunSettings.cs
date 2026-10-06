@@ -56,6 +56,9 @@ public sealed class TaskRunSettings : CommandSettings
     [CommandOption("--plugins <on|off>")]
     public string? Plugins { get; init; }
 
+    [CommandOption("--workspace-trust <on|off>")]
+    public string? WorkspaceTrust { get; init; }
+
     [CommandOption("--model-calls <COUNT>")]
     public string? ModelCalls { get; init; }
 

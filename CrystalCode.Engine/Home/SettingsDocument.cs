@@ -16,6 +16,8 @@ internal sealed class SettingsDocument
 
     public bool? Plugins { get; set; }
 
+    public bool? WorkspaceTrust { get; set; }
+
     public ExternalToolApprovalDocument? ExternalToolApproval { get; set; }
 
     public bool? EstimatedTokens { get; set; }

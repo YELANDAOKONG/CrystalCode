@@ -48,6 +48,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly TodoList _todos = new();
     private readonly MessageQueue _queue = new();
     private readonly GrantStore _grants;
+    private readonly WorkspaceTrustStore _trust;
     private readonly CrystalHome _home;
     private readonly SkillDiscovery _skillDiscovery;
     private readonly bool _replayOnStart;
@@ -105,6 +106,7 @@ public sealed class CodingSession : ITurnObserver
         SessionDocument? resume)
     {
         ArgumentNullException.ThrowIfNull(frontEnd);
+        ArgumentNullException.ThrowIfNull(frontEnd.Trust);
         ArgumentNullException.ThrowIfNull(plugins);
         ArgumentNullException.ThrowIfNull(credentials);
         _settings = settings;
@@ -123,6 +125,7 @@ public sealed class CodingSession : ITurnObserver
             () => _approval.Value);
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
+        _trust = new WorkspaceTrustStore(home);
         _home = home;
         _skillDiscovery = SkillDiscovery.Create(home);
         ReloadPlugins();
@@ -510,6 +513,8 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Cd:
                 await ChangeDirectoryAsync(command.Argument, cancellationToken);
                 return (true, false);
+            case SessionVerb.Trust:
+                return (true, await ChangeTrustAsync(command.Argument, cancellationToken));
             case SessionVerb.Fork:
                 ForkSession(command.Argument);
                 return (true, false);
@@ -1655,23 +1660,107 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (_workspace.TrySetRoot(argument, out var error))
+        if (!_workspace.TryResolve(argument, out var candidate, out var error))
         {
-            await ClosePluginSessionAsync(cancellationToken);
-            ReloadSkills();
-            ReloadPluginsWithProgress();
-            ReloadExternalToolsWithProgress();
-            ReloadPrompts();
-            RebuildExecutors();
-            WritePluginNotes();
-            WriteExternalNotes();
-            await OpenPluginSessionAsync(cancellationToken);
-            RefreshChrome();
-            Note("Workspace  " + _workspace.Root);
+            Error(error);
             return;
         }
 
-        Error(error);
+        if (!await ConfirmWorkspaceAsync(candidate, cancellationToken))
+        {
+            Note("Staying in " + _workspace.Root);
+            return;
+        }
+
+        _workspace.SetRoot(candidate);
+        await ClosePluginSessionAsync(cancellationToken);
+        ReloadSkills();
+        ReloadPluginsWithProgress();
+        ReloadExternalToolsWithProgress();
+        ReloadPrompts();
+        RebuildExecutors();
+        WritePluginNotes();
+        WriteExternalNotes();
+        await OpenPluginSessionAsync(cancellationToken);
+        RefreshChrome();
+        Note("Workspace  " + _workspace.Root);
+    }
+
+    private async Task<bool> ChangeTrustAsync(string argument, CancellationToken cancellationToken)
+    {
+        var command = argument.Trim().ToLowerInvariant();
+        var trustRoot = GitRoot.TrustRoot(_workspace.Root);
+        if (command.Length == 0)
+        {
+            Note("Workspace trust  " + (_settings.WorkspaceTrust ? "on" : "off"));
+            Note("Trust root  " + trustRoot);
+            Note("Trusted  " + (_trust.Contains(trustRoot) ? "yes" : "no"));
+            return false;
+        }
+
+        if (command is not ("on" or "off" or "forget"))
+        {
+            Error("Trust command must be /trust, /trust on|off, or /trust forget.");
+            return false;
+        }
+
+        if (command == "forget")
+        {
+            _trust.Forget(trustRoot);
+            Note("Forgot  " + trustRoot);
+            return false;
+        }
+
+        var enabled = command == "on";
+        _settings = _settings.WithWorkspaceTrust(enabled);
+        _settingsStore.Save(_settings);
+        Note("Workspace trust  " + (enabled ? "on" : "off"));
+        if (!enabled || _trust.Contains(trustRoot))
+        {
+            return false;
+        }
+
+        var accepted = await _frontEnd.Trust.ConfirmAsync(
+            new WorkspaceTrustRequest(_workspace.Root, trustRoot),
+            cancellationToken);
+        if (!accepted)
+        {
+            return true;
+        }
+
+        _trust.Remember(trustRoot);
+        Note("Trusted  " + trustRoot);
+        return false;
+    }
+
+    /// <summary>
+    /// Returns false when the operator declines, without recording that decline.
+    /// </summary>
+    private async Task<bool> ConfirmWorkspaceAsync(
+        string workspaceRoot,
+        CancellationToken cancellationToken)
+    {
+        if (!_settings.WorkspaceTrust)
+        {
+            return true;
+        }
+
+        var trustRoot = GitRoot.TrustRoot(workspaceRoot);
+        if (_trust.Contains(trustRoot))
+        {
+            return true;
+        }
+
+        var accepted = await _frontEnd.Trust.ConfirmAsync(
+            new WorkspaceTrustRequest(workspaceRoot, trustRoot),
+            cancellationToken);
+        if (!accepted)
+        {
+            return false;
+        }
+
+        _trust.Remember(trustRoot);
+        return true;
     }
 
     private PromptContext CurrentPromptContext() =>

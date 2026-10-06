@@ -1,6 +1,7 @@
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 using CrystalCode.Terminal;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -82,6 +83,35 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(error)}[/]");
             return 1;
+        }
+
+        if (harnessSettings.WorkspaceTrust && Directory.Exists(workspace))
+        {
+            var root = new Workspace(workspace).Root;
+            var trustRoot = GitRoot.TrustRoot(root);
+            var trust = new WorkspaceTrustStore(home);
+            if (!trust.Contains(trustRoot))
+            {
+                if (Console.IsInputRedirected)
+                {
+                    AnsiConsole.MarkupLine("[red]Trusting this directory requires a terminal.[/]");
+                    return 1;
+                }
+
+                using var trustRenderer = new SessionRenderer();
+                using (trustRenderer.Open())
+                {
+                    var accepted = await new TrustPrompt(trustRenderer).ConfirmAsync(
+                        new WorkspaceTrustRequest(root, trustRoot),
+                        cancellationToken);
+                    if (!accepted)
+                    {
+                        return 0;
+                    }
+                }
+
+                trust.Remember(trustRoot);
+            }
         }
 
         var plugins = PluginRegistry.CreateBuiltIn();

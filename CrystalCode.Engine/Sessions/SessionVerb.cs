@@ -19,6 +19,7 @@ public enum SessionVerb
     StatusLine,
     Clear,
     Cd,
+    Trust,
     Resume,
     Fork,
     Sessions,

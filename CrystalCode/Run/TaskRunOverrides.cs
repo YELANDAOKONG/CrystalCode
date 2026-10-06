@@ -195,6 +195,27 @@ internal static class TaskRunOverrides
         return parsed;
     }
 
+    internal static bool TryReadWorkspaceTrust(string? value, out bool enabled, out string error)
+    {
+        enabled = true;
+        error = string.Empty;
+        if (value is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            enabled = ParseSwitch(value, "--workspace-trust");
+            return true;
+        }
+        catch (ArgumentException exception)
+        {
+            error = exception.Message;
+            return false;
+        }
+    }
+
     private static bool ParseSwitch(string text, string flag)
     {
         var normalized = Required(text, flag).ToLowerInvariant();

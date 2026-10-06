@@ -643,6 +643,7 @@ contents of `binaries/code/`.
   prompt-history.jsonl
   credentials.json
   permissions.json
+  trusted.json
   instructions.md
   prompts/work.md
   prompts/plan.md
@@ -661,7 +662,15 @@ contents of `binaries/code/`.
 ```
 
 `config.json` stores mutable operator preferences such as the selected provider
-and model. For example, an unlimited time budget with finite call limits is:
+and model. `workspaceTrust` asks before the first interactive entry into a
+directory (default on; omitted when on, `false` when off). A yes is stored
+in `trusted.json` as the git root, or the workspace path when there is no
+git repository. That file is not written by the workspace. `crystal run`
+does not read `workspaceTrust`. `--workspace-trust on|off` is process-only:
+omitted or `on` denies an untrusted directory before the session exists,
+and `off` skips the check without recording trust.
+
+For example, an unlimited time budget with finite call limits is:
 
 ```json
 {
@@ -940,6 +949,8 @@ A front end supplies (`SessionFrontEnd`):
   is told when a call auto-passes or is under review.
 - `Questions` (`IUserPrompt`) answers the built-in `question` tool.
 - `Sessions` (`ISessionChooser`) picks a saved session for `/resume`.
+- `Trust` (`IWorkspaceTrustPrompt`) asks whether to trust a directory.
+  A front end that cannot ask returns false.
 
 A front end calls `CodingSession`: `Create`, `StartAsync`, `SubmitAsync`
 (slash commands, follow-ups while a turn runs, interrupts, and turn starts;
@@ -985,7 +996,7 @@ prefixes exactly the attached spans. Display cannot reference the engine, so it
 holds its own copy of the prefix; `ImageMarkerContractTests` keeps the two
 equal.
 
-Adding a front end means referencing CrystalCode.Engine, implementing the four
+Adding a front end means referencing CrystalCode.Engine, implementing the five
 contracts above, and projecting events onto its own surface. The terminal host
 in CrystalCode is the reference implementation. The headless test in
 CrystalCode.Engine.Tests is the smallest correct driver. A later Avalonia
@@ -1000,7 +1011,10 @@ Slash commands are rejected so they cannot change
 saved settings. Secrets are not command flags.
 
 The run supplies `RunLog` or `RunJsonLog`, `UnattendedApprovalPrompt`,
-`UnattendedUserPrompt`, and `UnattendedSessionChooser`. The approval prompt
+`UnattendedUserPrompt`, `UnattendedSessionChooser`, and
+`UnattendedTrustPrompt`. The trust prompt is a fail-closed fallback.
+The directory check itself runs before the session is created and follows
+`--workspace-trust`, not `workspaceTrust`. The approval prompt
 denies every call that would have asked the operator. The question prompt
 dismisses. Session choice is declined. Review and Audit still call the
 reviewing model: allow executes the tool, and deny returns the reviewer's

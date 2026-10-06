@@ -26,6 +26,8 @@ public sealed class CrystalHome
 
     public string PermissionsPath => Path.Combine(Root, "permissions.json");
 
+    public string TrustedPath => Path.Combine(Root, "trusted.json");
+
     public string SessionsDirectory => Path.Combine(Root, "sessions");
 
     public string MediaDirectory => Path.Combine(Root, "media");

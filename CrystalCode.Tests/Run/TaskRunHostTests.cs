@@ -11,6 +11,7 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 using CrystalCode.Run;
 
 using Xunit;
@@ -48,6 +49,100 @@ public sealed class TaskRunHostTests
         Assert.DoesNotContain("Stopped", result.Output, StringComparison.Ordinal);
         Assert.Equal(string.Empty, result.Error);
         fixture.AssertSettingsUnchanged();
+    }
+
+    [Fact]
+    public async Task UntrustedWorkspace_IsDeniedWithoutCreatingASession()
+    {
+        using var fixture = new RunFixture();
+        var untrusted = Directory.CreateTempSubdirectory("crystal-run-untrusted-").FullName;
+        try
+        {
+            var result = await fixture.RunAsync(
+                new ScriptedRunClient(AllowReview, TextRound("should not run")),
+                WorkspaceSettings(fixture, untrusted, workspaceTrust: "on"));
+
+            Assert.Equal(RunExit.Denied, result.Code);
+            Assert.Contains("not trusted", result.Error, StringComparison.Ordinal);
+            Assert.Contains("--workspace-trust off", result.Error, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, result.Output);
+            Assert.False(new WorkspaceTrustStore(new CrystalHome(fixture.Home)).Contains(untrusted));
+            fixture.AssertSettingsUnchanged();
+        }
+        finally
+        {
+            Directory.Delete(untrusted, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task UntrustedWorkspace_StaysDeniedWhenInteractiveTrustIsOff()
+    {
+        using var fixture = new RunFixture();
+        var untrusted = Directory.CreateTempSubdirectory("crystal-run-untrusted-").FullName;
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(fixture.Home, "config.json"),
+                """
+                {
+                  "provider": "ollama",
+                  "model": "qwen3:8b",
+                  "workspaceTrust": false
+                }
+                """);
+
+            var result = await fixture.RunAsync(
+                new ScriptedRunClient(AllowReview, TextRound("should not run")),
+                WorkspaceSettings(fixture, untrusted, workspaceTrust: null));
+
+            Assert.Equal(RunExit.Denied, result.Code);
+            Assert.Contains("not trusted", result.Error, StringComparison.Ordinal);
+            Assert.Contains(
+                "\"workspaceTrust\": false",
+                File.ReadAllText(Path.Combine(fixture.Home, "config.json")),
+                StringComparison.Ordinal);
+            Assert.False(new WorkspaceTrustStore(new CrystalHome(fixture.Home)).Contains(untrusted));
+        }
+        finally
+        {
+            Directory.Delete(untrusted, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WorkspaceTrustOff_RunsWithoutRecordingTheDirectory()
+    {
+        using var fixture = new RunFixture();
+        var untrusted = Directory.CreateTempSubdirectory("crystal-run-untrusted-").FullName;
+        try
+        {
+            var result = await fixture.RunAsync(
+                new ScriptedRunClient(AllowReview, TextRound("Hello there.")),
+                WorkspaceSettings(fixture, untrusted, workspaceTrust: "off"));
+
+            Assert.Equal(RunExit.Completed, result.Code);
+            Assert.Contains("Hello there.", result.Output, StringComparison.Ordinal);
+            Assert.False(new WorkspaceTrustStore(new CrystalHome(fixture.Home)).Contains(untrusted));
+            fixture.AssertSettingsUnchanged();
+        }
+        finally
+        {
+            Directory.Delete(untrusted, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WorkspaceTrust_RejectsAValueOtherThanOnOrOff()
+    {
+        using var fixture = new RunFixture();
+        var result = await fixture.RunAsync(
+            new ScriptedRunClient(AllowReview, TextRound("should not run")),
+            WorkspaceSettings(fixture, fixture.Workspace, workspaceTrust: "maybe"));
+
+        Assert.Equal(RunExit.Invalid, result.Code);
+        Assert.Contains("on or off", result.Error, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, result.Output);
     }
 
     [Fact]
@@ -496,6 +591,26 @@ public sealed class TaskRunHostTests
         return applied;
     }
 
+    private static TaskRunSettings WorkspaceSettings(
+        RunFixture fixture,
+        string workspace,
+        string? workspaceTrust)
+    {
+        var settings = fixture.Settings("Say hello");
+        return new TaskRunSettings
+        {
+            TaskText = settings.TaskText,
+            Home = settings.Home,
+            Workspace = workspace,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            Skills = settings.Skills,
+            ExternalTools = settings.ExternalTools,
+            Duration = settings.Duration,
+            WorkspaceTrust = workspaceTrust
+        };
+    }
+
     private static TaskRunSettings Copy(
         TaskRunSettings settings,
         string? approval = null,
@@ -558,11 +673,15 @@ public sealed class TaskRunHostTests
         {
             _home = Directory.CreateTempSubdirectory("crystal-run-home-").FullName;
             Workspace = Directory.CreateTempSubdirectory("crystal-run-workspace-").FullName;
-            new SettingsStore(new CrystalHome(_home)).LoadOrCreate();
+            var crystalHome = new CrystalHome(_home);
+            new SettingsStore(crystalHome).LoadOrCreate();
+            new WorkspaceTrustStore(crystalHome).Remember(Workspace);
             _configBefore = File.ReadAllBytes(Path.Combine(_home, "config.json"));
         }
 
         public string Workspace { get; }
+
+        public string Home => _home;
 
         public TaskRunSettings Settings(string? task) =>
             new()

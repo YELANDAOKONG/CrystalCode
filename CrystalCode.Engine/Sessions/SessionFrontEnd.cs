@@ -12,4 +12,5 @@ public sealed record SessionFrontEnd(
     ISessionObserver Observer,
     IApprovalPrompt Approvals,
     IUserPrompt Questions,
-    ISessionChooser Sessions);
+    ISessionChooser Sessions,
+    IWorkspaceTrustPrompt Trust);
