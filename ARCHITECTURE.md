@@ -1019,7 +1019,10 @@ the cursor at the right edge. The executable maps engine events onto that frame
 through `SessionProjection` and `SessionRenderer`; it does
 not paint rows itself. Entering the alternate screen sets the window
 title to Crystal Code when the terminal allows it, and restores the
-previous title on exit. Windows VT input mode is restored on screen disposal,
+previous title on exit. If setup fails after the alternate buffer is
+entered, the shell leaves that buffer, turns off bracketed paste and
+alternate scroll when those were enabled, and restores the title when
+it was changed. Windows VT input mode is restored on screen disposal,
 with a process-exit retry if the first restoration fails. When the terminal
 drops below the usable minimum
 (`ShellLayout.MinUsableWidth` x `ShellLayout.MinUsableHeight`, 80x24),
