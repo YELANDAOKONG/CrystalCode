@@ -16,6 +16,7 @@ profile_path=""
 profile_changed=false
 runtime_id=""
 binary_bytes=""
+previous_directory=""
 
 fail() {
     printf 'Check failed: %s\n' "$1" >&2
@@ -51,6 +52,97 @@ clear_directory() {
     fi
 
     detail "No previous ${label}."
+}
+
+# Command substitution drops a trailing newline, so a non-empty result
+# means the file does not end with one. Without this, the installer
+# comment is appended onto the last profile line.
+ensure_trailing_newline() {
+    if [ -s "$1" ] && [ -n "$(tail -c 1 "$1")" ]; then
+        printf '\n' >> "$1"
+    fi
+}
+
+# The live directory is renamed aside before the staged directory takes
+# its place. Both names are on one filesystem. Until the staged directory
+# lands, a failure or interrupt moves the previous install back.
+restore_install() {
+    if [ -z "$previous_directory" ]; then
+        return
+    fi
+
+    if [ ! -e "$install_directory" ] && [ -d "$previous_directory" ] && [ -d "$staging_directory" ]; then
+        if mv -- "$previous_directory" "$install_directory"; then
+            printf 'Restored the previous install at %s.\n' "$install_directory" >&2
+        else
+            printf 'Could not restore %s from %s.\n' "$install_directory" "$previous_directory" >&2
+        fi
+    fi
+}
+
+replace_install_directory() {
+    previous_directory="${install_directory}.previous"
+
+    case "$previous_directory" in
+        */.crystal/binaries/code.previous) ;;
+        *)
+            fail "Refusing to replace unexpected backup directory: ${previous_directory}"
+            ;;
+    esac
+
+    if [ -L "$previous_directory" ] || [ -L "$install_directory" ] || [ -L "$staging_directory" ]; then
+        fail "Refusing to replace a symbolic link."
+    fi
+
+    if [ -e "$previous_directory" ] && [ ! -d "$previous_directory" ]; then
+        fail "${previous_directory} exists and is not a directory."
+    fi
+
+    if [ -d "$previous_directory" ] && [ ! -e "$install_directory" ]; then
+        detail "Restoring the install directory after an interrupted replace."
+        if ! mv -- "$previous_directory" "$install_directory"; then
+            fail "Could not restore ${install_directory} from ${previous_directory}."
+        fi
+    fi
+
+    if [ -e "$previous_directory" ]; then
+        clear_directory "$previous_directory" "install backup"
+    fi
+
+    trap restore_install HUP INT TERM
+
+    if [ -d "$install_directory" ]; then
+        detail "Moving the current install aside."
+        if ! mv -- "$install_directory" "$previous_directory"; then
+            trap - HUP INT TERM
+            fail "Could not move ${install_directory} aside."
+        fi
+    elif [ -e "$install_directory" ]; then
+        trap - HUP INT TERM
+        fail "${install_directory} exists and is not a directory."
+    fi
+
+    detail "Moving the staged install into place."
+    if ! mv -- "$staging_directory" "$install_directory"; then
+        restore_install
+        trap - HUP INT TERM
+        if [ -e "$install_directory" ] && [ ! -e "$previous_directory" ]; then
+            fail "Could not move ${staging_directory} to ${install_directory}. Restored the previous install."
+        fi
+        if [ -d "$previous_directory" ]; then
+            fail "Could not move ${staging_directory} to ${install_directory}. The previous install is at ${previous_directory}."
+        fi
+        fail "Could not move ${staging_directory} to ${install_directory}."
+    fi
+
+    trap - HUP INT TERM
+
+    if [ -e "$previous_directory" ]; then
+        detail "Removing the previous install."
+        if ! rm -rf -- "$previous_directory"; then
+            detail "Could not remove ${previous_directory}. The new install is in place."
+        fi
+    fi
 }
 
 check_not_running() {
@@ -141,6 +233,7 @@ configure_path() {
     # Write a complete block when updating a partial or legacy configuration.
     # A later alias definition intentionally supersedes the legacy absolute-path alias.
     # The block matches scripts/install.sh.
+    ensure_trailing_newline "$profile_path"
     if [ "$(uname -s)" = "Linux" ]; then
         printf '\n\n\n' >> "$profile_path"
     fi
@@ -180,7 +273,7 @@ detail "Project: ${repository_root}/CrystalCode/CrystalCode.csproj"
 detail "Check passed: repository files exist."
 
 step "check" "Commands"
-for command_name in dotnet grep cp mv find chmod mkdir rm touch uname
+for command_name in dotnet grep cp mv find chmod mkdir rm touch uname tail
 do
     require_command "$command_name"
     detail "Found ${command_name}: $(command -v "$command_name")"
@@ -387,10 +480,7 @@ if [ "$staged_bytes" != "$binary_bytes" ]; then
 fi
 detail "Check passed: staged binary matches the build (${staged_bytes} bytes)."
 
-clear_directory "$install_directory" "install files"
-if ! mv -- "$staging_directory" "$install_directory"; then
-    fail "Could not move ${staging_directory} to ${install_directory}."
-fi
+replace_install_directory
 
 installed_binary="${install_directory}/${binary_name}"
 if [ ! -x "$installed_binary" ]; then

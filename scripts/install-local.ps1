@@ -29,19 +29,122 @@ function Detail([string]$message) {
     Write-Host "  $message"
 }
 
+function Test-ReparsePoint([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) {
+        return $false
+    }
+
+    $item = Get-Item -LiteralPath $path -Force
+    return [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)
+}
+
 function Clear-InstallTree([string]$target, [string]$label) {
     if (-not (Test-Path -LiteralPath $target)) {
         Detail "No previous $label."
         return
     }
 
-    $item = Get-Item -LiteralPath $target -Force
-    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+    if (Test-ReparsePoint $target) {
         Fail "Refusing to remove $target because it is a symbolic link."
     }
 
     Detail "Removing previous $label."
     Remove-Item -LiteralPath $target -Recurse -Force
+}
+
+function Install-StagedDirectory([string]$installPath, [string]$stagingPath) {
+    $parent = Split-Path -Parent $installPath
+    $previousPath = Join-Path $parent "code.previous"
+    $expectedInstall = Join-Path $parent "code"
+    $expectedStaging = Join-Path $parent "code.new"
+    $backupSuffix = [System.IO.Path]::Combine(".crystal", "binaries", "code.previous")
+
+    if ($installPath -ne $expectedInstall) {
+        Fail "Refusing to replace unexpected install directory: $installPath"
+    }
+
+    if ($stagingPath -ne $expectedStaging) {
+        Fail "Refusing to replace unexpected staging directory: $stagingPath"
+    }
+
+    if (-not $previousPath.EndsWith($backupSuffix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Fail "Refusing to replace unexpected backup directory: $previousPath"
+    }
+
+    foreach ($candidate in @($previousPath, $installPath, $stagingPath)) {
+        if (Test-ReparsePoint $candidate) {
+            Fail "Refusing to replace $candidate because it is a symbolic link."
+        }
+    }
+
+    if ((Test-Path -LiteralPath $previousPath) -and -not (Test-Path -LiteralPath $previousPath -PathType Container)) {
+        Fail "$previousPath exists and is not a directory."
+    }
+
+    # An interrupted replace leaves the live directory missing and the
+    # previous tree beside it. Put that tree back before trying again.
+    if ((Test-Path -LiteralPath $previousPath -PathType Container) -and -not (Test-Path -LiteralPath $installPath)) {
+        Detail "Restoring the install directory after an interrupted replace."
+        Move-Item -LiteralPath $previousPath -Destination $installPath
+    }
+
+    if (Test-Path -LiteralPath $previousPath) {
+        Clear-InstallTree $previousPath "install backup"
+    }
+
+    $replaceFailed = $false
+    $restoredPrevious = $false
+    try {
+        if (Test-Path -LiteralPath $installPath) {
+            Detail "Moving the current install aside."
+            Move-Item -LiteralPath $installPath -Destination $previousPath
+        }
+
+        Detail "Moving the staged install into place."
+        Move-Item -LiteralPath $stagingPath -Destination $installPath
+    }
+    catch {
+        $replaceFailed = $true
+    }
+    finally {
+        $installMissing = -not (Test-Path -LiteralPath $installPath)
+        $backupRemains = Test-Path -LiteralPath $previousPath -PathType Container
+        $stagedRemains = Test-Path -LiteralPath $stagingPath -PathType Container
+        if ($installMissing -and $backupRemains -and $stagedRemains) {
+            Move-Item -LiteralPath $previousPath -Destination $installPath
+            $restoredPrevious = $true
+            if (-not $replaceFailed) {
+                [Console]::Error.WriteLine("Restored the previous install at $installPath.")
+            }
+        }
+    }
+
+    if ($replaceFailed) {
+        if ($restoredPrevious) {
+            Fail "Could not move $stagingPath to $installPath. Restored the previous install."
+        }
+
+        if (Test-Path -LiteralPath $previousPath -PathType Container) {
+            Fail "Could not move $stagingPath to $installPath. The previous install is at $previousPath."
+        }
+
+        Fail "Could not move $stagingPath to $installPath."
+    }
+
+    if (Test-Path -LiteralPath $previousPath) {
+        Detail "Removing the previous install."
+        if (Test-ReparsePoint $previousPath) {
+            Detail "Could not remove $previousPath because it is a symbolic link. The new install is in place."
+        }
+        else {
+            try {
+                Remove-Item -LiteralPath $previousPath -Recurse -Force -ErrorAction Stop
+            }
+            catch {
+                Detail "Could not remove $previousPath. The new install is in place."
+            }
+        }
+    }
 }
 
 function Test-CrystalCodeStopped {
@@ -197,7 +300,7 @@ if ($installDirectory -ne $expectedDirectory) {
 
 if (Test-Path -LiteralPath $installDirectory) {
     $installItem = Get-Item -LiteralPath $installDirectory -Force
-    if ($installItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+    if (Test-ReparsePoint $installDirectory) {
         Fail "Refusing to replace $installDirectory because it is a symbolic link."
     }
     if (-not $installItem.PSIsContainer) {
@@ -237,11 +340,8 @@ Detail "Runtime: $runtimeId"
 Detail "Self-contained: true"
 Detail "PublishSingleFile: true"
 
-if (Test-Path -LiteralPath $publishDirectory) {
-    $publishItem = Get-Item -LiteralPath $publishDirectory -Force
-    if ($publishItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-        Fail "Refusing to remove $publishDirectory because it is a symbolic link."
-    }
+if (Test-ReparsePoint $publishDirectory) {
+    Fail "Refusing to remove $publishDirectory because it is a symbolic link."
 }
 
 Clear-InstallTree $publishDirectory "build output"
@@ -299,8 +399,7 @@ if ($stagedBytes -ne $binaryBytes) {
 }
 Detail "Check passed: staged binary matches the build ($stagedBytes bytes)."
 
-Clear-InstallTree $installDirectory "install files"
-Move-Item -LiteralPath $stagingDirectory -Destination $installDirectory
+Install-StagedDirectory $installDirectory $stagingDirectory
 
 $installedBinary = Join-Path $installDirectory $BinaryName
 if (-not (Test-Path -LiteralPath $installedBinary -PathType Leaf)) {

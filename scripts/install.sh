@@ -17,6 +17,15 @@ require_command() {
     fi
 }
 
+# Command substitution drops a trailing newline, so a non-empty result
+# means the file does not end with one. Without this, the installer
+# comment is appended onto the last profile line.
+ensure_trailing_newline() {
+    if [ -s "$1" ] && [ -n "$(tail -c 1 "$1")" ]; then
+        printf '\n' >> "$1"
+    fi
+}
+
 configure_path() {
     profile_path=""
     profile_comment="# Crystal Code CLI (Installer)"
@@ -59,6 +68,7 @@ configure_path() {
         return
     fi
 
+    ensure_trailing_newline "$profile_path"
     if [ "$(uname -s)" = "Linux" ]; then
         printf '\n\n\n' >> "$profile_path"
     fi
@@ -120,6 +130,7 @@ require_command curl
 require_command unzip
 require_command mktemp
 require_command grep
+require_command tail
 
 asset="$(detect_asset)"
 archive_name="CrystalCode-${asset}.zip"
