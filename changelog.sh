@@ -1,13 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ $# -ne 2 || -z "$1" || -z "$2" ]]; then
-    echo "Usage: ./changelog.sh <FROM> <TO>" >&2
+if [[ $# -lt 2 || -z "$1" || -z "$2" ]]; then
+    echo "Usage: ./changelog.sh <FROM> <TO> [MESSAGE...]" >&2
     exit 2
 fi
 
 FROM=$1
 TO=$2
+shift 2
 
 CMD="crystal"
 if ! command -v crystal >/dev/null 2>&1; then
@@ -40,6 +41,10 @@ Each item is one list line. Start with an asterisk and a space, then a noun phra
 After a blank line, end with a blockquote. Its label is bold Full Changelog. If origin is a GitHub remote, follow the label with the https compare URL for these two refs joined by three dots, leaving HEAD as HEAD, and strip a trailing .git. Otherwise follow the label with the two refs joined by three dots.
 
 Range start: ${FROM}
-Range end: ${TO}"
+Range end: ${TO}\n\n"
+TASK="$BASE_MSG"
+for arg in "$@"; do
+    TASK+=$'\n'"$arg"
+done
 
-"$CMD" run --workspace . --approval review --work --show-thinking --external-tools off --workspace-trust off --duration 600 "$BASE_MSG"
+"$CMD" run --workspace . --approval review --work --show-thinking --external-tools off --workspace-trust off --duration 600 "$TASK"
