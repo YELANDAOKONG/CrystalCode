@@ -22,6 +22,11 @@ public sealed class TranscriptCardTests
         Assert.Contains("hello", user, StringComparison.Ordinal);
         Assert.Contains("Thinking", thinking, StringComparison.Ordinal);
         Assert.Contains("Result", result, StringComparison.Ordinal);
+        var summary = string.Join(
+            '\n',
+            WidgetPaint.Plain(TranscriptCard.TryCreate(TranscriptKind.Summary, "## Objective")!, 48));
+        Assert.Contains("Earlier context", summary, StringComparison.Ordinal);
+        Assert.Contains("## Objective", summary, StringComparison.Ordinal);
     }
 
     [Fact]

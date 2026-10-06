@@ -622,7 +622,8 @@ a turn is running. User and assistant text in the folded head are replaced
 by the summary; they are not kept beside it. The screen keeps the earlier
 lines. When `showCompactionSummary` is on (the default; omitted from
 `config.json` when on, `false` when off), the stored summary is printed
-under those lines. Automatic compaction does not print it.
+under those lines in a rounded panel titled `Earlier context`. Automatic
+compaction does not print it.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a successful `/compact`, and on an orderly exit

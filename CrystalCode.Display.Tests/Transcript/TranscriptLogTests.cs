@@ -72,6 +72,20 @@ public sealed class TranscriptLogTests
     }
 
     [Fact]
+    public void BuildLines_FramesCompactionSummary()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.Summary, "## Objective\n- Continue.");
+
+        var text = string.Join('\n', log.BuildLines(48).Select(line => line.Plain));
+
+        Assert.Contains("╭", text, StringComparison.Ordinal);
+        Assert.Contains("Earlier context", text, StringComparison.Ordinal);
+        Assert.Contains("## Objective", text, StringComparison.Ordinal);
+        Assert.Contains("╰", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildLines_LiveThinkingAppendMatchesTheFullCard()
     {
         const int width = 36;

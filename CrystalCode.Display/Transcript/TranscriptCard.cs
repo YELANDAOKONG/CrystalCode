@@ -6,7 +6,7 @@ using Spectre.Console.Rendering;
 namespace CrystalCode.Display.Transcript;
 
 /// <summary>
-/// Shared rounded panel for user, thinking, tool, and result blocks.
+/// Shared rounded panel for user, thinking, tool, result, and summary blocks.
 /// </summary>
 public static class TranscriptCard
 {
@@ -111,6 +111,7 @@ public static class TranscriptCard
             TranscriptKind.Tool => "Tool",
             TranscriptKind.Result => "Result",
             TranscriptKind.Error => "Error",
+            TranscriptKind.Summary => "Earlier context",
             _ => null
         };
 
@@ -122,6 +123,7 @@ public static class TranscriptCard
             TranscriptKind.Tool => Theme.Tool,
             TranscriptKind.Result => Theme.Ok,
             TranscriptKind.Error => Theme.Fail,
+            TranscriptKind.Summary => Theme.User,
             _ => Theme.Chrome
         };
 
@@ -133,6 +135,7 @@ public static class TranscriptCard
             TranscriptKind.Tool => Theme.Chrome,
             TranscriptKind.Result => Theme.Rule,
             TranscriptKind.Error => Theme.Fail,
+            TranscriptKind.Summary => Theme.Chrome,
             _ => Theme.Chrome
         };
 }

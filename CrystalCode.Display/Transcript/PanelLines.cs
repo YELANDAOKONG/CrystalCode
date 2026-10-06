@@ -19,7 +19,8 @@ internal static class PanelLines
         kind is TranscriptKind.User
             or TranscriptKind.Thinking
             or TranscriptKind.Tool
-            or TranscriptKind.Error;
+            or TranscriptKind.Error
+            or TranscriptKind.Summary;
 
     internal static int PanelWidth(int width) => Math.Max(width, WidgetPaint.MinimumWidth);
 

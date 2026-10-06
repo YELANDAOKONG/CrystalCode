@@ -1,5 +1,6 @@
 using CrystalCode.Display.Cards;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 
@@ -49,6 +50,9 @@ internal sealed class SessionProjection : ISessionObserver
                 break;
             case PromptHistoryLoaded history:
                 _renderer.SeedPromptHistory(history.Entries);
+                break;
+            case NoteWritten note when TryCompactionSummary(note.Text, out var summary):
+                _renderer.WriteSummary(summary);
                 break;
             case NoteWritten note:
                 _renderer.WriteNote(note.Text);
@@ -149,6 +153,18 @@ internal sealed class SessionProjection : ISessionObserver
         _renderer.VerboseApprovals = preferences.VerboseApprovals;
         _renderer.VerboseThinking = preferences.VerboseThinking;
         _renderer.SetStatusLine(preferences.StatusLineEnabled, preferences.StatusLineFields);
+    }
+
+    private static bool TryCompactionSummary(string text, out string body)
+    {
+        if (!text.StartsWith(CompactionPrompt.Marker, StringComparison.Ordinal))
+        {
+            body = string.Empty;
+            return false;
+        }
+
+        body = text[CompactionPrompt.Marker.Length..].TrimStart('\r', '\n').Trim();
+        return body.Length > 0;
     }
 
     private static string Caption(SessionActivity activity) =>

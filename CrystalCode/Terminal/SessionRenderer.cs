@@ -401,6 +401,11 @@ public sealed class SessionRenderer : IDisposable
         Add(TranscriptKind.Note, text);
     }
 
+    public void WriteSummary(string text)
+    {
+        Add(TranscriptKind.Summary, text);
+    }
+
     internal void WriteNote(IRenderable widget, string fallbackText)
     {
         ArgumentNullException.ThrowIfNull(widget);

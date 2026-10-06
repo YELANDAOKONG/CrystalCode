@@ -627,7 +627,7 @@ the frame is already up.
 
 Assistant text is rendered as markdown while it streams and after it
 commits (headings, lists, fenced code, inline code and bold). User,
-thinking, tool, and result blocks are rounded panels. Tool names in
+thinking, tool, result, and compaction-summary blocks are rounded panels. Tool names in
 chrome are Title Case. Approval cards for edit and write show a short
 `+` / `-` preview of the change.
 
@@ -1214,8 +1214,8 @@ user turn. A session with nothing before that turn prints
 `Nothing earlier to compact`. It is refused while a turn is running. A
 successful compact is written to the session file. The screen keeps the
 earlier lines. When `showCompactionSummary` is on (the default), the
-summary is printed under those lines. Automatic compaction does not print
-it. `/resume` restores that full conversation, while the model continues
+summary is printed under those lines in a rounded panel titled
+`Earlier context`. Automatic compaction does not print it. `/resume` restores that full conversation, while the model continues
 from the summary and tail, and refreshes only the live system prompt.
 
 ## Data directory

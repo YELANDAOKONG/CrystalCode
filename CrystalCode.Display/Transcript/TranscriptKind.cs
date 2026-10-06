@@ -12,5 +12,6 @@ public enum TranscriptKind
     Result,
     Note,
     Error,
-    Approval
+    Approval,
+    Summary
 }

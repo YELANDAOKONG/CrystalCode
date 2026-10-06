@@ -550,6 +550,7 @@ public sealed class TranscriptLog
             TranscriptKind.Note => Theme.Chrome,
             TranscriptKind.Error => Theme.Fail,
             TranscriptKind.Approval => Theme.Review,
+            TranscriptKind.Summary => Theme.User,
             _ => Theme.Chrome
         };
 }

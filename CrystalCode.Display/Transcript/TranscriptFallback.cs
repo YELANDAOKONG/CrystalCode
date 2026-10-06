@@ -19,6 +19,7 @@ public static class TranscriptFallback
             TranscriptKind.Tool => Theme.Tool,
             TranscriptKind.Approval => Theme.Review,
             TranscriptKind.User => Theme.User,
+            TranscriptKind.Summary => Theme.User,
             _ => Theme.Chrome
         };
         var card = TranscriptCard.TryCreate(kind, text);
