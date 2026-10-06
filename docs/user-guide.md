@@ -421,6 +421,7 @@ Top-level fields:
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
 | `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
+| `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). Automatic compaction still prints only `Compacted context` |
 | `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 120 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
 
 Add named endpoints and model tables in `providers.json`, not in new
@@ -701,8 +702,8 @@ Interrupt does not drop queued text.
    estimated transcript or the last model-round usage is over budget;
    if compaction cannot reduce further, the turn stops.
 7. After a completed turn, consider compaction from that last round
-   and the estimated transcript. `/compact` summarizes older context
-   immediately.
+   and the estimated transcript. `/compact` summarizes earlier context
+   immediately and prints the summary.
 
 ## Modes
 
@@ -857,7 +858,7 @@ returns the transcript viewport to the latest output.
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
-| `/compact` | `/summarize` | Summarize older context now (refused while a turn is running) |
+| `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running) |
 | `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
 | `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
@@ -1205,11 +1206,16 @@ model's usable window, the host:
 CTX percent is the last model round, not the sum of rounds in a turn.
 The transcript prints `compacting context...` and the progress row
 shows `Compacting` while this runs; the frame keeps painting so the
-terminal does not freeze. `/compact` (alias `/summarize`) runs this
-immediately. It is refused while a turn is running. A successful
-compact is written to the session file. The screen keeps the earlier lines.
-`/resume` restores that full conversation, while the model continues from
-the summary and tail, and refreshes only the live system prompt.
+terminal does not freeze. `/compact` (alias `/summarize`) runs
+immediately and does not wait for the threshold. When the retained tail
+already holds every turn, it still summarizes everything before the latest
+user turn. A session with nothing before that turn prints
+`Nothing earlier to compact`. It is refused while a turn is running. A
+successful compact is written to the session file. The screen keeps the
+earlier lines. When `showCompactionSummary` is on (the default), the
+summary is printed under those lines. Automatic compaction does not print
+it. `/resume` restores that full conversation, while the model continues
+from the summary and tail, and refreshes only the live system prompt.
 
 ## Data directory
 

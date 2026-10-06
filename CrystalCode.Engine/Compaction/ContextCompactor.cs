@@ -43,11 +43,17 @@ public sealed class ContextCompactor
                 PromptContext.InstructionsOnly(string.Empty).WithMode("compaction")));
     }
 
+    /// <summary>
+    /// Summarizes older turns. When <paramref name="force"/> is set, history
+    /// that still fits in the retained tail is summarized too, and only the
+    /// latest user turn stays verbatim.
+    /// </summary>
     public async Task<CompactionOutcome> CompactAsync(
         IReadOnlyList<ChatItem> transcript,
         string todos,
         CompactionLimits limits,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool force = false)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(todos);
@@ -61,6 +67,11 @@ public sealed class ContextCompactor
         var pruned = ToolResultPruner.Prune(transcript, OmittedResultText);
         var prunedChanged = WasRewritten(transcript, pruned);
         var split = CompactionSelection.Choose(pruned, limits.ResolveTailBudget());
+        if (split.Head.Count == 0 && force)
+        {
+            split = CompactionSelection.ChooseLatestTurn(pruned);
+        }
+
         if (split.Head.Count == 0)
         {
             return prunedChanged
@@ -115,9 +126,11 @@ public sealed class ContextCompactor
             }
 
             summary = Finish(PluginCompactionPhase.Summary, summary.Trim());
+            var stored = FormatSummary(summary, todos);
             return new CompactionOutcome(
-                Rebuild(pruned, split, summary, todos),
-                CompactionKind.Applied);
+                Rebuild(pruned, split, stored),
+                CompactionKind.Applied,
+                stored);
         }
         catch (OperationCanceledException)
         {
@@ -139,8 +152,7 @@ public sealed class ContextCompactor
     private static IReadOnlyList<ChatItem> Rebuild(
         IReadOnlyList<ChatItem> pruned,
         CompactionSplit split,
-        string summary,
-        string todos)
+        string storedSummary)
     {
         var kept = new List<ChatItem>();
         if (pruned.Count > 0
@@ -151,7 +163,7 @@ public sealed class ContextCompactor
             kept.Add(system);
         }
 
-        kept.Add(new ChatMessage(ChatRole.System, FormatSummary(summary, todos)));
+        kept.Add(new ChatMessage(ChatRole.System, storedSummary));
         kept.AddRange(split.Tail);
         return kept;
     }

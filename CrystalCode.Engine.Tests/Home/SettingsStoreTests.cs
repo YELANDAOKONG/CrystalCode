@@ -738,6 +738,38 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsShowCompactionSummary()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "showCompactionSummary": false
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.ShowCompactionSummary);
+        store.Save(settings);
+        Assert.Contains(
+            "\"showCompactionSummary\": false",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+        store.Save(settings.WithShowCompactionSummary(true));
+        Assert.DoesNotContain(
+            "showCompactionSummary",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+        Assert.True(store.Load().ShowCompactionSummary);
+    }
+
+    [Fact]
     public void Save_WritesProviderAndModelSelection()
     {
         using var root = new TemporaryHome();

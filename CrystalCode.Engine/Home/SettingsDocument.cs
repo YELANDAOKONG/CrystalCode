@@ -40,6 +40,8 @@ internal sealed class SettingsDocument
 
     public double? CompactionThreshold { get; set; }
 
+    public bool? ShowCompactionSummary { get; set; }
+
     public System.Text.Json.JsonElement? ExecutionBudget { get; set; }
 
     public System.Text.Json.JsonElement? BashTimeoutSeconds { get; set; }

@@ -33,7 +33,7 @@ public static class SlashCatalog
         new(SessionVerb.Resume, "resume", ["continue"], "Choose a session, workspace, or all", ["all"]),
         new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
         new(SessionVerb.Sessions, "sessions", [], "List workspace sessions or all", ["all"]),
-        new(SessionVerb.Compact, "compact", ["summarize"], "Summarize older context now"),
+        new(SessionVerb.Compact, "compact", ["summarize"], "Summarize earlier context now and print the summary"),
         new(SessionVerb.Todos, "todos", ["todo"], "Show the full session todo list"),
         new(SessionVerb.Tools, "tools", [], "List tools or configure external tool sets",
             ["on", "off", "reload", "enable", "disable", "show", "home", "project"]),

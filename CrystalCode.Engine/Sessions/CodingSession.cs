@@ -1992,7 +1992,8 @@ public sealed class CodingSession : ITurnObserver
         await RunCompactionAsync(
             _transcript,
             silentSkip: false,
-            cancellationToken);
+            cancellationToken,
+            force: true);
     }
 
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
@@ -2045,7 +2046,8 @@ public sealed class CodingSession : ITurnObserver
     private async Task<CompactionOutcome> RunCompactionAsync(
         IReadOnlyList<ChatItem> transcript,
         bool silentSkip,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool force = false)
     {
         Note("Compacting context...");
         SetActivity(SessionActivity.Compacting);
@@ -2058,7 +2060,8 @@ public sealed class CodingSession : ITurnObserver
                 transcript,
                 _todos.Format(),
                 CurrentLimits(),
-                compactSource.Token);
+                compactSource.Token,
+                force);
         }
         finally
         {
@@ -2082,6 +2085,13 @@ public sealed class CodingSession : ITurnObserver
             }
 
             Note("Compacted context");
+            if (force
+                && _settings.ShowCompactionSummary
+                && !string.IsNullOrWhiteSpace(outcome.Summary))
+            {
+                Note(outcome.Summary);
+            }
+
             return outcome;
         }
 
@@ -2093,7 +2103,7 @@ public sealed class CodingSession : ITurnObserver
 
         if (!silentSkip)
         {
-            Note("Compaction skipped");
+            Note("Nothing earlier to compact");
         }
 
         return outcome;

@@ -20,7 +20,10 @@ internal sealed class HeadlessSession : IDisposable
     private readonly TemporaryHome _home = new();
     private readonly TemporaryWorkspace _workspace = new();
 
-    public HeadlessSession(IStreamingChatClient client, SessionDocument? resume = null)
+    public HeadlessSession(
+        IStreamingChatClient client,
+        SessionDocument? resume = null,
+        bool showCompactionSummary = true)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -37,6 +40,10 @@ internal sealed class HeadlessSession : IDisposable
             ApprovalMode.Default,
             0.8,
             ProviderCatalog.CreateStarter().Overlay([provider]));
+        if (!showCompactionSummary)
+        {
+            settings = settings.WithShowCompactionSummary(false);
+        }
 
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());

@@ -94,6 +94,55 @@ public sealed class ContextCompactorTests
 
         Assert.Equal(CompactionKind.Unchanged, outcome.Kind);
         Assert.Null(client.LastRequest);
+        Assert.Null(outcome.Summary);
+    }
+
+    [Fact]
+    public async Task CompactAsync_ForceSummarizesWhenTheTailAlreadyHoldsEveryTurn()
+    {
+        var client = new FixedChatClient("## Objective\n- Continue.");
+        var compactor = new ContextCompactor(client);
+
+        var outcome = await compactor.CompactAsync(
+            LongTranscript(),
+            "No todos.",
+            new CompactionLimits(100_000, tailBudget: 10_000),
+            force: true);
+
+        Assert.Equal(CompactionKind.Applied, outcome.Kind);
+        Assert.NotNull(client.LastRequest);
+        Assert.NotNull(outcome.Summary);
+        Assert.Contains("Continue.", outcome.Summary, StringComparison.Ordinal);
+        Assert.StartsWith(CompactionPrompt.Marker, outcome.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            outcome.Transcript,
+            item => item is ChatMessage { Role.Value: "user", Text: "first" });
+        Assert.Contains(
+            outcome.Transcript,
+            item => item is ChatMessage { Role.Value: "user", Text: "third" });
+    }
+
+    [Fact]
+    public async Task CompactAsync_ForceLeavesASingleTurnUnchanged()
+    {
+        var client = new FixedChatClient("should not run");
+        var compactor = new ContextCompactor(client);
+        var transcript = new List<ChatItem>
+        {
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "only"),
+            new ChatMessage(ChatRole.Assistant, "ok")
+        };
+
+        var outcome = await compactor.CompactAsync(
+            transcript,
+            "No todos.",
+            new CompactionLimits(100_000, tailBudget: 10_000),
+            force: true);
+
+        Assert.Equal(CompactionKind.Unchanged, outcome.Kind);
+        Assert.Null(client.LastRequest);
+        Assert.Null(outcome.Summary);
     }
 
     [Fact]

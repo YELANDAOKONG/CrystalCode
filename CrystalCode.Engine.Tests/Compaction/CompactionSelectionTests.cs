@@ -38,6 +38,31 @@ public sealed class CompactionSelectionTests
         Assert.DoesNotContain(split.Tail, CompactionSelection.IsSummary);
     }
 
+    [Fact]
+    public void ChooseLatestTurn_FoldsEveryTurnExceptTheLast()
+    {
+        var split = CompactionSelection.ChooseLatestTurn(Sample());
+
+        Assert.Contains(split.Head, item => item is ChatMessage { Role.Value: "user", Text: "first" });
+        Assert.Contains(split.Head, item => item is ChatMessage { Role.Value: "user", Text: "second" });
+        Assert.Contains(split.Tail, item => item is ChatMessage { Role.Value: "user", Text: "third" });
+        Assert.DoesNotContain(split.Tail, item => item is ChatMessage { Role.Value: "user", Text: "first" });
+    }
+
+    [Fact]
+    public void ChooseLatestTurn_HasAnEmptyHeadForOneTurn()
+    {
+        var split = CompactionSelection.ChooseLatestTurn(
+        [
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "only"),
+            new ChatMessage(ChatRole.Assistant, "ok")
+        ]);
+
+        Assert.Empty(split.Head);
+        Assert.Contains(split.Tail, item => item is ChatMessage { Role.Value: "user", Text: "only" });
+    }
+
     private static List<ChatItem> Sample() =>
     [
         new ChatMessage(ChatRole.System, "work"),

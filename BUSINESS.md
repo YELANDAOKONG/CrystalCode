@@ -40,8 +40,10 @@ separate library with no terminal code. The product can:
 - ask one or more operator questions in one request, with described choices,
   single or multiple selection, optional custom answers, and confirmation;
 - compact the context sent to the model when usage approaches the model
-  window, or when the operator runs `/compact`, while keeping the full
-  conversation for resume, fork, and export;
+  window, or when the operator runs `/compact`. Manual compaction summarizes
+  earlier turns without waiting for that threshold, prints the summary unless
+  `showCompactionSummary` is off, and keeps the full conversation for resume,
+  fork, and export;
 - ask before the first interactive session in a directory, when workspace
   trust is on (the default). Trust is the git root when the workspace is
   inside a repository, and the workspace itself otherwise. A yes is

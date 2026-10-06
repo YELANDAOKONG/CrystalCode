@@ -35,6 +35,33 @@ public static class CompactionSelection
 
     public static CompactionSplit Choose(IReadOnlyList<ChatItem> items, int tailBudget)
     {
+        var (working, previous) = Prepare(items);
+        if (working.Count == 0)
+        {
+            return new CompactionSplit([], [], previous);
+        }
+
+        var split = TailStart(working, tailBudget);
+        return SplitAt(working, split, previous);
+    }
+
+    /// <summary>
+    /// Keeps only the latest user turn verbatim and folds everything before it.
+    /// </summary>
+    public static CompactionSplit ChooseLatestTurn(IReadOnlyList<ChatItem> items)
+    {
+        var (working, previous) = Prepare(items);
+        var turns = UserStarts(working);
+        if (turns.Count == 0)
+        {
+            return new CompactionSplit([], working, previous);
+        }
+
+        return SplitAt(working, turns[^1], previous);
+    }
+
+    private static (List<ChatItem> Working, string? Previous) Prepare(IReadOnlyList<ChatItem> items)
+    {
         ArgumentNullException.ThrowIfNull(items);
         var previous = LastSummaryBody(items);
         var working = new List<ChatItem>();
@@ -48,17 +75,17 @@ public static class CompactionSelection
             working.Add(items[i]);
         }
 
-        if (working.Count == 0)
-        {
-            return new CompactionSplit([], [], previous);
-        }
-
-        var split = TailStart(working, tailBudget);
-        return new CompactionSplit(
-            working.GetRange(0, split),
-            working.GetRange(split, working.Count - split),
-            previous);
+        return (working, previous);
     }
+
+    private static CompactionSplit SplitAt(
+        List<ChatItem> working,
+        int tailStart,
+        string? previous) =>
+        new(
+            working.GetRange(0, tailStart),
+            working.GetRange(tailStart, working.Count - tailStart),
+            previous);
 
     private static bool IsLiveSystem(IReadOnlyList<ChatItem> items, int index) =>
         index == 0

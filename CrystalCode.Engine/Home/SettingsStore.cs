@@ -84,7 +84,8 @@ public sealed class SettingsStore
             BashTimeoutMapper.Read(parsed.RootElement),
             ReadApprovalModel(document.ApprovalModel),
             document.Plugins ?? defaults.Plugins,
-            document.WorkspaceTrust ?? defaults.WorkspaceTrust);
+            document.WorkspaceTrust ?? defaults.WorkspaceTrust,
+            document.ShowCompactionSummary ?? defaults.ShowCompactionSummary);
     }
 
     public void Save(HarnessSettings settings)
@@ -134,6 +135,7 @@ public sealed class SettingsStore
                     ? null
                     : [.. settings.StatusLine.Fields],
             CompactionThreshold = settings.CompactionThreshold,
+            ShowCompactionSummary = settings.ShowCompactionSummary ? null : false,
             ExecutionBudget = ExecutionBudgetMapper.Write(settings.ExecutionBudget),
             BashTimeoutSeconds = BashTimeoutMapper.Write(settings.BashTimeoutSeconds),
             Providers = previous?.Providers,

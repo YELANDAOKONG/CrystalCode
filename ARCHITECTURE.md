@@ -353,7 +353,8 @@ User cancellation and the turn budget still stop the command. External tool
 sets keep their own `timeoutSeconds`.
 7. After a completed turn, consider compaction from that last round's
    reported usage and the estimated model context. `/compact` (alias
-   `/summarize`) runs the same summarizer immediately. Compaction runs
+   `/summarize`) summarizes earlier turns immediately, without waiting for
+   that threshold. Compaction runs
    inside an engine call the front end awaits; the front end keeps its
    own surface live meanwhile (the terminal host pumps the frame so the
    spinner, resize, and composer stay live).
@@ -613,9 +614,15 @@ the turn. The status bar can show 100% when usage meets or exceeds the
 window. Compaction does not block the session loop: the progress row
 stays on `Compacting` and the composer remains usable.
 
-`/compact` (alias `/summarize`) runs that path immediately. It is
-refused while a turn is running. User and assistant text in the folded
-head are replaced by the summary; they are not kept beside it.
+`/compact` (alias `/summarize`) runs immediately and does not wait for
+the threshold. When the retained tail already holds every turn, it still
+summarizes everything before the latest user turn. A session with nothing
+before that turn prints `Nothing earlier to compact`. It is refused while
+a turn is running. User and assistant text in the folded head are replaced
+by the summary; they are not kept beside it. The screen keeps the earlier
+lines. When `showCompactionSummary` is on (the default; omitted from
+`config.json` when on, `false` when off), the stored summary is printed
+under those lines. Automatic compaction does not print it.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a successful `/compact`, and on an orderly exit

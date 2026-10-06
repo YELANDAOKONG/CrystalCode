@@ -93,6 +93,63 @@ public sealed class ConversationArchiveTests
     }
 
     [Fact]
+    public async Task Compact_SummarizesTurnsThatFitInTheTailAndPrintsTheSummary()
+    {
+        using var headless = new HeadlessSession(
+            new SummaryClient(),
+            ShortSession("older turn", "latest turn"));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("/compact");
+
+        var saved = headless.ReadSaved();
+        Assert.Contains(saved.Archive!, item => item.Text == "older turn");
+        Assert.Contains(saved.Archive!, item => item.Text == "latest turn");
+        Assert.Contains(
+            saved.Items,
+            item => item.Text is not null && item.Text.Contains("kept the facts", StringComparison.Ordinal));
+        Assert.DoesNotContain(saved.Items, item => item.Text == "older turn");
+        Assert.Contains(saved.Items, item => item.Text == "latest turn");
+        var notes = Notes(headless);
+        Assert.Contains(notes, note => note == "Compacted context");
+        Assert.Contains(notes, note => note.Contains("kept the facts", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Compact_LeavesASingleTurnAndSaysThereIsNothingEarlier()
+    {
+        using var headless = new HeadlessSession(new SummaryClient(), ShortSession("only turn"));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("/compact");
+
+        var notes = Notes(headless);
+        Assert.Contains(notes, note => note == "Nothing earlier to compact");
+        Assert.DoesNotContain(notes, note => note == "Compacted context");
+        Assert.DoesNotContain(notes, note => note.Contains("kept the facts", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Compact_HidesTheSummaryWhenConfiguredOff()
+    {
+        using var headless = new HeadlessSession(
+            new SummaryClient(),
+            ShortSession("older turn", "latest turn"),
+            showCompactionSummary: false);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("/compact");
+
+        var saved = headless.ReadSaved();
+        Assert.Contains(
+            saved.Items,
+            item => item.Text is not null && item.Text.Contains("kept the facts", StringComparison.Ordinal));
+        var notes = Notes(headless);
+        Assert.Contains(notes, note => note == "Compacted context");
+        Assert.DoesNotContain(notes, note => note.Contains("kept the facts", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Save_KeepsAnImageReferencedOnlyByTheArchive()
     {
         var marker = ImageMarkerText.Tag(1);
@@ -114,6 +171,26 @@ public sealed class ConversationArchiveTests
             saved.Archive!,
             item => item.Text is not null && item.Text.Contains(marker, StringComparison.Ordinal));
     }
+
+    private static string[] Notes(HeadlessSession headless) =>
+    [
+        .. headless.Observer.Events.OfType<NoteWritten>().Select(note => note.Text)
+    ];
+
+    private static SessionDocument ShortSession(params string[] turns) =>
+        new()
+        {
+            ImageMarkersTagged = true,
+            Items =
+            [
+                new SessionItemDocument { Kind = "message", Role = "system", Text = "system" },
+                .. turns.Select(text => new SessionItemDocument { Kind = "message", Role = "user", Text = text })
+            ],
+            Archive =
+            [
+                .. turns.Select(text => new SessionItemDocument { Kind = "message", Role = "user", Text = text })
+            ]
+        };
 
     private static ChatStreamEvent[] TextRound(string text) =>
     [

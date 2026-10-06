@@ -13,6 +13,8 @@ public sealed record HarnessSettings
 {
     public const double DefaultCompactionThreshold = 0.8;
 
+    public const bool DefaultShowCompactionSummary = true;
+
     public const bool DefaultSkills = true;
 
     public const bool DefaultExternalTools = true;
@@ -55,7 +57,8 @@ public sealed record HarnessSettings
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
         ApprovalModelSettings? approvalModel = null,
         bool plugins = DefaultPlugins,
-        bool workspaceTrust = DefaultWorkspaceTrust)
+        bool workspaceTrust = DefaultWorkspaceTrust,
+        bool showCompactionSummary = DefaultShowCompactionSummary)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -103,6 +106,7 @@ public sealed record HarnessSettings
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
+        ShowCompactionSummary = showCompactionSummary;
         if (ApprovalModel.Enabled)
         {
             try
@@ -137,6 +141,8 @@ public sealed record HarnessSettings
     public bool Plugins { get; }
 
     public bool WorkspaceTrust { get; }
+
+    public bool ShowCompactionSummary { get; }
 
     public bool EstimatedTokens { get; }
 
@@ -221,6 +227,9 @@ public sealed record HarnessSettings
     public HarnessSettings WithWorkspaceTrust(bool workspaceTrust) =>
         Copy(workspaceTrust: workspaceTrust);
 
+    public HarnessSettings WithShowCompactionSummary(bool showCompactionSummary) =>
+        Copy(showCompactionSummary: showCompactionSummary);
+
     public HarnessSettings WithEstimatedTokens(bool estimatedTokens) =>
         Copy(estimatedTokens: estimatedTokens);
 
@@ -299,7 +308,8 @@ public sealed record HarnessSettings
         ApprovalModelSettings? approvalModel = null,
         bool setApprovalModel = false,
         bool? plugins = null,
-        bool? workspaceTrust = null) =>
+        bool? workspaceTrust = null,
+        bool? showCompactionSummary = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -322,7 +332,8 @@ public sealed record HarnessSettings
             setBashTimeout ? bashTimeoutSeconds : BashTimeoutSeconds,
             setApprovalModel ? approvalModel : ApprovalModel,
             plugins ?? Plugins,
-            workspaceTrust ?? WorkspaceTrust);
+            workspaceTrust ?? WorkspaceTrust,
+            showCompactionSummary ?? ShowCompactionSummary);
 
     public override string ToString() => nameof(HarnessSettings);
 
