@@ -69,6 +69,7 @@ public sealed class SessionRenderer : IDisposable
     private int _sideScroll;
     private bool _sideStick = true;
     private bool _sideClearRequested;
+    private bool _sideCancelRequested;
     private bool _sideSuspended;
     private int _sideSpinnerFrame;
     private DateTimeOffset _sideSpinnerAt;
@@ -82,6 +83,8 @@ public sealed class SessionRenderer : IDisposable
     public Action<string>? OnComposerEdited { get; set; }
 
     public Action? OnSideCleared { get; set; }
+
+    public Action? OnSideCancelled { get; set; }
 
     internal bool SideQuestionOpen
     {
@@ -571,6 +574,20 @@ public sealed class SessionRenderer : IDisposable
                 _sideOpen = true;
             }
 
+            PaintUnlocked(force: true);
+        }
+    }
+
+    internal void DismissSideQuestion()
+    {
+        lock (_gate)
+        {
+            if (!_sideOpen)
+            {
+                return;
+            }
+
+            _sideOpen = false;
             PaintUnlocked(force: true);
         }
     }
@@ -1089,12 +1106,14 @@ public sealed class SessionRenderer : IDisposable
             string? submitted;
             bool pasteImage;
             bool clearSide;
+            bool cancelSide;
             lock (_gate)
             {
                 var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
                 submitted = null;
                 pasteImage = false;
                 clearSide = false;
+                cancelSide = false;
                 while (index < events.Count)
                 {
                     submitted = DispatchUnlocked(events[index], pageRows, togglePlan, checkSize);
@@ -1103,7 +1122,9 @@ public sealed class SessionRenderer : IDisposable
                     _imagePasteRequested = false;
                     clearSide = _sideClearRequested;
                     _sideClearRequested = false;
-                    if (submitted is not null || pasteImage || clearSide)
+                    cancelSide = _sideCancelRequested;
+                    _sideCancelRequested = false;
+                    if (submitted is not null || pasteImage || clearSide || cancelSide)
                     {
                         break;
                     }
@@ -1116,6 +1137,11 @@ public sealed class SessionRenderer : IDisposable
             if (clearSide)
             {
                 OnSideCleared?.Invoke();
+            }
+
+            if (cancelSide)
+            {
+                OnSideCancelled?.Invoke();
             }
 
             if (pasteImage && OnImagePasteAsync is not null)
@@ -1497,7 +1523,7 @@ public sealed class SessionRenderer : IDisposable
     {
         CommitLiveUnlocked();
         AddHelpUnlocked(
-            "/btw         Side question; not saved. Esc closes, x clears",
+            "/btw         Side question; not saved. Esc or Ctrl+C closes, x clears",
             "enter        Submit; queue while working",
             "queue        Stays above the composer; sends after this tool or turn",
             "ctrl+j       Newline",
@@ -1767,6 +1793,10 @@ public sealed class SessionRenderer : IDisposable
                 _side = SideQuestionSnapshot.Empty;
                 _sideClearRequested = true;
                 return null;
+            case InputKey key when IsSideCancel(key):
+                _sideOpen = false;
+                _sideCancelRequested = true;
+                return null;
             case InputKey key when key.Modifiers == ConsoleModifiers.None && key.Key == ConsoleKey.LeftArrow:
                 MoveSide(-1);
                 return null;
@@ -1792,6 +1822,13 @@ public sealed class SessionRenderer : IDisposable
     private static bool IsSideClear(InputKey key) =>
         key.Modifiers == ConsoleModifiers.None
         && (key.Key == ConsoleKey.X || key.KeyChar is 'x' or 'X');
+
+    private static bool IsSideCancel(InputKey key) =>
+        key.KeyChar == '\u0003'
+        || (key.Key == ConsoleKey.C
+            && key.Modifiers.HasFlag(ConsoleModifiers.Control)
+            && !key.Modifiers.HasFlag(ConsoleModifiers.Alt)
+            && !key.Modifiers.HasFlag(ConsoleModifiers.Shift));
 
     private void MoveSide(int direction)
     {

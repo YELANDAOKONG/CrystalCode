@@ -819,7 +819,7 @@ returns the transcript viewport to the latest output.
 | `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
 | `/stats` | | Replaces the session frame with Overview, Tokens, and Tools panels, including a tool share bar. Supports `all`, `<Nd>`, and `tools <count>`. Esc or `q` restores the session |
-| `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. While the model has not started, the panel shows the same spinner as the progress row. An empty `/btw` reopens it. Esc, Enter, or Space closes it. Left and Right step through earlier answers. `x` clears them |
+| `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. While the model has not started, the panel shows the same spinner as the progress row. Once reasoning starts, the caption changes to Thinking until answer text arrives. An empty `/btw` reopens it. Esc, Enter, Space, or Ctrl+C closes it. Ctrl+C also cancels a side question that is still running and leaves the main turn running. Left and Right step through earlier answers. `x` clears them |
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here |

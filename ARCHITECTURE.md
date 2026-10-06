@@ -372,12 +372,14 @@ and the question stays in the panel so it can be asked again. The question,
 the answer, and the token usage stay out of the queue, the transcript, the
 usage ledger, compaction, and the saved session. The terminal draws the
 answer in a panel above the composer and leaves the status bar, transcript,
-and progress row in place. Until the answer starts, that panel shows
-Waiting for the model with the same one-cell spinner as the progress row,
-and the frame keeps advancing while the panel is open. Esc, Enter, or
-Space closes the panel. Left and Right step through earlier answers. `x`
-clears the in-memory thread. While that panel is open, Ctrl+C cancels the
-side question and leaves the main turn running. `/clear`, `/resume`, and
+and progress row in place. Until reasoning starts, that panel shows
+Waiting for the model with the same one-cell spinner as the progress row.
+Once reasoning starts and before answer text, it shows Thinking with that
+spinner, and the frame keeps advancing while the panel is open. Esc, Enter,
+or Space closes the panel. Left and Right step through earlier answers. `x`
+clears the in-memory thread. While that panel is open, Ctrl+C cancels an
+in-flight side question, closes the panel, and leaves the main turn running.
+`/clear`, `/resume`, and
 `/fork` drop the thread. `crystal run` rejects the command with every other
 slash command.
 

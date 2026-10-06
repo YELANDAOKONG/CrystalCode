@@ -70,6 +70,7 @@ internal sealed class TerminalHost
         _renderer.OnImagePasteAsync = _session.PasteClipboardImageAsync;
         _renderer.OnComposerEdited = _session.NotifyDraftChanged;
         _renderer.OnSideCleared = _session.ClearSideQuestions;
+        _renderer.OnSideCancelled = () => _session.TryCancelSideQuestion();
         _renderer.OnVerboseToggled = PersistVerboseToggle;
         await _session.StartAsync(cancellationToken);
 
@@ -82,6 +83,7 @@ internal sealed class TerminalHost
             if (_renderer.SideQuestionOpen)
             {
                 _session.TryCancelSideQuestion();
+                _renderer.DismissSideQuestion();
                 return;
             }
 

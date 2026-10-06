@@ -312,7 +312,8 @@ public sealed class SessionRendererTests
             true,
             "why",
             string.Empty,
-            null));
+            null,
+            false));
         Assert.True(renderer.SideQuestionOpen);
 
         var quit = await renderer.DispatchBurstAsync(
@@ -355,7 +356,8 @@ public sealed class SessionRendererTests
             false,
             string.Empty,
             string.Empty,
-            null));
+            null,
+            false));
 
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('x', ConsoleKey.X, false, false, false)],
@@ -365,6 +367,49 @@ public sealed class SessionRendererTests
 
         Assert.Null(submitted);
         Assert.True(cleared);
+        Assert.False(renderer.SideQuestionOpen);
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_CtrlCClosesSideQuestionWithoutSubmitting()
+    {
+        var renderer = new SessionRenderer();
+        var cancelled = false;
+        renderer.OnSideCancelled = () => cancelled = true;
+        renderer.SeedComposer("draft");
+        renderer.ShowSideQuestion(new SideQuestionSnapshot(
+            true,
+            [],
+            true,
+            "why",
+            string.Empty,
+            null,
+            true));
+
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\u0003', ConsoleKey.C, false, false, true)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Null(submitted);
+        Assert.True(cancelled);
+        Assert.False(renderer.SideQuestionOpen);
+        var draft = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        Assert.Equal("draft", draft);
+
+        renderer.ShowSideQuestion(new SideQuestionSnapshot(
+            false,
+            [],
+            false,
+            "why",
+            string.Empty,
+            "Side question cancelled.",
+            false));
         Assert.False(renderer.SideQuestionOpen);
     }
 
@@ -422,7 +467,8 @@ public sealed class SessionRendererTests
             false,
             string.Empty,
             string.Empty,
-            null));
+            null,
+            false));
 
         renderer.ResumeComposer();
 
@@ -449,5 +495,6 @@ public sealed class SessionRendererTests
             false,
             string.Empty,
             string.Empty,
-            null);
+            null,
+            false);
 }

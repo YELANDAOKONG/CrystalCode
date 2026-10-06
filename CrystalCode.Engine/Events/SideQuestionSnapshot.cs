@@ -11,7 +11,8 @@ public sealed record SideQuestionSnapshot(
     bool Running,
     string PendingQuestion,
     string LiveAnswer,
-    string? Failure) : SessionEvent
+    string? Failure,
+    bool Thinking) : SessionEvent
 {
-    public static SideQuestionSnapshot Empty { get; } = new(true, [], false, string.Empty, string.Empty, null);
+    public static SideQuestionSnapshot Empty { get; } = new(true, [], false, string.Empty, string.Empty, null, false);
 }

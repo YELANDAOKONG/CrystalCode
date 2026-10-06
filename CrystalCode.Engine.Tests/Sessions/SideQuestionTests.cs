@@ -1,5 +1,6 @@
 using Crystal;
 using Crystal.Chat;
+using Crystal.Reasoning;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
@@ -44,6 +45,42 @@ public sealed class SideQuestionTests
         Assert.Equal(ChatRole.User, asked.Role);
         Assert.Contains("why retry", asked.Text, StringComparison.Ordinal);
         Assert.Contains("Do not call tools.", asked.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Btw_ShowsThinkingBeforeTheAnswerAndKeepsTheReasoningOut()
+    {
+        var client = new ScriptedStreamingClient(
+        [
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Trace, "plan"),
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Trace, " more"),
+            new ChatTextDelta(0, 1, ChatRole.Assistant, "Because."),
+            new ChatCandidateCompleted(0, FinishReason.Stop)
+        ]);
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/btw why", CancellationToken.None);
+        await headless.Session.SideQuestionTask;
+
+        var snapshots = headless.Observer.Events.OfType<SideQuestionSnapshot>().ToArray();
+        Assert.Single(snapshots, static snapshot =>
+            snapshot.Thinking
+            && snapshot.Running
+            && snapshot.PendingQuestion == "why"
+            && snapshot.LiveAnswer.Length == 0);
+        Assert.Contains(snapshots, static snapshot => snapshot.LiveAnswer == "Because.");
+        var finished = snapshots[^1];
+        Assert.Equal("Because.", finished.Exchanges[0].Answer);
+        Assert.False(finished.Thinking);
+        Assert.DoesNotContain(headless.Observer.Events, static item => item is StreamReceived);
+        Assert.All(snapshots, static snapshot =>
+        {
+            Assert.DoesNotContain("plan", snapshot.LiveAnswer, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                snapshot.Exchanges,
+                static exchange => exchange.Answer.Contains("plan", StringComparison.Ordinal));
+        });
     }
 
     [Fact]

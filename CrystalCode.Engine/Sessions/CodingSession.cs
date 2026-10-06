@@ -90,6 +90,7 @@ public sealed class CodingSession : ITurnObserver
     private string? _sidePending;
     private string _sideLive = string.Empty;
     private string? _sideFailure;
+    private bool _sideThinking;
     private TokenUsage? _shownUsage;
     private TokenUsage? _shownCumulative;
     private TokenUsage? _turnCumulativeBaseline;
@@ -3040,6 +3041,7 @@ public sealed class CodingSession : ITurnObserver
             _sidePending = question;
             _sideLive = string.Empty;
             _sideFailure = null;
+            _sideThinking = false;
             _sideRunning = true;
             prior = [.. _sideExchanges];
         }
@@ -3070,7 +3072,11 @@ public sealed class CodingSession : ITurnObserver
             var live = new StringBuilder();
             await foreach (var streamEvent in client.StreamAsync(request, cancellationToken))
             {
-                if (streamEvent is ChatTextDelta text)
+                if (streamEvent is ChatReasoningTextDelta reasoningDelta && reasoningDelta.Text.Length > 0)
+                {
+                    NoteSideThinking(generation);
+                }
+                else if (streamEvent is ChatTextDelta text)
                 {
                     live.Append(text.Text);
                     NoteSideLive(generation, live.ToString());
@@ -3121,6 +3127,24 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    private void NoteSideThinking(long generation)
+    {
+        var publish = false;
+        lock (_sideGate)
+        {
+            if (generation == _sideGeneration && _sideRunning && !_sideThinking)
+            {
+                _sideThinking = true;
+                publish = true;
+            }
+        }
+
+        if (publish)
+        {
+            Publish(CaptureSide(announce: false));
+        }
+    }
+
     private void NoteSideLive(long generation, string live)
     {
         var publish = false;
@@ -3158,6 +3182,7 @@ public sealed class CodingSession : ITurnObserver
             _sidePending = null;
             _sideLive = string.Empty;
             _sideFailure = null;
+            _sideThinking = false;
             _sideRunning = false;
             publish = true;
         }
@@ -3179,6 +3204,7 @@ public sealed class CodingSession : ITurnObserver
             }
 
             _sideFailure = message;
+            _sideThinking = false;
             _sideRunning = false;
             publish = true;
         }
@@ -3199,7 +3225,8 @@ public sealed class CodingSession : ITurnObserver
                 _sideRunning,
                 _sidePending ?? string.Empty,
                 _sideLive,
-                _sideRunning ? null : _sideFailure);
+                _sideRunning ? null : _sideFailure,
+                _sideThinking);
         }
     }
 
@@ -3220,6 +3247,7 @@ public sealed class CodingSession : ITurnObserver
             _sidePending = null;
             _sideLive = string.Empty;
             _sideFailure = null;
+            _sideThinking = false;
             _sideRunning = false;
             publish = announce && occupied;
         }

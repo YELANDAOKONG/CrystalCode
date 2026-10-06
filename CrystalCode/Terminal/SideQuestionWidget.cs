@@ -11,6 +11,8 @@ internal static class SideQuestionWidget
 {
     public const string WaitingCaption = "Waiting for the model";
 
+    public const string ThinkingCaption = "Thinking";
+
     public static IRenderable Create(
         SideQuestionSnapshot snapshot,
         int index,
@@ -30,9 +32,10 @@ internal static class SideQuestionWidget
         {
             rows.Add(Text.Empty);
             var glyph = ProgressSpinner.Frame(spinnerFrame);
+            var caption = snapshot.Thinking ? ThinkingCaption : WaitingCaption;
             rows.Add(new Markup(
                 $"[{Theme.Accent}]{MarkupText.Escape(glyph)}[/]  "
-                + $"[{Theme.Muted}]{MarkupText.Escape(WaitingCaption)}[/]"));
+                + $"[{Theme.Muted}]{MarkupText.Escape(caption)}[/]"));
         }
         else if (body.Length > 0)
         {
@@ -52,7 +55,7 @@ internal static class SideQuestionWidget
         }
 
         rows.Add(Text.Empty);
-        rows.Add(new Markup($"[{Theme.Muted}]Esc, Enter, or Space closes. Left and Right step. x clears.[/]"));
+        rows.Add(new Markup($"[{Theme.Muted}]Esc, Enter, Space, or Ctrl+C closes. Left and Right step. x clears.[/]"));
         var panel = new Panel(new Rows(rows))
         {
             Header = new PanelHeader($"[{Theme.Heading}]{MarkupText.Escape(title)}[/]"),

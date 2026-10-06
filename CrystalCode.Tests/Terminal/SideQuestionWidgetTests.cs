@@ -18,19 +18,20 @@ public sealed class SideQuestionWidgetTests
             false,
             string.Empty,
             string.Empty,
-            null);
+            null,
+            false);
 
         var text = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0), 80));
 
         Assert.Contains("why", text, StringComparison.Ordinal);
         Assert.Contains("Because.", text, StringComparison.Ordinal);
-        Assert.Contains("Esc, Enter, or Space closes", text, StringComparison.Ordinal);
+        Assert.Contains("Esc, Enter, Space, or Ctrl+C closes", text, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Create_ShowsWaitingWhileTheQuestionRuns()
     {
-        var snapshot = new SideQuestionSnapshot(true, [], true, "why", string.Empty, null);
+        var snapshot = new SideQuestionSnapshot(true, [], true, "why", string.Empty, null, false);
 
         var text = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0), 80));
 
@@ -41,7 +42,7 @@ public sealed class SideQuestionWidgetTests
     [Fact]
     public void Create_AdvancesTheWaitingSpinner()
     {
-        var snapshot = new SideQuestionSnapshot(true, [], true, "why", string.Empty, null);
+        var snapshot = new SideQuestionSnapshot(true, [], true, "why", string.Empty, null, false);
 
         var first = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0, 0), 80));
         var next = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0, 1), 80));
@@ -50,6 +51,30 @@ public sealed class SideQuestionWidgetTests
         Assert.DoesNotContain(ProgressSpinner.Frame(1), first, StringComparison.Ordinal);
         Assert.Contains(ProgressSpinner.Frame(1), next, StringComparison.Ordinal);
         Assert.Contains(SideQuestionWidget.WaitingCaption, next, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_ShowsThinkingWhileReasoning()
+    {
+        var snapshot = new SideQuestionSnapshot(true, [], true, "why", string.Empty, null, true);
+
+        var text = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0), 80));
+
+        Assert.Contains(SideQuestionWidget.ThinkingCaption, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(SideQuestionWidget.WaitingCaption, text, StringComparison.Ordinal);
+        Assert.Contains(ProgressSpinner.Frame(0), text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_ShowsTheAnswerOnceTextArrives()
+    {
+        var snapshot = new SideQuestionSnapshot(true, [], true, "why", "Because.", null, true);
+
+        var text = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 0), 80));
+
+        Assert.Contains("Because.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(SideQuestionWidget.ThinkingCaption, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(SideQuestionWidget.WaitingCaption, text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -67,7 +92,8 @@ public sealed class SideQuestionWidgetTests
             false,
             string.Empty,
             string.Empty,
-            null);
+            null,
+            false);
 
         var text = string.Join('\n', WidgetPaint.Plain(SideQuestionWidget.Create(snapshot, 1), 80));
 
@@ -86,7 +112,8 @@ public sealed class SideQuestionWidgetTests
             false,
             string.Empty,
             string.Empty,
-            null);
+            null,
+            false);
 
         var lines = WidgetPaint.Lines(SideQuestionWidget.Create(snapshot, 0), width);
 
