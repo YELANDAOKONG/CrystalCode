@@ -38,4 +38,48 @@ public sealed class TerminalTextTests
 
         Assert.Same(text, TerminalText.SanitizeStream(text, ref state));
     }
+
+    [Fact]
+    public void SanitizeStream_ReturnsACleanCrlfChunkUnchanged()
+    {
+        const string text = "hello\r\nworld";
+        var state = default(TerminalText.StreamState);
+
+        Assert.Same(text, TerminalText.SanitizeStream(text, ref state));
+        Assert.True(state.IsIdle);
+    }
+
+    [Fact]
+    public void SanitizeStream_JoinsACarriageReturnSplitFromItsLineFeed()
+    {
+        var state = default(TerminalText.StreamState);
+        const string tail = "\nworld";
+
+        Assert.Equal("hello", TerminalText.SanitizeStream("hello\r", ref state));
+        Assert.False(state.IsIdle);
+        Assert.Same(tail, TerminalText.SanitizeStream(tail, ref state));
+        Assert.True(state.IsIdle);
+    }
+
+    [Fact]
+    public void SanitizeStream_EmitsAHeldCarriageReturnBeforeTheNextText()
+    {
+        var state = default(TerminalText.StreamState);
+
+        Assert.Equal("hello", TerminalText.SanitizeStream("hello\r", ref state));
+        Assert.Equal("\nworld", TerminalText.SanitizeStream("world", ref state));
+        Assert.True(state.IsIdle);
+    }
+
+    [Fact]
+    public void SanitizeStream_ResetDropsAHeldCarriageReturn()
+    {
+        var state = default(TerminalText.StreamState);
+        const string world = "world";
+        _ = TerminalText.SanitizeStream("hello\r", ref state);
+
+        state.Reset();
+
+        Assert.Same(world, TerminalText.SanitizeStream(world, ref state));
+    }
 }

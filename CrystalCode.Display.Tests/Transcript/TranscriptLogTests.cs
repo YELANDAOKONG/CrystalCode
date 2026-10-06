@@ -135,6 +135,21 @@ public sealed class TranscriptLogTests
     }
 
     [Fact]
+    public void AppendLive_JoinsASplitCarriageReturnWithoutABlankLine()
+    {
+        var log = new TranscriptLog();
+        Assert.Equal("hello", log.AppendLive(TranscriptKind.Assistant, "hello\r"));
+        Assert.Equal("\nworld", log.AppendLive(TranscriptKind.Assistant, "\nworld"));
+
+        var lines = log.BuildLines(80);
+        var text = string.Join("\n", lines.Select(line => line.Plain));
+
+        Assert.Contains("hello", text, StringComparison.Ordinal);
+        Assert.Contains("world", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(lines, line => line.Plain.Trim().Length == 0);
+    }
+
+    [Fact]
     public void AppendLive_JoinsASplitEscapeWithoutRewritingEarlierText()
     {
         var log = new TranscriptLog();

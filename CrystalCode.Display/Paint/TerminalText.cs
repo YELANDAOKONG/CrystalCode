@@ -6,6 +6,8 @@ namespace CrystalCode.Display.Paint;
 /// Removes terminal controls before text becomes frame rows.
 /// A complete block collapses carriage returns. A stream never rewinds
 /// characters already handed to the live card, so finished rows stay put.
+/// A carriage return at the end of a chunk stays pending so a following
+/// line feed remains one break. Reset drops that pending return.
 /// </summary>
 public static class TerminalText
 {
@@ -23,14 +25,16 @@ public static class TerminalText
     {
         internal byte _kind;
         internal byte _length;
+        internal bool _pendingCarriageReturn;
 
         public void Reset()
         {
             _kind = Idle;
             _length = 0;
+            _pendingCarriageReturn = false;
         }
 
-        internal bool IsIdle => _kind == Idle;
+        internal bool IsIdle => _kind == Idle && !_pendingCarriageReturn;
     }
 
     public static string Sanitize(string text)
@@ -53,10 +57,41 @@ public static class TerminalText
             return text;
         }
 
-        var builder = new StringBuilder(text.Length);
+        // The pending return plus a leading line feed is already the one break.
+        if (state._pendingCarriageReturn
+            && state._kind == Idle
+            && text.Length > 0
+            && text[0] == '\n'
+            && IsClean(text))
+        {
+            state._pendingCarriageReturn = false;
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length + 1);
         var kind = state._kind;
         var length = state._length;
-        for (var i = 0; i < text.Length; i++)
+        var pendingCarriageReturn = state._pendingCarriageReturn;
+        var start = 0;
+        if (pendingCarriageReturn && kind == Idle)
+        {
+            pendingCarriageReturn = false;
+            if (text.Length == 0)
+            {
+                pendingCarriageReturn = true;
+            }
+            else if (text[0] == '\n')
+            {
+                builder.Append('\n');
+                start = 1;
+            }
+            else
+            {
+                builder.Append('\n');
+            }
+        }
+
+        for (var i = start; i < text.Length; i++)
         {
             var ch = text[i];
             switch (kind)
@@ -108,8 +143,14 @@ public static class TerminalText
 
             if (ch == '\r')
             {
+                if (i + 1 >= text.Length)
+                {
+                    pendingCarriageReturn = true;
+                    continue;
+                }
+
                 builder.Append('\n');
-                if (i + 1 < text.Length && text[i + 1] == '\n')
+                if (text[i + 1] == '\n')
                 {
                     i++;
                 }
@@ -127,6 +168,7 @@ public static class TerminalText
 
         state._kind = kind;
         state._length = length;
+        state._pendingCarriageReturn = pendingCarriageReturn;
         return builder.ToString();
     }
 
