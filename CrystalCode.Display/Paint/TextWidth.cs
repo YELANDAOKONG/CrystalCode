@@ -79,19 +79,10 @@ public static class TextWidth
             var start = 0;
             while (start < paragraph.Length)
             {
-                var columns = 0;
-                var end = start;
-                while (end < paragraph.Length)
+                var end = FitEnd(paragraph, start, paragraph.Length, columnBudget);
+                if (end <= start)
                 {
-                    var next = MoveRight(paragraph, end);
-                    var width = Measure(paragraph.AsSpan(end, next - end));
-                    if (columns + width > columnBudget && end > start)
-                    {
-                        break;
-                    }
-
-                    columns += width;
-                    end = next;
+                    end = MoveRight(paragraph, start);
                 }
 
                 lines.Add(paragraph[start..end]);
@@ -100,6 +91,30 @@ public static class TextWidth
         }
 
         return lines;
+    }
+
+    /// <summary>
+    /// End index of the next wrapped row. Shared with markdown so both paths
+    /// break on the same column without a second copy of the text.
+    /// </summary>
+    internal static int FitEnd(string text, int start, int limit, int columnBudget)
+    {
+        var columns = 0;
+        var end = start;
+        while (end < limit)
+        {
+            var next = MoveRight(text, end);
+            var width = Measure(text.AsSpan(end, next - end));
+            if (columns + width > columnBudget && end > start)
+            {
+                return end;
+            }
+
+            columns += width;
+            end = next;
+        }
+
+        return end;
     }
 
     public static string Truncate(string text, int columnBudget)
@@ -192,9 +207,14 @@ public static class TextWidth
         var category = Rune.GetUnicodeCategory(rune);
         if (category is UnicodeCategory.NonSpacingMark
             or UnicodeCategory.EnclosingMark
-            or UnicodeCategory.SpacingCombiningMark)
+            or UnicodeCategory.Format)
         {
             return 0;
+        }
+
+        if (category is UnicodeCategory.SpacingCombiningMark)
+        {
+            return 1;
         }
 
         return IsWide(value) ? 2 : 1;
@@ -212,6 +232,9 @@ public static class TextWidth
             or (>= 0xFF00 and <= 0xFF60)
             or (>= 0xFFE0 and <= 0xFFE6)
             or (>= 0x1F300 and <= 0x1F64F)
+            or (>= 0x1F680 and <= 0x1F6FF)
+            or (>= 0x1F7E0 and <= 0x1F7FF)
             or (>= 0x1F900 and <= 0x1F9FF)
+            or (>= 0x1FA00 and <= 0x1FAFF)
             or (>= 0x20000 and <= 0x3FFFD);
 }

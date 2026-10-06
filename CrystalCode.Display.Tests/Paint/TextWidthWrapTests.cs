@@ -24,6 +24,14 @@ public sealed class TextWidthWrapTests
     }
 
     [Fact]
+    public void Measure_CountsFormatAsZeroAndEmojiAsTwoColumns()
+    {
+        Assert.Equal(0, TextWidth.Measure("\u200d"));
+        Assert.Equal(2, TextWidth.Measure("\U0001F680"));
+        Assert.Equal(2, TextWidth.Measure("你"));
+    }
+
+    [Fact]
     public void Wrap_CountsTabsAsFourDisplayColumns()
     {
         Assert.Equal(6, TextWidth.Measure("a\tb"));

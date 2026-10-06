@@ -18,6 +18,9 @@ public static class MarkdownRenderer
         }
 
         var lines = new List<PaintLine>();
+        var pieces = new List<InlinePiece>();
+        var scratch = new StringBuilder();
+        var markup = new StringBuilder();
         var inFence = false;
         string? fenceLang = null;
 
@@ -66,13 +69,13 @@ public static class MarkdownRenderer
 
             if (TryBlockquote(raw, out var quoteText))
             {
-                RenderBlockquote(lines, quoteText, width);
+                RenderBlockquote(lines, quoteText, width, pieces, scratch, markup);
                 continue;
             }
 
             if (TryList(raw, out var listPrefix, out var itemText, out var isOrdered))
             {
-                RenderListItem(lines, listPrefix, itemText, isOrdered, width);
+                RenderListItem(lines, listPrefix, itemText, isOrdered, width, pieces, scratch, markup);
                 continue;
             }
 
@@ -82,7 +85,7 @@ public static class MarkdownRenderer
                 continue;
             }
 
-            RenderParagraph(lines, raw, width);
+            RenderParagraph(lines, raw, width, pieces, scratch, markup);
         }
 
         return lines;
@@ -120,15 +123,30 @@ public static class MarkdownRenderer
     private static void RenderBlockquote(
         List<PaintLine> lines,
         string text,
-        int width)
+        int width,
+        List<InlinePiece> pieces,
+        StringBuilder scratch,
+        StringBuilder markup)
     {
+        var body = ApplyInline(text, pieces, scratch);
         var availWidth = Math.Max(width - 6, 8);
-        var innerLines = TextWidth.Wrap(text, availWidth);
-        foreach (var inner in innerLines)
+        if (body.Length == 0)
         {
-            var plain = "  │ " + inner;
-            var markup = $"  [{Theme.Muted}]│[/] [{Theme.Chrome}]{InlineMarkup(inner)}[/]";
-            lines.Add(new PaintLine(markup, plain));
+            lines.Add(new PaintLine($"  [{Theme.Muted}]│[/]", "  │ "));
+            return;
+        }
+
+        var start = 0;
+        while (start < body.Length)
+        {
+            var end = NextWrap(body, start, availWidth);
+            var plain = "  │ " + body[start..end];
+            markup.Clear();
+            markup.Append("  [").Append(Theme.Muted).Append("]│[/] [").Append(Theme.Chrome).Append(']');
+            AppendMarkup(markup, body, start, end, pieces);
+            markup.Append("[/]");
+            lines.Add(new PaintLine(markup.ToString(), plain));
+            start = end;
         }
     }
 
@@ -281,111 +299,12 @@ public static class MarkdownRenderer
 
     public static string InlineMarkup(string plain)
     {
+        ArgumentNullException.ThrowIfNull(plain);
+        var pieces = new List<InlinePiece>();
+        var visible = ApplyInline(plain, pieces, new StringBuilder());
         var markup = new StringBuilder();
-        var i = 0;
-        while (i < plain.Length)
-        {
-            if (plain[i] == '`' && TryTakeDelimited(plain, i, "`", out var code, out var afterCode))
-            {
-                markup.Append('[').Append(Theme.Code).Append(']')
-                    .Append(MarkupText.Escape(code))
-                    .Append("[/]");
-                i = afterCode;
-                continue;
-            }
-
-            if (plain[i] == '*'
-                && i + 1 < plain.Length
-                && plain[i + 1] == '*'
-                && TryTakeDelimited(plain, i, "**", out var bold, out var afterBold))
-            {
-                markup.Append("[bold]").Append(MarkupText.Escape(bold)).Append("[/]");
-                i = afterBold;
-                continue;
-            }
-
-            if (plain[i] == '*'
-                && (i + 1 >= plain.Length || plain[i + 1] != '*')
-                && TryTakeDelimited(plain, i, "*", out var italicStar, out var afterItalicStar))
-            {
-                markup.Append("[italic]").Append(MarkupText.Escape(italicStar)).Append("[/]");
-                i = afterItalicStar;
-                continue;
-            }
-
-            if (plain[i] == '~'
-                && i + 1 < plain.Length
-                && plain[i + 1] == '~'
-                && TryTakeDelimited(plain, i, "~~", out var strike, out var afterStrike))
-            {
-                markup.Append("[strikethrough]").Append(MarkupText.Escape(strike)).Append("[/]");
-                i = afterStrike;
-                continue;
-            }
-
-            if (plain[i] == '_'
-                && i + 1 < plain.Length
-                && plain[i + 1] == '_'
-                && TryTakeDelimited(plain, i, "__", out var underline, out var afterUnderline))
-            {
-                markup.Append("[underline]").Append(MarkupText.Escape(underline)).Append("[/]");
-                i = afterUnderline;
-                continue;
-            }
-
-            if (plain[i] == '_'
-                && (i + 1 >= plain.Length || plain[i + 1] != '_')
-                && TryTakeDelimited(plain, i, "_", out var italicUnder, out var afterItalicUnder))
-            {
-                markup.Append("[italic]").Append(MarkupText.Escape(italicUnder)).Append("[/]");
-                i = afterItalicUnder;
-                continue;
-            }
-
-            var next = NextMarker(plain, i);
-            markup.Append(MarkupText.Escape(plain[i..next]));
-            i = next;
-        }
-
+        AppendMarkup(markup, visible, 0, visible.Length, pieces);
         return markup.ToString();
-    }
-
-    private static int NextMarker(string plain, int start)
-    {
-        for (var i = start + 1; i < plain.Length; i++)
-        {
-            if (plain[i] is '`' or '*' or '~' or '_')
-            {
-                return i;
-            }
-        }
-
-        return plain.Length;
-    }
-
-    private static bool TryTakeDelimited(
-        string plain,
-        int start,
-        string delimiter,
-        out string inner,
-        out int after)
-    {
-        inner = string.Empty;
-        after = start;
-        if (start + delimiter.Length >= plain.Length)
-        {
-            return false;
-        }
-
-        var close = plain.IndexOf(delimiter, start + delimiter.Length, StringComparison.Ordinal);
-        if (close < 0)
-        {
-            return false;
-        }
-
-        inner = plain[(start + delimiter.Length)..close];
-        after = close + delimiter.Length;
-        return true;
     }
 
     private static void RenderListItem(
@@ -393,43 +312,315 @@ public static class MarkdownRenderer
         string prefix,
         string text,
         bool isOrdered,
-        int width)
+        int width,
+        List<InlinePiece> pieces,
+        StringBuilder scratch,
+        StringBuilder markup)
     {
         var indent = isOrdered ? prefix.Length + 3 : 4;
         var availWidth = Math.Max(width - indent, 8);
-        var bodyLines = TextWidth.Wrap(text, availWidth);
-        for (var i = 0; i < bodyLines.Count; i++)
+        var body = ApplyInline(text, pieces, scratch);
+        if (body.Length == 0)
         {
-            var body = bodyLines[i];
-            if (i == 0)
-            {
-                var bullet = isOrdered ? prefix : "*";
-                var plain = "  " + bullet + " " + body;
-                var bulletMarkup = isOrdered
-                    ? $"[{Theme.Accent}]{bullet}[/]"
-                    : $"[{Theme.Muted}]*[/]";
-                var markup = "  " + bulletMarkup + " " + InlineMarkup(body);
-                lines.Add(new PaintLine(markup, plain));
-            }
-            else
-            {
-                var pad = new string(' ', indent);
-                var plain = pad + body;
-                var markup = pad + InlineMarkup(body);
-                lines.Add(new PaintLine(markup, plain));
-            }
+            lines.Add(ListLine(isOrdered, prefix, indent, string.Empty, 0, 0, pieces, markup, first: true));
+            return;
         }
+
+        var start = 0;
+        var first = true;
+        while (start < body.Length)
+        {
+            var end = NextWrap(body, start, availWidth);
+            lines.Add(ListLine(isOrdered, prefix, indent, body, start, end, pieces, markup, first));
+            first = false;
+            start = end;
+        }
+    }
+
+    private static PaintLine ListLine(
+        bool isOrdered,
+        string prefix,
+        int indent,
+        string body,
+        int start,
+        int end,
+        List<InlinePiece> pieces,
+        StringBuilder markup,
+        bool first)
+    {
+        var slice = body[start..end];
+        markup.Clear();
+        if (first)
+        {
+            var bullet = isOrdered ? prefix : "*";
+            var bulletMarkup = isOrdered
+                ? $"[{Theme.Accent}]{bullet}[/]"
+                : $"[{Theme.Muted}]*[/]";
+            markup.Append("  ").Append(bulletMarkup).Append(' ');
+            AppendMarkup(markup, body, start, end, pieces);
+            return new PaintLine(markup.ToString(), "  " + bullet + " " + slice);
+        }
+
+        var pad = new string(' ', indent);
+        markup.Append(pad);
+        AppendMarkup(markup, body, start, end, pieces);
+        return new PaintLine(markup.ToString(), pad + slice);
     }
 
     private static void RenderParagraph(
         List<PaintLine> lines,
         string raw,
-        int width)
+        int width,
+        List<InlinePiece> pieces,
+        StringBuilder scratch,
+        StringBuilder markup)
     {
-        var plain = "  " + raw.Trim();
-        foreach (var wrapped in TextWidth.Wrap(plain, width))
+        var trimmed = raw.Trim();
+        var body = ApplyInline(trimmed, pieces, scratch);
+        var plain = "  " + body;
+        if (pieces.Count == 1 && pieces[0].Kind == InlineKind.Plain)
         {
-            lines.Add(new PaintLine(InlineMarkup(wrapped), wrapped));
+            pieces[0] = new InlinePiece(0, plain.Length, InlineKind.Plain);
+        }
+        else
+        {
+            for (var i = 0; i < pieces.Count; i++)
+            {
+                var piece = pieces[i];
+                pieces[i] = piece with { Start = piece.Start + 2, End = piece.End + 2 };
+            }
+
+            pieces.Insert(0, new InlinePiece(0, 2, InlineKind.Plain));
+        }
+
+        AppendWrapped(lines, plain, width, pieces, markup);
+    }
+
+    private static void AppendWrapped(
+        List<PaintLine> lines,
+        string plain,
+        int width,
+        List<InlinePiece> pieces,
+        StringBuilder markup)
+    {
+        if (plain.Length == 0)
+        {
+            lines.Add(PaintLine.Blank);
+            return;
+        }
+
+        var start = 0;
+        while (start < plain.Length)
+        {
+            var end = NextWrap(plain, start, width);
+            markup.Clear();
+            AppendMarkup(markup, plain, start, end, pieces);
+            lines.Add(new PaintLine(markup.ToString(), plain[start..end]));
+            start = end;
         }
     }
+
+    private static int NextWrap(string text, int start, int width)
+    {
+        var end = TextWidth.FitEnd(text, start, text.Length, width);
+        if (end <= start)
+        {
+            end = TextWidth.MoveRight(text, start);
+        }
+
+        return end;
+    }
+
+    private static string ApplyInline(string text, List<InlinePiece> pieces, StringBuilder visible)
+    {
+        pieces.Clear();
+        if (!ContainsMarker(text))
+        {
+            pieces.Add(new InlinePiece(0, text.Length, InlineKind.Plain));
+            return text;
+        }
+
+        visible.Clear();
+        var index = 0;
+        while (index < text.Length)
+        {
+            if (TryStyle(text, index, out var kind, out var inner, out var after))
+            {
+                var start = visible.Length;
+                visible.Append(inner);
+                if (visible.Length > start)
+                {
+                    pieces.Add(new InlinePiece(start, visible.Length, kind));
+                }
+
+                index = after;
+                continue;
+            }
+
+            var next = NextMarker(text, index);
+            var plainStart = visible.Length;
+            visible.Append(text, index, next - index);
+            if (visible.Length > plainStart)
+            {
+                pieces.Add(new InlinePiece(plainStart, visible.Length, InlineKind.Plain));
+            }
+
+            index = next;
+        }
+
+        return visible.ToString();
+    }
+
+    private static void AppendMarkup(
+        StringBuilder markup,
+        string text,
+        int start,
+        int end,
+        List<InlinePiece> pieces)
+    {
+        foreach (var piece in pieces)
+        {
+            if (piece.End <= start)
+            {
+                continue;
+            }
+
+            if (piece.Start >= end)
+            {
+                break;
+            }
+
+            var from = Math.Max(piece.Start, start);
+            var to = Math.Min(piece.End, end);
+            if (from >= to)
+            {
+                continue;
+            }
+
+            var slice = text[from..to];
+            if (piece.Kind == InlineKind.Plain)
+            {
+                markup.Append(MarkupText.Escape(slice));
+                continue;
+            }
+
+            markup.Append(piece.Kind switch
+            {
+                InlineKind.Code => $"[{Theme.Code}]",
+                InlineKind.Bold => "[bold]",
+                InlineKind.Italic => "[italic]",
+                InlineKind.Strike => "[strikethrough]",
+                _ => string.Empty
+            });
+            markup.Append(MarkupText.Escape(slice));
+            markup.Append("[/]");
+        }
+    }
+
+    private static bool ContainsMarker(string text)
+    {
+        foreach (var ch in text)
+        {
+            if (ch is '`' or '*' or '~')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryStyle(
+        string text,
+        int start,
+        out InlineKind kind,
+        out string inner,
+        out int after)
+    {
+        kind = InlineKind.Plain;
+        inner = string.Empty;
+        after = start;
+        if (text[start] == '`' && TryTakeDelimited(text, start, "`", out inner, out after))
+        {
+            kind = InlineKind.Code;
+            return true;
+        }
+
+        if (text[start] == '*'
+            && start + 1 < text.Length
+            && text[start + 1] == '*'
+            && TryTakeDelimited(text, start, "**", out inner, out after))
+        {
+            kind = InlineKind.Bold;
+            return true;
+        }
+
+        if (text[start] == '*'
+            && (start + 1 >= text.Length || text[start + 1] != '*')
+            && TryTakeDelimited(text, start, "*", out inner, out after))
+        {
+            kind = InlineKind.Italic;
+            return true;
+        }
+
+        if (text[start] == '~'
+            && start + 1 < text.Length
+            && text[start + 1] == '~'
+            && TryTakeDelimited(text, start, "~~", out inner, out after))
+        {
+            kind = InlineKind.Strike;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static int NextMarker(string text, int start)
+    {
+        for (var i = start + 1; i < text.Length; i++)
+        {
+            if (text[i] is '`' or '*' or '~')
+            {
+                return i;
+            }
+        }
+
+        return text.Length;
+    }
+
+    private static bool TryTakeDelimited(
+        string text,
+        int start,
+        string delimiter,
+        out string inner,
+        out int after)
+    {
+        inner = string.Empty;
+        after = start;
+        if (start + delimiter.Length >= text.Length)
+        {
+            return false;
+        }
+
+        var close = text.IndexOf(delimiter, start + delimiter.Length, StringComparison.Ordinal);
+        if (close < 0)
+        {
+            return false;
+        }
+
+        inner = text[(start + delimiter.Length)..close];
+        after = close + delimiter.Length;
+        return true;
+    }
+
+    private enum InlineKind
+    {
+        Plain,
+        Code,
+        Bold,
+        Italic,
+        Strike
+    }
+
+    private readonly record struct InlinePiece(int Start, int End, InlineKind Kind);
 }

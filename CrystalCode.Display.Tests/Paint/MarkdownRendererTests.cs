@@ -85,4 +85,29 @@ public sealed class MarkdownRendererTests
         Assert.Contains("[strikethrough]strikethrough[/]", lines[0].Markup, StringComparison.Ordinal);
         Assert.Contains($"[{Theme.Code}]inline code[/]", lines[0].Markup, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Render_LeavesIdentifierUnderscoresLiteral()
+    {
+        var lines = MarkdownRenderer.Render("Call __init__ and snake_case_name.", 80);
+
+        var line = Assert.Single(lines);
+        Assert.Contains("__init__", line.Plain, StringComparison.Ordinal);
+        Assert.Contains("snake_case_name", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("[italic]", line.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("[underline]", line.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_KeepsBoldAcrossWrappedRows()
+    {
+        var lines = MarkdownRenderer.Render("**" + new string('a', 30) + "**", 20);
+
+        Assert.True(lines.Count > 1);
+        Assert.All(lines, line =>
+        {
+            Assert.Contains("[bold]", line.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("**", line.Plain, StringComparison.Ordinal);
+        });
+    }
 }
