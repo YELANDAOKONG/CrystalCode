@@ -105,6 +105,15 @@ public sealed class TerminalTextTests
     }
 
     [Fact]
+    public void SanitizeLine_FlattensCarriageReturnsWithoutErasingTheHead()
+    {
+        Assert.Equal("fix tests add coverage", TerminalText.SanitizeLine("fix tests\r\nadd coverage"));
+        Assert.Equal("hello world", TerminalText.SanitizeLine("hello\rworld"));
+        Assert.Equal("hello ", TerminalText.SanitizeLine("hello\r"));
+        Assert.False(TerminalText.HasControls(TerminalText.SanitizeLine("fix tests\r\nadd coverage")));
+    }
+
+    [Fact]
     public void StripControls_KeepsTabsAndPrintableText()
     {
         Assert.Equal("a\tb", TerminalText.StripControls("a\u001b\tb\n\r\u007f\u009b"));

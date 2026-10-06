@@ -70,4 +70,13 @@ public sealed class TodoBarTests
         Assert.Equal("  [~] first second", lines[1].Plain);
         Assert.Equal("  [ ] clear  done", lines[2].Plain);
     }
+
+    [Fact]
+    public void Lines_KeepsBothSidesOfAWindowsBreak()
+    {
+        var lines = TodoBar.Lines([new TodoBarItem(" ", "fix tests\r\nadd coverage")], 80);
+
+        Assert.Equal("  [ ] fix tests add coverage", lines[1].Plain);
+        Assert.False(TerminalText.HasControls(lines[1].Plain));
+    }
 }

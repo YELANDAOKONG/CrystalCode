@@ -24,6 +24,10 @@ public sealed class TranscriptLog
 
     private int _cachedWidth;
     private readonly List<PaintLine> _committedLines = [];
+
+    // Row counts parallel to _entries at the cached width. A zero count is a
+    // hidden block, so an anchor can skip it and find the same later row.
+    private readonly List<int> _entryRows = [];
     private bool _verboseTools = true;
     private bool _verboseCommands = true;
     private bool _verboseApprovals = true;
@@ -142,7 +146,7 @@ public sealed class TranscriptLog
         _entries.Add(entry);
         if (_cachedWidth > 0)
         {
-            _committedLines.AddRange(RenderEntry(entry, _cachedWidth));
+            AppendCommitted(RenderEntry(entry, _cachedWidth));
         }
     }
 
@@ -187,7 +191,7 @@ public sealed class TranscriptLog
             if (_cachedWidth > 0)
             {
                 var ready = ReadyLiveLines(_cachedWidth);
-                _committedLines.AddRange(ready ?? RenderEntry(entry, _cachedWidth));
+                AppendCommitted(ready ?? RenderEntry(entry, _cachedWidth));
             }
         }
 
@@ -210,6 +214,7 @@ public sealed class TranscriptLog
     {
         _entries.Clear();
         _committedLines.Clear();
+        _entryRows.Clear();
         _cachedWidth = 0;
         _streamState.Reset();
         _live.Clear();
@@ -257,6 +262,82 @@ public sealed class TranscriptLog
         EnsureCommittedLines(width);
         var count = _committedLines.Count + LiveLines(width).Count;
         return Math.Clamp(scrollBack, 0, Math.Max(0, count - rows));
+    }
+
+    /// <summary>
+    /// The committed row at this content index. A live tail is marked with the
+    /// entry index it will occupy once committed.
+    /// </summary>
+    internal ScrollMark MarkAt(int width, int contentRow)
+    {
+        EnsureCommittedLines(width);
+        var live = LiveLines(width);
+        var committed = _committedLines.Count;
+        var total = committed + live.Count;
+        if (total == 0)
+        {
+            return new ScrollMark(0, 0);
+        }
+
+        var row = Math.Clamp(contentRow, 0, total - 1);
+        if (row >= committed)
+        {
+            return new ScrollMark(_entries.Count, row - committed);
+        }
+
+        var index = 0;
+        for (var i = 0; i < _entryRows.Count; i++)
+        {
+            var rows = _entryRows[i];
+            if (rows == 0)
+            {
+                continue;
+            }
+
+            if (row < index + rows)
+            {
+                return new ScrollMark(i, row - index);
+            }
+
+            index += rows;
+        }
+
+        return new ScrollMark(_entries.Count, 0);
+    }
+
+    /// <summary>
+    /// Where the marked row sits after later output or an earlier block
+    /// changed height. A hidden entry resolves to the next visible row.
+    /// </summary>
+    internal int RowOf(int width, ScrollMark mark)
+    {
+        EnsureCommittedLines(width);
+        var live = LiveLines(width);
+        var committed = _committedLines.Count;
+        var total = committed + live.Count;
+        if (total == 0)
+        {
+            return 0;
+        }
+
+        var last = total - 1;
+        if (mark.EntryIndex == _entries.Count && live.Count > 0)
+        {
+            return committed + Math.Clamp(mark.Line, 0, live.Count - 1);
+        }
+
+        if ((uint)mark.EntryIndex >= (uint)_entryRows.Count)
+        {
+            return last;
+        }
+
+        var entryRows = _entryRows[mark.EntryIndex];
+        if (entryRows == 0)
+        {
+            return NextContentRow(mark.EntryIndex, total);
+        }
+
+        return EntryStart(mark.EntryIndex) + Math.Clamp(mark.Line, 0, entryRows - 1);
     }
 
     public IReadOnlyList<PaintLine> BuildLines(int width)
@@ -336,18 +417,50 @@ public sealed class TranscriptLog
         _otherLiveLength = -1;
     }
 
+    private void AppendCommitted(IReadOnlyList<PaintLine> lines)
+    {
+        _committedLines.AddRange(lines);
+        _entryRows.Add(lines.Count);
+    }
+
+    private int EntryStart(int entryIndex)
+    {
+        var index = 0;
+        var limit = Math.Min(entryIndex, _entryRows.Count);
+        for (var i = 0; i < limit; i++)
+        {
+            index += _entryRows[i];
+        }
+
+        return index;
+    }
+
+    private int NextContentRow(int entryIndex, int total)
+    {
+        for (var i = entryIndex; i < _entryRows.Count; i++)
+        {
+            if (_entryRows[i] > 0)
+            {
+                return EntryStart(i);
+            }
+        }
+
+        return Math.Max(0, total - 1);
+    }
+
     private void EnsureCommittedLines(int width)
     {
-        if (_cachedWidth == width)
+        if (_cachedWidth == width && _entryRows.Count == _entries.Count)
         {
             return;
         }
 
         _cachedWidth = width;
         _committedLines.Clear();
+        _entryRows.Clear();
         for (var i = 0; i < _entries.Count; i++)
         {
-            _committedLines.AddRange(RenderEntry(_entries[i], width));
+            AppendCommitted(RenderEntry(_entries[i], width));
         }
     }
 

@@ -1646,7 +1646,11 @@ public sealed class SessionRenderer : IDisposable
             composerView = _composer.Project(width, regions.ComposerRows);
         }
 
-        _scrollBack = _scrollAnchor.Resolve(regions.Width, _log.RowCount(regions.Width), _scrollBack);
+        _scrollBack = _scrollAnchor.Resolve(
+            regions.Width,
+            _log,
+            regions.TranscriptRows,
+            _scrollBack);
         _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
         var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
         var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;

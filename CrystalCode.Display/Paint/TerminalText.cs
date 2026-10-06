@@ -50,19 +50,28 @@ public static class TerminalText
     }
 
     /// <summary>
-    /// One display line: control sequences are removed, and line breaks and tabs
-    /// become single spaces. For chrome fields that must never span rows.
+    /// One display line: control sequences are removed, and carriage returns,
+    /// line breaks, and tabs become single spaces. A chrome line keeps the
+    /// text on both sides of a break; it does not use carriage-return overwrite.
     /// </summary>
     public static string SanitizeLine(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var clean = Sanitize(text);
-        if (clean.AsSpan().IndexOfAny('\n', '\t') < 0)
+        if (IsClean(text) && text.AsSpan().IndexOfAny('\r', '\n', '\t') < 0)
         {
-            return clean;
+            return text;
         }
 
-        return clean.Replace('\n', ' ').Replace('\t', ' ');
+        var stripped = Strip(text);
+        if (stripped.AsSpan().IndexOfAny('\r', '\n', '\t') < 0)
+        {
+            return stripped;
+        }
+
+        return stripped
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Replace('\t', ' ');
     }
 
     /// <summary>

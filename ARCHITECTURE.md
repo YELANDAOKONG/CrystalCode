@@ -1039,10 +1039,14 @@ for layout only.
 
 Text that came from a model, a tool, or a file never reaches the terminal as
 control bytes. `TerminalText.Sanitize` removes C0 and C1 controls, DEL, and
-escape introducers from streamed and committed text. `PaintLine.Fit` strips
-controls again from every row after tab expansion, so no producer can leak an
-escape sequence into a frame. Todo content, activity and progress text, and
-widget segments go through the same path. Approval cards are different: the
+escape introducers from streamed and committed text. Tool bodies still collapse
+a carriage return the way a terminal overwrites the current line. One-line
+chrome (`SanitizeLine` for todos, activity, and progress) flattens carriage
+returns, line breaks, and tabs to spaces and does not use that overwrite.
+`PaintLine.Fit` strips controls again from every row after tab expansion, so
+no producer can leak an escape sequence into a frame. Todo content, activity
+and progress text, and widget segments go through the same path. Approval
+cards are different: the
 operator must see what is being approved, so control and bidirectional
 characters in commands, diffs, rationale, and tool summaries are shown as
 visible `\xNN` and `\uNNNN` escapes through `TerminalText.Reveal` instead of
@@ -1062,10 +1066,14 @@ width characters assume a narrow terminal.
 strikethrough, and invert when it rasterizes Spectre widgets. Links and
 blinking are dropped on purpose.
 
-`ScrollAnchor` keeps the transcript where the operator left it. The scroll
-position is a distance from the bottom, so growth at an unchanged width is
-added to that distance while it is above zero; at the bottom the view
-follows new rows. A width change keeps the distance and re-clamps it.
+`ScrollAnchor` keeps the transcript on the row the operator is reading. That
+position is one committed row, named by entry index and line. A live tail
+uses the entry index it will occupy once committed. New rows at the end move
+the distance from the bottom so the anchored row stays put. At the bottom,
+where no row is anchored, the view follows new output. A scroll that leaves
+the bottom is measured from the latest row count. A width change keeps the
+distance and re-clamps it, then takes a new anchor. When a block above the
+anchor changes height, the same row is found again.
 
 Terminal.Gui is referenced from CrystalCode.Display with a floating
 version and is not used. Do not call `Application.Init` or mix a second

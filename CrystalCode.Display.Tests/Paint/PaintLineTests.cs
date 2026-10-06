@@ -28,12 +28,24 @@ public sealed class PaintLineTests
     }
 
     [Fact]
-    public void Colored_RemovesEscapeSequencesAndBreaks()
+    public void Colored_FlattensEscapeSequencesAndBreaks()
     {
         var line = PaintLine.Colored(Theme.Chrome, "a\u001b[2Jb\nc");
 
-        Assert.Equal("abc", line.Plain);
+        Assert.Equal("ab c", line.Plain);
         Assert.False(TerminalText.HasControls(line.Markup));
+    }
+
+    [Fact]
+    public void Colored_KeepsTabsWhileFlatteningBreaks()
+    {
+        var line = PaintLine.Colored(Theme.Chrome, "a\tb\nc");
+
+        Assert.Equal("a\tb c", line.Plain);
+
+        var fitted = line.Fit(20);
+        Assert.Equal("a    b c", fitted.Plain);
+        Assert.DoesNotContain('\t', fitted.Markup);
     }
 
     [Fact]

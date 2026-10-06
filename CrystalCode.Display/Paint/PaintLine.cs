@@ -14,10 +14,26 @@ public readonly record struct PaintLine(string Markup, string Plain)
         ArgumentNullException.ThrowIfNull(plain);
         if (TerminalText.HasControls(plain))
         {
-            plain = TerminalText.StripControls(TerminalText.Sanitize(plain));
+            // SanitizeLine turns a tab into one space. A row keeps tabs so Fit
+            // can expand them; breaks still become spaces, without carriage-return
+            // overwrite.
+            plain = plain.Contains('\t')
+                ? FlattenBreaksKeepingTabs(plain)
+                : TerminalText.SanitizeLine(plain);
         }
 
         return new PaintLine($"[{color}]{MarkupText.Escape(plain)}[/]", plain);
+    }
+
+    private static string FlattenBreaksKeepingTabs(string plain)
+    {
+        var parts = plain.Split('\t');
+        for (var i = 0; i < parts.Length; i++)
+        {
+            parts[i] = TerminalText.SanitizeLine(parts[i]);
+        }
+
+        return string.Join('\t', parts);
     }
 
     /// <summary>
