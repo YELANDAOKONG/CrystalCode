@@ -756,7 +756,7 @@ public sealed class SessionRenderer : IDisposable
             if (calls.Count > 0)
             {
                 SetTurnActivityUnlocked(
-                    DisplayCase.Token(calls[^1].Name),
+                    DisplayCase.Token(calls[0].Name),
                     ProgressText.Running(calls[0].Name));
                 PaintUnlocked(force: true);
             }
@@ -2068,10 +2068,12 @@ public sealed class SessionRenderer : IDisposable
             return;
         }
 
-        var burst = await ReadBurstAsync(cancellationToken);
+        _ = await ReadBurstAsync(cancellationToken);
         lock (_gate)
         {
-            _decoder.Push(burst);
+            // The keys are ignored. Push would keep an unfinished escape
+            // sequence and attach it to the next real key.
+            _decoder.Reset();
         }
     }
 
