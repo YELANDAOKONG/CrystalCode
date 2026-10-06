@@ -29,9 +29,11 @@ public sealed class AlternateScreen : IDisposable
         }
 
         var inputMode = WindowsConsole.EnableVirtualInput();
+        var entered = false;
         try
         {
             AnsiConsole.Write(new ControlCode("\u001b[?1049h"));
+            entered = true;
             AnsiConsole.Write(new ControlCode("\u001b[?2004h"));
             AnsiConsole.Write(new ControlCode("\u001b[?1007h"));
             AnsiConsole.Write(new ControlCode("\u001b[H"));
@@ -43,6 +45,17 @@ public sealed class AlternateScreen : IDisposable
         }
         catch (IOException)
         {
+            if (entered)
+            {
+                try
+                {
+                    AnsiConsole.Write(new ControlCode("\u001b[?1049l"));
+                }
+                catch (IOException)
+                {
+                }
+            }
+
             inputMode?.Dispose();
             return new AlternateScreen(false);
         }
