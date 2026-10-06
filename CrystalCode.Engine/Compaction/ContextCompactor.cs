@@ -20,6 +20,7 @@ public sealed class ContextCompactor
     private readonly Func<PluginCompactionPhase, string, string?>? _amend;
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
         _prepareHead;
+    private readonly Func<ChatResponse, CancellationToken, Task>? _reportResponse;
 
     public ContextCompactor(
         IChatClient client,
@@ -27,7 +28,8 @@ public sealed class ContextCompactor
         Action<SessionRetryAttempt>? onRetry = null,
         Func<string>? systemText = null,
         Func<PluginCompactionPhase, string, string?>? amend = null,
-        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareHead = null)
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareHead = null,
+        Func<ChatResponse, CancellationToken, Task>? reportResponse = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
@@ -35,6 +37,7 @@ public sealed class ContextCompactor
         _onRetry = onRetry;
         _amend = amend;
         _prepareHead = prepareHead;
+        _reportResponse = reportResponse;
         _systemText = systemText
             ?? (() => CompactionPrompt.ComposeSystem(
                 PromptContext.InstructionsOnly(string.Empty).WithMode("compaction")));
@@ -100,6 +103,11 @@ public sealed class ContextCompactor
                 _retry,
                 _onRetry,
                 cancellationToken);
+            if (_reportResponse is not null && response.Candidates.Count > 0)
+            {
+                await _reportResponse(response, cancellationToken);
+            }
+
             var summary = ReadAssistantText(response);
             if (string.IsNullOrWhiteSpace(summary))
             {

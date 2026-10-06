@@ -109,6 +109,48 @@ public sealed class ContextCompactorTests
     }
 
     [Fact]
+    public async Task CompactAsync_ReportsTheReturnedSummaryBeforeRebuilding()
+    {
+        const string summary = "## Objective\n- Read then write App.cs.";
+        string? seen = null;
+        var compactor = new ContextCompactor(
+            new FixedChatClient(summary),
+            reportResponse: (response, _) =>
+            {
+                seen = Assert.IsType<ChatMessage>(response.Candidates[0].Items[0]).Text;
+                return Task.CompletedTask;
+            });
+
+        var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", TightLimits);
+
+        Assert.Equal(summary, seen);
+        Assert.Equal(CompactionKind.Applied, outcome.Kind);
+        Assert.Contains(
+            outcome.Transcript,
+            item => item is ChatMessage message
+                && message.Text.Contains(summary, StringComparison.Ordinal)
+                && message.Text.StartsWith(CompactionPrompt.Marker, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CompactAsync_ReportsABlankSummaryTheHostDiscards()
+    {
+        var reported = 0;
+        var compactor = new ContextCompactor(
+            new EmptyChatClient(),
+            reportResponse: (_, _) =>
+            {
+                reported++;
+                return Task.CompletedTask;
+            });
+
+        var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", TightLimits);
+
+        Assert.Equal(1, reported);
+        Assert.Equal(CompactionKind.Exhausted, outcome.Kind);
+    }
+
+    [Fact]
     public async Task CompactAsync_RetriesRetryableSummaryFailure()
     {
         var client = new FlakyChatClient(

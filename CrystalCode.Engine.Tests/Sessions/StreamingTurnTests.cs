@@ -30,6 +30,37 @@ public sealed class StreamingTurnTests
     }
 
     [Fact]
+    public async Task RunAsync_ReportsEachResponseBeforeItsToolsRun()
+    {
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "echo", "{}"),
+            TextRound("ok"));
+        var order = new List<string>();
+        var reasons = new List<FinishReason>();
+        var inner = new ToolExecutor(
+            new ToolCatalog([new EchoTool()]),
+            new ToolExecutionOptions(ToolExecutionMode.Serial, 1));
+        var turn = new StreamingTurn(
+            client,
+            new OrderingExecutor(order, inner),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            onModelResponse: (response, _) =>
+            {
+                order.Add("response");
+                reasons.Add(response.Candidates[0].FinishReason);
+                return Task.CompletedTask;
+            });
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "echo")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(["response", "tool", "response"], order);
+        Assert.Equal(FinishReason.ToolCalls, reasons[0]);
+        Assert.Equal(FinishReason.Stop, reasons[1]);
+        Assert.Equal("ok", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    [Fact]
     public async Task RunAsync_ExecutesToolBatchThenCompletes()
     {
         var client = new ScriptedStreamingClient(
@@ -424,6 +455,19 @@ public sealed class StreamingTurnTests
         }
 
         return [.. events];
+    }
+
+    private sealed class OrderingExecutor(List<string> order, IToolExecutor inner) : IToolExecutor
+    {
+        public IReadOnlyList<ToolDefinition> Definitions => inner.Definitions;
+
+        public Task<IReadOnlyList<ToolResult>> ExecuteAsync(
+            IEnumerable<ToolCall> calls,
+            CancellationToken cancellationToken = default)
+        {
+            order.Add("tool");
+            return inner.ExecuteAsync(calls, cancellationToken);
+        }
     }
 
     private sealed class CancellingTool : ITool

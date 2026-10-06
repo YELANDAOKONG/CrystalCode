@@ -136,6 +136,7 @@ external tools. A hook that throws is skipped with an English note.
 | `OnTurnStartedAsync` / `OnTurnFinishedAsync` | Read the stored user text, mode, and, when the turn ends, the stop reason | Change the transcript |
 | `RebuildModelAsync` | Drop or reorder items for one outbound call, including the text summarized during compaction | Change the live system prompt, add a tool call, split a call from its result, or write the archive |
 | `TransformModelAsync` | Change user, assistant, or tool-result text for that same call, or drop image references already on an item | Reorder items, edit a system message, add an image, or write the archive |
+| `OnModelResponseAsync` | Read the purpose, finish reason, returned items, and usage of one completed work, plan, side, or compaction call | Change the transcript, the archive, or the response the host uses |
 | `OnToolCallAsync` | Replace the name or arguments | Change the call id, skip the call, or skip approval |
 | `OnToolResultAsync` | Replace the text result and, on an image-capable turn, its images | Mark an approval as passed |
 | `OnApproval` | Raise risk, or require another prompt | Lower the host risk, or auto-pass |
@@ -151,6 +152,10 @@ be summarized. They do not see the approval review. Returned image lists
 may only name attachments already on that item. The stored transcript and
 the archive stay as they were, except for text replaced by
 `OnUserMessageAsync`.
+
+`OnModelResponseAsync` runs after one of those calls returns and before the
+host commits that candidate or runs its tools. Approval review does not
+call it. The host keeps the candidate it received.
 
 Session start runs after the plugin load. Session end runs when the
 session closes and before a `/cd` reload. `crystal run` closes the

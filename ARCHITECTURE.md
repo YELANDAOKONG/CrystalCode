@@ -1328,10 +1328,11 @@ a protocol factory for a protocol the built-in adapters do not own,
 classifiers for unknown tools, slash commands that do not reuse a
 built-in verb, and hooks. Hooks append prompt and compaction text,
 rewrite a user message before it is stored, project one outbound model
-request without writing the archive, rewrite a tool call before approval
-runs again, replace a tool result, and raise approval risk or require
-another prompt. They do not lower risk, skip approval, or replace Work,
-Plan, or Review. Catalog order is
+request without writing the archive, read one returned model response
+without changing the candidate the host uses, rewrite a tool call before
+approval runs again, replace a tool result, and raise approval risk or
+require another prompt. They do not lower risk, skip approval, or replace
+Work, Plan, or Review. Catalog order is
 built-in tools, disk plugin tools, external tools, then `skill`.
 
 Operator tool sets are not plugins. They are discovered from `tools/` and

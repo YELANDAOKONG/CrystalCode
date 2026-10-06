@@ -1,3 +1,4 @@
+using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
 
@@ -143,6 +144,37 @@ public sealed class PluginHookPipelineTests
         Assert.Contains(notes, note => note.Contains("split a tool call", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task OnModelResponse_SkipsAThrowingHookAndKeepsTheReturnedText()
+    {
+        var notes = new List<string>();
+        var seen = new List<PluginModelResponse>();
+        IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.Assistant, "done")];
+        var pipeline = new PluginHookPipeline(
+            [new ThrowingResponseHook(), new RecordingResponseHook(seen)],
+            notes.Add);
+
+        await pipeline.OnModelResponseAsync(
+            PluginModelPurpose.Side,
+            FinishReason.Stop,
+            items,
+            new TokenUsage(3, 1),
+            new Dictionary<int, string>(),
+            CancellationToken.None);
+
+        var response = Assert.Single(seen);
+        Assert.Equal(PluginModelPurpose.Side, response.Purpose);
+        Assert.Equal(FinishReason.Stop, response.FinishReason);
+        Assert.NotNull(response.Usage);
+        Assert.Equal(3, response.Usage.InputTokenCount);
+        Assert.Equal(1, response.Usage.OutputTokenCount);
+        var message = Assert.IsType<PluginModelMessage>(Assert.Single(response.Items));
+        Assert.Equal(ChatRole.Assistant, message.Role);
+        Assert.Equal("done", message.Text);
+        Assert.Equal("done", Assert.IsType<ChatMessage>(items[0]).Text);
+        Assert.Contains(notes, note => note.Contains("model-response", StringComparison.Ordinal));
+    }
+
     private sealed class TextHook(string text) : IPluginHook
     {
         public string? OnPrompt(PluginPrompt prompt) => text;
@@ -203,6 +235,25 @@ public sealed class PluginHookPipelineTests
                 })
             ];
             return ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(next);
+        }
+    }
+
+    private sealed class ThrowingResponseHook : IPluginHook
+    {
+        public ValueTask OnModelResponseAsync(
+            PluginModelResponse response,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("response hook failed.");
+    }
+
+    private sealed class RecordingResponseHook(List<PluginModelResponse> seen) : IPluginHook
+    {
+        public ValueTask OnModelResponseAsync(
+            PluginModelResponse response,
+            CancellationToken cancellationToken = default)
+        {
+            seen.Add(response);
+            return ValueTask.CompletedTask;
         }
     }
 

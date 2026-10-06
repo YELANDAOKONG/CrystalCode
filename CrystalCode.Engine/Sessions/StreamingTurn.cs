@@ -21,6 +21,7 @@ public sealed class StreamingTurn
     private readonly Action<IReadOnlyList<ChatItem>>? _commit;
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
         _prepareModel;
+    private readonly Func<ChatResponse, CancellationToken, Task>? _onModelResponse;
 
     public StreamingTurn(
         IStreamingChatClient client,
@@ -31,7 +32,8 @@ public sealed class StreamingTurn
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<CompactionOutcome>>? compactBeforeRound = null,
         SessionRetryOptions? retry = null,
         Action<IReadOnlyList<ChatItem>>? commit = null,
-        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null)
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null,
+        Func<ChatResponse, CancellationToken, Task>? onModelResponse = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(executor);
@@ -45,6 +47,7 @@ public sealed class StreamingTurn
         _retry = retry ?? SessionRetryOptions.Default;
         _commit = commit;
         _prepareModel = prepareModel;
+        _onModelResponse = onModelResponse;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -110,6 +113,7 @@ public sealed class StreamingTurn
                 var response = await StreamModelAsync(request, usage, linked.Token);
                 usage.Add(response.Usage);
                 _observer?.OnUsageUpdated(response.Usage ?? usage.Last, usage.Build());
+                await ReportResponseAsync(response, linked.Token);
 
                 var candidate = response.Candidates[0];
                 var marked = transcript.Count;
@@ -219,6 +223,16 @@ public sealed class StreamingTurn
         var prepared = await _prepareModel(transcript, cancellationToken);
         ArgumentNullException.ThrowIfNull(prepared);
         return prepared;
+    }
+
+    private async Task ReportResponseAsync(ChatResponse response, CancellationToken cancellationToken)
+    {
+        if (_onModelResponse is null || response.Candidates.Count == 0)
+        {
+            return;
+        }
+
+        await _onModelResponse(response, cancellationToken);
     }
 
     private Task<ChatResponse> StreamModelAsync(

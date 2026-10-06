@@ -27,6 +27,7 @@ public sealed class MultimodalStreamingTurn
     private readonly Action<IReadOnlyList<ChatItem>>? _commit;
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
         _prepareModel;
+    private readonly Func<ChatResponse, CancellationToken, Task>? _onModelResponse;
 
     public MultimodalStreamingTurn(
         IStreamingMultimodalChatClient client,
@@ -89,7 +90,8 @@ public sealed class MultimodalStreamingTurn
         Action<ImageAttachment> addImage,
         Func<IDictionary<int, ImageAttachment>> imageSnapshot,
         Action<IReadOnlyList<ChatItem>>? commit = null,
-        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null)
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null,
+        Func<ChatResponse, CancellationToken, Task>? onModelResponse = null)
         : this(client, executor, limits, images, observer, reasoning, compactBeforeRound, retry)
     {
         _reserveImageNumber = reserveImageNumber;
@@ -97,6 +99,7 @@ public sealed class MultimodalStreamingTurn
         _imageSnapshot = imageSnapshot;
         _commit = commit;
         _prepareModel = prepareModel;
+        _onModelResponse = onModelResponse;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -162,6 +165,7 @@ public sealed class MultimodalStreamingTurn
                 var response = await StreamModelAsync(request, usage, linked.Token);
                 usage.Add(response.Usage);
                 _observer?.OnUsageUpdated(response.Usage ?? usage.Last, usage.Build());
+                await ReportResponseAsync(response, linked.Token);
 
                 var candidate = response.Candidates[0];
                 var marked = transcript.Count;
@@ -279,6 +283,16 @@ public sealed class MultimodalStreamingTurn
         var prepared = await _prepareModel(transcript, cancellationToken);
         ArgumentNullException.ThrowIfNull(prepared);
         return prepared;
+    }
+
+    private async Task ReportResponseAsync(ChatResponse response, CancellationToken cancellationToken)
+    {
+        if (_onModelResponse is null || response.Candidates.Count == 0)
+        {
+            return;
+        }
+
+        await _onModelResponse(response, cancellationToken);
     }
 
     private Task<ChatResponse> StreamModelAsync(

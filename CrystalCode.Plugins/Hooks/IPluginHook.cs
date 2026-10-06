@@ -66,6 +66,15 @@ public interface IPluginHook
         ValueTask.FromResult<IReadOnlyList<PluginModelItem>?>(null);
 
     /// <summary>
+    /// Called when one model call returns. The response is read-only.
+    /// Approval review does not call this hook.
+    /// </summary>
+    ValueTask OnModelResponseAsync(
+        PluginModelResponse response,
+        CancellationToken cancellationToken = default) =>
+        ValueTask.CompletedTask;
+
+    /// <summary>
     /// Returns a replacement call, or null to keep the current call.
     /// The call id must stay the same. The host classifies and approves the
     /// replacement before the tool runs.

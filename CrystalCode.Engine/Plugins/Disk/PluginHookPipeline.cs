@@ -1,3 +1,4 @@
+using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
 
@@ -240,6 +241,42 @@ internal sealed class PluginHookPipeline
         }
 
         return ModelHookTranscript.Apply(projection, current);
+    }
+
+    public async ValueTask OnModelResponseAsync(
+        PluginModelPurpose purpose,
+        FinishReason finishReason,
+        IReadOnlyList<ChatItem> items,
+        TokenUsage? usage,
+        IReadOnlyDictionary<int, string> mediaTypes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(finishReason);
+        ArgumentNullException.ThrowIfNull(items);
+        ArgumentNullException.ThrowIfNull(mediaTypes);
+        if (_hooks.Count == 0)
+        {
+            return;
+        }
+
+        var projection = ModelHookTranscript.Project(items, mediaTypes);
+        var response = new PluginModelResponse(purpose, finishReason, projection.Items, usage);
+        foreach (var hook in _hooks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await hook.OnModelResponseAsync(response, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                Report(hook, "model-response", exception.Message);
+            }
+        }
     }
 
     public async ValueTask<ToolCall> OnToolCallAsync(ToolCall call, CancellationToken cancellationToken)

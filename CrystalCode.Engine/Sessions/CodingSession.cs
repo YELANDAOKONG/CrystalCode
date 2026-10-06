@@ -2745,14 +2745,37 @@ public sealed class CodingSession : ITurnObserver
 
     private string CurrentModeName() => _planMode ? "plan" : "work";
 
+    private PluginModelPurpose CurrentModelPurpose() =>
+        _planMode ? PluginModelPurpose.Plan : PluginModelPurpose.Work;
+
     private Task<IReadOnlyList<ChatItem>> PrepareOutboundAsync(
         IReadOnlyList<ChatItem> items,
         CancellationToken cancellationToken) =>
         _hooks.PrepareModelAsync(
-            _planMode ? PluginModelPurpose.Plan : PluginModelPurpose.Work,
+            CurrentModelPurpose(),
             items,
             ImageMediaTypes(),
             cancellationToken);
+
+    private Task ReportModelResponseAsync(
+        PluginModelPurpose purpose,
+        ChatResponse response,
+        CancellationToken cancellationToken)
+    {
+        if (response.Candidates.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var candidate = response.Candidates[0];
+        return _hooks.OnModelResponseAsync(
+            purpose,
+            candidate.FinishReason,
+            candidate.Items,
+            response.Usage,
+            ImageMediaTypes(),
+            cancellationToken).AsTask();
+    }
 
     private Dictionary<int, string> ImageMediaTypes()
     {
@@ -2783,7 +2806,8 @@ public sealed class CodingSession : ITurnObserver
                 AddImage,
                 ImageSnapshot,
                 CommitArchive,
-                PrepareOutboundAsync);
+                PrepareOutboundAsync,
+                (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token));
             return multimodalTurn.RunAsync(_transcript, cancellationToken);
         }
 
@@ -2796,7 +2820,8 @@ public sealed class CodingSession : ITurnObserver
             CompactRoundAsync,
             SessionRetryOptions.Default,
             CommitArchive,
-            PrepareOutboundAsync);
+            PrepareOutboundAsync,
+            (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token));
         return turn.RunAsync(_transcript, cancellationToken);
     }
 
@@ -3034,6 +3059,10 @@ public sealed class CodingSession : ITurnObserver
                 PluginModelPurpose.Compaction,
                 items,
                 ImageMediaTypes(),
+                token),
+            (response, token) => ReportModelResponseAsync(
+                PluginModelPurpose.Compaction,
+                response,
                 token));
 
     /// <summary>
@@ -3357,6 +3386,7 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
+            await ReportModelResponseAsync(PluginModelPurpose.Side, response, cancellationToken);
             if (!SideQuestion.TryReadAnswer(response, out var answer, out var ignoredToolCall))
             {
                 FailSide(

@@ -1,6 +1,6 @@
 namespace CrystalCode.Plugins.Hooks;
 
-/// <summary>Which model call is about to be sent.</summary>
+/// <summary>Which model call a hook is seeing.</summary>
 public enum PluginModelPurpose
 {
     Work,
