@@ -31,4 +31,13 @@ public sealed class AlternateScreenTests
 
         Assert.Equal(["\u001b[?2004l", "\u001b[?1049l"], codes);
     }
+
+    [Fact]
+    public void LeaveSequences_ShowsTheCursorAfterThePrimaryScreenReturns()
+    {
+        var codes = AlternateScreen.LeaveSequences();
+
+        Assert.Equal("\u001b[?1049l", codes[^2]);
+        Assert.Equal("\u001b[?25h", codes[^1]);
+    }
 }

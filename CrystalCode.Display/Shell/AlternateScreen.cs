@@ -16,6 +16,8 @@ public sealed class AlternateScreen : IDisposable
     private bool _titlePushed;
     private string? _previousTitle;
     private WindowsConsole.InputModeLease? _inputMode;
+    private EventHandler? _onProcessExit;
+    private int _restored;
 
     private AlternateScreen(bool active)
     {
@@ -50,6 +52,7 @@ public sealed class AlternateScreen : IDisposable
             screen = new AlternateScreen(true);
             screen._inputMode = inputMode;
             screen.ApplyWindowTitle();
+            screen.ArmProcessExit();
             return screen;
         }
         catch (IOException)
@@ -114,6 +117,19 @@ public sealed class AlternateScreen : IDisposable
         return codes;
     }
 
+    /// <summary>
+    /// Leaves the alternate buffer, then shows the cursor. Showing it first is
+    /// discarded by terminals that restore the hidden cursor with the primary screen.
+    /// </summary>
+    internal static IReadOnlyList<string> LeaveSequences() =>
+    [
+        "\u001b[?1006l",
+        "\u001b[?1000l",
+        "\u001b[?2004l",
+        "\u001b[?1049l",
+        "\u001b[?25h"
+    ];
+
     public void Dispose()
     {
         if (!_active)
@@ -121,14 +137,61 @@ public sealed class AlternateScreen : IDisposable
             return;
         }
 
+        Restore(raw: false);
+    }
+
+    private void ArmProcessExit()
+    {
+        // Ctrl+C exits without unwinding the caller's using, so Dispose never runs.
+        _onProcessExit = OnProcessExit;
+        AppDomain.CurrentDomain.ProcessExit += _onProcessExit;
+    }
+
+    private void OnProcessExit(object? sender, EventArgs args)
+    {
+        if (_active)
+        {
+            Restore(raw: true);
+        }
+    }
+
+    private void DisarmProcessExit()
+    {
+        if (_onProcessExit is null)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.ProcessExit -= _onProcessExit;
+        _onProcessExit = null;
+    }
+
+    private void Restore(bool raw)
+    {
+        if (Interlocked.Exchange(ref _restored, 1) != 0)
+        {
+            return;
+        }
+
+        DisarmProcessExit();
         try
         {
-            RestoreWindowTitle();
-            AnsiConsole.Cursor.Show();
-            AnsiConsole.Write(new ControlCode("\u001b[?1006l"));
-            AnsiConsole.Write(new ControlCode("\u001b[?1000l"));
-            AnsiConsole.Write(new ControlCode("\u001b[?2004l"));
-            AnsiConsole.Write(new ControlCode("\u001b[?1049l"));
+            if (_titlePushed)
+            {
+                WriteSequence("\u001b[23;0t", raw);
+                _titlePushed = false;
+            }
+
+            RestoreConsoleTitle();
+            foreach (var code in LeaveSequences())
+            {
+                WriteSequence(code, raw);
+            }
+
+            if (raw)
+            {
+                Console.Out.Flush();
+            }
         }
         catch (IOException)
         {
@@ -139,6 +202,23 @@ public sealed class AlternateScreen : IDisposable
             _inputMode = null;
             _active = false;
             inputMode?.Dispose();
+        }
+    }
+
+    private static void WriteSequence(string code, bool raw)
+    {
+        try
+        {
+            if (raw)
+            {
+                Console.Out.Write(code);
+                return;
+            }
+
+            AnsiConsole.Write(new ControlCode(code));
+        }
+        catch (IOException)
+        {
         }
     }
 
@@ -168,17 +248,6 @@ public sealed class AlternateScreen : IDisposable
             {
             }
         }
-    }
-
-    private void RestoreWindowTitle()
-    {
-        if (_titlePushed)
-        {
-            AnsiConsole.Write(new ControlCode("\u001b[23;0t"));
-            _titlePushed = false;
-        }
-
-        RestoreConsoleTitle();
     }
 
     private void RestoreConsoleTitle()

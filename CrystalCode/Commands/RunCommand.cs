@@ -208,20 +208,28 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return (1, null);
         }
 
+        using var interrupt = TerminalInterrupt.Link(cancellationToken);
         using var pickerRenderer = new SessionRenderer();
-        using (pickerRenderer.Open())
+        try
         {
-            var id = await new SessionPicker(pickerRenderer).ChooseAsync(
-                available,
-                currentId: null,
-                listWorkspace,
-                cancellationToken);
-            if (id is null)
+            using (pickerRenderer.Open())
             {
-                return (0, null);
-            }
+                var id = await new SessionPicker(pickerRenderer).ChooseAsync(
+                    available,
+                    currentId: null,
+                    listWorkspace,
+                    interrupt.Token);
+                if (id is null)
+                {
+                    return (0, null);
+                }
 
-            return (null, id);
+                return (null, id);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return (0, null);
         }
     }
 
@@ -252,16 +260,24 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return new TrustDecision(false, 1);
         }
 
+        using var interrupt = TerminalInterrupt.Link(cancellationToken);
         using var trustRenderer = new SessionRenderer();
-        using (trustRenderer.Open())
+        try
         {
-            var accepted = await new TrustPrompt(trustRenderer).ConfirmAsync(
-                new WorkspaceTrustRequest(root, trustRoot),
-                cancellationToken);
-            if (!accepted)
+            using (trustRenderer.Open())
             {
-                return new TrustDecision(false, 0);
+                var accepted = await new TrustPrompt(trustRenderer).ConfirmAsync(
+                    new WorkspaceTrustRequest(root, trustRoot),
+                    interrupt.Token);
+                if (!accepted)
+                {
+                    return new TrustDecision(false, 0);
+                }
             }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new TrustDecision(false, 0);
         }
 
         trust.Remember(trustRoot);
