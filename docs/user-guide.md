@@ -190,8 +190,9 @@ the ordinary trust rule. If `space` itself is a git repository, its children
 share that trust root. Sessions there are saved under the absolute path,
 the same way as any other workspace.
 
-`crystal run --workspace ~/.crystal/space` accepts the directory. It does
-not write a trust entry.
+`crystal run --space` creates that directory when it is missing and runs
+one task there. It does not write a trust entry. `--space` cannot be
+combined with `--workspace`.
 
 ## Version
 
@@ -250,6 +251,7 @@ checks the directory. `unlimited` removes that one cap.
 | :--- | :--- |
 | `-p`, `--provider` / `-m`, `--model` | Provider and model for this process |
 | `-w`, `--workspace` / `--home` | Workspace root and data directory |
+| `--space` | Use the operator space `{home}/space` as the workspace. Creates it when missing. Cannot be combined with `--workspace` |
 | `--approval <mode>` | `default`, `edit`, `review`, `audit`, or `full` |
 | `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
@@ -274,8 +276,8 @@ or `--approval-model-id`.
 setting. Leaving it out checks the directory even when `workspaceTrust`
 is false in `config.json`. An untrusted directory exits 4 before a
 session starts. Trust it from the interactive terminal, or pass
-`--workspace-trust off` for that process. The operator space at
-`{home}/space` is already trusted.
+`--workspace-trust off` for that process. `crystal run --space` uses the
+operator space, which is already trusted.
 
 There is no operator. In Review and Audit the reviewing model still
 judges calls that require review: allow runs the tool, and deny returns

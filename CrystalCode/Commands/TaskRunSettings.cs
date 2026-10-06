@@ -20,6 +20,9 @@ public sealed class TaskRunSettings : CommandSettings
     [CommandOption("-w|--workspace <PATH>")]
     public string? Workspace { get; init; }
 
+    [CommandOption("--space")]
+    public bool Space { get; init; }
+
     [CommandOption("--home <PATH>")]
     public string? Home { get; init; }
 

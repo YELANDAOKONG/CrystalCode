@@ -704,7 +704,9 @@ entry. Its trust root is that directory even when a parent is a git
 repository, so opening it does not grant the parent. `/trust forget` does
 not remove that trust or a separate parent grant. A child of `space`
 follows the ordinary rule unless `space` is the git root. `crystal space`
-creates the directory and opens the terminal there. `crystal run`
+creates the directory and opens the terminal there. `crystal run --space`
+uses that directory and creates it when it is missing. It cannot be
+combined with `--workspace`. `crystal run`
 does not read `workspaceTrust`. `--workspace-trust on|off` is process-only:
 omitted or `on` denies an untrusted directory before the session exists,
 and `off` skips the check without recording trust. The operator space

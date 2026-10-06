@@ -53,7 +53,9 @@ separate library with no terminal code. The product can:
   without a ledger entry. Trust stops at that directory and does not climb
   to a parent git repository. `/trust forget` leaves it trusted. A
   subdirectory follows the ordinary rule unless `space` itself is the git
-  root. `crystal space` creates the directory when it is missing;
+  root. `crystal space` creates the directory when it is missing.
+  `crystal run --space` runs one task there and creates it the same way.
+  That flag cannot be combined with `--workspace`;
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model, Plan or Work, thinking, prompt set, skills,

@@ -130,6 +130,66 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task SpaceFlag_CreatesTheOperatorSpaceAndRunsThere()
+    {
+        using var fixture = new RunFixture();
+        Directory.CreateDirectory(Path.Combine(fixture.Home, ".git"));
+        var home = new CrystalHome(fixture.Home);
+        var space = OperatorSpace.Resolve(home);
+        var before = File.ReadAllText(Path.Combine(fixture.Home, "trusted.json"));
+        var settings = fixture.Settings("Say hello");
+
+        var result = await fixture.RunAsync(
+            new ScriptedRunClient(AllowReview, TextRound("Hello there.")),
+            new TaskRunSettings
+            {
+                TaskText = settings.TaskText,
+                Home = settings.Home,
+                Space = true,
+                Provider = settings.Provider,
+                Model = settings.Model,
+                Skills = settings.Skills,
+                ExternalTools = settings.ExternalTools,
+                Duration = settings.Duration,
+                WorkspaceTrust = "on"
+            });
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        Assert.Contains("Hello there.", result.Output, StringComparison.Ordinal);
+        Assert.True(Directory.Exists(space));
+        Assert.Equal(before, File.ReadAllText(Path.Combine(fixture.Home, "trusted.json")));
+        Assert.NotEmpty(new SessionStore(home).List(space));
+        fixture.AssertSettingsUnchanged();
+    }
+
+    [Fact]
+    public async Task SpaceFlag_RejectsAWorkspacePath()
+    {
+        using var fixture = new RunFixture();
+        var settings = fixture.Settings("Say hello");
+
+        var result = await fixture.RunAsync(
+            new ScriptedRunClient(AllowReview, TextRound("should not run")),
+            new TaskRunSettings
+            {
+                TaskText = settings.TaskText,
+                Home = settings.Home,
+                Workspace = fixture.Workspace,
+                Space = true,
+                Provider = settings.Provider,
+                Model = settings.Model,
+                Skills = settings.Skills,
+                ExternalTools = settings.ExternalTools,
+                Duration = settings.Duration
+            });
+
+        Assert.Equal(RunExit.Invalid, result.Code);
+        Assert.Contains("--workspace", result.Error, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, result.Output);
+        Assert.False(Directory.Exists(OperatorSpace.Resolve(new CrystalHome(fixture.Home))));
+    }
+
+    [Fact]
     public async Task WorkspaceTrustOff_RunsWithoutRecordingTheDirectory()
     {
         using var fixture = new RunFixture();

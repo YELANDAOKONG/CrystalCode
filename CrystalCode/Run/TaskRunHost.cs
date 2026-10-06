@@ -58,19 +58,33 @@ internal static class TaskRunHost
             return RunExit.Invalid;
         }
 
-        var workspace = ResolveWorkspace(settings.Workspace);
-        if (!Directory.Exists(workspace))
+        if (settings.Space && !string.IsNullOrWhiteSpace(settings.Workspace))
         {
-            await error.WriteLineAsync("Workspace directory not found: " + workspace);
+            await error.WriteLineAsync("--space cannot be combined with --workspace.");
             return RunExit.Invalid;
         }
 
         HarnessSettings applied;
         bool planMode;
         CrystalHome home;
+        string workspace;
         try
         {
             home = CrystalHome.Resolve(settings.Home);
+            if (settings.Space)
+            {
+                workspace = OperatorSpace.EnsureCreated(home);
+            }
+            else
+            {
+                workspace = ResolveWorkspace(settings.Workspace);
+                if (!Directory.Exists(workspace))
+                {
+                    await error.WriteLineAsync("Workspace directory not found: " + workspace);
+                    return RunExit.Invalid;
+                }
+            }
+
             var loaded = new SettingsStore(home).LoadOrCreate();
             if (!TaskRunOverrides.TryApply(loaded, settings, out applied, out planMode, out var applyError))
             {
