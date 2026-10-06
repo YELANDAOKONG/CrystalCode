@@ -27,6 +27,7 @@ public static class SlashCatalog
             ["on", "off", "reset"]),
         new(SessionVerb.Clear, "clear", ["new"], "New conversation"),
         new(SessionVerb.Cd, "cd", [], "Show or set workspace"),
+        new(SessionVerb.Space, "space", [], "Switch to the operator space"),
         new(SessionVerb.Trust, "trust", [], "Show workspace trust or turn it on or off",
             ["on", "off", "forget"]),
         new(SessionVerb.Resume, "resume", ["continue"], "Choose a session, workspace, or all", ["all"]),

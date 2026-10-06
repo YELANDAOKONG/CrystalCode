@@ -516,6 +516,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Cd:
                 await ChangeDirectoryAsync(command.Argument, cancellationToken);
                 return (true, false);
+            case SessionVerb.Space:
+                await ChangeSpaceAsync(command.Argument, cancellationToken);
+                return (true, false);
             case SessionVerb.Trust:
                 return (true, await ChangeTrustAsync(command.Argument, cancellationToken));
             case SessionVerb.Fork:
@@ -1764,6 +1767,34 @@ public sealed class CodingSession : ITurnObserver
         }
 
         await EnterWorkspaceAsync(candidate, cancellationToken);
+    }
+
+    private async Task ChangeSpaceAsync(string argument, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(argument))
+        {
+            Error("Space command must be /space.");
+            return;
+        }
+
+        string space;
+        try
+        {
+            space = OperatorSpace.EnsureCreated(_home);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Error("Operator space could not be created.");
+            return;
+        }
+
+        if (string.Equals(space, _workspace.Root, StringComparison.Ordinal))
+        {
+            Note("Workspace  " + _workspace.Root);
+            return;
+        }
+
+        await EnterWorkspaceAsync(space, cancellationToken);
     }
 
     /// <summary>

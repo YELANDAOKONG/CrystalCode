@@ -704,7 +704,9 @@ entry. Its trust root is that directory even when a parent is a git
 repository, so opening it does not grant the parent. `/trust forget` does
 not remove that trust or a separate parent grant. A child of `space`
 follows the ordinary rule unless `space` is the git root. `crystal space`
-creates the directory and opens the terminal there. `crystal run --space`
+creates the directory and opens the terminal there. `/space` switches an
+open session to that directory and creates it when it is missing.
+`crystal run --space`
 uses that directory and creates it when it is missing. It cannot be
 combined with `--workspace`. `crystal run`
 does not read `workspaceTrust`. `--workspace-trust on|off` is process-only:
@@ -1202,7 +1204,7 @@ runs, a progress row sits directly above the status bar
 `Compacting`, `Retrying In Ns (Attempt K)`). The retry caption counts
 remaining wait down. The same row shows
 `Loading Tools` while operator tool
-sets are discovered at session start and on `/cd`, after the frame is
+sets are discovered at session start and on `/cd` or `/space`, after the frame is
 up, so a slow assembly load does not leave a blank terminal. The
 caption is prefixed with a one-cell spinner
 that advances while the turn is live, plus the current activity

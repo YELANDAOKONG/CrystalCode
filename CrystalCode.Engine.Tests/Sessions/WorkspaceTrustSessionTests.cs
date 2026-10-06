@@ -104,6 +104,61 @@ public sealed class WorkspaceTrustSessionTests
     }
 
     [Fact]
+    public async Task Space_CreatesTheDirectoryAndEntersWithoutAsking()
+    {
+        using var home = new TemporaryHome();
+        Directory.CreateDirectory(Path.Combine(home.Root, ".git"));
+        using var current = new TemporaryWorkspace();
+        var prompt = new ScriptedTrustPrompt(accept: false);
+        var opened = Open(home, current.Path, prompt);
+        var space = OperatorSpace.Resolve(home.Home);
+
+        var quit = await opened.Session.SubmitAsync("/space", CancellationToken.None);
+
+        Assert.False(quit);
+        Assert.Equal(0, prompt.Asked);
+        Assert.True(Directory.Exists(space));
+        Assert.Contains(Notes(opened.Observer), text => text == "Workspace  " + space);
+        Assert.False(File.Exists(home.Home.TrustedPath));
+        opened.Session.Close();
+    }
+
+    [Fact]
+    public async Task Space_RejectsAnArgumentAndStays()
+    {
+        using var home = new TemporaryHome();
+        using var current = new TemporaryWorkspace();
+        var prompt = new ScriptedTrustPrompt(accept: false);
+        var opened = Open(home, current.Path, prompt);
+
+        var quit = await opened.Session.SubmitAsync("/space extra", CancellationToken.None);
+
+        Assert.False(quit);
+        Assert.Equal(0, prompt.Asked);
+        Assert.Contains(
+            opened.Observer.Events.OfType<ErrorWritten>(),
+            error => error.Text == "Space command must be /space.");
+        Assert.False(Directory.Exists(OperatorSpace.Resolve(home.Home)));
+        opened.Session.Close();
+    }
+
+    [Fact]
+    public async Task Space_WhenAlreadyThereNotesTheWorkspace()
+    {
+        using var home = new TemporaryHome();
+        var space = OperatorSpace.EnsureCreated(home.Home);
+        var prompt = new ScriptedTrustPrompt(accept: false);
+        var opened = Open(home, space, prompt);
+
+        var quit = await opened.Session.SubmitAsync("/space", CancellationToken.None);
+
+        Assert.False(quit);
+        Assert.Equal(0, prompt.Asked);
+        Assert.Contains(Notes(opened.Observer), text => text == "Workspace  " + space);
+        opened.Session.Close();
+    }
+
+    [Fact]
     public async Task ChangeDirectory_OperatorSpaceDoesNotAskOrRecordTheParent()
     {
         using var home = new TemporaryHome();

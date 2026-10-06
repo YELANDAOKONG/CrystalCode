@@ -54,6 +54,7 @@ separate library with no terminal code. The product can:
   to a parent git repository. `/trust forget` leaves it trusted. A
   subdirectory follows the ordinary rule unless `space` itself is the git
   root. `crystal space` creates the directory when it is missing.
+  `/space` switches the open session there and creates it the same way.
   `crystal run --space` runs one task there and creates it the same way.
   That flag cannot be combined with `--workspace`;
 - run one task without a terminal through `crystal run`, then exit.

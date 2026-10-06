@@ -184,7 +184,8 @@ terminal there. `--home` selects the data directory, so the space is
 It does not accept `--workspace`.
 
 That directory is trusted without a prompt and without a `trusted.json`
-entry. `/cd` to it does not ask. Trust does not climb to a parent git
+entry. `/space` creates it when missing and switches there. It uses the
+same trust and reload path as `/cd`, and does not ask. Trust does not climb to a parent git
 repository, and `/trust forget` does not remove it. A subdirectory follows
 the ordinary trust rule. If `space` itself is a git repository, its children
 share that trust root. Sessions there are saved under the absolute path,
@@ -849,6 +850,7 @@ returns the transcript viewport to the latest output.
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here. The operator space does not ask |
+| `/space` | | Switch to the operator space. Creates `{home}/space` when it is missing. Takes no path |
 | `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry. `forget` leaves the operator space trusted |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
@@ -1126,9 +1128,9 @@ Project, walking from the workspace up to the git root:
 3. `.opencode/{skill,skills}/<name>/SKILL.md`
 4. `.crystal/{skill,skills}/<name>/SKILL.md`
 
-`/cd` reloads skills and external tool sets from the new workspace. `/cd`
-and a resume that enters another directory reload prompts from that
-workspace. Resume refreshes the first system message from the current
+`/cd` and `/space` reload skills and external tool sets from the new
+workspace. Both, and a resume that enters another directory, reload prompts
+from that workspace. Resume refreshes the first system message from the current
 prompt files, the current `<env>` block, and current skill guidance.
 
 ## Sessions
