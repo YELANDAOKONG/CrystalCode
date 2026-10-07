@@ -123,7 +123,28 @@ public sealed class SlashPickerTests
         var picker = SlashPicker.Create("/approval model ", ApprovalOptions());
 
         Assert.NotNull(picker);
-        Assert.Equal(["gpt-5.6-sol", "openai"], picker.Matches.Select(match => match.Name));
+        Assert.Equal(
+            ["on", "off", "gpt-5.6-sol", "openai"],
+            picker.Matches.Select(match => match.Name));
+        Assert.Equal("/approval model on ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_FiltersApprovalModelSwitchWords()
+    {
+        var picker = SlashPicker.Create("/approval model of", ApprovalOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal("off", picker.Matches[0].Name);
+        Assert.Equal("/approval model off ", picker.CompletedText);
+        Assert.True(picker.IsExact("/approval model off"));
+    }
+
+    [Fact]
+    public void Create_HidesAfterAFilledApprovalModelSwitch()
+    {
+        Assert.Null(SlashPicker.Create("/approval model off ", ApprovalOptions()));
+        Assert.Null(SlashPicker.Create("/approval model on extra", ApprovalOptions()));
     }
 
     [Fact]
@@ -234,6 +255,8 @@ public sealed class SlashPickerTests
                     "approval model",
                     ["model"],
                     [
+                        new("on", "Turn the approval model on", ["on"]),
+                        new("off", "Turn the approval model off", ["off"]),
                         new("gpt-5.6-sol", "openai", ["gpt-5.6-sol"]),
                         new(
                             "openai",
