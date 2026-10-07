@@ -61,4 +61,22 @@ public sealed class GrepToolTests
         Assert.Contains("visible", output.Text);
         Assert.DoesNotContain("SECRET", output.Text);
     }
+
+    [Fact]
+    public async Task InvokeAsync_SymlinkedFile_SearchesBothEntries()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "a.txt"), "alpha\n");
+        File.CreateSymbolicLink(
+            Path.Combine(root.Path, "link.txt"),
+            Path.Combine(root.Path, "a.txt"));
+        var tool = new GrepTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", GrepTool.ToolName, """{"pattern":"alpha"}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains("a.txt:1:alpha", output.Text);
+        Assert.Contains("link.txt:1:alpha", output.Text);
+    }
 }

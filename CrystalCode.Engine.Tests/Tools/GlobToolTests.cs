@@ -72,6 +72,23 @@ public sealed class GlobToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_SymlinkedFile_ListsBothEntries()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "a.txt"), "a\n");
+        File.CreateSymbolicLink(
+            Path.Combine(root.Path, "link.txt"),
+            Path.Combine(root.Path, "a.txt"));
+        var tool = new GlobTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt"}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal("a.txt\nlink.txt", output.Text);
+    }
+
+    [Fact]
     public async Task InvokeAsync_PagesBeyondOneThousandMatches()
     {
         using var root = new TemporaryWorkspace();

@@ -206,7 +206,15 @@ public sealed class Workspace
                     continue;
                 }
 
-                yield return resolved;
+                // Yield the directory entry, not the resolved target: two
+                // entries that alias one file must stay distinct, and a search
+                // rooted below the target still reports the path it found.
+                if (IsCredentialPath(resolved))
+                {
+                    continue;
+                }
+
+                yield return file;
             }
 
             IEnumerable<string> children;
