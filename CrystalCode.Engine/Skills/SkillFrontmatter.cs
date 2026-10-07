@@ -110,10 +110,9 @@ public sealed record SkillFrontmatter
             }
         }
 
-        if (name is null
-            || description is null
-            || name.Length == 0
-            || description.Length is 0 or > SkillFiles.MaximumDescriptionLength)
+        if (string.IsNullOrWhiteSpace(name)
+            || string.IsNullOrWhiteSpace(description)
+            || description.Trim().Length > SkillFiles.MaximumDescriptionLength)
         {
             return false;
         }

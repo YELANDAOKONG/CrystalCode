@@ -98,6 +98,102 @@ public sealed class SkillDiscoveryTests
     }
 
     [Fact]
+    public void Collect_ProjectOpenCodeOverwritesHomeOpenCode()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        WriteSkill(
+            Path.Combine(home.Home.Root, "profile", ".opencode", "skills"),
+            "shared-skill",
+            "from home opencode");
+        WriteSkill(
+            Path.Combine(workspace.Path, ".opencode", "skills"),
+            "shared-skill",
+            "from project opencode");
+        var discovery = SkillDiscovery.Isolated(home.Home);
+
+        var catalog = discovery.Collect(workspace.Path);
+
+        Assert.Equal("from project opencode", catalog.Find("shared-skill")!.Description);
+    }
+
+    [Fact]
+    public void Collect_IgnoresNestedSkillFiles()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var root = Path.Combine(workspace.Path, ".crystal", "skills", "git-release");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(
+            Path.Combine(root, "SKILL.md"),
+            """
+            ---
+            name: git-release
+            description: Outer skill.
+            ---
+            body
+            """);
+        var notes = Path.Combine(root, "sub dir");
+        Directory.CreateDirectory(notes);
+        File.WriteAllText(
+            Path.Combine(notes, "SKILL.md"),
+            """
+            ---
+            name: git-release
+            description: Nested replacement.
+            ---
+            body
+            """);
+        var examples = Path.Combine(root, "examples");
+        Directory.CreateDirectory(examples);
+        File.WriteAllText(
+            Path.Combine(examples, "SKILL.md"),
+            """
+            ---
+            name: examples
+            description: Nested extra.
+            ---
+            body
+            """);
+        var discovery = SkillDiscovery.Isolated(home.Home);
+
+        var catalog = discovery.Collect(workspace.Path);
+
+        Assert.Equal("Outer skill.", catalog.Find("git-release")!.Description);
+        Assert.Null(catalog.Find("examples"));
+        Assert.True(catalog.ContainsReadablePath(Path.Combine(examples, "SKILL.md")));
+    }
+
+    [Fact]
+    public void Collect_SkipsQuotedWhitespaceFrontmatter()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WriteSkill(
+            Path.Combine(workspace.Path, ".crystal", "skills"),
+            "good-skill",
+            "A valid skill.");
+        var blank = Path.Combine(workspace.Path, ".crystal", "skills", "blank-name");
+        Directory.CreateDirectory(blank);
+        File.WriteAllText(
+            Path.Combine(blank, "SKILL.md"),
+            """
+            ---
+            name: "   "
+            description: "   "
+            ---
+            body
+            """);
+        var discovery = SkillDiscovery.Isolated(home.Home);
+
+        var catalog = discovery.Collect(workspace.Path);
+
+        Assert.NotNull(catalog.Find("good-skill"));
+        Assert.Null(catalog.Find("blank-name"));
+    }
+
+    [Fact]
     public void Collect_ProjectCrystalOverwritesGlobalAndOpenCode()
     {
         using var home = new TemporaryHome();

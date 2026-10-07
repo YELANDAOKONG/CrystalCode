@@ -55,6 +55,24 @@ public sealed class SkillFrontmatterTests
     }
 
     [Fact]
+    public void TryRead_RejectsQuotedWhitespace()
+    {
+        var ok = SkillFrontmatter.TryRead(
+            """
+            ---
+            name: "   "
+            description: "   "
+            ---
+            body
+            """,
+            out var frontmatter,
+            out _);
+
+        Assert.False(ok);
+        Assert.Null(frontmatter);
+    }
+
+    [Fact]
     public void TryRead_AcceptsDisplayTitleName()
     {
         var ok = SkillFrontmatter.TryRead(

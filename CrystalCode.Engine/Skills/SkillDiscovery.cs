@@ -69,14 +69,14 @@ public sealed class SkillDiscovery
             ScanConfig(skills, readRoots, Path.Combine(_configDirectory, SkillFiles.OpenCodeConfigName));
         }
 
-        foreach (var directory in ancestors)
-        {
-            ScanConfig(skills, readRoots, Path.Combine(directory, SkillFiles.OpenCodeDirectory));
-        }
-
         if (_userProfile is not null)
         {
             ScanConfig(skills, readRoots, Path.Combine(_userProfile, SkillFiles.OpenCodeDirectory));
+        }
+
+        foreach (var directory in ancestors)
+        {
+            ScanConfig(skills, readRoots, Path.Combine(directory, SkillFiles.OpenCodeDirectory));
         }
 
         ScanConfig(skills, readRoots, _home.Root);
@@ -142,11 +142,28 @@ public sealed class SkillDiscovery
         Array.Sort(files, StringComparer.Ordinal);
         foreach (var path in files)
         {
+            if (!IsImmediateSkill(fullRoot, path))
+            {
+                continue;
+            }
+
             if (TryLoad(path, out var skill))
             {
                 skills[skill.Name] = skill;
             }
         }
+    }
+
+    private static bool IsImmediateSkill(string root, string path)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(directory))
+        {
+            return false;
+        }
+
+        var parent = Path.GetDirectoryName(directory);
+        return parent is not null && PathsEqual(parent, root);
     }
 
     private static bool TryLoad(string path, out SkillInfo skill)
