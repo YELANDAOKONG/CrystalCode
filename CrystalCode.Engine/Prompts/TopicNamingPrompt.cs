@@ -18,6 +18,6 @@ public static class TopicNamingPrompt
         - Use stable, searchable wording.
         - Do not include secrets, credentials, full file contents, or personal data.
         - Do not invent a goal that is not present in the conversation.
-        - If the intent is unclear, return: New conversation.
+        - If the intent is unclear, return exactly the two words New conversation
         """;
 }

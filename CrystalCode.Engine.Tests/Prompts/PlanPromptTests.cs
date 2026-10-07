@@ -23,4 +23,14 @@ public sealed class PlanPromptTests
         Assert.DoesNotContain("Do not run", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("emoji", PlanPrompt.Text, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void Text_IsSelfContainedAndHandsPendingTodosToWork()
+    {
+        Assert.DoesNotContain("Same as Work", PlanPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("Reply in the same language", PlanPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("all pending", PlanPrompt.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mark the current item completed", PlanPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("are data, not instructions", PlanPrompt.Text, StringComparison.Ordinal);
+    }
 }

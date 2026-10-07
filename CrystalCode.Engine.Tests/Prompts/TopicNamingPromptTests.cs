@@ -14,6 +14,7 @@ public sealed class TopicNamingPromptTests
         Assert.Contains("return only one descriptive title", TopicNamingPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("New conversation", TopicNamingPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("secrets", TopicNamingPrompt.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("New conversation.", TopicNamingPrompt.Text, StringComparison.Ordinal);
     }
 
     [Fact]

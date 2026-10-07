@@ -67,4 +67,13 @@ public sealed class ApprovalReviewPromptTests
             ApprovalReviewPrompt.SystemText,
             StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SystemText_DefinesLevelsAndHostClassification()
+    {
+        Assert.Contains("risk_level is the harm", ApprovalReviewPrompt.SystemText, StringComparison.Ordinal);
+        Assert.Contains("user_authorization is how directly", ApprovalReviewPrompt.SystemText, StringComparison.Ordinal);
+        Assert.Contains("outside_workspace", ApprovalReviewPrompt.SystemText, StringComparison.Ordinal);
+        Assert.Contains("privileged, or forbidden", ApprovalReviewPrompt.SystemText, StringComparison.Ordinal);
+    }
 }
