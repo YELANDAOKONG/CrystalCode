@@ -75,7 +75,7 @@ public sealed record PromptSet
         foreach (var attachment in attachments)
         {
             ArgumentNullException.ThrowIfNull(attachment);
-            var trimmed = attachment.Trim();
+            var trimmed = PromptFiles.TrimKeepingTrailingNewlines(attachment);
             if (trimmed.Length > 0)
             {
                 copy.Add(trimmed);
@@ -99,7 +99,8 @@ public sealed record PromptSet
         var parts = new List<string> { body };
         foreach (var attachment in attachments)
         {
-            var text = PromptBinder.Apply(attachment, context, placeholders).Trim();
+            var text = PromptFiles.TrimKeepingTrailingNewlines(
+                PromptBinder.Apply(attachment, context, placeholders));
             if (text.Length > 0)
             {
                 parts.Add(text);

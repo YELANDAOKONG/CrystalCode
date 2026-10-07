@@ -4,12 +4,47 @@ internal static class PromptFiles
 {
     private static readonly string[] Extensions = [".md", ".txt"];
 
-    public static string? ReadNamed(string directory, string name)
+    public static string? ReadNamed(string directory, string name) =>
+        ReadNamed(directory, name, keepTrailingNewlines: false);
+
+    public static string? ReadAttachment(string directory, string name) =>
+        ReadNamed(directory, name, keepTrailingNewlines: true);
+
+    public static bool TryRead(string path, out string text) =>
+        TryRead(path, keepTrailingNewlines: false, out text);
+
+    internal static string TrimKeepingTrailingNewlines(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var start = 0;
+        while (start < text.Length && char.IsWhiteSpace(text[start]))
+        {
+            start++;
+        }
+
+        var end = text.Length;
+        while (end > start
+            && char.IsWhiteSpace(text[end - 1])
+            && text[end - 1] is not '\n' and not '\r')
+        {
+            end--;
+        }
+
+        if (start >= end)
+        {
+            return string.Empty;
+        }
+
+        var slice = text[start..end];
+        return string.IsNullOrWhiteSpace(slice) ? string.Empty : slice;
+    }
+
+    private static string? ReadNamed(string directory, string name, bool keepTrailingNewlines)
     {
         foreach (var extension in Extensions)
         {
             var path = Path.Combine(directory, name + extension);
-            if (TryRead(path, out var text))
+            if (TryRead(path, keepTrailingNewlines, out var text))
             {
                 return text;
             }
@@ -18,7 +53,7 @@ internal static class PromptFiles
         return null;
     }
 
-    public static bool TryRead(string path, out string text)
+    private static bool TryRead(string path, bool keepTrailingNewlines, out string text)
     {
         text = string.Empty;
         if (!File.Exists(path))
@@ -28,13 +63,14 @@ internal static class PromptFiles
 
         try
         {
-            var raw = File.ReadAllText(path).Trim();
-            if (raw.Length == 0)
+            var raw = File.ReadAllText(path);
+            var normalized = keepTrailingNewlines ? TrimKeepingTrailingNewlines(raw) : raw.Trim();
+            if (normalized.Length == 0)
             {
                 return false;
             }
 
-            text = raw;
+            text = normalized;
             return true;
         }
         catch (IOException)

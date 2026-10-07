@@ -522,7 +522,8 @@ been bound. The resolved text stays in place. Attachments are not prompt-set
 members. Topic naming and compaction stay unchanged. Each attachment is a
 directory of `prompt.json` plus the same `work.md`, `plan.md`, and `review.md`
 files (`.txt` is also accepted). A missing file contributes nothing for that
-mode. Empty files are missing. Directory names use the same 1-64 character
+mode. Empty files are missing. A trailing newline at the end of an
+attachment file is kept. Directory names use the same 1-64 character
 hyphenated form as prompt sets. `default` is a valid attachment name.
 
 Discovery reads `~/.crystal/prompt-attachments/<name>/` and

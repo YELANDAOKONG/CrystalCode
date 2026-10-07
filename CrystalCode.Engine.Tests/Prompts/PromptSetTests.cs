@@ -102,6 +102,21 @@ public sealed class PromptSetTests
         Assert.Equal("body ready\n\n\nextra ready", text);
     }
 
+    [Fact]
+    public void ComposeWork_KeepsATrailingNewlineOnAnAttachment()
+    {
+        var set = new PromptSet(
+            "body",
+            "plan",
+            "review",
+            string.Empty,
+            workAttachments: ["extra\n", "\n\n", "  later\r\n"]);
+
+        var text = set.ComposeWork(PromptContext.InstructionsOnly(string.Empty));
+
+        Assert.Equal("body\n\n\nextra\n\n\n\nlater\r\n", text);
+    }
+
     private sealed class BuildPlaceholder : IPluginPlaceholder
     {
         public string Name => "build";

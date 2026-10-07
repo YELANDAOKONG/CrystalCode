@@ -264,7 +264,7 @@ public sealed class PromptStore
 
     private static void AddNamed(List<string> parts, string directory, string name)
     {
-        var text = PromptFiles.ReadNamed(directory, name);
+        var text = PromptFiles.ReadAttachment(directory, name);
         if (text is not null)
         {
             parts.Add(text);

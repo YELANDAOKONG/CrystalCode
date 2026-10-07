@@ -1121,7 +1121,8 @@ Prompt attachments append after the resolved Work, Plan, or Review text.
 Topic naming and compaction are unchanged. Each attachment is a directory
 with `prompt.json` and any of `work.md`, `plan.md`, and `review.md` (`.txt`
 is also accepted). A mode with no file gets nothing from that attachment.
-Empty files are treated as missing. Directory names are 1-64 lowercase
+Empty files are treated as missing. A trailing newline at the end of an
+attachment file is kept. Directory names are 1-64 lowercase
 alphanumeric words joined by single hyphens. `default` is allowed.
 
 Attachments are discovered in both places:

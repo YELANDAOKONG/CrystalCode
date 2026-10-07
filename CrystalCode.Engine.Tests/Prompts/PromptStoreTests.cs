@@ -337,6 +337,23 @@ public sealed class PromptStoreTests
     }
 
     [Fact]
+    public void Resolve_KeepsTrailingNewlinesFromAttachmentFiles()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var alpha = AttachmentDirectory(home.Home, "alpha");
+        WritePrompt(alpha, "work.md", "ALPHA\n\n");
+        WriteManifest(alpha, enabled: true, order: 0);
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path);
+        var text = resolution.Prompts.ComposeWork(PromptContext.InstructionsOnly(string.Empty));
+
+        Assert.EndsWith("ALPHA\n\n", text, StringComparison.Ordinal);
+        Assert.Equal(["ALPHA\n\n"], resolution.Prompts.WorkAttachments);
+    }
+
+    [Fact]
     public void Resolve_WorkspaceAttachmentReplacesHomeCopy()
     {
         using var home = new TemporaryHome();
