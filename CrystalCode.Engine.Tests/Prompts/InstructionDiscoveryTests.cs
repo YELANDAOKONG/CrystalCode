@@ -73,4 +73,34 @@ public sealed class InstructionDiscoveryTests
 
         Assert.Contains("claude global", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Collect_SkipsUnreadableAgentsAndUsesClaude()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var agents = Path.Combine(workspace.Path, InstructionNames.Agents);
+        File.WriteAllText(agents, "secret agents");
+        File.SetUnixFileMode(agents, UnixFileMode.None);
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Claude), "claude fallback");
+        var discovery = InstructionDiscovery.Isolated(home.Home);
+
+        try
+        {
+            var parts = discovery.Collect(workspace.Path);
+            var text = string.Join("\n\n", parts);
+
+            Assert.Contains("claude fallback", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("secret agents", text, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.SetUnixFileMode(agents, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
 }

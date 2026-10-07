@@ -138,14 +138,25 @@ public sealed class InstructionDiscovery
             return false;
         }
 
-        var text = File.ReadAllText(path).Trim();
-        if (text.Length == 0)
+        try
+        {
+            var text = File.ReadAllText(path).Trim();
+            if (text.Length == 0)
+            {
+                return false;
+            }
+
+            parts.Add("Instructions from: " + Path.GetFullPath(path) + "\n" + text);
+            return true;
+        }
+        catch (IOException)
         {
             return false;
         }
-
-        parts.Add("Instructions from: " + Path.GetFullPath(path) + "\n" + text);
-        return true;
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static bool PathsEqual(string left, string right) =>
