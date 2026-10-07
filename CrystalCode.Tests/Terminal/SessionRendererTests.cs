@@ -4,8 +4,10 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 
+using CrystalCode.Display.Composer;
 using CrystalCode.Display.Input;
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
@@ -596,6 +598,50 @@ public sealed class SessionRendererTests
         Assert.Contains('╯', window[^1].Plain);
         Assert.Equal(lines[^1].Plain, window[^1].Plain);
         Assert.All(window, line => Assert.True(TextWidth.Measure(line.Plain) <= width));
+    }
+
+    [Fact]
+    public void FrameRows_KeepsThePinnedSideQuestionFrameInsideTheOverlaySlot()
+    {
+        const int width = 80;
+        var answer = string.Join(
+            '\n',
+            Enumerable.Range(0, 24).Select(static i => "answer line " + i));
+        var snapshot = new SideQuestionSnapshot(
+            true,
+            [new SideExchange("why", answer)],
+            false,
+            string.Empty,
+            string.Empty,
+            null,
+            false);
+        var lines = WidgetPaint.Lines(SideQuestionWidget.Create(snapshot, 0), width);
+
+        var scroll = int.MaxValue;
+        var window = SessionRenderer.WindowCardLines(lines, 12, ref scroll);
+        var regions = ShellLayout.Measure(
+            width,
+            height: 24,
+            composerWanted: 1,
+            overlayWanted: window.Count,
+            queueWanted: 0,
+            progressWanted: 1,
+            todoWanted: 0);
+
+        var frame = FrameRows.Assemble(
+            regions,
+            transcript: [],
+            overlay: window,
+            status: PaintLine.Blank,
+            queue: [],
+            composer: new ComposerView([PaintLine.Blank], 0, 0));
+
+        Assert.Equal(12, regions.OverlayRows);
+        Assert.Equal(window[0].Plain, frame[regions.OverlayTop].Plain);
+        Assert.Equal(window[^1].Plain, frame[regions.OverlayTop + regions.OverlayRows - 1].Plain);
+        Assert.Contains("Side question", frame[regions.OverlayTop].Plain, StringComparison.Ordinal);
+        Assert.Contains('╭', frame[regions.OverlayTop].Plain);
+        Assert.Contains('╯', frame[regions.OverlayTop + regions.OverlayRows - 1].Plain);
     }
 
     [Fact]
