@@ -449,6 +449,10 @@ The Ollama starter assumes a 4,096-token local context. If the local model
 uses a different context size, set that size in `providers.json` and configure
 the Ollama model to match it. Other local or cloud model IDs may be added there.
 
+Anthropic Messages is also a built-in protocol, but the starter catalog
+ships no entry for it, so Claude models come from `providers.json`. See
+[Example: add an Anthropic (Claude) provider](#example-add-an-anthropic-claude-provider).
+
 ### Provider fields
 
 | Field | Meaning |
@@ -539,6 +543,37 @@ it. Restart after editing `providers.json`. Select the model with
 `model` in `config.json`.
 CLI `--provider` and `--model` override that selection for one run;
 `/approval` (including `/approval model`), `/thinking`, and `/model` write their values to `config.json`.
+
+### Example: add an Anthropic (Claude) provider
+
+Anthropic Messages is a built-in protocol, but the starter catalog ships no
+Anthropic entry, so Claude models are reached by adding one to
+`~/.crystal/providers.json`. Write the key in
+`~/.crystal/credentials.json` under `anthropic`.
+
+```json
+{
+  "anthropic": {
+    "protocol": "anthropic",
+    "baseUri": "https://api.anthropic.com/v1/",
+    "models": {
+      "claude-sonnet-4": {
+        "contextWindow": 200000,
+        "maxTokens": 8192,
+        "thinking": true,
+        "thinkingEfforts": ["low", "medium", "high"],
+        "imageInput": true
+      }
+    }
+  }
+}
+```
+
+`ANTHROPIC_API_KEY` overrides that file for one process. Restart after
+editing `providers.json`, then select the model with
+`/model anthropic claude-sonnet-4`, or set `provider` and `model` in
+`config.json`. The same entry reaches any Anthropic Messages gateway:
+change `baseUri` and the model id to match it.
 
 ### Example: add OpenCode Zen protocol endpoints
 

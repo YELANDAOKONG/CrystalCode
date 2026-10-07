@@ -11,7 +11,7 @@ Crystal Code works in a local repository through a streaming terminal UI. Ask it
 - **Stay in the terminal.** Follow streamed responses and tool calls, edit a multiline prompt, and queue follow-up requests while a turn runs.
 - **Choose how work happens.** Plan mode offers built-in reading and planning tools; Work mode also enables file edits and shell commands. Tool calls follow a risk-aware approval policy.
 - **Keep a conversation going.** Resume or fork saved sessions, switch models with `/model`, and compact older context automatically or with `/compact`.
-- **Use the model endpoints you prefer.** Built-in DeepSeek, OpenAI, Gemini, and Ollama providers are available, and you can configure OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages endpoints.
+- **Use the model endpoints you prefer.** Built-in DeepSeek, OpenAI, Gemini, and Ollama providers are available, and you can configure OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages (Claude) endpoints.
 - **Extend the workflow.** Load skills and operator tool sets from your home directory or workspace. Image-capable models can receive workspace or clipboard images.
 
 Crystal Code is the coding product built on the sibling [Crystal](https://github.com/YELANDAOKONG/Crystal) library. The terminal is its operator surface.
@@ -102,7 +102,7 @@ Preferences and provider definitions are separate:
 | `~/.crystal/providers.json` | Additional provider endpoints and model definitions |
 | `~/.crystal/credentials.json` | Plain-text API keys, one entry per provider |
 
-The built-in catalog includes DeepSeek, OpenAI, Gemini, and Ollama. You can select any model listed in the effective catalog with `/model`, or use `--provider` and `--model` when starting the app. [Provider configuration](docs/user-guide.md#configuration) explains protocols, model fields, and examples.
+The built-in catalog includes DeepSeek, OpenAI, Gemini, and Ollama; Anthropic Messages (Claude) is also a built-in protocol reachable by adding a provider entry. You can select any model listed in the effective catalog with `/model`, or use `--provider` and `--model` when starting the app. [Provider configuration](docs/user-guide.md#configuration) explains protocols, model fields, and examples.
 
 File edits and shell commands stay within the workspace. Reads outside it require approval, and credential paths are forbidden. [Approval modes](docs/user-guide.md#approval) explain which calls ask you, use a reviewing model, or pass automatically.
 
