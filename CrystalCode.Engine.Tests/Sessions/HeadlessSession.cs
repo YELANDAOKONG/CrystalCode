@@ -23,26 +23,18 @@ internal sealed class HeadlessSession : IDisposable
     public HeadlessSession(
         IStreamingChatClient client,
         SessionDocument? resume = null,
-        bool showCompactionSummary = true)
+        bool showCompactionSummary = true,
+        HarnessSettings? settings = null,
+        HarnessSettings? persistedSettings = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
         Approvals = new RecordingApprovalPrompt(ApprovalChoice.Deny);
 
-        var provider = new ProviderDefinition(
-            new ProviderName("scripted"),
-            ScriptedChatPlugin.Protocol,
-            new Uri("http://localhost:11434/"),
-            new Dictionary<string, ModelSettings> { ["model"] = new(200_000) });
-        var settings = new HarnessSettings(
-            provider.Name,
-            "model",
-            ApprovalMode.Default,
-            0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
-        if (!showCompactionSummary)
+        var sessionSettings = settings ?? ScriptedSettings();
+        if (settings is null && !showCompactionSummary)
         {
-            settings = settings.WithShowCompactionSummary(false);
+            sessionSettings = sessionSettings.WithShowCompactionSummary(false);
         }
 
         var plugins = new PluginRegistry();
@@ -59,7 +51,7 @@ internal sealed class HeadlessSession : IDisposable
         }
 
         Session = CodingSession.Create(
-            settings,
+            sessionSettings,
             new SettingsStore(_home.Home),
             new CredentialStore(_home.Home),
             _home.Home,
@@ -71,7 +63,26 @@ internal sealed class HeadlessSession : IDisposable
                 new DecliningSessionChooser(),
                 new ScriptedTrustPrompt(accept: false)),
             plugins,
-            resume);
+            resume,
+            persistedSettings);
+    }
+
+    public static HarnessSettings ScriptedSettings(bool thinking = false)
+    {
+        var model = thinking
+            ? new ModelSettings(200_000, thinking: true, thinkingEfforts: ["low", "high"])
+            : new ModelSettings(200_000);
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings> { ["model"] = model });
+        return new HarnessSettings(
+            provider.Name,
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([provider]));
     }
 
     public SessionDocument ReadSaved()
@@ -86,6 +97,8 @@ internal sealed class HeadlessSession : IDisposable
     }
 
     public CodingSession Session { get; }
+
+    public CrystalHome Home => _home.Home;
 
     public RecordingSessionObserver Observer { get; }
 

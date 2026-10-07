@@ -19,7 +19,12 @@ the Crystal library they already own.
 
 The current product is a terminal application. `crystal` opens the
 terminal, which is the only operator surface. `crystal space` opens that
-terminal in the operator space at `~/.crystal/space`. `crystal run` is a
+terminal in the operator space at `~/.crystal/space`. `crystal` and
+`crystal space` accept the same session overrides as `crystal run`, except
+the task text, `--format`, `--show-thinking`, `--space`, and
+`--workspace-trust`. Those overrides shape that process only and are not
+written to `config.json` or `prompt.json`. A later preference command still
+writes `--provider` and `--model` when they were passed. `crystal run` is a
 headless entry for one task and has no operator. `crystal version` prints
 the build identity and exits. The engine behind the terminal and `crystal run` is a
 separate library with no terminal code. The product can:

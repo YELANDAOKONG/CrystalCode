@@ -156,6 +156,26 @@ CLI options:
 | `-w`, `--workspace <path>` | Workspace root (default: current directory) |
 | `--home <path>` | Data directory (default: `CRYSTAL_HOME`, then `~/.crystal`) |
 | `-r`, `--resume [id]` | Choose a saved session. Omit the value to list this workspace. An id loads that file and stays here. A directory lists that workspace and enters it. `all` lists every workspace and enters the chosen session's directory |
+| `--approval <mode>` | `default`, `edit`, `review`, `audit`, or `full` for this process |
+| `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
+| `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
+| `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
+| `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
+| `--thinking <effort>` | Same values as `/thinking` |
+| `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
+| `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing |
+| `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
+| `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
+| `--duration <seconds>` | Wall-clock cap for each turn. `unlimited` removes that cap |
+| `--bash-timeout <seconds>` | Per-command bash cap. `unlimited` disables that timer |
+
+These flags shape this process only. They are not written to `config.json`
+or `prompt.json` at startup. A later slash command that saves a preference
+writes that preference. It also writes `--provider` and `--model` when those
+were passed. It does not write the other flags above. `--plan` and `--work`
+together are rejected. `crystal space` accepts the same flags except
+`--workspace`.
 
 `--help` prints the same options.
 
@@ -181,8 +201,9 @@ If the provider has more than one model and neither `config.json` nor
 
 `crystal space` creates `~/.crystal/space` when it is missing and opens the
 terminal there. `--home` selects the data directory, so the space is
-`{home}/space`. The command accepts `--provider`, `--model`, and `--resume`.
-It does not accept `--workspace`.
+`{home}/space`. The command accepts the same session flags as `crystal`,
+including `--provider`, `--model`, `--resume`, `--prompt-set`, and the other
+process-only overrides. It does not accept `--workspace`.
 
 That directory is trusted without a prompt and without a `trusted.json`
 entry. `/space` creates it when missing and switches there. It uses the
@@ -1157,7 +1178,8 @@ status bar still shows only the selected prompt set. `crystal
 prompt-attachments list|show|enable|disable` accepts `--home`, `--workspace`,
 `--source home|project`, and `--format text`.
 
-`crystal run` follows the enabled manifests. `--prompt-set <name>` forces one
+`crystal`, `crystal space`, and `crystal run` follow the enabled manifests.
+`--prompt-set <name>` forces one
 set for that process, including a set whose file says `enabled: false`.
 `default` forces the built-in text. `--prompt-attachments off` appends
 nothing. Omitting the flag, or passing `on`, follows the files. Neither flag

@@ -156,6 +156,8 @@ Run `dotnet build`, `dotnet test`, and `dotnet run` from the Crystal Code reposi
 
 Maintainers can write a commit message and commit the current change with [`commit.sh`](commit.sh). It runs `crystal run` in this repository. Extra arguments are appended to the task. The run skips external tools and the directory trust check, and it does not record the directory as trusted.
 
+Branch roles: `master` is the main development branch. `release` is the release branch; a push to it runs the release workflow, which builds and publishes the release artifacts. `test` is used to trigger the test workflow; a push to it runs the test matrix on all supported platforms.
+
 ## 📚 Documentation
 
 - 📘 [User guide](docs/user-guide.md): installation, configuration, commands, tools, sessions, and prompts

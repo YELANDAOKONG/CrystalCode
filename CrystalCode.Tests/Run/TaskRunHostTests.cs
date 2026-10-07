@@ -13,6 +13,7 @@ using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Run;
+using CrystalCode.Terminal;
 
 using Xunit;
 
@@ -634,6 +635,48 @@ public sealed class TaskRunHostTests
             out _,
             out var modeError));
         Assert.Contains("--plan", modeError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LaunchPlan_WorkLeavesAResumedPlanSession()
+    {
+        using var fixture = new RunFixture();
+        var home = new CrystalHome(fixture.Home);
+        var loaded = new SettingsStore(home).Load();
+        var plugins = new PluginRegistry();
+        plugins.Add(new WorkspaceToolsPlugin());
+        plugins.Add(new ScriptedRunPlugin(new ScriptedRunClient(AllowReview)));
+        var session = CodingSession.Create(
+            loaded.WithOverrides("ollama", "qwen3:8b"),
+            new SettingsStore(home),
+            new CredentialStore(home),
+            home,
+            fixture.Workspace,
+            new SessionFrontEnd(
+                new RunLog(TextWriter.Null, showThinking: false),
+                new UnattendedApprovalPrompt(),
+                new UnattendedUserPrompt(),
+                new UnattendedSessionChooser(),
+                new UnattendedTrustPrompt()),
+            plugins,
+            new SessionDocument
+            {
+                Id = SessionStore.NewId(),
+                Workspace = fixture.Workspace,
+                PlanMode = true,
+                Items =
+                [
+                    new SessionItemDocument { Kind = "message", Role = "user", Text = "hello" }
+                ]
+            });
+
+        Assert.True(session.PlanMode);
+        TerminalHost.ApplyLaunchPlan(session, null);
+        Assert.True(session.PlanMode);
+        TerminalHost.ApplyLaunchPlan(session, false);
+        Assert.False(session.PlanMode);
+        TerminalHost.ApplyLaunchPlan(session, true);
+        Assert.True(session.PlanMode);
     }
 
     [Fact]

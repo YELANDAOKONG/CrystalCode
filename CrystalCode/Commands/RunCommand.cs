@@ -3,6 +3,7 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Run;
 using CrystalCode.Terminal;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -23,8 +24,18 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         return RunAsync(settings, cancellationToken);
     }
 
-    internal static async Task<int> RunAsync(
+    internal static Task<int> RunAsync(
         RunSettings settings,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return RunAsync(settings, settings.Workspace, settings.Resume, cancellationToken);
+    }
+
+    internal static async Task<int> RunAsync(
+        SessionLaunchSettings settings,
+        string? workspacePath,
+        FlagValue<string?> resume,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -32,9 +43,31 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
 
         var home = CrystalHome.Resolve(settings.Home);
         var settingsStore = new SettingsStore(home);
-        var harnessSettings = settingsStore
-            .LoadOrCreate()
-            .WithOverrides(settings.Provider, settings.Model);
+        var loaded = settingsStore.LoadOrCreate();
+        if (!TaskRunOverrides.TryApply(loaded, settings, out var harnessSettings, out _, out var applyError))
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(applyError)}[/]");
+            return 1;
+        }
+
+        if (!TaskRunOverrides.TryAcceptPromptSet(home, settings.PromptSet, out var promptError))
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(promptError)}[/]");
+            return 1;
+        }
+
+        // Provider and model stay eligible for a later preference save.
+        // The other launch flags stay on the live settings only.
+        var persisted = loaded.WithOverrides(settings.Provider, settings.Model);
+        bool? launchPlan = null;
+        if (settings.Plan)
+        {
+            launchPlan = true;
+        }
+        else if (settings.Work)
+        {
+            launchPlan = false;
+        }
         var credentials = new CredentialStore(home);
         if (!credentials.TryResolve(
                 harnessSettings.ActiveProvider,
@@ -45,13 +78,13 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return 1;
         }
 
-        var workspace = ResolveWorkspace(settings.Workspace);
-        SessionDocument? resume = null;
-        if (settings.Resume.IsSet)
+        var workspace = ResolveWorkspace(workspacePath);
+        SessionDocument? resumed = null;
+        if (resume.IsSet)
         {
             var sessions = new SessionStore(home);
             if (!ResumeRequest.TryParse(
-                    settings.Resume.Value,
+                    resume.Value,
                     Environment.CurrentDirectory,
                     sessions,
                     out var request,
@@ -64,7 +97,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             switch (request.Target)
             {
                 case ResumeRequest.Kind.Session:
-                    if (!TryLoadResume(sessions, workspace, request.Value, out resume, out resumeError))
+                    if (!TryLoadResume(sessions, workspace, request.Value, out resumed, out resumeError))
                     {
                         AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
                         return 1;
@@ -83,7 +116,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                         return currentExit;
                     }
 
-                    if (!TryLoadResume(sessions, workspace, picked.Id, out resume, out resumeError))
+                    if (!TryLoadResume(sessions, workspace, picked.Id, out resumed, out resumeError))
                     {
                         AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
                         return 1;
@@ -93,8 +126,8 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                 }
                 case ResumeRequest.Kind.Workspace:
                 {
-                    if (!string.IsNullOrWhiteSpace(settings.Workspace)
-                        && !ResumeRequest.SameDirectory(settings.Workspace, request.Value!))
+                    if (!string.IsNullOrWhiteSpace(workspacePath)
+                        && !ResumeRequest.SameDirectory(workspacePath, request.Value!))
                     {
                         AnsiConsole.MarkupLine("[red]Workspace and --resume path differ.[/]");
                         return 1;
@@ -121,7 +154,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                         return namedExit;
                     }
 
-                    if (!TryLoadResume(sessions, workspace, picked.Id, out resume, out resumeError))
+                    if (!TryLoadResume(sessions, workspace, picked.Id, out resumed, out resumeError))
                     {
                         AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
                         return 1;
@@ -141,14 +174,14 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                         return allExit;
                     }
 
-                    if (!TryLoadResume(sessions, workspace, picked.Id, out resume, out resumeError))
+                    if (!TryLoadResume(sessions, workspace, picked.Id, out resumed, out resumeError))
                     {
                         AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
                         return 1;
                     }
 
                     if (!ResumeRequest.TryCanonicalWorkspace(
-                            resume.Workspace,
+                            resumed.Workspace,
                             out workspace,
                             out resumeError))
                     {
@@ -184,7 +217,9 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             home,
             workspace,
             plugins,
-            resume);
+            resumed,
+            persisted,
+            launchPlan);
         return await host.RunAsync(cancellationToken);
     }
 

@@ -36,6 +36,11 @@ public sealed class CodingSession : ITurnObserver
     private string? _approvalClientKey;
     private IStreamingMultimodalChatClient? _multimodalClient;
     private HarnessSettings _settings;
+
+    // Disk snapshot plus operator edits. Launch overrides stay on _settings
+    // unless the operator changes that field. Provider and model from the
+    // command line are already on this copy.
+    private HarnessSettings _persisted;
     private readonly SettingsStore _settingsStore;
     private readonly CredentialStore _credentials;
     private readonly PromptStore _promptStore;
@@ -113,13 +118,15 @@ public sealed class CodingSession : ITurnObserver
         Workspace workspace,
         SessionFrontEnd frontEnd,
         PluginRegistry plugins,
-        SessionDocument? resume)
+        SessionDocument? resume,
+        HarnessSettings? persistedSettings)
     {
         ArgumentNullException.ThrowIfNull(frontEnd);
         ArgumentNullException.ThrowIfNull(frontEnd.Trust);
         ArgumentNullException.ThrowIfNull(plugins);
         ArgumentNullException.ThrowIfNull(credentials);
         _settings = settings;
+        _persisted = persistedSettings ?? settings;
         _settingsStore = settingsStore;
         _credentials = credentials;
         _promptStore = new PromptStore(home);
@@ -177,7 +184,8 @@ public sealed class CodingSession : ITurnObserver
         string workspaceRoot,
         SessionFrontEnd frontEnd,
         PluginRegistry? plugins = null,
-        SessionDocument? resume = null)
+        SessionDocument? resume = null,
+        HarnessSettings? persistedSettings = null)
     {
         return new CodingSession(
             settings,
@@ -187,7 +195,8 @@ public sealed class CodingSession : ITurnObserver
             new Workspace(workspaceRoot),
             frontEnd,
             plugins ?? PluginRegistry.CreateBuiltIn(),
-            resume);
+            resume,
+            persistedSettings);
     }
 
     /// <summary>
@@ -345,16 +354,23 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public void SetVerbose(VerboseTarget target, bool enabled)
     {
-        _settings = target switch
+        SaveSettings(current => target switch
         {
-            VerboseTarget.Tools => _settings.WithVerboseTools(enabled),
-            VerboseTarget.Commands => _settings.WithVerboseCommands(enabled),
-            VerboseTarget.Approvals => _settings.WithVerboseApprovals(enabled),
-            VerboseTarget.Thinking => _settings.WithVerboseThinking(enabled),
-            _ => _settings
-        };
-        _settingsStore.Save(_settings);
+            VerboseTarget.Tools => current.WithVerboseTools(enabled),
+            VerboseTarget.Commands => current.WithVerboseCommands(enabled),
+            VerboseTarget.Approvals => current.WithVerboseApprovals(enabled),
+            VerboseTarget.Thinking => current.WithVerboseThinking(enabled),
+            _ => current
+        });
         PublishPreferences();
+    }
+
+    private void SaveSettings(Func<HarnessSettings, HarnessSettings> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        _settings = change(_settings);
+        _persisted = change(_persisted);
+        _settingsStore.Save(_persisted);
     }
 
     /// <summary>
@@ -616,8 +632,7 @@ public sealed class CodingSession : ITurnObserver
             }
         }
 
-        _settings = _settings.WithApproval(_approval);
-        _settingsStore.Save(_settings);
+        SaveSettings(current => current.WithApproval(_approval));
         RebuildExecutors();
         ReplaceLiveSystem();
         RefreshChrome();
@@ -667,6 +682,7 @@ public sealed class CodingSession : ITurnObserver
         try
         {
             updated = _settings.WithApprovalModel(next);
+            _ = _persisted.WithApprovalModel(next);
         }
         catch (InvalidOperationException exception)
         {
@@ -680,7 +696,8 @@ public sealed class CodingSession : ITurnObserver
         }
 
         _settings = updated;
-        _settingsStore.Save(_settings);
+        _persisted = _persisted.WithApprovalModel(next);
+        _settingsStore.Save(_persisted);
         ReplaceApprovalClient(next, client);
         RebuildExecutors();
         Note(next.Describe());
@@ -818,8 +835,7 @@ public sealed class CodingSession : ITurnObserver
             _thinkingEffort = selection;
         }
 
-        _settings = _settings.WithThinkingEffort(_thinkingEffort);
-        _settingsStore.Save(_settings);
+        SaveSettings(current => current.WithThinkingEffort(_thinkingEffort));
         RebuildExecutors();
         RefreshChrome();
         Note("Thinking  " + ThinkingLabel.For(_thinkingEffort));
@@ -827,21 +843,18 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeEstimatedTokens(string argument)
     {
+        bool enabled;
         if (string.IsNullOrWhiteSpace(argument))
         {
-            _settings = _settings.WithEstimatedTokens(!_settings.EstimatedTokens);
+            enabled = !_settings.EstimatedTokens;
         }
-        else if (TryParseToggle(argument, out var enabled))
-        {
-            _settings = _settings.WithEstimatedTokens(enabled);
-        }
-        else
+        else if (!TryParseToggle(argument, out enabled))
         {
             Error("Estimated tokens is on or off.");
             return;
         }
 
-        _settingsStore.Save(_settings);
+        SaveSettings(current => current.WithEstimatedTokens(enabled));
         PublishPreferences();
         Note(
             "Estimated tokens  " + (_settings.EstimatedTokens ? "On" : "Off"));
@@ -994,7 +1007,8 @@ public sealed class CodingSession : ITurnObserver
         _multimodalClient = nextMultimodalClient;
         _compactor = CreateCompactor(nextClient);
         _settings = nextSettings;
-        _settingsStore.Save(_settings);
+        _persisted = _persisted.WithSelection(selection.Provider, selection.Model);
+        _settingsStore.Save(_persisted);
         _clientView.ReleaseSession();
         if (!ReferenceEquals(previous, _approvalClient))
         {
@@ -1627,8 +1641,7 @@ public sealed class CodingSession : ITurnObserver
         var approval = source == "home"
             ? _settings.ExternalToolApproval.WithHome(policy)
             : _settings.ExternalToolApproval.WithProject(policy);
-        _settings = _settings.WithExternalToolApproval(approval);
-        _settingsStore.Save(_settings);
+        SaveSettings(current => current.WithExternalToolApproval(approval));
         ReloadExternalToolsWithProgress();
         PublishPluginEnvironment();
         RebuildExecutors();
@@ -1645,8 +1658,7 @@ public sealed class CodingSession : ITurnObserver
 
         if (command != "reload")
         {
-            _settings = _settings.WithExternalTools(command == "on");
-            _settingsStore.Save(_settings);
+            SaveSettings(current => current.WithExternalTools(command == "on"));
         }
 
         ReloadExternalToolsWithProgress();
@@ -1768,8 +1780,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        _settings = _settings.WithStatusLine(statusLine);
-        _settingsStore.Save(_settings);
+        SaveSettings(current => current.WithStatusLine(statusLine));
         PublishPreferences();
         Note("Custom status line  " + (statusLine.Enabled ? "On" : "Off"));
     }
@@ -2114,8 +2125,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var enabled = command == "on";
-        _settings = _settings.WithWorkspaceTrust(enabled);
-        _settingsStore.Save(_settings);
+        SaveSettings(current => current.WithWorkspaceTrust(enabled));
         Note("Workspace trust  " + (enabled ? "on" : "off"));
         if (!enabled || _trust.Contains(_workspace.Root))
         {
@@ -3071,8 +3081,7 @@ public sealed class CodingSession : ITurnObserver
         await ClosePluginSessionAsync(cancellationToken);
         if (command != "reload")
         {
-            _settings = _settings.WithPlugins(command == "on");
-            _settingsStore.Save(_settings);
+            SaveSettings(current => current.WithPlugins(command == "on"));
         }
 
         ReloadPluginsWithProgress();

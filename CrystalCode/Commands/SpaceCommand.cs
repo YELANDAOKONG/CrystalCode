@@ -20,15 +20,6 @@ public sealed class SpaceCommand : AsyncCommand<SpaceSettings>
 
         var home = CrystalHome.Resolve(settings.Home);
         var space = OperatorSpace.EnsureCreated(home);
-        return RunCommand.RunAsync(
-            new RunSettings
-            {
-                Provider = settings.Provider,
-                Model = settings.Model,
-                Home = settings.Home,
-                Workspace = space,
-                Resume = settings.Resume,
-            },
-            cancellationToken);
+        return RunCommand.RunAsync(settings, space, settings.Resume, cancellationToken);
     }
 }

@@ -16,12 +16,14 @@ internal sealed class TerminalHost
 {
     private readonly SessionRenderer _renderer;
     private readonly CodingSession _session;
+    private readonly bool? _launchPlan;
     private int _idleCancels;
 
-    private TerminalHost(SessionRenderer renderer, CodingSession session)
+    private TerminalHost(SessionRenderer renderer, CodingSession session, bool? launchPlan)
     {
         _renderer = renderer;
         _session = session;
+        _launchPlan = launchPlan;
     }
 
     public static TerminalHost Create(
@@ -31,7 +33,9 @@ internal sealed class TerminalHost
         CrystalHome home,
         string workspaceRoot,
         PluginRegistry plugins,
-        SessionDocument? resume)
+        SessionDocument? resume,
+        HarnessSettings? persistedSettings = null,
+        bool? launchPlan = null)
     {
         var renderer = new SessionRenderer();
         var frontEnd = new SessionFrontEnd(
@@ -48,8 +52,22 @@ internal sealed class TerminalHost
             workspaceRoot,
             frontEnd,
             plugins,
-            resume);
-        return new TerminalHost(renderer, session);
+            resume,
+            persistedSettings);
+        return new TerminalHost(renderer, session, launchPlan);
+    }
+
+    /// <summary>
+    /// Switches Plan or Work only when a launch flag disagrees with the
+    /// session. A missing flag leaves a resumed mode in place.
+    /// </summary>
+    internal static void ApplyLaunchPlan(CodingSession session, bool? launchPlan)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        if (launchPlan is bool requested && requested != session.PlanMode)
+        {
+            session.TogglePlan();
+        }
     }
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
@@ -73,6 +91,7 @@ internal sealed class TerminalHost
         _renderer.OnSideCancelled = () => _session.TryCancelSideQuestion();
         _renderer.OnVerboseToggled = PersistVerboseToggle;
         await _session.StartAsync(cancellationToken);
+        ApplyLaunchPlan(_session, _launchPlan);
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);

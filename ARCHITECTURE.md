@@ -548,7 +548,8 @@ manifests. It accepts `--home`, `--workspace`, `--source home|project`, and
 `--format text`. Session `/promptattach` edits the winning directory and has
 no source prefix.
 
-`crystal run --prompt-set <name>` forces that set for the process even when
+`crystal`, `crystal space`, and `crystal run` accept `--prompt-set <name>`.
+That flag forces the named set for the process even when
 its manifest says `enabled: false`. `default` forces the built-in text.
 `--prompt-attachments on|off` is the process switch: omitted or `on` follows
 the file flags and order; `off` appends nothing. Neither flag writes
@@ -1164,10 +1165,17 @@ desktop front end uses C# markup and does not add XAML or AXAML files.
 
 `crystal run` is the headless front end in this executable, not a second
 assembly. It reads one task from an argument or from stdin, applies
-process-only overrides, starts one user turn, and exits. Overrides are not
+process-only overrides, starts one user turn, and exits. The interactive
+`crystal` and `crystal space` commands apply the same session overrides:
+approval, the approval model, Plan or Work, thinking, prompt set, prompt
+attachments, skills, external tools, plugins, and turn quotas. Overrides are not
 written to `config.json`. That includes the approval-model switch
 (`--approval-model`, `--approval-provider`, `--approval-model-id`).
-Slash commands are rejected so they cannot change
+A later interactive preference command writes the field the operator changed,
+and can also write a `--provider` or `--model` passed at launch. It does not
+write the other launch overrides. The task text, `--format`,
+`--show-thinking`, `--space`, and `--workspace-trust` stay on `crystal run`.
+Slash commands are rejected on `crystal run` so they cannot change
 saved settings. Secrets are not command flags.
 
 The run supplies `RunLog` or `RunJsonLog`, `UnattendedApprovalPrompt`,

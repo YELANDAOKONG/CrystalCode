@@ -3,6 +3,8 @@ using System.Globalization;
 using CrystalCode.Commands;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 
 namespace CrystalCode.Run;
@@ -14,7 +16,7 @@ internal static class TaskRunOverrides
 {
     public static bool TryApply(
         HarnessSettings current,
-        TaskRunSettings request,
+        SessionLaunchSettings request,
         out HarnessSettings applied,
         out bool planMode,
         out string error)
@@ -105,7 +107,7 @@ internal static class TaskRunOverrides
 
     private static ApprovalModelSettings ParseApprovalModel(
         HarnessSettings current,
-        TaskRunSettings request)
+        SessionLaunchSettings request)
     {
         var specifiedProvider = request.ApprovalProvider is not null;
         var specifiedModel = request.ApprovalModelId is not null;
@@ -151,7 +153,7 @@ internal static class TaskRunOverrides
         return new ApprovalModelSettings(true, provider.Value, model);
     }
 
-    private static TurnLimits ParseBudget(HarnessSettings current, TaskRunSettings request)
+    private static TurnLimits ParseBudget(HarnessSettings current, SessionLaunchSettings request)
     {
         var modelCalls = current.ExecutionBudget.MaximumModelCalls;
         var toolCalls = current.ExecutionBudget.MaximumToolCalls;
@@ -199,6 +201,24 @@ internal static class TaskRunOverrides
         }
 
         return parsed;
+    }
+
+    internal static bool TryAcceptPromptSet(CrystalHome home, string? name, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(home);
+        error = string.Empty;
+        if (name is null)
+        {
+            return true;
+        }
+
+        if (new PromptStore(home).ContainsSet(name))
+        {
+            return true;
+        }
+
+        error = "Prompt set not found  " + name.Trim();
+        return false;
     }
 
     internal static bool TryReadWorkspaceTrust(string? value, out bool enabled, out string error)

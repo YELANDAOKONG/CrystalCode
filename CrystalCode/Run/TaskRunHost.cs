@@ -4,7 +4,6 @@ using CrystalCode.Commands;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
-using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 
 namespace CrystalCode.Run;
@@ -115,9 +114,9 @@ internal static class TaskRunHost
             return RunExit.Invalid;
         }
 
-        if (settings.PromptSet is not null && !new PromptStore(home).ContainsSet(settings.PromptSet))
+        if (!TaskRunOverrides.TryAcceptPromptSet(home, settings.PromptSet, out var promptError))
         {
-            await error.WriteLineAsync("Prompt set not found  " + settings.PromptSet.Trim());
+            await error.WriteLineAsync(promptError);
             return RunExit.Invalid;
         }
 
