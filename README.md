@@ -36,7 +36,7 @@ Invoke-RestMethod `
   -Uri https://raw.githubusercontent.com/YELANDAOKONG/CrystalCode/master/scripts/install.ps1 | Invoke-Expression
 ```
 
-The installer places the application under `~/.crystal/binaries/code/`, adds that directory to your shell path, and aliases `crystal` to `CrystalCode`. Open a new terminal after installation. To inspect a script before running it, download it first and run the local copy.
+The installer places the application under `~/.crystal/binaries/code/` and adds that directory to your path. On Linux and macOS it also aliases `crystal` to `CrystalCode`; on Windows the command stays `CrystalCode`. Open a new terminal after installation. To inspect a script before running it, download it first and run the local copy.
 
 ### 2. Set an API key
 
@@ -63,7 +63,9 @@ On Windows, run `CrystalCode` instead of `crystal`. The current directory become
 
 Inside the app, type `/help` for commands and shortcuts. Use Tab or `/plan` to switch between Plan and Work. The [interactive session guide](docs/user-guide.md#interactive-session) covers the composer, image attachments, and follow-up queue.
 
-## Everyday commands
+## Everyday Slash commands
+
+Type these inside a running session; `/help` lists them all.
 
 | Command | What it does |
 | :--- | :--- |
@@ -80,7 +82,7 @@ See the [complete command reference](docs/user-guide.md#slash-commands).
 
 ## Command line
 
-The interactive terminal is one entry point. Other commands start, do their work, and exit without a session:
+Run these from your shell. The interactive terminal is one entry point; the others start, do their work, and exit without a session:
 
 | Command | What it does |
 | :--- | :--- |
