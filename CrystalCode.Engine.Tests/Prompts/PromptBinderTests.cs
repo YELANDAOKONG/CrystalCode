@@ -233,7 +233,7 @@ public sealed class PromptBinderTests
         var text = PromptBinder.Apply("{{build}} {{workspace}}", context, table);
 
         Assert.StartsWith("{{workspace}} ", text, StringComparison.Ordinal);
-        Assert.EndsWith("/tmp/demo", text, StringComparison.Ordinal);
+        Assert.EndsWith(Path.GetFullPath("/tmp/demo"), text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -277,7 +277,7 @@ public sealed class PromptBinderTests
 
         var text = PromptBinder.Apply("{{workspace}}", context, table);
 
-        Assert.Equal("/tmp/demo", text);
+        Assert.Equal(Path.GetFullPath("/tmp/demo"), text);
     }
 
     [Fact]
