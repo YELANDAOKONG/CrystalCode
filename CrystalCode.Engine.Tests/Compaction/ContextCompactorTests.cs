@@ -222,6 +222,42 @@ public sealed class ContextCompactorTests
                 && message.Text.Contains("Read then write App.cs.", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task CompactAsync_IsExhaustedWhenTheSummarizerThrows()
+    {
+        var compactor = new ContextCompactor(
+            new FlakyChatClient(new InvalidOperationException("provider down"), "unused"));
+
+        var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", TightLimits);
+
+        Assert.Equal(CompactionKind.Exhausted, outcome.Kind);
+        Assert.Null(outcome.Summary);
+    }
+
+    [Fact]
+    public async Task CompactAsync_PropagatesReportingFailure()
+    {
+        var compactor = new ContextCompactor(
+            new FixedChatClient("## Objective\n- Read then write App.cs."),
+            reportResponse: (_, _) => throw new InvalidOperationException("usage ledger failed"));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compactor.CompactAsync(LongTranscript(), "No todos.", TightLimits));
+
+        Assert.Equal("usage ledger failed", error.Message);
+    }
+
+    [Fact]
+    public async Task CompactAsync_TreatsEmptyCandidatesAsNoSummary()
+    {
+        var compactor = new ContextCompactor(new EmptyCandidatesChatClient());
+
+        var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", TightLimits);
+
+        Assert.Equal(CompactionKind.Exhausted, outcome.Kind);
+        Assert.Null(outcome.Summary);
+    }
+
     private static CompactionLimits TightLimits { get; } = new(100_000, tailBudget: 8);
 
     private static List<ChatItem> LongTranscript() =>
@@ -239,6 +275,14 @@ public sealed class ContextCompactorTests
     ];
 
     private static bool IsUser(ChatMessage message) => message.Role.Value == "user";
+
+    private sealed class EmptyCandidatesChatClient : IChatClient
+    {
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ChatResponse([]));
+    }
 
     private sealed class EmptyChatClient : IChatClient
     {

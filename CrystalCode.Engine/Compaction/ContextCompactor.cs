@@ -101,9 +101,10 @@ public sealed class ContextCompactor
             return FinishWithoutSummary(pruned, prunedChanged);
         }
 
+        ChatResponse response;
         try
         {
-            var response = await SessionRetry.RunAsync(
+            response = await SessionRetry.RunAsync(
                 token => _client.CompleteAsync(
                     new ChatRequest(
                     [
@@ -114,23 +115,6 @@ public sealed class ContextCompactor
                 _retry,
                 _onRetry,
                 cancellationToken);
-            if (_reportResponse is not null && response.Candidates.Count > 0)
-            {
-                await _reportResponse(response, cancellationToken);
-            }
-
-            var summary = ReadAssistantText(response);
-            if (string.IsNullOrWhiteSpace(summary))
-            {
-                return FinishWithoutSummary(pruned, prunedChanged);
-            }
-
-            summary = Finish(PluginCompactionPhase.Summary, summary.Trim());
-            var stored = FormatSummary(summary, todos);
-            return new CompactionOutcome(
-                Rebuild(pruned, split, stored),
-                CompactionKind.Applied,
-                stored);
         }
         catch (OperationCanceledException)
         {
@@ -140,6 +124,24 @@ public sealed class ContextCompactor
         {
             return FinishWithoutSummary(pruned, prunedChanged);
         }
+
+        if (_reportResponse is not null && response.Candidates.Count > 0)
+        {
+            await _reportResponse(response, cancellationToken);
+        }
+
+        var summary = ReadAssistantText(response);
+        if (string.IsNullOrWhiteSpace(summary))
+        {
+            return FinishWithoutSummary(pruned, prunedChanged);
+        }
+
+        summary = Finish(PluginCompactionPhase.Summary, summary.Trim());
+        var stored = FormatSummary(summary, todos);
+        return new CompactionOutcome(
+            Rebuild(pruned, split, stored),
+            CompactionKind.Applied,
+            stored);
     }
 
     private static CompactionOutcome FinishWithoutSummary(
@@ -209,6 +211,11 @@ public sealed class ContextCompactor
 
     private static string ReadAssistantText(ChatResponse response)
     {
+        if (response.Candidates.Count == 0)
+        {
+            return string.Empty;
+        }
+
         foreach (var item in response.Candidates[0].Items)
         {
             if (item is ChatMessage message

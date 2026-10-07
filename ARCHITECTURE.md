@@ -595,8 +595,9 @@ Persistent grants are stored in `~/.crystal/permissions.json`.
 ## Compaction
 
 Crystal does not reduce context. When estimated transcript size or the
-last model-round usage crosses the configured fraction of the selected
-model's usable window (context minus reserved output), the host:
+last model-round usage crosses the lesser of the configured fraction of
+the model context window and the usable window (context minus reserved
+output), the host:
 
 1. Clears old tool results outside a protected recent band, when enough
    tokens would be freed.

@@ -1194,8 +1194,9 @@ complete ids so they can be copied into `/resume` or `/fork`.
 ## Compaction
 
 Crystal does not reduce context. When estimated transcript size or the
-last model-round usage crosses `compactionThreshold` of the selected
-model's usable window, the host:
+last model-round usage crosses the lesser of `compactionThreshold` of
+the model context window and the usable window (context minus reserved
+output), the host:
 
 1. Clears old tool results outside a protected recent band, when that
    frees enough tokens.
