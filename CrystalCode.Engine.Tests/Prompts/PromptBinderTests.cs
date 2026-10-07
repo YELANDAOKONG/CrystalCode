@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 
 using CrystalCode.Engine.Prompts;
+using CrystalCode.Engine.Tests.Tools;
 
 using Xunit;
 
@@ -147,6 +148,26 @@ public sealed class PromptBinderTests
         var text = PromptBinder.Apply("{{ WORKSPACE }}", context);
 
         Assert.Equal(Path.GetFullPath("/tmp/demo"), text);
+    }
+
+    [Fact]
+    public void Apply_SubstitutesGitRootSeparatelyFromTheWorkspaceFlag()
+    {
+        using var workspace = new TemporaryWorkspace();
+        Directory.CreateDirectory(Path.Combine(workspace.Path, ".git"));
+        var nested = Path.Combine(workspace.Path, "src");
+        Directory.CreateDirectory(nested);
+        var context = PromptContext.Create(
+            nested,
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty);
+
+        var text = PromptBinder.Apply("repo={{is_git_repo}} root={{git_root}}", context);
+
+        Assert.Equal("repo=no root=" + Path.GetFullPath(workspace.Path), text);
     }
 
     [Fact]

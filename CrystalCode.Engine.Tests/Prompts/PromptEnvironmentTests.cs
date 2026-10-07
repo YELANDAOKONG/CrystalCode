@@ -24,6 +24,7 @@ public sealed class PromptEnvironmentTests
         Assert.Contains("<env>", text, StringComparison.Ordinal);
         Assert.Contains(Path.GetFullPath(workspace.Path), text, StringComparison.Ordinal);
         Assert.Contains("Is git repo: no", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Git root:", text, StringComparison.Ordinal);
         Assert.Contains("Today's date: Monday Aug 31, 2026", text, StringComparison.Ordinal);
         Assert.Contains("Local time: 12:00:00 +00:00", text, StringComparison.Ordinal);
         Assert.Contains("OS: " + RuntimeInformation.OSDescription.Trim(), text, StringComparison.Ordinal);
@@ -49,5 +50,20 @@ public sealed class PromptEnvironmentTests
         var text = PromptEnvironment.Render(workspace.Path, "openai", "gpt-4.1");
 
         Assert.Contains("Is git repo: yes", text, StringComparison.Ordinal);
+        Assert.Contains("Git root: " + Path.GetFullPath(workspace.Path), text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_ReportsAncestorGitRootWithoutMarkingTheWorkspaceAsARepo()
+    {
+        using var workspace = new TemporaryWorkspace();
+        Directory.CreateDirectory(Path.Combine(workspace.Path, ".git"));
+        var nested = Path.Combine(workspace.Path, "src");
+        Directory.CreateDirectory(nested);
+
+        var text = PromptEnvironment.Render(nested, "openai", "gpt-4.1");
+
+        Assert.Contains("Is git repo: no", text, StringComparison.Ordinal);
+        Assert.Contains("Git root: " + Path.GetFullPath(workspace.Path), text, StringComparison.Ordinal);
     }
 }

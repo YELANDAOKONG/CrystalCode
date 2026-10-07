@@ -64,6 +64,9 @@ public static partial class PromptBinder
             case PromptPlaceholder.IsGitRepo:
                 value = context.IsGitRepo;
                 return true;
+            case PromptPlaceholder.GitRoot:
+                value = context.GitRoot;
+                return true;
             case PromptPlaceholder.Platform:
                 value = context.Platform;
                 return true;

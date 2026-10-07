@@ -10,6 +10,7 @@ public sealed record PromptContext
     private PromptContext(
         string workspace,
         string isGitRepo,
+        string gitRoot,
         string platform,
         string os,
         string architecture,
@@ -26,6 +27,7 @@ public sealed record PromptContext
     {
         Workspace = workspace;
         IsGitRepo = isGitRepo;
+        GitRoot = gitRoot;
         Platform = platform;
         Os = os;
         Architecture = architecture;
@@ -44,6 +46,8 @@ public sealed record PromptContext
     public string Workspace { get; }
 
     public string IsGitRepo { get; }
+
+    public string GitRoot { get; }
 
     public string Platform { get; }
 
@@ -113,6 +117,7 @@ public sealed record PromptContext
         return new PromptContext(
             snapshot.Workspace,
             snapshot.IsGitRepo,
+            snapshot.GitRoot,
             snapshot.Platform,
             snapshot.Os,
             snapshot.Architecture,
@@ -142,6 +147,7 @@ public sealed record PromptContext
             string.Empty,
             string.Empty,
             string.Empty,
+            string.Empty,
             DefaultProductName,
             string.Empty,
             string.Empty,
@@ -155,6 +161,7 @@ public sealed record PromptContext
         return new PromptContext(
             Workspace,
             IsGitRepo,
+            GitRoot,
             Platform,
             Os,
             Architecture,

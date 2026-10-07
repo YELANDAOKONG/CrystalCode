@@ -6,6 +6,7 @@ namespace CrystalCode.Engine.Prompts;
 public sealed record PromptEnvironmentSnapshot(
     string Workspace,
     string IsGitRepo,
+    string GitRoot,
     string Platform,
     string Os,
     string Architecture,

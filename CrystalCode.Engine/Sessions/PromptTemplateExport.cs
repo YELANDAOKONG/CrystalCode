@@ -49,6 +49,7 @@ public static class PromptTemplateExport
         - {{instructions_section}}
         - {{workspace}}
         - {{is_git_repo}}
+        - {{git_root}}
         - {{platform}}
         - {{os}}
         - {{architecture}}

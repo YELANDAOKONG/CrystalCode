@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 
+using CrystalCode.Engine.Tools;
+
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
@@ -35,11 +37,13 @@ public static class PromptEnvironment
         ArgumentNullException.ThrowIfNull(approval);
 
         var stamp = now ?? DateTimeOffset.Now;
-        var gitPath = Path.Combine(workspaceRoot, ".git");
+        var fullWorkspace = Path.GetFullPath(workspaceRoot);
+        var gitPath = Path.Combine(fullWorkspace, ".git");
         var git = Directory.Exists(gitPath) || File.Exists(gitPath) ? "yes" : "no";
         return new PromptEnvironmentSnapshot(
-            Path.GetFullPath(workspaceRoot),
+            fullWorkspace,
             git,
+            GitRoot.Find(fullWorkspace) ?? string.Empty,
             PlatformName(),
             OperatingSystemDescription(),
             ArchitectureName(),
@@ -58,14 +62,19 @@ public static class PromptEnvironment
         {
             "<env>",
             $"  Workspace: {snapshot.Workspace}",
-            $"  Is git repo: {snapshot.IsGitRepo}",
-            $"  Platform: {snapshot.Platform}",
-            $"  OS: {snapshot.Os}",
-            $"  Architecture: {snapshot.Architecture}",
-            $"  Today's date: {snapshot.Date}",
-            $"  Local time: {snapshot.Time}",
-            $"  Model: {snapshot.Provider} / {snapshot.Model}"
+            $"  Is git repo: {snapshot.IsGitRepo}"
         };
+        if (snapshot.GitRoot.Length > 0)
+        {
+            lines.Add($"  Git root: {snapshot.GitRoot}");
+        }
+
+        lines.Add($"  Platform: {snapshot.Platform}");
+        lines.Add($"  OS: {snapshot.Os}");
+        lines.Add($"  Architecture: {snapshot.Architecture}");
+        lines.Add($"  Today's date: {snapshot.Date}");
+        lines.Add($"  Local time: {snapshot.Time}");
+        lines.Add($"  Model: {snapshot.Provider} / {snapshot.Model}");
         if (snapshot.SessionId.Length > 0)
         {
             lines.Add($"  Session: {snapshot.SessionId}");
@@ -87,6 +96,7 @@ public static class PromptEnvironment
             new PromptEnvironmentSnapshot(
                 context.Workspace,
                 context.IsGitRepo,
+                context.GitRoot,
                 context.Platform,
                 context.Os,
                 context.Architecture,

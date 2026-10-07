@@ -431,17 +431,21 @@ Live Work and Plan system text is assembled from overlayable templates using
 host-owned placeholders (`{{name}}`). Review and compaction prompts use the
 same placeholder syntax. Composite session slots are `{{env}}`, `{{skills}}`,
 and `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
-include `{{workspace}}`, `{{is_git_repo}}`, `{{platform}}`, `{{os}}`,
-`{{architecture}}`, `{{date}}`, `{{time}}`, `{{provider}}`, `{{model}}`,
-`{{model_line}}`, `{{mode}}`, `{{product_name}}`, `{{session_id}}`, and
-`{{approval}}`. `{{os}}` is the operating system name and version.
-`{{architecture}}` is the process architecture. `{{time}}` is the local
-time with a numeric offset, captured when that system message is composed.
+include `{{workspace}}`, `{{is_git_repo}}`, `{{git_root}}`, `{{platform}}`,
+`{{os}}`, `{{architecture}}`, `{{date}}`, `{{time}}`, `{{provider}}`,
+`{{model}}`, `{{model_line}}`, `{{mode}}`, `{{product_name}}`,
+`{{session_id}}`, and `{{approval}}`. `{{os}}` is the operating system name
+and version. `{{architecture}}` is the process architecture. `{{time}}` is
+the local time with a numeric offset, captured when that system message is
+composed. `{{is_git_repo}}` is `yes` when the workspace directory itself
+contains a `.git` directory or file. `{{git_root}}` is the repository root
+found by walking parent directories, or empty when that walk finds none.
 `{{session_id}}` is the saved session id. `{{approval}}` is the approval
 mode (`plan`, `default`, `edit`, `review`, `audit`, or `full`). `{{mode}}`
-stays `plan` or `work`. The `{{env}}` block includes the operating system,
-architecture, and local time, and adds session and approval lines when the
-host has them. Review user templates add `{{conversation}}`,
+is `plan` or `work` for Work and Plan, `review` for Review system text, and
+`compaction` for compaction system text. The `{{env}}` block includes the
+operating system, architecture, and local time, and adds git root, session,
+and approval lines when the host has them. Review user templates add `{{conversation}}`,
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,

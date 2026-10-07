@@ -18,6 +18,8 @@ public static class PromptPlaceholder
 
     public const string IsGitRepo = "is_git_repo";
 
+    public const string GitRoot = "git_root";
+
     public const string Platform = "platform";
 
     public const string Date = "date";
@@ -70,6 +72,7 @@ public static class PromptPlaceholder
         InstructionsSection,
         Workspace,
         IsGitRepo,
+        GitRoot,
         Platform,
         Date,
         Time,
