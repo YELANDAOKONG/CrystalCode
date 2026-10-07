@@ -70,4 +70,28 @@ public sealed class GlobToolTests
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("App.cs", output.Text);
     }
+
+    [Fact]
+    public async Task InvokeAsync_PagesBeyondOneThousandMatches()
+    {
+        using var root = new TemporaryWorkspace();
+        for (var index = 0; index <= 1000; index++)
+        {
+            File.WriteAllText(Path.Combine(root.Path, $"f{index:0000}.txt"), string.Empty);
+        }
+
+        var tool = new GlobTool(new Workspace(root.Path));
+
+        var firstPage = await tool.InvokeAsync(
+            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt","limit":2}"""));
+        var lastPage = await tool.InvokeAsync(
+            new ToolCall("2", GlobTool.ToolName, """{"pattern":"*.txt","offset":1001,"limit":1}"""));
+
+        Assert.Equal(ToolResultStatus.Success, firstPage.Status);
+        Assert.Equal(
+            "f0000.txt\nf0001.txt\n[showing 2 of 1001 files; continue with offset 3]",
+            firstPage.Text);
+        Assert.Equal(ToolResultStatus.Success, lastPage.Status);
+        Assert.Equal("f1000.txt", lastPage.Text);
+    }
 }

@@ -13,7 +13,7 @@ public sealed class GlobTool : ITool
 
     private static readonly string ToolDescription =
         "Lists workspace files matching a glob, for example **/*.cs. "
-        + "Optional path limits the search directory. Skips bin, obj, and .git. "
+        + "Optional path limits the search directory. Skips .git, .vs, bin, obj, node_modules, and dist. "
         + "Use offset (1-based) and limit to page through matches; "
         + $"limit defaults to {WorkspaceLimits.MaximumGlobMatches} files and is capped there. "
         + "Batch independent searches in parallel.";
@@ -116,16 +116,27 @@ public sealed class GlobTool : ITool
 
         try
         {
-            var matches = new List<string>();
+            var start = offset ?? 1;
+            var maximum = Math.Min(
+                limit ?? WorkspaceLimits.MaximumGlobMatches,
+                WorkspaceLimits.MaximumGlobMatches);
+            var keep = start - 1L + maximum;
+            var total = 0;
+            List<string> selected;
             if (File.Exists(searchRoot))
             {
+                selected = [];
                 if (MatchSingleFile(glob!, searchRoot))
                 {
-                    matches.Add(_workspace.ToRelative(searchRoot));
+                    total = 1;
+                    selected.Add(_workspace.ToRelative(searchRoot));
                 }
             }
             else
             {
+                // Keep only the smallest keep matches so memory stays bounded
+                // while pages stay consistent with the full ordinal order.
+                var smallest = new SortedSet<string>(StringComparer.Ordinal);
                 foreach (var file in _workspace.EnumerateFiles(searchRoot))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -141,40 +152,42 @@ public sealed class GlobTool : ITool
                         continue;
                     }
 
-                    matches.Add(relative);
+                    total++;
+                    smallest.Add(relative);
+                    if (smallest.Count > keep)
+                    {
+                        smallest.Remove(smallest.Max!);
+                    }
                 }
+
+                selected = [.. smallest];
             }
 
-            matches.Sort(StringComparer.Ordinal);
-            if (matches.Count == 0)
+            if (total == 0)
             {
                 return ValueTask.FromResult(new ToolOutput("No files matched."));
             }
 
-            var start = offset ?? 1;
-            if (start > matches.Count)
+            if (start > total)
             {
-                var noun = matches.Count == 1 ? "file" : "files";
+                var noun = total == 1 ? "file" : "files";
                 return ValueTask.FromResult(
                     new ToolOutput(
-                        $"Glob matched {matches.Count} {noun}; offset {start} is past the end.",
+                        $"Glob matched {total} {noun}; offset {start} is past the end.",
                         ToolResultStatus.Failure));
             }
 
-            var maximum = Math.Min(
-                limit ?? WorkspaceLimits.MaximumGlobMatches,
-                WorkspaceLimits.MaximumGlobMatches);
-            var count = Math.Min(maximum, matches.Count - start + 1);
+            var count = Math.Min(maximum, total - start + 1);
             var builder = new StringBuilder();
             for (var index = start - 1; index < start - 1 + count; index++)
             {
-                builder.AppendLine(matches[index]);
+                builder.AppendLine(selected[index]);
             }
 
-            if (start - 1 + count < matches.Count)
+            if (start - 1 + count < total)
             {
                 builder.AppendLine(
-                    $"[showing {count} of {matches.Count} files; continue with offset {start + count}]");
+                    $"[showing {count} of {total} files; continue with offset {start + count}]");
             }
 
             return ValueTask.FromResult(new ToolOutput(builder.ToString().TrimEnd()));

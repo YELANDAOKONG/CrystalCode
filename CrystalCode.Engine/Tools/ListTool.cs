@@ -157,7 +157,7 @@ public sealed class ListTool : ITool
     private static string Describe() =>
         "Lists the immediate entries of a directory. path may be workspace-relative or absolute "
         + "and defaults to the workspace root. Directories end with a slash. "
-        + "Skips bin, obj, .git, .vs, node_modules, and dist. "
+        + "Skips .git, .vs, bin, obj, node_modules, and dist. "
         + "Use offset (1-based) and limit to page through large directories; "
         + $"limit defaults to {WorkspaceLimits.MaximumListEntries} entries and is capped there. "
         + "Paths outside the workspace require approval.";
