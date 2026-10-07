@@ -106,8 +106,17 @@ internal static class CompatibleWire
         try
         {
             using var document = JsonDocument.Parse(body);
-            if (!document.RootElement.TryGetProperty("error", out var error)
-                || error.ValueKind != JsonValueKind.Object)
+            if (!document.RootElement.TryGetProperty("error", out var error))
+            {
+                return (null, null);
+            }
+
+            if (error.ValueKind == JsonValueKind.String)
+            {
+                return (null, error.GetString());
+            }
+
+            if (error.ValueKind != JsonValueKind.Object)
             {
                 return (null, null);
             }

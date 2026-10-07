@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 
 using Crystal;
@@ -155,6 +156,75 @@ public sealed class OllamaProviderTests
             events,
             item => item is ChatCandidateCompleted { FinishReason: var reason }
                 && reason == FinishReason.Length);
+    }
+
+    [Fact]
+    public async Task StreamAsync_EmitsToolCallsWhenTheFinishIsStop()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"message":{"role":"assistant","tool_calls":[{"function":{"name":"read","arguments":{"path":"a"}}}]},"done":false}
+            {"done":true,"done_reason":"stop"}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var item in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "read a")])))
+        {
+            events.Add(item);
+        }
+
+        Assert.Contains(events, item => item is ChatToolCallDelta { NameDelta: "read" });
+        Assert.Contains(
+            events,
+            item => item is ChatCandidateCompleted { FinishReason: var reason }
+                && reason == FinishReason.ToolCalls);
+    }
+
+    [Fact]
+    public async Task StreamAsync_DropsToolCallsWhenTheFinishIsLength()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"message":{"role":"assistant","content":"partial","tool_calls":[{"function":{"name":"read","arguments":{}}}]},"done":false}
+            {"done":true,"done_reason":"length"}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var item in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "read")])))
+        {
+            events.Add(item);
+        }
+
+        Assert.DoesNotContain(events, item => item is ChatToolCallDelta);
+        Assert.Contains(events, item => item is ChatTextDelta { Text: "partial" });
+        Assert.Contains(
+            events,
+            item => item is ChatCandidateCompleted { FinishReason: var reason }
+                && reason == FinishReason.Length);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsAStringErrorBody()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":"model 'qwen' not found"}""",
+            HttpStatusCode.NotFound));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        var exception = await Assert.ThrowsAsync<OllamaException>(
+            () => provider.CompleteAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "hi")])));
+
+        Assert.Equal(404, exception.StatusCode);
+        Assert.Null(exception.ErrorCode);
+        Assert.Contains("model 'qwen' not found", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

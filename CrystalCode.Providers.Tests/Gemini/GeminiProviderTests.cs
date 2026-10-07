@@ -109,6 +109,32 @@ public sealed class GeminiProviderTests
     }
 
     [Fact]
+    public async Task StreamAsync_ReportsTheLatestCumulativeUsage()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"candidates":[{"index":0,"content":{"parts":[{"text":"Hello"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":1,"thoughtsTokenCount":0}}
+
+            data: {"candidates":[{"index":0,"content":{"parts":[{"text":" world"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":8,"thoughtsTokenCount":4}}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("test-key", "gemini-test"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var item in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "hi")])))
+        {
+            events.Add(item);
+        }
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>());
+        Assert.Equal(10, usage.Usage.InputTokenCount);
+        Assert.Equal(12, usage.Usage.OutputTokenCount);
+        Assert.Equal(4, usage.Usage.ReasoningTokenCount);
+    }
+
+    [Fact]
     public async Task CompleteAsync_ReplaysNativeCallWithoutInventingWireId()
     {
         var firstHandler = new RecordingHandler(JsonResponse.Create(

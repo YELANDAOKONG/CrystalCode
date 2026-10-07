@@ -9,6 +9,7 @@ namespace CrystalCode.Providers.Ollama;
 
 internal sealed class OllamaStreamParser : IProtocolStreamParser
 {
+    private readonly List<ChatToolCallDelta> _heldTools = [];
     private int _nextItemIndex;
     private int? _reasoningItemIndex;
     private int? _textItemIndex;
@@ -57,7 +58,7 @@ internal sealed class OllamaStreamParser : IProtocolStreamParser
                 foreach (var call in calls.EnumerateArray())
                 {
                     var tool = OllamaCodec.ReadToolCall(call);
-                    events.Add(new ChatToolCallDelta(
+                    _heldTools.Add(new ChatToolCallDelta(
                         0,
                         _nextItemIndex++,
                         tool.CallId,
@@ -75,15 +76,22 @@ internal sealed class OllamaStreamParser : IProtocolStreamParser
                 throw new OllamaException("Ollama completed a response more than once.");
             }
 
+            // done_reason decides whether a call is a tool request. Hold it
+            // until then, and drop it when the finish is not a tool call.
+            var finish = OllamaCodec.ReadFinish(root, _hasTools);
+            if (finish == FinishReason.ToolCalls)
+            {
+                events.AddRange(_heldTools);
+            }
+
+            _heldTools.Clear();
             var usage = OllamaCodec.ReadUsage(root);
             if (usage is not null)
             {
                 events.Add(new ChatUsageReceived(usage));
             }
 
-            events.Add(new ChatCandidateCompleted(
-                0,
-                OllamaCodec.ReadFinish(root, _hasTools)));
+            events.Add(new ChatCandidateCompleted(0, finish));
             IsComplete = true;
         }
 

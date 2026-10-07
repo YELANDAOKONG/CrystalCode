@@ -11,7 +11,7 @@ namespace CrystalCode.Providers.Gemini;
 internal sealed class GeminiStreamParser : IProtocolStreamParser
 {
     private readonly Dictionary<int, CandidateState> _candidates = [];
-    private bool _usageReceived;
+    private TokenUsage? _usage;
 
     public bool IsComplete => _candidates.Count > 0
         && _candidates.Values.All(static candidate => candidate.Completed);
@@ -19,6 +19,7 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
     public IReadOnlyList<ChatStreamEvent> Parse(JsonElement root)
     {
         var events = new List<ChatStreamEvent>();
+        var completeBefore = IsComplete;
         if (root.TryGetProperty("error", out var error))
         {
             throw new GeminiException(error.TryGetProperty("message", out var message)
@@ -71,11 +72,16 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
             }
         }
 
-        var usage = GeminiCodec.ReadUsage(root);
-        if (usage is not null && !_usageReceived)
+        // Each chunk repeats the cumulative usage. Keep the latest totals and
+        // report them once, when every candidate has completed.
+        if (GeminiCodec.ReadUsage(root) is { } usage)
         {
-            _usageReceived = true;
-            events.Add(new ChatUsageReceived(usage));
+            _usage = usage;
+        }
+
+        if (!completeBefore && IsComplete && _usage is not null)
+        {
+            events.Add(new ChatUsageReceived(_usage));
         }
 
         return events;
