@@ -21,6 +21,7 @@ public sealed class ContextCompactor
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
         _prepareHead;
     private readonly Func<ChatResponse, CancellationToken, Task>? _reportResponse;
+    private readonly Func<string, string, string?, string>? _userText;
 
     public ContextCompactor(
         IChatClient client,
@@ -29,7 +30,8 @@ public sealed class ContextCompactor
         Func<string>? systemText = null,
         Func<PluginCompactionPhase, string, string?>? finish = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareHead = null,
-        Func<ChatResponse, CancellationToken, Task>? reportResponse = null)
+        Func<ChatResponse, CancellationToken, Task>? reportResponse = null,
+        Func<string, string, string?, string>? userText = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
@@ -38,6 +40,7 @@ public sealed class ContextCompactor
         _finish = finish;
         _prepareHead = prepareHead;
         _reportResponse = reportResponse;
+        _userText = userText;
         _systemText = systemText
             ?? (() => CompactionPrompt.ComposeSystem(
                 PromptContext.InstructionsOnly(string.Empty).WithMode("compaction")));
@@ -92,7 +95,9 @@ public sealed class ContextCompactor
             return FinishWithoutSummary(pruned, prunedChanged);
         }
 
-        var prompt = CompactionPrompt.UserText(conversation, todos, split.PreviousSummary);
+        var prompt = _userText is null
+            ? CompactionPrompt.UserText(conversation, todos, split.PreviousSummary)
+            : _userText(conversation, todos, split.PreviousSummary);
         prompt = Finish(PluginCompactionPhase.Prompt, prompt);
         var systemText = _systemText();
         var promptTokens = TokenEstimator.Text(systemText) + TokenEstimator.Text(prompt);

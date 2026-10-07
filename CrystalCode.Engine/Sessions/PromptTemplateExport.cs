@@ -79,5 +79,8 @@ public static class PromptTemplateExport
         - {{summary_task}}
         - {{output_template}}
         - {{todos_section}}
+
+        A loaded plugin may add further names. Those names are not listed here.
+        The host rejects a name it already owns.
         """;
 }

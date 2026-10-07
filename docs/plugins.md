@@ -3,7 +3,9 @@
 Operators add in-process extensions as **plugins**. A plugin is one
 directory, one `plugin.json`, and one assembly in its own load context.
 It can contribute tools, a protocol client, approval classifiers, slash
-commands, hooks, and raw hooks.
+commands, hooks, raw hooks, and prompt placeholders. After the host has
+loaded plugins, external tools, and skills, it calls `Attach` with a
+read-only snapshot of those catalogs.
 
 The host owns catalog registration, approval, workspace fencing, output
 truncation, and timeouts. Plugin code does not bypass
@@ -87,8 +89,14 @@ a tool needs `ToolHostContext`. Do not reference `CrystalCode.Engine`,
 `CrystalCode`, `CrystalCode.Display`, or `CrystalCode.Providers`.
 
 `Contribute` returns tools, client factories, classifiers, commands,
-hooks, and raw hooks. A null entry is omitted with a note. One bad plugin does not
+hooks, raw hooks, and prompt placeholders. A null entry is omitted with a note. One bad plugin does not
 stop the others.
+
+`Attach` runs after `Contribute`, once plugins, external tools, and skills
+are loaded, and again when those catalogs reload. It runs before the
+session-start hook. The default method does nothing. Reading the snapshot
+inside `Contribute` is too early: the host has not finished the other
+catalogs.
 
 ### Tools
 
@@ -135,6 +143,38 @@ assigns risk and authority for an unknown tool. It does not reclassify
 `IPluginCommand` adds a `/name` verb. Built-in verbs and their aliases
 win. Names use the same pattern as tool names. `IPluginOutput.Write`
 and `Fail` become session notes.
+
+### Placeholders
+
+`IPluginPlaceholder` adds a `{{name}}` token. The name is 1–64 characters:
+a letter, then letters, digits, or `_`. Matching is case-insensitive. The
+host rejects a name it already owns. Two plugins cannot share a name; the
+first in load order wins and the later one is omitted with a note.
+
+The host calls `Resolve` each time it binds a template, including
+attachments, Review, and compaction. The context carries the mode,
+workspace, session id, approval mode, provider, model, and the current
+catalog snapshot. Strings the host does not have yet are empty. The
+returned text is inserted as-is. Tokens inside that text are not expanded
+again. A throw, or a missing return, leaves the original token and records
+an English note.
+
+Before the first `Attach`, the snapshot on that context is empty.
+
+### Catalog snapshot
+
+`IPluginEnvironment` is read-only. It does not enable, disable, invoke, or
+reorder anything, and it does not declare a load dependency.
+
+| List | Contains |
+| :--- | :--- |
+| `Plugins` | Every discovered plugin directory, including this plugin. Directory, source (`home` or `project`), display name, enabled, effective, loaded, and skip reason. No assembly path, type name, or manifest path. |
+| `ToolSets` | Every discovered external tool set, with the same directory fields. |
+| `ExternalTools` | Tools that loaded: name, set, source, and whether the tool is in Plan, Work, or both. |
+| `Skills` | Skills the `skill` tool can load right now: name and description. One entry per name. Empty when Skills is off. No file body and no path. |
+
+`enabled` is null when the manifest could not say. Display name is empty
+until that plugin loads. Built-in tools are not listed.
 
 ## Hooks
 

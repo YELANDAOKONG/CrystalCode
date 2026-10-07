@@ -1,4 +1,6 @@
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
+using CrystalCode.Plugins.Placeholders;
 
 using Xunit;
 
@@ -73,5 +75,37 @@ public sealed class PromptSetTests
         Assert.True(skills > env);
         Assert.True(instructions > skills);
         Assert.DoesNotContain("Skills provide", set.WorkSystem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ComposeWork_ExpandsPluginPlaceholderInBodyAndAttachment()
+    {
+        var set = new PromptSet(
+            "body {{build}}",
+            "plan",
+            "review",
+            string.Empty,
+            workAttachments: ["extra {{build}}"]);
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty);
+        var table = new PluginPlaceholderTable(
+            [new PluginPlaceholderRegistration("build", "Acme", new BuildPlaceholder())],
+            _ => { });
+
+        var text = set.ComposeWork(context, table);
+
+        Assert.Equal("body ready\n\nextra ready", text);
+    }
+
+    private sealed class BuildPlaceholder : IPluginPlaceholder
+    {
+        public string Name => "build";
+
+        public string Resolve(PluginPlaceholderContext context) => "ready";
     }
 }

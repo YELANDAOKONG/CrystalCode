@@ -1,5 +1,9 @@
 using System.Text.RegularExpressions;
 
+using CrystalCode.Engine.Plugins;
+using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Placeholders;
+
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
@@ -8,7 +12,13 @@ namespace CrystalCode.Engine.Prompts;
 public static partial class PromptBinder
 {
     public static string Apply(string template, PromptContext session) =>
-        Apply(template, new PromptBinding(Session: session));
+        Apply(template, session, placeholders: null);
+
+    public static string Apply(
+        string template,
+        PromptContext session,
+        PluginPlaceholderTable? placeholders) =>
+        Apply(template, new PromptBinding(Session: session, Placeholders: placeholders));
 
     public static string Apply(string template, PromptBinding binding)
     {
@@ -39,7 +49,36 @@ public static partial class PromptBinder
             return compactionValue;
         }
 
+        if (binding.Placeholders is not null
+            && binding.Placeholders.TryResolve(name, CreatePlaceholderContext(binding), out var pluginValue))
+        {
+            return pluginValue;
+        }
+
         return "{{" + rawName + "}}";
+    }
+
+    private static PluginPlaceholderContext CreatePlaceholderContext(PromptBinding binding)
+    {
+        var session = binding.Session;
+        var mode = session?.Mode ?? string.Empty;
+        if (mode.Length == 0 && binding.Review is not null)
+        {
+            mode = "review";
+        }
+        else if (mode.Length == 0 && binding.Compaction is not null)
+        {
+            mode = "compaction";
+        }
+
+        return new PluginPlaceholderContext(
+            mode,
+            session?.Workspace ?? string.Empty,
+            session?.SessionId ?? string.Empty,
+            session?.Approval ?? string.Empty,
+            session?.Provider ?? string.Empty,
+            session?.Model ?? string.Empty,
+            binding.Placeholders?.Environment ?? PluginEnvironment.Empty);
     }
 
     private static bool TryGetSessionValue(string name, PromptContext context, out string value)

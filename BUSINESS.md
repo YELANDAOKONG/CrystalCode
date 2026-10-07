@@ -91,8 +91,10 @@ separate library with no terminal code. The product can:
   when External Tools is enabled;
 - load operator plugins from `~/.crystal/plugins` and
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
-  tools, protocol clients, classifiers, slash commands, hooks, and raw
-  hooks. Hooks may revise a user message before it is stored and may
+  tools, protocol clients, classifiers, slash commands, hooks, raw
+  hooks, and prompt placeholders. After catalogs load, a plugin can read
+  the discovered plugins, external tool sets, loaded external tools, and
+  the skills currently available to the skill tool. Hooks may revise a user message before it is stored and may
   revise the text of the outbound model request without changing the saved
   archive. A raw hook is a privileged extension point. It may rebuild one
   outbound request, replace composed prompt and compaction text with any

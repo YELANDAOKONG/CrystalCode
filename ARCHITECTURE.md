@@ -466,7 +466,13 @@ and approval lines when the host has them. Review user templates add `{{conversa
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
-`{{output_template}}`, and `{{todos_section}}`. Built-in Work, Plan, Review,
+`{{output_template}}`, and `{{todos_section}}`. A disk plugin may add further
+names through `IPluginPlaceholder`. The host rejects a name it already owns,
+and the first loaded plugin keeps a duplicated name. Those values expand in
+the same binding pass as the host names, including attachments, Review, and
+compaction. A returned value is inserted as text, so tokens inside it stay
+literal. A resolver that throws, or returns no text, leaves the token and
+records an English note. Built-in Work, Plan, Review,
 and compaction templates declare the slots they need explicitly. Topic naming
 has a built-in prompt and is overridden by `topic.md` in Home or project
 `prompts/`; it is not a prompt-set member and is not yet invoked by the live
@@ -1465,7 +1471,17 @@ and a tool that implements `IHostTool` or `IHostMultimodalTool` receives a
 `ToolHostContext` captured when that call starts. It may also contribute
 a protocol factory for a protocol the built-in adapters do not own,
 classifiers for unknown tools, slash commands that do not reuse a
-built-in verb, hooks, and raw hooks. Hooks append prompt and compaction text,
+built-in verb, hooks, raw hooks, and prompt placeholders. After plugins,
+external tools, and skills have loaded, the host calls `IPlugin.Attach`
+with a read-only snapshot and calls it again when those catalogs reload.
+The snapshot lists discovered plugin directories and external tool sets
+(directory, source, enabled, effective, loaded, and skip reason), loaded
+external tools (name, set, source, and Plan or Work), and the skills the
+`skill` tool can load (name and description). It includes the calling
+plugin. It does not include assembly paths, manifest paths, built-in
+tools, or skill file bodies. `Contribute` runs before that snapshot
+exists. The snapshot does not enable, disable, invoke, or reorder other
+plugins or tools. Hooks append prompt and compaction text,
 rewrite a user message before it is stored, and revise the text of one
 outbound model request without writing the archive, so the model can see
 text the archive does not store. Hooks also read

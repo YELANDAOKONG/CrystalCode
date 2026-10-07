@@ -1,3 +1,5 @@
+using CrystalCode.Engine.Plugins;
+
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
@@ -51,14 +53,14 @@ public sealed record PromptSet
     public string ReviewSystem =>
         ComposeReview(PromptContext.InstructionsOnly(Instructions).WithMode("review"));
 
-    public string ComposeWork(PromptContext context) =>
-        AppendAttachments(PromptBinder.Apply(Work, context), WorkAttachments, context);
+    public string ComposeWork(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        AppendAttachments(PromptBinder.Apply(Work, context, placeholders), WorkAttachments, context, placeholders);
 
-    public string ComposePlan(PromptContext context) =>
-        AppendAttachments(PromptBinder.Apply(Plan, context), PlanAttachments, context);
+    public string ComposePlan(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        AppendAttachments(PromptBinder.Apply(Plan, context, placeholders), PlanAttachments, context, placeholders);
 
-    public string ComposeReview(PromptContext context) =>
-        AppendAttachments(PromptBinder.Apply(Review, context), ReviewAttachments, context);
+    public string ComposeReview(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        AppendAttachments(PromptBinder.Apply(Review, context, placeholders), ReviewAttachments, context, placeholders);
 
     public override string ToString() => nameof(PromptSet);
 
@@ -86,7 +88,8 @@ public sealed record PromptSet
     private static string AppendAttachments(
         string body,
         IReadOnlyList<string> attachments,
-        PromptContext context)
+        PromptContext context,
+        PluginPlaceholderTable? placeholders)
     {
         if (attachments.Count == 0)
         {
@@ -96,7 +99,7 @@ public sealed record PromptSet
         var parts = new List<string> { body };
         foreach (var attachment in attachments)
         {
-            var text = PromptBinder.Apply(attachment, context).Trim();
+            var text = PromptBinder.Apply(attachment, context, placeholders).Trim();
             if (text.Length > 0)
             {
                 parts.Add(text);

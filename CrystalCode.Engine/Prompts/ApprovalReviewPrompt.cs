@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Plugins;
 
 namespace CrystalCode.Engine.Prompts;
 
@@ -56,13 +57,16 @@ public static class ApprovalReviewPrompt
         Assess this exact action against the user's authorized task in the conversation above.
         """;
 
-    public static string ComposeSystem(PromptContext context)
+    public static string ComposeSystem(PromptContext context, PluginPlaceholderTable? placeholders = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return PromptBinder.Apply(SystemText, context.WithMode("review"));
+        return PromptBinder.Apply(SystemText, context.WithMode("review"), placeholders);
     }
 
-    public static string UserText(ApprovalReviewRequest request)
+    public static string UserText(ApprovalReviewRequest request) =>
+        UserText(request, facts: null);
+
+    public static string UserText(ApprovalReviewRequest request, PromptBinding? facts)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.Conversation))
@@ -74,6 +78,9 @@ public static class ApprovalReviewPrompt
 
         return PromptBinder.Apply(
             UserTemplate,
-            new PromptBinding(Review: ReviewPromptContext.From(request)));
+            new PromptBinding(
+                facts?.Session,
+                ReviewPromptContext.From(request),
+                Placeholders: facts?.Placeholders));
     }
 }

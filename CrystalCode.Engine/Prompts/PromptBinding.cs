@@ -1,3 +1,5 @@
+using CrystalCode.Engine.Plugins;
+
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
@@ -6,4 +8,5 @@ namespace CrystalCode.Engine.Prompts;
 public sealed record PromptBinding(
     PromptContext? Session = null,
     ReviewPromptContext? Review = null,
-    CompactionPromptContext? Compaction = null);
+    CompactionPromptContext? Compaction = null,
+    PluginPlaceholderTable? Placeholders = null);

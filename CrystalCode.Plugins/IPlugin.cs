@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Environment;
+
 namespace CrystalCode.Plugins;
 
 /// <summary>
@@ -9,6 +11,17 @@ public interface IPlugin
     /// <summary>Gets the plugin name shown to the operator.</summary>
     string Name { get; }
 
-    /// <summary>Returns the tools, factories, commands, and hooks from this plugin.</summary>
+    /// <summary>Returns the tools, factories, commands, hooks, and placeholders from this plugin.</summary>
     PluginContribution Contribute();
+
+    /// <summary>
+    /// Receives the catalog snapshot after plugins, external tools, and skills
+    /// have been loaded. The host calls this again when those catalogs reload.
+    /// <see cref="Contribute"/> has already returned, so the snapshot is not
+    /// available there. The default does nothing.
+    /// </summary>
+    void Attach(IPluginEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+    }
 }

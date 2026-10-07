@@ -1184,7 +1184,9 @@ replaced. Review user templates add `{{conversation}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
 `{{output_template}}`, and `{{todos_section}}`. Placeholder names are
-case-insensitive. Unknown names are left unchanged. Templates must declare
+case-insensitive. Unknown names are left unchanged. A plugin may add
+further names. The host rejects a name it already owns, and inserts the
+plugin's value as text. Templates must declare
 every host slot they need. When Skills is enabled, available-skill guidance
 fills `{{skills}}`. Composite host values are not overlayable.
 

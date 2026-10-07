@@ -52,6 +52,8 @@ public sealed class ExternalCatalog
 
     public IReadOnlyList<ExternalToolInfo> Tools { get; private init; } = [];
 
+    public IReadOnlyList<ExternalSetLoad> Attempted { get; private init; } = [];
+
     public IReadOnlySet<string> AutomaticTools { get; }
 
     public static ExternalCatalog Load(
@@ -91,8 +93,11 @@ public sealed class ExternalCatalog
         var workMultimodal = new List<IMultimodalTool>();
         var classifications = new Dictionary<string, ExternalToolSpec>(StringComparer.Ordinal);
         var origins = new Dictionary<string, ParsedToolSet>(StringComparer.Ordinal);
+        var attempted = new List<ExternalSetLoad>();
         foreach (var set in sets)
         {
+            var noted = notes.Count;
+            var classified = classifications.Count;
             if (set.Runner == ExternalRunnerKind.Exec)
             {
                 AddExec(
@@ -107,21 +112,26 @@ public sealed class ExternalCatalog
                     workMultimodal,
                     classifications,
                     origins);
-                continue;
+            }
+            else
+            {
+                _ = DotnetToolFactory.TryCreate(
+                    workspace,
+                    host,
+                    set,
+                    registered,
+                    notes,
+                    plan,
+                    work,
+                    planMultimodal,
+                    workMultimodal,
+                    classifications,
+                    origins);
             }
 
-            _ = DotnetToolFactory.TryCreate(
-                workspace,
-                host,
-                set,
-                registered,
-                notes,
-                plan,
-                work,
-                planMultimodal,
-                workMultimodal,
-                classifications,
-                origins);
+            var loaded = classifications.Count > classified;
+            var error = loaded || notes.Count == noted ? string.Empty : notes[^1];
+            attempted.Add(new ExternalSetLoad(set.DirectoryName, set.Source, loaded, error));
         }
 
         var settings = approvalSettings ?? ExternalToolApprovalSettings.Default;
@@ -161,7 +171,8 @@ public sealed class ExternalCatalog
             new ExternalApprovalClassifier(classifications),
             automaticTools)
         {
-            Tools = tools
+            Tools = tools,
+            Attempted = attempted
         };
     }
 

@@ -59,6 +59,7 @@ public sealed class CodingSession : ITurnObserver
     private SkillCatalog? _skills;
     private ExternalCatalog _external = ExternalCatalog.Empty;
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
+    private PluginPlaceholderTable _placeholders = PluginPlaceholderTable.Empty;
     private PluginHookPipeline _hooks = PluginHookPipeline.Empty;
     private bool _pluginSessionOpen;
     private readonly SessionToolHost _toolHost;
@@ -227,6 +228,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         ReloadExternalToolsWithProgress();
+        PublishPluginEnvironment();
         RebuildExecutors();
         ReplaceLiveSystem();
         WritePluginNotes();
@@ -1617,6 +1619,7 @@ public sealed class CodingSession : ITurnObserver
         _settings = _settings.WithExternalToolApproval(approval);
         _settingsStore.Save(_settings);
         ReloadExternalToolsWithProgress();
+        PublishPluginEnvironment();
         RebuildExecutors();
         Note($"Tool approval  {Title(source)} {Title(policy.Value)}");
     }
@@ -1636,7 +1639,9 @@ public sealed class CodingSession : ITurnObserver
         }
 
         ReloadExternalToolsWithProgress();
+        PublishPluginEnvironment();
         RebuildExecutors();
+        ReplaceLiveSystem();
         WriteExternalNotes();
         Note(command == "reload" ? "Tools reloaded" : "External tools  " + Title(command));
     }
@@ -1828,7 +1833,9 @@ public sealed class CodingSession : ITurnObserver
         if (changed)
         {
             ReloadExternalToolsWithProgress();
+            PublishPluginEnvironment();
             RebuildExecutors();
+            ReplaceLiveSystem();
             WriteExternalNotes();
         }
 
@@ -2022,6 +2029,7 @@ public sealed class CodingSession : ITurnObserver
         ReloadSkills();
         ReloadPluginsWithProgress();
         ReloadExternalToolsWithProgress();
+        PublishPluginEnvironment();
         ReloadPrompts();
         RebuildExecutors();
         WritePluginNotes();
@@ -2125,14 +2133,17 @@ public sealed class CodingSession : ITurnObserver
     private string CurrentSystemText() =>
         ApplyPluginPrompt(
             _planMode
-                ? _prompts.ComposePlan(CurrentPromptContext())
-                : _prompts.ComposeWork(CurrentPromptContext()),
+                ? _prompts.ComposePlan(CurrentPromptContext(), _placeholders)
+                : _prompts.ComposeWork(CurrentPromptContext(), _placeholders),
             _planMode ? "plan" : "work");
 
     private string CurrentReviewSystemText() =>
         ApplyPluginPrompt(
-            _prompts.ComposeReview(CurrentPromptContext().WithMode("review")),
+            _prompts.ComposeReview(CurrentPromptContext().WithMode("review"), _placeholders),
             "review");
+
+    private PromptBinding CurrentPromptBinding(PromptContext context) =>
+        new(context, Placeholders: _placeholders);
 
     private string ApplyPluginPrompt(string text, string mode) =>
         _hooks.FinishPrompt(mode, _prompts.Instructions, text);
@@ -2755,7 +2766,10 @@ public sealed class CodingSession : ITurnObserver
         var reviewer = new ModelApprovalReviewer(
             ReviewerClient(),
             CurrentReviewSystemText(),
-            ReviewerReasoning());
+            ReviewerReasoning(),
+            request => ApprovalReviewPrompt.UserText(
+                request,
+                CurrentPromptBinding(CurrentPromptContext().WithMode("review"))));
         var policy = new ApprovalPolicy(
             _approval,
             _workspace,
@@ -2863,6 +2877,7 @@ public sealed class CodingSession : ITurnObserver
     {
         _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins, _toolHost);
         _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note, _loadedPlugins.RawHooks);
+        _placeholders = new PluginPlaceholderTable(_loadedPlugins.Placeholders, Note);
     }
 
     private void ReloadPluginsWithProgress()
@@ -3015,6 +3030,7 @@ public sealed class CodingSession : ITurnObserver
 
         ReloadPluginsWithProgress();
         ReloadExternalToolsWithProgress();
+        PublishPluginEnvironment();
         try
         {
             ReplaceClients();
@@ -3098,6 +3114,7 @@ public sealed class CodingSession : ITurnObserver
             await ClosePluginSessionAsync(cancellationToken);
             ReloadPluginsWithProgress();
             ReloadExternalToolsWithProgress();
+            PublishPluginEnvironment();
             try
             {
                 ReplaceClients();
@@ -3149,6 +3166,18 @@ public sealed class CodingSession : ITurnObserver
                 SetActivity(SessionActivity.Idle);
             }
         }
+    }
+
+    private void PublishPluginEnvironment()
+    {
+        var environment = PluginEnvironmentFactory.Create(
+            _home,
+            _workspace.Root,
+            _loadedPlugins,
+            _external,
+            _skills);
+        _placeholders.SetEnvironment(environment);
+        _loadedPlugins.Attach(environment, Note);
     }
 
     private void WriteExternalNotes()
@@ -3741,7 +3770,9 @@ public sealed class CodingSession : ITurnObserver
             SessionRetryOptions.Default,
             attempt => Publish(new RetryScheduled(attempt)),
             () => ApplyPluginPrompt(
-                CompactionPrompt.ComposeSystem(CurrentPromptContext().WithMode("compaction")),
+                CompactionPrompt.ComposeSystem(
+                    CurrentPromptContext().WithMode("compaction"),
+                    _placeholders),
                 "compaction"),
             (phase, text) => _hooks.FinishCompaction(phase, text),
             (items, token) => _hooks.PrepareModelAsync(
@@ -3753,7 +3784,12 @@ public sealed class CodingSession : ITurnObserver
             (response, token) => ReportModelResponseAsync(
                 PluginModelPurpose.Compaction,
                 response,
-                token));
+                token),
+            (conversation, todos, previous) => CompactionPrompt.UserText(
+                conversation,
+                todos,
+                previous,
+                CurrentPromptBinding(CurrentPromptContext().WithMode("compaction"))));
 
     /// <summary>
     /// Collects the finished turn: records its transcript, compacts when over

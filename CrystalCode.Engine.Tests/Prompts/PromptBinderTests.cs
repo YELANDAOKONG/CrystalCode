@@ -1,7 +1,10 @@
 using System.Runtime.InteropServices;
 
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Placeholders;
 
 using Xunit;
 
@@ -208,5 +211,94 @@ public sealed class PromptBinderTests
         Assert.Contains("summarize", text, StringComparison.Ordinal);
         Assert.Contains("template body", text, StringComparison.Ordinal);
         Assert.Contains("Open todos:", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Apply_InsertsPluginPlaceholderWithoutExpandingItsValue()
+    {
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty,
+            sessionId: "sess",
+            approval: "audit");
+        var table = new PluginPlaceholderTable(
+            [new PluginPlaceholderRegistration("build", "Acme", new FixedPlaceholder("build", "{{workspace}}"))],
+            _ => { });
+
+        var text = PromptBinder.Apply("{{build}} {{workspace}}", context, table);
+
+        Assert.StartsWith("{{workspace}} ", text, StringComparison.Ordinal);
+        Assert.EndsWith("/tmp/demo", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Apply_LeavesPluginPlaceholderWhenResolveFails()
+    {
+        var notes = new List<string>();
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "plan",
+            string.Empty,
+            string.Empty);
+        var table = new PluginPlaceholderTable(
+            [
+                new PluginPlaceholderRegistration("boom", "Acme", new ThrowingPlaceholder()),
+                new PluginPlaceholderRegistration("blank", "Acme", new FixedPlaceholder("blank", null))
+            ],
+            notes.Add);
+
+        var text = PromptBinder.Apply("{{boom}} {{blank}}", context, table);
+
+        Assert.Equal("{{boom}} {{blank}}", text);
+        Assert.Contains(notes, note => note.Contains("failed", StringComparison.Ordinal));
+        Assert.Contains(notes, note => note.Contains("returned no text", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Apply_HostPlaceholderWinsOverPluginValue()
+    {
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty);
+        var table = new PluginPlaceholderTable(
+            [new PluginPlaceholderRegistration("workspace", "Acme", new FixedPlaceholder("workspace", "nope"))],
+            _ => { });
+
+        var text = PromptBinder.Apply("{{workspace}}", context, table);
+
+        Assert.Equal("/tmp/demo", text);
+    }
+
+    private sealed class FixedPlaceholder : IPluginPlaceholder
+    {
+        private readonly string? _value;
+
+        public FixedPlaceholder(string name, string? value)
+        {
+            Name = name;
+            _value = value;
+        }
+
+        public string Name { get; }
+
+        public string Resolve(PluginPlaceholderContext context) => _value!;
+    }
+
+    private sealed class ThrowingPlaceholder : IPluginPlaceholder
+    {
+        public string Name => "boom";
+
+        public string Resolve(PluginPlaceholderContext context) =>
+            throw new InvalidOperationException("broken");
     }
 }

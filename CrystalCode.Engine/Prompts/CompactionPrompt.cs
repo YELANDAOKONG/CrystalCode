@@ -1,3 +1,5 @@
+using CrystalCode.Engine.Plugins;
+
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
@@ -71,16 +73,26 @@ public static class CompactionPrompt
         - Do not mention the summary process or that context was compacted.
         """;
 
-    public static string ComposeSystem(PromptContext context) =>
-        PromptBinder.Apply(SystemText, context.WithMode("compaction"));
+    public static string ComposeSystem(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        PromptBinder.Apply(SystemText, context.WithMode("compaction"), placeholders);
 
-    public static string UserText(string conversation, string todos, string? previousSummary)
+    public static string UserText(string conversation, string todos, string? previousSummary) =>
+        UserText(conversation, todos, previousSummary, facts: null);
+
+    public static string UserText(
+        string conversation,
+        string todos,
+        string? previousSummary,
+        PromptBinding? facts)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(todos);
         return PromptBinder.Apply(
             UserTemplate,
-            new PromptBinding(Compaction: CreateUserContext(conversation, todos, previousSummary)));
+            new PromptBinding(
+                facts?.Session,
+                Compaction: CreateUserContext(conversation, todos, previousSummary),
+                Placeholders: facts?.Placeholders));
     }
 
     public static CompactionPromptContext CreateUserContext(

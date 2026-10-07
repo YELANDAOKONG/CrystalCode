@@ -7,8 +7,11 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Hooks;
 
 using Xunit;
@@ -146,6 +149,31 @@ public sealed class PluginCatalogTests
         var added = Assert.IsType<ChatMessage>(sent[^1]);
         Assert.Equal(ChatRole.User, added.Role);
         Assert.Equal("raw-line", added.Text);
+        Assert.Equal("sample_token", Assert.Single(catalog.Placeholders).Name);
+        var environment = new PluginEnvironment(
+            [new PluginPeer("Fixture", "home", "Sample", true, true, true, string.Empty)],
+            [new ExternalToolSetPeer("Extra", "project", true, true, false, string.Empty)],
+            [new ExternalToolPeer("lint", "Extra", "project", plan: false, work: true)],
+            [new SkillPeer("review-diff", "Review the diff.")]);
+        catalog.Attach(environment, _ => { });
+        var peers = catalog.WorkTools.Single(tool => tool.Definition.Name == "peers");
+        var listed = await peers.InvokeAsync(new Crystal.Tools.ToolCall("4", "peers", "{}"));
+        Assert.Equal("1\n1\n1\n1", listed.Text);
+        var table = new PluginPlaceholderTable(catalog.Placeholders, _ => { });
+        table.SetEnvironment(environment);
+        var bound = PromptBinder.Apply(
+            "{{sample_token}}",
+            PromptContext.Create(
+                root.Root,
+                "openai",
+                "gpt",
+                "work",
+                string.Empty,
+                string.Empty,
+                sessionId: "sess-1",
+                approval: "audit"),
+            table);
+        Assert.Equal("token:1:work", bound);
     }
 
     [Fact]
@@ -199,7 +227,9 @@ public sealed class PluginCatalogTests
             using System.Text.Json;
             using Crystal.Tools;
             using CrystalCode.Plugins;
+            using CrystalCode.Plugins.Environment;
             using CrystalCode.Plugins.Hooks;
+            using CrystalCode.Plugins.Placeholders;
             using CrystalCode.Plugins.Tools;
             using CrystalCode.Tools;
 
@@ -207,12 +237,66 @@ public sealed class PluginCatalogTests
 
             public sealed class SamplePlugin : IPlugin
             {
+                private IPluginEnvironment _environment = PluginEnvironment.Empty;
+
                 public string Name => "Sample";
 
+                public IPluginEnvironment Environment => _environment;
+
+                public void Attach(IPluginEnvironment environment) => _environment = environment;
+
                 public PluginContribution Contribute() => new(
-                    tools: [new SampleTool(), new HostedTool()],
+                    tools: [new SampleTool(), new HostedTool(), new PeerTool(this)],
                     hooks: [new SampleHook()],
-                    rawHooks: [new SampleRawHook()]);
+                    rawHooks: [new SampleRawHook()],
+                    placeholders: [new SamplePlaceholder()]);
+            }
+
+            public sealed class SamplePlaceholder : IPluginPlaceholder
+            {
+                public string Name => "sample_token";
+
+                public string Resolve(PluginPlaceholderContext context) =>
+                    "token:" + context.Environment.Plugins.Count + ":" + context.Mode;
+            }
+
+            public sealed class PeerTool : IPluginTool
+            {
+                private readonly SamplePlugin _plugin;
+
+                public PeerTool(SamplePlugin plugin) => _plugin = plugin;
+
+                public string Name => "peers";
+
+                public PluginToolCatalogs Catalogs => PluginToolCatalogs.Work;
+
+                public ITool Tool => new Inner(_plugin);
+
+                private sealed class Inner : ITool
+                {
+                    private readonly SamplePlugin _plugin;
+
+                    public Inner(SamplePlugin plugin)
+                    {
+                        _plugin = plugin;
+                        using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                        Definition = new ToolDefinition("peers", document.RootElement.Clone(), "Peers.");
+                    }
+
+                    public ToolDefinition Definition { get; }
+
+                    public ValueTask<ToolOutput> InvokeAsync(
+                        ToolCall call,
+                        CancellationToken cancellationToken = default)
+                    {
+                        var environment = _plugin.Environment;
+                        return ValueTask.FromResult(new ToolOutput(
+                            environment.Plugins.Count
+                            + "\n" + environment.ToolSets.Count
+                            + "\n" + environment.ExternalTools.Count
+                            + "\n" + environment.Skills.Count));
+                    }
+                }
             }
 
             public sealed class SampleTool : IPluginTool

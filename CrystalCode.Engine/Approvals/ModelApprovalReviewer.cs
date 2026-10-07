@@ -17,11 +17,13 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
     private readonly IChatClient _client;
     private readonly string _systemText;
     private readonly ReasoningOptions? _reasoning;
+    private readonly Func<ApprovalReviewRequest, string> _userText;
 
     public ModelApprovalReviewer(
         IChatClient client,
         string? systemText = null,
-        ReasoningOptions? reasoning = null)
+        ReasoningOptions? reasoning = null,
+        Func<ApprovalReviewRequest, string>? userText = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
@@ -30,6 +32,7 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
                 PromptContext.InstructionsOnly(string.Empty).WithMode("review"))
             : systemText.Trim();
         _reasoning = reasoning;
+        _userText = userText ?? ApprovalReviewPrompt.UserText;
     }
 
     public async ValueTask<ApprovalReviewVerdict> ReviewAsync(
@@ -52,7 +55,7 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
                 new ChatRequest(
                 [
                     new ChatMessage(ChatRole.System, _systemText),
-                    new ChatMessage(ChatRole.User, ApprovalReviewPrompt.UserText(request))
+                    new ChatMessage(ChatRole.User, _userText(request))
                 ],
                 reasoning: _reasoning),
                 cancellationToken);

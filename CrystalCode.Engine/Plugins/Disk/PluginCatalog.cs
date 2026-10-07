@@ -7,11 +7,13 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Clients;
+using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Tools;
 using CrystalCode.Tools;
@@ -37,6 +39,7 @@ public sealed class PluginCatalog
     ];
 
     private readonly List<IPluginClientFactory> _clients;
+    private readonly IReadOnlyList<LoadedPlugin> _instances;
 
     private PluginCatalog(
         IReadOnlyList<ITool> planTools,
@@ -50,7 +53,10 @@ public sealed class PluginCatalog
         IReadOnlyList<IPluginClientFactory> clients,
         IReadOnlyList<PluginInfo> plugins,
         IReadOnlyList<string> notes,
-        IReadOnlySet<string> toolNames)
+        IReadOnlySet<string> toolNames,
+        IReadOnlyList<LoadedPlugin> instances,
+        IReadOnlyList<PluginPlaceholderRegistration> placeholders,
+        IReadOnlyList<PluginActivationFailure> failures)
     {
         PlanTools = planTools;
         WorkTools = workTools;
@@ -63,7 +69,10 @@ public sealed class PluginCatalog
         Plugins = plugins;
         Notes = notes;
         ToolNames = toolNames;
+        Placeholders = placeholders;
+        Failures = failures;
         _clients = [.. clients];
+        _instances = instances;
     }
 
     public static PluginCatalog Empty { get; } = new(
@@ -78,7 +87,10 @@ public sealed class PluginCatalog
         [],
         [],
         [],
-        new HashSet<string>(StringComparer.Ordinal));
+        new HashSet<string>(StringComparer.Ordinal),
+        [],
+        [],
+        []);
 
     public IReadOnlyList<ITool> PlanTools { get; }
 
@@ -101,6 +113,10 @@ public sealed class PluginCatalog
     public IReadOnlyList<string> Notes { get; }
 
     public IReadOnlySet<string> ToolNames { get; }
+
+    public IReadOnlyList<PluginPlaceholderRegistration> Placeholders { get; }
+
+    public IReadOnlyList<PluginActivationFailure> Failures { get; }
 
     public static PluginCatalog Load(
         CrystalHome home,
@@ -132,20 +148,24 @@ public sealed class PluginCatalog
         var rawHooks = new List<IPluginRawHook>();
         var clients = new List<IPluginClientFactory>();
         var plugins = new List<PluginInfo>();
+        var instances = new List<LoadedPlugin>();
+        var placeholders = new List<PluginPlaceholderRegistration>();
+        var failures = new List<PluginActivationFailure>();
         var toolNames = new HashSet<string>(StringComparer.Ordinal);
         var commandNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pluginNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var placeholderNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in discovered)
         {
             if (!TryActivate(item, out var plugin, out var error) || plugin is null)
             {
-                notes.Add($"Plugin '{item.DirectoryName}' was skipped: {error}");
+                Skip(item, error);
                 continue;
             }
 
             if (string.IsNullOrWhiteSpace(plugin.Name) || !pluginNames.Add(plugin.Name.Trim()))
             {
-                notes.Add($"Plugin '{item.DirectoryName}' was skipped: plugin name is missing or already registered.");
+                Skip(item, "plugin name is missing or already registered.");
                 continue;
             }
 
@@ -156,7 +176,7 @@ public sealed class PluginCatalog
             }
             catch (Exception exception)
             {
-                notes.Add($"Plugin '{item.DirectoryName}' was skipped: {exception.Message}");
+                Skip(item, exception.Message);
                 continue;
             }
 
@@ -175,6 +195,13 @@ public sealed class PluginCatalog
             var classifierCount = AddClassifiers(item.DirectoryName, contribution, notes, classifiers);
             var hookCount = AddHooks(item.DirectoryName, contribution, notes, hooks);
             var rawHookCount = AddRawHooks(item.DirectoryName, contribution, notes, rawHooks);
+            AddPlaceholders(
+                item.DirectoryName,
+                contribution,
+                placeholderNames,
+                notes,
+                placeholders);
+            instances.Add(new LoadedPlugin(item.DirectoryName, plugin));
             plugins.Add(new PluginInfo(
                 item.DirectoryName,
                 item.Source,
@@ -199,7 +226,33 @@ public sealed class PluginCatalog
             clients,
             plugins,
             notes,
-            toolNames);
+            toolNames,
+            instances,
+            placeholders,
+            failures);
+
+        void Skip(DiscoveredPlugin item, string reason)
+        {
+            notes.Add($"Plugin '{item.DirectoryName}' was skipped: {reason}");
+            failures.Add(new PluginActivationFailure(item.DirectoryName, item.Source, reason));
+        }
+    }
+
+    public void Attach(IPluginEnvironment environment, Action<string> note)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(note);
+        foreach (var instance in _instances)
+        {
+            try
+            {
+                instance.Plugin.Attach(environment);
+            }
+            catch (Exception exception)
+            {
+                note($"Plugin '{instance.DirectoryName}' could not be attached: {exception.Message}");
+            }
+        }
     }
 
     public bool TryCreateClient(HarnessSettings settings, string apiKey, out IStreamingChatClient? client)
@@ -430,6 +483,28 @@ public sealed class PluginCatalog
         return added;
     }
 
+    private static void AddPlaceholders(
+        string directoryName,
+        DiskContribution contribution,
+        HashSet<string> names,
+        IList<string> notes,
+        List<PluginPlaceholderRegistration> placeholders)
+    {
+        foreach (var placeholder in contribution.Placeholders)
+        {
+            if (PluginPlaceholderAdmission.TryAdmit(
+                    directoryName,
+                    placeholder,
+                    names,
+                    notes,
+                    out var registration)
+                && registration is not null)
+            {
+                placeholders.Add(registration);
+            }
+        }
+    }
+
     private static int AddCommands(
         string directoryName,
         DiskContribution contribution,
@@ -608,4 +683,6 @@ public sealed class PluginCatalog
 
         return true;
     }
+
+    private sealed record LoadedPlugin(string DirectoryName, CrystalCode.Plugins.IPlugin Plugin);
 }
