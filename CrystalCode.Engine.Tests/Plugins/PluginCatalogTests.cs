@@ -8,6 +8,7 @@ using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Hooks;
 
 using Xunit;
@@ -113,7 +114,10 @@ public sealed class PluginCatalogTests
             }
             """);
 
-        var catalog = PluginCatalog.Load(home.Home, new Workspace(workspace.Path), enabled: true);
+        var approval = "audit";
+        var root = new Workspace(workspace.Path);
+        var host = new SessionToolHost(root, () => "sess-1", () => approval);
+        var catalog = PluginCatalog.Load(home.Home, root, enabled: true, host);
 
         Assert.Equal("Plugin 'Fixture' registered a raw hook.", Assert.Single(catalog.Notes));
         var info = Assert.Single(catalog.Plugins);
@@ -124,6 +128,12 @@ public sealed class PluginCatalogTests
         Assert.Empty(catalog.PlanTools);
         var output = await catalog.WorkTools[0].InvokeAsync(new Crystal.Tools.ToolCall("1", "sample", "{}"));
         Assert.Equal("sample-ok", output.Text);
+        var hosted = catalog.WorkTools.Single(tool => tool.Definition.Name == "hosted");
+        var first = await hosted.InvokeAsync(new Crystal.Tools.ToolCall("2", "hosted", "{}"));
+        Assert.Equal(root.Root + "\nsess-1\naudit", first.Text);
+        approval = "full";
+        var second = await hosted.InvokeAsync(new Crystal.Tools.ToolCall("3", "hosted", "{}"));
+        Assert.Equal(root.Root + "\nsess-1\nfull", second.Text);
         var pipeline = new PluginHookPipeline(catalog.Hooks, rawHooks: catalog.RawHooks);
         Assert.Equal("hook-line", pipeline.OnPrompt("work", string.Empty));
         IReadOnlyList<ChatItem> items = [new ChatMessage(ChatRole.System, "work")];
@@ -163,6 +173,7 @@ public sealed class PluginCatalogTests
         var crystal = Path.Combine(AppContext.BaseDirectory, "Crystal.dll");
         var tools = Path.Combine(AppContext.BaseDirectory, "Crystal.Tools.dll");
         var contract = Path.Combine(AppContext.BaseDirectory, "CrystalCode.Plugins.dll");
+        var hostTools = Path.Combine(AppContext.BaseDirectory, "CrystalCode.Tools.dll");
         Assert.True(File.Exists(contract), contract);
         File.WriteAllText(
             Path.Combine(project, "FixturePlugin.csproj"),
@@ -178,6 +189,7 @@ public sealed class PluginCatalogTests
                 <Reference Include="Crystal"><HintPath>{crystal}</HintPath></Reference>
                 <Reference Include="Crystal.Tools"><HintPath>{tools}</HintPath></Reference>
                 <Reference Include="CrystalCode.Plugins"><HintPath>{contract}</HintPath></Reference>
+                <Reference Include="CrystalCode.Tools"><HintPath>{hostTools}</HintPath></Reference>
               </ItemGroup>
             </Project>
             """);
@@ -189,6 +201,7 @@ public sealed class PluginCatalogTests
             using CrystalCode.Plugins;
             using CrystalCode.Plugins.Hooks;
             using CrystalCode.Plugins.Tools;
+            using CrystalCode.Tools;
 
             namespace FixturePlugin;
 
@@ -197,7 +210,7 @@ public sealed class PluginCatalogTests
                 public string Name => "Sample";
 
                 public PluginContribution Contribute() => new(
-                    tools: [new SampleTool()],
+                    tools: [new SampleTool(), new HostedTool()],
                     hooks: [new SampleHook()],
                     rawHooks: [new SampleRawHook()]);
             }
@@ -222,6 +235,31 @@ public sealed class PluginCatalogTests
                         ToolCall call,
                         CancellationToken cancellationToken = default) =>
                         ValueTask.FromResult(new ToolOutput("sample-ok"));
+                }
+            }
+
+            public sealed class HostedTool : IPluginTool
+            {
+                public string Name => "hosted";
+                public PluginToolCatalogs Catalogs => PluginToolCatalogs.Work;
+                public ITool Tool { get; } = new Inner();
+
+                private sealed class Inner : IHostTool
+                {
+                    public Inner()
+                    {
+                        using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                        Definition = new ToolDefinition("hosted", document.RootElement.Clone(), "Hosted.");
+                    }
+
+                    public ToolDefinition Definition { get; }
+
+                    public ValueTask<ToolOutput> InvokeAsync(
+                        ToolCall call,
+                        ToolHostContext context,
+                        CancellationToken cancellationToken = default) =>
+                        ValueTask.FromResult(new ToolOutput(
+                            context.WorkspaceRoot + "\n" + context.SessionId + "\n" + context.Approval));
                 }
             }
 

@@ -4,6 +4,7 @@ using Crystal.Multimodal;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Tools;
@@ -91,6 +92,28 @@ public sealed class HostToolTests
         var pictured = await image.InvokeAsync(new MultimodalToolCall("4", "echo_image", "{}"));
         var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
         Assert.Equal(Facts(root.Root, "sess-9", "full"), content.Text);
+    }
+
+    [Fact]
+    public async Task PluginHost_ReceivesFactsCurrentAtTheCall()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var root = new Workspace(workspace.Path);
+        var approval = "audit";
+        var host = new SessionToolHost(root, () => "sess-1", () => approval);
+        ITool text = new PluginHostTool(new EchoHostTool(), host);
+        IMultimodalTool image = new PluginHostMultimodalTool(new EchoHostImageTool(), host);
+
+        var first = await text.InvokeAsync(new ToolCall("1", "echo", "{}"));
+        Assert.Equal(Facts(root.Root, "sess-1", "audit"), first.Text);
+
+        approval = "full";
+        var second = await text.InvokeAsync(new ToolCall("2", "echo", "{}"));
+        Assert.Equal(Facts(root.Root, "sess-1", "full"), second.Text);
+
+        var pictured = await image.InvokeAsync(new MultimodalToolCall("3", "echo_image", "{}"));
+        var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
+        Assert.Equal(Facts(root.Root, "sess-1", "full"), content.Text);
     }
 
     private static string Facts(string workspaceRoot, string sessionId, string approval) =>

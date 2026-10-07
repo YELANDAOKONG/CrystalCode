@@ -2655,7 +2655,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void ReloadPlugins()
     {
-        _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins);
+        _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins, _toolHost);
         _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note, _loadedPlugins.RawHooks);
     }
 

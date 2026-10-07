@@ -1359,6 +1359,8 @@ each plugin. Shared contracts (`Crystal`, `Crystal.Tools`,
 `CrystalCode.Tools`, and `CrystalCode.Plugins`) come from the host.
 `CrystalCode`, `CrystalCode.Engine`, `CrystalCode.Display`, and
 `CrystalCode.Providers` are refused. A disk plugin may contribute tools,
+and a tool that implements `IHostTool` or `IHostMultimodalTool` receives a
+`ToolHostContext` captured when that call starts. It may also contribute
 a protocol factory for a protocol the built-in adapters do not own,
 classifiers for unknown tools, slash commands that do not reuse a
 built-in verb, hooks, and raw hooks. Hooks append prompt and compaction text,

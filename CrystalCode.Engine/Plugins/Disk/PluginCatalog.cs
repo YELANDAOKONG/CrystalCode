@@ -14,6 +14,7 @@ using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Tools;
+using CrystalCode.Tools;
 
 using DiskContribution = CrystalCode.Plugins.PluginContribution;
 
@@ -101,7 +102,11 @@ public sealed class PluginCatalog
 
     public IReadOnlySet<string> ToolNames { get; }
 
-    public static PluginCatalog Load(CrystalHome home, Workspace workspace, bool enabled)
+    public static PluginCatalog Load(
+        CrystalHome home,
+        Workspace workspace,
+        bool enabled,
+        SessionToolHost? host = null)
     {
         ArgumentNullException.ThrowIfNull(home);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -109,6 +114,11 @@ public sealed class PluginCatalog
         {
             return Empty;
         }
+
+        host ??= new SessionToolHost(
+            workspace,
+            static () => string.Empty,
+            static () => string.Empty);
 
         var notes = new List<string>();
         var discovered = new PluginDiscovery(home).Collect(workspace.Root, notes);
@@ -153,6 +163,7 @@ public sealed class PluginCatalog
             var toolCount = AddTools(
                 item.DirectoryName,
                 contribution,
+                host,
                 toolNames,
                 notes,
                 plan,
@@ -330,6 +341,7 @@ public sealed class PluginCatalog
     private static int AddTools(
         string directoryName,
         DiskContribution contribution,
+        SessionToolHost host,
         HashSet<string> names,
         IList<string> notes,
         List<ITool> plan,
@@ -354,6 +366,11 @@ public sealed class PluginCatalog
             }
 
             var tool = contributionTool.Tool;
+            if (tool is IHostTool hosted)
+            {
+                tool = new PluginHostTool(hosted, host);
+            }
+
             if (tool is null || !string.Equals(tool.Definition.Name, name, StringComparison.Ordinal))
             {
                 names.Remove(name);
@@ -380,6 +397,11 @@ public sealed class PluginCatalog
             }
 
             var multimodal = contributionTool.Multimodal;
+            if (multimodal is IHostMultimodalTool hostedMultimodal)
+            {
+                multimodal = new PluginHostMultimodalTool(hostedMultimodal, host);
+            }
+
             if (multimodal is not null)
             {
                 if (string.Equals(multimodal.Definition.Name, name, StringComparison.Ordinal))
