@@ -4,6 +4,7 @@ using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Placeholders;
 
 using Xunit;
@@ -279,6 +280,49 @@ public sealed class PromptBinderTests
         Assert.Equal("/tmp/demo", text);
     }
 
+    [Fact]
+    public void Apply_GivesPluginPlaceholderTheReviewSwitch()
+    {
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty);
+        var table = new PluginPlaceholderTable(
+            [new PluginPlaceholderRegistration("review_model", "Acme", new ReviewPlaceholder())],
+            _ => { });
+
+        Assert.Equal("session", PromptBinder.Apply("{{review_model}}", context, table));
+
+        table.SetModels(new PluginModels(
+            new PluginModel(
+                "openai",
+                "openai",
+                "gpt",
+                contextWindow: 8,
+                maxTokens: null,
+                temperature: null,
+                topP: null,
+                imageInput: false,
+                thinking: "low"),
+            new PluginReview(
+                true,
+                new PluginModel(
+                    "anthropic",
+                    "anthropic",
+                    "claude",
+                    contextWindow: 8,
+                    maxTokens: null,
+                    temperature: null,
+                    topP: null,
+                    imageInput: false,
+                    thinking: "default"))));
+
+        Assert.Equal("own:anthropic:claude", PromptBinder.Apply("{{review_model}}", context, table));
+    }
+
     private sealed class FixedPlaceholder : IPluginPlaceholder
     {
         private readonly string? _value;
@@ -300,5 +344,21 @@ public sealed class PromptBinderTests
 
         public string Resolve(PluginPlaceholderContext context) =>
             throw new InvalidOperationException("broken");
+    }
+
+    private sealed class ReviewPlaceholder : IPluginPlaceholder
+    {
+        public string Name => "review_model";
+
+        public string Resolve(PluginPlaceholderContext context)
+        {
+            var review = context.Models.Review;
+            if (!review.Independent || review.Model is null)
+            {
+                return "session";
+            }
+
+            return "own:" + review.Model.Provider + ":" + review.Model.Name;
+        }
     }
 }

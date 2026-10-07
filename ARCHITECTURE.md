@@ -1482,7 +1482,23 @@ external tools (name, set, source, and Plan or Work), and the skills the
 plugin. It does not include assembly paths, manifest paths, built-in
 tools, or skill file bodies. `Contribute` runs before that snapshot
 exists. The snapshot does not enable, disable, invoke, or reorder other
-plugins or tools. Hooks append prompt and compaction text,
+plugins or tools. The host then calls `IPlugin.AttachSession` with a live
+view of the session model and the review model. Each read returns the
+current provider, protocol, model name, context window, maximum tokens,
+temperature, top-p, image input, and thinking gear. `Review.Independent`
+is true only when review uses its own model. While it is false, review
+uses the session model and a stored selection is omitted. The view has no
+API key, endpoint, organization, or project. A plugin that implements
+`IPluginModelClient` also receives `AttachClients`. The host names that
+plugin when it loads. Those clients are new instances on the same provider
+and model, kept apart from the instances inside a turn or a review.
+`IndependentReview` matches the review flag. `Review` is absent while that
+flag is false. When the flag is true and the review client cannot be
+created, the read fails and the session client stays in place. The host
+drops a side-channel client when it rebuilds the session client or the
+review client, and when review stops using its own model. `Contribute` runs before either call.
+`PluginRegistry` does not use them. Placeholder resolution receives the
+same model view. Hooks append prompt and compaction text,
 rewrite a user message before it is stored, and revise the text of one
 outbound model request without writing the archive, so the model can see
 text the archive does not store. Hooks also read

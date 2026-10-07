@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Placeholders;
 
 namespace CrystalCode.Engine.Prompts;
@@ -78,7 +79,8 @@ public static partial class PromptBinder
             session?.Approval ?? string.Empty,
             session?.Provider ?? string.Empty,
             session?.Model ?? string.Empty,
-            binding.Placeholders?.Environment ?? PluginEnvironment.Empty);
+            binding.Placeholders?.Environment ?? PluginEnvironment.Empty,
+            binding.Placeholders?.Models ?? PluginModels.Empty);
     }
 
     private static bool TryGetSessionValue(string name, PromptContext context, out string value)

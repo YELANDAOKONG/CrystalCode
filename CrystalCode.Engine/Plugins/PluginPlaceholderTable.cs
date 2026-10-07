@@ -1,11 +1,12 @@
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Placeholders;
 
 namespace CrystalCode.Engine.Plugins;
 
 /// <summary>
-/// Placeholders admitted for the current plugin catalog. The environment is
-/// empty until the session publishes a snapshot.
+/// Placeholders admitted for the current plugin catalog. The environment
+/// and model view are empty until the session publishes them.
 /// </summary>
 public sealed class PluginPlaceholderTable
 {
@@ -14,6 +15,7 @@ public sealed class PluginPlaceholderTable
     private readonly Dictionary<string, PluginPlaceholderRegistration> _entries;
     private readonly Action<string> _note;
     private IPluginEnvironment _environment = PluginEnvironment.Empty;
+    private IPluginModels _models = PluginModels.Empty;
 
     public PluginPlaceholderTable(
         IEnumerable<PluginPlaceholderRegistration> placeholders,
@@ -32,10 +34,18 @@ public sealed class PluginPlaceholderTable
 
     public IPluginEnvironment Environment => _environment;
 
+    public IPluginModels Models => _models;
+
     public void SetEnvironment(IPluginEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
         _environment = environment;
+    }
+
+    public void SetModels(IPluginModels models)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        _models = models;
     }
 
     public bool TryResolve(string name, PluginPlaceholderContext context, out string value)

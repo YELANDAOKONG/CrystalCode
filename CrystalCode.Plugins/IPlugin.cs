@@ -1,4 +1,5 @@
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Models;
 
 namespace CrystalCode.Plugins;
 
@@ -23,5 +24,17 @@ public interface IPlugin
     void Attach(IPluginEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
+    }
+
+    /// <summary>
+    /// Receives the live session and review model. Each read returns the
+    /// current values. The host calls this after catalogs load, and again
+    /// when this plugin instance is loaded again. <see cref="Contribute"/>
+    /// has already returned, so the model is not available there. The
+    /// default does nothing.
+    /// </summary>
+    void AttachSession(IPluginModels models)
+    {
+        ArgumentNullException.ThrowIfNull(models);
     }
 }

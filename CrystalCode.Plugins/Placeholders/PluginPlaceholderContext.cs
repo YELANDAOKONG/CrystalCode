@@ -1,4 +1,5 @@
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Models;
 
 namespace CrystalCode.Plugins.Placeholders;
 
@@ -15,7 +16,8 @@ public sealed record PluginPlaceholderContext
         string approval,
         string provider,
         string model,
-        IPluginEnvironment environment)
+        IPluginEnvironment environment,
+        IPluginModels models)
     {
         ArgumentNullException.ThrowIfNull(mode);
         ArgumentNullException.ThrowIfNull(workspaceRoot);
@@ -24,6 +26,7 @@ public sealed record PluginPlaceholderContext
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(models);
         Mode = mode.Trim();
         WorkspaceRoot = workspaceRoot;
         SessionId = sessionId;
@@ -31,6 +34,7 @@ public sealed record PluginPlaceholderContext
         Provider = provider;
         Model = model;
         Environment = environment;
+        Models = models;
     }
 
     public string Mode { get; }
@@ -46,6 +50,11 @@ public sealed record PluginPlaceholderContext
     public string Model { get; }
 
     public IPluginEnvironment Environment { get; }
+
+    /// <summary>
+    /// Live session and review model. Empty until the session publishes it.
+    /// </summary>
+    public IPluginModels Models { get; }
 
     public override string ToString() => nameof(PluginPlaceholderContext);
 }

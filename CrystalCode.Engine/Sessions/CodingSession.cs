@@ -17,6 +17,7 @@ using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Plugins.Hooks;
+using CrystalCode.Plugins.Models;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 
@@ -60,6 +61,8 @@ public sealed class CodingSession : ITurnObserver
     private ExternalCatalog _external = ExternalCatalog.Empty;
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
     private PluginPlaceholderTable _placeholders = PluginPlaceholderTable.Empty;
+    private readonly PluginModelView _modelView;
+    private readonly PluginClientView _clientView;
     private PluginHookPipeline _hooks = PluginHookPipeline.Empty;
     private bool _pluginSessionOpen;
     private readonly SessionToolHost _toolHost;
@@ -135,6 +138,12 @@ public sealed class CodingSession : ITurnObserver
         _trust = new WorkspaceTrustStore(home);
         _home = home;
         _skillDiscovery = SkillDiscovery.Create(home);
+        _modelView = new PluginModelView(CurrentPluginModel, CurrentPluginReview);
+        _clientView = new PluginClientView(
+            () => _settings.ApprovalModel.Enabled,
+            CreateSideSessionClient,
+            CreateSideImageClient,
+            CreateSideReviewClient);
         ReloadPlugins();
         _client = CreateClient(settings);
         _multimodalClient = CreateMultimodalClient(settings);
@@ -755,6 +764,7 @@ public sealed class CodingSession : ITurnObserver
     private void ReplaceApprovalClient(ApprovalModelSettings settings, IStreamingChatClient? client)
     {
         ReleaseApprovalClient();
+        _clientView.ReleaseReview();
         if (client is null)
         {
             return;
@@ -985,6 +995,7 @@ public sealed class CodingSession : ITurnObserver
         _compactor = CreateCompactor(nextClient);
         _settings = nextSettings;
         _settingsStore.Save(_settings);
+        _clientView.ReleaseSession();
         if (!ReferenceEquals(previous, _approvalClient))
         {
             DisposeClient(previous);
@@ -1871,6 +1882,39 @@ public sealed class CodingSession : ITurnObserver
         _compactor = CreateCompactor(_client);
     }
 
+    private PluginModel CurrentPluginModel() =>
+        PluginModelFacts.Describe(
+            _settings.ActiveProvider,
+            _settings.Model,
+            _settings.ActiveModel,
+            _thinkingEffort.Value);
+
+    private PluginReview CurrentPluginReview() =>
+        PluginModelFacts.DescribeReview(_settings.ApprovalModel, _settings.Catalog);
+
+    /// <summary>
+    /// A new client on the session model. Plugin calls stay off the instance
+    /// that is streaming the current turn.
+    /// </summary>
+    private IStreamingChatClient CreateSideSessionClient() => CreateClient(_settings);
+
+    private IStreamingMultimodalChatClient? CreateSideImageClient() =>
+        CreateMultimodalClient(_settings);
+
+    private IStreamingChatClient CreateSideReviewClient()
+    {
+        var approval = _settings.ApprovalModel;
+        if (!approval.Enabled || approval.Provider is null || approval.Model is null)
+        {
+            throw new InvalidOperationException("Review is using the session model.");
+        }
+
+        var selected = _settings.WithSelection(
+            new ProviderName(approval.Provider),
+            approval.Model);
+        return CreateClient(selected);
+    }
+
     private IStreamingChatClient CreateClient(HarnessSettings settings)
     {
         if (!_credentials.TryResolve(settings.ActiveProvider, out var apiKey, out var error))
@@ -1913,6 +1957,8 @@ public sealed class CodingSession : ITurnObserver
 
     private void DisposeClient()
     {
+        _clientView.ReleaseSession();
+        _clientView.ReleaseReview();
         ReleaseApprovalClient();
         DisposeClient(_client);
         DisposeClient(_multimodalClient);
@@ -2878,6 +2924,7 @@ public sealed class CodingSession : ITurnObserver
         _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins, _toolHost);
         _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note, _loadedPlugins.RawHooks);
         _placeholders = new PluginPlaceholderTable(_loadedPlugins.Placeholders, Note);
+        _placeholders.SetModels(_modelView);
     }
 
     private void ReloadPluginsWithProgress()
@@ -3177,7 +3224,10 @@ public sealed class CodingSession : ITurnObserver
             _external,
             _skills);
         _placeholders.SetEnvironment(environment);
+        _placeholders.SetModels(_modelView);
         _loadedPlugins.Attach(environment, Note);
+        _loadedPlugins.AttachSession(_modelView, Note);
+        _loadedPlugins.AttachClients(_clientView, Note);
     }
 
     private void WriteExternalNotes()
@@ -3198,6 +3248,7 @@ public sealed class CodingSession : ITurnObserver
         if (!_settings.ApprovalModel.Enabled)
         {
             ReleaseApprovalClient();
+            _clientView.ReleaseReview();
             return _client;
         }
 
@@ -3238,6 +3289,7 @@ public sealed class CodingSession : ITurnObserver
         ReleaseApprovalClient();
         _approvalClient = client;
         _approvalClientKey = key;
+        _clientView.ReleaseReview();
     }
 
     private void ReleaseApprovalClient()

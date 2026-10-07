@@ -14,6 +14,7 @@ using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Tools;
 using CrystalCode.Tools;
@@ -201,6 +202,12 @@ public sealed class PluginCatalog
                 placeholderNames,
                 notes,
                 placeholders);
+            if (plugin is IPluginModelClient)
+            {
+                notes.Add(
+                    $"Plugin '{item.DirectoryName}' can call the session and review models.");
+            }
+
             instances.Add(new LoadedPlugin(item.DirectoryName, plugin));
             plugins.Add(new PluginInfo(
                 item.DirectoryName,
@@ -251,6 +258,47 @@ public sealed class PluginCatalog
             catch (Exception exception)
             {
                 note($"Plugin '{instance.DirectoryName}' could not be attached: {exception.Message}");
+            }
+        }
+    }
+
+    public void AttachSession(IPluginModels models, Action<string> note)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        ArgumentNullException.ThrowIfNull(note);
+        foreach (var instance in _instances)
+        {
+            try
+            {
+                instance.Plugin.AttachSession(models);
+            }
+            catch (Exception exception)
+            {
+                note(
+                    $"Plugin '{instance.DirectoryName}' could not receive model facts: {exception.Message}");
+            }
+        }
+    }
+
+    public void AttachClients(IPluginClients clients, Action<string> note)
+    {
+        ArgumentNullException.ThrowIfNull(clients);
+        ArgumentNullException.ThrowIfNull(note);
+        foreach (var instance in _instances)
+        {
+            if (instance.Plugin is not IPluginModelClient client)
+            {
+                continue;
+            }
+
+            try
+            {
+                client.AttachClients(clients);
+            }
+            catch (Exception exception)
+            {
+                note(
+                    $"Plugin '{instance.DirectoryName}' could not receive model clients: {exception.Message}");
             }
         }
     }

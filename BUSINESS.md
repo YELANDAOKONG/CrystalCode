@@ -94,7 +94,11 @@ separate library with no terminal code. The product can:
   tools, protocol clients, classifiers, slash commands, hooks, raw
   hooks, and prompt placeholders. After catalogs load, a plugin can read
   the discovered plugins, external tool sets, loaded external tools, and
-  the skills currently available to the skill tool. Hooks may revise a user message before it is stored and may
+  the skills currently available to the skill tool. A plugin can read the
+  live session model and whether review is using its own model. A plugin
+  that asks for model clients can call the session model and, while that
+  switch is on, the review model, on clients kept apart from the turn.
+  Hooks may revise a user message before it is stored and may
   revise the text of the outbound model request without changing the saved
   archive. A raw hook is a privileged extension point. It may rebuild one
   outbound request, replace composed prompt and compaction text with any

@@ -5,7 +5,9 @@ directory, one `plugin.json`, and one assembly in its own load context.
 It can contribute tools, a protocol client, approval classifiers, slash
 commands, hooks, raw hooks, and prompt placeholders. After the host has
 loaded plugins, external tools, and skills, it calls `Attach` with a
-read-only snapshot of those catalogs.
+read-only snapshot of those catalogs, then `AttachSession` with the live
+session and review model. A plugin that implements `IPluginModelClient`
+also receives clients for those models.
 
 The host owns catalog registration, approval, workspace fencing, output
 truncation, and timeouts. Plugin code does not bypass
@@ -153,8 +155,9 @@ first in load order wins and the later one is omitted with a note.
 
 The host calls `Resolve` each time it binds a template, including
 attachments, Review, and compaction. The context carries the mode,
-workspace, session id, approval mode, provider, model, and the current
-catalog snapshot. Strings the host does not have yet are empty. The
+workspace, session id, approval mode, provider, model, the current
+catalog snapshot, and the live session and review model. Strings the host
+does not have yet are empty. The
 returned text is inserted as-is. Tokens inside that text are not expanded
 again. A throw, or a missing return, leaves the original token and records
 an English note.
@@ -175,6 +178,57 @@ reorder anything, and it does not declare a load dependency.
 
 `enabled` is null when the manifest could not say. Display name is empty
 until that plugin loads. Built-in tools are not listed.
+
+### Model facts
+
+`AttachSession` runs with `Attach`, after `Contribute`, and again when
+that plugin instance is loaded again. The object stays live. `/model`,
+`/approval model`, and `/thinking` show up on the next read. The host does
+not call `AttachSession` again for those changes.
+
+`Session` carries the provider, protocol, model name, context window,
+maximum tokens, temperature, top-p, image input, and the current thinking
+gear. `default` and `off` are host sentinels. Other values are effort
+names such as `low` or `high`.
+
+`Review.Independent` is true only when review uses its own model. That
+model's thinking gear is `default`. While the switch is off, review uses
+the session model, `Model` is null, and a saved provider or model name is
+omitted. The facts include no API key, endpoint, organization, or project.
+
+`PluginPlaceholderContext.Models` is the same live view. It is empty until
+the session publishes it.
+
+### Model clients
+
+A model call spends the operator's credentials. It does not enter the
+transcript, the approval path, or the turn budget. The entry type receives
+clients only when it implements `IPluginModelClient`. The host names that
+plugin when it loads, for example `Plugin 'Acme' can call the session and
+review models.` Built-in plugins do not receive these clients.
+
+`AttachClients` runs after `AttachSession`. The clients are new instances
+on the same provider and model. They are kept apart from the instances
+inside a turn or a review.
+
+| Member | Meaning |
+| :--- | :--- |
+| `Session` | Text client for the session model. |
+| `Images` | Image client for the session model, or null when that model does not accept images. |
+| `IndependentReview` | True only when review uses its own model. Reading it does not create a client. |
+| `Review` | Text client for the review model while `IndependentReview` is true. Null while review uses the session model. |
+
+When `IndependentReview` is true and the review client cannot be created,
+reading `Review` fails. The host leaves the session client in place.
+
+The first read creates a client. Later reads return that instance until
+the host drops it. The host drops the session and image clients when it
+rebuilds the session client, and drops the review client when it rebuilds
+the review client or the switch turns off. Read the property again after
+that.
+
+`IPluginClientFactory` remains the other direction. It builds a client for
+a protocol the built-in adapters do not own.
 
 ## Hooks
 

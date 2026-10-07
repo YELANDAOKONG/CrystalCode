@@ -1043,7 +1043,11 @@ of the same name replaces the home plugin. `"enabled": false` in
 field is omitted from the written file.
 
 A plugin can add tools, a protocol client, approval classifiers, slash
-commands, hooks, and raw hooks. Hooks may append prompt and compaction text,
+commands, hooks, raw hooks, and prompt placeholders. It can read the
+current session model and whether review is using its own model. A plugin
+that asks for model clients can call the session model and, while that
+switch is on, the review model. Those calls use separate clients from the
+turn, and they do not enter the transcript. Hooks may append prompt and compaction text,
 rewrite a user message before it is stored, revise the text of one outbound
 model request without changing the stored transcript, read one completed
 model response, rewrite a tool call (approval runs
@@ -1186,8 +1190,9 @@ and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
 `{{output_template}}`, and `{{todos_section}}`. Placeholder names are
 case-insensitive. Unknown names are left unchanged. A plugin may add
-further names. The host rejects a name it already owns, and inserts the
-plugin's value as text. Templates must declare
+further names. While resolving a name, the plugin can read the current
+session model and whether review is using its own model. The host rejects
+a name it already owns, and inserts the plugin's value as text. Templates must declare
 every host slot they need. When Skills is enabled, available-skill guidance
 fills `{{skills}}`. Composite host values are not overlayable.
 

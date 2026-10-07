@@ -1,6 +1,7 @@
 using System.Diagnostics;
 
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
@@ -11,8 +12,10 @@ using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Hooks;
+using CrystalCode.Plugins.Models;
 
 using Xunit;
 
@@ -122,7 +125,12 @@ public sealed class PluginCatalogTests
         var host = new SessionToolHost(root, () => "sess-1", () => approval);
         var catalog = PluginCatalog.Load(home.Home, root, enabled: true, host);
 
-        Assert.Equal("Plugin 'Fixture' registered a raw hook.", Assert.Single(catalog.Notes));
+        Assert.Contains(
+            "Plugin 'Fixture' registered a raw hook.",
+            catalog.Notes);
+        Assert.Contains(
+            "Plugin 'Fixture' can call the session and review models.",
+            catalog.Notes);
         var info = Assert.Single(catalog.Plugins);
         Assert.Equal(1, info.Hooks);
         Assert.Equal(1, info.RawHooks);
@@ -156,9 +164,24 @@ public sealed class PluginCatalogTests
             [new ExternalToolPeer("lint", "Extra", "project", plan: false, work: true)],
             [new SkillPeer("review-diff", "Review the diff.")]);
         catalog.Attach(environment, _ => { });
+        catalog.AttachSession(
+            new PluginModels(
+                new PluginModel(
+                    "openai",
+                    "openai",
+                    "gpt",
+                    contextWindow: 8,
+                    maxTokens: null,
+                    temperature: null,
+                    topP: null,
+                    imageInput: false,
+                    thinking: "low"),
+                PluginReview.UsingSession),
+            _ => { });
+        catalog.AttachClients(new IdleClients(), _ => { });
         var peers = catalog.WorkTools.Single(tool => tool.Definition.Name == "peers");
         var listed = await peers.InvokeAsync(new Crystal.Tools.ToolCall("4", "peers", "{}"));
-        Assert.Equal("1\n1\n1\n1", listed.Text);
+        Assert.Equal("1\n1\n1\n1\nsession\nyes", listed.Text);
         var table = new PluginPlaceholderTable(catalog.Placeholders, _ => { });
         table.SetEnvironment(environment);
         var bound = PromptBinder.Apply(
@@ -227,23 +250,35 @@ public sealed class PluginCatalogTests
             using System.Text.Json;
             using Crystal.Tools;
             using CrystalCode.Plugins;
+            using CrystalCode.Plugins.Clients;
             using CrystalCode.Plugins.Environment;
             using CrystalCode.Plugins.Hooks;
+            using CrystalCode.Plugins.Models;
             using CrystalCode.Plugins.Placeholders;
             using CrystalCode.Plugins.Tools;
             using CrystalCode.Tools;
 
             namespace FixturePlugin;
 
-            public sealed class SamplePlugin : IPlugin
+            public sealed class SamplePlugin : IPlugin, IPluginModelClient
             {
                 private IPluginEnvironment _environment = PluginEnvironment.Empty;
+                private IPluginModels _models = PluginModels.Empty;
+                private IPluginClients? _clients;
 
                 public string Name => "Sample";
 
                 public IPluginEnvironment Environment => _environment;
 
+                public IPluginModels Models => _models;
+
+                public IPluginClients? Clients => _clients;
+
                 public void Attach(IPluginEnvironment environment) => _environment = environment;
+
+                public void AttachSession(IPluginModels models) => _models = models;
+
+                public void AttachClients(IPluginClients clients) => _clients = clients;
 
                 public PluginContribution Contribute() => new(
                     tools: [new SampleTool(), new HostedTool(), new PeerTool(this)],
@@ -290,11 +325,15 @@ public sealed class PluginCatalogTests
                         CancellationToken cancellationToken = default)
                     {
                         var environment = _plugin.Environment;
+                        var review = _plugin.Models.Review.Independent ? "own" : "session";
+                        var clients = _plugin.Clients is null ? "no" : "yes";
                         return ValueTask.FromResult(new ToolOutput(
                             environment.Plugins.Count
                             + "\n" + environment.ToolSets.Count
                             + "\n" + environment.ExternalTools.Count
-                            + "\n" + environment.Skills.Count));
+                            + "\n" + environment.Skills.Count
+                            + "\n" + review
+                            + "\n" + clients));
                     }
                 }
             }
@@ -387,5 +426,17 @@ public sealed class PluginCatalogTests
         var stdout = process.StandardOutput.ReadToEnd();
         var stderr = process.StandardError.ReadToEnd();
         Assert.True(process.ExitCode == 0, stdout + stderr);
+    }
+
+    private sealed class IdleClients : IPluginClients
+    {
+        public bool IndependentReview => false;
+
+        public IStreamingChatClient Session =>
+            throw new NotSupportedException("This test does not call the session model.");
+
+        public IStreamingMultimodalChatClient? Images => null;
+
+        public IStreamingChatClient? Review => null;
     }
 }
