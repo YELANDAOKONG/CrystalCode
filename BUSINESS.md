@@ -170,6 +170,19 @@ infrastructure to support them safely; they are not excluded from the product.
 Implement each capability only when its behavior and ownership are defined, and
 do not reserve empty public types in advance.
 
+Deferred on a much longer horizon than the list above, with no schedule:
+
+- product modes other than Plan and Work, including operator-defined custom
+  modes. The product has exactly two modes today. Prompt overlays, prompt
+  sets, prompt attachments, and external tool catalogs shape those two; they
+  do not add a mode, and no mode registry, configuration field, or public
+  type is reserved for a new one in advance. Whether custom modes are added
+  at all is not decided.
+
+Whether Plan may include bash is under consideration and is not decided.
+The current behavior stands: built-in Plan has no edit, write, or bash. No
+change is scheduled, and a later decision may revisit it.
+
 More hook methods will be added later on the existing hook interfaces, and
 are not reserved as empty types in advance. Whether plugins declare
 dependencies on one another, and related loading questions, are under
