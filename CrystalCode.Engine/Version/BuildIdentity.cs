@@ -8,4 +8,6 @@ public sealed record BuildIdentity(
     string? ProductRevision,
     string? LibraryRevision,
     string? SdkVersion,
-    string? Runtime);
+    string? Configuration,
+    string? Runtime,
+    string? OperatingSystem);

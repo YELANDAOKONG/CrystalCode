@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 
 using Crystal.Chat;
 
@@ -21,9 +22,23 @@ public sealed class BuildIdentityReaderTests
         Assert.Matches("^[0-9a-fA-F]{40}$", identity.LibraryRevision);
         Assert.False(string.IsNullOrWhiteSpace(identity.SdkVersion));
         Assert.DoesNotContain(' ', identity.SdkVersion);
+        Assert.Equal(Configuration(typeof(BuildIdentityReader).Assembly), identity.Configuration);
         Assert.Equal(".NET 10.0.4", identity.Runtime);
+        Assert.Null(identity.OperatingSystem);
         Assert.DoesNotContain("1.0.0", identity.ProductRevision, StringComparison.Ordinal);
         Assert.DoesNotContain("1.0.0", identity.LibraryRevision, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Read_AppendsOperatingSystemArchitecture()
+    {
+        var identity = BuildIdentityReader.Read(
+            typeof(BuildIdentityReader).Assembly,
+            ".NET 10.0.4",
+            "  KDE neon User Edition  ",
+            Architecture.X64);
+
+        Assert.Equal("KDE neon User Edition x64", identity.OperatingSystem);
     }
 
     [Fact]
@@ -36,7 +51,9 @@ public sealed class BuildIdentityReaderTests
             SourceRevision.FromInformationalVersion(InformationalVersion(typeof(ChatMessage).Assembly)),
             identity.LibraryRevision);
         Assert.Null(identity.Runtime);
+        Assert.Null(identity.OperatingSystem);
         Assert.Equal(SdkMetadata(product), identity.SdkVersion);
+        Assert.Equal(Configuration(product), identity.Configuration);
     }
 
     private static string? InformationalVersion(Assembly assembly) =>
@@ -54,4 +71,7 @@ public sealed class BuildIdentityReaderTests
 
         return null;
     }
+
+    private static string? Configuration(Assembly assembly) =>
+        assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration;
 }

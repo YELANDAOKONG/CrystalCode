@@ -10,22 +10,27 @@ public sealed class BuildIdentityTextTests
     private const string Library = "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d";
 
     [Fact]
-    public void Format_AlignsRecordedLines()
+    public void Format_SeparatesBuildAndHost()
     {
         var text = BuildIdentityText.Format(new BuildIdentity(
             Product,
             Library,
             "10.0.201",
-            ".NET 10.0.4"));
+            "Debug",
+            ".NET 10.0.4",
+            "Ubuntu 24.04.2 LTS x64"));
 
         Assert.Equal(
             string.Join(
                 Environment.NewLine,
                 [
-                    "Crystal Code  " + Product,
-                    "Crystal       " + Library,
-                    "SDK           10.0.201",
-                    "Runtime       .NET 10.0.4"
+                    "Crystal Code   " + Product,
+                    "Crystal        " + Library,
+                    "SDK            10.0.201",
+                    "Configuration  Debug",
+                    "",
+                    "Runtime        .NET 10.0.4",
+                    "OS             Ubuntu 24.04.2 LTS x64"
                 ]),
             text);
     }
@@ -37,23 +42,39 @@ public sealed class BuildIdentityTextTests
             Product,
             "  ",
             null,
-            ".NET 10.0.4"));
+            "Release",
+            null,
+            "   "));
 
         Assert.Equal(
             string.Join(
                 Environment.NewLine,
                 [
-                    "Crystal Code  " + Product,
-                    "Runtime       .NET 10.0.4"
+                    "Crystal Code   " + Product,
+                    "Configuration  Release"
                 ]),
             text);
         Assert.DoesNotContain("1.0.0", text, StringComparison.Ordinal);
     }
 
     [Fact]
+    public void Format_OmitsAnEmptySection()
+    {
+        var text = BuildIdentityText.Format(new BuildIdentity(
+            null,
+            null,
+            null,
+            null,
+            ".NET 10.0.4",
+            null));
+
+        Assert.Equal("Runtime  .NET 10.0.4", text);
+    }
+
+    [Fact]
     public void Format_ReturnsEmptyWhenNothingIsRecorded()
     {
-        var text = BuildIdentityText.Format(new BuildIdentity(null, null, null, null));
+        var text = BuildIdentityText.Format(new BuildIdentity(null, null, null, null, null, null));
 
         Assert.Equal(string.Empty, text);
     }

@@ -56,15 +56,23 @@ its own observer, approval prompt, question prompt, and session chooser. It
 does not own session logic, approval policy, prompts, storage, or tools, and
 it does not own the frame painter, composer buffer, or transcript log.
 `crystal version` and `crystal --version` print the build identity as plain
-text and exit: `Crystal Code` (this repository's commit), `Crystal` (the Crystal
-library repository's commit), `SDK` (the .NET SDK that compiled the
-executable), and `Runtime` (the shared framework hosting the process). A
-line is omitted when that value was not recorded. Commits are the
-40-character source revision the SDK appends to the assembly informational
-version. The assembly version placeholder is left unread. `SDK` is the
+text and exit. The build section is `Crystal Code` (this repository's
+commit), `Crystal` (the Crystal library repository's commit), `SDK` (the
+.NET SDK that compiled the executable), and `Configuration` (the MSBuild
+configuration stamped on the executable). A blank line separates it from
+the host section: `Runtime` (the shared framework hosting the process) and
+`OS` (`RuntimeInformation.OSDescription` plus the operating-system
+architecture). A line is omitted when that value was not recorded. An empty
+section is omitted, including the blank line. Commits are the 40-character
+source revision the SDK appends to the assembly informational version. The
+assembly version placeholder is left unread. `SDK` is the
 `NETCoreSdkVersion` assembly metadata stamped by `Directory.Build.targets`
-for projects in this repository. The outbound `User-Agent` stays
-`Crystal Code`.
+for projects in this repository. `Configuration` is
+`AssemblyConfigurationAttribute`. The host passes
+`RuntimeInformation.FrameworkDescription`, `OSDescription`, and
+`OSArchitecture`. The description is kept whole and the architecture is
+appended in lower case. The report does not start a process. The outbound
+`User-Agent` stays `Crystal Code`.
 
 ### CrystalCode.Tools
 
@@ -178,7 +186,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
 | `Plugins/Providers` | Built-in DeepSeek, OpenAI-compatible, Responses, Anthropic, Gemini, and Ollama client factories |
-| `Version` | Build identity for `crystal version`: product commit, Crystal commit, compiling SDK, and host runtime |
+| `Version` | Build identity for `crystal version`: product commit, Crystal commit, compiling SDK, compile configuration, host runtime, and host operating system. Two plain-text sections |
 
 CrystalCode.Display:
 

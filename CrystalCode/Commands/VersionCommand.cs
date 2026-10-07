@@ -22,7 +22,9 @@ public sealed class VersionCommand : AsyncCommand<VersionSettings>
         ArgumentNullException.ThrowIfNull(writer);
         var identity = BuildIdentityReader.Read(
             typeof(Program).Assembly,
-            RuntimeInformation.FrameworkDescription);
+            RuntimeInformation.FrameworkDescription,
+            RuntimeInformation.OSDescription,
+            RuntimeInformation.OSArchitecture);
         writer.WriteLine(BuildIdentityText.Format(identity));
     }
 

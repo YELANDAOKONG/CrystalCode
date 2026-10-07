@@ -26,7 +26,7 @@ the task text, `--format`, `--show-thinking`, `--space`, and
 written to `config.json` or `prompt.json`. A later preference command still
 writes `--provider` and `--model` when they were passed. `crystal run` is a
 headless entry for one task and has no operator. `crystal version` prints
-the build identity and exits. The engine behind the terminal and `crystal run` is a
+the build identity in two plain-text sections and exits. The engine behind the terminal and `crystal run` is a
 separate library with no terminal code. The product can:
 
 - stream a model turn with tool calls, and queue follow-ups while it runs;

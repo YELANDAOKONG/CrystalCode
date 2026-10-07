@@ -236,17 +236,25 @@ others off. Prompt attachments also accept `--workspace` and
 writes `config.json`.
 
 ```text
-Crystal Code  3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a
-Crystal       1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d
-SDK           10.0.201
-Runtime       .NET 10.0.4
+Crystal Code   3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a
+Crystal        1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d
+SDK            10.0.201
+Configuration  Debug
+
+Runtime        .NET 10.0.4
+OS             Ubuntu 24.04.2 LTS x64
 ```
 
 `Crystal Code` is the commit of this repository. `Crystal` is the commit of
 the Crystal library repository. `SDK` is the .NET SDK that compiled the
-executable. `Runtime` is the shared framework hosting this process. A line
-is omitted when that value was not recorded. The commits and SDK version
-above are examples.
+executable. `Configuration` is the MSBuild configuration recorded on the
+executable, usually `Debug` or `Release`. A blank line separates that build
+from the process host. `Runtime` is the shared framework hosting this
+process. `OS` is the runtime's operating-system description plus the
+architecture. A line is omitted when that value was not recorded, and an
+empty section is omitted with the blank line. The
+commits, SDK version, configuration, runtime, and operating system above
+are examples.
 
 ## Headless run
 
