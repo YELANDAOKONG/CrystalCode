@@ -36,6 +36,30 @@ public sealed class ComposerBufferTests
         buffer.Replace("queued");
         var vtEnter = new ConsoleKeyInfo('\r', default, false, false, false);
         Assert.Equal(ComposerAction.Submit, buffer.Handle(vtEnter));
+
+        buffer.Replace("hello");
+        var unixCtrlJ = new ConsoleKeyInfo('\n', ConsoleKey.Enter, false, false, true);
+        Assert.Equal(ComposerAction.None, buffer.Handle(unixCtrlJ));
+        Assert.Equal("hello\n", buffer.Text);
+    }
+
+    [Fact]
+    public void Handle_BackslashEnterInsertsNewlineAtTheCursor()
+    {
+        var buffer = new ComposerBuffer();
+        var enter = new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false);
+        buffer.Insert("hello\\");
+
+        Assert.Equal(ComposerAction.None, buffer.Handle(enter));
+        Assert.Equal("hello\n", buffer.Text);
+
+        buffer.Replace("a\\b");
+        buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.LeftArrow, false, false, false));
+        Assert.Equal(ComposerAction.None, buffer.Handle(enter));
+        Assert.Equal("a\nb", buffer.Text);
+
+        buffer.Replace("a\\b");
+        Assert.Equal(ComposerAction.Submit, buffer.Handle(enter));
     }
 
     [Fact]

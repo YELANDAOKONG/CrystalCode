@@ -22,6 +22,33 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_UnixCtrlJ_IsNewlineNotEnter()
+    {
+        var events = new InputDecoder().Push(Linux(
+            new ConsoleKeyInfo('\n', ConsoleKey.Enter, false, false, true)));
+
+        var key = Assert.IsType<InputKey>(Assert.Single(events));
+        Assert.Equal(ConsoleKey.J, key.Key);
+        Assert.Equal('\n', key.KeyChar);
+        Assert.True(key.Modifiers.HasFlag(ConsoleModifiers.Control));
+    }
+
+    [Fact]
+    public void Push_UnixCtrlJBesideAnUnparsedKey_StaysANewline()
+    {
+        var events = new InputDecoder().Push(Linux(
+            new ConsoleKeyInfo('\\', default, false, false, false),
+            new ConsoleKeyInfo('\n', ConsoleKey.Enter, false, false, true)));
+
+        Assert.Equal(2, events.Count);
+        Assert.Equal('\\', Assert.IsType<InputKey>(events[0]).KeyChar);
+        var newline = Assert.IsType<InputKey>(events[1]);
+        Assert.Equal(ConsoleKey.J, newline.Key);
+        Assert.Equal('\n', newline.KeyChar);
+        Assert.NotEqual(ConsoleKey.Enter, newline.Key);
+    }
+
+    [Fact]
     public void Push_LetterY_MatchesOnEveryPlatform()
     {
         var decoder = new InputDecoder();

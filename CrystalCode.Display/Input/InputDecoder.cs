@@ -102,7 +102,7 @@ public sealed class InputDecoder
 
         foreach (var key in burst)
         {
-            events.Add(new InputKey(key.Key, key.KeyChar, key.Modifiers));
+            events.Add(NormalizeKey(key));
         }
 
         return true;
@@ -399,6 +399,17 @@ public sealed class InputDecoder
             _ => null!
         };
         return mapped is not null;
+    }
+
+    private static InputKey NormalizeKey(ConsoleKeyInfo key)
+    {
+        // Unix ReadKey reports Ctrl+J as Enter with LF. Keep that chord a newline.
+        if (key.KeyChar == '\n' && key.Modifiers.HasFlag(ConsoleModifiers.Control))
+        {
+            return new InputKey(ConsoleKey.J, key.KeyChar, key.Modifiers);
+        }
+
+        return InputKey.From(key);
     }
 
     private static InputKey MetaKey(char intro)

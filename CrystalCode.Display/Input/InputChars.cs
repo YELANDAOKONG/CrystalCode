@@ -15,7 +15,8 @@ internal static class InputChars
         {
             if (key.Key == ConsoleKey.Enter)
             {
-                text.Append('\r');
+                // Ctrl+J is Enter plus LF on Unix. Keep the LF so it stays a newline.
+                text.Append(key.KeyChar == '\n' ? '\n' : '\r');
                 continue;
             }
 

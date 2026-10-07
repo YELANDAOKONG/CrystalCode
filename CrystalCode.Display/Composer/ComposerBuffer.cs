@@ -341,7 +341,9 @@ public sealed class ComposerBuffer
 
     private static bool IsNewline(InputKey key)
     {
-        if (key.Key == ConsoleKey.J && key.Modifiers.HasFlag(ConsoleModifiers.Control))
+        // Unix ReadKey reports Ctrl+J as Enter with LF. It still inserts a newline.
+        if (key.Modifiers.HasFlag(ConsoleModifiers.Control)
+            && (key.Key == ConsoleKey.J || key.KeyChar == '\n'))
         {
             return true;
         }
@@ -357,12 +359,7 @@ public sealed class ComposerBuffer
 
     private bool TryConsumeBackslashNewline()
     {
-        if (_cursor == 0 || _cursor != _text.Length)
-        {
-            return false;
-        }
-
-        if (_text[_cursor - 1] != '\\')
+        if (_cursor == 0 || _text[_cursor - 1] != '\\')
         {
             return false;
         }
