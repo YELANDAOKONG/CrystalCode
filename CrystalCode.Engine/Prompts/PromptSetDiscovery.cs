@@ -41,8 +41,13 @@ internal sealed class PromptSetDiscovery
         foreach (var directory in directories)
         {
             var name = Path.GetFileName(directory);
-            if (!PromptSetNames.IsValid(name)
-                || string.Equals(name, PromptSetNames.Default, StringComparison.Ordinal))
+            if (string.Equals(name, PromptSetNames.Default, StringComparison.Ordinal))
+            {
+                notes.Add($"Prompt set '{name}' was skipped: '{PromptSetNames.Default}' is reserved.");
+                continue;
+            }
+
+            if (!PromptSetNames.IsValid(name))
             {
                 notes.Add($"Prompt set '{name}' was skipped: directory name is invalid.");
                 continue;

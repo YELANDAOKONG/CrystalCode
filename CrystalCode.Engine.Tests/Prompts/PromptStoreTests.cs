@@ -296,6 +296,28 @@ public sealed class PromptStoreTests
     }
 
     [Fact]
+    public void Resolve_SkipsReservedDefaultDirectory()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(
+            Path.Combine(home.Home.PromptSetsDirectory, PromptSetNames.Default),
+            "work.md",
+            "not virtual");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default);
+
+        Assert.False(PromptSetNames.IsValid(PromptSetNames.Default));
+        Assert.True(store.ContainsSet(PromptSetNames.Default));
+        Assert.Equal(WorkPrompt.Text, resolution.Prompts.Work);
+        Assert.DoesNotContain(PromptSetNames.Default, resolution.AvailableSets);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("reserved", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ContainsSet_RequiresAHomePromptFile()
     {
         using var home = new TemporaryHome();

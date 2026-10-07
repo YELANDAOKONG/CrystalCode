@@ -15,7 +15,9 @@ public static class PromptSetNames
 
     public static bool IsValid(string name)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.Length > MaximumLength)
+        if (string.IsNullOrWhiteSpace(name)
+            || name.Length > MaximumLength
+            || string.Equals(name, Default, StringComparison.Ordinal))
         {
             return false;
         }
