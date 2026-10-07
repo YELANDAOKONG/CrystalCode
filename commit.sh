@@ -47,7 +47,7 @@ for arg in "$@"; do
 done
 
 #printf '[%s]\n' 
-"$CMD" run --workspace . --approval review --work --show-thinking --prompt-set default --external-tools off --workspace-trust off --duration 600 "$TASK"
+"$CMD" run --workspace . --approval review --work --show-thinking --prompt-set default --prompt-attachments off --external-tools off --workspace-trust off --duration 600 "$TASK"
 
 
 
