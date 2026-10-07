@@ -5,6 +5,7 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 
 using CrystalCode.Display.Input;
+using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
@@ -486,6 +487,29 @@ public sealed class SessionRendererTests
         renderer.ResumeComposer();
 
         Assert.False(renderer.SideQuestionOpen);
+    }
+
+    [Fact]
+    public void WindowLines_ScrollsATallQuestionAndStopsAtTheEnds()
+    {
+        var lines = new PaintLine[5];
+        for (var i = 0; i < lines.Length; i++)
+        {
+            lines[i] = PaintLine.Colored("white", i.ToString());
+        }
+
+        var scroll = 0;
+        var window = SessionRenderer.WindowLines(lines, 2, ref scroll);
+        Assert.Equal(["0", "1"], window.Select(static line => line.Plain).ToArray());
+
+        Assert.True(SessionRenderer.MoveOverlayScroll(scroll, lines.Length - 2, towardTop: -1, out scroll));
+        window = SessionRenderer.WindowLines(lines, 2, ref scroll);
+        Assert.Equal(["1", "2"], window.Select(static line => line.Plain).ToArray());
+
+        Assert.False(SessionRenderer.MoveOverlayScroll(0, hidden: 0, towardTop: -1, out scroll));
+        Assert.Equal(0, scroll);
+        Assert.False(SessionRenderer.MoveOverlayScroll(3, hidden: 3, towardTop: -1, out var stuck));
+        Assert.Equal(3, stuck);
     }
 
     private static SideQuestionSnapshot SampleSide() =>

@@ -1284,7 +1284,9 @@ Approval is a Spectre panel with a two-column Title Case field grid
 (`Status`, `Reason`, `Risk`, `Authority`, `Outcome`). Question panels show
 header tabs, described choices, selection state, custom input, and a final
 answer review when confirmation is required. Plain Up/Down stays with question
-selection; PageUp/PageDown, the wheel, and Ctrl+Up/Down continue to scroll the
+selection. When the question panel is taller than its slot, PageUp/PageDown,
+the wheel, and Ctrl+Up/Down scroll that panel. A scroll that would move past
+either end, and any scroll while the panel already fits, scrolls the
 transcript. Custom answers edit inside the overlay with an independent buffer:
 Enter saves and Escape cancels editing without dismissing the question. The
 paused main composer keeps its draft and hides its cursor. Ask and auto-pass

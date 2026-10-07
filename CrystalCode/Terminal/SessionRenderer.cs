@@ -64,6 +64,7 @@ public sealed class SessionRenderer : IDisposable
     private bool _imagePasteRequested;
     private bool _fullPageOverlay;
     private int _pageScroll;
+    private int _overlayScroll;
     private const int MaxSideRows = 12;
     private SideQuestionSnapshot? _side;
     private bool _sideOpen;
@@ -1193,7 +1194,7 @@ public sealed class SessionRenderer : IDisposable
             InputKey? mapped = null;
             lock (_gate)
             {
-                var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                var pageRows = ScrollPageRows();
                 var dirty = false;
                 foreach (var item in _decoder.Push(burst))
                 {
@@ -1203,7 +1204,7 @@ public sealed class SessionRenderer : IDisposable
                             dirty = true;
                             break;
                         case InputWheel wheel:
-                            _scrollBack = Math.Max(0, _scrollBack + wheel.Delta);
+                            ApplyScrollUnlocked(wheel.Delta);
                             dirty = true;
                             break;
                         case InputKey key:
@@ -1213,7 +1214,7 @@ public sealed class SessionRenderer : IDisposable
                                 pageRows,
                                 out var delta))
                             {
-                                _scrollBack = Math.Max(0, _scrollBack + delta);
+                                ApplyScrollUnlocked(delta);
                                 dirty = true;
                                 break;
                             }
@@ -1263,6 +1264,11 @@ public sealed class SessionRenderer : IDisposable
         ArgumentNullException.ThrowIfNull(widget);
         var buffer = new ComposerBuffer();
         buffer.Replace(initialText);
+        lock (_gate)
+        {
+            _overlayScroll = 0;
+        }
+
         SetOverlay(widget(buffer.Text, buffer.Cursor));
 
         while (true)
@@ -1281,7 +1287,7 @@ public sealed class SessionRenderer : IDisposable
             var canceled = false;
             lock (_gate)
             {
-                var pageRows = Math.Max(1, CurrentRegions().TranscriptRows - 1);
+                var pageRows = ScrollPageRows();
                 foreach (var item in _decoder.Push(burst))
                 {
                     switch (item)
@@ -1290,7 +1296,7 @@ public sealed class SessionRenderer : IDisposable
                             buffer.Insert(paste.Text);
                             break;
                         case InputWheel wheel:
-                            _scrollBack = Math.Max(0, _scrollBack + wheel.Delta);
+                            ApplyScrollUnlocked(wheel.Delta);
                             break;
                         case InputKey { Key: ConsoleKey.Escape }:
                             canceled = true;
@@ -1300,7 +1306,7 @@ public sealed class SessionRenderer : IDisposable
                             scrollPlainArrows: false,
                             pageRows,
                             out var delta):
-                            _scrollBack = Math.Max(0, _scrollBack + delta);
+                            ApplyScrollUnlocked(delta);
                             break;
                         case InputKey { KeyChar: '?' } when buffer.IsEmpty:
                             buffer.Insert("?");
@@ -1450,6 +1456,7 @@ public sealed class SessionRenderer : IDisposable
     {
         _fullPageOverlay = false;
         _pageScroll = 0;
+        _overlayScroll = 0;
         _overlayWidget = null;
         _modalOverlay.Clear();
     }
@@ -1675,6 +1682,11 @@ public sealed class SessionRenderer : IDisposable
             composerView = _composer.Project(width, regions.ComposerRows);
         }
 
+        if (!_sideOpen)
+        {
+            overlay = WindowLines(overlay, regions.OverlayRows, ref _overlayScroll);
+        }
+
         _scrollBack = _scrollAnchor.Resolve(
             regions.Width,
             _log,
@@ -1890,6 +1902,84 @@ public sealed class SessionRenderer : IDisposable
         for (var row = 0; row < window.Length; row++)
         {
             window[row] = lines[_sideScroll + row];
+        }
+
+        return window;
+    }
+
+    private void ApplyScrollUnlocked(int towardTop)
+    {
+        if (!TryScrollOverlayUnlocked(towardTop))
+        {
+            _scrollBack = Math.Max(0, _scrollBack + towardTop);
+        }
+    }
+
+    private int ScrollPageRows()
+    {
+        var regions = CurrentRegions();
+        if (OverlayHiddenRows(regions) > 0)
+        {
+            return Math.Max(1, regions.OverlayRows - 1);
+        }
+
+        return Math.Max(1, regions.TranscriptRows - 1);
+    }
+
+    private bool TryScrollOverlayUnlocked(int towardTop)
+    {
+        var hidden = OverlayHiddenRows(CurrentRegions());
+        if (!MoveOverlayScroll(_overlayScroll, hidden, towardTop, out var next))
+        {
+            return false;
+        }
+
+        _overlayScroll = next;
+        return true;
+    }
+
+    private int OverlayHiddenRows(ShellRegions regions)
+    {
+        if (_fullPageOverlay || _sideOpen || (_overlayWidget is null && _modalOverlay.Count == 0))
+        {
+            return 0;
+        }
+
+        _ = ScreenSize.TryRead(out var width, out _);
+        return Math.Max(0, OverlayLines(width).Count - regions.OverlayRows);
+    }
+
+    // The layout keeps a transcript floor, so a tall question is clipped to the
+    // overlay slot. Offset zero is the top of that card.
+    internal static bool MoveOverlayScroll(int scroll, int hidden, int towardTop, out int next)
+    {
+        if (hidden <= 0)
+        {
+            next = 0;
+            return false;
+        }
+
+        next = Math.Clamp(scroll - towardTop, 0, hidden);
+        return next != scroll;
+    }
+
+    internal static IReadOnlyList<PaintLine> WindowLines(
+        IReadOnlyList<PaintLine> lines,
+        int rows,
+        ref int scroll)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        if (rows < 1 || lines.Count <= rows)
+        {
+            scroll = 0;
+            return lines;
+        }
+
+        scroll = Math.Clamp(scroll, 0, lines.Count - rows);
+        var window = new PaintLine[rows];
+        for (var i = 0; i < window.Length; i++)
+        {
+            window[i] = lines[scroll + i];
         }
 
         return window;

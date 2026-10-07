@@ -715,9 +715,10 @@ questions and multiple selection use a Confirm tab. Use Up/Down or `J`/`K` to
 move, Enter to select, Space to toggle multiple choices, Left/Right or Tab to
 navigate questions, and Escape to dismiss the request. While a custom answer is
 being edited, its text and cursor appear inside the question panel; Enter saves
-it and Escape returns to the choices without changing the answer. PageUp,
-PageDown, and Ctrl+Up/Down remain available for transcript scrolling. The
-mouse wheel scrolls the transcript.
+it and Escape returns to the choices without changing the answer. When the
+question panel is taller than the room on screen, the mouse wheel, PageUp,
+PageDown, and Ctrl+Up/Down scroll the panel. A scroll past either end, and
+those same keys while the panel already fits, scroll the transcript.
 
 ### Follow-up queue
 
