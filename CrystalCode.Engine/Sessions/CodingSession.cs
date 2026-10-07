@@ -3471,6 +3471,11 @@ public sealed class CodingSession : ITurnObserver
 
     private IReadOnlyList<SlashCompletion> ApprovalModelCompletions()
     {
+        var options = new List<SlashCompletion>
+        {
+            new("on", "Turn the approval model on", ["on"]),
+            new("off", "Turn the approval model off", ["off"])
+        };
         var provider = _settings.Provider;
         if (_settings.ApprovalModel.Provider is string stored)
         {
@@ -3486,7 +3491,8 @@ public sealed class CodingSession : ITurnObserver
             }
         }
 
-        return ModelCompletions.For(_settings.Catalog, provider);
+        options.AddRange(ModelCompletions.For(_settings.Catalog, provider));
+        return options;
     }
 
     private IReadOnlyList<SlashCompletion> ApprovalThinkingCompletions()

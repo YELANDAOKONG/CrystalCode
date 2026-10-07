@@ -1437,9 +1437,9 @@ configurable through `exportDirectory` in
 is a command prefix. After a verb that takes an argument
 (`/thinking`, `/approval`, `/model`, `/tokens`, `/verbose`), Tab also completes the argument.
 `/model` completes current-provider models, then a provider name, then
-that provider's models. `/approval model` completes the same way for the
-stored approval provider, and `/approval thinking` completes the selected
-approval model's gear. `/export` completes the format, optional system flag,
+that provider's models. `/approval model` completes `on`, `off`, and the
+stored approval provider's catalog, and `/approval thinking` completes the
+selected approval model's gear. `/export` completes the format, optional system flag,
 and the system flag after an explicit path. `/prompts export` offers directory
 examples while Enter on the optional argument boundary still submits with the
 default directory. Ctrl+O and Ctrl+G toggle verbose tool and command output when the composer is

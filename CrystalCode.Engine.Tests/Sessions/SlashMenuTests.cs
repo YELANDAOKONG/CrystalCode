@@ -28,9 +28,11 @@ public sealed class SlashMenuTests
 
         var model = approval.ArgumentOptions.Single(item => item.Name == "model");
         Assert.Equal(["gpt-5.6-sol", "openai"], model.ArgumentOptions.Select(item => item.Name));
+        Assert.Equal("Show or set the approval model; on and off switch it", model.Help);
 
         var thinking = approval.ArgumentOptions.Single(item => item.Name == "thinking");
         Assert.Equal(["default", "high"], thinking.ArgumentOptions.Select(item => item.Name));
+        Assert.Equal("Cycle or set the reviewer thinking gear", thinking.Help);
 
         var review = approval.ArgumentOptions.Single(item => item.Name == "review");
         Assert.Empty(review.ArgumentOptions);

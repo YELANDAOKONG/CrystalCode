@@ -102,6 +102,8 @@ public sealed class CodingSessionApprovalModelTests
         var menu = headless.Observer.Events.OfType<SlashCommandsChanged>().Last().Commands;
         var approval = menu.Single(item => item.Name == "approval");
         var modelArgument = approval.ArgumentOptions.Single(item => item.Name == "model");
+        Assert.Contains(modelArgument.ArgumentOptions, item => item.Name == "on");
+        Assert.Contains(modelArgument.ArgumentOptions, item => item.Name == "off");
         Assert.Contains(modelArgument.ArgumentOptions, item => item.Name == "model");
         var thinkingArgument = approval.ArgumentOptions.Single(item => item.Name == "thinking");
         Assert.Contains(thinkingArgument.ArgumentOptions, item => item.Name == "high");

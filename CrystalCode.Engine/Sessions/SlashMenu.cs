@@ -126,9 +126,15 @@ public static class SlashMenu
                 "thinking" => thinkingArguments,
                 _ => null
             };
+            var help = argument switch
+            {
+                "model" => "Show or set the approval model; on and off switch it",
+                "thinking" => "Cycle or set the reviewer thinking gear",
+                _ => argument
+            };
             options.Add(nested is { Count: > 0 }
-                ? new SlashCompletion(argument, argument, [argument], nested)
-                : new SlashCompletion(argument, argument, [argument]));
+                ? new SlashCompletion(argument, help, [argument], nested)
+                : new SlashCompletion(argument, help, [argument]));
         }
 
         return options;
