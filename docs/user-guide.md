@@ -82,6 +82,8 @@ another protocol. Image input is available for supported models and providers.
 
 ## Requirements
 
+Linux and macOS are the recommended platforms. On Windows, install [Git for Windows](https://git-scm.com/install/windows) so Git Bash provides `bash` on the `PATH`.
+
 - An API key for the selected provider in `~/.crystal/credentials.json`,
   or in the process environment for one launch (see [Credentials](#credentials))
 - A TTY for the interactive alternate-screen UI. `crystal run` does not

@@ -34,6 +34,8 @@ Crystal Code is the coding product built on the sibling [Crystal](https://github
 
 The self-contained release supports Linux x64 and ARM64, macOS ARM64, and Windows x64.
 
+Linux and macOS are the recommended platforms. On Windows, install [Git for Windows](https://git-scm.com/install/windows); its Git Bash provides the `bash` shell the built-in `bash` tool uses.
+
 **Linux or macOS**
 
 ```bash
