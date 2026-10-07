@@ -71,19 +71,19 @@ public sealed class QuestionPrompt : IUserPrompt
                 switch (key.Key)
                 {
                     case ConsoleKey.UpArrow:
-                    case ConsoleKey.K:
+                    case ConsoleKey.K when IsPlainChoiceKey(key):
                         flow.MoveSelection(-1);
                         break;
                     case ConsoleKey.DownArrow:
-                    case ConsoleKey.J:
+                    case ConsoleKey.J when IsPlainChoiceKey(key):
                         flow.MoveSelection(1);
                         break;
                     case ConsoleKey.LeftArrow:
-                    case ConsoleKey.H:
+                    case ConsoleKey.H when IsPlainChoiceKey(key):
                         flow.MoveTab(-1);
                         break;
                     case ConsoleKey.RightArrow:
-                    case ConsoleKey.L:
+                    case ConsoleKey.L when IsPlainChoiceKey(key):
                     case ConsoleKey.Tab:
                         flow.MoveTab(key.Modifiers.HasFlag(ConsoleModifiers.Shift) ? -1 : 1);
                         break;
@@ -138,11 +138,11 @@ public sealed class QuestionPrompt : IUserPrompt
         switch (key.Key)
         {
             case ConsoleKey.LeftArrow:
-            case ConsoleKey.H:
+            case ConsoleKey.H when IsPlainChoiceKey(key):
                 flow.MoveTab(-1);
                 break;
             case ConsoleKey.RightArrow:
-            case ConsoleKey.L:
+            case ConsoleKey.L when IsPlainChoiceKey(key):
                 flow.MoveTab(1);
                 break;
             case ConsoleKey.Tab:
@@ -293,6 +293,15 @@ public sealed class QuestionPrompt : IUserPrompt
         }
 
         return grid;
+    }
+
+    // Ctrl+J is a newline in the composer. On a choice list it must not move
+    // the selection just because Unix reports that chord as J.
+    internal static bool IsPlainChoiceKey(InputKey key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        return !key.Modifiers.HasFlag(ConsoleModifiers.Control)
+            && !key.Modifiers.HasFlag(ConsoleModifiers.Alt);
     }
 
     private static bool TryChoiceNumber(InputKey key, int count, out int index)
