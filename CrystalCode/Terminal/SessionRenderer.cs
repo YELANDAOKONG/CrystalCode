@@ -65,6 +65,7 @@ public sealed class SessionRenderer : IDisposable
     private bool _fullPageOverlay;
     private int _pageScroll;
     private int _overlayScroll;
+    private int _overlayFollowRow = -1;
     private const int MaxSideRows = 12;
     private SideQuestionSnapshot? _side;
     private bool _sideOpen;
@@ -1457,6 +1458,7 @@ public sealed class SessionRenderer : IDisposable
         _fullPageOverlay = false;
         _pageScroll = 0;
         _overlayScroll = 0;
+        _overlayFollowRow = -1;
         _overlayWidget = null;
         _modalOverlay.Clear();
     }
@@ -1684,6 +1686,7 @@ public sealed class SessionRenderer : IDisposable
 
         if (!_sideOpen)
         {
+            FollowOverlay(overlay, regions.OverlayRows);
             overlay = WindowLines(overlay, regions.OverlayRows, ref _overlayScroll);
         }
 
@@ -1949,6 +1952,24 @@ public sealed class SessionRenderer : IDisposable
         return Math.Max(0, OverlayLines(width).Count - regions.OverlayRows);
     }
 
+    private void FollowOverlay(IReadOnlyList<PaintLine> lines, int rows)
+    {
+        var anchor = FindFollowRow(lines);
+        if (anchor < 0)
+        {
+            _overlayFollowRow = -1;
+            return;
+        }
+
+        if (anchor == _overlayFollowRow)
+        {
+            return;
+        }
+
+        _overlayScroll = Reveal(_overlayScroll, rows, anchor, lines.Count);
+        _overlayFollowRow = anchor;
+    }
+
     // The layout keeps a transcript floor, so a tall question is clipped to the
     // overlay slot. Offset zero is the top of that card.
     internal static bool MoveOverlayScroll(int scroll, int hidden, int towardTop, out int next)
@@ -1961,6 +1982,50 @@ public sealed class SessionRenderer : IDisposable
 
         next = Math.Clamp(scroll - towardTop, 0, hidden);
         return next != scroll;
+    }
+
+    internal static int FindFollowRow(IReadOnlyList<PaintLine> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        var choice = -1;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var markup = lines[i].Markup;
+            if (markup.Contains("]|[/]", StringComparison.Ordinal))
+            {
+                return i;
+            }
+
+            if (choice < 0 && markup.Contains("]>[/]", StringComparison.Ordinal))
+            {
+                choice = i;
+            }
+        }
+
+        return choice;
+    }
+
+    internal static int Reveal(int scroll, int rows, int anchor, int lineCount)
+    {
+        var max = Math.Max(0, lineCount - Math.Max(rows, 1));
+        scroll = Math.Clamp(scroll, 0, max);
+        if (rows < 1 || anchor < 0)
+        {
+            return scroll;
+        }
+
+        if (anchor < scroll)
+        {
+            return anchor;
+        }
+
+        var lastVisible = scroll + rows - 1;
+        if (anchor > lastVisible)
+        {
+            return Math.Min(anchor - rows + 1, max);
+        }
+
+        return scroll;
     }
 
     internal static IReadOnlyList<PaintLine> WindowLines(

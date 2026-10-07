@@ -717,7 +717,9 @@ navigate questions, and Escape to dismiss the request. While a custom answer is
 being edited, its text and cursor appear inside the question panel; Enter saves
 it and Escape returns to the choices without changing the answer. When the
 question panel is taller than the room on screen, the mouse wheel, PageUp,
-PageDown, and Ctrl+Up/Down scroll the panel. A scroll past either end, and
+PageDown, and Ctrl+Up/Down scroll the panel. Moving the highlight, or the
+cursor while editing a custom answer, brings that row back into view. A manual
+scroll stays until the highlight or cursor moves. A scroll past either end, and
 those same keys while the panel already fits, scroll the transcript.
 
 ### Follow-up queue

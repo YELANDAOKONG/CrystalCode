@@ -512,6 +512,23 @@ public sealed class SessionRendererTests
         Assert.Equal(3, stuck);
     }
 
+    [Fact]
+    public void Reveal_FollowsTheChoiceAndKeepsAVisibleRow()
+    {
+        var lines = new[]
+        {
+            new PaintLine("header", "header"),
+            new PaintLine("[lightsteelblue]>[/]", ">"),
+            new PaintLine("[bold lightsteelblue]|[/]", "|")
+        };
+
+        Assert.Equal(1, SessionRenderer.FindFollowRow(lines[..2]));
+        Assert.Equal(2, SessionRenderer.FindFollowRow(lines));
+        Assert.Equal(4, SessionRenderer.Reveal(scroll: 0, rows: 3, anchor: 6, lineCount: 10));
+        Assert.Equal(2, SessionRenderer.Reveal(scroll: 2, rows: 3, anchor: 3, lineCount: 10));
+        Assert.Equal(1, SessionRenderer.Reveal(scroll: 4, rows: 3, anchor: 1, lineCount: 10));
+    }
+
     private static SideQuestionSnapshot SampleSide() =>
         new(
             true,
