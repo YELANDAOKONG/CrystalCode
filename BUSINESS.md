@@ -145,6 +145,7 @@ implemented in the current build:
 - parent/child Agents through `Crystal.Harness.AgentHarness`;
 - MCP servers;
 - an operating-system sandbox;
+- multiple accessible directories in one session, beyond the single workspace;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
   and Ollama Chat;
