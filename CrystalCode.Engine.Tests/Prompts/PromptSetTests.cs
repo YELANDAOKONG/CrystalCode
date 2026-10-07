@@ -99,7 +99,7 @@ public sealed class PromptSetTests
 
         var text = set.ComposeWork(context, table);
 
-        Assert.Equal("body ready\n\nextra ready", text);
+        Assert.Equal("body ready\n\n\nextra ready", text);
     }
 
     private sealed class BuildPlaceholder : IPluginPlaceholder

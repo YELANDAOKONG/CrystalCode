@@ -332,7 +332,7 @@ public sealed class PromptStoreTests
         var resolution = store.Resolve(workspace.Path);
         var text = resolution.Prompts.ComposeWork(PromptContext.InstructionsOnly(string.Empty));
 
-        Assert.EndsWith("BETA\n\nALPHA", text, StringComparison.Ordinal);
+        Assert.EndsWith("BETA\n\n\nALPHA", text, StringComparison.Ordinal);
         Assert.Equal(["BETA", "ALPHA"], resolution.Prompts.WorkAttachments);
     }
 

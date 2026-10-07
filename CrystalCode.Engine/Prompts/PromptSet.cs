@@ -106,6 +106,6 @@ public sealed record PromptSet
             }
         }
 
-        return string.Join("\n\n", parts);
+        return string.Join("\n\n\n", parts);
     }
 }
