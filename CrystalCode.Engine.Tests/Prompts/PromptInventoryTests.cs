@@ -52,6 +52,61 @@ public sealed class PromptInventoryTests
     }
 
     [Fact]
+    public void Enable_LeavesOrderAloneWhenTheAttachmentIsAlreadyEnabled()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var alpha = Attachment(home.Home, "alpha", enabled: true, order: 0);
+        var beta = Attachment(home.Home, "beta", enabled: true, order: 1);
+
+        Assert.True(
+            PromptAttachmentInventory.TrySetEnabled(
+                home.Home,
+                workspace.Path,
+                "alpha",
+                source: null,
+                enabled: true,
+                out var error),
+            error);
+
+        Assert.Contains("\"order\": 0", File.ReadAllText(Path.Combine(alpha, "prompt.json")), StringComparison.Ordinal);
+        Assert.Contains("\"order\": 1", File.ReadAllText(Path.Combine(beta, "prompt.json")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Enable_DoesNotRewriteTheWorkspaceCopyWhenHomeIsShadowed()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var homeAlpha = Attachment(home.Home, "alpha", enabled: false, order: null);
+        var workspaceAlpha = Path.Combine(
+            workspace.Path,
+            ".crystal",
+            "prompt-attachments",
+            "alpha");
+        Directory.CreateDirectory(workspaceAlpha);
+        File.WriteAllText(Path.Combine(workspaceAlpha, "work.md"), "workspace");
+        File.WriteAllText(
+            Path.Combine(workspaceAlpha, "prompt.json"),
+            "{\n  \"enabled\": true,\n  \"order\": 3,\n  \"note\": \"keep\"\n}\n");
+
+        Assert.True(
+            PromptAttachmentInventory.TrySetEnabled(
+                home.Home,
+                workspace.Path,
+                "alpha",
+                source: "home",
+                enabled: true,
+                out var error),
+            error);
+
+        var workspaceJson = File.ReadAllText(Path.Combine(workspaceAlpha, "prompt.json"));
+        Assert.Contains("\"order\": 3", workspaceJson, StringComparison.Ordinal);
+        Assert.Contains("\"note\": \"keep\"", workspaceJson, StringComparison.Ordinal);
+        Assert.Contains("\"enabled\": true", File.ReadAllText(Path.Combine(homeAlpha, "prompt.json")), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Move_SwapsEnabledAttachments()
     {
         using var home = new TemporaryHome();

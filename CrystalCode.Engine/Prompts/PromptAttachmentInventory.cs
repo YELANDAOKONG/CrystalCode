@@ -52,21 +52,20 @@ public static class PromptAttachmentInventory
             return false;
         }
 
-        if (!enabled)
+        if (!enabled || !EditsWinningCopy(home, workspaceRoot, normalized, directory))
         {
             return true;
         }
 
-        var order = new List<string>();
         foreach (var item in before)
         {
-            if (!string.Equals(item, normalized, StringComparison.Ordinal))
+            if (string.Equals(item, normalized, StringComparison.Ordinal))
             {
-                order.Add(item);
+                return true;
             }
         }
 
-        order.Add(normalized);
+        var order = new List<string>(before) { normalized };
         return TryAssignOrders(home, workspaceRoot, order, out error);
     }
 
@@ -160,6 +159,26 @@ public static class PromptAttachmentInventory
             .ThenBy(item => item.Name, StringComparer.Ordinal)
             .Select(item => item.Name)
             .ToArray();
+    }
+
+    private static bool EditsWinningCopy(
+        CrystalHome home,
+        string workspaceRoot,
+        string name,
+        string directory)
+    {
+        var notes = new List<string>();
+        var project = new CrystalHome(Path.Combine(workspaceRoot, PromptStore.ProjectDirectoryName));
+        var catalog = new PromptAttachmentDiscovery().Collect(home, project, notes);
+        if (!catalog.TryGet(name, out var definition))
+        {
+            return false;
+        }
+
+        return string.Equals(
+            Path.GetFullPath(definition.Directory),
+            Path.GetFullPath(directory),
+            StringComparison.Ordinal);
     }
 
     private static bool TryAssignOrders(

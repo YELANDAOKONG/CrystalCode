@@ -165,15 +165,26 @@ public static class PromptConsole
                 continue;
             }
 
-            if (match is null
-                || (string.Equals(entry.Source, "Workspace", StringComparison.Ordinal)
-                    && !string.Equals(match.Source, "Workspace", StringComparison.Ordinal)))
+            if (match is null || Prefer(entry, match))
             {
                 match = entry;
             }
         }
 
         return match;
+    }
+
+    private static bool Prefer(PromptCatalogEntry candidate, PromptCatalogEntry current)
+    {
+        var candidateOk = candidate.Error.Length == 0;
+        var currentOk = current.Error.Length == 0;
+        if (candidateOk != currentOk)
+        {
+            return candidateOk;
+        }
+
+        return string.Equals(candidate.Source, "Workspace", StringComparison.Ordinal)
+            && !string.Equals(current.Source, "Workspace", StringComparison.Ordinal);
     }
 
     private static void WriteSets(bool plain, IReadOnlyList<PromptCatalogEntry> entries)
