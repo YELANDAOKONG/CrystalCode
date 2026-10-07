@@ -178,9 +178,12 @@ adds, or drops items, changes a role or a tool call, or edits a system
 message is skipped with an English note. Structural changes belong to raw
 hooks.
 
-Session start runs after the plugin load. Session end runs when the
-session closes and before a `/cd` reload. `crystal run` closes the
-session when the process finishes.
+Session start runs after the plugin load, and again when another coding
+session becomes active. Session end runs when the session closes, when
+`/clear`, `/resume`, or `/fork` replaces it, and before a `/cd` or
+`/space` reload. The end callback still carries the workspace and session
+being left. A resume that also changes workspace is one end and one start.
+`crystal run` closes the session when the process finishes.
 
 ## Raw hooks
 

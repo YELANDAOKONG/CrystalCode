@@ -1372,7 +1372,11 @@ one returned model response
 without changing the candidate the host uses, rewrite a tool call before
 approval runs again, replace a tool result, and raise approval risk or
 require another prompt. They do not lower risk, skip approval, or replace
-Work, Plan, or Review.
+Work, Plan, or Review. Session start and end follow the coding session.
+`/clear`, `/resume`, and `/fork` end the session being left and start the
+one that replaces it. A workspace change ends in the directory being left,
+reloads plugins, and starts in the new directory. A resume that also
+changes workspace is a single end and start.
 
 Authority is decided per method, and a method with extra authority lives
 on its own interface with its own registration list. `IPluginRawHook` is

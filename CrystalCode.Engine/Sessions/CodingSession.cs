@@ -510,7 +510,7 @@ public sealed class CodingSession : ITurnObserver
                 ChangeStatusLine(command.Argument);
                 return (true, false);
             case SessionVerb.Clear:
-                BeginNewSession();
+                await RebindPluginSessionAsync(BeginNewSession, cancellationToken);
                 Publish(new ConversationCleared());
                 ShowUsage(null, null);
                 Note("New conversation");
@@ -524,7 +524,7 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Trust:
                 return (true, await ChangeTrustAsync(command.Argument, cancellationToken));
             case SessionVerb.Fork:
-                ForkSession(command.Argument);
+                await ForkSessionAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Sessions:
                 ShowSessions(command.Argument);
@@ -1839,8 +1839,19 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
+        await RebindPluginSessionAsync(() => ApplyWorkspace(candidate), cancellationToken);
+        RefreshChrome();
+        Note("Workspace  " + _workspace.Root);
+        return true;
+    }
+
+    /// <summary>
+    /// Reloads workspace-owned catalogs after the root has changed.
+    /// The caller ends the plugin session before this and starts it after.
+    /// </summary>
+    private void ApplyWorkspace(string candidate)
+    {
         _workspace.SetRoot(candidate);
-        await ClosePluginSessionAsync(cancellationToken);
         ReloadSkills();
         ReloadPluginsWithProgress();
         ReloadExternalToolsWithProgress();
@@ -1848,10 +1859,6 @@ public sealed class CodingSession : ITurnObserver
         RebuildExecutors();
         WritePluginNotes();
         WriteExternalNotes();
-        await OpenPluginSessionAsync(cancellationToken);
-        RefreshChrome();
-        Note("Workspace  " + _workspace.Root);
-        return true;
     }
 
     private async Task<bool> ChangeTrustAsync(string argument, CancellationToken cancellationToken)
@@ -2190,7 +2197,7 @@ public sealed class CodingSession : ITurnObserver
         switch (request.Target)
         {
             case ResumeRequest.Kind.Session:
-                ResumeLoaded(request.Value);
+                await ResumeLoadedAsync(request.Value, cancellationToken);
                 return;
             case ResumeRequest.Kind.CurrentWorkspace:
                 await ResumeListedAsync(
@@ -2262,12 +2269,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (!await EnterWorkspaceAsync(workspaceRoot, cancellationToken))
-        {
-            return;
-        }
-
-        FinishResume(document);
+        await EnterWorkspaceAndResumeAsync(workspaceRoot, document, cancellationToken);
     }
 
     private async Task ResumeListedAsync(
@@ -2310,30 +2312,54 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (adoptWorkspace
-            && !await AdoptSessionWorkspaceAsync(document, cancellationToken))
+        if (adoptWorkspace)
         {
+            if (string.IsNullOrWhiteSpace(document.Workspace)
+                || !_workspace.TryResolve(document.Workspace, out var candidate, out _))
+            {
+                Error("Session workspace is not a directory.");
+                return;
+            }
+
+            await EnterWorkspaceAndResumeAsync(candidate, document, cancellationToken);
             return;
         }
 
-        FinishResume(document);
+        await FinishResumeAsync(document, cancellationToken);
     }
 
-    private async Task<bool> AdoptSessionWorkspaceAsync(
+    /// <summary>
+    /// Enters <paramref name="candidate"/> and restores <paramref name="document"/>
+    /// inside one plugin-session rebind when the directory changes.
+    /// </summary>
+    private async Task EnterWorkspaceAndResumeAsync(
+        string candidate,
         SessionDocument document,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(document.Workspace)
-            || !_workspace.TryResolve(document.Workspace, out var candidate, out _))
+        if (string.Equals(candidate, _workspace.Root, StringComparison.Ordinal))
         {
-            Error("Session workspace is not a directory.");
-            return false;
+            await FinishResumeAsync(document, cancellationToken);
+            return;
         }
 
-        return await EnterWorkspaceAsync(candidate, cancellationToken);
+        if (!await ConfirmWorkspaceAsync(candidate, cancellationToken))
+        {
+            Note("Staying in " + _workspace.Root);
+            return;
+        }
+
+        await RebindPluginSessionAsync(
+            () =>
+            {
+                ApplyWorkspace(candidate);
+                Note("Workspace  " + _workspace.Root);
+                ApplyResume(document);
+            },
+            cancellationToken);
     }
 
-    private void ResumeLoaded(string? id)
+    private async Task ResumeLoadedAsync(string? id, CancellationToken cancellationToken)
     {
         if (!SessionResume.TryLoad(
                 _sessionStore,
@@ -2346,10 +2372,15 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        FinishResume(document);
+        await FinishResumeAsync(document, cancellationToken);
     }
 
-    private void FinishResume(SessionDocument document)
+    private async Task FinishResumeAsync(SessionDocument document, CancellationToken cancellationToken)
+    {
+        await RebindPluginSessionAsync(() => ApplyResume(document), cancellationToken);
+    }
+
+    private void ApplyResume(SessionDocument document)
     {
         CancelAndClearSide(announce: true);
         ApplyDocument(document);
@@ -2357,7 +2388,7 @@ public sealed class CodingSession : ITurnObserver
         PresentResume();
     }
 
-    private void ForkSession(string argument)
+    private async Task ForkSessionAsync(string argument, CancellationToken cancellationToken)
     {
         SessionDocument source;
         if (string.IsNullOrWhiteSpace(argument))
@@ -2382,20 +2413,25 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        CancelAndClearSide(announce: true);
         var sourceId = source.Id!;
         var fork = SessionFork.Create(
             source,
             SessionStore.NewId(),
             _workspace.Root,
             DateTimeOffset.UtcNow);
-        ApplyDocument(fork);
-        SaveSession();
-        RefreshChrome();
-        ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
-        Publish(new HistoryReplayed(ArchiveSnapshot()));
-        ShowTodos();
-        Note($"Forked  {sourceId}  ->  {_sessionId}");
+        await RebindPluginSessionAsync(
+            () =>
+            {
+                CancelAndClearSide(announce: true);
+                ApplyDocument(fork);
+                SaveSession();
+                RefreshChrome();
+                ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
+                Publish(new HistoryReplayed(ArchiveSnapshot()));
+                ShowTodos();
+                Note($"Forked  {sourceId}  ->  {_sessionId}");
+            },
+            cancellationToken);
     }
 
     private void ShowSessions(string argument)
@@ -2684,6 +2720,39 @@ public sealed class CodingSession : ITurnObserver
         foreach (var note in _loadedPlugins.Notes)
         {
             Note(note);
+        }
+    }
+
+    /// <summary>
+    /// Ends the plugin session while the current snapshot is still current,
+    /// applies <paramref name="change"/>, then starts it again when it was open.
+    /// </summary>
+    private async Task RebindPluginSessionAsync(Action change, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        var reopen = _pluginSessionOpen;
+        if (reopen)
+        {
+            await ClosePluginSessionAsync(cancellationToken);
+        }
+
+        try
+        {
+            change();
+        }
+        catch (Exception)
+        {
+            if (reopen)
+            {
+                await OpenPluginSessionAsync(cancellationToken);
+            }
+
+            throw;
+        }
+
+        if (reopen)
+        {
+            await OpenPluginSessionAsync(cancellationToken);
         }
     }
 
