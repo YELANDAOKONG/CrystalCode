@@ -60,6 +60,11 @@ internal static class StatusWidget
             rows.Add(("Approval model", status.ApprovalModel));
         }
 
+        if (status.ApprovalThinking is not null)
+        {
+            rows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
+        }
+
         return Card("Model", rows);
     }
 

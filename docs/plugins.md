@@ -183,7 +183,8 @@ until that plugin loads. Built-in tools are not listed.
 
 `AttachSession` runs with `Attach`, after `Contribute`, and again when
 that plugin instance is loaded again. The object stays live. `/model`,
-`/approval model`, and `/thinking` show up on the next read. The host does
+`/approval model`, `/approval thinking`, and `/thinking` show up on the
+next read. The host does
 not call `AttachSession` again for those changes.
 
 `Session` carries the provider, protocol, model name, context window,
@@ -192,7 +193,8 @@ gear. `default` and `off` are host sentinels. Other values are effort
 names such as `low` or `high`.
 
 `Review.Independent` is true only when review uses its own model. That
-model's thinking gear is `default`. While the switch is off, review uses
+model's thinking gear is its stored `thinkingEffort`, `default` when
+unset. While the switch is off, review uses
 the session model, `Model` is null, and a saved provider or model name is
 omitted. The facts include no API key, endpoint, organization, or project.
 

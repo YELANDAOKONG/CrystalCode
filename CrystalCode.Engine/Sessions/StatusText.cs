@@ -35,6 +35,11 @@ public static class StatusText
             modelRows.Add(("Approval model", status.ApprovalModel));
         }
 
+        if (status.ApprovalThinking is not null)
+        {
+            modelRows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
+        }
+
         AddSection(lines, "Model", modelRows);
         AddSection(
             lines,

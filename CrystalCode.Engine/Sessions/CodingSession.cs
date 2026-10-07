@@ -615,6 +615,12 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        if (ApprovalThinkingArguments.IsThinkingCommand(argument))
+        {
+            ChangeApprovalThinking(ApprovalThinkingArguments.Parse(argument));
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(argument))
         {
             _approval = ApprovalMode.Next(_approval);
@@ -703,6 +709,76 @@ public sealed class CodingSession : ITurnObserver
         Note(next.Describe());
     }
 
+    private void ChangeApprovalThinking(ApprovalThinkingArguments.Request request)
+    {
+        var approval = _settings.ApprovalModel;
+        if (!approval.HasSelection)
+        {
+            Error("Set an approval model before changing its thinking gear.");
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = _settings.Catalog.GetModel(
+                new ProviderName(approval.Provider!),
+                approval.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        if (!model.Thinking)
+        {
+            Error("The approval model does not support thinking.");
+            return;
+        }
+
+        var selection = approval.ThinkingEffort;
+        if (request.Effort is null)
+        {
+            selection = ThinkingSelection.Next(selection, model);
+        }
+        else
+        {
+            ThinkingSelection parsed;
+            try
+            {
+                parsed = ThinkingSelection.Parse(request.Effort);
+            }
+            catch (ArgumentException exception)
+            {
+                Error(exception.Message);
+                return;
+            }
+
+            if (parsed == ThinkingSelection.Off && !model.ThinkingCanDisable)
+            {
+                Error("The approval model cannot disable thinking.");
+                return;
+            }
+
+            if (parsed != ThinkingSelection.Default
+                && parsed != ThinkingSelection.Off
+                && !model.AllowsEffort(parsed.Value))
+            {
+                Error(
+                    $"Thinking effort '{parsed.Value}' is not available for the approval model.");
+                return;
+            }
+
+            selection = parsed;
+        }
+
+        SaveSettings(current => current.WithApprovalModel(
+            current.ApprovalModel.WithThinkingEffort(selection)));
+        RebuildExecutors();
+        Note("Approval thinking  " + ThinkingLabel.For(selection));
+    }
+
     private bool TrySelectApprovalModel(
         string selectionText,
         out ApprovalModelSettings settings,
@@ -727,7 +803,11 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        settings = new ApprovalModelSettings(true, selection.Provider.Value, selection.Model);
+        settings = new ApprovalModelSettings(
+            true,
+            selection.Provider.Value,
+            selection.Model,
+            _settings.ApprovalModel.ThinkingEffort);
         error = string.Empty;
         return true;
     }
@@ -1750,6 +1830,9 @@ public sealed class CodingSession : ITurnObserver
                 CustomStatusLineEnabled: _settings.StatusLine.Enabled,
                 ApprovalModel: _settings.ApprovalModel.Enabled
                     ? _settings.ApprovalModel.Provider + " / " + _settings.ApprovalModel.Model
+                    : null,
+                ApprovalThinking: _settings.ApprovalModel.Enabled
+                    ? CurrentApprovalThinkingStatus()
                     : null),
             full));
     }
@@ -3290,7 +3373,7 @@ public sealed class CodingSession : ITurnObserver
         var model = _settings.Catalog.GetModel(
             new ProviderName(_settings.ApprovalModel.Provider!),
             _settings.ApprovalModel.Model!);
-        return ThinkingSelection.Default.ToReasoningOptions(model);
+        return _settings.ApprovalModel.ThinkingEffort.ToReasoningOptions(model);
     }
 
     private void EnsureApprovalClient()
@@ -3340,6 +3423,14 @@ public sealed class CodingSession : ITurnObserver
 
     private string CurrentThinkingStatus() =>
         ThinkingStatus.For(_settings.ActiveModel, _thinkingEffort);
+
+    private string CurrentApprovalThinkingStatus()
+    {
+        var model = _settings.Catalog.GetModel(
+            new ProviderName(_settings.ApprovalModel.Provider!),
+            _settings.ApprovalModel.Model!);
+        return ThinkingStatus.For(model, _settings.ApprovalModel.ThinkingEffort);
+    }
 
     private string CurrentPromptStatus() =>
         string.Equals(

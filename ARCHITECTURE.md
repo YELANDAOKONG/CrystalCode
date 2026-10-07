@@ -643,26 +643,32 @@ Modes:
   Privileged, and outside-workspace paths never fully auto-pass.
 
 The reviewing model is the session model unless `approvalModel` is
-enabled in `config.json`. The object is `enabled`, `provider`, and
-`model`. An omitted object means off. `enabled: false` keeps a stored
-provider and model unused, and Review and Audit follow `/model` and the
-work thinking gear. While enabled, review calls use a separate client
-and that provider's credentials. `/model` and the work thinking gear do
-not apply. The reviewer uses the approval model's default thinking
-gear. Compaction stays on the session model. Review usage is not added
-to the work transcript. A missing credential, a missing catalog model,
-or a saved switch that names a model the catalog does not contain fails
-instead of falling back to the session model. `/approval model` shows
-the switch, turns it on or off, or sets a model or `provider model` and
-turns it on. `/status` adds an Approval model row only while the switch
-is on. The status bar does not.
+enabled in `config.json`. The object is `enabled`, `provider`, `model`,
+and optional `thinkingEffort`. An omitted object means off.
+`enabled: false` keeps a stored provider, model, and gear unused, and
+Review and Audit follow `/model` and the work thinking gear. While
+enabled, review calls use a separate client and that provider's
+credentials. `/model` and the work thinking gear do not apply. The
+reviewer uses the stored gear; a stored gear the model does not offer
+falls back to the provider default, like the work gear. Compaction
+stays on the session model. Review usage is not added to the work
+transcript. A missing credential, a missing catalog model, or a saved
+switch that names a model the catalog does not contain fails instead
+of falling back to the session model. `/approval model` shows the
+switch, turns it on or off, or sets a model or `provider model` and
+turns it on; a stored gear is kept. `/approval thinking` cycles the
+stored gear or sets one
+by name and persists it; it needs a stored or enabled approval model,
+but works while the switch is off. `/status` adds
+Approval model and Approval thinking rows only while the switch is on.
+The status bar does not.
 
 `crystal run` can set the switch for one process with
-`--approval-model on|off`, `--approval-provider`, and
-`--approval-model-id`. Those flags are not written to `config.json`.
+`--approval-model on|off`, `--approval-provider`, `--approval-model-id`,
+and `--approval-thinking`. Those flags are not written to `config.json`.
 Passing a provider or model id turns the switch on for that process.
-`--approval-model off` keeps any stored names unused and rejects a
-provider or model id on the same command.
+`--approval-model off` keeps any stored names and gear unused and rejects
+a provider or model id on the same command.
 
 Legacy config values `autoedit`, `fullreview`, and `full-review` still
 parse to Edit and Audit.
@@ -1180,10 +1186,12 @@ desktop front end uses C# markup and does not add XAML or AXAML files.
 assembly. It reads one task from an argument or from stdin, applies
 process-only overrides, starts one user turn, and exits. The interactive
 `crystal` and `crystal space` commands apply the same session overrides:
-approval, the approval model, Plan or Work, thinking, prompt set, prompt
-attachments, skills, external tools, plugins, and turn quotas. Overrides are not
-written to `config.json`. That includes the approval-model switch
-(`--approval-model`, `--approval-provider`, `--approval-model-id`).
+approval, the approval model and its thinking gear, Plan or Work, thinking,
+prompt set, prompt attachments, skills, external tools, plugins, and turn
+quotas. Overrides are not written to `config.json`. That includes the
+approval-model switch
+(`--approval-model`, `--approval-provider`, `--approval-model-id`) and gear
+(`--approval-thinking`).
 A later interactive preference command writes the field the operator changed,
 and can also write a `--provider` or `--model` passed at launch. It does not
 write the other launch overrides. The task text, `--format`,

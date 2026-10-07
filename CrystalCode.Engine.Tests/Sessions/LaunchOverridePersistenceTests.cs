@@ -67,6 +67,31 @@ public sealed class LaunchOverridePersistenceTests
         Assert.DoesNotContain("audit", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PreferenceSave_KeepsLaunchApprovalGearOffDisk()
+    {
+        var baseline = HeadlessSession.ScriptedSettings(thinking: true)
+            .WithApprovalModel(new ApprovalModelSettings(
+                true,
+                "scripted",
+                "model",
+                ThinkingSelection.Parse("low")));
+        var live = baseline.WithApprovalModel(
+            baseline.ApprovalModel.WithThinkingEffort(ThinkingSelection.Parse("high")));
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: live,
+            persistedSettings: baseline);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/tokens on", CancellationToken.None);
+
+        var saved = Read(headless);
+        Assert.NotNull(saved.ApprovalModel);
+        Assert.True(saved.ApprovalModel!.Enabled);
+        Assert.Equal("low", saved.ApprovalModel.ThinkingEffort);
+    }
+
     private static SettingsDocument Read(HeadlessSession headless)
     {
         var json = File.ReadAllText(headless.Home.ConfigPath);

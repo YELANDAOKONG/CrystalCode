@@ -199,12 +199,21 @@ public sealed class SettingsStore
                 "approvalModel.enabled requires provider and model.");
         }
 
-        return new ApprovalModelSettings(document.Enabled ?? false, provider, model);
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new ApprovalModelSettings(
+            document.Enabled ?? false,
+            provider,
+            model,
+            thinkingEffort);
     }
 
     private static ApprovalModelDocument? WriteApprovalModel(ApprovalModelSettings settings)
     {
-        if (!settings.Enabled && !settings.HasSelection)
+        if (!settings.Enabled
+            && !settings.HasSelection
+            && settings.ThinkingEffort == ThinkingSelection.Default)
         {
             return null;
         }
@@ -213,7 +222,10 @@ public sealed class SettingsStore
         {
             Enabled = settings.Enabled ? true : null,
             Provider = settings.Provider,
-            Model = settings.Model
+            Model = settings.Model,
+            ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
+                ? null
+                : settings.ThinkingEffort.Value
         };
     }
 

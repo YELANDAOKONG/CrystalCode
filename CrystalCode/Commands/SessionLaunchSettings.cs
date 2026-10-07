@@ -30,6 +30,9 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--approval-model-id <MODEL>")]
     public string? ApprovalModelId { get; init; }
 
+    [CommandOption("--approval-thinking <EFFORT>")]
+    public string? ApprovalThinking { get; init; }
+
     [CommandOption("--plan")]
     public bool Plan { get; init; }
 

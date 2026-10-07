@@ -68,7 +68,8 @@ separate library with no terminal code. The product can:
   That flag cannot be combined with `--workspace`;
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
-  approval, the approval model, Plan or Work, thinking, prompt set, prompt
+  approval, the approval model and its thinking gear, Plan or Work,
+  thinking, prompt set, prompt
   attachments, skills, external tools, and turn quotas for that process only.
   They are not written to `config.json` or `prompt.json`. Stdout is a readable plain-text trace, or one JSON object
   per line when `--format json` is set. Review and Audit still use the

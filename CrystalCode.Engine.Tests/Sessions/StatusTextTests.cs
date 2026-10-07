@@ -64,6 +64,7 @@ public sealed class StatusTextTests
             line => line.Contains("Verbose thinking", StringComparison.Ordinal)
                 && line.TrimEnd().EndsWith("Off", StringComparison.Ordinal));
         Assert.DoesNotContain("Approval model", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Approval thinking", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -95,11 +96,14 @@ public sealed class StatusTextTests
             WorkTools: 1,
             ExternalTools: 0,
             CumulativeUsage: null,
-            ApprovalModel: "openai / gpt-5.6-sol");
+            ApprovalModel: "openai / gpt-5.6-sol",
+            ApprovalThinking: "Think High");
 
         var text = StatusText.Format(status, full: false);
 
-        Assert.Contains("Approval model  openai / gpt-5.6-sol", text, StringComparison.Ordinal);
+        Assert.Contains("Approval model", text, StringComparison.Ordinal);
+        Assert.Contains("openai / gpt-5.6-sol", text, StringComparison.Ordinal);
+        Assert.Contains("Approval thinking  High", text, StringComparison.Ordinal);
     }
 
     [Fact]

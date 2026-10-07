@@ -903,6 +903,38 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Save_RoundTripsAndOmitsTheApprovalThinkingGear()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithApprovalModel(
+            new ApprovalModelSettings(
+                true,
+                "openai",
+                "gpt-5.6-sol",
+                ThinkingSelection.Parse("high")));
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal("high", loaded.ApprovalModel.ThinkingEffort.Value);
+        Assert.Contains(
+            "\"thinkingEffort\": \"high\"",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+
+        store.Save(loaded.WithApprovalModel(
+            loaded.ApprovalModel.WithThinkingEffort(ThinkingSelection.Default)));
+        var after = store.Load();
+
+        Assert.Equal(ThinkingSelection.Default, after.ApprovalModel.ThinkingEffort);
+        Assert.DoesNotContain(
+            "thinkingEffort",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Save_KeepsADisabledApprovalModelWithoutEnablingIt()
     {
         using var root = new TemporaryHome();

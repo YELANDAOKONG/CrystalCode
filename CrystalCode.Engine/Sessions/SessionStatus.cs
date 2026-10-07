@@ -38,4 +38,5 @@ public sealed record SessionStatus(
     bool VerboseApprovalsEnabled = true,
     bool VerboseThinkingEnabled = true,
     bool PluginsEnabled = true,
-    int Plugins = 0);
+    int Plugins = 0,
+    string? ApprovalThinking = null);

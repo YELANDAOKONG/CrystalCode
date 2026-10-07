@@ -48,6 +48,6 @@ internal static class PluginModelFacts
         var model = catalog.GetModel(providerName, approval.Model);
         return new PluginReview(
             true,
-            Describe(provider, approval.Model, model, ThinkingSelection.Default.Value));
+            Describe(provider, approval.Model, model, approval.ThinkingEffort.Value));
     }
 }

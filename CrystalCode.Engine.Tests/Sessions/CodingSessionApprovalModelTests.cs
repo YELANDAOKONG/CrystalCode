@@ -62,6 +62,96 @@ public sealed class CodingSessionApprovalModelTests
     }
 
     [Fact]
+    public async Task Commands_SetAndCycleTheApprovalThinkingGear()
+    {
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: HeadlessSession.ScriptedSettings(thinking: true));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/approval thinking low", CancellationToken.None);
+        Assert.Equal(
+            "Set an approval model before changing its thinking gear.",
+            LastError(headless));
+
+        await headless.Session.SubmitAsync("/approval model model", CancellationToken.None);
+        await headless.Session.SubmitAsync("/approval thinking", CancellationToken.None);
+        Assert.Equal("Approval thinking  Off", LastNote(headless));
+
+        await headless.Session.SubmitAsync("/approval thinking", CancellationToken.None);
+        Assert.Equal("Approval thinking  Low", LastNote(headless));
+
+        await headless.Session.SubmitAsync("/approval thinking", CancellationToken.None);
+        Assert.Equal("Approval thinking  High", LastNote(headless));
+
+        await headless.Session.SubmitAsync("/approval thinking", CancellationToken.None);
+        Assert.Equal("Approval thinking  Default", LastNote(headless));
+
+        await headless.Session.SubmitAsync("/approval thinking high", CancellationToken.None);
+        Assert.Equal("Approval thinking  High", LastNote(headless));
+        Assert.Contains(
+            "\"thinkingEffort\": \"high\"",
+            File.ReadAllText(headless.Home.ConfigPath),
+            StringComparison.Ordinal);
+
+        await headless.Session.SubmitAsync("/approval model model", CancellationToken.None);
+        Assert.Equal(
+            "Approval model  On  scripted  model  ·  Think High",
+            LastNote(headless));
+
+        await headless.Session.SubmitAsync("/approval thinking maximum", CancellationToken.None);
+        Assert.Equal(
+            "Thinking effort 'maximum' is not available for the approval model.",
+            LastError(headless));
+
+        var status = await ReportedStatusAsync(headless);
+        Assert.Equal("scripted / model", status.ApprovalModel);
+        Assert.Equal("Think High", status.ApprovalThinking);
+    }
+
+    [Fact]
+    public async Task Commands_RejectApprovalThinkingForAModelWithoutThinking()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/approval model model", CancellationToken.None);
+        await headless.Session.SubmitAsync("/approval thinking low", CancellationToken.None);
+
+        Assert.Equal("The approval model does not support thinking.", LastError(headless));
+    }
+
+    [Fact]
+    public async Task Commands_RejectOffWhenTheApprovalModelCannotDisableThinking()
+    {
+        var model = new ModelSettings(
+            200_000,
+            thinking: true,
+            thinkingEfforts: ["low", "high"],
+            thinkingCanDisable: false);
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings> { ["model"] = model });
+        var settings = new HarnessSettings(
+            provider.Name,
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([provider]));
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/approval model model", CancellationToken.None);
+        await headless.Session.SubmitAsync("/approval thinking off", CancellationToken.None);
+
+        Assert.Equal("The approval model cannot disable thinking.", LastError(headless));
+    }
+
+    [Fact]
     public async Task Review_UsesTheApprovalModelAndKeepsItAcrossWorkModelChanges()
     {
         var outside = Path.Combine(Path.GetTempPath(), "crystal-approval-" + Guid.NewGuid().ToString("N") + ".txt");
@@ -173,6 +263,45 @@ public sealed class CodingSessionApprovalModelTests
     }
 
     [Fact]
+    public async Task Review_UsesTheConfiguredApprovalThinkingGear()
+    {
+        var outside = Path.Combine(Path.GetTempPath(), "crystal-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        await File.WriteAllTextAsync(outside, "outside-text");
+        var work = new CountingClient(ToolRound(outside), TextRound("Read it."));
+        var reviewer = new CountingClient();
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var observer = new RecordingSessionObserver();
+        var approvals = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var session = Open(
+            Settings(enabled: true, approvalThinking: ThinkingSelection.Parse("high")),
+            new Dictionary<string, IStreamingChatClient>
+            {
+                ["work"] = work,
+                ["reviewer"] = reviewer
+            },
+            home,
+            workspace,
+            observer,
+            approvals);
+        try
+        {
+            await session.StartAsync(CancellationToken.None);
+            await RunTurnAsync(session, "Read the outside file.");
+
+            Assert.Equal(1, reviewer.CompleteCount);
+            Assert.Equal(0, reviewer.StreamCount);
+            Assert.Equal(ReasoningMode.Enabled, reviewer.LastComplete?.Reasoning?.Mode);
+            Assert.Equal(ReasoningEffort.High, reviewer.LastComplete?.Reasoning?.Effort);
+        }
+        finally
+        {
+            session.Close();
+            File.Delete(outside);
+        }
+    }
+
+    [Fact]
     public void Create_FailsWhenTheEnabledApprovalModelHasNoCredential()
     {
         using var home = new TemporaryHome();
@@ -215,9 +344,15 @@ public sealed class CodingSessionApprovalModelTests
         Assert.Contains("Missing API key", exception.Message, StringComparison.Ordinal);
     }
 
-    private static HarnessSettings Settings(bool enabled)
+    private static HarnessSettings Settings(
+        bool enabled,
+        ThinkingSelection? approvalThinking = null)
     {
-        var selection = new ApprovalModelSettings(enabled, "scripted", "reviewer");
+        var selection = new ApprovalModelSettings(
+            enabled,
+            "scripted",
+            "reviewer",
+            approvalThinking);
         return new HarnessSettings(
             new ProviderName("scripted"),
             "work",
@@ -289,6 +424,14 @@ public sealed class CodingSessionApprovalModelTests
         var quit = await headless.Session.SubmitAsync("/status", CancellationToken.None);
         Assert.False(quit);
         return headless.Observer.Events.OfType<StatusReported>().Single().Status.ApprovalModel;
+    }
+
+    private static async Task<SessionStatus> ReportedStatusAsync(HeadlessSession headless)
+    {
+        headless.Observer.Clear();
+        var quit = await headless.Session.SubmitAsync("/status", CancellationToken.None);
+        Assert.False(quit);
+        return headless.Observer.Events.OfType<StatusReported>().Single().Status;
     }
 
     private static string LastNote(HeadlessSession headless) =>

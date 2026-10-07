@@ -549,13 +549,15 @@ public sealed class TaskRunHostTests
         var settings = Copy(
             fixture.Settings("Say hello"),
             approvalModel: "on",
-            approvalModelId: "qwen3:8b");
+            approvalModelId: "qwen3:8b",
+            approvalThinking: "high");
 
         var result = await fixture.RunAsync(client, settings);
 
         Assert.Equal(RunExit.Completed, result.Code);
         fixture.AssertSettingsUnchanged();
         Assert.False(fixture.Reload().ApprovalModel.Enabled);
+        Assert.Equal(ThinkingSelection.Default, fixture.Reload().ApprovalModel.ThinkingEffort);
     }
 
     [Fact]
@@ -588,6 +590,24 @@ public sealed class TaskRunHostTests
         Assert.Equal("openai", selected.ApprovalModel.Provider);
         Assert.Equal("gpt-5.6-terra", selected.ApprovalModel.Model);
         Assert.Equal(ProviderName.DeepSeek, selected.Provider);
+
+        var geared = AssertApplied(
+            HarnessSettings.CreateDefault(),
+            new TaskRunSettings { ApprovalThinking = "high" });
+        Assert.False(geared.ApprovalModel.Enabled);
+        Assert.Equal("high", geared.ApprovalModel.ThinkingEffort.Value);
+
+        var selectedWithGear = AssertApplied(
+            stored,
+            new TaskRunSettings
+            {
+                ApprovalModelId = "gpt-5.6-sol",
+                ApprovalThinking = "high"
+            });
+        Assert.True(selectedWithGear.ApprovalModel.Enabled);
+        Assert.Equal("gpt-5.6-sol", selectedWithGear.ApprovalModel.Model);
+        Assert.Equal("high", selectedWithGear.ApprovalModel.ThinkingEffort.Value);
+        Assert.Equal(ThinkingSelection.Default, stored.ApprovalModel.ThinkingEffort);
     }
 
     [Fact]
@@ -613,6 +633,14 @@ public sealed class TaskRunHostTests
             out var missing));
         Assert.Equal("Pass --approval-model-id.", missing);
         Assert.False(current.ApprovalModel.Enabled);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { ApprovalThinking = "bogus" },
+            out _,
+            out _,
+            out var gearError));
+        Assert.Contains("Thinking effort must be", gearError, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -804,7 +832,8 @@ public sealed class TaskRunHostTests
         bool showThinking = false,
         string? approvalModel = null,
         string? approvalProvider = null,
-        string? approvalModelId = null) =>
+        string? approvalModelId = null,
+        string? approvalThinking = null) =>
         new()
         {
             TaskText = settings.TaskText,
@@ -823,7 +852,8 @@ public sealed class TaskRunHostTests
             ShowThinking = showThinking,
             ApprovalModel = approvalModel,
             ApprovalProvider = approvalProvider,
-            ApprovalModelId = approvalModelId
+            ApprovalModelId = approvalModelId,
+            ApprovalThinking = approvalThinking
         };
 
     private static ChatStreamEvent[] TextRound(string text, string? thinking = null)

@@ -162,6 +162,7 @@ CLI options:
 | `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
+| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Stored even while the approval-model switch is off |
 | `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. `/promptset` switching is refused and does not write the file. Listing and export stay available |
@@ -296,6 +297,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
+| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Stored even while the switch is off. Same values as `/approval thinking`; an unsupported gear falls back to the provider default, and an unknown value exits 1 |
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. An unknown value exits 1 |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
@@ -311,7 +313,9 @@ checks the directory. `unlimited` removes that one cap.
 
 `--approval-model off` cannot be combined with `--approval-provider` or
 `--approval-model-id`. `--approval-model on` needs a saved approval model
-or `--approval-model-id`.
+or `--approval-model-id`. `--approval-thinking` stores a gear for the
+saved or flag-selected approval model; it is ignored while the switch is
+off.
 
 `--workspace-trust` is not one of the flags that inherit the saved
 setting. Leaving it out checks the directory even when `workspaceTrust`
@@ -447,7 +451,7 @@ Top-level fields:
 | `provider` | Active provider name |
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
-| `approvalModel` | Optional reviewer. `enabled`, `provider`, and `model`. Omitted means off. `enabled: false` keeps a stored provider and model unused |
+| `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
@@ -586,7 +590,8 @@ it. Restart after editing `providers.json`. Select the model with
 `/model openrouter anthropic/claude-sonnet-4`, or set `provider` and
 `model` in `config.json`.
 CLI `--provider` and `--model` override that selection for one run;
-`/approval` (including `/approval model`), `/thinking`, and `/model` write their values to `config.json`.
+`/approval` (including `/approval model` and `/approval thinking`),
+`/thinking`, and `/model` write their values to `config.json`.
 
 ### Example: add an Anthropic (Claude) provider
 
@@ -835,18 +840,25 @@ values `autoedit`, `fullreview`, and `full-review` still parse.
 The reviewing model is the session model unless you turn on a separate
 approval model. `/approval model` shows `Approval model  Off`, or
 `Approval model  On  openai  gpt-5.6-sol` when a provider and model are
-stored. `/approval model on` and `/approval model off` persist the
-switch and leave a stored provider and model in place. `/approval model
-<model>` or `/approval model <provider> <model>` selects a catalog model
-and turns the switch on. The model must exist in `providers.json`. A
+stored; a stored non-default gear is appended as `·  Think High`.
+`/approval model on` and `/approval model off` persist the
+switch and leave a stored provider, model, and gear in place. `/approval model
+<model>` or `/approval model <provider> <model>` selects a catalog model,
+keeps the stored gear, and turns the switch on. The model must exist in
+`providers.json`. A
 missing credential or an unknown model is refused, and the previous
 setting stays. While the switch is on, Review and Audit call that
-model with its own credentials and its default thinking gear. `/model`
+model with its own credentials and its stored thinking gear.
+`/approval thinking` cycles that gear, or sets one by name, and
+persists it. It needs a stored or selected approval model and works
+while the switch is off. A stored gear the model does
+not offer falls back to the provider default, and `/approval thinking`
+refuses `off` for a model that cannot disable thinking. `/model`
 and the work thinking gear do not change it. Compaction stays on the
 session model. While the switch is off, no separate client is created
 and Review and Audit follow `/model`. Finish the current turn before
-changing the approval model. `/status` adds an Approval model row only
-while the switch is on. The status bar does not.
+changing the approval model. `/status` adds Approval model and Approval
+thinking rows only while the switch is on. The status bar does not.
 
 When you are asked, the overlay uses a two-column field grid
 (Status, Reason, Risk, Authority, and for review also Outcome plus
@@ -880,6 +892,11 @@ may deny those calls or escalate them to you. Writes under `.ssh`,
 name: `off`, `none`, `default`, `minimal`, `low`, `medium`, `high`,
 `maximum`, `max`. Tab completes the argument from the efforts the
 selected model lists. The choice is written to `config.json`.
+
+The approval model has its own gear. `/approval thinking` cycles it, or
+sets one by name, restricted to that model's efforts, and stores it in
+`approvalModel.thinkingEffort`. It applies while the approval-model
+switch is on.
 
 If the selected model does not support thinking, the command reports
 that and does nothing. The status bar shows `Think Off`, or `Think`
@@ -932,7 +949,7 @@ returns the transcript viewport to the latest output.
 | :--- | :--- | :--- |
 | `/help` | `/h` | Shortcuts and commands |
 | `/plan` | | Toggle Plan / Work |
-| `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model |
+| `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model; `thinking` cycles or sets its gear |
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |

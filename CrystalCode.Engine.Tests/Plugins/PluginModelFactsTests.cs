@@ -50,6 +50,23 @@ public sealed class PluginModelFactsTests
     }
 
     [Fact]
+    public void DescribeReview_UsesTheStoredThinkingGear()
+    {
+        var settings = HarnessSettings.CreateDefault();
+        var enabled = new ApprovalModelSettings(
+            true,
+            settings.Provider.Value,
+            settings.Model,
+            ThinkingSelection.Parse("high"));
+
+        var review = PluginModelFacts.DescribeReview(enabled, settings.Catalog);
+
+        Assert.True(review.Independent);
+        Assert.NotNull(review.Model);
+        Assert.Equal("high", review.Model.Thinking);
+    }
+
+    [Fact]
     public void View_RereadsTheCurrentSwitchAndGear()
     {
         var settings = HarnessSettings.CreateDefault();

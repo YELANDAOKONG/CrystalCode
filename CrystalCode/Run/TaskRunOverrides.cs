@@ -47,6 +47,14 @@ internal static class TaskRunOverrides
                 next = next.WithApprovalModel(ParseApprovalModel(next, request));
             }
 
+            if (request.ApprovalThinking is not null)
+            {
+                var effort = ThinkingSelection.Parse(
+                    Required(request.ApprovalThinking, "Approval thinking"));
+                next = next.WithApprovalModel(
+                    next.ApprovalModel.WithThinkingEffort(effort));
+            }
+
             if (request.Thinking is not null)
             {
                 next = next.WithThinkingEffort(

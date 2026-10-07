@@ -121,11 +121,15 @@ public sealed class StatusWidgetTests
             8,
             0,
             null,
-            ApprovalModel: "openai / gpt-5.6-sol");
+            ApprovalModel: "openai / gpt-5.6-sol",
+            ApprovalThinking: "Think High");
 
         var text = string.Join('\n', WidgetPaint.Plain(StatusWidget.Create(status, full: false), 88));
 
         Assert.Contains("Approval model", text, StringComparison.Ordinal);
-        Assert.Contains("openai / gpt-5.6-sol", text, StringComparison.Ordinal);
+        Assert.Contains("openai /", text, StringComparison.Ordinal);
+        Assert.Contains("gpt-5.6-sol", text, StringComparison.Ordinal);
+        Assert.Contains("Approval thinking", text, StringComparison.Ordinal);
+        Assert.Contains("High", text, StringComparison.Ordinal);
     }
 }

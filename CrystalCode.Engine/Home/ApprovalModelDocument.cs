@@ -7,4 +7,6 @@ internal sealed class ApprovalModelDocument
     public string? Provider { get; set; }
 
     public string? Model { get; set; }
+
+    public string? ThinkingEffort { get; set; }
 }
