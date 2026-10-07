@@ -134,7 +134,7 @@ public sealed class ReadTool : ITool
 
             builder.Append(lineNumber.ToString().PadLeft(6));
             builder.Append('|');
-            builder.AppendLine(line);
+            ToolOutputText.AppendLine(builder, line);
             written++;
         }
 
@@ -153,7 +153,8 @@ public sealed class ReadTool : ITool
 
         if (truncated)
         {
-            builder.AppendLine(
+            ToolOutputText.AppendLine(
+                builder,
                 $"[truncated after {written} lines; file has at least {lineNumber} lines]");
         }
 

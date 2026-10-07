@@ -130,12 +130,13 @@ public sealed class ListTool : ITool
             var builder = new StringBuilder();
             for (var index = start - 1; index < start - 1 + count; index++)
             {
-                builder.AppendLine(entries[index]);
+                ToolOutputText.AppendLine(builder, entries[index]);
             }
 
             if (start - 1 + count < entries.Count)
             {
-                builder.AppendLine(
+                ToolOutputText.AppendLine(
+                    builder,
                     $"[showing {count} of {entries.Count} entries; continue with offset {start + count}]");
             }
 

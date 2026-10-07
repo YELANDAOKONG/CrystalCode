@@ -6,6 +6,10 @@
 - Keep BUSINESS.md, ARCHITECTURE.md, and this file synchronized with material
   behavior changes.
 - Runtime and exception text is plain English and contains no emoji.
+- Model-visible tool text uses explicit LF separators
+  (`ToolOutputText.LineSeparator`, `ToolOutputText.AppendLine`), never
+  `Environment.NewLine` or `StringBuilder.AppendLine`. Tool text reaches
+  providers and session files, so it stays identical on every platform.
 - Crystal-authored diagnostics rules still apply to host logs: no credentials,
   no raw API keys, no secret file contents.
 - Comments explain constraints and intent rather than syntax.

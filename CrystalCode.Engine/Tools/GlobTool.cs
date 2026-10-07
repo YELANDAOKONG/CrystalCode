@@ -183,12 +183,13 @@ public sealed class GlobTool : ITool
             var builder = new StringBuilder();
             for (var index = start - 1; index < start - 1 + count; index++)
             {
-                builder.AppendLine(selected[index]);
+                ToolOutputText.AppendLine(builder, selected[index]);
             }
 
             if (start - 1 + count < total)
             {
-                builder.AppendLine(
+                ToolOutputText.AppendLine(
+                    builder,
                     $"[showing {count} of {total} files; continue with offset {start + count}]");
             }
 

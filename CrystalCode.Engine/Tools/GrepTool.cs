@@ -128,7 +128,9 @@ public sealed class GrepTool : ITool
 
         if (truncated)
         {
-            builder.AppendLine($"[truncated to {WorkspaceLimits.MaximumGrepMatches} matches]");
+            ToolOutputText.AppendLine(
+                builder,
+                $"[truncated to {WorkspaceLimits.MaximumGrepMatches} matches]");
         }
 
         return ValueTask.FromResult(new ToolOutput(builder.ToString().TrimEnd()));
@@ -223,7 +225,7 @@ public sealed class GrepTool : ITool
             builder.Append(':');
             builder.Append(lineNumber);
             builder.Append(':');
-            builder.AppendLine(line);
+            ToolOutputText.AppendLine(builder, line);
             matches++;
             if (matches >= WorkspaceLimits.MaximumGrepMatches)
             {

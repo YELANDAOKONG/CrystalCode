@@ -160,7 +160,7 @@ internal sealed class ExecExternalTool : ITool, IMultimodalTool
 
         return streams.Stdout.Length == 0
             ? streams.Stderr
-            : streams.Stdout + Environment.NewLine + streams.Stderr;
+            : streams.Stdout + ToolOutputText.LineSeparator + streams.Stderr;
     }
 
     private static string PrefixExit(int exitCode, string text) =>

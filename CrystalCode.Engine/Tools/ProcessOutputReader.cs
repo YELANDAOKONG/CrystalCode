@@ -21,7 +21,7 @@ internal static class ProcessOutputReader
         return ToolOutputText.Truncate(
             streams.Stdout.Length == 0
                 ? streams.Stderr
-                : streams.Stdout + Environment.NewLine + streams.Stderr);
+                : streams.Stdout + ToolOutputText.LineSeparator + streams.Stderr);
     }
 
     public static async Task<Streams> ReadStreamsAsync(

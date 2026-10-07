@@ -78,5 +78,6 @@ public sealed class GrepToolTests
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("a.txt:1:alpha", output.Text);
         Assert.Contains("link.txt:1:alpha", output.Text);
+        Assert.DoesNotContain("\r", output.Text);
     }
 }

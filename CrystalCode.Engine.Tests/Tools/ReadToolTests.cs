@@ -21,6 +21,7 @@ public sealed class ReadToolTests
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("1|alpha", output.Text);
         Assert.Contains("2|beta", output.Text);
+        Assert.DoesNotContain("\r", output.Text);
     }
 
     [Fact]
