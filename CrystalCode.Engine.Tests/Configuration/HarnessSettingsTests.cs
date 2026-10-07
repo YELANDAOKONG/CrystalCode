@@ -102,6 +102,17 @@ public sealed class HarnessSettingsTests
     }
 
     [Fact]
+    public void WithPromptAttachments_ReplacesTheEnabledList()
+    {
+        var settings = HarnessSettings.CreateDefault().WithPromptAttachments(["alpha"]);
+
+        var next = settings.WithPromptAttachments(["beta", " gamma "]);
+
+        Assert.Equal(["beta", "gamma"], next.PromptAttachments);
+        Assert.Equal(["alpha"], settings.PromptAttachments);
+    }
+
+    [Fact]
     public void WithExportDirectory_ClearsConfiguredDirectory()
     {
         var settings = HarnessSettings.CreateDefault().WithExportDirectory("workspace");

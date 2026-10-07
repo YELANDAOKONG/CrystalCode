@@ -803,6 +803,37 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Save_RoundTripsPromptAttachmentsInOrder()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithPromptAttachments(["beta", "alpha"]);
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal(["beta", "alpha"], loaded.PromptAttachments);
+        Assert.Contains(
+            "\"promptAttachments\":",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_OmitsEmptyPromptAttachments()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+
+        store.Save(store.LoadOrCreate().WithPromptAttachments(["alpha"]).WithPromptAttachments([]));
+
+        Assert.DoesNotContain(
+            "promptAttachments",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Save_OmitsDefaultPromptSet()
     {
         using var root = new TemporaryHome();

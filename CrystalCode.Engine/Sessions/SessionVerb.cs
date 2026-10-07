@@ -13,6 +13,7 @@ public enum SessionVerb
     Tokens,
     Model,
     PromptSet,
+    PromptAttachment,
     Status,
     Stats,
     Btw,

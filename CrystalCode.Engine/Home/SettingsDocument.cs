@@ -32,6 +32,8 @@ internal sealed class SettingsDocument
 
     public string? PromptSet { get; set; }
 
+    public List<string>? PromptAttachments { get; set; }
+
     public string? ExportDirectory { get; set; }
 
     public bool? CustomStatusLine { get; set; }

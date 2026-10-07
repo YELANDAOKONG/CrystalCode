@@ -13,6 +13,7 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? thinkingArguments = null,
         IReadOnlyList<SlashCompletion>? modelArguments = null,
         IReadOnlyList<SlashCompletion>? promptSetArguments = null,
+        IReadOnlyList<SlashCompletion>? promptAttachmentArguments = null,
         IReadOnlyList<SlashCompletion>? toolArguments = null,
         IReadOnlyList<SlashCompletion>? exportArguments = null)
     {
@@ -26,6 +27,7 @@ public static class SlashMenu
                 thinkingArguments,
                 modelArguments,
                 promptSetArguments,
+                promptAttachmentArguments,
                 toolArguments,
                 exportArguments);
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
@@ -49,6 +51,7 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? thinkingArguments,
         IReadOnlyList<SlashCompletion>? modelArguments,
         IReadOnlyList<SlashCompletion>? promptSetArguments,
+        IReadOnlyList<SlashCompletion>? promptAttachmentArguments,
         IReadOnlyList<SlashCompletion>? toolArguments,
         IReadOnlyList<SlashCompletion>? exportArguments)
     {
@@ -65,6 +68,11 @@ public static class SlashMenu
         if (spec.Verb == SessionVerb.PromptSet && promptSetArguments is not null)
         {
             return promptSetArguments;
+        }
+
+        if (spec.Verb == SessionVerb.PromptAttachment && promptAttachmentArguments is not null)
+        {
+            return promptAttachmentArguments;
         }
 
         if (spec.Verb == SessionVerb.Tools && toolArguments is not null)

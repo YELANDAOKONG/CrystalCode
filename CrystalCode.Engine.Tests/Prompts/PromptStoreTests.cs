@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
@@ -318,6 +319,147 @@ public sealed class PromptStoreTests
     }
 
     [Fact]
+    public void Resolve_AppendsEnabledAttachmentsInListOrder()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "work.md", "ALPHA");
+        WritePrompt(AttachmentDirectory(home.Home, "beta"), "work.md", "BETA");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(
+            workspace.Path,
+            PromptSetNames.Default,
+            ["beta", "alpha"]);
+        var text = resolution.Prompts.ComposeWork(PromptContext.InstructionsOnly(string.Empty));
+
+        Assert.EndsWith("BETA\n\nALPHA", text, StringComparison.Ordinal);
+        Assert.Equal(["BETA", "ALPHA"], resolution.Prompts.WorkAttachments);
+    }
+
+    [Fact]
+    public void Resolve_WorkspaceAttachmentReplacesHomeCopy()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "work.md", "HOME EXTRA");
+        WritePrompt(ProjectAttachmentDirectory(workspace.Path, "alpha"), "work.md", "WORKSPACE EXTRA");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["alpha"]);
+        var text = resolution.Prompts.ComposeWork(PromptContext.InstructionsOnly(string.Empty));
+
+        Assert.Contains("WORKSPACE EXTRA", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("HOME EXTRA", text, StringComparison.Ordinal);
+        Assert.Equal(PromptAttachmentSource.Workspace, resolution.Attachments[0].Source);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("workspace copy", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resolve_DoesNotWalkParentDirectoriesForAttachments()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var child = Path.Combine(workspace.Path, "nested");
+        Directory.CreateDirectory(child);
+        WritePrompt(ProjectAttachmentDirectory(workspace.Path, "parent-only"), "work.md", "FROM PARENT");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(child, PromptSetNames.Default, ["parent-only"]);
+
+        Assert.DoesNotContain("FROM PARENT", resolution.Prompts.WorkSystem, StringComparison.Ordinal);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("was not found", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resolve_SkipsAMissingModeFileAndExpandsPlaceholders()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "plan.md", "PLAN EXTRA");
+        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "review.md", "See {{workspace}}");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["alpha"]);
+        var context = PromptContext.Create(
+            workspace.Path,
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty);
+
+        Assert.DoesNotContain("PLAN EXTRA", resolution.Prompts.ComposeWork(context), StringComparison.Ordinal);
+        Assert.Contains("PLAN EXTRA", resolution.Prompts.ComposePlan(context), StringComparison.Ordinal);
+        Assert.Contains(
+            workspace.Path,
+            resolution.Prompts.ComposeReview(context.WithMode("review")),
+            StringComparison.Ordinal);
+        Assert.Empty(resolution.Prompts.WorkAttachments);
+    }
+
+    [Fact]
+    public void Resolve_NotesAMissingAttachmentWithoutUsingIt()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["missing", "missing"]);
+
+        Assert.Equal(WorkPrompt.Text, resolution.Prompts.Work);
+        Assert.Empty(resolution.Prompts.WorkAttachments);
+        Assert.Equal("missing", resolution.Attachments[0].Name);
+        Assert.Null(resolution.Attachments[0].Source);
+        Assert.True(resolution.Attachments[0].Enabled);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("was not found", StringComparison.Ordinal));
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("more than once", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resolve_ListsADisabledAttachmentWithoutAppendingIt()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "work.md", "ALPHA");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, []);
+
+        Assert.DoesNotContain("ALPHA", resolution.Prompts.WorkSystem, StringComparison.Ordinal);
+        Assert.False(resolution.Attachments[0].Enabled);
+        Assert.Equal(PromptAttachmentSource.Home, resolution.Attachments[0].Source);
+    }
+
+    [Fact]
+    public void Resolve_SkipsInvalidAndEmptyAttachmentDirectories()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        WritePrompt(AttachmentDirectory(home.Home, "Bad_Name"), "work.md", "bad");
+        WritePrompt(AttachmentDirectory(home.Home, "empty"), "work.md", "   ");
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["Bad_Name"]);
+
+        Assert.Empty(resolution.Prompts.WorkAttachments);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("directory name is invalid", StringComparison.Ordinal));
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("no prompt files", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ContainsSet_RequiresAHomePromptFile()
     {
         using var home = new TemporaryHome();
@@ -334,6 +476,12 @@ public sealed class PromptStoreTests
         Assert.True(store.ContainsSet("concise"));
         Assert.False(store.ContainsSet("Bad_Name"));
     }
+
+    private static string AttachmentDirectory(CrystalHome home, string name) =>
+        Path.Combine(home.PromptAttachmentsDirectory, name);
+
+    private static string ProjectAttachmentDirectory(string workspace, string name) =>
+        Path.Combine(workspace, PromptStore.ProjectDirectoryName, "prompt-attachments", name);
 
     private static PromptStore CreateStore(TemporaryHome home) =>
         new(home.Home, InstructionDiscovery.Isolated(home.Home));

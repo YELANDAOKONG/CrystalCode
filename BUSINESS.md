@@ -78,6 +78,9 @@ separate library with no terminal code. The product can:
   recent text-only entries across runs for the same workspace;
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace;
+- enable an ordered list of prompt attachments that append to the resolved
+  Work, Plan, and Review text; directories are discovered in Home and in the
+  current workspace, and the workspace copy wins when both exist;
 - list saved sessions for the current workspace or every workspace; resume the
   current workspace, a named directory, or every workspace, entering that
   directory when the choice names one; and fork into a new independent session;
@@ -172,7 +175,11 @@ User data lives in `~/.crystal`. Prompts may be replaced in
 definitions live in `~/.crystal/providers.json`; changing preferences in
 `config.json` does not rewrite those definitions. The legacy
 `config.json.providers` field remains readable for existing installations.
-Home-only reusable prompt sets live under `~/.crystal/promptsets`; workspace
+Home-only reusable prompt sets live under `~/.crystal/promptsets`. Prompt
+attachments live under `~/.crystal/prompt-attachments` and
+`<workspace>/.crystal/prompt-attachments`. `promptAttachments` in
+`config.json` is the ordered list of names that append. A missing name is
+skipped and left in the list. Workspace
 hints remain independent and are appended from `instructions.md`, `.crystal.md`, and
 OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
 are never prompt overlays. Skills are discovered from Crystal,

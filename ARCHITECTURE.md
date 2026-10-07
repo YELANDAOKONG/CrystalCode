@@ -470,8 +470,9 @@ and `{{classification_summary}}`. Compaction user templates add
 and compaction templates declare the slots they need explicitly. Topic naming
 has a built-in prompt and is overridden by `topic.md` in Home or project
 `prompts/`; it is not a prompt-set member and is not yet invoked by the live
-session. Review is the
-named file alone for system text; its user turn is template-driven. Composite
+session. Review system text is the named file plus any enabled review
+attachments. It does not receive the workspace instruction block. Its user
+turn is template-driven. Composite
 and atomic host values are not overlay files and refresh on `/cd`, `/model`,
 `/approval`, and when the live system message is replaced. Skill guidance is host-owned
 and is not an overlay file.
@@ -493,6 +494,34 @@ and rebuilds Review. `/promptset default` clears the stored selection. A
 configured set that is missing at startup falls back to `default`, reports a
 note, and is not silently rewritten. Resume and fork use the current global
 selection rather than storing a selection in the session.
+
+Prompt attachments append after the resolved Work, Plan, or Review text has
+been bound. The resolved text stays in place. Attachments are not prompt-set
+members. Topic naming and compaction stay unchanged. Each attachment is a
+directory of the same `work.md`, `plan.md`, and `review.md` files (`.txt` is
+also accepted). A missing file contributes nothing for that mode. Empty files
+are missing. Directory names use the same 1-64 character hyphenated form as
+prompt sets. `default` is a valid attachment name.
+
+Discovery reads `~/.crystal/prompt-attachments/<name>/` and
+`<workspace>/.crystal/prompt-attachments/<name>/`. The workspace is the
+current workspace root only; parent directories are not walked. The same name
+in both places uses the workspace directory. `promptAttachments` in
+`config.json` is the ordered enable list. A discovered directory that is not
+in the list does not append. A listed name that is missing or invalid is
+skipped, reported, and left in the list. Duplicate names keep the first copy.
+Placeholder tokens inside an attachment expand with the same host values as
+the body. The host never writes attachment files.
+
+Composition order is the resolved body, bound placeholders, enabled
+attachments for that mode in list order, then an ordinary plugin `OnPrompt`
+append. A raw `RewritePrompt` can still replace the result. `/promptattach`
+lists discovered attachments, the enable order, and Home or workspace source.
+`/promptattach enable|disable <name>` changes membership.
+`/promptattach up|down <name>` moves a name in the enabled list. Changes are
+refused while a turn is running. Listing stays available. The status bar
+continues to show only the selected prompt set. `crystal run` uses the saved
+list and has no separate flag for it.
 
 ## Model
 
@@ -716,6 +745,9 @@ contents of `binaries/code/`.
   promptsets/<name>/work.md
   promptsets/<name>/plan.md
   promptsets/<name>/review.md
+  prompt-attachments/<name>/work.md
+  prompt-attachments/<name>/plan.md
+  prompt-attachments/<name>/review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
@@ -774,8 +806,8 @@ version can continue reading it. Preference saves do not rewrite an existing
 rejected. Editing provider definitions in the TUI is deferred product work.
 The catalog changes by editing this file, then restarting.
 
-Project overlay (wins over home for named prompts, Crystal skills, and
-tool sets of the same directory name):
+Project overlay (wins over home for named prompts, prompt attachments,
+Crystal skills, and tool sets of the same directory name):
 
 ```text
 <workspace>/.crystal/
@@ -784,6 +816,9 @@ tool sets of the same directory name):
   prompts/plan.md
   prompts/review.md
   prompts/topic.md
+  prompt-attachments/<name>/work.md
+  prompt-attachments/<name>/plan.md
+  prompt-attachments/<name>/review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
@@ -798,8 +833,9 @@ Built-in Work and Plan identify the assistant as Crystal Code. Operators
 who replace those files choose their own identity.
 
 `instructions.md` and `.crystal.md` are appended under
-"Workspace instructions" on Work and Plan only. Review is the named
-file alone so the reviewer stays a safety check. Files may be `.md`
+"Workspace instructions" on Work and Plan only. Review does not receive
+that instruction block. Enabled prompt attachments can still append to
+Review. Files may be `.md`
 or `.txt`. Empty files are treated as missing. The host never writes
 prompt files. The host appends a non-overlayable `<env>` block between
 the Work or Plan body and those instructions. When Skills is enabled,
@@ -990,6 +1026,10 @@ written.
 `promptSet` selects a Home prompt set by directory name. It is omitted for the
 virtual `default` selection. Names are 1-64 lowercase alphanumeric words joined
 by single hyphens.
+
+`promptAttachments` is the ordered list of prompt attachment directory names
+that append to Work, Plan, and Review. It is omitted when empty. Names that
+are not currently discovered stay in the list.
 
 `estimatedTokens` shows a live four-characters-per-token estimate on
 the progress row during Thinking and Writing (default `false`). The

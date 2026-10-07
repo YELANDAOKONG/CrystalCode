@@ -16,6 +16,7 @@ public sealed class PromptSetCompletionsTests
             PromptSource.PromptSet,
             PromptSource.BuiltIn,
             PromptSource.BuiltIn,
+            [],
             []);
 
         var options = PromptSetCompletions.For(resolution);

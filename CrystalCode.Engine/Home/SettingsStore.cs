@@ -85,7 +85,8 @@ public sealed class SettingsStore
             ReadApprovalModel(document.ApprovalModel),
             document.Plugins ?? defaults.Plugins,
             document.WorkspaceTrust ?? defaults.WorkspaceTrust,
-            document.ShowCompactionSummary ?? defaults.ShowCompactionSummary);
+            document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
+            document.PromptAttachments);
     }
 
     public void Save(HarnessSettings settings)
@@ -127,6 +128,9 @@ public sealed class SettingsStore
                 StringComparison.Ordinal)
                     ? null
                     : settings.PromptSet,
+            PromptAttachments = settings.PromptAttachments.Count == 0
+                ? null
+                : [.. settings.PromptAttachments],
             ExportDirectory = settings.ExportDirectory,
             CustomStatusLine = settings.StatusLine.Enabled ? true : null,
             StatusLine = settings.StatusLine.Fields.SequenceEqual(

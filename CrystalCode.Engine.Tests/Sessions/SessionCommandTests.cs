@@ -24,6 +24,7 @@ public sealed class SessionCommandTests
     [InlineData("/compact", SessionVerb.Compact)]
     [InlineData("/model", SessionVerb.Model)]
     [InlineData("/promptset concise", SessionVerb.PromptSet)]
+    [InlineData("/promptattach enable alpha", SessionVerb.PromptAttachment)]
     [InlineData("/prompts", SessionVerb.PromptSet)]
     [InlineData("/tokens", SessionVerb.Tokens)]
     [InlineData("/verbose", SessionVerb.Verbose)]

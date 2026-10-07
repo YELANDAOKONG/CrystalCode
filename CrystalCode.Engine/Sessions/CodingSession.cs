@@ -138,7 +138,10 @@ public sealed class CodingSession : ITurnObserver
         _client = CreateClient(settings);
         _multimodalClient = CreateMultimodalClient(settings);
         _compactor = CreateCompactor(_client);
-        _promptResolution = _promptStore.Resolve(workspace.Root, settings.PromptSet);
+        _promptResolution = _promptStore.Resolve(
+            workspace.Root,
+            settings.PromptSet,
+            settings.PromptAttachments);
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
         _sessionId = SessionStore.NewId();
@@ -215,6 +218,12 @@ public sealed class CodingSession : ITurnObserver
         if (!string.IsNullOrWhiteSpace(CurrentPromptStatus()))
         {
             Note("Prompt set  " + _promptResolution.PromptSet);
+        }
+
+        var attachmentStatus = PromptAttachmentText.Status(_promptResolution);
+        if (attachmentStatus.Length > 0)
+        {
+            Note("Prompt attachments  " + attachmentStatus);
         }
 
         ReloadExternalToolsWithProgress();
@@ -488,6 +497,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.PromptSet:
                 ChangePromptSet(command.Argument);
+                return (true, false);
+            case SessionVerb.PromptAttachment:
+                ChangePromptAttachments(command.Argument);
                 return (true, false);
             case SessionVerb.Status:
                 ShowStatus(command.Argument);
@@ -1262,7 +1274,10 @@ public sealed class CodingSession : ITurnObserver
             Error(parseError);
             return;
         }
-        var resolution = _promptStore.Resolve(_workspace.Root, requested);
+        var resolution = _promptStore.Resolve(
+            _workspace.Root,
+            requested,
+            _settings.PromptAttachments);
         if (!string.Equals(requested, PromptSetNames.Default, StringComparison.Ordinal)
             && !string.Equals(requested, resolution.PromptSet, StringComparison.Ordinal))
         {
@@ -1280,6 +1295,129 @@ public sealed class CodingSession : ITurnObserver
         RefreshChrome();
         WritePromptNotes();
         Note("Prompt set  " + resolution.PromptSet);
+    }
+
+    private void ChangePromptAttachments(string argument)
+    {
+        IReadOnlyList<string> tokens;
+        try
+        {
+            tokens = string.IsNullOrWhiteSpace(argument)
+                ? []
+                : CommandArguments.Split(argument);
+        }
+        catch (ArgumentException exception)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        if (tokens.Count == 0)
+        {
+            Note(PromptAttachmentText.Format(_promptResolution));
+            return;
+        }
+
+        if (_turnActive)
+        {
+            Error("Finish the current turn before changing prompt attachments.");
+            return;
+        }
+
+        if (!PromptAttachmentChangeArguments.TryParse(tokens, out var action, out var name, out var parseError))
+        {
+            Error(parseError);
+            return;
+        }
+
+        var current = EnabledAttachmentNames();
+        var changed = false;
+        IReadOnlyList<string> next = current;
+        if (action == "enable")
+        {
+            changed = PromptAttachmentList.TryEnable(
+                current,
+                name,
+                AttachmentAvailable(name),
+                out next,
+                out parseError);
+        }
+        else if (action == "disable")
+        {
+            changed = PromptAttachmentList.TryDisable(current, name, out next, out parseError);
+        }
+        else if (action == "up")
+        {
+            changed = PromptAttachmentList.TryMove(
+                current,
+                name,
+                earlier: true,
+                out next,
+                out parseError);
+        }
+        else if (action == "down")
+        {
+            changed = PromptAttachmentList.TryMove(
+                current,
+                name,
+                earlier: false,
+                out next,
+                out parseError);
+        }
+        else
+        {
+            parseError = "Prompt attachments accept enable, disable, up, or down, and one name.";
+        }
+
+        if (!changed)
+        {
+            Error(parseError);
+            return;
+        }
+
+        _settings = _settings.WithPromptAttachments(next);
+        _settingsStore.Save(_settings);
+        var resolution = _promptStore.Resolve(
+            _workspace.Root,
+            _settings.PromptSet,
+            _settings.PromptAttachments);
+        _promptResolution = resolution;
+        _prompts = resolution.Prompts;
+        ReplaceLiveSystem();
+        RebuildExecutors();
+        RefreshSlashCommands();
+        RefreshChrome();
+        WritePromptNotes();
+        var status = PromptAttachmentText.Status(resolution);
+        Note(status.Length == 0 ? "Prompt attachments  none" : "Prompt attachments  " + status);
+    }
+
+    private IReadOnlyList<string> EnabledAttachmentNames()
+    {
+        var names = new List<string>();
+        foreach (var entry in _promptResolution.Attachments)
+        {
+            if (entry.Enabled)
+            {
+                names.Add(entry.Name);
+            }
+        }
+
+        return names;
+    }
+
+    private bool AttachmentAvailable(string name)
+    {
+        foreach (var entry in _promptResolution.Attachments)
+        {
+            if (entry.Source is not null
+                && string.Equals(entry.Name, name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void ChangeTools(string argument)
@@ -1972,7 +2110,10 @@ public sealed class CodingSession : ITurnObserver
 
     private void ReloadPrompts()
     {
-        _promptResolution = _promptStore.Resolve(_workspace.Root, _settings.PromptSet);
+        _promptResolution = _promptStore.Resolve(
+            _workspace.Root,
+            _settings.PromptSet,
+            _settings.PromptAttachments);
         _prompts = _promptResolution.Prompts;
         ReplaceLiveSystem();
         WritePromptNotes();
@@ -3089,6 +3230,7 @@ public sealed class CodingSession : ITurnObserver
             ThinkingCompletions.For(_settings.ActiveModel),
             ModelCompletions.For(_settings.Catalog, _settings.Provider),
             PromptSetCompletions.For(_promptResolution),
+            PromptAttachmentCompletions.For(_promptResolution),
             ToolCompletions.All,
             ExportCompletions.All);
         Publish(new SlashCommandsChanged(menu));

@@ -7,4 +7,5 @@ internal sealed record PromptResolution(
     PromptSource WorkSource,
     PromptSource PlanSource,
     PromptSource ReviewSource,
-    IReadOnlyList<string> Notes);
+    IReadOnlyList<string> Notes,
+    IReadOnlyList<PromptAttachmentEntry> Attachments);

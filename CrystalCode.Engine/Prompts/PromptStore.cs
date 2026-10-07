@@ -4,8 +4,9 @@ namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
 /// Resolves built-ins, a selected Home prompt set, direct Home and project
-/// overrides, then appended instructions, including
-/// OpenCode-compatible <c>AGENTS.md</c> / <c>CLAUDE.md</c>, are appended.
+/// overrides, then enabled prompt attachments. Workspace instructions, including
+/// OpenCode-compatible <c>AGENTS.md</c> / <c>CLAUDE.md</c>, are appended inside
+/// the body and are not prompt attachments.
 /// </summary>
 public sealed class PromptStore
 {
@@ -58,7 +59,10 @@ public sealed class PromptStore
         return new PromptSetDiscovery(_home).Collect(notes).TryGet(normalized, out _);
     }
 
-    internal PromptResolution Resolve(string workspaceRoot, string selectedSet)
+    internal PromptResolution Resolve(
+        string workspaceRoot,
+        string selectedSet,
+        IReadOnlyList<string>? promptAttachments = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(selectedSet);
@@ -88,14 +92,24 @@ public sealed class PromptStore
             ApprovalReviewPrompt.SystemText,
             selected,
             project);
+        var attachments = new PromptAttachmentDiscovery().Collect(_home, project, notes);
+        var enabled = ResolveAttachments(promptAttachments, attachments, notes);
         return new PromptResolution(
-            new PromptSet(work.Text, plan.Text, review.Text, ReadInstructions(workspaceRoot, project)),
+            new PromptSet(
+                work.Text,
+                plan.Text,
+                review.Text,
+                ReadInstructions(workspaceRoot, project),
+                enabled.Work,
+                enabled.Plan,
+                enabled.Review),
             effectiveSet,
             catalog.Names,
             work.Source,
             plan.Source,
             review.Source,
-            [.. notes]);
+            Dedupe(notes),
+            enabled.Entries);
     }
 
     private (string Text, PromptSource Source) ResolveNamed(
@@ -130,6 +144,98 @@ public sealed class PromptStore
         return (text, source);
     }
 
+    private static AttachmentSelection ResolveAttachments(
+        IReadOnlyList<string>? requested,
+        PromptAttachmentCatalog catalog,
+        List<string> notes)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var entries = new List<PromptAttachmentEntry>();
+        var work = new List<string>();
+        var plan = new List<string>();
+        var review = new List<string>();
+        if (requested is not null)
+        {
+            foreach (var raw in requested)
+            {
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+
+                var name = raw.Trim();
+                if (!seen.Add(name))
+                {
+                    notes.Add(
+                        $"Prompt attachment '{name}' is listed more than once; later copies are ignored.");
+                    continue;
+                }
+
+                if (!PromptAttachmentNames.IsValid(name) || !catalog.TryGet(name, out var definition))
+                {
+                    if (!PromptAttachmentNames.IsValid(name))
+                    {
+                        notes.Add(
+                            $"Prompt attachment '{name}' was skipped: directory name is invalid.");
+                    }
+                    else
+                    {
+                        notes.Add($"Prompt attachment '{name}' was not found.");
+                    }
+
+                    entries.Add(new PromptAttachmentEntry(name, null, Enabled: true));
+                    continue;
+                }
+
+                if (definition.ReplacedHome)
+                {
+                    notes.Add($"Prompt attachment '{name}' uses the workspace copy.");
+                }
+
+                entries.Add(new PromptAttachmentEntry(name, definition.Source, Enabled: true));
+                AddNamed(work, definition.Directory, PromptNames.Work);
+                AddNamed(plan, definition.Directory, PromptNames.Plan);
+                AddNamed(review, definition.Directory, PromptNames.Review);
+            }
+        }
+
+        foreach (var name in catalog.Names)
+        {
+            if (seen.Contains(name) || !catalog.TryGet(name, out var definition))
+            {
+                continue;
+            }
+
+            entries.Add(new PromptAttachmentEntry(name, definition.Source, Enabled: false));
+        }
+
+        return new AttachmentSelection(work, plan, review, entries);
+    }
+
+    private static void AddNamed(List<string> parts, string directory, string name)
+    {
+        var text = PromptFiles.ReadNamed(directory, name);
+        if (text is not null)
+        {
+            parts.Add(text);
+        }
+    }
+
+    private static List<string> Dedupe(List<string> notes)
+    {
+        var unique = new List<string>(notes.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var note in notes)
+        {
+            if (seen.Add(note))
+            {
+                unique.Add(note);
+            }
+        }
+
+        return unique;
+    }
+
     private string ReadInstructions(string workspaceRoot, CrystalHome project)
     {
         var parts = new List<string>();
@@ -156,4 +262,10 @@ public sealed class PromptStore
             parts.Add(text);
         }
     }
+
+    private sealed record AttachmentSelection(
+        IReadOnlyList<string> Work,
+        IReadOnlyList<string> Plan,
+        IReadOnlyList<string> Review,
+        IReadOnlyList<PromptAttachmentEntry> Entries);
 }

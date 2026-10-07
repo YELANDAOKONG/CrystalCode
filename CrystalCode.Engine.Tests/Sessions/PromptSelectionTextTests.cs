@@ -17,6 +17,7 @@ public sealed class PromptSelectionTextTests
             PromptSource.HomeOverride,
             PromptSource.PromptSet,
             PromptSource.ProjectOverride,
+            [],
             []);
 
         var text = PromptSelectionText.Format(resolution);

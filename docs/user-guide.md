@@ -897,6 +897,7 @@ returns the transcript viewport to the latest output.
 | `/verbose` | | Show or set tool, command, approval, or thinking detail: `tools`, `commands`, `approvals`, `thinking`, then `on` or `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, select a set, or `/prompts export [dir]` |
+| `/promptattach` | | List prompt attachments, or `enable` / `disable` / `up` / `down` one name |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
 | `/stats` | | Replaces the session frame with Overview, Tokens, and Tools panels, including a tool share bar. Supports `all`, `<Nd>`, and `tools <count>`. Esc or `q` restores the session |
 | `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. While the model has not started, the panel shows the same spinner as the progress row. Once reasoning starts, the caption changes to Thinking until answer text arrives. An empty `/btw` reopens it. Esc, Enter, Space, or Ctrl+C closes it. Ctrl+C also cancels a side question that is still running and leaves the main turn running. Left and Right step through earlier answers. `x` clears them |
@@ -1093,6 +1094,39 @@ non-default set appears as `Prompt <name>` in the status bar and as a startup
 note. If a configured set is missing, Crystal uses default prompts, reports the
 fallback, and leaves the configured name intact.
 
+Prompt attachments append after the resolved Work, Plan, or Review text.
+Topic naming and compaction are unchanged. Each attachment
+is a directory that may contain `work.md`, `plan.md`, and `review.md` (`.txt`
+is also accepted). A mode with no file gets nothing from that attachment.
+Empty files are treated as missing. Directory names are 1-64 lowercase
+alphanumeric words joined by single hyphens. `default` is allowed.
+
+Attachments are discovered in both places:
+
+1. `~/.crystal/prompt-attachments/<name>/`
+2. `<workspace>/.crystal/prompt-attachments/<name>/`
+
+The workspace scan is the current workspace root only. Parent directories are
+not walked. When the same name exists in both places, the workspace directory
+is the one that appends. Discovery does not enable a directory by itself.
+
+`promptAttachments` in `config.json` is the ordered list of enabled names. It
+is omitted when empty. A listed name that is missing or invalid is skipped,
+reported, and left in the list. The first copy of a repeated name is kept.
+Placeholders inside an attachment expand with the same values as the body.
+
+`/promptattach` lists every discovered attachment and the enabled order.
+Enabled rows are numbered. The source is Home, Workspace, or Not found.
+`/promptattach enable <name>` appends a discovered name.
+`/promptattach disable <name>` removes a name, including one that is currently
+missing. `/promptattach up <name>` and `/promptattach down <name>` move a name
+in the enabled list. Changes are refused while a turn is running. Listing
+stays available. The status bar still shows only the selected prompt set.
+`crystal run` uses the saved list and has no separate flag for it.
+
+Enabled attachment text is added after the body is bound, and before an
+ordinary plugin prompt hook appends its own text.
+
 The built-in Work and Plan assistant name is Crystal Code. Work, Plan,
 Review, and compaction templates use host-owned placeholders (`{{name}}`).
 Composite session slots are `{{env}}`, `{{skills}}`, and
@@ -1124,8 +1158,8 @@ every host slot they need. When Skills is enabled, available-skill guidance
 fills `{{skills}}`. Composite host values are not overlayable.
 
 Workspace facts are appended under "Workspace instructions" on Work
-and Plan only. Review is the named file alone so the reviewer stays
-a safety check.
+and Plan only. Review does not receive that instruction block. Enabled
+prompt attachments can still append to Review.
 
 Instruction sources, in order:
 
@@ -1296,6 +1330,11 @@ Override with `CRYSTAL_HOME` or `--home`.
       work.md
       plan.md
       review.md
+  prompt-attachments/
+    <name>/
+      work.md
+      plan.md
+      review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
@@ -1304,8 +1343,8 @@ Override with `CRYSTAL_HOME` or `--home`.
   plugins/<directory>/plugin.json
 ```
 
-Project overlay (named prompts, Crystal skills, tool sets, and plugins of
-the same directory name win over home):
+Project overlay (named prompts, prompt attachments, Crystal skills, tool
+sets, and plugins of the same directory name win over home):
 
 ```text
 <workspace>/.crystal/
@@ -1314,6 +1353,11 @@ the same directory name win over home):
     work.md
     plan.md
     review.md
+  prompt-attachments/
+    <name>/
+      work.md
+      plan.md
+      review.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json

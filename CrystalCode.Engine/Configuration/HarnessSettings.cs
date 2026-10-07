@@ -58,7 +58,8 @@ public sealed record HarnessSettings
         ApprovalModelSettings? approvalModel = null,
         bool plugins = DefaultPlugins,
         bool workspaceTrust = DefaultWorkspaceTrust,
-        bool showCompactionSummary = DefaultShowCompactionSummary)
+        bool showCompactionSummary = DefaultShowCompactionSummary,
+        IReadOnlyList<string>? promptAttachments = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -107,6 +108,7 @@ public sealed record HarnessSettings
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
         ShowCompactionSummary = showCompactionSummary;
+        PromptAttachments = CopyPromptAttachments(promptAttachments);
         if (ApprovalModel.Enabled)
         {
             try
@@ -155,6 +157,8 @@ public sealed record HarnessSettings
     public bool VerboseThinking { get; }
 
     public string PromptSet { get; }
+
+    public IReadOnlyList<string> PromptAttachments { get; }
 
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
@@ -251,6 +255,12 @@ public sealed record HarnessSettings
         return Copy(promptSet: promptSet.Trim());
     }
 
+    public HarnessSettings WithPromptAttachments(IReadOnlyList<string> promptAttachments)
+    {
+        ArgumentNullException.ThrowIfNull(promptAttachments);
+        return Copy(promptAttachments: promptAttachments, setPromptAttachments: true);
+    }
+
     public HarnessSettings WithExternalToolApproval(ExternalToolApprovalSettings approval)
     {
         ArgumentNullException.ThrowIfNull(approval);
@@ -309,7 +319,9 @@ public sealed record HarnessSettings
         bool setApprovalModel = false,
         bool? plugins = null,
         bool? workspaceTrust = null,
-        bool? showCompactionSummary = null) =>
+        bool? showCompactionSummary = null,
+        IReadOnlyList<string>? promptAttachments = null,
+        bool setPromptAttachments = false) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -333,7 +345,8 @@ public sealed record HarnessSettings
             setApprovalModel ? approvalModel : ApprovalModel,
             plugins ?? Plugins,
             workspaceTrust ?? WorkspaceTrust,
-            showCompactionSummary ?? ShowCompactionSummary);
+            showCompactionSummary ?? ShowCompactionSummary,
+            setPromptAttachments ? promptAttachments : PromptAttachments);
 
     public override string ToString() => nameof(HarnessSettings);
 
@@ -357,5 +370,26 @@ public sealed record HarnessSettings
 
         throw new InvalidOperationException(
             $"Provider '{provider.Value}' has more than one model. Pass --model.");
+    }
+
+    private static IReadOnlyList<string> CopyPromptAttachments(IReadOnlyList<string>? names)
+    {
+        if (names is null || names.Count == 0)
+        {
+            return [];
+        }
+
+        var copy = new List<string>(names.Count);
+        foreach (var name in names)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            copy.Add(name.Trim());
+        }
+
+        return copy;
     }
 }

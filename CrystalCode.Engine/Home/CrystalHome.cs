@@ -43,6 +43,8 @@ public sealed class CrystalHome
 
     public string PromptSetsDirectory => Path.Combine(Root, "promptsets");
 
+    public string PromptAttachmentsDirectory => Path.Combine(Root, "prompt-attachments");
+
     public string InstructionsPath => Path.Combine(Root, "instructions.md");
 
     public string SpaceDirectory => Path.Combine(Root, SpaceDirectoryName);
