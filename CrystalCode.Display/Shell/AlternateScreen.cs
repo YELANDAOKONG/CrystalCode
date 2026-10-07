@@ -42,11 +42,12 @@ public sealed class AlternateScreen : IDisposable
         {
             AnsiConsole.Write(new ControlCode("\u001b[?1049h"));
             entered = true;
-            AnsiConsole.Write(new ControlCode("\u001b[?2004h"));
             bracketedPaste = true;
-            AnsiConsole.Write(new ControlCode("\u001b[?1000h"));
             mouseReporting = true;
-            AnsiConsole.Write(new ControlCode("\u001b[?1006h"));
+            foreach (var code in EnableInputSequences())
+            {
+                AnsiConsole.Write(new ControlCode(code));
+            }
             AnsiConsole.Write(new ControlCode("\u001b[H"));
             AnsiConsole.Write(new ControlCode("\u001b[2J"));
             screen = new AlternateScreen(true);
@@ -80,6 +81,42 @@ public sealed class AlternateScreen : IDisposable
             screen?.RestoreConsoleTitle();
             inputMode?.Dispose();
             return new AlternateScreen(false);
+        }
+    }
+
+    /// <summary>
+    /// Bracketed paste and SGR mouse reporting. Alternate scroll (1007) stays
+    /// off so a terminal does not turn the wheel into Up/Down. Re-sent while
+    /// the screen is up because a console host can clear the other modes.
+    /// </summary>
+    internal static IReadOnlyList<string> EnableInputSequences() =>
+    [
+        "\u001b[?2004h",
+        "\u001b[?1000h",
+        "\u001b[?1006h",
+        "\u001b[?1007l"
+    ];
+
+    /// <summary>
+    /// Puts the wheel back if Windows quick edit or a cleared mouse mode took it.
+    /// </summary>
+    public void MaintainInputModes()
+    {
+        if (!_active)
+        {
+            return;
+        }
+
+        WindowsConsole.MaintainVirtualInput();
+        foreach (var code in EnableInputSequences())
+        {
+            try
+            {
+                AnsiConsole.Write(new ControlCode(code));
+            }
+            catch (IOException)
+            {
+            }
         }
     }
 

@@ -29,6 +29,7 @@ public sealed class SessionRenderer : IDisposable
 {
     private const int PollMilliseconds = 40;
     private const int EscapeHoldMilliseconds = 50;
+    private static readonly TimeSpan InputModeInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan PaintBudget = TimeSpan.FromMilliseconds(33);
     private readonly object _gate = new();
     private readonly TranscriptLog _log = new();
@@ -52,6 +53,7 @@ public sealed class SessionRenderer : IDisposable
     private int _scrollBack;
     private int _paintedWidth;
     private int _paintedHeight;
+    private DateTimeOffset _inputModesAt;
     private bool _composerPaused;
     private bool _showEstimatedTokens;
     private int _streamedCharacters;
@@ -2075,6 +2077,13 @@ public sealed class SessionRenderer : IDisposable
                 if (sizeChanged || _chrome.SpinnerDue(now) || SideSpinnerDue(now))
                 {
                     PaintUnlocked(force: true);
+                }
+
+                if (_screen is { IsActive: true }
+                    && now - _inputModesAt >= InputModeInterval)
+                {
+                    _inputModesAt = now;
+                    _screen.MaintainInputModes();
                 }
             }
 

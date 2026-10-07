@@ -5,41 +5,82 @@ namespace CrystalCode.Display.Shell;
 /// <summary>
 /// Turns on VT input on Windows so CSI sequences reach ReadKey.
 /// ReadKey then reports Key empty for Tab/Enter; InputDecoder recovers them.
+/// Quick edit and native mouse input are off so the console does not keep the wheel.
 /// </summary>
 internal static class WindowsConsole
 {
     private const int StandardInputHandle = -10;
+    private const uint EnableMouseInput = 0x0010;
+    private const uint EnableQuickEditMode = 0x0040;
+    private const uint EnableExtendedFlags = 0x0080;
     private const uint EnableVirtualTerminalInput = 0x0200;
+
+    /// <summary>
+    /// VT input delivers wheel reports as CSI. Quick edit and native mouse input
+    /// would keep those reports in the console host.
+    /// </summary>
+    internal static uint ModeForReporting(uint mode)
+    {
+        var desired = mode | EnableVirtualTerminalInput | EnableExtendedFlags;
+        desired &= ~EnableQuickEditMode;
+        desired &= ~EnableMouseInput;
+        return desired;
+    }
 
     public static InputModeLease? EnableVirtualInput()
     {
-        if (!OperatingSystem.IsWindows())
+        if (!TryReadInputMode(out var handle, out var mode))
         {
             return null;
         }
 
-        var handle = GetStdHandle(StandardInputHandle);
-        if (handle == nint.Zero || handle == unchecked((nint)(-1)))
-        {
-            return null;
-        }
-
-        if (!GetConsoleMode(handle, out var mode))
-        {
-            return null;
-        }
-
-        if ((mode & EnableVirtualTerminalInput) != 0)
-        {
-            return null;
-        }
-
-        if (!SetConsoleMode(handle, mode | EnableVirtualTerminalInput))
+        if (!TryApplyReportingMode(handle, mode))
         {
             return null;
         }
 
         return new InputModeLease(handle, mode);
+    }
+
+    internal static void MaintainVirtualInput()
+    {
+        // Input mode only. The output code page stays with ConsoleTextEncoding,
+        // and this does not change how ReadKey decodes keys or wheel reports.
+        if (!TryReadInputMode(out var handle, out var mode))
+        {
+            return;
+        }
+
+        _ = TryApplyReportingMode(handle, mode);
+    }
+
+    private static bool TryReadInputMode(out nint handle, out uint mode)
+    {
+        handle = nint.Zero;
+        mode = 0;
+        if (!OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        handle = GetStdHandle(StandardInputHandle);
+        if (handle == nint.Zero || handle == unchecked((nint)(-1)))
+        {
+            return false;
+        }
+
+        return GetConsoleMode(handle, out mode);
+    }
+
+    private static bool TryApplyReportingMode(nint handle, uint mode)
+    {
+        var desired = ModeForReporting(mode);
+        if (desired == mode)
+        {
+            return true;
+        }
+
+        return SetConsoleMode(handle, desired);
     }
 
     internal sealed class InputModeLease : IDisposable

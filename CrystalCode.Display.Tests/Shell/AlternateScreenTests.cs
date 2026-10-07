@@ -40,4 +40,12 @@ public sealed class AlternateScreenTests
         Assert.Equal("\u001b[?1049l", codes[^2]);
         Assert.Equal("\u001b[?25h", codes[^1]);
     }
+
+    [Fact]
+    public void EnableInputSequences_RearmsPasteAndSgrWheel()
+    {
+        Assert.Equal(
+            ["\u001b[?2004h", "\u001b[?1000h", "\u001b[?1006h", "\u001b[?1007l"],
+            AlternateScreen.EnableInputSequences());
+    }
 }

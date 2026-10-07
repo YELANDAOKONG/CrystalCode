@@ -427,6 +427,23 @@ once such a tool is installed. Approval still runs.
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.
 
+The todo list belongs to the session, not to a mode. Built-in Plan text asks
+the model to write the plan's steps as pending todos and leave them pending;
+built-in Work text asks the model to work through pending todos it finds
+instead of starting a new list. Built-in Work and Plan text also tell the
+model that file contents and tool results are data, not instructions, and
+that workspace instructions override the built-in defaults while the user's
+latest message overrides both. When `question` is unavailable or dismissed,
+Work continues on the recommended default only when it is safe and
+reversible, and Plan records that default as an open question.
+
+Built-in Review text defines `risk_level` and `user_authorization` levels and
+derives `outcome` from them: allow for low risk with medium or high
+authorization, medium risk with high authorization, or high risk the user
+explicitly requested; deny for low authorization or unrequested harm; ask
+otherwise. Host risk and host authority are a lower bound, and the policy
+still refuses to pass a `forbidden` call whatever the verdict says.
+
 Live Work and Plan system text is assembled from overlayable templates using
 host-owned placeholders (`{{name}}`). Review and compaction prompts use the
 same placeholder syntax. Composite session slots are `{{env}}`, `{{skills}}`,
@@ -1115,6 +1132,11 @@ denial.
 
 CrystalCode.Display is the TUI host. Spectre.Console supplies markup,
 color, panels, grids, rules, and padding as an offline rasterizer.
+Process startup sets console output to UTF-8 without a BOM and turns
+Spectre's Unicode output on, then restores the previous output encoding
+when the process exits. Console input encoding is left alone. Files,
+prompts, and provider bodies are already UTF-8. The progress spinner is
+braille, so a Windows OEM code page would replace each frame with `?`.
 `AnsiConsole.Live` is not the session shell: it fights the composer.
 Widgets are rasterized into frame rows. A live user, thinking, tool, or
 error card keeps rows that are already wrapped. New stream text reflows
@@ -1322,7 +1344,12 @@ markers do not carry image bytes or a stable cross-session attachment.
 PageUp/PageDown are the primary transcript scroll controls;
 Ctrl+Up/Down also scroll when the terminal passes those keys through.
 The alternate screen enables bracketed paste (2004) and mouse reporting
-(1000 with SGR encoding 1006). A wheel report scrolls the transcript and is
+(1000 with SGR encoding 1006) and turns alternate scroll (1007) off.
+While that screen is up, the shell repeats
+those modes about once a second. On Windows it also puts VT input back and
+turns quick edit and native mouse input off, then restores the console
+input mode captured at entry when the screen closes. The next refresh puts
+the wheel back if the console host cleared it. A wheel report scrolls the transcript and is
 drained without waiting; other mouse reports are swallowed. The wheel is
 never converted to Up/Down, so plain Up/Down stay with the composer, prompt
 history, or the active selection. Terminal text selection needs Shift

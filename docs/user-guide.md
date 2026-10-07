@@ -656,7 +656,9 @@ queued-follow-up count appears while items wait. While a turn runs, a
 progress row sits above the status bar (`Awaiting Approval · 5s`,
 `Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`,
 `Retrying In 8s (Attempt 1)`, `Compacting`), prefixed with a spinner, and is
-independent of the status-bar activity bullet. The `~N Tokens` estimate
+independent of the status-bar activity bullet. The spinner is braille.
+Console output is UTF-8, so Windows does not replace those frames with `?`.
+The `~N Tokens` estimate
 appears only when `estimatedTokens` is on. When the session has todos, a
 pinned `Todos` bar sits above that progress row (first four items; `/todos`
 prints the full list). Session start and `/cd`
@@ -690,7 +692,11 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Ctrl+C twice on an empty composer | Exit |
 
 The alternate screen enables bracketed paste and mouse reporting (1000
-with SGR encoding 1006). The wheel scrolls the transcript on its own and
+with SGR encoding 1006), turns alternate scroll off, and repeats those
+modes while the session is open.
+On Windows the console's quick edit is off for that time, so the wheel
+reaches the transcript instead of the console host; the previous console
+input mode returns when the session closes. The wheel scrolls the transcript on its own and
 never becomes Up/Down, so prompt history stays on the arrow keys. While
 mouse reporting is on, the terminal's own selection needs Shift held
 while you drag (Option or Fn in some macOS terminals). Rows that arrive

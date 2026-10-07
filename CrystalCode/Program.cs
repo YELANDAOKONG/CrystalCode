@@ -1,5 +1,7 @@
-﻿using CrystalCode.Commands;
-using Spectre.Console.Cli;
+﻿using Spectre.Console.Cli;
+
+using CrystalCode.Commands;
+using CrystalCode.Display.Shell;
 
 namespace CrystalCode;
 
@@ -7,6 +9,7 @@ public static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        using var outputEncoding = ConsoleTextEncoding.UseUtf8Output();
         if (VersionCommand.IsVersionRequest(args))
         {
             VersionCommand.Write(Console.Out);
