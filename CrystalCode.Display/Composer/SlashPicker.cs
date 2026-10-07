@@ -168,15 +168,30 @@ public sealed class SlashPicker
         var trailingSpace = nestedRemainder.IndexOf(' ');
         if (trailingSpace >= 0)
         {
-            if (nested.TrailingArgumentOptions.Count == 0
-                || nestedRemainder[(trailingSpace + 1)..].Contains(' ', StringComparison.Ordinal))
+            var value = nestedRemainder[..trailingSpace];
+            var trailingRemainder = nestedRemainder[(trailingSpace + 1)..];
+            if (trailingRemainder.Contains(' ', StringComparison.Ordinal))
             {
                 return null;
             }
 
-            var value = nestedRemainder[..trailingSpace];
-            var trailingRemainder = nestedRemainder[(trailingSpace + 1)..];
-            if (FindNestedCommand(value, nested.ArgumentOptions) is not null)
+            var deeper = FindNestedCommand(value, nested.ArgumentOptions);
+            if (deeper is not null)
+            {
+                if (deeper.ArgumentOptions.Count == 0)
+                {
+                    return null;
+                }
+
+                return FilterArguments(
+                    deeper.ArgumentOptions,
+                    trailingRemainder,
+                    "/" + verb + " " + first + " " + value + " ",
+                    deeper.ArgumentsOptional,
+                    sourceText);
+            }
+
+            if (nested.TrailingArgumentOptions.Count == 0)
             {
                 return null;
             }

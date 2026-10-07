@@ -15,7 +15,9 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? promptSetArguments = null,
         IReadOnlyList<SlashCompletion>? promptAttachmentArguments = null,
         IReadOnlyList<SlashCompletion>? toolArguments = null,
-        IReadOnlyList<SlashCompletion>? exportArguments = null)
+        IReadOnlyList<SlashCompletion>? exportArguments = null,
+        IReadOnlyList<SlashCompletion>? approvalModelArguments = null,
+        IReadOnlyList<SlashCompletion>? approvalThinkingArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -29,7 +31,9 @@ public static class SlashMenu
                 promptSetArguments,
                 promptAttachmentArguments,
                 toolArguments,
-                exportArguments);
+                exportArguments,
+                approvalModelArguments,
+                approvalThinkingArguments);
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
         }
 
@@ -53,8 +57,18 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? promptSetArguments,
         IReadOnlyList<SlashCompletion>? promptAttachmentArguments,
         IReadOnlyList<SlashCompletion>? toolArguments,
-        IReadOnlyList<SlashCompletion>? exportArguments)
+        IReadOnlyList<SlashCompletion>? exportArguments,
+        IReadOnlyList<SlashCompletion>? approvalModelArguments,
+        IReadOnlyList<SlashCompletion>? approvalThinkingArguments)
     {
+        if (spec.Verb == SessionVerb.Approval)
+        {
+            return ApprovalArguments(
+                spec.Arguments,
+                approvalModelArguments,
+                approvalThinkingArguments);
+        }
+
         if (spec.Verb == SessionVerb.Thinking && thinkingArguments is not null)
         {
             return thinkingArguments;
@@ -86,6 +100,38 @@ public static class SlashMenu
         }
 
         return ToArgumentOptions(spec.Arguments);
+    }
+
+    /// <summary>
+    /// Keeps the static approval arguments and nests the dynamic completion
+    /// lists under <c>model</c> and <c>thinking</c>. Unlike the single-purpose
+    /// verbs, <c>/approval</c> mixes mode words with two subcommands.
+    /// </summary>
+    private static IReadOnlyList<SlashCompletion> ApprovalArguments(
+        IReadOnlyList<string>? arguments,
+        IReadOnlyList<SlashCompletion>? modelArguments,
+        IReadOnlyList<SlashCompletion>? thinkingArguments)
+    {
+        if (arguments is null || arguments.Count == 0)
+        {
+            return [];
+        }
+
+        var options = new List<SlashCompletion>(arguments.Count);
+        foreach (var argument in arguments)
+        {
+            var nested = argument switch
+            {
+                "model" => modelArguments,
+                "thinking" => thinkingArguments,
+                _ => null
+            };
+            options.Add(nested is { Count: > 0 }
+                ? new SlashCompletion(argument, argument, [argument], nested)
+                : new SlashCompletion(argument, argument, [argument]));
+        }
+
+        return options;
     }
 
     private static IReadOnlyList<SlashCompletion> ToArgumentOptions(

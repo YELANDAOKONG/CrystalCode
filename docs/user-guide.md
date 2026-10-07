@@ -854,7 +854,9 @@ model with its own credentials and its stored thinking gear.
 persists it. It needs a stored or selected approval model and works
 while the switch is off. A stored gear the model does
 not offer falls back to the provider default, and `/approval thinking`
-refuses `off` for a model that cannot disable thinking. `/model`
+refuses `off` for a model that cannot disable thinking. Tab completes
+`/approval model` from the catalog and `/approval thinking` from that
+model's gear. `/model`
 and the work thinking gear do not change it. Compaction stays on the
 session model. While the switch is off, no separate client is created
 and Review and Audit follow `/model`. Finish the current turn before

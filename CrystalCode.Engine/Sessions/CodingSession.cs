@@ -710,6 +710,7 @@ public sealed class CodingSession : ITurnObserver
         _settingsStore.Save(_persisted);
         ReplaceApprovalClient(next, client);
         RebuildExecutors();
+        RefreshSlashCommands();
         Note(next.Describe());
     }
 
@@ -780,6 +781,7 @@ public sealed class CodingSession : ITurnObserver
         SaveSettings(current => current.WithApprovalModel(
             current.ApprovalModel.WithThinkingEffort(selection)));
         RebuildExecutors();
+        RefreshSlashCommands();
         Note("Approval thinking  " + ThinkingLabel.For(selection));
     }
 
@@ -3461,8 +3463,51 @@ public sealed class CodingSession : ITurnObserver
             PromptSetCompletions.For(_promptResolution),
             PromptAttachmentCompletions.For(_promptResolution),
             ToolCompletions.All,
-            ExportCompletions.All);
+            ExportCompletions.All,
+            ApprovalModelCompletions(),
+            ApprovalThinkingCompletions());
         Publish(new SlashCommandsChanged(menu));
+    }
+
+    private IReadOnlyList<SlashCompletion> ApprovalModelCompletions()
+    {
+        var provider = _settings.Provider;
+        if (_settings.ApprovalModel.Provider is string stored)
+        {
+            try
+            {
+                var parsed = ProviderName.Parse(stored);
+                _ = _settings.Catalog.Get(parsed);
+                provider = parsed;
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+            {
+                provider = _settings.Provider;
+            }
+        }
+
+        return ModelCompletions.For(_settings.Catalog, provider);
+    }
+
+    private IReadOnlyList<SlashCompletion> ApprovalThinkingCompletions()
+    {
+        var approval = _settings.ApprovalModel;
+        if (approval.Provider is null || approval.Model is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            return ThinkingCompletions.For(
+                _settings.Catalog.GetModel(
+                    new ProviderName(approval.Provider),
+                    approval.Model));
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return [];
+        }
     }
 
     private SessionChrome CurrentChrome() =>

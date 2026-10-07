@@ -92,6 +92,67 @@ public sealed class SlashPickerTests
     }
 
     [Fact]
+    public void Create_CompletesApprovalThinkingGear()
+    {
+        var picker = SlashPicker.Create("/approval thinking ", ApprovalOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal(["default", "high"], picker.Matches.Select(match => match.Name));
+        Assert.Equal("/approval thinking default ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_FiltersApprovalThinkingGear()
+    {
+        var picker = SlashPicker.Create("/approval thinking h", ApprovalOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal("high", picker.Matches[0].Name);
+        Assert.Equal("/approval thinking high ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_HidesAfterAFilledApprovalThinkingGear()
+    {
+        Assert.Null(SlashPicker.Create("/approval thinking high extra", ApprovalOptions()));
+    }
+
+    [Fact]
+    public void Create_CompletesApprovalModelAfterSubcommand()
+    {
+        var picker = SlashPicker.Create("/approval model ", ApprovalOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal(["gpt-5.6-sol", "openai"], picker.Matches.Select(match => match.Name));
+    }
+
+    [Fact]
+    public void Create_CompletesNestedApprovalModelAfterProvider()
+    {
+        var picker = SlashPicker.Create("/approval model openai ", ApprovalOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal(["gpt-5.6-sol", "gpt-5.6-terra"], picker.Matches.Select(match => match.Name));
+        Assert.Equal("/approval model openai gpt-5.6-sol ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_FiltersNestedApprovalModelAfterProvider()
+    {
+        var picker = SlashPicker.Create("/approval model openai gpt-5.6-t", ApprovalOptions());
+
+        Assert.NotNull(picker);
+        Assert.Equal("gpt-5.6-terra", picker.Matches[0].Name);
+        Assert.Equal("/approval model openai gpt-5.6-terra ", picker.CompletedText);
+    }
+
+    [Fact]
+    public void Create_HidesAfterAFilledNestedApprovalModel()
+    {
+        Assert.Null(SlashPicker.Create("/approval model openai gpt-5.6-sol extra", ApprovalOptions()));
+    }
+
+    [Fact]
     public void Create_CompletesExportFormatAndOptionalSystemFlag()
     {
         var options = ExportOptions();
@@ -158,6 +219,41 @@ public sealed class SlashPickerTests
                     ])
             ]);
         return [model, .. Options];
+    }
+
+    private static SlashOption[] ApprovalOptions()
+    {
+        var approval = new SlashOption(
+            "approval",
+            "approval modes",
+            ["approval"],
+            [
+                new("review", "mode", ["review"]),
+                new(
+                    "model",
+                    "approval model",
+                    ["model"],
+                    [
+                        new("gpt-5.6-sol", "openai", ["gpt-5.6-sol"]),
+                        new(
+                            "openai",
+                            "Provider",
+                            ["openai"],
+                            [
+                                new("gpt-5.6-sol", "openai", ["gpt-5.6-sol"]),
+                                new("gpt-5.6-terra", "openai", ["gpt-5.6-terra"])
+                            ])
+                    ]),
+                new(
+                    "thinking",
+                    "gear",
+                    ["thinking"],
+                    [
+                        new("default", "provider default", ["default"]),
+                        new("high", "High", ["high"])
+                    ])
+            ]);
+        return [approval, .. Options];
     }
 
     private static SlashOption[] ExportOptions()
