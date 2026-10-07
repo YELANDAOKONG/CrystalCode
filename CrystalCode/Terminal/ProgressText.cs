@@ -58,6 +58,7 @@ public static class ProgressText
         {
             BashTool.ToolName => "Running Command",
             ReadTool.ToolName => "Reading",
+            ListTool.ToolName => "Listing",
             WriteTool.ToolName => "Writing File",
             EditTool.ToolName => "Editing",
             GlobTool.ToolName => "Searching",

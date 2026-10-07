@@ -164,7 +164,7 @@ public sealed class BashTool : ITool
             : "no per-command timeout";
         return "Runs one shell command in the workspace root (bash -lc, " + limit + "). "
             + "Use it for builds, tests, git, and scripts. Do not use it to read, write, or search files; "
-            + "use read, glob, grep, edit, and write. Avoid interactive commands. "
+            + "use read, list, glob, grep, edit, and write. Avoid interactive commands. "
             + "Unless the user explicitly asked, do not commit, amend, or push, and do not change git config, "
             + "skip hooks, use interactive git, or force-push.";
     }

@@ -260,7 +260,7 @@ echo "Summarize the repository." | crystal run --model-calls 8 --tool-calls 32
 ```
 
 `--format default` prints a readable trace: the assistant reply, then each
-tool beside its own result. `read`, `glob`, and `grep` keep a short head
+tool beside its own result. `read`, `list`, `glob`, and `grep` keep a short head
 excerpt and say how many lines were omitted. `edit` and `write` keep their
 result. `bash` keeps the command, the exit status, and a short tail, with
 a longer tail when the command fails. Other successful tools use the same
@@ -795,7 +795,7 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | Built-in read, glob, grep, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Plan** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
 | **Work** | Built-in Plan tools plus edit, write, bash, plus external tools listed for Work | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
@@ -814,7 +814,7 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
 | **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
-| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including bash and read, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including bash and read, list, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
 | **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
 
@@ -976,12 +976,12 @@ custom field order.
 
 ## Built-in tools
 
-`read`, `glob`, `grep`, `edit`, and `write` may use a path outside the
+`read`, `list`, `glob`, `grep`, `edit`, and `write` may use a path outside the
 workspace after approval (you, or the Review model in Review or
 Audit). Workspace `write` and `edit` still follow the approval mode.
 `bash` starts in the workspace root and is approved as a side effect.
 Credential paths
-(`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob and grep
+(`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, and list
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
 files are rejected for read/edit (NUL probe). Shell working directory
 is the workspace root.
@@ -989,6 +989,7 @@ is the workspace root.
 | Tool | Catalog | Purpose |
 | :--- | :--- | :--- |
 | `read` | Plan, Work | Read a workspace text file (`path`, optional 1-based `offset` and `limit`) |
+| `list` | Plan, Work | List a directory's immediate entries (`path` optional, 1-based `offset` and `limit` paging) |
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`) |
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
@@ -1001,7 +1002,8 @@ is the workspace root.
 
 Practical limits: read up to 1,000,000 characters or 20,000 lines;
 write up to 2 MiB; grep up to 500 matches and 8 MiB per file; glob
-up to 1,000 matches; tool output truncated at 100,000 characters.
+up to 1,000 matches; list up to 1,000 entries per page; tool output
+truncated at 100,000 characters.
 
 ## External tools
 
@@ -1253,7 +1255,7 @@ replacements. They never replace Work, Plan, or Review.
 
 Skills are OpenCode-compatible instruction folders. They are not
 prompt overlays. The model sees a list of available skills and loads
-one with the `skill` tool. When Skills is enabled, `read`/`glob`/`grep`
+one with the `skill` tool. When Skills is enabled, `read`/`list`/`glob`/`grep`
 of any path inside a Skills search directory (`skill` / `skills`
 trees, including scripts and other files that are not `SKILL.md`)
 auto-passes; it does not ask you. Set `"skills": false` in

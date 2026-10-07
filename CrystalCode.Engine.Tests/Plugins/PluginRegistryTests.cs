@@ -17,6 +17,7 @@ public sealed class PluginRegistryTests
         var registry = PluginRegistry.CreateBuiltIn();
 
         Assert.Contains(registry.Tools, tool => tool.Name == ReadTool.ToolName);
+        Assert.Contains(registry.Tools, tool => tool.Name == ListTool.ToolName);
         Assert.Contains(registry.Tools, tool => tool.Name == WriteTool.ToolName);
         Assert.Contains(registry.Tools, tool => tool.Name == TodoReadTool.ToolName);
         Assert.Equal(6, registry.Clients.Count);

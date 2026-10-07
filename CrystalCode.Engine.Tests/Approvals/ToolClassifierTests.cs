@@ -104,6 +104,69 @@ public sealed class ToolClassifierTests
     }
 
     [Fact]
+    public void Classify_ListTool_IsReadInWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        var classifier = new ToolClassifier(new Workspace(root.Path));
+
+        var classification = classifier.Classify(
+            new ToolCall("1", ListTool.ToolName, "{}"));
+
+        Assert.Equal(Risk.Read, classification.Risk);
+        Assert.Equal(Authority.Workspace, classification.Authority);
+        Assert.Equal("List workspace", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ListOutsideWorkspace_UsesOutsideAuthority()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var classifier = new ToolClassifier(new Workspace(root.Path));
+        var json = "{\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
+
+        var classification = classifier.Classify(
+            new ToolCall("1", ListTool.ToolName, json));
+
+        Assert.Equal(Risk.Read, classification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
+        Assert.Equal("List outside workspace", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ListCredentialPath_IsForbidden()
+    {
+        using var root = new TemporaryWorkspace();
+        var classifier = new ToolClassifier(new Workspace(root.Path));
+
+        var classification = classifier.Classify(
+            new ToolCall("1", ListTool.ToolName, """{"path":"~/.ssh"}"""));
+
+        Assert.Equal(Risk.Forbidden, classification.Risk);
+        Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
+    }
+
+    [Fact]
+    public void Classify_ListSkillsTree_WithCatalog_IsWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var skillsRoot = Path.Combine(outside.Path, "skills");
+        var skillPath = Path.Combine(skillsRoot, "demo-skill");
+        Directory.CreateDirectory(skillPath);
+        var catalog = new SkillCatalog([], [skillsRoot]);
+        var classifier = new ToolClassifier(new Workspace(root.Path), skills: catalog);
+        var json = "{\"path\":\"" + skillPath.Replace("\\", "/") + "\"}";
+
+        var classification = classifier.Classify(
+            new ToolCall("1", ListTool.ToolName, json));
+
+        Assert.Equal(Risk.Read, classification.Risk);
+        Assert.Equal(Authority.Workspace, classification.Authority);
+        Assert.Equal("List skills path", classification.Summary);
+    }
+
+    [Fact]
     public void Classify_SkillTool_IsReadInWorkspace()
     {
         using var root = new TemporaryWorkspace();

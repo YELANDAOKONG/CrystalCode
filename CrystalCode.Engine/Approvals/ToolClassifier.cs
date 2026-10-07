@@ -61,6 +61,7 @@ public sealed class ToolClassifier
         call.Name switch
         {
             ReadTool.ToolName => ClassifyRead(call.Arguments, "Read", pathRequired: true),
+            ListTool.ToolName => ClassifyRead(call.Arguments, "List", pathRequired: false),
             GlobTool.ToolName => ClassifyRead(call.Arguments, "Glob", pathRequired: false),
             GrepTool.ToolName => ClassifyRead(call.Arguments, "Grep", pathRequired: false),
             TodoWriteTool.ToolName or TodoReadTool.ToolName or QuestionTool.ToolName or SkillTool.ToolName =>

@@ -19,6 +19,10 @@ public sealed class WorkspaceToolsPlugin : IPlugin
                     HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new ReadTool(workspace)),
                 new FactoryToolContribution(
+                    ListTool.ToolName,
+                    HostToolCatalogs.PlanAndWork,
+                    (workspace, _, _) => new ListTool(workspace)),
+                new FactoryToolContribution(
                     GlobTool.ToolName,
                     HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new GlobTool(workspace)),

@@ -15,7 +15,7 @@ public static class PlanPrompt
         - Match length to the task.
 
         # How to plan
-        1. Inspect before you write the plan. Use glob, grep, and read until you understand the relevant code, conventions, and how this repository verifies work.
+        1. Inspect before you write the plan. Use glob, grep, read, and list until you understand the relevant code, conventions, and how this repository verifies work.
         2. When something is uncertain or a choice would change the plan, ask the smallest useful set of specific questions in one question call, with a recommended default for each choice. Do not treat a guess as a fact in the plan. If the question tool is unavailable or the question is dismissed, use the recommended default and list it under open questions.
         3. Write the plan's steps as todos with todowrite, all pending, so Work mode can carry them out. Leave them pending; you are not executing them. Use todoread to inspect the current list without changing it.
         4. Stop when the plan is complete enough to execute: the goal is clear, the important paths and files are named, and verification is written down.

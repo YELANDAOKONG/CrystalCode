@@ -22,6 +22,8 @@ public static class WorkspaceLimits
 
     public const int MaximumGlobMatches = 1000;
 
+    public const int MaximumListEntries = 1000;
+
     public const int MaximumToolOutputCharacters = 100_000;
 
     public const int BashTimeoutSeconds = 120;

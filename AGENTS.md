@@ -63,7 +63,7 @@ semantics. Do not copy its Demo UI into this product.
   `<workspace>/.crystal/tools` (`ExternalCatalog`). Dotnet tool sets load
   class libraries from the set directory only.
 - Keep assembly ownership consistent with ARCHITECTURE.md.
-- Write, edit, read, glob, and grep of paths outside the workspace
+- Write, edit, read, list, glob, and grep of paths outside the workspace
   require approval (the Review model in Review or Audit, otherwise the
   operator). Edit, Review, and Full do not auto-pass an outside write
   or edit. When Skills

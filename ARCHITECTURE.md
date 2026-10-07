@@ -407,7 +407,7 @@ slash command.
 
 These are product modes, not Crystal types.
 
-- Plan registers read, glob, grep, todowrite, todoread, and question. When
+- Plan registers read, list, glob, grep, todowrite, todoread, and question. When
   Skills is enabled, it also registers skill. External tools whose
   `catalogs` include `plan` are appended after the built-ins.
 - Work registers those tools plus edit, write, and bash, then external
@@ -598,7 +598,7 @@ Every side-effect tool call is classified before invocation:
 Modes:
 
 - Plan: no built-in edit, write, or bash. Workspace reads auto-execute.
-  Reads, glob, and grep of paths outside the workspace ask the operator.
+  Reads, list, glob, and grep of paths outside the workspace ask the operator.
   When Skills is enabled, any path inside a Skills search directory
   (`skill` / `skills` trees) auto-executes as a workspace read. The
   comparison uses the final target of each symbolic link. External
@@ -612,7 +612,7 @@ Modes:
 - Review: workspace file changes for built-in `write` and `edit`
   pass without review, same as Edit. Another model checks
   each remaining side-effect call (Codex guardian-style), including
-  bash, reads, glob, grep, write, and edit of paths outside the
+  bash, reads, list, glob, grep, write, and edit of paths outside the
   workspace, and external Write. Workspace reads and Skills search
   directories still
   auto-execute. A bounded transcript excerpt is attached: the first
@@ -889,7 +889,7 @@ available-skill guidance is appended after the env block.
 Skills are OpenCode-compatible `SKILL.md` folders. They are loaded
 on demand through the `skill` tool. Available-skill guidance lists
 name and description only; it does not include absolute paths. When
-Skills is enabled, `read`, glob, and grep of any path inside a Skills
+Skills is enabled, `read`, `list`, glob, and grep of any path inside a Skills
 search directory (`skill` / `skills` trees, including files that are
 not `SKILL.md`) auto-execute as workspace reads. The comparison uses
 the final target of each symbolic link. Other
@@ -1196,7 +1196,7 @@ also rejects those side effects when a catalog still contains them.
 `--format default` writes a readable trace. Each model round prints thinking
 text only when `--show-thinking` is set, then the assistant reply, then each
 tool beside its own result. With `--show-thinking`, the reply is labeled
-`[Assistant]`. `read`, `glob`, `grep`, and other successful
+`[Assistant]`. `read`, `list`, `glob`, `grep`, and other successful
 tools keep a short head excerpt and an omitted-line count. `edit` and `write`
 keep their result. `bash` keeps the command, the exit status, and a short
 tail, with a longer tail when the command fails. Other failures keep the
