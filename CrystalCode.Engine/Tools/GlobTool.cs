@@ -152,11 +152,13 @@ public sealed class GlobTool : ITool
                         continue;
                     }
 
-                    total++;
-                    smallest.Add(relative);
-                    if (smallest.Count > keep)
+                    if (smallest.Add(relative))
                     {
-                        smallest.Remove(smallest.Max!);
+                        total++;
+                        if (smallest.Count > keep)
+                        {
+                            smallest.Remove(smallest.Max!);
+                        }
                     }
                 }
 

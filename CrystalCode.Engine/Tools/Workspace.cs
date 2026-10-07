@@ -2,8 +2,9 @@ namespace CrystalCode.Engine.Tools;
 
 /// <summary>
 /// Resolves tool paths from a workspace root. Reads and writes may leave the
-/// root after approval. Credential paths stay forbidden. Symbolic links resolve
-/// to their final target.
+/// root after approval. Credential paths stay forbidden. Path resolution and
+/// fence checks follow symbolic links to their final target; enumeration
+/// reports the directory entry path.
 /// </summary>
 public sealed class Workspace
 {
