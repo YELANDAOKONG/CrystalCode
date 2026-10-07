@@ -162,7 +162,7 @@ CLI options:
 | `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
-| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Stored even while the approval-model switch is off |
+| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Does not change `approvalModel.thinkingEffort` on disk |
 | `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. `/promptset` switching is refused and does not write the file. Listing and export stay available |
@@ -297,7 +297,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
-| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Stored even while the switch is off. Same values as `/approval thinking`; an unsupported gear falls back to the provider default, and an unknown value exits 1 |
+| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default, and an unknown value exits 1. Does not write the file |
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. An unknown value exits 1 |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
@@ -313,9 +313,10 @@ checks the directory. `unlimited` removes that one cap.
 
 `--approval-model off` cannot be combined with `--approval-provider` or
 `--approval-model-id`. `--approval-model on` needs a saved approval model
-or `--approval-model-id`. `--approval-thinking` stores a gear for the
-saved or flag-selected approval model; it is ignored while the switch is
-off.
+or `--approval-model-id`. `--approval-thinking` sets a gear for this
+process only: `/approval model` keeps the saved gear, and
+`/approval thinking` is the command that writes one. The process gear is
+ignored while the switch is off.
 
 `--workspace-trust` is not one of the flags that inherit the saved
 setting. Leaving it out checks the directory even when `workspaceTrust`

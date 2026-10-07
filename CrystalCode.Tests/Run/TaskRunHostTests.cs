@@ -608,6 +608,28 @@ public sealed class TaskRunHostTests
         Assert.Equal("gpt-5.6-sol", selectedWithGear.ApprovalModel.Model);
         Assert.Equal("high", selectedWithGear.ApprovalModel.ThinkingEffort.Value);
         Assert.Equal(ThinkingSelection.Default, stored.ApprovalModel.ThinkingEffort);
+
+        var storedWithGear = stored.WithApprovalModel(
+            stored.ApprovalModel.WithThinkingEffort(ThinkingSelection.Parse("high")));
+
+        var onKeepsGear = AssertApplied(
+            storedWithGear,
+            new TaskRunSettings { ApprovalModel = "on" });
+        Assert.True(onKeepsGear.ApprovalModel.Enabled);
+        Assert.Equal("high", onKeepsGear.ApprovalModel.ThinkingEffort.Value);
+
+        var selectedKeepsGear = AssertApplied(
+            storedWithGear,
+            new TaskRunSettings { ApprovalModelId = "gpt-5.6-sol" });
+        Assert.True(selectedKeepsGear.ApprovalModel.Enabled);
+        Assert.Equal("gpt-5.6-sol", selectedKeepsGear.ApprovalModel.Model);
+        Assert.Equal("high", selectedKeepsGear.ApprovalModel.ThinkingEffort.Value);
+
+        var offKeepsGear = AssertApplied(
+            storedWithGear,
+            new TaskRunSettings { ApprovalModel = "off" });
+        Assert.False(offKeepsGear.ApprovalModel.Enabled);
+        Assert.Equal("high", offKeepsGear.ApprovalModel.ThinkingEffort.Value);
     }
 
     [Fact]

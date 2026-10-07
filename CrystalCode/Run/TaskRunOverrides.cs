@@ -160,7 +160,11 @@ internal static class TaskRunOverrides
             throw new ArgumentException(exception.Message, exception);
         }
 
-        return new ApprovalModelSettings(true, provider.Value, model);
+        return new ApprovalModelSettings(
+            true,
+            provider.Value,
+            model,
+            current.ApprovalModel.ThinkingEffort);
     }
 
     private static TurnLimits ParseBudget(HarnessSettings current, SessionLaunchSettings request)

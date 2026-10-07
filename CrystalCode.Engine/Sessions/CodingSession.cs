@@ -684,11 +684,15 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        // A launch gear is process-only. This command changes the switch or
+        // the selection, so the saved gear stays whatever config.json held.
+        var persistedNext = next.WithThinkingEffort(
+            _persisted.ApprovalModel.ThinkingEffort);
         HarnessSettings updated;
         try
         {
             updated = _settings.WithApprovalModel(next);
-            _ = _persisted.WithApprovalModel(next);
+            _ = _persisted.WithApprovalModel(persistedNext);
         }
         catch (InvalidOperationException exception)
         {
@@ -702,7 +706,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         _settings = updated;
-        _persisted = _persisted.WithApprovalModel(next);
+        _persisted = _persisted.WithApprovalModel(persistedNext);
         _settingsStore.Save(_persisted);
         ReplaceApprovalClient(next, client);
         RebuildExecutors();

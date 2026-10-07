@@ -4,6 +4,7 @@ using Crystal.Chat;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 
 using Xunit;
@@ -90,6 +91,44 @@ public sealed class LaunchOverridePersistenceTests
         Assert.NotNull(saved.ApprovalModel);
         Assert.True(saved.ApprovalModel!.Enabled);
         Assert.Equal("low", saved.ApprovalModel.ThinkingEffort);
+    }
+
+    [Fact]
+    public async Task ApprovalModelCommand_KeepsLaunchGearOffDiskAndStoredGearOnDisk()
+    {
+        var persisted = HeadlessSession.ScriptedSettings(thinking: true)
+            .WithApprovalModel(new ApprovalModelSettings(
+                true,
+                "scripted",
+                "model",
+                ThinkingSelection.Parse("low")));
+        var live = persisted.WithApprovalModel(
+            persisted.ApprovalModel.WithThinkingEffort(ThinkingSelection.Parse("high")));
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: live,
+            persistedSettings: persisted);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/approval model model", CancellationToken.None);
+
+        var selected = Read(headless);
+        Assert.NotNull(selected.ApprovalModel);
+        Assert.Equal("low", selected.ApprovalModel!.ThinkingEffort);
+
+        headless.Observer.Clear();
+        var quit = await headless.Session.SubmitAsync("/status", CancellationToken.None);
+        Assert.False(quit);
+        var status = headless.Observer.Events.OfType<StatusReported>().Single().Status;
+        Assert.Equal("Think High", status.ApprovalThinking);
+
+        await headless.Session.SubmitAsync("/approval model off", CancellationToken.None);
+        await headless.Session.SubmitAsync("/approval model on", CancellationToken.None);
+
+        var toggled = Read(headless);
+        Assert.NotNull(toggled.ApprovalModel);
+        Assert.True(toggled.ApprovalModel!.Enabled);
+        Assert.Equal("low", toggled.ApprovalModel.ThinkingEffort);
     }
 
     private static SettingsDocument Read(HeadlessSession headless)
