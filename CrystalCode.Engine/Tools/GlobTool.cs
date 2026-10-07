@@ -11,9 +11,11 @@ public sealed class GlobTool : ITool
 {
     public const string ToolName = "glob";
 
-    private const string ToolDescription =
+    private static readonly string ToolDescription =
         "Lists workspace files matching a glob, for example **/*.cs. "
         + "Optional path limits the search directory. Skips bin, obj, and .git. "
+        + "Use offset (1-based) and limit to page through matches; "
+        + $"limit defaults to {WorkspaceLimits.MaximumGlobMatches} files and is capped there. "
         + "Batch independent searches in parallel.";
 
     private readonly Workspace _workspace;
@@ -36,6 +38,14 @@ public sealed class GlobTool : ITool
                     "path": {
                       "type": "string",
                       "description": "Optional workspace-relative directory to search from."
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "description": "1-based match to start from."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "Maximum number of matches to return, up to 1000."
                     }
                   },
                   "required": ["pattern"]
@@ -54,11 +64,21 @@ public sealed class GlobTool : ITool
         ArgumentNullException.ThrowIfNull(call);
 
         if (!ToolArguments.TryReadRequiredString(call.Arguments, "pattern", out var pattern)
-            || !ToolArguments.TryReadOptionalString(call.Arguments, "path", out var relativePath))
+            || !ToolArguments.TryReadOptionalString(call.Arguments, "path", out var relativePath)
+            || !ToolArguments.TryReadOptionalInt32(call.Arguments, "offset", out var offset)
+            || !ToolArguments.TryReadOptionalInt32(call.Arguments, "limit", out var limit))
         {
             return ValueTask.FromResult(
                 new ToolOutput(
-                    "Arguments must include pattern and an optional path string.",
+                    "Arguments must include pattern, with optional path string and offset and limit integers.",
+                    ToolResultStatus.Failure));
+        }
+
+        if (offset is <= 0 || limit is <= 0)
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "offset and limit must be positive when supplied.",
                     ToolResultStatus.Failure));
         }
 
@@ -91,39 +111,37 @@ public sealed class GlobTool : ITool
                         ToolResultStatus.Failure));
             }
 
-            if (File.Exists(location))
-            {
-                return ValueTask.FromResult(
-                    MatchSingleFile(glob!, location)
-                        ? new ToolOutput(_workspace.ToRelative(location))
-                        : new ToolOutput("No files matched."));
-            }
-
             searchRoot = location;
         }
 
         try
         {
             var matches = new List<string>();
-            foreach (var file in _workspace.EnumerateFiles(searchRoot))
+            if (File.Exists(searchRoot))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var relative = _workspace.ToRelative(file);
-                if (Workspace.IsCredentialPath(file) || Workspace.IsCredentialPath(relative))
+                if (MatchSingleFile(glob!, searchRoot))
                 {
-                    continue;
+                    matches.Add(_workspace.ToRelative(searchRoot));
                 }
-
-                if (!glob!.IsMatch(relative)
-                    && !glob.IsMatch(Path.GetRelativePath(searchRoot, file).Replace('\\', '/')))
+            }
+            else
+            {
+                foreach (var file in _workspace.EnumerateFiles(searchRoot))
                 {
-                    continue;
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var relative = _workspace.ToRelative(file);
+                    if (Workspace.IsCredentialPath(file) || Workspace.IsCredentialPath(relative))
+                    {
+                        continue;
+                    }
 
-                matches.Add(relative);
-                if (matches.Count >= WorkspaceLimits.MaximumGlobMatches)
-                {
-                    break;
+                    if (!glob!.IsMatch(relative)
+                        && !glob.IsMatch(Path.GetRelativePath(searchRoot, file).Replace('\\', '/')))
+                    {
+                        continue;
+                    }
+
+                    matches.Add(relative);
                 }
             }
 
@@ -133,15 +151,30 @@ public sealed class GlobTool : ITool
                 return ValueTask.FromResult(new ToolOutput("No files matched."));
             }
 
-            var builder = new StringBuilder();
-            foreach (var match in matches)
+            var start = offset ?? 1;
+            if (start > matches.Count)
             {
-                builder.AppendLine(match);
+                var noun = matches.Count == 1 ? "file" : "files";
+                return ValueTask.FromResult(
+                    new ToolOutput(
+                        $"Glob matched {matches.Count} {noun}; offset {start} is past the end.",
+                        ToolResultStatus.Failure));
             }
 
-            if (matches.Count == WorkspaceLimits.MaximumGlobMatches)
+            var maximum = Math.Min(
+                limit ?? WorkspaceLimits.MaximumGlobMatches,
+                WorkspaceLimits.MaximumGlobMatches);
+            var count = Math.Min(maximum, matches.Count - start + 1);
+            var builder = new StringBuilder();
+            for (var index = start - 1; index < start - 1 + count; index++)
             {
-                builder.AppendLine($"[truncated to {WorkspaceLimits.MaximumGlobMatches} files]");
+                builder.AppendLine(matches[index]);
+            }
+
+            if (start - 1 + count < matches.Count)
+            {
+                builder.AppendLine(
+                    $"[showing {count} of {matches.Count} files; continue with offset {start + count}]");
             }
 
             return ValueTask.FromResult(new ToolOutput(builder.ToString().TrimEnd()));

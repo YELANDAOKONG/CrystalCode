@@ -34,6 +34,26 @@ public static class ToolArguments
     public static bool TryReadRequiredString(string arguments, string name, out string value) =>
         TryReadString(arguments, name, out value) && !string.IsNullOrWhiteSpace(value);
 
+    /// <summary>
+    /// True when arguments are a JSON object or empty text, which callers
+    /// treat as an absent argument list.
+    /// </summary>
+    public static bool IsObjectOrEmpty(string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            return true;
+        }
+
+        if (!TryOpen(arguments, out var document))
+        {
+            return false;
+        }
+
+        document.Dispose();
+        return true;
+    }
+
     public static bool TryReadOptionalString(string arguments, string name, out string? value)
     {
         value = null;

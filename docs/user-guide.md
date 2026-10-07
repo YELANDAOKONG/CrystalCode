@@ -990,7 +990,7 @@ is the workspace root.
 | :--- | :--- | :--- |
 | `read` | Plan, Work | Read a workspace text file (`path`, optional 1-based `offset` and `limit`) |
 | `list` | Plan, Work | List a directory's immediate entries (`path` optional, 1-based `offset` and `limit` paging) |
-| `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`) |
+| `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`, 1-based `offset` and `limit` paging) |
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
 | `todoread` | Plan, Work | Read the current session todo list |
@@ -1001,9 +1001,9 @@ is the workspace root.
 | `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 120 seconds) |
 
 Practical limits: read up to 1,000,000 characters or 20,000 lines;
-write up to 2 MiB; grep up to 500 matches and 8 MiB per file; glob
-up to 1,000 matches; list up to 1,000 entries per page; tool output
-truncated at 100,000 characters.
+write up to 2 MiB; grep up to 1,000 matches and 8 MiB per file; glob
+up to 1,000 matches per page; list up to 1,000 entries per page; tool
+output truncated at 100,000 characters.
 
 ## External tools
 

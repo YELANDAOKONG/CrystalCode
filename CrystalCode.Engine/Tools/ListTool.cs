@@ -52,6 +52,16 @@ public sealed class ListTool : ITool
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(call);
 
+        // Every field is optional, so a malformed payload would otherwise
+        // silently degrade to an argument-less workspace listing.
+        if (!ToolArguments.IsObjectOrEmpty(call.Arguments))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput(
+                    "Arguments must be a JSON object with optional path, offset, and limit.",
+                    ToolResultStatus.Failure));
+        }
+
         if (!ToolArguments.TryReadOptionalString(call.Arguments, "path", out var path)
             || !ToolArguments.TryReadOptionalInt32(call.Arguments, "offset", out var offset)
             || !ToolArguments.TryReadOptionalInt32(call.Arguments, "limit", out var limit))
@@ -94,7 +104,8 @@ public sealed class ListTool : ITool
 
         try
         {
-            var entries = ReadEntries(location, cancellationToken);
+            var isFile = File.Exists(location);
+            var entries = ReadEntries(location, isFile, cancellationToken);
             entries.Sort(StringComparer.Ordinal);
             if (entries.Count == 0)
             {
@@ -104,9 +115,11 @@ public sealed class ListTool : ITool
             var start = offset ?? 1;
             if (start > entries.Count)
             {
+                var subject = isFile ? "File" : "Directory";
+                var noun = entries.Count == 1 ? "entry" : "entries";
                 return ValueTask.FromResult(
                     new ToolOutput(
-                        $"Directory has {entries.Count} entries; offset {start} is past the end.",
+                        $"{subject} has {entries.Count} {noun}; offset {start} is past the end.",
                         ToolResultStatus.Failure));
             }
 
@@ -149,10 +162,10 @@ public sealed class ListTool : ITool
         + $"limit defaults to {WorkspaceLimits.MaximumListEntries} entries and is capped there. "
         + "Paths outside the workspace require approval.";
 
-    private List<string> ReadEntries(string location, CancellationToken cancellationToken)
+    private List<string> ReadEntries(string location, bool isFile, CancellationToken cancellationToken)
     {
         var entries = new List<string>();
-        if (File.Exists(location))
+        if (isFile)
         {
             entries.Add(_workspace.ToRelative(location));
             return entries;

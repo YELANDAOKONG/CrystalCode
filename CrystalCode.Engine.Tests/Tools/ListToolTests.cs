@@ -78,17 +78,58 @@ public sealed class ListToolTests
     }
 
     [Fact]
-    public async Task InvokeAsync_OffsetPastEnd_Fails()
+    public async Task InvokeAsync_FilePathOffsetPastEnd_ReportsFile()
     {
         using var root = new TemporaryWorkspace();
         File.WriteAllText(Path.Combine(root.Path, "only.txt"), "x\n");
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"offset":2}"""));
+            new ToolCall("1", ListTool.ToolName, """{"path":"only.txt","offset":2}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
-        Assert.Equal("Directory has 1 entries; offset 2 is past the end.", output.Text);
+        Assert.Equal("File has 1 entry; offset 2 is past the end.", output.Text);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_DirectoryOffsetPastEnd_ReportsDirectory()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "a.txt"), "a\n");
+        File.WriteAllText(Path.Combine(root.Path, "b.txt"), "b\n");
+        var tool = new ListTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", ListTool.ToolName, """{"offset":3}"""));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+        Assert.Equal("Directory has 2 entries; offset 3 is past the end.", output.Text);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_MalformedArguments_Fails()
+    {
+        using var root = new TemporaryWorkspace();
+        var tool = new ListTool(new Workspace(root.Path));
+
+        var text = await tool.InvokeAsync(new ToolCall("1", ListTool.ToolName, "not json"));
+        var array = await tool.InvokeAsync(new ToolCall("2", ListTool.ToolName, "[]"));
+
+        Assert.Equal(ToolResultStatus.Failure, text.Status);
+        Assert.Equal(ToolResultStatus.Failure, array.Status);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_EmptyArguments_ListWorkspaceRoot()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "keep.txt"), "k\n");
+        var tool = new ListTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(new ToolCall("1", ListTool.ToolName, string.Empty));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal("keep.txt", output.Text);
     }
 
     [Fact]
