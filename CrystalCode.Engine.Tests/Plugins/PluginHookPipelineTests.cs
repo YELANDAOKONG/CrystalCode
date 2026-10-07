@@ -424,6 +424,7 @@ public sealed class PluginHookPipelineTests
         var note = pipeline.TakeRawNote();
 
         Assert.Equal("Raw hook 'DropCallsHook' changed this model request. The failure may be related.", note);
+        Assert.NotNull(note);
         Assert.True(char.IsUpper(note[0]));
         Assert.Null(pipeline.TakeRawNote());
     }
