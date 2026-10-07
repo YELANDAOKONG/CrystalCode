@@ -861,6 +861,10 @@ Crystal skills, and tool sets of the same directory name):
 <workspace>/.crystal.md
 ```
 
+`config.json` is not part of the project overlay. Operator preferences load
+from the Home `config.json` only; workspace-level configuration is deferred
+product work.
+
 Overlay is built-in default, then `~/.crystal`, then the project
 `.crystal`. Named prompt files replace the built-in Work, Plan, or
 Review system text.

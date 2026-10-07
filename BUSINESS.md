@@ -145,6 +145,9 @@ implemented in the current build:
   and Ollama Chat;
 - audio and video input, and image, audio, or video model output;
 - editing provider definitions in the TUI;
+- workspace-level configuration, read from `<workspace>/.crystal/config.json`
+  once its field scope, precedence, write policy, and trust semantics are
+  defined;
 - automatically fetching model-list information from a provider;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
@@ -152,6 +155,10 @@ implemented in the current build:
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. TODO: add
 MCP without bypassing the existing plugin, approval, and media boundaries.
+
+TODO: add workspace-level configuration only after its field scope, precedence,
+write policy, and trust semantics are defined; a repository-controlled file
+must not weaken approval or trust.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
@@ -176,7 +183,9 @@ coding product built on Crystal. Its Chinese name is "晶码".
 
 ## Data
 
-User data lives in `~/.crystal`. Prompts may be replaced in
+User data lives in `~/.crystal`. Operator preferences load from
+`~/.crystal/config.json` only; a workspace-level `config.json` is not read.
+Prompts may be replaced in
 `~/.crystal/prompts` and the project's `.crystal/prompts`. Provider and model
 definitions live in `~/.crystal/providers.json`; changing preferences in
 `config.json` does not rewrite those definitions. The legacy

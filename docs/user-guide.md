@@ -396,7 +396,9 @@ Host settings live in `~/.crystal/config.json`. Provider and model definitions
 live in `~/.crystal/providers.json`; the built-in DeepSeek and OpenAI catalog
 is available even when this file is absent. Operator definitions overlay that
 catalog. Edit the file you changed, then restart for the changes to take effect.
-Editing provider definitions in the TUI is deferred.
+Editing provider definitions in the TUI is deferred. A
+`<workspace>/.crystal/config.json` is not read; workspace-level configuration
+is deferred.
 
 When `providers.json` exists, it supplies the operator catalog, and the legacy
 `config.json.providers` field is not read. When `providers.json` is absent,
@@ -1408,6 +1410,9 @@ sets, and plugins of the same directory name win over home):
 <workspace>/.crystal.md
 <workspace>/AGENTS.md
 ```
+
+`config.json` is not part of the project overlay; workspace-level
+configuration is deferred.
 
 `plugins/<directory>/plugin.json` loads one operator plugin. Dotnet tool
 sets still load class libraries from the tool-set directory only. See
