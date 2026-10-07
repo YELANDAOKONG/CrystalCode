@@ -4,21 +4,31 @@
 
 Crystal Code works in a local repository through a streaming terminal UI. Ask it to inspect code, plan a change, or edit files. Plan and Work modes, tool approvals, and workspace boundaries keep you in control of what it can do.
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4.svg)](https://dotnet.microsoft.com/)
+[![Platforms](https://img.shields.io/badge/platforms-linux--x64%20%7C%20linux--arm64%20%7C%20macos--arm64%20%7C%20windows--x64-informational.svg)](#get-started)
+[![Tests](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml)
+[![Release](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml/badge.svg)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml)
+
 [Get started](#get-started) · [Features](#features) · [Command line](#command-line) · [Configuration](#configuration) · [User guide](docs/user-guide.md)
 
-## Features
+<a name="features"></a>
 
-- **Stay in the terminal.** Follow streamed responses and tool calls, edit a multiline prompt, and queue follow-up requests while a turn runs.
-- **Choose how work happens.** Plan mode offers built-in reading and planning tools; Work mode also enables file edits and shell commands. Tool calls follow a risk-aware approval policy.
-- **Keep a conversation going.** Resume or fork saved sessions, switch models with `/model`, and compact older context automatically or with `/compact`.
-- **Use the model endpoints you prefer.** Built-in DeepSeek, OpenAI, Gemini, and Ollama providers are available, and you can configure OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages (Claude) endpoints.
-- **Extend the workflow.** Load skills and operator tool sets from your home directory or workspace. Image-capable models can receive workspace or clipboard images.
+## ✨ Features
+
+- **🖥️ Stay in the terminal.** Follow streamed responses and tool calls, edit a multiline prompt, and queue follow-up requests while a turn runs.
+- **🎛️ Choose how work happens.** Plan mode offers built-in reading and planning tools; Work mode also enables file edits and shell commands. Tool calls follow a risk-aware approval policy.
+- **🧵 Keep a conversation going.** Resume or fork saved sessions, switch models with `/model`, and compact older context automatically or with `/compact`.
+- **🔌 Use the model endpoints you prefer.** Built-in DeepSeek, OpenAI, Gemini, and Ollama providers are available, and you can configure OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages (Claude) endpoints.
+- **🧩 Extend the workflow.** Load skills and operator tool sets from your home directory or workspace. Image-capable models can receive workspace or clipboard images.
 
 Crystal Code is the coding product built on the sibling [Crystal](https://github.com/YELANDAOKONG/Crystal) library. The terminal is its operator surface.
 
-## Get started
+<a name="get-started"></a>
 
-### 1. Install
+## 🚀 Get started
+
+### 📦 1. Install
 
 The self-contained release supports Linux x64 and ARM64, macOS ARM64, and Windows x64.
 
@@ -38,7 +48,7 @@ Invoke-RestMethod `
 
 The installer places the application under `~/.crystal/binaries/code/` and adds that directory to your path. On Linux and macOS it also aliases `crystal` to `CrystalCode`; on Windows the command stays `CrystalCode`. Open a new terminal after installation. To inspect a script before running it, download it first and run the local copy.
 
-### 2. Set an API key
+### 🔑 2. Set an API key
 
 Write the key in `~/.crystal/credentials.json` under the provider name. For the default DeepSeek provider the file looks like:
 
@@ -52,7 +62,7 @@ The value is plain text. Where the operating system allows it, the file is limit
 
 `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, or `<PROVIDER>_API_KEY` overrides that file for the process that receives it. Use an environment variable for a single launch or a CI runner. See [Credentials](docs/user-guide.md#credentials) for the full lookup order.
 
-### 3. Start in your repository
+### 🏁 3. Start in your repository
 
 ```bash
 cd /path/to/your/repository
@@ -63,7 +73,7 @@ On Windows, run `CrystalCode` instead of `crystal`. The current directory become
 
 Inside the app, type `/help` for commands and shortcuts. Use Tab or `/plan` to switch between Plan and Work. The [interactive session guide](docs/user-guide.md#interactive-session) covers the composer, image attachments, and follow-up queue.
 
-## Everyday Slash commands
+## ⌨️ Everyday Slash commands
 
 Type these inside a running session; `/help` lists them all.
 
@@ -80,7 +90,9 @@ Type these inside a running session; `/help` lists them all.
 
 See the [complete command reference](docs/user-guide.md#slash-commands).
 
-## Command line
+<a name="command-line"></a>
+
+## 💻 Command line
 
 Run these from your shell. The interactive terminal is one entry point; the others start, do their work, and exit without a session:
 
@@ -94,7 +106,9 @@ Run these from your shell. The interactive terminal is one entry point; the othe
 
 See the [headless run](docs/user-guide.md#headless-run) and [operator space](docs/user-guide.md#operator-space) sections of the user guide for the full option list.
 
-## Configuration
+<a name="configuration"></a>
+
+## ⚙️ Configuration
 
 Preferences and provider definitions are separate:
 
@@ -108,7 +122,7 @@ The built-in catalog includes DeepSeek, OpenAI, Gemini, and Ollama; Anthropic Me
 
 File edits and shell commands stay within the workspace. Reads outside it require approval, and credential paths are forbidden. [Approval modes](docs/user-guide.md#approval) explain which calls ask you, use a reviewing model, or pass automatically.
 
-## Build from source
+## 🔨 Build from source
 
 You need the .NET 10 or .NET 11 SDK and a sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal`.
 
@@ -134,24 +148,24 @@ The script checks for the .NET 10 or .NET 11 SDK, the sibling Crystal checkout, 
 
 Run `dotnet build`, `dotnet test`, and `dotnet run` from the Crystal Code repository root. To work on a different repository, add `--workspace <path>` after the final `--` in the `dotnet run` command. A TTY is required for the interactive UI, and `bash` must be on the path (Git Bash is used on Windows when available).
 
-## Contributing
+## 🤝 Contributing
 
 Maintainers can write a commit message and commit the current change with [`commit.sh`](commit.sh). It runs `crystal run` in this repository. Extra arguments are appended to the task. The run skips external tools and the directory trust check, and it does not record the directory as trusted.
 
-## Documentation
+## 📚 Documentation
 
-- [User guide](docs/user-guide.md): installation, configuration, commands, tools, sessions, and prompts
-- [External tools](docs/external-tools.md): tool-set format and runners
-- [Plugins](docs/plugins.md): plugin contract, tools, and hooks
-- [Product definition](BUSINESS.md): scope and terminology
-- [Architecture](ARCHITECTURE.md): components and runtime behavior
-- [Engineering standards](STANDARDS.md): source and verification rules
-- [Agent instructions](AGENTS.md): repository guidance for coding agents
+- 📘 [User guide](docs/user-guide.md): installation, configuration, commands, tools, sessions, and prompts
+- 🧰 [External tools](docs/external-tools.md): tool-set format and runners
+- 🧩 [Plugins](docs/plugins.md): plugin contract, tools, and hooks
+- 📄 [Product definition](BUSINESS.md): scope and terminology
+- 🏗️ [Architecture](ARCHITECTURE.md): components and runtime behavior
+- 📏 [Engineering standards](STANDARDS.md): source and verification rules
+- 🤖 [Agent instructions](AGENTS.md): repository guidance for coding agents
 
-## Roadmap
+## 🗺️ Roadmap
 
 MCP servers, an operating-system sandbox, parent/child agents, audio and video input, non-text model output, and editing provider definitions in the TUI are planned but not yet implemented. Image input is available for supported models and providers. `/model` selects a configured provider and model; it does not edit the catalog.
 
-## License
+## 📄 License
 
 [MIT](LICENSE)
