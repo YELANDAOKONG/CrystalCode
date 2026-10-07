@@ -1687,7 +1687,9 @@ public sealed class SessionRenderer : IDisposable
         if (!_sideOpen)
         {
             FollowOverlay(overlay, regions.OverlayRows);
-            overlay = WindowLines(overlay, regions.OverlayRows, ref _overlayScroll);
+            overlay = _overlayWidget is not null
+                ? WindowCardLines(overlay, regions.OverlayRows, ref _overlayScroll)
+                : WindowLines(overlay, regions.OverlayRows, ref _overlayScroll);
         }
 
         _scrollBack = _scrollAnchor.Resolve(
@@ -1823,10 +1825,12 @@ public sealed class SessionRenderer : IDisposable
             case InputKey key when key.Modifiers == ConsoleModifiers.None && key.Key == ConsoleKey.RightArrow:
                 MoveSide(1);
                 return null;
+            // Page by the rows inside the pinned frame, not by the whole card,
+            // so a page never skips answer text.
             case InputKey key when ScrollInput.TryKeyScroll(
                 key,
                 scrollPlainArrows: true,
-                MaxSideRows,
+                MaxSideRows - 2,
                 out var delta):
                 ScrollSide(-delta);
                 return null;
@@ -1896,18 +1900,7 @@ public sealed class SessionRenderer : IDisposable
             _sideStick = _sideScroll >= max;
         }
 
-        if (_sideScroll == 0 && lines.Count <= MaxSideRows)
-        {
-            return lines;
-        }
-
-        var window = new PaintLine[Math.Min(MaxSideRows, lines.Count - _sideScroll)];
-        for (var row = 0; row < window.Length; row++)
-        {
-            window[row] = lines[_sideScroll + row];
-        }
-
-        return window;
+        return WindowCardLines(lines, MaxSideRows, ref _sideScroll);
     }
 
     private void ApplyScrollUnlocked(int towardTop)
@@ -1923,7 +1916,10 @@ public sealed class SessionRenderer : IDisposable
         var regions = CurrentRegions();
         if (OverlayHiddenRows(regions) > 0)
         {
-            return Math.Max(1, regions.OverlayRows - 1);
+            // A card overlay pins its frame, so a page moves the rows between
+            // the borders; other content pages the whole slot.
+            var framed = _overlayWidget is not null && regions.OverlayRows >= 3;
+            return Math.Max(1, regions.OverlayRows - (framed ? 2 : 1));
         }
 
         return Math.Max(1, regions.TranscriptRows - 1);
@@ -1966,7 +1962,9 @@ public sealed class SessionRenderer : IDisposable
             return;
         }
 
-        _overlayScroll = Reveal(_overlayScroll, rows, anchor, lines.Count);
+        _overlayScroll = _overlayWidget is not null
+            ? RevealCard(_overlayScroll, rows, anchor, lines.Count)
+            : Reveal(_overlayScroll, rows, anchor, lines.Count);
         _overlayFollowRow = anchor;
     }
 
@@ -2028,6 +2026,13 @@ public sealed class SessionRenderer : IDisposable
         return scroll;
     }
 
+    // Follow math for a card window: the first and last rows are pinned, so the
+    // anchor and the visible rows are expressed inside the frame.
+    internal static int RevealCard(int scroll, int rows, int anchor, int lineCount) =>
+        rows >= 3 && lineCount >= 3
+            ? Reveal(scroll, rows - 2, anchor - 1, lineCount - 2)
+            : Reveal(scroll, rows, anchor, lineCount);
+
     internal static IReadOnlyList<PaintLine> WindowLines(
         IReadOnlyList<PaintLine> lines,
         int rows,
@@ -2047,6 +2052,32 @@ public sealed class SessionRenderer : IDisposable
             window[i] = lines[scroll + i];
         }
 
+        return window;
+    }
+
+    // Windows a card that owns a rounded frame. The first and last rows stay
+    // pinned (title and bottom border); only the rows between them scroll. A
+    // card that fits is returned unchanged.
+    internal static IReadOnlyList<PaintLine> WindowCardLines(
+        IReadOnlyList<PaintLine> lines,
+        int rows,
+        ref int scroll)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        if (rows < 3 || lines.Count <= rows)
+        {
+            return WindowLines(lines, rows, ref scroll);
+        }
+
+        scroll = Math.Clamp(scroll, 0, lines.Count - rows);
+        var window = new PaintLine[rows];
+        window[0] = lines[0];
+        for (var i = 1; i < rows - 1; i++)
+        {
+            window[i] = lines[scroll + i];
+        }
+
+        window[rows - 1] = lines[^1];
         return window;
     }
 

@@ -529,6 +529,85 @@ public sealed class SessionRendererTests
         Assert.Equal(1, SessionRenderer.Reveal(scroll: 4, rows: 3, anchor: 1, lineCount: 10));
     }
 
+    [Fact]
+    public void WindowCardLines_PinsTheFrameAndScrollsTheInterior()
+    {
+        var lines = new PaintLine[8];
+        for (var i = 0; i < lines.Length; i++)
+        {
+            lines[i] = PaintLine.Colored("white", i.ToString());
+        }
+
+        var scroll = 0;
+        var window = SessionRenderer.WindowCardLines(lines, 4, ref scroll);
+        Assert.Equal(["0", "1", "2", "7"], window.Select(static line => line.Plain).ToArray());
+
+        Assert.True(SessionRenderer.MoveOverlayScroll(scroll, lines.Length - 4, towardTop: -1, out scroll));
+        window = SessionRenderer.WindowCardLines(lines, 4, ref scroll);
+        Assert.Equal(["0", "2", "3", "7"], window.Select(static line => line.Plain).ToArray());
+
+        scroll = int.MaxValue;
+        window = SessionRenderer.WindowCardLines(lines, 4, ref scroll);
+        Assert.Equal(4, scroll);
+        Assert.Equal(["0", "5", "6", "7"], window.Select(static line => line.Plain).ToArray());
+    }
+
+    [Fact]
+    public void WindowCardLines_ReturnsACardThatFitsUnchanged()
+    {
+        var lines = new[]
+        {
+            PaintLine.Colored("white", "top"),
+            PaintLine.Colored("white", "body")
+        };
+        var scroll = 3;
+
+        var window = SessionRenderer.WindowCardLines(lines, 6, ref scroll);
+
+        Assert.Same(lines, window);
+        Assert.Equal(0, scroll);
+    }
+
+    [Fact]
+    public void WindowCardLines_KeepsSideQuestionBordersWhileScrolled()
+    {
+        const int width = 80;
+        var answer = string.Join(
+            '\n',
+            Enumerable.Range(0, 24).Select(static i => "answer line " + i));
+        var snapshot = new SideQuestionSnapshot(
+            true,
+            [new SideExchange("why", answer)],
+            false,
+            string.Empty,
+            string.Empty,
+            null,
+            false);
+
+        var lines = WidgetPaint.Lines(SideQuestionWidget.Create(snapshot, 0), width);
+        Assert.True(lines.Count > 12);
+
+        var scroll = int.MaxValue;
+        var window = SessionRenderer.WindowCardLines(lines, 12, ref scroll);
+
+        Assert.Equal(12, window.Count);
+        Assert.Contains("Side question", window[0].Plain, StringComparison.Ordinal);
+        Assert.Contains('╭', window[0].Plain);
+        Assert.Contains('╯', window[^1].Plain);
+        Assert.Equal(lines[^1].Plain, window[^1].Plain);
+        Assert.All(window, line => Assert.True(TextWidth.Measure(line.Plain) <= width));
+    }
+
+    [Fact]
+    public void RevealCard_FollowsInsideThePinnedFrame()
+    {
+        // Rows 0 and 19 are the frame, so the interior holds rows 1..18 inside
+        // a 6-row window (4 visible interior rows).
+        Assert.Equal(14, SessionRenderer.RevealCard(scroll: 0, rows: 6, anchor: 18, lineCount: 20));
+        Assert.Equal(0, SessionRenderer.RevealCard(scroll: 5, rows: 6, anchor: 1, lineCount: 20));
+        Assert.Equal(1, SessionRenderer.RevealCard(scroll: 0, rows: 6, anchor: 5, lineCount: 20));
+    }
+
     private static SideQuestionSnapshot SampleSide() =>
         new(
             true,

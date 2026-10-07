@@ -725,10 +725,11 @@ navigate questions, and Escape to dismiss the request. While a custom answer is
 being edited, its text and cursor appear inside the question panel; Enter saves
 it and Escape returns to the choices without changing the answer. When the
 question panel is taller than the room on screen, the mouse wheel, PageUp,
-PageDown, and Ctrl+Up/Down scroll the panel. Moving the highlight, or the
-cursor while editing a custom answer, brings that row back into view. A manual
-scroll stays until the highlight or cursor moves. A scroll past either end, and
-those same keys while the panel already fits, scroll the transcript.
+PageDown, and Ctrl+Up/Down scroll the rows inside it; the title and border
+stay visible. Moving the highlight, or the cursor while editing a custom
+answer, brings that row back into view. A manual scroll stays until the
+highlight or cursor moves. A scroll past either end, and those same keys while
+the panel already fits, scroll the transcript.
 
 ### Follow-up queue
 
@@ -908,7 +909,7 @@ returns the transcript viewport to the latest output.
 | `/promptattach` | | List prompt attachments, or `enable` / `disable` / `up` / `down` one name |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
 | `/stats` | | Replaces the session frame with Overview, Tokens, and Tools panels, including a tool share bar. Supports `all`, `<Nd>`, and `tools <count>`. Esc or `q` restores the session |
-| `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. While the model has not started, the panel shows the same spinner as the progress row. Once reasoning starts, the caption changes to Thinking until answer text arrives. An empty `/btw` reopens it. Esc, Enter, Space, or Ctrl+C closes it. Ctrl+C also cancels a side question that is still running and leaves the main turn running. Left and Right step through earlier answers. `x` clears them |
+| `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. An answer taller than the panel scrolls inside it with the wheel, PageUp, PageDown, or Ctrl+Up/Down, and the title and border stay visible. While the model has not started, the panel shows the same spinner as the progress row. Once reasoning starts, the caption changes to Thinking until answer text arrives. An empty `/btw` reopens it. Esc, Enter, Space, or Ctrl+C closes it. Ctrl+C also cancels a side question that is still running and leaves the main turn running. Left and Right step through earlier answers. `x` clears them |
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here. The operator space does not ask. Changing the directory is refused while a turn is running |
