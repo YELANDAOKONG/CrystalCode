@@ -511,7 +511,8 @@ override. Instructions, skill guidance, the environment block, and compaction
 text are not prompt-set members. `/promptset` (alias `/prompts`) lists sets and
 the effective source of Work, Plan, and Review. `/promptset <name>` switches at
 idle by writing `prompt.json`, replaces the live system message, and rebuilds
-Review. It does not write `config.json`. Resume and fork use the enabled
+Review. It does not write `config.json`. A process `--prompt-set` refuses
+that switch and leaves the file unchanged. Resume and fork use the enabled
 manifest rather than a selection stored in the session. `crystal promptsets
 list|show|enable|disable` edits the same Home manifests outside a session.
 `--home` and `--format text` match the plugin commands. There is no
@@ -551,8 +552,11 @@ no source prefix.
 `crystal`, `crystal space`, and `crystal run` accept `--prompt-set <name>`.
 That flag forces the named set for the process even when
 its manifest says `enabled: false`. `default` forces the built-in text.
+`/promptset` switching, including `default`, is refused while the flag is
+set and does not write `prompt.json`. Listing and export stay available.
 `--prompt-attachments on|off` is the process switch: omitted or `on` follows
-the file flags and order; `off` appends nothing. Neither flag writes
+the file flags and order; `off` appends nothing and refuses enable, disable,
+up, and down. Listing stays available. Neither flag writes
 `prompt.json` or `config.json`. Older `promptSet` and `promptAttachments`
 keys in `config.json` are ignored and omitted the next time preferences are
 saved. There is no migration tool.

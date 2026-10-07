@@ -64,6 +64,7 @@ internal static class TaskRunHost
         }
 
         HarnessSettings applied;
+        HarnessSettings loaded;
         bool planMode;
         CrystalHome home;
         string workspace;
@@ -84,7 +85,7 @@ internal static class TaskRunHost
                 }
             }
 
-            var loaded = new SettingsStore(home).LoadOrCreate();
+            loaded = new SettingsStore(home).LoadOrCreate();
             if (!TaskRunOverrides.TryApply(loaded, settings, out applied, out planMode, out var applyError))
             {
                 await error.WriteLineAsync(applyError);
@@ -135,6 +136,8 @@ internal static class TaskRunHost
         CodingSession session;
         try
         {
+            // loaded is the disk baseline. A later save must not write this
+            // process's launch overrides, including provider and model.
             session = CodingSession.Create(
                 applied,
                 new SettingsStore(home),
@@ -147,7 +150,9 @@ internal static class TaskRunHost
                     questions,
                     new UnattendedSessionChooser(),
                     new UnattendedTrustPrompt()),
-                plugins ?? PluginRegistry.CreateBuiltIn());
+                plugins ?? PluginRegistry.CreateBuiltIn(),
+                resume: null,
+                persistedSettings: loaded);
         }
         catch (Exception exception) when (IsSetupFailure(exception))
         {

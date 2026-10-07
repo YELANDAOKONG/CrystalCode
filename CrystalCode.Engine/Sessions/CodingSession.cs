@@ -1296,6 +1296,15 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        if (_settings.PromptSetOverride is not null)
+        {
+            Error(
+                "Prompt set "
+                + _settings.PromptSetOverride
+                + " is forced for this process.");
+            return;
+        }
+
         if (!PromptSetChangeArguments.TryParseName(tokens, out var requested, out var parseError))
         {
             Error(parseError);
@@ -1358,6 +1367,12 @@ public sealed class CodingSession : ITurnObserver
         if (_turnActive)
         {
             Error("Finish the current turn before changing prompt attachments.");
+            return;
+        }
+
+        if (!_settings.UsePromptAttachments)
+        {
+            Error("Prompt attachments are off for this process.");
             return;
         }
 

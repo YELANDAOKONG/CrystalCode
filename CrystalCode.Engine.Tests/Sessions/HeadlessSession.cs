@@ -25,7 +25,8 @@ internal sealed class HeadlessSession : IDisposable
         SessionDocument? resume = null,
         bool showCompactionSummary = true,
         HarnessSettings? settings = null,
-        HarnessSettings? persistedSettings = null)
+        HarnessSettings? persistedSettings = null,
+        Action<CrystalHome, string>? prepare = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -49,6 +50,8 @@ internal sealed class HeadlessSession : IDisposable
                 resume.Id = SessionStore.NewId();
             }
         }
+
+        prepare?.Invoke(_home.Home, _workspace.Path);
 
         Session = CodingSession.Create(
             sessionSettings,

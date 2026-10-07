@@ -164,8 +164,8 @@ CLI options:
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
 | `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
 | `--thinking <effort>` | Same values as `/thinking` |
-| `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
-| `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing |
+| `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. `/promptset` switching is refused and does not write the file. Listing and export stay available |
+| `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing and refuses enable, disable, up, and down. Listing stays available |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
 | `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
 | `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
@@ -1184,8 +1184,11 @@ prompt-attachments list|show|enable|disable` accepts `--home`, `--workspace`,
 `--prompt-set <name>` forces one
 set for that process, including a set whose file says `enabled: false`.
 `default` forces the built-in text. `--prompt-attachments off` appends
-nothing. Omitting the flag, or passing `on`, follows the files. Neither flag
-writes `prompt.json` or `config.json`.
+nothing and refuses `/promptattach` enable, disable, up, and down. Listing
+stays available. Omitting the flag, or passing `on`, follows the files.
+`--prompt-set` refuses `/promptset` switching for the process, including
+`default`, and does not write `prompt.json`. Listing and export stay
+available. Neither flag writes `prompt.json` or `config.json`.
 
 Enabled attachment text is added after the body is bound, and before an
 ordinary plugin prompt hook appends its own text.

@@ -44,6 +44,29 @@ public sealed class LaunchOverridePersistenceTests
         Assert.DoesNotContain("audit", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task RunBaseline_PreferenceSaveLeavesLaunchOverridesOffDisk()
+    {
+        var live = HeadlessSession.ScriptedSettings(thinking: true)
+            .WithApproval(ApprovalMode.Audit)
+            .WithThinkingEffort(new ThinkingSelection("high"));
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: live,
+            persistedSettings: HarnessSettings.CreateDefault());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/tokens on", CancellationToken.None);
+
+        var saved = Read(headless);
+        Assert.Equal("deepseek", saved.Provider);
+        Assert.Equal("deepseek-flash", saved.Model);
+        Assert.Equal("default", saved.Approval);
+        Assert.Null(saved.ThinkingEffort);
+        Assert.True(saved.EstimatedTokens);
+        Assert.DoesNotContain("audit", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
+    }
+
     private static SettingsDocument Read(HeadlessSession headless)
     {
         var json = File.ReadAllText(headless.Home.ConfigPath);

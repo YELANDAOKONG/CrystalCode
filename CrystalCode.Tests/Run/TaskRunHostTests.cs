@@ -638,6 +638,54 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public void Overrides_RejectsAnUnknownProviderOrModel()
+    {
+        var current = HarnessSettings.CreateDefault();
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { Provider = "nosuchprovider" },
+            out _,
+            out _,
+            out var providerError));
+        Assert.Contains("nosuchprovider", providerError, StringComparison.Ordinal);
+        Assert.Contains("not configured", providerError, StringComparison.Ordinal);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { Model = "nosuch-model" },
+            out _,
+            out _,
+            out var modelError));
+        Assert.Contains("nosuch-model", modelError, StringComparison.Ordinal);
+        Assert.Equal(ProviderName.DeepSeek, current.Provider);
+        Assert.Equal("deepseek-flash", current.Model);
+    }
+
+    [Fact]
+    public async Task UnknownProvider_ExitsInvalid()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(AllowReview, TextRound("unused"));
+        var settings = fixture.Settings("hello");
+        settings = new TaskRunSettings
+        {
+            TaskText = settings.TaskText,
+            Home = settings.Home,
+            Workspace = settings.Workspace,
+            Provider = "nosuchprovider",
+            Model = settings.Model
+        };
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Invalid, result.Code);
+        Assert.Contains("nosuchprovider", result.Error, StringComparison.Ordinal);
+        Assert.Equal(0, client.RequestCount);
+        fixture.AssertSettingsUnchanged();
+    }
+
+    [Fact]
     public void LaunchPlan_WorkLeavesAResumedPlanSession()
     {
         using var fixture = new RunFixture();

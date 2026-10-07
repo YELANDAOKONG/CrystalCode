@@ -98,7 +98,9 @@ internal static class TaskRunOverrides
             planMode = request.Plan;
             return true;
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or KeyNotFoundException)
         {
             error = exception.Message;
             return false;
