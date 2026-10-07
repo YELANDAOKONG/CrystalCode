@@ -804,7 +804,7 @@ otherwise the same conversation.
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
 | **Plan** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
-| **Work** | Built-in Plan tools plus edit, write, bash, plus external tools listed for Work | After approval |
+| **Work** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus edit, write, and bash, plus any external tools listed for Work | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
 

@@ -418,8 +418,9 @@ These are product modes, not Crystal types.
 - Plan registers read, list, glob, grep, todowrite, todoread, and question. When
   Skills is enabled, it also registers skill. External tools whose
   `catalogs` include `plan` are appended after the built-ins.
-- Work registers those tools plus edit, write, and bash, then external
-  tools whose `catalogs` include `work`.
+- Work registers read, list, glob, grep, todowrite, todoread, question, and
+  skill when enabled, then edit, write, and bash, then external tools whose
+  `catalogs` include `work`.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
