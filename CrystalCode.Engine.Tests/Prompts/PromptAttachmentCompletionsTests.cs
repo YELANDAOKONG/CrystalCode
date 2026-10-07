@@ -18,16 +18,16 @@ public sealed class PromptAttachmentCompletionsTests
             PromptSource.BuiltIn,
             [],
             [
-                new PromptAttachmentEntry("beta", PromptAttachmentSource.Home, Enabled: true),
-                new PromptAttachmentEntry("gone", null, Enabled: true),
-                new PromptAttachmentEntry("alpha", PromptAttachmentSource.Workspace, Enabled: false)
-            ]);
+                new PromptAttachmentEntry("beta", "beta", string.Empty, PromptAttachmentSource.Home, true, true, 0),
+                new PromptAttachmentEntry("alpha", "alpha", string.Empty, PromptAttachmentSource.Workspace, false, false, null)
+            ],
+            []);
 
         var options = PromptAttachmentCompletions.For(resolution);
 
         Assert.Equal(["enable", "disable", "up", "down"], options.Select(option => option.Name));
         Assert.Equal(["beta", "alpha"], options[0].ArgumentOptions.Select(option => option.Name));
-        Assert.Equal(["beta", "gone"], options[1].ArgumentOptions.Select(option => option.Name));
-        Assert.Equal(["beta", "gone"], options[2].ArgumentOptions.Select(option => option.Name));
+        Assert.Equal(["beta"], options[1].ArgumentOptions.Select(option => option.Name));
+        Assert.Equal(["beta"], options[2].ArgumentOptions.Select(option => option.Name));
     }
 }

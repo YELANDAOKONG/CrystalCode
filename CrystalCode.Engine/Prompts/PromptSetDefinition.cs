@@ -1,3 +1,6 @@
 namespace CrystalCode.Engine.Prompts;
 
-internal sealed record PromptSetDefinition(string Name, string Directory);
+internal sealed record PromptSetDefinition(
+    string Name,
+    string Directory,
+    PromptManifest Manifest);

@@ -50,6 +50,9 @@ public sealed class TaskRunSettings : CommandSettings
     [CommandOption("--prompt-set <NAME>")]
     public string? PromptSet { get; init; }
 
+    [CommandOption("--prompt-attachments <on|off>")]
+    public string? PromptAttachments { get; init; }
+
     [CommandOption("--skills <on|off>")]
     public string? Skills { get; init; }
 

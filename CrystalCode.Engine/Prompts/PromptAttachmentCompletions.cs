@@ -11,11 +11,7 @@ internal static class PromptAttachmentCompletions
         var enabled = new List<string>();
         foreach (var entry in resolution.Attachments)
         {
-            if (entry.Source is not null)
-            {
-                discovered.Add(entry.Name);
-            }
-
+            discovered.Add(entry.Name);
             if (entry.Enabled)
             {
                 enabled.Add(entry.Name);

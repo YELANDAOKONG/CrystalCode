@@ -68,7 +68,13 @@ internal static class TaskRunOverrides
 
             if (request.PromptSet is not null)
             {
-                next = next.WithPromptSet(Required(request.PromptSet, "Prompt set"));
+                next = next.WithPromptSetOverride(Required(request.PromptSet, "Prompt set"));
+            }
+
+            if (request.PromptAttachments is not null)
+            {
+                next = next.WithUsePromptAttachments(
+                    ParseSwitch(request.PromptAttachments, "--prompt-attachments"));
             }
 
             if (request.ModelCalls is not null

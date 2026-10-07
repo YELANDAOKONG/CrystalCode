@@ -479,49 +479,75 @@ and is not an overlay file.
 
 Prompt set selection and direct prompt overrides are separate features. A
 prompt set is a Home-only directory under `~/.crystal/promptsets/<name>` with
-any subset of `work.md`, `plan.md`, and `review.md` (`.txt` is also accepted).
-The host never scans a workspace for prompt sets. `default` is a virtual,
-reserved selection backed by the built-in prompts. A missing or empty file in
-a selected set falls back to the built-in prompt for that name.
+`prompt.json` and any subset of `work.md`, `plan.md`, and `review.md` (`.txt`
+is also accepted). The host never scans a workspace for prompt sets.
+`default` is a virtual, reserved selection backed by the built-in prompts. A
+missing or empty file in a selected set falls back to the built-in prompt for
+that name. Direct `prompts/work.md` overrides do not use `prompt.json`.
+
+`prompt.json` may set `name` (display title, at most 80 characters) and
+`description` (at most 280 characters). The directory name stays the id.
+`enabled` is required to turn the directory on; omitting it means off.
+Unknown fields are kept. A missing, unreadable, or invalid manifest skips
+the directory and reports an English note. Commands do not create a missing
+directory or a missing manifest, and they leave a broken manifest unchanged.
+
+At most one prompt set may be enabled. Enabling one writes `enabled: true`
+on that manifest and `enabled: false` on every other enabled set. Disabling
+the current set, or `/promptset default`, clears every enabled flag and the
+session uses built-in text. If two or more sets are hand-edited to
+`enabled: true`, the session uses none, notes the conflict, and stays on
+`default`.
 
 The complete named-prompt precedence is built-in, selected prompt set, direct
 `~/.crystal/prompts` override, then direct workspace `.crystal/prompts`
 override. Instructions, skill guidance, the environment block, and compaction
 text are not prompt-set members. `/promptset` (alias `/prompts`) lists sets and
 the effective source of Work, Plan, and Review. `/promptset <name>` switches at
-idle, persists `promptSet` in `config.json`, replaces the live system message,
-and rebuilds Review. `/promptset default` clears the stored selection. A
-configured set that is missing at startup falls back to `default`, reports a
-note, and is not silently rewritten. Resume and fork use the current global
-selection rather than storing a selection in the session.
+idle by writing `prompt.json`, replaces the live system message, and rebuilds
+Review. It does not write `config.json`. Resume and fork use the enabled
+manifest rather than a selection stored in the session. `crystal promptsets
+list|show|enable|disable` edits the same Home manifests outside a session.
+`--home` and `--format text` match the plugin commands. There is no
+`--source` flag, because prompt sets are Home-only.
 
 Prompt attachments append after the resolved Work, Plan, or Review text has
 been bound. The resolved text stays in place. Attachments are not prompt-set
 members. Topic naming and compaction stay unchanged. Each attachment is a
-directory of the same `work.md`, `plan.md`, and `review.md` files (`.txt` is
-also accepted). A missing file contributes nothing for that mode. Empty files
-are missing. Directory names use the same 1-64 character hyphenated form as
-prompt sets. `default` is a valid attachment name.
+directory of `prompt.json` plus the same `work.md`, `plan.md`, and `review.md`
+files (`.txt` is also accepted). A missing file contributes nothing for that
+mode. Empty files are missing. Directory names use the same 1-64 character
+hyphenated form as prompt sets. `default` is a valid attachment name.
 
 Discovery reads `~/.crystal/prompt-attachments/<name>/` and
 `<workspace>/.crystal/prompt-attachments/<name>/`. The workspace is the
 current workspace root only; parent directories are not walked. The same name
-in both places uses the workspace directory. `promptAttachments` in
-`config.json` is the ordered enable list. A discovered directory that is not
-in the list does not append. A listed name that is missing or invalid is
-skipped, reported, and left in the list. Duplicate names keep the first copy.
-Placeholder tokens inside an attachment expand with the same host values as
-the body. The host never writes attachment files.
+in both places uses the workspace `prompt.json` entirely, including `enabled`
+and `order`. Many attachments may be enabled. They sort by `order`, then by
+directory name. A missing `order` sorts last. Enabling appends the name and
+rewrites the enabled orders as `0..n-1`. Disabling sets `enabled` false and
+does not renumber. `/promptattach up` and `down` swap within that order and
+rewrite it. Placeholder tokens inside an attachment expand with the same host
+values as the body.
 
 Composition order is the resolved body, bound placeholders, enabled
-attachments for that mode in list order, then an ordinary plugin `OnPrompt`
+attachments for that mode in `order`, then an ordinary plugin `OnPrompt`
 append. A raw `RewritePrompt` can still replace the result. `/promptattach`
-lists discovered attachments, the enable order, and Home or workspace source.
-`/promptattach enable|disable <name>` changes membership.
-`/promptattach up|down <name>` moves a name in the enabled list. Changes are
-refused while a turn is running. Listing stays available. The status bar
-continues to show only the selected prompt set. `crystal run` uses the saved
-list and has no separate flag for it.
+lists discovered attachments with title, description, and Home or workspace
+source. Changes are refused while a turn is running. Listing stays available.
+The status bar continues to show only the selected prompt set directory name.
+`crystal prompt-attachments list|show|enable|disable` edits the same
+manifests. It accepts `--home`, `--workspace`, `--source home|project`, and
+`--format text`. Session `/promptattach` edits the winning directory and has
+no source prefix.
+
+`crystal run --prompt-set <name>` forces that set for the process even when
+its manifest says `enabled: false`. `default` forces the built-in text.
+`--prompt-attachments on|off` is the process switch: omitted or `on` follows
+the file flags and order; `off` appends nothing. Neither flag writes
+`prompt.json` or `config.json`. Older `promptSet` and `promptAttachments`
+keys in `config.json` are ignored and omitted the next time preferences are
+saved. There is no migration tool.
 
 ## Model
 
@@ -742,9 +768,11 @@ contents of `binaries/code/`.
   prompts/plan.md
   prompts/review.md
   prompts/topic.md
+  promptsets/<name>/prompt.json
   promptsets/<name>/work.md
   promptsets/<name>/plan.md
   promptsets/<name>/review.md
+  prompt-attachments/<name>/prompt.json
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
   prompt-attachments/<name>/review.md
@@ -816,6 +844,7 @@ Crystal skills, and tool sets of the same directory name):
   prompts/plan.md
   prompts/review.md
   prompts/topic.md
+  prompt-attachments/<name>/prompt.json
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
   prompt-attachments/<name>/review.md
@@ -1023,13 +1052,9 @@ and Project `host`. The object is omitted from the written file when
 both members are the defaults; otherwise only changed members are
 written.
 
-`promptSet` selects a Home prompt set by directory name. It is omitted for the
-virtual `default` selection. Names are 1-64 lowercase alphanumeric words joined
-by single hyphens.
-
-`promptAttachments` is the ordered list of prompt attachment directory names
-that append to Work, Plan, and Review. It is omitted when empty. Names that
-are not currently discovered stay in the list.
+`promptSet` and `promptAttachments` are no longer preferences. A file that
+still contains them is read, the values are ignored, and the next preference
+save omits both keys. Selection lives in each directory's `prompt.json`.
 
 `estimatedTokens` shows a live four-characters-per-token estimate on
 the progress row during Thinking and Writing (default `false`). The

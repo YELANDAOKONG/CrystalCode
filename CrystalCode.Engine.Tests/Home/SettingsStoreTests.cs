@@ -284,7 +284,11 @@ public sealed class SettingsStoreTests
         var oldProviders = original.RootElement.GetProperty("providers");
         Assert.True(JsonElement.DeepEquals(oldProviders, copied.RootElement));
         Assert.True(JsonElement.DeepEquals(oldProviders, saved.RootElement.GetProperty("providers")));
-        Assert.Equal("concise", store.Load().PromptSet);
+        Assert.Equal(HarnessSettings.DefaultPromptSet, store.Load().PromptSet);
+        Assert.DoesNotContain(
+            "promptSet",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
         Assert.Equal(123456, store.Load().ActiveModel.ContextWindow);
     }
 
@@ -786,65 +790,40 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
-    public void Save_RoundTripsNonDefaultPromptSet()
+    public void Save_OmitsPromptSetAndPromptAttachments()
     {
         using var root = new TemporaryHome();
+        root.Home.EnsureCreated();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "promptSet": "concise",
+              "promptAttachments": [ "beta", "alpha" ]
+            }
+            """);
         var store = new SettingsStore(root.Home);
-        var settings = store.LoadOrCreate().WithPromptSet("concise");
-
-        store.Save(settings);
         var loaded = store.Load();
 
-        Assert.Equal("concise", loaded.PromptSet);
-        Assert.Contains(
-            "\"promptSet\": \"concise\"",
-            File.ReadAllText(root.Home.ConfigPath),
-            StringComparison.Ordinal);
-    }
+        Assert.Equal(HarnessSettings.DefaultPromptSet, loaded.PromptSet);
+        Assert.Empty(loaded.PromptAttachments);
+        Assert.Null(loaded.PromptSetOverride);
+        Assert.True(loaded.UsePromptAttachments);
 
-    [Fact]
-    public void Save_RoundTripsPromptAttachmentsInOrder()
-    {
-        using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
-        var settings = store.LoadOrCreate().WithPromptAttachments(["beta", "alpha"]);
+        store.Save(loaded
+            .WithPromptSet("concise")
+            .WithPromptAttachments(["beta", "alpha"])
+            .WithPromptSetOverride("strict")
+            .WithUsePromptAttachments(false));
+        var json = File.ReadAllText(root.Home.ConfigPath);
+        var again = store.Load();
 
-        store.Save(settings);
-        var loaded = store.Load();
-
-        Assert.Equal(["beta", "alpha"], loaded.PromptAttachments);
-        Assert.Contains(
-            "\"promptAttachments\":",
-            File.ReadAllText(root.Home.ConfigPath),
-            StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Save_OmitsEmptyPromptAttachments()
-    {
-        using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
-
-        store.Save(store.LoadOrCreate().WithPromptAttachments(["alpha"]).WithPromptAttachments([]));
-
-        Assert.DoesNotContain(
-            "promptAttachments",
-            File.ReadAllText(root.Home.ConfigPath),
-            StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Save_OmitsDefaultPromptSet()
-    {
-        using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
-
-        store.Save(HarnessSettings.CreateDefault());
-
-        Assert.DoesNotContain(
-            "promptSet",
-            File.ReadAllText(root.Home.ConfigPath),
-            StringComparison.Ordinal);
+        Assert.DoesNotContain("promptSet", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("promptAttachments", json, StringComparison.Ordinal);
+        Assert.Equal(HarnessSettings.DefaultPromptSet, again.PromptSet);
+        Assert.Empty(again.PromptAttachments);
+        Assert.Null(again.PromptSetOverride);
+        Assert.True(again.UsePromptAttachments);
     }
 
     [Fact]

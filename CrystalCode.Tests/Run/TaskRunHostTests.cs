@@ -517,7 +517,8 @@ public sealed class TaskRunHostTests
             ExternalTools = "off",
             Thinking = "max",
             Approval = "audit",
-            PromptSet = "default"
+            PromptSet = "concise",
+            PromptAttachments = "off"
         };
 
         var applied = AssertApplied(current, request);
@@ -530,6 +531,11 @@ public sealed class TaskRunHostTests
         Assert.False(applied.ExternalTools);
         Assert.Equal("maximum", applied.ThinkingEffort.Value);
         Assert.Equal(ApprovalMode.Audit, applied.Approval);
+        Assert.Equal("concise", applied.PromptSetOverride);
+        Assert.Equal(HarnessSettings.DefaultPromptSet, applied.PromptSet);
+        Assert.False(applied.UsePromptAttachments);
+        Assert.Null(current.PromptSetOverride);
+        Assert.True(current.UsePromptAttachments);
         Assert.Equal(current.Provider, applied.Provider);
         Assert.Equal(TurnLimits.DefaultMaximumModelCalls, current.ExecutionBudget.MaximumModelCalls);
     }

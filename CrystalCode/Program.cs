@@ -48,6 +48,30 @@ public static class Program
                 tools.AddCommand<ToolsDisableCommand>("disable")
                     .WithDescription("Disable one external tool set directory.");
             });
+            config.AddBranch<PromptSetCommandSettings>("promptsets", promptSets =>
+            {
+                promptSets.SetDescription("List, show, enable, or disable one Home prompt set.");
+                promptSets.AddCommand<PromptSetsListCommand>("list")
+                    .WithDescription("List Home prompt sets, including disabled ones.");
+                promptSets.AddCommand<PromptSetsShowCommand>("show")
+                    .WithDescription("Show one prompt set manifest.");
+                promptSets.AddCommand<PromptSetsEnableCommand>("enable")
+                    .WithDescription("Enable one prompt set and disable the others.");
+                promptSets.AddCommand<PromptSetsDisableCommand>("disable")
+                    .WithDescription("Disable one prompt set.");
+            });
+            config.AddBranch<PromptAttachmentCommandSettings>("prompt-attachments", attachments =>
+            {
+                attachments.SetDescription("List, show, enable, or disable one prompt attachment.");
+                attachments.AddCommand<PromptAttachmentsListCommand>("list")
+                    .WithDescription("List prompt attachments, including disabled ones.");
+                attachments.AddCommand<PromptAttachmentsShowCommand>("show")
+                    .WithDescription("Show one prompt attachment manifest.");
+                attachments.AddCommand<PromptAttachmentsEnableCommand>("enable")
+                    .WithDescription("Enable one prompt attachment.");
+                attachments.AddCommand<PromptAttachmentsDisableCommand>("disable")
+                    .WithDescription("Disable one prompt attachment.");
+            });
             config.AddCommand<VersionCommand>("version")
                 .WithDescription("Print the build identity and exit. --version prints the same text.");
         });

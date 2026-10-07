@@ -18,12 +18,17 @@ public sealed class PromptSelectionTextTests
             PromptSource.PromptSet,
             PromptSource.ProjectOverride,
             [],
-            []);
+            [],
+            [
+                new PromptSetEntry("concise", "Concise", "Shorter replies", true, true),
+                new PromptSetEntry("strict-review", "strict-review", string.Empty, false, false)
+            ]);
 
         var text = PromptSelectionText.Format(resolution);
 
         Assert.Contains("Prompt Set: concise", text, StringComparison.Ordinal);
-        Assert.Contains("* concise", text, StringComparison.Ordinal);
+        Assert.Contains("* concise  Concise  Shorter replies", text, StringComparison.Ordinal);
+        Assert.Contains("strict-review", text, StringComparison.Ordinal);
         Assert.Contains("Work    Home Override", text, StringComparison.Ordinal);
         Assert.Contains("Plan    Prompt Set concise", text, StringComparison.Ordinal);
         Assert.Contains("Review  Project Override", text, StringComparison.Ordinal);

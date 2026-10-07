@@ -59,7 +59,9 @@ public sealed record HarnessSettings
         bool plugins = DefaultPlugins,
         bool workspaceTrust = DefaultWorkspaceTrust,
         bool showCompactionSummary = DefaultShowCompactionSummary,
-        IReadOnlyList<string>? promptAttachments = null)
+        IReadOnlyList<string>? promptAttachments = null,
+        string? promptSetOverride = null,
+        bool usePromptAttachments = true)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -109,6 +111,10 @@ public sealed record HarnessSettings
         WorkspaceTrust = workspaceTrust;
         ShowCompactionSummary = showCompactionSummary;
         PromptAttachments = CopyPromptAttachments(promptAttachments);
+        PromptSetOverride = string.IsNullOrWhiteSpace(promptSetOverride)
+            ? null
+            : promptSetOverride.Trim();
+        UsePromptAttachments = usePromptAttachments;
         if (ApprovalModel.Enabled)
         {
             try
@@ -159,6 +165,18 @@ public sealed record HarnessSettings
     public string PromptSet { get; }
 
     public IReadOnlyList<string> PromptAttachments { get; }
+
+    /// <summary>
+    /// Process-only prompt set. Null follows <c>prompt.json</c>. This value
+    /// is not written to <c>config.json</c>.
+    /// </summary>
+    public string? PromptSetOverride { get; }
+
+    /// <summary>
+    /// Process-only attachment switch. False appends nothing. This value
+    /// is not written to <c>config.json</c>.
+    /// </summary>
+    public bool UsePromptAttachments { get; }
 
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
@@ -261,6 +279,15 @@ public sealed record HarnessSettings
         return Copy(promptAttachments: promptAttachments, setPromptAttachments: true);
     }
 
+    public HarnessSettings WithPromptSetOverride(string promptSet)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(promptSet);
+        return Copy(promptSetOverride: promptSet.Trim(), setPromptSetOverride: true);
+    }
+
+    public HarnessSettings WithUsePromptAttachments(bool usePromptAttachments) =>
+        Copy(usePromptAttachments: usePromptAttachments, setUsePromptAttachments: true);
+
     public HarnessSettings WithExternalToolApproval(ExternalToolApprovalSettings approval)
     {
         ArgumentNullException.ThrowIfNull(approval);
@@ -321,7 +348,11 @@ public sealed record HarnessSettings
         bool? workspaceTrust = null,
         bool? showCompactionSummary = null,
         IReadOnlyList<string>? promptAttachments = null,
-        bool setPromptAttachments = false) =>
+        bool setPromptAttachments = false,
+        string? promptSetOverride = null,
+        bool setPromptSetOverride = false,
+        bool? usePromptAttachments = null,
+        bool setUsePromptAttachments = false) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -346,7 +377,9 @@ public sealed record HarnessSettings
             plugins ?? Plugins,
             workspaceTrust ?? WorkspaceTrust,
             showCompactionSummary ?? ShowCompactionSummary,
-            setPromptAttachments ? promptAttachments : PromptAttachments);
+            setPromptAttachments ? promptAttachments : PromptAttachments,
+            setPromptSetOverride ? promptSetOverride : PromptSetOverride,
+            setUsePromptAttachments ? usePromptAttachments ?? UsePromptAttachments : UsePromptAttachments);
 
     public override string ToString() => nameof(HarnessSettings);
 

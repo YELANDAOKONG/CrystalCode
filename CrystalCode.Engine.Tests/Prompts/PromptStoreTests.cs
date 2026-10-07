@@ -185,10 +185,9 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        WritePrompt(
-            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
-            "work.md",
-            "concise work");
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(concise, "work.md", "concise work");
+        WriteManifest(concise, enabled: false);
         var store = CreateStore(home);
 
         var resolution = store.Resolve(workspace.Path, "concise");
@@ -208,10 +207,9 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        WritePrompt(
-            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
-            "work.md",
-            "set work");
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(concise, "work.md", "set work");
+        WriteManifest(concise, enabled: true);
         WritePrompt(home.Home.PromptsDirectory, "work.md", "home work");
         WritePrompt(
             Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "prompts"),
@@ -230,10 +228,9 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        WritePrompt(
-            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
-            "plan.md",
-            "set plan");
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(concise, "plan.md", "set plan");
+        WriteManifest(concise, enabled: true);
         WritePrompt(home.Home.PromptsDirectory, "plan.md", "home plan");
         var store = CreateStore(home);
 
@@ -288,6 +285,7 @@ public sealed class PromptStoreTests
         WritePrompt(directory, "work.txt", "text work");
         WritePrompt(directory, "work.md", "markdown work");
         WritePrompt(directory, "plan.txt", "text plan");
+        WriteManifest(directory, enabled: false);
         var store = CreateStore(home);
 
         var resolution = store.Resolve(workspace.Path, "concise");
@@ -323,14 +321,15 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "work.md", "ALPHA");
-        WritePrompt(AttachmentDirectory(home.Home, "beta"), "work.md", "BETA");
+        var alpha = AttachmentDirectory(home.Home, "alpha");
+        var beta = AttachmentDirectory(home.Home, "beta");
+        WritePrompt(alpha, "work.md", "ALPHA");
+        WritePrompt(beta, "work.md", "BETA");
+        WriteManifest(alpha, enabled: true, order: 1);
+        WriteManifest(beta, enabled: true, order: 0);
         var store = CreateStore(home);
 
-        var resolution = store.Resolve(
-            workspace.Path,
-            PromptSetNames.Default,
-            ["beta", "alpha"]);
+        var resolution = store.Resolve(workspace.Path);
         var text = resolution.Prompts.ComposeWork(PromptContext.InstructionsOnly(string.Empty));
 
         Assert.EndsWith("BETA\n\nALPHA", text, StringComparison.Ordinal);
@@ -342,11 +341,15 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "work.md", "HOME EXTRA");
-        WritePrompt(ProjectAttachmentDirectory(workspace.Path, "alpha"), "work.md", "WORKSPACE EXTRA");
+        var homeAlpha = AttachmentDirectory(home.Home, "alpha");
+        var workspaceAlpha = ProjectAttachmentDirectory(workspace.Path, "alpha");
+        WritePrompt(homeAlpha, "work.md", "HOME EXTRA");
+        WritePrompt(workspaceAlpha, "work.md", "WORKSPACE EXTRA");
+        WriteManifest(homeAlpha, enabled: true, order: 0);
+        WriteManifest(workspaceAlpha, enabled: true, order: 4);
         var store = CreateStore(home);
 
-        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["alpha"]);
+        var resolution = store.Resolve(workspace.Path);
         var text = resolution.Prompts.ComposeWork(PromptContext.InstructionsOnly(string.Empty));
 
         Assert.Contains("WORKSPACE EXTRA", text, StringComparison.Ordinal);
@@ -364,15 +367,15 @@ public sealed class PromptStoreTests
         using var workspace = new TemporaryWorkspace();
         var child = Path.Combine(workspace.Path, "nested");
         Directory.CreateDirectory(child);
-        WritePrompt(ProjectAttachmentDirectory(workspace.Path, "parent-only"), "work.md", "FROM PARENT");
+        var parent = ProjectAttachmentDirectory(workspace.Path, "parent-only");
+        WritePrompt(parent, "work.md", "FROM PARENT");
+        WriteManifest(parent, enabled: true, order: 0);
         var store = CreateStore(home);
 
-        var resolution = store.Resolve(child, PromptSetNames.Default, ["parent-only"]);
+        var resolution = store.Resolve(child);
 
         Assert.DoesNotContain("FROM PARENT", resolution.Prompts.WorkSystem, StringComparison.Ordinal);
-        Assert.Contains(
-            resolution.Notes,
-            note => note.Contains("was not found", StringComparison.Ordinal));
+        Assert.Empty(resolution.Attachments);
     }
 
     [Fact]
@@ -380,11 +383,13 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "plan.md", "PLAN EXTRA");
-        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "review.md", "See {{workspace}}");
+        var alpha = AttachmentDirectory(home.Home, "alpha");
+        WritePrompt(alpha, "plan.md", "PLAN EXTRA");
+        WritePrompt(alpha, "review.md", "See {{workspace}}");
+        WriteManifest(alpha, enabled: true, order: 0);
         var store = CreateStore(home);
 
-        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["alpha"]);
+        var resolution = store.Resolve(workspace.Path);
         var context = PromptContext.Create(
             workspace.Path,
             "openai",
@@ -403,25 +408,21 @@ public sealed class PromptStoreTests
     }
 
     [Fact]
-    public void Resolve_NotesAMissingAttachmentWithoutUsingIt()
+    public void Resolve_SkipsAnAttachmentWithoutAManifest()
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
+        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "work.md", "ALPHA");
         var store = CreateStore(home);
 
-        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["missing", "missing"]);
+        var resolution = store.Resolve(workspace.Path);
 
         Assert.Equal(WorkPrompt.Text, resolution.Prompts.Work);
         Assert.Empty(resolution.Prompts.WorkAttachments);
-        Assert.Equal("missing", resolution.Attachments[0].Name);
-        Assert.Null(resolution.Attachments[0].Source);
-        Assert.True(resolution.Attachments[0].Enabled);
+        Assert.Empty(resolution.Attachments);
         Assert.Contains(
             resolution.Notes,
-            note => note.Contains("was not found", StringComparison.Ordinal));
-        Assert.Contains(
-            resolution.Notes,
-            note => note.Contains("more than once", StringComparison.Ordinal));
+            note => note.Contains("prompt.json is missing", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -429,13 +430,16 @@ public sealed class PromptStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        WritePrompt(AttachmentDirectory(home.Home, "alpha"), "work.md", "ALPHA");
+        var alpha = AttachmentDirectory(home.Home, "alpha");
+        WritePrompt(alpha, "work.md", "ALPHA");
+        WriteManifest(alpha, enabled: false);
         var store = CreateStore(home);
 
-        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, []);
+        var resolution = store.Resolve(workspace.Path);
 
         Assert.DoesNotContain("ALPHA", resolution.Prompts.WorkSystem, StringComparison.Ordinal);
         Assert.False(resolution.Attachments[0].Enabled);
+        Assert.False(resolution.Attachments[0].Effective);
         Assert.Equal(PromptAttachmentSource.Home, resolution.Attachments[0].Source);
     }
 
@@ -448,7 +452,7 @@ public sealed class PromptStoreTests
         WritePrompt(AttachmentDirectory(home.Home, "empty"), "work.md", "   ");
         var store = CreateStore(home);
 
-        var resolution = store.Resolve(workspace.Path, PromptSetNames.Default, ["Bad_Name"]);
+        var resolution = store.Resolve(workspace.Path);
 
         Assert.Empty(resolution.Prompts.WorkAttachments);
         Assert.Contains(
@@ -468,10 +472,11 @@ public sealed class PromptStoreTests
         Assert.True(store.ContainsSet(PromptSetNames.Default));
         Assert.False(store.ContainsSet("concise"));
 
-        WritePrompt(
-            Path.Combine(home.Home.PromptSetsDirectory, "concise"),
-            "work.md",
-            "custom work");
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(concise, "work.md", "custom work");
+        Assert.False(store.ContainsSet("concise"));
+
+        WriteManifest(concise, enabled: false);
 
         Assert.True(store.ContainsSet("concise"));
         Assert.False(store.ContainsSet("Bad_Name"));
@@ -486,9 +491,79 @@ public sealed class PromptStoreTests
     private static PromptStore CreateStore(TemporaryHome home) =>
         new(home.Home, InstructionDiscovery.Isolated(home.Home));
 
+    [Fact]
+    public void Resolve_UsesTheSingleEnabledPromptSet()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(concise, "work.md", "concise work");
+        WriteManifest(concise, enabled: true);
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path);
+
+        Assert.Equal("concise", resolution.PromptSet);
+        Assert.Equal("concise work", resolution.Prompts.Work);
+        Assert.Contains(resolution.Sets, entry => entry.Name == "concise" && entry.Effective);
+    }
+
+    [Fact]
+    public void Resolve_UsesDefaultWhenMoreThanOnePromptSetIsEnabled()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        var strict = Path.Combine(home.Home.PromptSetsDirectory, "strict");
+        WritePrompt(concise, "work.md", "concise work");
+        WritePrompt(strict, "work.md", "strict work");
+        WriteManifest(concise, enabled: true);
+        WriteManifest(strict, enabled: true);
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path);
+
+        Assert.Equal(PromptSetNames.Default, resolution.PromptSet);
+        Assert.Equal(WorkPrompt.Text, resolution.Prompts.Work);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("More than one prompt set is enabled", StringComparison.Ordinal));
+        Assert.DoesNotContain(resolution.Sets, entry => entry.Effective);
+    }
+
+    [Fact]
+    public void Resolve_SkipsAttachmentsWhenTheProcessSwitchIsOff()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var alpha = AttachmentDirectory(home.Home, "alpha");
+        WritePrompt(alpha, "work.md", "ALPHA");
+        WriteManifest(alpha, enabled: true, order: 0);
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, promptSetOverride: null, usePromptAttachments: false);
+
+        Assert.DoesNotContain("ALPHA", resolution.Prompts.WorkSystem, StringComparison.Ordinal);
+        Assert.Empty(resolution.Prompts.WorkAttachments);
+        Assert.True(resolution.Attachments[0].Enabled);
+        Assert.False(resolution.Attachments[0].Effective);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("off for this process", StringComparison.Ordinal));
+    }
+
     private static void WritePrompt(string directory, string fileName, string text)
     {
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, fileName), text);
+    }
+
+    private static void WriteManifest(string directory, bool enabled, int? order = null)
+    {
+        Directory.CreateDirectory(directory);
+        var orderLine = order is int value ? ",\n  \"order\": " + value : string.Empty;
+        File.WriteAllText(
+            Path.Combine(directory, "prompt.json"),
+            "{\n  \"enabled\": " + (enabled ? "true" : "false") + orderLine + "\n}\n");
     }
 }

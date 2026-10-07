@@ -70,9 +70,7 @@ public sealed class SettingsStore
             document.VerboseCommands ?? defaults.VerboseCommands,
             document.VerboseApprovals ?? defaults.VerboseApprovals,
             document.VerboseThinking ?? defaults.VerboseThinking,
-            string.IsNullOrWhiteSpace(document.PromptSet)
-                ? defaults.PromptSet
-                : document.PromptSet.Trim(),
+            defaults.PromptSet,
             externalToolApproval,
             string.IsNullOrWhiteSpace(document.ExportDirectory)
                 ? null
@@ -85,8 +83,7 @@ public sealed class SettingsStore
             ReadApprovalModel(document.ApprovalModel),
             document.Plugins ?? defaults.Plugins,
             document.WorkspaceTrust ?? defaults.WorkspaceTrust,
-            document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
-            document.PromptAttachments);
+            document.ShowCompactionSummary ?? defaults.ShowCompactionSummary);
     }
 
     public void Save(HarnessSettings settings)
@@ -122,15 +119,8 @@ public sealed class SettingsStore
             VerboseCommands = settings.VerboseCommands ? null : false,
             VerboseApprovals = settings.VerboseApprovals ? null : false,
             VerboseThinking = settings.VerboseThinking ? null : false,
-            PromptSet = string.Equals(
-                settings.PromptSet,
-                HarnessSettings.DefaultPromptSet,
-                StringComparison.Ordinal)
-                    ? null
-                    : settings.PromptSet,
-            PromptAttachments = settings.PromptAttachments.Count == 0
-                ? null
-                : [.. settings.PromptAttachments],
+            PromptSet = null,
+            PromptAttachments = null,
             ExportDirectory = settings.ExportDirectory,
             CustomStatusLine = settings.StatusLine.Enabled ? true : null,
             StatusLine = settings.StatusLine.Fields.SequenceEqual(

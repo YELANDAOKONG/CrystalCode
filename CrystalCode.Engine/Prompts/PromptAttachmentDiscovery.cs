@@ -60,20 +60,25 @@ internal sealed class PromptAttachmentDiscovery
                 continue;
             }
 
-            if (!HasPrompt(directory))
+            if (!PromptManifestDirectory.TryAccept(
+                    directory,
+                    name,
+                    "Prompt attachment",
+                    notes,
+                    out var manifest)
+                || manifest is null)
             {
-                notes.Add($"Prompt attachment '{name}' was skipped: no prompt files were found.");
                 continue;
             }
 
             var replacedHome = source == PromptAttachmentSource.Workspace
                 && attachments.ContainsKey(name);
-            attachments[name] = new PromptAttachmentDefinition(name, directory, source, replacedHome);
+            attachments[name] = new PromptAttachmentDefinition(
+                name,
+                directory,
+                source,
+                replacedHome,
+                manifest);
         }
     }
-
-    private static bool HasPrompt(string directory) =>
-        PromptFiles.ReadNamed(directory, PromptNames.Work) is not null
-        || PromptFiles.ReadNamed(directory, PromptNames.Plan) is not null
-        || PromptFiles.ReadNamed(directory, PromptNames.Review) is not null;
 }

@@ -15,12 +15,10 @@ internal static class PromptSelectionText
                 ? "* default"
                 : "  default"
         };
-        foreach (var name in resolution.AvailableSets)
+        foreach (var entry in resolution.Sets)
         {
-            var marker = string.Equals(name, resolution.PromptSet, StringComparison.Ordinal)
-                ? "* "
-                : "  ";
-            lines.Add(marker + name);
+            var marker = entry.Effective ? "* " : "  ";
+            lines.Add(marker + entry.Name + Detail(entry.Name, entry.Title, entry.Description));
         }
 
         lines.Add(string.Empty);
@@ -29,6 +27,28 @@ internal static class PromptSelectionText
         lines.Add("  Plan    " + Source(resolution.PlanSource, resolution.PromptSet));
         lines.Add("  Review  " + Source(resolution.ReviewSource, resolution.PromptSet));
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string Detail(string name, string title, string description)
+    {
+        var showTitle = title.Length > 0
+            && !string.Equals(title, name, StringComparison.Ordinal);
+        if (!showTitle && description.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (!showTitle)
+        {
+            return "  " + description;
+        }
+
+        if (description.Length == 0)
+        {
+            return "  " + title;
+        }
+
+        return "  " + title + "  " + description;
     }
 
     private static string Source(PromptSource source, string promptSet) =>

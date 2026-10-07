@@ -17,14 +17,16 @@ internal static class PromptAttachmentText
         var enabledIndex = 0;
         foreach (var entry in resolution.Attachments)
         {
-            if (entry.Enabled)
+            var label = Label(entry);
+            var detail = label.Length == 0 ? string.Empty : "  " + label;
+            if (entry.Effective)
             {
                 enabledIndex++;
-                lines.Add("* " + enabledIndex + "  " + entry.Name + "  " + Source(entry.Source));
+                lines.Add("* " + enabledIndex + "  " + entry.Name + detail + "  " + Source(entry.Source));
             }
             else
             {
-                lines.Add("     " + entry.Name + "  " + Source(entry.Source));
+                lines.Add("     " + entry.Name + detail + "  " + Source(entry.Source));
             }
         }
 
@@ -37,7 +39,7 @@ internal static class PromptAttachmentText
         var names = new List<string>();
         foreach (var entry in resolution.Attachments)
         {
-            if (entry.Enabled && entry.Source is not null)
+            if (entry.Effective)
             {
                 names.Add(entry.Name);
             }
@@ -46,12 +48,29 @@ internal static class PromptAttachmentText
         return string.Join(", ", names);
     }
 
-    private static string Source(PromptAttachmentSource? source) =>
+    private static string Label(PromptAttachmentEntry entry)
+    {
+        var title = string.Equals(entry.Title, entry.Name, StringComparison.Ordinal)
+            ? string.Empty
+            : entry.Title;
+        if (title.Length == 0)
+        {
+            return entry.Description;
+        }
+
+        if (entry.Description.Length == 0)
+        {
+            return title;
+        }
+
+        return title + "  " + entry.Description;
+    }
+
+    private static string Source(PromptAttachmentSource source) =>
         source switch
         {
             PromptAttachmentSource.Home => "Home",
             PromptAttachmentSource.Workspace => "Workspace",
-            null => "Not found",
             _ => throw new ArgumentOutOfRangeException(nameof(source))
         };
 }

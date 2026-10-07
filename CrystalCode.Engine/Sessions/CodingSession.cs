@@ -140,8 +140,8 @@ public sealed class CodingSession : ITurnObserver
         _compactor = CreateCompactor(_client);
         _promptResolution = _promptStore.Resolve(
             workspace.Root,
-            settings.PromptSet,
-            settings.PromptAttachments);
+            settings.PromptSetOverride,
+            settings.UsePromptAttachments);
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
         _sessionId = SessionStore.NewId();
@@ -1274,19 +1274,29 @@ public sealed class CodingSession : ITurnObserver
             Error(parseError);
             return;
         }
-        var resolution = _promptStore.Resolve(
-            _workspace.Root,
-            requested,
-            _settings.PromptAttachments);
-        if (!string.Equals(requested, PromptSetNames.Default, StringComparison.Ordinal)
-            && !string.Equals(requested, resolution.PromptSet, StringComparison.Ordinal))
+        if (string.Equals(requested, PromptSetNames.Default, StringComparison.Ordinal))
+        {
+            if (!PromptSetInventory.TryDisableAll(_home, out var disableError))
+            {
+                Error(disableError);
+                return;
+            }
+        }
+        else if (!_promptStore.ContainsSet(requested))
         {
             Error("Prompt set not found  " + requested);
             return;
         }
+        else if (!PromptSetInventory.TryEnable(_home, requested, out var enableError))
+        {
+            Error(enableError);
+            return;
+        }
 
-        _settings = _settings.WithPromptSet(resolution.PromptSet);
-        _settingsStore.Save(_settings);
+        var resolution = _promptStore.Resolve(
+            _workspace.Root,
+            _settings.PromptSetOverride,
+            _settings.UsePromptAttachments);
         _promptResolution = resolution;
         _prompts = resolution.Prompts;
         ReplaceLiveSystem();
@@ -1330,38 +1340,61 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var current = EnabledAttachmentNames();
         var changed = false;
-        IReadOnlyList<string> next = current;
         if (action == "enable")
         {
-            changed = PromptAttachmentList.TryEnable(
-                current,
-                name,
-                AttachmentAvailable(name),
-                out next,
-                out parseError);
+            if (!AttachmentAvailable(name))
+            {
+                parseError = "Prompt attachment not found  " + name;
+            }
+            else if (AttachmentEnabled(name))
+            {
+                parseError = $"Prompt attachment '{name}' is already enabled.";
+            }
+            else
+            {
+                changed = PromptAttachmentInventory.TrySetEnabled(
+                    _home,
+                    _workspace.Root,
+                    name,
+                    source: null,
+                    enabled: true,
+                    out parseError);
+            }
         }
         else if (action == "disable")
         {
-            changed = PromptAttachmentList.TryDisable(current, name, out next, out parseError);
+            if (!AttachmentEnabled(name))
+            {
+                parseError = $"Prompt attachment '{name}' is not enabled.";
+            }
+            else
+            {
+                changed = PromptAttachmentInventory.TrySetEnabled(
+                    _home,
+                    _workspace.Root,
+                    name,
+                    source: null,
+                    enabled: false,
+                    out parseError);
+            }
         }
         else if (action == "up")
         {
-            changed = PromptAttachmentList.TryMove(
-                current,
+            changed = PromptAttachmentInventory.TryMove(
+                _home,
+                _workspace.Root,
                 name,
                 earlier: true,
-                out next,
                 out parseError);
         }
         else if (action == "down")
         {
-            changed = PromptAttachmentList.TryMove(
-                current,
+            changed = PromptAttachmentInventory.TryMove(
+                _home,
+                _workspace.Root,
                 name,
                 earlier: false,
-                out next,
                 out parseError);
         }
         else
@@ -1375,12 +1408,10 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        _settings = _settings.WithPromptAttachments(next);
-        _settingsStore.Save(_settings);
         var resolution = _promptStore.Resolve(
             _workspace.Root,
-            _settings.PromptSet,
-            _settings.PromptAttachments);
+            _settings.PromptSetOverride,
+            _settings.UsePromptAttachments);
         _promptResolution = resolution;
         _prompts = resolution.Prompts;
         ReplaceLiveSystem();
@@ -1392,26 +1423,24 @@ public sealed class CodingSession : ITurnObserver
         Note(status.Length == 0 ? "Prompt attachments  none" : "Prompt attachments  " + status);
     }
 
-    private IReadOnlyList<string> EnabledAttachmentNames()
-    {
-        var names = new List<string>();
-        foreach (var entry in _promptResolution.Attachments)
-        {
-            if (entry.Enabled)
-            {
-                names.Add(entry.Name);
-            }
-        }
-
-        return names;
-    }
-
     private bool AttachmentAvailable(string name)
     {
         foreach (var entry in _promptResolution.Attachments)
         {
-            if (entry.Source is not null
-                && string.Equals(entry.Name, name, StringComparison.Ordinal))
+            if (string.Equals(entry.Name, name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool AttachmentEnabled(string name)
+    {
+        foreach (var entry in _promptResolution.Attachments)
+        {
+            if (entry.Enabled && string.Equals(entry.Name, name, StringComparison.Ordinal))
             {
                 return true;
             }
@@ -2112,8 +2141,8 @@ public sealed class CodingSession : ITurnObserver
     {
         _promptResolution = _promptStore.Resolve(
             _workspace.Root,
-            _settings.PromptSet,
-            _settings.PromptAttachments);
+            _settings.PromptSetOverride,
+            _settings.UsePromptAttachments);
         _prompts = _promptResolution.Prompts;
         ReplaceLiveSystem();
         WritePromptNotes();

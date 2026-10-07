@@ -53,20 +53,15 @@ internal sealed class PromptSetDiscovery
                 continue;
             }
 
-            if (!HasPrompt(directory))
+            if (!PromptManifestDirectory.TryAccept(directory, name, "Prompt set", notes, out var manifest)
+                || manifest is null)
             {
-                notes.Add($"Prompt set '{name}' was skipped: no prompt files were found.");
                 continue;
             }
 
-            sets[name] = new PromptSetDefinition(name, directory);
+            sets[name] = new PromptSetDefinition(name, directory, manifest);
         }
 
         return new PromptSetCatalog(sets);
     }
-
-    private static bool HasPrompt(string directory) =>
-        PromptFiles.ReadNamed(directory, PromptNames.Work) is not null
-        || PromptFiles.ReadNamed(directory, PromptNames.Plan) is not null
-        || PromptFiles.ReadNamed(directory, PromptNames.Review) is not null;
 }

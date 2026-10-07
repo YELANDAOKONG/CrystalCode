@@ -105,6 +105,8 @@ Run these from your shell. The interactive terminal is one entry point; the othe
 | `crystal version` | Print the build identity and exit |
 | `crystal plugins` | List, show, enable, or disable one operator plugin outside a session |
 | `crystal tools` | List, show, enable, or disable one operator tool set outside a session |
+| `crystal promptsets` | List, show, enable, or disable one Home prompt set. Enabling one turns the others off |
+| `crystal prompt-attachments` | List, show, enable, or disable one prompt attachment in Home or the workspace |
 
 See the [headless run](docs/user-guide.md#headless-run) and [operator space](docs/user-guide.md#operator-space) sections of the user guide for the full option list.
 

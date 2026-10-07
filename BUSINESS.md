@@ -63,9 +63,9 @@ separate library with no terminal code. The product can:
   That flag cannot be combined with `--workspace`;
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
-  approval, the approval model, Plan or Work, thinking, prompt set, skills,
-  external tools, and turn quotas for that process only. They are not written
-  to `config.json`. Stdout is a readable plain-text trace, or one JSON object
+  approval, the approval model, Plan or Work, thinking, prompt set, prompt
+  attachments, skills, external tools, and turn quotas for that process only.
+  They are not written to `config.json` or `prompt.json`. Stdout is a readable plain-text trace, or one JSON object
   per line when `--format json` is set. Review and Audit still use the
   reviewing model. That model can be a separate provider and model, and
   the choice can be turned off.
@@ -177,9 +177,13 @@ definitions live in `~/.crystal/providers.json`; changing preferences in
 `config.json.providers` field remains readable for existing installations.
 Home-only reusable prompt sets live under `~/.crystal/promptsets`. Prompt
 attachments live under `~/.crystal/prompt-attachments` and
-`<workspace>/.crystal/prompt-attachments`. `promptAttachments` in
-`config.json` is the ordered list of names that append. A missing name is
-skipped and left in the list. Workspace
+`<workspace>/.crystal/prompt-attachments`. Each directory carries its own
+`prompt.json` with an optional display name, an optional description, and
+`enabled`. A missing `enabled` value means off. At most one prompt set is
+enabled. Attachments may enable many, ordered by `order`. A directory without
+a readable manifest is skipped. There is no migration from older
+`config.json` keys: `promptSet` and `promptAttachments` are ignored and
+omitted the next time preferences are saved. Workspace
 hints remain independent and are appended from `instructions.md`, `.crystal.md`, and
 OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
 are never prompt overlays. Skills are discovered from Crystal,

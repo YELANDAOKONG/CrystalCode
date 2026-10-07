@@ -12,17 +12,15 @@ public sealed class PromptAttachmentTextTests
     {
         var resolution = Resolution(
         [
-            new PromptAttachmentEntry("beta", PromptAttachmentSource.Workspace, Enabled: true),
-            new PromptAttachmentEntry("gone", null, Enabled: true),
-            new PromptAttachmentEntry("alpha", PromptAttachmentSource.Home, Enabled: false)
+            new PromptAttachmentEntry("beta", "Beta", "Second", PromptAttachmentSource.Workspace, true, true, 0),
+            new PromptAttachmentEntry("alpha", "alpha", string.Empty, PromptAttachmentSource.Home, false, false, null)
         ]);
 
         var text = PromptAttachmentText.Format(resolution);
 
-        Assert.Contains("* 1  beta  Workspace", text, StringComparison.Ordinal);
-        Assert.Contains("* 2  gone  Not found", text, StringComparison.Ordinal);
+        Assert.Contains("* 1  beta  Beta  Second  Workspace", text, StringComparison.Ordinal);
         Assert.Contains("alpha  Home", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("* 3", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("* 2", text, StringComparison.Ordinal);
         Assert.Equal("beta", PromptAttachmentText.Status(resolution));
     }
 
@@ -44,5 +42,6 @@ public sealed class PromptAttachmentTextTests
             PromptSource.BuiltIn,
             PromptSource.BuiltIn,
             [],
-            attachments);
+            attachments,
+            []);
 }

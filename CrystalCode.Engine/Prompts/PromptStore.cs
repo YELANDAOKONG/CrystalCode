@@ -24,7 +24,7 @@ public sealed class PromptStore
 
     public PromptSet Load(string workspaceRoot)
     {
-        return Resolve(workspaceRoot, PromptSetNames.Default).Prompts;
+        return Resolve(workspaceRoot).Prompts;
     }
 
     public string LoadTopicNaming(string workspaceRoot)
@@ -37,9 +37,9 @@ public sealed class PromptStore
     }
 
     /// <summary>
-    /// True for the default set, and for a home prompt-set directory that
-    /// contains at least one prompt file. A missing name does not fall back
-    /// to the default set.
+    /// True for the default set, and for a home prompt-set directory with a
+    /// readable <c>prompt.json</c> and at least one prompt file. Disabled sets
+    /// still count. A missing name does not fall back to the default set.
     /// </summary>
     public bool ContainsSet(string name)
     {
@@ -61,39 +61,23 @@ public sealed class PromptStore
 
     internal PromptResolution Resolve(
         string workspaceRoot,
-        string selectedSet,
-        IReadOnlyList<string>? promptAttachments = null)
+        string? promptSetOverride = null,
+        bool usePromptAttachments = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
-        ArgumentException.ThrowIfNullOrWhiteSpace(selectedSet);
         var project = new CrystalHome(Path.Combine(workspaceRoot, ProjectDirectoryName));
         var notes = new List<string>();
         var catalog = new PromptSetDiscovery(_home).Collect(notes);
-        var normalized = selectedSet.Trim();
-        PromptSetDefinition? selected = null;
-        var effectiveSet = PromptSetNames.Default;
-        if (!string.Equals(normalized, PromptSetNames.Default, StringComparison.Ordinal))
-        {
-            if (catalog.TryGet(normalized, out var found))
-            {
-                selected = found;
-                effectiveSet = found.Name;
-            }
-            else
-            {
-                notes.Add($"Prompt set '{normalized}' was not found; using the default prompt set.");
-            }
-        }
-
-        var work = ResolveNamed(PromptNames.Work, WorkPrompt.Text, selected, project);
-        var plan = ResolveNamed(PromptNames.Plan, PlanPrompt.Text, selected, project);
+        var selection = SelectSet(catalog, promptSetOverride, notes);
+        var work = ResolveNamed(PromptNames.Work, WorkPrompt.Text, selection.Selected, project);
+        var plan = ResolveNamed(PromptNames.Plan, PlanPrompt.Text, selection.Selected, project);
         var review = ResolveNamed(
             PromptNames.Review,
             ApprovalReviewPrompt.SystemText,
-            selected,
+            selection.Selected,
             project);
         var attachments = new PromptAttachmentDiscovery().Collect(_home, project, notes);
-        var enabled = ResolveAttachments(promptAttachments, attachments, notes);
+        var enabled = ResolveAttachments(attachments, usePromptAttachments, notes);
         return new PromptResolution(
             new PromptSet(
                 work.Text,
@@ -103,13 +87,14 @@ public sealed class PromptStore
                 enabled.Work,
                 enabled.Plan,
                 enabled.Review),
-            effectiveSet,
+            selection.Effective,
             catalog.Names,
             work.Source,
             plan.Source,
             review.Source,
             Dedupe(notes),
-            enabled.Entries);
+            enabled.Entries,
+            selection.Entries);
     }
 
     private (string Text, PromptSource Source) ResolveNamed(
@@ -144,73 +129,138 @@ public sealed class PromptStore
         return (text, source);
     }
 
-    private static AttachmentSelection ResolveAttachments(
-        IReadOnlyList<string>? requested,
-        PromptAttachmentCatalog catalog,
+    private static SetSelection SelectSet(
+        PromptSetCatalog catalog,
+        string? promptSetOverride,
         List<string> notes)
     {
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        var entries = new List<PromptAttachmentEntry>();
-        var work = new List<string>();
-        var plan = new List<string>();
-        var review = new List<string>();
-        if (requested is not null)
+        var enabled = new List<PromptSetDefinition>();
+        foreach (var name in catalog.Names)
         {
-            foreach (var raw in requested)
+            if (catalog.TryGet(name, out var definition) && definition.Manifest.Enabled)
             {
-                if (string.IsNullOrWhiteSpace(raw))
-                {
-                    continue;
-                }
-
-                var name = raw.Trim();
-                if (!seen.Add(name))
-                {
-                    notes.Add(
-                        $"Prompt attachment '{name}' is listed more than once; later copies are ignored.");
-                    continue;
-                }
-
-                if (!PromptAttachmentNames.IsValid(name) || !catalog.TryGet(name, out var definition))
-                {
-                    if (!PromptAttachmentNames.IsValid(name))
-                    {
-                        notes.Add(
-                            $"Prompt attachment '{name}' was skipped: directory name is invalid.");
-                    }
-                    else
-                    {
-                        notes.Add($"Prompt attachment '{name}' was not found.");
-                    }
-
-                    entries.Add(new PromptAttachmentEntry(name, null, Enabled: true));
-                    continue;
-                }
-
-                if (definition.ReplacedHome)
-                {
-                    notes.Add($"Prompt attachment '{name}' uses the workspace copy.");
-                }
-
-                entries.Add(new PromptAttachmentEntry(name, definition.Source, Enabled: true));
-                AddNamed(work, definition.Directory, PromptNames.Work);
-                AddNamed(plan, definition.Directory, PromptNames.Plan);
-                AddNamed(review, definition.Directory, PromptNames.Review);
+                enabled.Add(definition);
             }
         }
 
+        PromptSetDefinition? selected = null;
+        var effective = PromptSetNames.Default;
+        if (promptSetOverride is not null)
+        {
+            var normalized = promptSetOverride.Trim();
+            if (!string.Equals(normalized, PromptSetNames.Default, StringComparison.Ordinal))
+            {
+                if (catalog.TryGet(normalized, out var found))
+                {
+                    selected = found;
+                    effective = found.Name;
+                }
+                else
+                {
+                    notes.Add($"Prompt set '{normalized}' was not found; using the default prompt set.");
+                }
+            }
+        }
+        else if (enabled.Count == 1)
+        {
+            selected = enabled[0];
+            effective = enabled[0].Name;
+        }
+        else if (enabled.Count > 1)
+        {
+            notes.Add("More than one prompt set is enabled; using the default prompt set.");
+        }
+
+        var entries = new List<PromptSetEntry>();
         foreach (var name in catalog.Names)
         {
-            if (seen.Contains(name) || !catalog.TryGet(name, out var definition))
+            if (!catalog.TryGet(name, out var definition))
             {
                 continue;
             }
 
-            entries.Add(new PromptAttachmentEntry(name, definition.Source, Enabled: false));
+            entries.Add(new PromptSetEntry(
+                name,
+                PromptManifestDirectory.Title(name, definition.Manifest),
+                definition.Manifest.Description,
+                definition.Manifest.Enabled,
+                string.Equals(name, effective, StringComparison.Ordinal)));
+        }
+
+        return new SetSelection(selected, effective, entries);
+    }
+
+    private static AttachmentSelection ResolveAttachments(
+        PromptAttachmentCatalog catalog,
+        bool usePromptAttachments,
+        List<string> notes)
+    {
+        if (!usePromptAttachments)
+        {
+            notes.Add("Prompt attachments are off for this process.");
+        }
+
+        var definitions = new List<PromptAttachmentDefinition>();
+        foreach (var name in catalog.Names)
+        {
+            if (catalog.TryGet(name, out var definition))
+            {
+                definitions.Add(definition);
+            }
+        }
+
+        var active = definitions
+            .Where(item => usePromptAttachments && item.Manifest.Enabled)
+            .OrderBy(item => item.Manifest.Order ?? int.MaxValue)
+            .ThenBy(item => item.Name, StringComparer.Ordinal)
+            .ToList();
+        foreach (var definition in active)
+        {
+            if (definition.ReplacedHome)
+            {
+                notes.Add($"Prompt attachment '{definition.Name}' uses the workspace copy.");
+            }
+        }
+
+        var work = new List<string>();
+        var plan = new List<string>();
+        var review = new List<string>();
+        foreach (var definition in active)
+        {
+            AddNamed(work, definition.Directory, PromptNames.Work);
+            AddNamed(plan, definition.Directory, PromptNames.Plan);
+            AddNamed(review, definition.Directory, PromptNames.Review);
+        }
+
+        var activeNames = new HashSet<string>(active.Select(item => item.Name), StringComparer.Ordinal);
+        var entries = new List<PromptAttachmentEntry>();
+        foreach (var definition in active)
+        {
+            entries.Add(Entry(definition, effective: true));
+        }
+
+        foreach (var definition in definitions.OrderBy(item => item.Name, StringComparer.Ordinal))
+        {
+            if (activeNames.Contains(definition.Name))
+            {
+                continue;
+            }
+
+            entries.Add(Entry(definition, effective: false));
         }
 
         return new AttachmentSelection(work, plan, review, entries);
     }
+
+    private static PromptAttachmentEntry Entry(PromptAttachmentDefinition definition, bool effective) =>
+        new(
+            definition.Name,
+            PromptManifestDirectory.Title(definition.Name, definition.Manifest),
+            definition.Manifest.Description,
+            definition.Source,
+            definition.Manifest.Enabled,
+            effective,
+            definition.Manifest.Order);
 
     private static void AddNamed(List<string> parts, string directory, string name)
     {
@@ -262,6 +312,11 @@ public sealed class PromptStore
             parts.Add(text);
         }
     }
+
+    private sealed record SetSelection(
+        PromptSetDefinition? Selected,
+        string Effective,
+        IReadOnlyList<PromptSetEntry> Entries);
 
     private sealed record AttachmentSelection(
         IReadOnlyList<string> Work,

@@ -102,6 +102,29 @@ public sealed class HarnessSettingsTests
     }
 
     [Fact]
+    public void WithPromptSetOverride_StaysInMemory()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithPromptSetOverride(" concise ");
+
+        Assert.Equal("concise", next.PromptSetOverride);
+        Assert.Null(settings.PromptSetOverride);
+        Assert.Equal(HarnessSettings.DefaultPromptSet, next.PromptSet);
+    }
+
+    [Fact]
+    public void WithUsePromptAttachments_StaysInMemory()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithUsePromptAttachments(false);
+
+        Assert.False(next.UsePromptAttachments);
+        Assert.True(settings.UsePromptAttachments);
+    }
+
+    [Fact]
     public void WithPromptAttachments_ReplacesTheEnabledList()
     {
         var settings = HarnessSettings.CreateDefault().WithPromptAttachments(["alpha"]);
