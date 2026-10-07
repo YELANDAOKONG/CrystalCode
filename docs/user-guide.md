@@ -73,8 +73,9 @@ or `CrystalCode` on Windows.
 
 The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
-parent/child Agents, audio and video input, non-text model output, and
-editing provider definitions in the TUI.
+parent/child Agents, audio and video input, non-text model output,
+editing provider definitions in the TUI, and automatically fetching
+model-list information from a provider.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.
@@ -448,6 +449,8 @@ thinking unless you add it.
 The Ollama starter assumes a 4,096-token local context. If the local model
 uses a different context size, set that size in `providers.json` and configure
 the Ollama model to match it. Other local or cloud model IDs may be added there.
+Automatically fetching model-list information from a provider is planned
+and is not available in this build.
 
 Anthropic Messages is also a built-in protocol, but the starter catalog
 ships no entry for it, so Claude models come from `providers.json`. See
@@ -857,6 +860,8 @@ refused while a turn is running.
   that provider's models.
 - Only models listed under `providers` can be selected. A missing API
   key leaves the current model unchanged.
+- Automatically fetching model-list information from a provider is
+  planned and is not available in this build.
 - The new `provider` and `model` are written to `config.json`.
 
 Switching models never fails because of thinking: unsupported thinking

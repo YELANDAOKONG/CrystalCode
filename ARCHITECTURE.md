@@ -981,7 +981,8 @@ label is prefixed with `~` so it is not mistaken for provider usage.
 `estimatedTokens` to `config.json` (`true` when on; omitted when off).
 
 `protocol` is `deepseek`, `openai`, `responses`, `anthropic`, `gemini`, or `ollama`. Models that are not listed cannot be
-selected. There is no global context window.
+selected. Automatically fetching model-list information from a provider is
+deferred. There is no global context window.
 
 A persistent key belongs in `credentials.json` as plain text, keyed by
 provider name. `apiKey` on a provider definition may be a literal secret,

@@ -4,8 +4,6 @@
 
 Crystal Code works in a local repository through a streaming terminal UI. Ask it to inspect code, plan a change, or edit files. Plan and Work modes, tool approvals, and workspace boundaries keep you in control of what it can do.
 
-![Crystal Code terminal session in Work mode](docs/terminal.png)
-
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Platforms](https://img.shields.io/badge/platforms-linux--x64%20%7C%20linux--arm64%20%7C%20macos--arm64%20%7C%20windows--x64-informational.svg)](#get-started)
@@ -13,6 +11,8 @@ Crystal Code works in a local repository through a streaming terminal UI. Ask it
 [![Release](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml/badge.svg)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml)
 
 [Get started](#get-started) · [Features](#features) · [Command line](#command-line) · [Configuration](#configuration) · [User guide](docs/user-guide.md)
+
+![Crystal Code terminal session in Work mode](docs/terminal.png)
 
 <a name="features"></a>
 
@@ -166,7 +166,7 @@ Maintainers can write a commit message and commit the current change with [`comm
 
 ## 🗺️ Roadmap
 
-MCP servers, an operating-system sandbox, parent/child agents, audio and video input, non-text model output, and editing provider definitions in the TUI are planned but not yet implemented. Image input is available for supported models and providers. `/model` selects a configured provider and model; it does not edit the catalog.
+MCP servers, an operating-system sandbox, parent/child agents, audio and video input, non-text model output, editing provider definitions in the TUI, and automatically fetching model-list information from a provider are planned but not yet implemented. Image input is available for supported models and providers. `/model` selects a configured provider and model; it does not edit the catalog.
 
 ## 📄 License
 
