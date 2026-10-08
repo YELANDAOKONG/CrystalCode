@@ -5,9 +5,11 @@ using Spectre.Console;
 namespace CrystalCode.Display.Shell;
 
 /// <summary>
-/// Console output is UTF-8 without a BOM. Windows OEM code pages replace the
-/// progress spinner's braille frames with a question mark. Input encoding stays
-/// as the console left it, so key and wheel decoding are unchanged.
+/// Console output is UTF-8 without a BOM. A Windows OEM code page replaces the
+/// progress spinner's braille frames with a question mark and garbles CJK text.
+/// The code page is switched to UTF-8 and Spectre is rebound to the UTF-8
+/// writer so its own encoding matches. Input encoding stays as the console left
+/// it, so key and wheel decoding are unchanged.
 /// </summary>
 public static class ConsoleTextEncoding
 {
@@ -15,17 +17,16 @@ public static class ConsoleTextEncoding
 
     public static EncodingLease? UseUtf8Output()
     {
-        ApplySpectre(Utf8);
         try
         {
             var previous = Console.OutputEncoding;
-            if (previous.CodePage == Utf8.CodePage)
+            if (previous.CodePage != Utf8.CodePage)
             {
-                return null;
+                Console.OutputEncoding = Utf8;
             }
 
-            Console.OutputEncoding = Utf8;
-            return new EncodingLease(previous);
+            ApplySpectre(Utf8);
+            return previous.CodePage == Utf8.CodePage ? null : new EncodingLease(previous);
         }
         catch (Exception exception) when (exception is IOException
             or ArgumentException
@@ -39,8 +40,13 @@ public static class ConsoleTextEncoding
     {
         try
         {
-            AnsiConsole.Profile.Encoding = encoding;
-            AnsiConsole.Profile.Capabilities.Unicode = true;
+            var profile = AnsiConsole.Profile;
+            profile.Encoding = encoding;
+            // Changing the code page replaces Console.Out, but the default
+            // profile captured the previous writer. Rebind so text is encoded
+            // with the code page the console now decodes.
+            profile.Out = new AnsiConsoleOutput(Console.Out);
+            profile.Capabilities.Unicode = true;
         }
         catch (Exception exception) when (exception is IOException
             or ArgumentException

@@ -710,7 +710,8 @@ progress row sits above the status bar (`Awaiting Approval · 5s`,
 `Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`,
 `Retrying In 8s (Attempt 1)`, `Compacting`), prefixed with a spinner, and is
 independent of the status-bar activity bullet. The spinner is braille.
-Console output is UTF-8, so Windows does not replace those frames with `?`.
+Console output is UTF-8, so Windows does not replace those frames with `?`
+or garble CJK text.
 The `~N Tokens` estimate
 appears only when `estimatedTokens` is on. When the session has todos, a
 pinned `Todos` bar sits above that progress row (first four items; `/todos`

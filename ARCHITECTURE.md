@@ -1274,11 +1274,15 @@ denial.
 
 CrystalCode.Display is the TUI host. Spectre.Console supplies markup,
 color, panels, grids, rules, and padding as an offline rasterizer.
-Process startup sets console output to UTF-8 without a BOM and turns
-Spectre's Unicode output on, then restores the previous output encoding
-when the process exits. Console input encoding is left alone. Files,
-prompts, and provider bodies are already UTF-8. The progress spinner is
-braille, so a Windows OEM code page would replace each frame with `?`.
+Process startup sets console output to UTF-8 without a BOM, binds
+Spectre's profile to the matching UTF-8 writer, and turns its Unicode
+output on, then restores the previous output encoding when the process
+exits. Changing the code page replaces `Console.Out`, so the profile is
+rebound to the new writer; otherwise Spectre would keep encoding with the
+old OEM code page. Console input encoding is left alone. Files, prompts,
+and provider bodies are already UTF-8. The progress spinner is braille, so
+a Windows OEM code page would replace each frame with `?` and garble CJK
+text.
 `AnsiConsole.Live` is not the session shell: it fights the composer.
 Widgets are rasterized into frame rows. A live user, thinking, tool, or
 error card keeps rows that are already wrapped. New stream text reflows
