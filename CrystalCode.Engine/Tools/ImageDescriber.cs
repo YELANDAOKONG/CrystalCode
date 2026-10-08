@@ -5,6 +5,7 @@ using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
 using Crystal.Reasoning;
 
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 
 namespace CrystalCode.Engine.Tools;
@@ -17,18 +18,26 @@ public sealed class ImageDescriber
 {
     private readonly Func<IStreamingMultimodalChatClient> _client;
     private readonly string _systemText;
+    private readonly string _userTemplate;
     private readonly ReasoningOptions? _reasoning;
+    private readonly PluginPlaceholderTable? _placeholders;
 
     public ImageDescriber(
         Func<IStreamingMultimodalChatClient> client,
         string systemText,
-        ReasoningOptions? reasoning)
+        ReasoningOptions? reasoning,
+        string? userTemplate = null,
+        PluginPlaceholderTable? placeholders = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentException.ThrowIfNullOrWhiteSpace(systemText);
         _client = client;
         _systemText = systemText.Trim();
+        _userTemplate = string.IsNullOrWhiteSpace(userTemplate)
+            ? ImageDescriptionPrompt.UserTemplate
+            : userTemplate.Trim();
         _reasoning = reasoning;
+        _placeholders = placeholders;
     }
 
     public async Task<string> DescribeAsync(
@@ -49,7 +58,7 @@ public sealed class ImageDescriber
                     new MultimodalMessage(
                         MultimodalChatRole.User,
                         [
-                            new TextContent(ImageDescriptionPrompt.UserText(question)),
+                            new TextContent(ImageDescriptionPrompt.UserText(question, _userTemplate, _placeholders)),
                             new ImageContent(new ImageMedia(
                                 new InlineMediaSource(data),
                                 new MediaMimeType(mimeType)))

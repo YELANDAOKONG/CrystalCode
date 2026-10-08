@@ -23,19 +23,33 @@ public static class ImageDescriptionPrompt
 
     public const string DescribeRequest = "Describe this image.";
 
-    public static string ComposeSystem(PromptContext context, PluginPlaceholderTable? placeholders = null)
+    public const string UserTemplate = "{{question}}";
+
+    public static string ComposeSystem(
+        PromptContext context,
+        PluginPlaceholderTable? placeholders = null,
+        string? template = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return PromptBinder.Apply(SystemText, context.WithMode("image"), placeholders);
+        return PromptBinder.Apply(
+            Use(template, SystemText),
+            context.WithMode("image"),
+            placeholders);
     }
 
-    public static string UserText(string? question)
+    public static string UserText(
+        string? question,
+        string? template = null,
+        PluginPlaceholderTable? placeholders = null)
     {
-        if (string.IsNullOrWhiteSpace(question))
-        {
-            return DescribeRequest;
-        }
-
-        return "Question: " + question.Trim();
+        var request = string.IsNullOrWhiteSpace(question)
+            ? DescribeRequest
+            : "Question: " + question.Trim();
+        return PromptBinder.Apply(
+            Use(template, UserTemplate),
+            new PromptBinding(Image: new ImagePromptContext(request), Placeholders: placeholders));
     }
+
+    private static string Use(string? template, string builtIn) =>
+        string.IsNullOrWhiteSpace(template) ? builtIn : template;
 }

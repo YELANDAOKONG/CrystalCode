@@ -199,6 +199,8 @@ public sealed class PromptStoreTests
         Assert.Equal(PromptSource.PromptSet, resolution.WorkSource);
         Assert.Equal(PromptSource.BuiltIn, resolution.PlanSource);
         Assert.Equal(PromptSource.BuiltIn, resolution.ReviewSource);
+        Assert.Equal(CompactionPrompt.SystemText, resolution.Prompts.CompactionSystem);
+        Assert.Equal(ImageDescriptionPrompt.SystemText, resolution.Prompts.ImageSystem);
         Assert.Equal(["concise"], resolution.AvailableSets);
     }
 
@@ -567,6 +569,36 @@ public sealed class PromptStoreTests
         Assert.Contains(
             resolution.Notes,
             note => note.Contains("off for this process", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resolve_NamedPromptsFollowSetThenHomeThenProject()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(concise, "compaction.system.md", "set compaction");
+        WritePrompt(concise, "image.system.md", "set image");
+        WritePrompt(concise, "image.user.md", "set question {{question}}");
+        WritePrompt(concise, "review.user.md", "set review {{tool_name}}");
+        WritePrompt(concise, "topic.md", "set topic");
+        WriteManifest(concise, enabled: true);
+        WritePrompt(home.Home.PromptsDirectory, "image.system.md", "home image");
+        WritePrompt(
+            Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "prompts"),
+            "compaction.user.md",
+            "project compaction user");
+        var store = CreateStore(home);
+
+        var prompts = store.Load(workspace.Path);
+
+        Assert.Equal("set compaction", prompts.CompactionSystem);
+        Assert.Equal("project compaction user", prompts.CompactionUser);
+        Assert.Equal("home image", prompts.ImageSystem);
+        Assert.Equal("set question {{question}}", prompts.ImageUser);
+        Assert.Equal("set review {{tool_name}}", prompts.ReviewUser);
+        Assert.Equal("set topic", prompts.Topic);
+        Assert.Equal(WorkPrompt.Text, prompts.Work);
     }
 
     private static void WritePrompt(string directory, string fileName, string text)

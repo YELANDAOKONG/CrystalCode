@@ -9,4 +9,5 @@ public sealed record PromptBinding(
     PromptContext? Session = null,
     ReviewPromptContext? Review = null,
     CompactionPromptContext? Compaction = null,
-    PluginPlaceholderTable? Placeholders = null);
+    PluginPlaceholderTable? Placeholders = null,
+    ImagePromptContext? Image = null);

@@ -2030,7 +2030,9 @@ public sealed class CodingSession : ITurnObserver
         return new ImageDescriber(
             OpenImageDescriptionClient,
             ImageDescriptionSystemText(selected),
-            _settings.ImageModel.ThinkingEffort.ToReasoningOptions(selected.ActiveModel));
+            _settings.ImageModel.ThinkingEffort.ToReasoningOptions(selected.ActiveModel),
+            _prompts.ImageUser,
+            _placeholders);
     }
 
     private string ImageDescriptionSystemText(HarnessSettings selected) =>
@@ -2044,7 +2046,8 @@ public sealed class CodingSession : ITurnObserver
                 instructions: string.Empty,
                 sessionId: _sessionId ?? string.Empty,
                 approval: _approval.Value),
-            _placeholders);
+            _placeholders,
+            _prompts.ImageSystem);
 
     private IStreamingMultimodalChatClient OpenImageDescriptionClient()
     {
@@ -2978,7 +2981,8 @@ public sealed class CodingSession : ITurnObserver
             ReviewerReasoning(),
             request => ApprovalReviewPrompt.UserText(
                 request,
-                CurrentPromptBinding(CurrentPromptContext().WithMode("review"))));
+                CurrentPromptBinding(CurrentPromptContext().WithMode("review")),
+                _prompts.ReviewUser));
         var policy = new ApprovalPolicy(
             _approval,
             _workspace,
@@ -4048,7 +4052,8 @@ public sealed class CodingSession : ITurnObserver
             () => ApplyPluginPrompt(
                 CompactionPrompt.ComposeSystem(
                     CurrentPromptContext().WithMode("compaction"),
-                    _placeholders),
+                    _placeholders,
+                    _prompts.CompactionSystem),
                 "compaction"),
             (phase, text) => _hooks.FinishCompaction(phase, text),
             (items, token) => _hooks.PrepareModelAsync(
@@ -4065,7 +4070,8 @@ public sealed class CodingSession : ITurnObserver
                 conversation,
                 todos,
                 previous,
-                CurrentPromptBinding(CurrentPromptContext().WithMode("compaction"))));
+                CurrentPromptBinding(CurrentPromptContext().WithMode("compaction")),
+                _prompts.CompactionUser));
 
     /// <summary>
     /// Collects the finished turn: records its transcript, compacts when over

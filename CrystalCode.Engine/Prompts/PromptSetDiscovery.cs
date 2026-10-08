@@ -53,7 +53,13 @@ internal sealed class PromptSetDiscovery
                 continue;
             }
 
-            if (!PromptManifestDirectory.TryAccept(directory, name, "Prompt set", notes, out var manifest)
+            if (!PromptManifestDirectory.TryAccept(
+                    directory,
+                    name,
+                    "Prompt set",
+                    notes,
+                    out var manifest,
+                    anyNamedPrompt: true)
                 || manifest is null)
             {
                 continue;

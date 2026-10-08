@@ -44,5 +44,9 @@ public sealed class ImageDescriptionPromptTests
         Assert.Equal(
             "Question: what error is shown",
             ImageDescriptionPrompt.UserText("  what error is shown  "));
+        Assert.Contains(
+            "Question: the color",
+            ImageDescriptionPrompt.UserText("the color", "Focus.\n{{question}}"),
+            StringComparison.Ordinal);
     }
 }

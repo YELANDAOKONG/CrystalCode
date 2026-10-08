@@ -154,7 +154,7 @@ host rejects a name it already owns. Two plugins cannot share a name; the
 first in load order wins and the later one is omitted with a note.
 
 The host calls `Resolve` each time it binds a template, including
-attachments, Review, and compaction. The context carries the mode,
+attachments, Review, compaction, and image description. The context carries the mode,
 workspace, session id, approval mode, provider, model, the current
 catalog snapshot, and the live session and review model. Strings the host
 does not have yet are empty. The

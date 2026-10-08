@@ -35,10 +35,14 @@ semantics. Do not copy its Demo UI into this product.
 - Secrets never appear in source, logs, diagnostics, or commit contents.
 - Crystal remains prompt-neutral. Every model-bound string this product sends
   is authored here: system prompts, compaction summaries, rejection text, and
-  tool exception mapping. Operators may replace Work, Plan, and Review via
-  `~/.crystal/prompts` and `<workspace>/.crystal/prompts`. `AGENTS.md` and
+  tool exception mapping. Operators may replace Work, Plan, Review, the Review
+  user turn, topic naming, compaction, and image description via
+  `~/.crystal/prompts`, a selected prompt set, and `<workspace>/.crystal/prompts`.
+  The file stems are `work`, `plan`, `review`, `review.user`, `topic`,
+  `compaction.system`, `compaction.user`, `image.system`, and `image.user`.
+  `AGENTS.md` and
   `CLAUDE.md` are OpenCode-compatible instructions that append; they do
-  not replace those prompts. Do not invent additional prompt file names.
+  not replace those prompts. Do not invent prompt file names beyond that list.
 - Provider adapters implement only Crystal chat contracts. They do not own
   tools, prompts, UI, or `~/.crystal` layout.
 - `CrystalCode.Engine` is front-end neutral. It must not reference

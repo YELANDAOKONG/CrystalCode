@@ -21,6 +21,8 @@ public static class PromptTemplateExport
             ("review.user.md", ApprovalReviewPrompt.UserTemplate),
             ("compaction.system.md", CompactionPrompt.SystemText),
             ("compaction.user.md", CompactionPrompt.UserTemplate),
+            ("image.system.md", ImageDescriptionPrompt.SystemText),
+            ("image.user.md", ImageDescriptionPrompt.UserTemplate),
             ("placeholders.md", RenderPlaceholderGuide())
         };
 
@@ -79,6 +81,10 @@ public static class PromptTemplateExport
         - {{summary_task}}
         - {{output_template}}
         - {{todos_section}}
+
+        ## Image user
+
+        - {{question}}
 
         A loaded plugin may add further names. Those names are not listed here.
         The host rejects a name it already owns.

@@ -14,7 +14,13 @@ public sealed record PromptSet
         string instructions,
         IReadOnlyList<string>? workAttachments = null,
         IReadOnlyList<string>? planAttachments = null,
-        IReadOnlyList<string>? reviewAttachments = null)
+        IReadOnlyList<string>? reviewAttachments = null,
+        string? topic = null,
+        string? reviewUser = null,
+        string? compactionSystem = null,
+        string? compactionUser = null,
+        string? imageSystem = null,
+        string? imageUser = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(work);
         ArgumentException.ThrowIfNullOrWhiteSpace(plan);
@@ -28,6 +34,12 @@ public sealed record PromptSet
         WorkAttachments = CopyAttachments(workAttachments);
         PlanAttachments = CopyAttachments(planAttachments);
         ReviewAttachments = CopyAttachments(reviewAttachments);
+        Topic = TextOrBuiltIn(topic, TopicNamingPrompt.Text);
+        ReviewUser = TextOrBuiltIn(reviewUser, ApprovalReviewPrompt.UserTemplate);
+        CompactionSystem = TextOrBuiltIn(compactionSystem, CompactionPrompt.SystemText);
+        CompactionUser = TextOrBuiltIn(compactionUser, CompactionPrompt.UserTemplate);
+        ImageSystem = TextOrBuiltIn(imageSystem, ImageDescriptionPrompt.SystemText);
+        ImageUser = TextOrBuiltIn(imageUser, ImageDescriptionPrompt.UserTemplate);
     }
 
     public string Work { get; }
@@ -43,6 +55,18 @@ public sealed record PromptSet
     public IReadOnlyList<string> PlanAttachments { get; }
 
     public IReadOnlyList<string> ReviewAttachments { get; }
+
+    public string Topic { get; }
+
+    public string ReviewUser { get; }
+
+    public string CompactionSystem { get; }
+
+    public string CompactionUser { get; }
+
+    public string ImageSystem { get; }
+
+    public string ImageUser { get; }
 
     public string WorkSystem =>
         ComposeWork(PromptContext.InstructionsOnly(Instructions));
@@ -84,6 +108,9 @@ public sealed record PromptSet
 
         return copy;
     }
+
+    private static string TextOrBuiltIn(string? text, string builtIn) =>
+        string.IsNullOrWhiteSpace(text) ? builtIn : text.Trim();
 
     private static string AppendAttachments(
         string body,

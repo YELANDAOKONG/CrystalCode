@@ -64,6 +64,8 @@ public static class PromptPlaceholder
 
     public const string TodosSection = "todos_section";
 
+    public const string Question = "question";
+
     public static IReadOnlyList<string> All { get; } =
     [
         Env,
@@ -94,6 +96,7 @@ public static class PromptPlaceholder
         PriorSummarySection,
         SummaryTask,
         OutputTemplate,
-        TodosSection
+        TodosSection,
+        Question
     ];
 }

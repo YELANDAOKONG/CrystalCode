@@ -30,10 +30,7 @@ public sealed class PromptStore
     public string LoadTopicNaming(string workspaceRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
-        var project = new CrystalHome(Path.Combine(workspaceRoot, ProjectDirectoryName));
-        var text = PromptFiles.ReadNamed(_home.PromptsDirectory, PromptNames.Topic);
-        var projectText = PromptFiles.ReadNamed(project.PromptsDirectory, PromptNames.Topic);
-        return projectText ?? text ?? TopicNamingPrompt.Text;
+        return Resolve(workspaceRoot).Prompts.Topic;
     }
 
     /// <summary>
@@ -76,6 +73,36 @@ public sealed class PromptStore
             ApprovalReviewPrompt.SystemText,
             selection.Selected,
             project);
+        var reviewUser = ResolveNamed(
+            PromptNames.ReviewUser,
+            ApprovalReviewPrompt.UserTemplate,
+            selection.Selected,
+            project);
+        var topic = ResolveNamed(
+            PromptNames.Topic,
+            TopicNamingPrompt.Text,
+            selection.Selected,
+            project);
+        var compactionSystem = ResolveNamed(
+            PromptNames.CompactionSystem,
+            CompactionPrompt.SystemText,
+            selection.Selected,
+            project);
+        var compactionUser = ResolveNamed(
+            PromptNames.CompactionUser,
+            CompactionPrompt.UserTemplate,
+            selection.Selected,
+            project);
+        var imageSystem = ResolveNamed(
+            PromptNames.ImageSystem,
+            ImageDescriptionPrompt.SystemText,
+            selection.Selected,
+            project);
+        var imageUser = ResolveNamed(
+            PromptNames.ImageUser,
+            ImageDescriptionPrompt.UserTemplate,
+            selection.Selected,
+            project);
         var attachments = new PromptAttachmentDiscovery().Collect(_home, project, notes);
         var enabled = ResolveAttachments(attachments, usePromptAttachments, notes);
         return new PromptResolution(
@@ -86,7 +113,13 @@ public sealed class PromptStore
                 ReadInstructions(workspaceRoot, project),
                 enabled.Work,
                 enabled.Plan,
-                enabled.Review),
+                enabled.Review,
+                topic.Text,
+                reviewUser.Text,
+                compactionSystem.Text,
+                compactionUser.Text,
+                imageSystem.Text,
+                imageUser.Text),
             selection.Effective,
             catalog.Names,
             work.Source,

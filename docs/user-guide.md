@@ -688,7 +688,8 @@ PNG, JPEG, GIF, and WebP input is accepted up to 20 MiB per image. Optional
 multimodal plugin tools may return generic Crystal `ImageContent`, which is
 fed into the next model round. When `imageModel` is set, Plan and Work
 include `describe_image`, which asks that vision model to describe a file
-so a model that cannot see images can still read it. A model that accepts
+so a model that cannot see images can still read it. The question it sends
+comes from `image.system.md` and `image.user.md`. A model that accepts
 images also gets `view_image`, which returns the file itself. Screenshot
 capture, device/browser/VM control, and coordinate protocols belong to
 external plugins, not CrystalCode.
@@ -1134,13 +1135,14 @@ Details are in [Plugins](plugins.md).
 ## Prompts and instructions
 
 Crystal is prompt-neutral. Every model-bound string this product
-sends is authored here. Operators may replace Work, Plan, Review, and
-the reserved topic-naming prompt
+sends is authored here. Operators may replace Work, Plan, Review, the Review
+user turn, topic naming, compaction, and image description
 by placing files under `~/.crystal/prompts` and
 `<workspace>/.crystal/prompts`.
 
-Named files (`work.md`, `plan.md`, `review.md`, and `topic.md`; `.txt` is also
-accepted):
+Named files (`work.md`, `plan.md`, `review.md`, `review.user.md`, `topic.md`,
+`compaction.system.md`, `compaction.user.md`, `image.system.md`, and
+`image.user.md`; `.txt` is also accepted):
 
 - Within direct overrides, the Home file is applied before the project file.
 - A project file replaces the home file for that name.
@@ -1149,9 +1151,8 @@ accepted):
 
 Prompt set selection is separate from direct prompt overrides. Reusable sets
 live only under `~/.crystal/promptsets/<name>/`; the workspace is never scanned
-for prompt sets. Each set contains `prompt.json` and any subset of `work.md`,
-`plan.md`, and `review.md` (`.txt` is also accepted). `topic.md` is a direct
-override only; it is not a prompt-set member and does not use `prompt.json`.
+for prompt sets. Each set contains `prompt.json` and any subset of those
+named files (`.txt` is also accepted).
 Missing or empty members use the built-in prompt for that name.
 
 `prompt.json` may include `name` and `description`. `name` is a display title
@@ -1185,7 +1186,8 @@ The next preference save omits them. There is no migration tool. Add
 `prompt.json` to each directory you still want.
 
 Prompt attachments append after the resolved Work, Plan, or Review text.
-Topic naming and compaction are unchanged. Each attachment is a directory
+An attachment does not replace topic, Review user, compaction, or image
+description. Each attachment is a directory
 with `prompt.json` and any of `work.md`, `plan.md`, and `review.md` (`.txt`
 is also accepted). A mode with no file gets nothing from that attachment.
 Empty files are treated as missing. A trailing newline at the end of an
@@ -1231,7 +1233,7 @@ Enabled attachment text is added after the body is bound, and before an
 ordinary plugin prompt hook appends its own text.
 
 The built-in Work and Plan assistant name is Crystal Code. Work, Plan,
-Review, and compaction templates use host-owned placeholders (`{{name}}`).
+Review, compaction, and image-description templates use host-owned placeholders (`{{name}}`).
 Composite session slots are `{{env}}`, `{{skills}}`, and
 `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
 include `{{workspace}}`, `{{is_git_repo}}`, `{{git_root}}`, `{{platform}}`,
@@ -1246,8 +1248,8 @@ workspace directory itself contains a `.git` directory or file.
 or empty when that walk finds none. `{{session_id}}` is the saved session
 id. `{{approval}}` is the approval mode (`plan`, `default`, `edit`,
 `review`, `audit`, or `full`). `{{mode}}` is `plan` or `work` for Work and
-Plan, `review` for Review system text, and `compaction` for compaction
-system text. The `{{env}}` block includes the operating system,
+Plan, `review` for Review system text, `compaction` for compaction
+system text, and `image` for image-description system text. The `{{env}}` block includes the operating system,
 architecture, and local time, and adds git root, session, and approval
 lines when the host has them. These values refresh
 on `/cd`, `/model`, `/approval`, and whenever the live system message is
@@ -1255,7 +1257,9 @@ replaced. Review user templates add `{{conversation}}`,
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
-`{{output_template}}`, and `{{todos_section}}`. Placeholder names are
+`{{output_template}}`, and `{{todos_section}}`. Image user templates add
+`{{question}}`, the description request or the model's question.
+Placeholder names are
 case-insensitive. Unknown names are left unchanged. A plugin may add
 further names. While resolving a name, the plugin can read the current
 session model and whether review is using its own model. The host rejects
@@ -1431,12 +1435,24 @@ Override with `CRYSTAL_HOME` or `--home`.
     work.md
     plan.md
     review.md
+    review.user.md
+    topic.md
+    compaction.system.md
+    compaction.user.md
+    image.system.md
+    image.user.md
   promptsets/
     concise/
       prompt.json
       work.md
       plan.md
       review.md
+      review.user.md
+      topic.md
+      compaction.system.md
+      compaction.user.md
+      image.system.md
+      image.user.md
   prompt-attachments/
     <name>/
       prompt.json
@@ -1461,6 +1477,12 @@ sets, and plugins of the same directory name win over home):
     work.md
     plan.md
     review.md
+    review.user.md
+    topic.md
+    compaction.system.md
+    compaction.user.md
+    image.system.md
+    image.user.md
   prompt-attachments/
     <name>/
       prompt.json

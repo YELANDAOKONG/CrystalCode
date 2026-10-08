@@ -73,8 +73,15 @@ public static class CompactionPrompt
         - Do not mention the summary process or that context was compacted.
         """;
 
-    public static string ComposeSystem(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
-        PromptBinder.Apply(SystemText, context.WithMode("compaction"), placeholders);
+    public static string ComposeSystem(
+        PromptContext context,
+        PluginPlaceholderTable? placeholders = null,
+        string? template = null)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var text = string.IsNullOrWhiteSpace(template) ? SystemText : template;
+        return PromptBinder.Apply(text, context.WithMode("compaction"), placeholders);
+    }
 
     public static string UserText(string conversation, string todos, string? previousSummary) =>
         UserText(conversation, todos, previousSummary, facts: null);
@@ -83,12 +90,14 @@ public static class CompactionPrompt
         string conversation,
         string todos,
         string? previousSummary,
-        PromptBinding? facts)
+        PromptBinding? facts,
+        string? template = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(todos);
+        var text = string.IsNullOrWhiteSpace(template) ? UserTemplate : template;
         return PromptBinder.Apply(
-            UserTemplate,
+            text,
             new PromptBinding(
                 facts?.Session,
                 Compaction: CreateUserContext(conversation, todos, previousSummary),

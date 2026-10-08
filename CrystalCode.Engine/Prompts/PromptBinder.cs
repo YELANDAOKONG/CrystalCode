@@ -50,6 +50,11 @@ public static partial class PromptBinder
             return compactionValue;
         }
 
+        if (binding.Image is not null && TryGetImageValue(name, binding.Image, out var imageValue))
+        {
+            return imageValue;
+        }
+
         if (binding.Placeholders is not null
             && binding.Placeholders.TryResolve(name, CreatePlaceholderContext(binding), out var pluginValue))
         {
@@ -70,6 +75,10 @@ public static partial class PromptBinder
         else if (mode.Length == 0 && binding.Compaction is not null)
         {
             mode = "compaction";
+        }
+        else if (mode.Length == 0 && binding.Image is not null)
+        {
+            mode = "image";
         }
 
         return new PluginPlaceholderContext(
@@ -201,6 +210,18 @@ public static partial class PromptBinder
                 value = string.Empty;
                 return false;
         }
+    }
+
+    private static bool TryGetImageValue(string name, ImagePromptContext context, out string value)
+    {
+        if (name == PromptPlaceholder.Question)
+        {
+            value = context.Question;
+            return true;
+        }
+
+        value = string.Empty;
+        return false;
     }
 
     [GeneratedRegex(

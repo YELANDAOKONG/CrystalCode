@@ -66,7 +66,10 @@ public static class ApprovalReviewPrompt
     public static string UserText(ApprovalReviewRequest request) =>
         UserText(request, facts: null);
 
-    public static string UserText(ApprovalReviewRequest request, PromptBinding? facts)
+    public static string UserText(ApprovalReviewRequest request, PromptBinding? facts) =>
+        UserText(request, facts, template: null);
+
+    public static string UserText(ApprovalReviewRequest request, PromptBinding? facts, string? template)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.Conversation))
@@ -76,8 +79,9 @@ public static class ApprovalReviewPrompt
                 nameof(request));
         }
 
+        var text = string.IsNullOrWhiteSpace(template) ? UserTemplate : template;
         return PromptBinder.Apply(
-            UserTemplate,
+            text,
             new PromptBinding(
                 facts?.Session,
                 ReviewPromptContext.From(request),

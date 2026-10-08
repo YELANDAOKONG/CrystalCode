@@ -277,7 +277,7 @@ model or provider does not support image input.
 `describe_image` is a text tool on Plan and Work when `config.json`
 `imageModel` names a provider and model whose catalog entry has
 `imageInput`. It sends that file to a side multimodal client with the
-built-in image-description prompt and returns the reply as text. The side
+image-description prompt and returns the reply as text. The side
 request has no tools, is not written into the session transcript, and uses
 `imageModel.thinkingEffort` through the same gear mapping as the host.
 `view_image` is registered only for an image-capable turn. It returns the
@@ -478,34 +478,38 @@ contains a `.git` directory or file. `{{git_root}}` is the repository root
 found by walking parent directories, or empty when that walk finds none.
 `{{session_id}}` is the saved session id. `{{approval}}` is the approval
 mode (`plan`, `default`, `edit`, `review`, `audit`, or `full`). `{{mode}}`
-is `plan` or `work` for Work and Plan, `review` for Review system text, and
-`compaction` for compaction system text. The `{{env}}` block includes the
+is `plan` or `work` for Work and Plan, `review` for Review system text,
+`compaction` for compaction system text, and `image` for image-description
+system text. The `{{env}}` block includes the
 operating system, architecture, and local time, and adds git root, session,
 and approval lines when the host has them. Review user templates add `{{conversation}}`,
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
-`{{output_template}}`, and `{{todos_section}}`. A disk plugin may add further
+`{{output_template}}`, and `{{todos_section}}`. Image user templates add
+`{{question}}`. A disk plugin may add further
 names through `IPluginPlaceholder`. The host rejects a name it already owns,
 and the first loaded plugin keeps a duplicated name. Those values expand in
-the same binding pass as the host names, including attachments, Review, and
-compaction. A returned value is inserted as text, so tokens inside it stay
+the same binding pass as the host names, including attachments, Review,
+compaction, and image description. A returned value is inserted as text, so tokens inside it stay
 literal. A resolver that throws, or returns no text, leaves the token and
-records an English note. Built-in Work, Plan, Review,
-and compaction templates declare the slots they need explicitly. Topic naming
-has a built-in prompt and is overridden by `topic.md` in Home or project
-`prompts/`; it is not a prompt-set member and is not yet invoked by the live
-session. Review system text is the named file plus any enabled review
+records an English note. Built-in Work, Plan, Review, compaction, and
+image-description templates declare the slots they need explicitly. Topic
+naming uses `topic.md`. It is a named prompt, so a prompt set, Home, or
+project file can replace it. The live session does not invoke it yet. Review
+system text is the named file plus any enabled review
 attachments. It does not receive the workspace instruction block. Its user
-turn is template-driven. Composite
+turn is the named `review.user` template. Composite
 and atomic host values are not overlay files and refresh on `/cd`, `/model`,
 `/approval`, and when the live system message is replaced. Skill guidance is host-owned
 and is not an overlay file.
 
 Prompt set selection and direct prompt overrides are separate features. A
 prompt set is a Home-only directory under `~/.crystal/promptsets/<name>` with
-`prompt.json` and any subset of `work.md`, `plan.md`, and `review.md` (`.txt`
-is also accepted). The host never scans a workspace for prompt sets.
+`prompt.json` and any subset of the named prompt files (`work.md`,
+`plan.md`, `review.md`, `review.user.md`, `topic.md`,
+`compaction.system.md`, `compaction.user.md`, `image.system.md`, and
+`image.user.md`; `.txt` is also accepted). The host never scans a workspace for prompt sets.
 `default` is a virtual, reserved selection backed by the built-in prompts. A
 missing or empty file in a selected set falls back to the built-in prompt for
 that name. Direct `prompts/work.md` overrides do not use `prompt.json`.
@@ -526,8 +530,12 @@ session uses built-in text. If two or more sets are hand-edited to
 
 The complete named-prompt precedence is built-in, selected prompt set, direct
 `~/.crystal/prompts` override, then direct workspace `.crystal/prompts`
-override. Instructions, skill guidance, the environment block, and compaction
-text are not prompt-set members. `/promptset` (alias `/prompts`) lists sets and
+override. That order covers Work, Plan, Review, the Review user turn, topic
+naming, compaction system and user text, and image-description system and
+user text. Instructions, skill guidance, and the environment block are not
+prompt-set members. Compaction's required output format stays inside
+`{{output_template}}`; replacing `compaction.user.md` can omit that slot.
+`/promptset` (alias `/prompts`) lists sets and
 the effective source of Work, Plan, and Review. `/promptset <name>` switches at
 idle by writing `prompt.json`, replaces the live system message, and rebuilds
 Review. It does not write `config.json`. A process `--prompt-set` refuses
@@ -539,8 +547,10 @@ list|show|enable|disable` edits the same Home manifests outside a session.
 
 Prompt attachments append after the resolved Work, Plan, or Review text has
 been bound. The resolved text stays in place. Attachments are not prompt-set
-members. Topic naming and compaction stay unchanged. Each attachment is a
-directory of `prompt.json` plus the same `work.md`, `plan.md`, and `review.md`
+members. An attachment only appends Work, Plan, or Review. Topic, Review
+user, compaction, and image description are replaced by named prompt files,
+not by attachments. Each attachment is a
+directory of `prompt.json` plus `work.md`, `plan.md`, and `review.md`
 files (`.txt` is also accepted). A missing file contributes nothing for that
 mode. Empty files are missing. A trailing newline at the end of an
 attachment file is kept. Directory names use the same 1-64 character
@@ -804,11 +814,22 @@ contents of `binaries/code/`.
   prompts/work.md
   prompts/plan.md
   prompts/review.md
+  prompts/review.user.md
   prompts/topic.md
+  prompts/compaction.system.md
+  prompts/compaction.user.md
+  prompts/image.system.md
+  prompts/image.user.md
   promptsets/<name>/prompt.json
   promptsets/<name>/work.md
   promptsets/<name>/plan.md
   promptsets/<name>/review.md
+  promptsets/<name>/review.user.md
+  promptsets/<name>/topic.md
+  promptsets/<name>/compaction.system.md
+  promptsets/<name>/compaction.user.md
+  promptsets/<name>/image.system.md
+  promptsets/<name>/image.user.md
   prompt-attachments/<name>/prompt.json
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
@@ -880,7 +901,12 @@ Crystal skills, and tool sets of the same directory name):
   prompts/work.md
   prompts/plan.md
   prompts/review.md
+  prompts/review.user.md
   prompts/topic.md
+  prompts/compaction.system.md
+  prompts/compaction.user.md
+  prompts/image.system.md
+  prompts/image.user.md
   prompt-attachments/<name>/prompt.json
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
@@ -896,8 +922,9 @@ from the Home `config.json` only; workspace-level configuration is deferred
 product work.
 
 Overlay is built-in default, then `~/.crystal`, then the project
-`.crystal`. Named prompt files replace the built-in Work, Plan, or
-Review system text.
+`.crystal`. A selected prompt set sits between the built-in text and the
+direct Home files. Named prompt files replace Work, Plan, Review, the Review
+user turn, topic naming, compaction, and image description.
 
 Built-in Work and Plan identify the assistant as Crystal Code. Operators
 who replace those files choose their own identity.

@@ -178,7 +178,7 @@ public static class PromptSetInventory
             return Problem(name, path, "directory name is invalid.");
         }
 
-        if (!PromptManifestDirectory.HasPrompt(directory))
+        if (!PromptManifestDirectory.HasNamedPrompt(directory))
         {
             return Problem(name, path, "no prompt files were found.");
         }

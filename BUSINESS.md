@@ -83,7 +83,8 @@ separate library with no terminal code. The product can:
 - recall submitted prompts from the composer with Up/Down and retain up to 200
   recent text-only entries across runs for the same workspace;
 - select a reusable Home prompt set without changing the higher-priority direct
-  prompt overrides in Home or the workspace;
+  prompt overrides in Home or the workspace; a set may replace Work, Plan,
+  Review, the Review user turn, topic naming, compaction, and image description;
 - enable an ordered list of prompt attachments that append to the resolved
   Work, Plan, and Review text; directories are discovered in Home and in the
   current workspace, and the workspace copy wins when both exist;
