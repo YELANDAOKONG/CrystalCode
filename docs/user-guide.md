@@ -453,6 +453,7 @@ Top-level fields:
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
+| `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
@@ -685,8 +686,12 @@ unit. Typing the same text does not attach an image. Raw image data is kept out
 of rendered text.
 PNG, JPEG, GIF, and WebP input is accepted up to 20 MiB per image. Optional
 multimodal plugin tools may return generic Crystal `ImageContent`, which is
-fed into the next model round. Screenshot capture, device/browser/VM control,
-and coordinate protocols belong to external plugins, not CrystalCode.
+fed into the next model round. When `imageModel` is set, Plan and Work
+include `describe_image`, which asks that vision model to describe a file
+so a model that cannot see images can still read it. A model that accepts
+images also gets `view_image`, which returns the file itself. Screenshot
+capture, device/browser/VM control, and coordinate protocols belong to
+external plugins, not CrystalCode.
 
 The default command opens an alternate-screen shell when stdout is a
 TTY: transcript viewport, optional overlay, optional pinned todos,
@@ -1017,6 +1022,8 @@ is the workspace root.
 | Tool | Catalog | Purpose |
 | :--- | :--- | :--- |
 | `read` | Plan, Work | Read a workspace text file (`path`, optional 1-based `offset` and `limit`) |
+| `describe_image` | Plan, Work | Describe an image through `imageModel` (`path`, optional `question`). Omitted when `imageModel` is unset |
+| `view_image` | Plan, Work | Show an image to the current model (`path`). Present only while that model accepts images |
 | `list` | Plan, Work | List a directory's immediate entries (`path` optional, 1-based `offset` and `limit` paging) |
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`, 1-based `offset` and `limit` paging) |
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |

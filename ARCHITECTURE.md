@@ -274,6 +274,16 @@ number. Input batches dispatch keys in order, so Ctrl+V finishes attaching
 before a following Enter submits the prompt.
 Dotnet multimodal tools are omitted from active catalogs when the selected
 model or provider does not support image input.
+`describe_image` is a text tool on Plan and Work when `config.json`
+`imageModel` names a provider and model whose catalog entry has
+`imageInput`. It sends that file to a side multimodal client with the
+built-in image-description prompt and returns the reply as text. The side
+request has no tools, is not written into the session transcript, and uses
+`imageModel.thinkingEffort` through the same gear mapping as the host.
+`view_image` is registered only for an image-capable turn. It returns the
+file as `ImageContent` so the current model sees it on the next round.
+Both follow the `read` path fence. A missing image-model credential fails
+the tool call and does not block session start.
 
 The Responses, OpenAI-compatible Chat Completions, DeepSeek Chat Completions,
 Anthropic Messages, Gemini GenerateContent, and Ollama Chat adapters accept

@@ -231,7 +231,11 @@ tool may also implement `CrystalCode.Tools.IHostTool` or
 and approval mode on each call. Tools that implement only Crystal's
 interfaces stay unchanged. Native
 multimodal entries are exposed only while the selected model and provider
-support image input. Whether each source's author
+support image input. `describe_image` is available on Plan and Work when
+`config.json` `imageModel` names a model that accepts images, and returns
+a text description from that model. `view_image` is available only while
+the selected model and provider support image input, and returns the image
+itself. Whether each source's author
 approval declarations take effect is stored under `externalToolApproval`
 in `config.json`. The application never writes
 secrets into the workspace.

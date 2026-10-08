@@ -18,7 +18,8 @@ public static class WorkspaceCatalog
         PluginRegistry? registry = null,
         SkillCatalog? skills = null,
         ExternalCatalog? external = null,
-        PluginCatalog? disk = null)
+        PluginCatalog? disk = null,
+        ImageDescriber? imageDescriber = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -32,7 +33,8 @@ public static class WorkspaceCatalog
                 skills,
                 external,
                 HostToolCatalog.Plan,
-                disk: disk));
+                disk: disk,
+                imageDescriber: imageDescriber));
     }
 
     public static ToolCatalog CreateWork(
@@ -43,7 +45,8 @@ public static class WorkspaceCatalog
         SkillCatalog? skills = null,
         ExternalCatalog? external = null,
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
-        PluginCatalog? disk = null)
+        PluginCatalog? disk = null,
+        ImageDescriber? imageDescriber = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -66,7 +69,8 @@ public static class WorkspaceCatalog
                 external,
                 HostToolCatalog.Work,
                 bashTimeoutSeconds,
-                disk));
+                disk,
+                imageDescriber));
     }
 
     private static IReadOnlyList<ITool> CreateTools(
@@ -78,7 +82,8 @@ public static class WorkspaceCatalog
         ExternalCatalog? external,
         HostToolCatalog catalog,
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
-        PluginCatalog? disk = null)
+        PluginCatalog? disk = null,
+        ImageDescriber? imageDescriber = null)
     {
         var tools = new List<ITool>(
             (registry ?? PluginRegistry.CreateBuiltIn())
@@ -101,6 +106,11 @@ public static class WorkspaceCatalog
         if (skills is not null)
         {
             tools.Add(new SkillTool(skills));
+        }
+
+        if (imageDescriber is not null)
+        {
+            tools.Add(new DescribeImageTool(workspace, imageDescriber));
         }
 
         return tools;

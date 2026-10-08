@@ -996,4 +996,83 @@ public sealed class SettingsStoreTests
         var unknown = Assert.Throws<InvalidOperationException>(() => store.Load());
         Assert.Contains("not-a-model", unknown.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Save_RoundTripsImageModelAndOmitsTheDefaultThinkingGear()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithImageModel(
+            new ImageModelSettings(
+                "openai",
+                "gpt-5.6-sol",
+                ThinkingSelection.Parse("high")));
+
+        store.Save(settings);
+        var loaded = store.Load();
+        var json = File.ReadAllText(root.Home.ConfigPath);
+
+        Assert.Equal("openai", loaded.ImageModel.Provider);
+        Assert.Equal("gpt-5.6-sol", loaded.ImageModel.Model);
+        Assert.Equal("high", loaded.ImageModel.ThinkingEffort.Value);
+        Assert.Contains("\"thinkingEffort\": \"high\"", json, StringComparison.Ordinal);
+
+        store.Save(loaded.WithImageModel(
+            loaded.ImageModel.WithThinkingEffort(ThinkingSelection.Default)));
+        var after = store.Load();
+
+        Assert.Equal(ThinkingSelection.Default, after.ImageModel.ThinkingEffort);
+        Assert.DoesNotContain(
+            "thinkingEffort",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_OmitsAnUnsetImageModel()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+
+        store.Save(HarnessSettings.CreateDefault());
+        var loaded = store.Load();
+
+        Assert.False(loaded.ImageModel.IsConfigured);
+        Assert.DoesNotContain(
+            "imageModel",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsAnImageModelThatIsIncompleteUnknownOrTextOnly()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "imageModel": { "provider": "openai" } }
+            """);
+        var incomplete = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Equal("imageModel requires provider and model.", incomplete.Message);
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "imageModel": { "provider": "openai", "model": "not-a-model" } }
+            """);
+        var unknown = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Contains("not-a-model", unknown.Message, StringComparison.Ordinal);
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "imageModel": { "provider": "deepseek", "model": "deepseek-v4-pro" } }
+            """);
+        var textOnly = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Contains("does not accept image input", textOnly.Message, StringComparison.Ordinal);
+    }
 }

@@ -326,6 +326,36 @@ public sealed class ToolClassifierTests
         Assert.Equal(Authority.Workspace, classification.Authority);
     }
 
+    [Fact]
+    public void Classify_ImageTools_MatchReadPathRules()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "shot.png");
+        File.WriteAllText(file, "png");
+        var classifier = new ToolClassifier(new Workspace(root.Path));
+        var outsideJson = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
+
+        foreach (var name in new[] { DescribeImageTool.ToolName, ViewImageTool.ToolName })
+        {
+            var inside = classifier.Classify(new ToolCall("1", name, """{"path":"shot.png"}"""));
+            Assert.Equal(Risk.Read, inside.Risk);
+            Assert.Equal(Authority.Workspace, inside.Authority);
+
+            var outsideClassification = classifier.Classify(new ToolCall("2", name, outsideJson));
+            Assert.Equal(Risk.Read, outsideClassification.Risk);
+            Assert.Equal(Authority.OutsideWorkspace, outsideClassification.Authority);
+
+            var credential = classifier.Classify(
+                new ToolCall("3", name, """{"path":".ssh/id_rsa"}"""));
+            Assert.Equal(Risk.Forbidden, credential.Risk);
+
+            Assert.Equal(
+                "shot.png",
+                GrantFingerprint.Create(new ToolCall("4", name, """{"path":"shot.png"}""")));
+        }
+    }
+
     private sealed class EchoClassifier : IApprovalClassifier
     {
         public bool TryClassify(

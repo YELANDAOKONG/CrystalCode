@@ -51,4 +51,6 @@ internal sealed class SettingsDocument
     public System.Text.Json.JsonElement? Providers { get; set; }
 
     public ApprovalModelDocument? ApprovalModel { get; set; }
+
+    public ImageModelDocument? ImageModel { get; set; }
 }

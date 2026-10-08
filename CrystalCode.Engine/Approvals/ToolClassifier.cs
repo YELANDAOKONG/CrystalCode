@@ -61,6 +61,8 @@ public sealed class ToolClassifier
         call.Name switch
         {
             ReadTool.ToolName => ClassifyRead(call.Arguments, "Read", pathRequired: true),
+            DescribeImageTool.ToolName => ClassifyRead(call.Arguments, "Describe image", pathRequired: true),
+            ViewImageTool.ToolName => ClassifyRead(call.Arguments, "View image", pathRequired: true),
             ListTool.ToolName => ClassifyRead(call.Arguments, "List", pathRequired: false),
             GlobTool.ToolName => ClassifyRead(call.Arguments, "Glob", pathRequired: false),
             GrepTool.ToolName => ClassifyRead(call.Arguments, "Grep", pathRequired: false),

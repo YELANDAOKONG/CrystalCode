@@ -61,7 +61,8 @@ public sealed record HarnessSettings
         bool showCompactionSummary = DefaultShowCompactionSummary,
         IReadOnlyList<string>? promptAttachments = null,
         string? promptSetOverride = null,
-        bool usePromptAttachments = true)
+        bool usePromptAttachments = true,
+        ImageModelSettings? imageModel = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -107,6 +108,7 @@ public sealed record HarnessSettings
         ExecutionBudget = executionBudget ?? TurnLimits.CreateDefault();
         BashTimeoutSeconds = bashTimeoutSeconds;
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
+        ImageModel = imageModel ?? ImageModelSettings.None;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
         ShowCompactionSummary = showCompactionSummary;
@@ -128,6 +130,8 @@ public sealed record HarnessSettings
                 throw new InvalidOperationException(exception.Message, exception);
             }
         }
+
+        RequireImageModel(catalog, ImageModel);
     }
 
     public ProviderName Provider { get; }
@@ -189,6 +193,8 @@ public sealed record HarnessSettings
     public int? BashTimeoutSeconds { get; }
 
     public ApprovalModelSettings ApprovalModel { get; }
+
+    public ImageModelSettings ImageModel { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.GetModelProvider(Provider, Model);
 
@@ -322,6 +328,12 @@ public sealed record HarnessSettings
         return Copy(approvalModel: approvalModel, setApprovalModel: true);
     }
 
+    public HarnessSettings WithImageModel(ImageModelSettings imageModel)
+    {
+        ArgumentNullException.ThrowIfNull(imageModel);
+        return Copy(imageModel: imageModel, setImageModel: true);
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -352,7 +364,9 @@ public sealed record HarnessSettings
         string? promptSetOverride = null,
         bool setPromptSetOverride = false,
         bool? usePromptAttachments = null,
-        bool setUsePromptAttachments = false) =>
+        bool setUsePromptAttachments = false,
+        ImageModelSettings? imageModel = null,
+        bool setImageModel = false) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -379,7 +393,8 @@ public sealed record HarnessSettings
             showCompactionSummary ?? ShowCompactionSummary,
             setPromptAttachments ? promptAttachments : PromptAttachments,
             setPromptSetOverride ? promptSetOverride : PromptSetOverride,
-            setUsePromptAttachments ? usePromptAttachments ?? UsePromptAttachments : UsePromptAttachments);
+            setUsePromptAttachments ? usePromptAttachments ?? UsePromptAttachments : UsePromptAttachments,
+            setImageModel ? imageModel : ImageModel);
 
     public override string ToString() => nameof(HarnessSettings);
 
@@ -403,6 +418,30 @@ public sealed record HarnessSettings
 
         throw new InvalidOperationException(
             $"Provider '{provider.Value}' has more than one model. Pass --model.");
+    }
+
+    private static void RequireImageModel(ProviderCatalog catalog, ImageModelSettings imageModel)
+    {
+        if (!imageModel.IsConfigured)
+        {
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = catalog.GetModel(new ProviderName(imageModel.Provider!), imageModel.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+
+        if (!model.ImageInput)
+        {
+            throw new InvalidOperationException(
+                $"Image model '{imageModel.Model}' does not accept image input.");
+        }
     }
 
     private static IReadOnlyList<string> CopyPromptAttachments(IReadOnlyList<string>? names)

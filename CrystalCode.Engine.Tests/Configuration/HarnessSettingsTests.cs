@@ -1,3 +1,5 @@
+using Crystal.Reasoning;
+
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 
@@ -197,5 +199,26 @@ public sealed class HarnessSettingsTests
         var enabled = Assert.Throws<InvalidOperationException>(() =>
             settings.WithApprovalModel(new ApprovalModelSettings(true, "openai", "not-a-model")));
         Assert.Contains("not-a-model", enabled.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ImageModel_MapsThinkingAndRejectsAModelThatCannotSeeImages()
+    {
+        var settings = HarnessSettings.CreateDefault();
+        Assert.False(settings.ImageModel.IsConfigured);
+
+        var geared = settings.WithImageModel(
+            new ImageModelSettings("deepseek", "deepseek-flash", ThinkingSelection.Parse("high")));
+        var model = geared.Catalog.GetModel(new ProviderName("deepseek"), "deepseek-flash");
+        var reasoning = geared.ImageModel.ThinkingEffort.ToReasoningOptions(model);
+
+        Assert.NotNull(reasoning);
+        Assert.Equal(ReasoningMode.Enabled, reasoning.Mode);
+        Assert.Equal("high", reasoning.Effort!.Value);
+
+        var textOnly = Assert.Throws<InvalidOperationException>(() =>
+            settings.WithImageModel(new ImageModelSettings("deepseek", "deepseek-v4-pro")));
+        Assert.Contains("does not accept image input", textOnly.Message, StringComparison.Ordinal);
+        Assert.False(settings.ImageModel.IsConfigured);
     }
 }

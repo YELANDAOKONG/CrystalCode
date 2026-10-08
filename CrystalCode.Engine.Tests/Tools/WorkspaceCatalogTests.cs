@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Engine.Tools;
 
@@ -98,5 +99,37 @@ public sealed class WorkspaceCatalogTests
             "no per-command timeout",
             catalog.Find(BashTool.ToolName)!.Definition.Description,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreatePlanAndWork_IncludeDescribeImageOnlyWhenConfigured()
+    {
+        using var root = new TemporaryWorkspace();
+        var workspace = new Workspace(root.Path);
+        var todos = new TodoList();
+        var prompt = new FixedUserPrompt("ok");
+        var without = WorkspaceCatalog.CreatePlan(workspace, todos, prompt);
+        var workWithout = WorkspaceCatalog.CreateWork(workspace, todos, prompt);
+
+        Assert.Null(without.Find(DescribeImageTool.ToolName));
+        Assert.Null(workWithout.Find(DescribeImageTool.ToolName));
+
+        var describer = new ImageDescriber(
+            () => throw new InvalidOperationException("The image client is not used by catalog construction."),
+            ImageDescriptionPrompt.SystemText,
+            reasoning: null);
+        var plan = WorkspaceCatalog.CreatePlan(
+            workspace,
+            todos,
+            prompt,
+            imageDescriber: describer);
+        var work = WorkspaceCatalog.CreateWork(
+            workspace,
+            todos,
+            prompt,
+            imageDescriber: describer);
+
+        Assert.NotNull(plan.Find(DescribeImageTool.ToolName));
+        Assert.NotNull(work.Find(DescribeImageTool.ToolName));
     }
 }

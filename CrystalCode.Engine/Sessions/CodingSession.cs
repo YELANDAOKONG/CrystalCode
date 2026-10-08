@@ -35,6 +35,7 @@ public sealed class CodingSession : ITurnObserver
     private IStreamingChatClient? _approvalClient;
     private string? _approvalClientKey;
     private IStreamingMultimodalChatClient? _multimodalClient;
+    private IStreamingMultimodalChatClient? _imageDescriptionClient;
     private HarnessSettings _settings;
 
     // Disk snapshot plus operator edits. Launch overrides stay on _settings
@@ -2016,6 +2017,52 @@ public sealed class CodingSession : ITurnObserver
     private IStreamingMultimodalChatClient? CreateSideImageClient() =>
         CreateMultimodalClient(_settings);
 
+    private ImageDescriber? CreateImageDescriber()
+    {
+        if (!_settings.ImageModel.IsConfigured)
+        {
+            return null;
+        }
+
+        var selected = _settings.WithSelection(
+            new ProviderName(_settings.ImageModel.Provider!),
+            _settings.ImageModel.Model!);
+        return new ImageDescriber(
+            OpenImageDescriptionClient,
+            ImageDescriptionSystemText(selected),
+            _settings.ImageModel.ThinkingEffort.ToReasoningOptions(selected.ActiveModel));
+    }
+
+    private string ImageDescriptionSystemText(HarnessSettings selected) =>
+        ImageDescriptionPrompt.ComposeSystem(
+            PromptContext.Create(
+                _workspace.Root,
+                selected.Provider.Value,
+                selected.Model,
+                "image",
+                skills: string.Empty,
+                instructions: string.Empty,
+                sessionId: _sessionId ?? string.Empty,
+                approval: _approval.Value),
+            _placeholders);
+
+    private IStreamingMultimodalChatClient OpenImageDescriptionClient()
+    {
+        if (_imageDescriptionClient is not null)
+        {
+            return _imageDescriptionClient;
+        }
+
+        var selected = _settings.WithSelection(
+            new ProviderName(_settings.ImageModel.Provider!),
+            _settings.ImageModel.Model!);
+        var client = CreateMultimodalClient(selected)
+            ?? throw new InvalidOperationException(
+                "The image model does not accept image input.");
+        _imageDescriptionClient = client;
+        return client;
+    }
+
     private IStreamingChatClient CreateSideReviewClient()
     {
         var approval = _settings.ApprovalModel;
@@ -2077,6 +2124,8 @@ public sealed class CodingSession : ITurnObserver
         ReleaseApprovalClient();
         DisposeClient(_client);
         DisposeClient(_multimodalClient);
+        DisposeClient(_imageDescriptionClient);
+        _imageDescriptionClient = null;
     }
 
     private static void DisposeClient(IStreamingChatClient? client)
@@ -2942,6 +2991,7 @@ public sealed class CodingSession : ITurnObserver
             _external.AutomaticTools,
             (call, classification) => _hooks.OnApproval(call, classification));
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
+        var imageDescriber = CreateImageDescriber();
         var workExecutor = new ToolExecutor(
             WorkspaceCatalog.CreateWork(
                 _workspace,
@@ -2951,7 +3001,8 @@ public sealed class CodingSession : ITurnObserver
                 _skills,
                 _external,
                 _settings.BashTimeoutSeconds,
-                _loadedPlugins),
+                _loadedPlugins,
+                imageDescriber),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -2963,7 +3014,8 @@ public sealed class CodingSession : ITurnObserver
                 _plugins,
                 _skills,
                 _external,
-                _loadedPlugins),
+                _loadedPlugins,
+                imageDescriber),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -3012,6 +3064,8 @@ public sealed class CodingSession : ITurnObserver
                 throw new ArgumentOutOfRangeException(nameof(catalog));
         }
 
+        // Text-only turns return before this, so view_image stays off that catalog.
+        tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
         return tools;
     }
 
