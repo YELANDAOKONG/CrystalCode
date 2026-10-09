@@ -1,0 +1,10 @@
+binaries/
+temp/
+build/
+data/
+logs/
+credentials.json
+permissions.json
+trusted.json
+
+
