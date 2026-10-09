@@ -78,7 +78,9 @@ appended in lower case. The report does not start a process. The outbound
 
 The contract external dotnet tools may reference when a call needs host
 facts. It defines `ToolHostContext`, `IHostTool`, and
-`IHostMultimodalTool`. It references only Crystal and Crystal.Tools. It
+`IHostMultimodalTool`. `ToolHostContext` carries the workspace root, the
+session id, the approval mode, and the extension's global and project
+runtime-data directories. It references only Crystal and Crystal.Tools. It
 does not reference the engine, the display, the executable, or a terminal
 library. Tools that implement only Crystal's `ITool` or `IMultimodalTool`
 do not reference it. There is no paired test project; dispatch and
@@ -87,7 +89,9 @@ load-context identity are tested in CrystalCode.Engine.Tests.
 ### CrystalCode.Plugins
 
 The contract a disk plugin references. It defines `IPlugin`, contribution
-lists, the hook and raw hook interfaces, and the hook context types. It references only Crystal and
+lists, the hook and raw hook interfaces, the hook context types, the model
+and environment views, and `IPluginDataDirectory` for an extension's runtime
+data directories. It references only Crystal and
 Crystal.Tools. It does not reference the engine, the display, the
 executable, or a terminal library. There is no paired test project;
 discovery, the load context, and hook order are tested in
@@ -837,10 +841,12 @@ contents of `binaries/code/`.
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
+  data/tools/<directory>/
+  plugins/
+  data/plugins/<directory>/
   sessions/<id>.json
   media/<sha256>
   logs/
-  plugins/
   space/
 ```
 
@@ -914,12 +920,29 @@ Crystal skills, and tool sets of the same directory name):
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
+  plugins/<directory>/plugin.json
+  data/tools/<directory>/
+  data/plugins/<directory>/
 <workspace>/.crystal.md
 ```
 
 `config.json` is not part of the project overlay. Operator preferences load
 from the Home `config.json` only; workspace-level configuration is deferred
 product work.
+
+Operator plugins and external tool sets keep their own runtime data under a
+`data/` root, split by kind. The global root is `{home}/data`; the project root
+is `<workspace>/.crystal/data`. Each extension's global directory is
+`{home}/data/{plugins|tools}/<directory>` and its project directory is
+`<workspace>/.crystal/data/{plugins|tools}/<directory>`. Both are separate from
+the `tools/` and `plugins/` install trees. The host resolves both paths and
+creates the directories lazily on first use; it never writes secrets there. A
+dotnet host tool reads them from `ToolHostContext.GlobalDataDirectory` and
+`ToolHostContext.ProjectDataDirectory`. An exec child reads them as the
+per-process environment variables `CRYSTAL_TOOL_DATA` (global) and
+`CRYSTAL_PROJECT_DATA` (project). A disk plugin that implements
+`CrystalCode.Plugins.Data.IPluginDataDirectory` receives them through
+`AttachDataDirectories`.
 
 Overlay is built-in default, then `~/.crystal`, then the project
 `.crystal`. A selected prompt set sits between the built-in text and the
@@ -989,7 +1012,8 @@ permissions. Process environment variables override those file credentials.
 Operator tool sets live under `tools/`. A project directory of the same
 name replaces the home set as a whole. `tools.json` field `enabled`
 (default `true`) omits a set without deleting it. `config.json` field
-`externalTools` enables discovery (default `true`). See
+`externalTools` enables discovery (default `true`). Each set also gets
+runtime-data directories under `data/tools/`. See
 [docs/external-tools.md](docs/external-tools.md).
 An unreadable or invalid project manifest with the same directory name
 also hides the home set. `timeoutSeconds` defaults to 120 for both runners;
@@ -1019,7 +1043,8 @@ customization.
 Operator plugins live under `plugins/`. A project directory of the same
 name replaces the home plugin as a whole. `plugin.json` field `enabled`
 (default `true`) omits a plugin without deleting it. `config.json` field
-`plugins` enables discovery (default `true`). See
+`plugins` enables discovery (default `true`). Each plugin also gets
+runtime-data directories under `data/plugins/`. See
 [docs/plugins.md](docs/plugins.md).
 Dotnet tool sets load class
 libraries from the set directory only, in one `AssemblyLoadContext` per
@@ -1567,7 +1592,9 @@ uses the session model and a stored selection is omitted. The view has no
 API key, endpoint, organization, or project. A plugin that implements
 `IPluginModelClient` also receives `AttachClients`. The host names that
 plugin when it loads. Those clients are new instances on the same provider
-and model, kept apart from the instances inside a turn or a review.
+and model, kept apart from the instances inside a turn or a review. A plugin
+that implements `IPluginDataDirectory` receives its global and project
+runtime-data directories through `AttachDataDirectories`.
 `IndependentReview` matches the review flag. `Review` is absent while that
 flag is false. When the flag is true and the review client cannot be
 created, the read fails and the session client stays in place. The host
@@ -1637,7 +1664,8 @@ global discovery switches stay separate.
 
 Operator tool sets are not plugins. They are discovered from `tools/` and
 wrapped by `ExternalCatalog`. An exec child starts in the workspace root
-and receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, and `CRYSTAL_APPROVAL`
+and receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, `CRYSTAL_APPROVAL`,
+`CRYSTAL_TOOL_DATA`, and `CRYSTAL_PROJECT_DATA`
 on that process only. `"output": "content"` reads one JSON object from
 stdout (`text` and optional fenced images). A dotnet set uses one non-collectible
 `AssemblyLoadContext` for that directory only. Shared contract types
@@ -1648,7 +1676,8 @@ implementations are loaded directly. A type may implement either contract
 or both; when it implements both, both definitions must match. A type may
 also implement `IHostTool` or `IHostMultimodalTool`. The wrapper then
 passes a `ToolHostContext` captured at the start of that call (workspace
-root, session id, approval mode). Other tools keep the original
+root, session id, approval mode, and the set's global and project data
+directories). Other tools keep the original
 `InvokeAsync`. Native multimodal tools join
 the active catalog only for an image-capable model and provider. The external-tool loader does not implement `CrystalCode.Plugins.IPlugin`
 and does not scan `plugins/`.

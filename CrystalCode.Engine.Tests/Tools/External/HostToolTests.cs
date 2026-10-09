@@ -4,6 +4,7 @@ using Crystal.Multimodal;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
@@ -15,12 +16,28 @@ namespace CrystalCode.Engine.Tests.Tools.External;
 
 public sealed class HostToolTests
 {
+    private const string TextSet = "test-set";
+    private const string PluginDirectory = "acme";
+
     [Fact]
     public void ToolHostContext_RejectsNullParts()
     {
         Assert.Throws<ArgumentNullException>(() => new ToolHostContext(null!, "session", "audit"));
         Assert.Throws<ArgumentNullException>(() => new ToolHostContext("/work", null!, "audit"));
         Assert.Throws<ArgumentNullException>(() => new ToolHostContext("/work", "session", null!));
+        Assert.Throws<ArgumentNullException>(
+            () => new ToolHostContext("/work", "session", "audit", null!));
+        Assert.Throws<ArgumentNullException>(
+            () => new ToolHostContext("/work", "session", "audit", "/data", null!));
+    }
+
+    [Fact]
+    public void ToolHostContext_DefaultsDataDirectoriesToEmpty()
+    {
+        var context = new ToolHostContext("/work", "session", "audit");
+
+        Assert.Equal(string.Empty, context.GlobalDataDirectory);
+        Assert.Equal(string.Empty, context.ProjectDataDirectory);
     }
 
     [Fact]
@@ -42,11 +59,13 @@ public sealed class HostToolTests
     {
         using var workspace = new TemporaryWorkspace();
         var root = new Workspace(workspace.Path);
-        var host = new SessionToolHost(root, () => "sess-9", () => "audit");
+        var home = new CrystalHome(Path.Combine(workspace.Path, "home"));
+        var host = new SessionToolHost(root, home, () => "sess-9", () => "audit");
         var fenced = new FencedExternalTool(
             new PlainTool(),
             root,
             host,
+            TextSet,
             [],
             timeoutSeconds: null);
 
@@ -61,37 +80,52 @@ public sealed class HostToolTests
     {
         using var workspace = new TemporaryWorkspace();
         var root = new Workspace(workspace.Path);
+        var home = new CrystalHome(Path.Combine(workspace.Path, "home"));
         var approval = "audit";
-        var host = new SessionToolHost(root, () => "sess-9", () => approval);
+        var host = new SessionToolHost(root, home, () => "sess-9", () => approval);
         var text = new FencedExternalTool(
             new EchoHostTool(),
             root,
             host,
+            TextSet,
             [],
             timeoutSeconds: null);
         var image = new FencedExternalMultimodalTool(
             new EchoHostImageTool(),
             root,
             host,
+            TextSet,
             [],
             timeoutSeconds: null);
+        var paths = ExtensionDataPaths.Resolve(home, root.Root, ExtensionDataKind.Tools, TextSet);
 
         var first = await text.InvokeAsync(new ToolCall("1", "echo", "{}"));
-        Assert.Equal(Facts(root.Root, "sess-9", "audit"), first.Text);
+        Assert.Equal(
+            Facts(root.Root, "sess-9", "audit", paths.GlobalDirectory, paths.ProjectDirectory),
+            first.Text);
+        Assert.True(Directory.Exists(paths.GlobalDirectory));
+        Assert.True(Directory.Exists(paths.ProjectDirectory));
 
         approval = "full";
         var second = await text.InvokeAsync(new ToolCall("2", "echo", "{}"));
-        Assert.Equal(Facts(root.Root, "sess-9", "full"), second.Text);
+        Assert.Equal(
+            Facts(root.Root, "sess-9", "full", paths.GlobalDirectory, paths.ProjectDirectory),
+            second.Text);
 
         var nested = Path.Combine(root.Root, "nested");
         Directory.CreateDirectory(nested);
         Assert.True(root.TrySetRoot(nested, out var error), error);
+        var movedPaths = ExtensionDataPaths.Resolve(home, root.Root, ExtensionDataKind.Tools, TextSet);
         var moved = await text.InvokeAsync(new ToolCall("3", "echo", "{}"));
-        Assert.Equal(Facts(root.Root, "sess-9", "full"), moved.Text);
+        Assert.Equal(
+            Facts(root.Root, "sess-9", "full", movedPaths.GlobalDirectory, movedPaths.ProjectDirectory),
+            moved.Text);
 
         var pictured = await image.InvokeAsync(new MultimodalToolCall("4", "echo_image", "{}"));
         var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
-        Assert.Equal(Facts(root.Root, "sess-9", "full"), content.Text);
+        Assert.Equal(
+            Facts(root.Root, "sess-9", "full", movedPaths.GlobalDirectory, movedPaths.ProjectDirectory),
+            content.Text);
     }
 
     [Fact]
@@ -99,25 +133,57 @@ public sealed class HostToolTests
     {
         using var workspace = new TemporaryWorkspace();
         var root = new Workspace(workspace.Path);
+        var home = new CrystalHome(Path.Combine(workspace.Path, "home"));
         var approval = "audit";
-        var host = new SessionToolHost(root, () => "sess-1", () => approval);
-        ITool text = new PluginHostTool(new EchoHostTool(), host);
-        IMultimodalTool image = new PluginHostMultimodalTool(new EchoHostImageTool(), host);
+        var host = new SessionToolHost(root, home, () => "sess-1", () => approval);
+        ITool text = new PluginHostTool(new EchoHostTool(), host, PluginDirectory);
+        IMultimodalTool image =
+            new PluginHostMultimodalTool(new EchoHostImageTool(), host, PluginDirectory);
+        var paths = ExtensionDataPaths.Resolve(home, root.Root, ExtensionDataKind.Plugins, PluginDirectory);
 
         var first = await text.InvokeAsync(new ToolCall("1", "echo", "{}"));
-        Assert.Equal(Facts(root.Root, "sess-1", "audit"), first.Text);
+        Assert.Equal(
+            Facts(root.Root, "sess-1", "audit", paths.GlobalDirectory, paths.ProjectDirectory),
+            first.Text);
+        Assert.True(Directory.Exists(paths.GlobalDirectory));
+        Assert.True(Directory.Exists(paths.ProjectDirectory));
 
         approval = "full";
         var second = await text.InvokeAsync(new ToolCall("2", "echo", "{}"));
-        Assert.Equal(Facts(root.Root, "sess-1", "full"), second.Text);
+        Assert.Equal(
+            Facts(root.Root, "sess-1", "full", paths.GlobalDirectory, paths.ProjectDirectory),
+            second.Text);
 
         var pictured = await image.InvokeAsync(new MultimodalToolCall("3", "echo_image", "{}"));
         var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
-        Assert.Equal(Facts(root.Root, "sess-1", "full"), content.Text);
+        Assert.Equal(
+            Facts(root.Root, "sess-1", "full", paths.GlobalDirectory, paths.ProjectDirectory),
+            content.Text);
     }
 
-    private static string Facts(string workspaceRoot, string sessionId, string approval) =>
-        workspaceRoot + "\n" + sessionId + "\n" + approval;
+    private static string Facts(
+        string workspaceRoot,
+        string sessionId,
+        string approval,
+        string globalDataDirectory,
+        string projectDataDirectory) =>
+        workspaceRoot
+            + "\n"
+            + sessionId
+            + "\n"
+            + approval
+            + "\n"
+            + globalDataDirectory
+            + "\n"
+            + projectDataDirectory;
+
+    private static string FactsFrom(ToolHostContext context) =>
+        Facts(
+            context.WorkspaceRoot,
+            context.SessionId,
+            context.Approval,
+            context.GlobalDataDirectory,
+            context.ProjectDataDirectory);
 
     private static ToolDefinition Define(string name)
     {
@@ -153,8 +219,7 @@ public sealed class HostToolTests
             ToolCall call,
             ToolHostContext context,
             CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult(new ToolOutput(
-                Facts(context.WorkspaceRoot, context.SessionId, context.Approval)));
+            ValueTask.FromResult(new ToolOutput(FactsFrom(context)));
     }
 
     private sealed class EchoHostImageTool : IHostMultimodalTool
@@ -172,7 +237,7 @@ public sealed class HostToolTests
             CancellationToken cancellationToken = default) =>
             ValueTask.FromResult(new MultimodalToolOutput(
             [
-                new TextContent(Facts(context.WorkspaceRoot, context.SessionId, context.Approval))
+                new TextContent(FactsFrom(context))
             ]));
     }
 }

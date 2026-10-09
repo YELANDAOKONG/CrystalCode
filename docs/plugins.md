@@ -32,6 +32,9 @@ under `plugins/`.
 <workspace>/.crystal/plugins/<directory>/plugin.json
 ```
 
+Runtime data lives separately under `data/plugins/<directory>/` in the same
+two trees; see [Data directories](#data-directories).
+
 Overlay key: the directory name. A project directory replaces the home
 plugin of the same name as a whole. Directory names are 1–64 characters,
 start with a letter, then `A–Z` `a–z` `0–9` `_` `.` `-`.
@@ -231,6 +234,26 @@ that.
 
 `IPluginClientFactory` remains the other direction. It builds a client for
 a protocol the built-in adapters do not own.
+
+### Data directories
+
+A plugin that keeps its own runtime state implements
+`CrystalCode.Plugins.Data.IPluginDataDirectory`. The host calls
+`AttachDataDirectories(globalDataDirectory, projectDataDirectory)` after
+`Attach`, and again when the plugin instance is loaded again. The interface
+is opt-in, like `IPluginModelClient`.
+
+The global directory is `{home}/data/plugins/<directory>` and is shared
+across workspaces. The project directory is
+`<workspace>/.crystal/data/plugins/<directory>` and belongs to the current
+workspace. The host creates both lazily before the call; a directory that
+cannot be created is not reported, so create it when it is missing. They are
+separate from the `plugins/` install directory and are not a secret store:
+do not write credentials there, and the project directory is inside the
+workspace.
+
+A plugin tool that implements `IHostTool` or `IHostMultimodalTool` also
+receives the same two directories on `ToolHostContext`.
 
 ## Hooks
 

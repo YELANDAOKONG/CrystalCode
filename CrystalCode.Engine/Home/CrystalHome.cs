@@ -49,6 +49,8 @@ public sealed class CrystalHome
 
     public string SpaceDirectory => Path.Combine(Root, SpaceDirectoryName);
 
+    public string DataDirectory => Path.Combine(Root, "data");
+
     public static CrystalHome Resolve(string? root = null)
     {
         if (!string.IsNullOrWhiteSpace(root))

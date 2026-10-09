@@ -174,6 +174,7 @@ internal static class DotnetToolFactory
                     pair.Text,
                     workspace,
                     host,
+                    set.DirectoryName,
                     pair.Spec.PathArguments,
                     set.TimeoutSeconds);
                 AddText(pair.Spec, wrapped, plan, work);
@@ -185,6 +186,7 @@ internal static class DotnetToolFactory
                     pair.Multimodal,
                     workspace,
                     host,
+                    set.DirectoryName,
                     pair.Spec.PathArguments,
                     set.TimeoutSeconds);
                 AddMultimodal(

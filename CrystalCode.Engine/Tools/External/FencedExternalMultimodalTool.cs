@@ -2,6 +2,7 @@ using Crystal.Multimodal;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Home;
 using CrystalCode.Tools;
 
 namespace CrystalCode.Engine.Tools.External;
@@ -15,6 +16,7 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
     private readonly IMultimodalTool _inner;
     private readonly Workspace _workspace;
     private readonly SessionToolHost _host;
+    private readonly string _directoryName;
     private readonly IReadOnlyList<string> _pathArguments;
     private readonly int? _timeoutSeconds;
 
@@ -22,16 +24,19 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
         IMultimodalTool inner,
         Workspace workspace,
         SessionToolHost host,
+        string directoryName,
         IReadOnlyList<string> pathArguments,
         int? timeoutSeconds)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(host);
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryName);
         ArgumentNullException.ThrowIfNull(pathArguments);
         _inner = inner;
         _workspace = workspace;
         _host = host;
+        _directoryName = directoryName;
         _pathArguments = pathArguments;
         _timeoutSeconds = timeoutSeconds;
         Definition = inner.Definition;
@@ -76,7 +81,10 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
             if (_inner is IHostMultimodalTool hosted)
             {
                 output = await hosted
-                    .InvokeAsync(next, _host.CreateContext(), timeout.Token)
+                    .InvokeAsync(
+                        next,
+                        _host.CreateContext(ExtensionDataKind.Tools, _directoryName),
+                        timeout.Token)
                     .AsTask()
                     .WaitAsync(timeout.Token);
             }

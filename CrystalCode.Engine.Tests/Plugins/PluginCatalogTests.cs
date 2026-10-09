@@ -122,7 +122,7 @@ public sealed class PluginCatalogTests
 
         var approval = "audit";
         var root = new Workspace(workspace.Path);
-        var host = new SessionToolHost(root, () => "sess-1", () => approval);
+        var host = new SessionToolHost(root, home.Home, () => "sess-1", () => approval);
         var catalog = PluginCatalog.Load(home.Home, root, enabled: true, host);
 
         Assert.Contains(
@@ -179,6 +179,17 @@ public sealed class PluginCatalogTests
                 PluginReview.UsingSession),
             _ => { });
         catalog.AttachClients(new IdleClients(), _ => { });
+        catalog.AttachDataDirectories(home.Home, root.Root, _ => { });
+        var dataPaths = ExtensionDataPaths.Resolve(
+            home.Home,
+            root.Root,
+            ExtensionDataKind.Plugins,
+            "Fixture");
+        var dataTool = catalog.WorkTools.Single(tool => tool.Definition.Name == "datadirs");
+        var dataLine = await dataTool.InvokeAsync(new Crystal.Tools.ToolCall("5", "datadirs", "{}"));
+        Assert.Equal(dataPaths.GlobalDirectory + "\n" + dataPaths.ProjectDirectory, dataLine.Text);
+        Assert.True(Directory.Exists(dataPaths.GlobalDirectory));
+        Assert.True(Directory.Exists(dataPaths.ProjectDirectory));
         var peers = catalog.WorkTools.Single(tool => tool.Definition.Name == "peers");
         var listed = await peers.InvokeAsync(new Crystal.Tools.ToolCall("4", "peers", "{}"));
         Assert.Equal("1\n1\n1\n1\nsession\nyes", listed.Text);
@@ -251,6 +262,7 @@ public sealed class PluginCatalogTests
             using Crystal.Tools;
             using CrystalCode.Plugins;
             using CrystalCode.Plugins.Clients;
+            using CrystalCode.Plugins.Data;
             using CrystalCode.Plugins.Environment;
             using CrystalCode.Plugins.Hooks;
             using CrystalCode.Plugins.Models;
@@ -260,11 +272,13 @@ public sealed class PluginCatalogTests
 
             namespace FixturePlugin;
 
-            public sealed class SamplePlugin : IPlugin, IPluginModelClient
+            public sealed class SamplePlugin : IPlugin, IPluginModelClient, IPluginDataDirectory
             {
                 private IPluginEnvironment _environment = PluginEnvironment.Empty;
                 private IPluginModels _models = PluginModels.Empty;
                 private IPluginClients? _clients;
+                private string _globalDataDirectory = string.Empty;
+                private string _projectDataDirectory = string.Empty;
 
                 public string Name => "Sample";
 
@@ -274,14 +288,24 @@ public sealed class PluginCatalogTests
 
                 public IPluginClients? Clients => _clients;
 
+                public string DataLine => _globalDataDirectory + "\n" + _projectDataDirectory;
+
                 public void Attach(IPluginEnvironment environment) => _environment = environment;
 
                 public void AttachSession(IPluginModels models) => _models = models;
 
                 public void AttachClients(IPluginClients clients) => _clients = clients;
 
+                public void AttachDataDirectories(
+                    string globalDataDirectory,
+                    string projectDataDirectory)
+                {
+                    _globalDataDirectory = globalDataDirectory;
+                    _projectDataDirectory = projectDataDirectory;
+                }
+
                 public PluginContribution Contribute() => new(
-                    tools: [new SampleTool(), new HostedTool(), new PeerTool(this)],
+                    tools: [new SampleTool(), new HostedTool(), new DataTool(this), new PeerTool(this)],
                     hooks: [new SampleHook()],
                     rawHooks: [new SampleRawHook()],
                     placeholders: [new SamplePlaceholder()]);
@@ -383,6 +407,41 @@ public sealed class PluginCatalogTests
                         CancellationToken cancellationToken = default) =>
                         ValueTask.FromResult(new ToolOutput(
                             context.WorkspaceRoot + "\n" + context.SessionId + "\n" + context.Approval));
+                }
+            }
+
+            public sealed class DataTool : IPluginTool
+            {
+                private readonly SamplePlugin _plugin;
+
+                public DataTool(SamplePlugin plugin) => _plugin = plugin;
+
+                public string Name => "datadirs";
+
+                public PluginToolCatalogs Catalogs => PluginToolCatalogs.Work;
+
+                public ITool Tool => new Inner(_plugin);
+
+                private sealed class Inner : ITool
+                {
+                    private readonly SamplePlugin _plugin;
+
+                    public Inner(SamplePlugin plugin)
+                    {
+                        _plugin = plugin;
+                        using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                        Definition = new ToolDefinition(
+                            "datadirs",
+                            document.RootElement.Clone(),
+                            "Data directories.");
+                    }
+
+                    public ToolDefinition Definition { get; }
+
+                    public ValueTask<ToolOutput> InvokeAsync(
+                        ToolCall call,
+                        CancellationToken cancellationToken = default) =>
+                        ValueTask.FromResult(new ToolOutput(_plugin.DataLine));
                 }
             }
 

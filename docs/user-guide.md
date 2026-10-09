@@ -1069,8 +1069,10 @@ Runners:
 - **exec**: `ProcessStartInfo.ArgumentList`, no shell templates. Stdin
   is the fenced arguments object (default on). An `argv` map turns
   scalar properties into flags. Working directory is the workspace
-  root. Each child receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, and
-  `CRYSTAL_APPROVAL`. `"output": "content"` makes stdout a JSON object
+  root. Each child receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`,
+  `CRYSTAL_APPROVAL`, `CRYSTAL_TOOL_DATA` (the set's global data
+  directory), and `CRYSTAL_PROJECT_DATA` (its project data directory).
+  `"output": "content"` makes stdout a JSON object
   with `text` and optional `images` (`base64` or a workspace `path`).
   Text-only turns reject image results. Image-capable turns attach them
   through the same marker path as other tools.
@@ -1078,7 +1080,8 @@ Runners:
   `Crystal.Tools.ITool` or `Crystal.Multimodal.Tools.IMultimodalTool`.
   A tool that implements `CrystalCode.Tools.IHostTool` or
   `IHostMultimodalTool` receives a `ToolHostContext` on each call
-  (workspace root, session id, and approval mode). Tools that do not
+  (workspace root, session id, approval mode, and the set's global and
+  project data directories). Tools that do not
   implement those interfaces are unchanged. Every public non-abstract
   tool is loaded in one isolated load context for that set. Shared
   types are `Crystal`, `Crystal.Tools`, and `CrystalCode.Tools`; other
@@ -1110,6 +1113,8 @@ field is omitted from the written file.
 A plugin can add tools, a protocol client, approval classifiers, slash
 commands, hooks, raw hooks, and prompt placeholders. It can read the
 current session model and whether review is using its own model. A plugin
+that implements `CrystalCode.Plugins.Data.IPluginDataDirectory` receives its
+global and project runtime-data directories. A plugin
 that asks for model clients can call the session model and, while that
 switch is on, the review model. Those calls use separate clients from the
 turn, and they do not enter the transcript. Hooks may append prompt and compaction text,
@@ -1463,9 +1468,11 @@ Override with `CRYSTAL_HOME` or `--home`.
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
+  data/tools/<directory>/
+  plugins/<directory>/plugin.json
+  data/plugins/<directory>/
   sessions/<id>.json
   logs/
-  plugins/<directory>/plugin.json
 ```
 
 Project overlay (named prompts, prompt attachments, Crystal skills, tool
@@ -1494,12 +1501,22 @@ sets, and plugins of the same directory name win over home):
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
   plugins/<directory>/plugin.json
+  data/tools/<directory>/
+  data/plugins/<directory>/
 <workspace>/.crystal.md
 <workspace>/AGENTS.md
 ```
 
 `config.json` is not part of the project overlay; workspace-level
 configuration is deferred.
+
+Operator plugins and external tool sets keep their own runtime data under a
+`data/` root, split by kind. The global root is `~/.crystal/data`; the
+project root is `<workspace>/.crystal/data`. Each extension gets
+`{home}/data/{plugins|tools}/<directory>` (global, shared across workspaces)
+and `<workspace>/.crystal/data/{plugins|tools}/<directory>` (project). The
+host creates both lazily on first use. They are separate from the `tools/`
+and `plugins/` install trees and are not a secret store.
 
 `plugins/<directory>/plugin.json` loads one operator plugin. Dotnet tool
 sets still load class libraries from the tool-set directory only. See

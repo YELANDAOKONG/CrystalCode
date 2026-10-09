@@ -13,6 +13,7 @@ using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Clients;
+using CrystalCode.Plugins.Data;
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Hooks;
@@ -134,6 +135,7 @@ public sealed class PluginCatalog
 
         host ??= new SessionToolHost(
             workspace,
+            home,
             static () => string.Empty,
             static () => string.Empty);
 
@@ -299,6 +301,36 @@ public sealed class PluginCatalog
             {
                 note(
                     $"Plugin '{instance.DirectoryName}' could not receive model clients: {exception.Message}");
+            }
+        }
+    }
+
+    public void AttachDataDirectories(CrystalHome home, string workspaceRoot, Action<string> note)
+    {
+        ArgumentNullException.ThrowIfNull(home);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
+        ArgumentNullException.ThrowIfNull(note);
+        foreach (var instance in _instances)
+        {
+            if (instance.Plugin is not IPluginDataDirectory data)
+            {
+                continue;
+            }
+
+            try
+            {
+                var paths = ExtensionDataPaths.Resolve(
+                    home,
+                    workspaceRoot,
+                    ExtensionDataKind.Plugins,
+                    instance.DirectoryName);
+                _ = paths.EnsureCreated();
+                data.AttachDataDirectories(paths.GlobalDirectory, paths.ProjectDirectory);
+            }
+            catch (Exception exception)
+            {
+                note(
+                    $"Plugin '{instance.DirectoryName}' could not receive data directories: {exception.Message}");
             }
         }
     }
@@ -469,7 +501,7 @@ public sealed class PluginCatalog
             var tool = contributionTool.Tool;
             if (tool is IHostTool hosted)
             {
-                tool = new PluginHostTool(hosted, host);
+                tool = new PluginHostTool(hosted, host, directoryName);
             }
 
             if (tool is null || !string.Equals(tool.Definition.Name, name, StringComparison.Ordinal))
@@ -500,7 +532,7 @@ public sealed class PluginCatalog
             var multimodal = contributionTool.Multimodal;
             if (multimodal is IHostMultimodalTool hostedMultimodal)
             {
-                multimodal = new PluginHostMultimodalTool(hostedMultimodal, host);
+                multimodal = new PluginHostMultimodalTool(hostedMultimodal, host, directoryName);
             }
 
             if (multimodal is not null)

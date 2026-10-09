@@ -427,7 +427,7 @@ public sealed class DotnetToolFactoryTests
             home.Home,
             root,
             enabled: true,
-            host: new SessionToolHost(root, () => "sess-9", () => "audit"));
+            host: new SessionToolHost(root, home.Home, () => "sess-9", () => "audit"));
 
         Assert.Empty(catalog.Notes);
         Assert.True(File.Exists(Path.Combine(output, "CrystalCode.Tools.dll")));

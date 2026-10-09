@@ -139,6 +139,7 @@ public sealed class CodingSession : ITurnObserver
         _approval = settings.Approval;
         _toolHost = new SessionToolHost(
             _workspace,
+            home,
             () => _sessionId ?? string.Empty,
             () => _approval.Value);
         _thinkingEffort = settings.ThinkingEffort;
@@ -3399,6 +3400,7 @@ public sealed class CodingSession : ITurnObserver
         _loadedPlugins.Attach(environment, Note);
         _loadedPlugins.AttachSession(_modelView, Note);
         _loadedPlugins.AttachClients(_clientView, Note);
+        _loadedPlugins.AttachDataDirectories(_home, _workspace.Root, Note);
     }
 
     private void WriteExternalNotes()

@@ -73,6 +73,7 @@ public sealed class ExternalCatalog
 
         host ??= new SessionToolHost(
             workspace,
+            home,
             static () => string.Empty,
             static () => string.Empty);
 
@@ -214,6 +215,7 @@ public sealed class ExternalCatalog
                 exec,
                 workspace,
                 host,
+                set.DirectoryName,
                 spec.PathArguments,
                 timeoutSeconds: null);
             classifications[spec.Name] = spec;
@@ -237,6 +239,7 @@ public sealed class ExternalCatalog
                 exec,
                 workspace,
                 host,
+                set.DirectoryName,
                 spec.PathArguments,
                 timeoutSeconds: null);
             if (spec.Catalogs.Plan)

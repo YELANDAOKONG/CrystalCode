@@ -229,7 +229,14 @@ the home and project `.crystal` trees and are loaded as extra `ITool`
 or `IMultimodalTool` entries when External Tools is enabled. A dotnet
 tool may also implement `CrystalCode.Tools.IHostTool` or
 `IHostMultimodalTool` and then receives the workspace root, session id,
-and approval mode on each call. Tools that implement only Crystal's
+approval mode, and its global and project runtime-data directories on each
+call. A disk plugin that implements
+`CrystalCode.Plugins.Data.IPluginDataDirectory` receives the same two data
+directories. Plugins and tool sets keep that runtime data under
+`data/plugins/<directory>/` and `data/tools/<directory>/` in the home and
+project `.crystal` trees; the host creates those directories lazily, and they
+are separate from the `plugins/` and `tools/` install trees. Tools that
+implement only Crystal's
 interfaces stay unchanged. Native
 multimodal entries are exposed only while the selected model and provider
 support image input. `describe_image` is available on Plan and Work when

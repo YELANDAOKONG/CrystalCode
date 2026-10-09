@@ -90,6 +90,15 @@ set. The session enters the terminal frame first, shows `Loading Tools`
 on the progress row, then scans and loads. `/cd` reloads the same way
 from the new workspace.
 
+Runtime data is separate from the install tree:
+
+```text
+~/.crystal/data/tools/<directory>/          global data
+<workspace>/.crystal/data/tools/<directory>/  project data
+```
+
+The host resolves both and creates them lazily on the first call.
+
 `config.json` field `externalTools` enables the feature (default
 `true`), matching `skills`. When `true`, the field is omitted from the
 written file. When `false`, manifests are not scanned.
@@ -342,20 +351,31 @@ Stdout and stderr are drained concurrently while only a bounded prefix is
 retained. The combined result is truncated to
 `MaximumToolOutputCharacters`, the same limit as bash.
 
+Each set's global and project runtime-data directories are ordinary
+writable directories. They are not a secret store: do not write
+credentials there. The project directory is inside the workspace, so
+anything written there is workspace content.
+
 ## Exec: stdin JSON and argv
 
 The host starts the process with `ProcessStartInfo.ArgumentList` (no
 `bash -lc`, no one-line command string). Working directory is the
 workspace root. The child environment inherits the host process and
-also receives three variables, rewritten for that process only:
+also receives five variables, rewritten for that process only:
 
 | Variable | Value |
 | :--- | :--- |
 | `CRYSTAL_WORKSPACE` | Absolute workspace root |
 | `CRYSTAL_SESSION` | Current session id |
 | `CRYSTAL_APPROVAL` | Current approval mode (`plan`, `default`, `edit`, `review`, `audit`, or `full`) |
+| `CRYSTAL_TOOL_DATA` | Absolute global data directory for this set, `{home}/data/tools/<directory>` |
+| `CRYSTAL_PROJECT_DATA` | Absolute per-workspace data directory for this set, `<workspace>/.crystal/data/tools/<directory>` |
 
-Secrets are not added. `CRYSTAL_HOME` is not set for the tool.
+Secrets are not added. `CRYSTAL_HOME` is not set for the tool. The two
+data directories are host-resolved and created lazily the first time the
+tool runs. A directory that cannot be created is not reported, so create
+it when it is missing. They are separate from the set install directory;
+keep them free of secrets.
 
 A bare executable name is resolved inside the set directory when that
 file exists; otherwise it may PATH-search. A relative path that
@@ -423,21 +443,23 @@ or both, with a public parameterless constructor. Multimodal output uses
 Crystal's native `MultimodalToolOutput`, `TextContent`, `ImageContent`, and
 media-source contracts; there is no manifest or JSON output protocol.
 
-A tool that needs the session workspace, session id, or approval mode
-also references `CrystalCode.Tools` and implements `IHostTool` or
-`IHostMultimodalTool` (a type may implement one or both). The method
-takes the model call plus a `ToolHostContext`. The host builds that
-value at the start of the call, so a later `/cd` or `/approval` shows
-up on the next call and does not change an instance the tool already
-holds. `WorkspaceRoot` is the session workspace, not the process
-current directory. `SessionId` and `Approval` are empty when the host
-has none. Known approval modes are `plan`, `default`, `edit`,
-`review`, `audit`, and `full`. The context carries no credentials and
-no home-directory path. The inherited `InvokeAsync` without a context
-fails with "This tool requires host context." The wrapper does not call
-it. Tools that implement only `ITool` or `IMultimodalTool` do not
-reference `CrystalCode.Tools` and keep the original method. Exec tools
-still receive the same three facts as child environment variables.
+A tool that needs the session workspace, session id, approval mode, or its
+runtime-data directories also references `CrystalCode.Tools` and implements
+`IHostTool` or `IHostMultimodalTool` (a type may implement one or both). The
+method takes the model call plus a `ToolHostContext`. The host builds that
+value at the start of the call, so a later `/cd` or `/approval` shows up on
+the next call and does not change an instance the tool already holds.
+`WorkspaceRoot` is the session workspace, not the process current directory.
+`SessionId` and `Approval` are empty when the host has none. Known approval
+modes are `plan`, `default`, `edit`, `review`, `audit`, and `full`.
+`GlobalDataDirectory` is `{home}/data/tools/<directory>` and
+`ProjectDataDirectory` is `<workspace>/.crystal/data/tools/<directory>`; the
+host creates both lazily before the first call. The context carries no
+credentials and no other home-directory path. The inherited `InvokeAsync`
+without a context fails with "This tool requires host context." The wrapper
+does not call it. Tools that implement only `ITool` or `IMultimodalTool` do
+not reference `CrystalCode.Tools` and keep the original method. Exec tools
+receive the same facts as child environment variables.
 
 The host loads the assembly once, then **adds every matching type**:
 

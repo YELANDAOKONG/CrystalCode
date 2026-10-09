@@ -327,7 +327,7 @@ public sealed class ExternalCatalogTests
             home.Home,
             root,
             enabled: true,
-            host: new SessionToolHost(root, () => "sess-9", () => "audit"));
+            host: new SessionToolHost(root, home.Home, () => "sess-9", () => "audit"));
 
         var output = await catalog.WorkTools[0].InvokeAsync(
             new ToolCall("1", "showenv", "{}"));
@@ -336,6 +336,15 @@ public sealed class ExternalCatalogTests
         Assert.Contains(root.Root, output.Text, StringComparison.Ordinal);
         Assert.Contains("sess-9", output.Text, StringComparison.Ordinal);
         Assert.Contains("audit", output.Text, StringComparison.Ordinal);
+        var data = ExtensionDataPaths.Resolve(
+            home.Home,
+            root.Root,
+            ExtensionDataKind.Tools,
+            "showenv");
+        Assert.Contains(data.GlobalDirectory, output.Text, StringComparison.Ordinal);
+        Assert.Contains(data.ProjectDirectory, output.Text, StringComparison.Ordinal);
+        Assert.True(Directory.Exists(data.GlobalDirectory));
+        Assert.True(Directory.Exists(data.ProjectDirectory));
     }
 
     [Fact]
@@ -478,14 +487,14 @@ public sealed class ExternalCatalogTests
             var script = Path.Combine(directory, "show-env.cmd");
             File.WriteAllText(
                 script,
-                "@echo off\r\necho %CRYSTAL_WORKSPACE%\r\necho %CRYSTAL_SESSION%\r\necho %CRYSTAL_APPROVAL%\r\n");
+                "@echo off\r\necho %CRYSTAL_WORKSPACE%\r\necho %CRYSTAL_SESSION%\r\necho %CRYSTAL_APPROVAL%\r\necho %CRYSTAL_TOOL_DATA%\r\necho %CRYSTAL_PROJECT_DATA%\r\n");
             return script;
         }
 
         var path = Path.Combine(directory, "show-env.sh");
         File.WriteAllText(
             path,
-            "#!/bin/sh\nprintf '%s\\n' \"$CRYSTAL_WORKSPACE\" \"$CRYSTAL_SESSION\" \"$CRYSTAL_APPROVAL\"\n");
+            "#!/bin/sh\nprintf '%s\\n' \"$CRYSTAL_WORKSPACE\" \"$CRYSTAL_SESSION\" \"$CRYSTAL_APPROVAL\" \"$CRYSTAL_TOOL_DATA\" \"$CRYSTAL_PROJECT_DATA\"\n");
         File.SetUnixFileMode(path, ExecutableMode());
         return path;
     }

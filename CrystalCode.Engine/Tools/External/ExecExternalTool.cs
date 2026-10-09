@@ -6,6 +6,8 @@ using Crystal.Multimodal;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Home;
+
 namespace CrystalCode.Engine.Tools.External;
 
 /// <summary>
@@ -149,6 +151,10 @@ internal sealed class ExecExternalTool : ITool, IMultimodalTool
         start.Environment["CRYSTAL_WORKSPACE"] = workspace;
         start.Environment["CRYSTAL_SESSION"] = _host.SessionId;
         start.Environment["CRYSTAL_APPROVAL"] = _host.Approval;
+        var data = _host.ExtensionData(ExtensionDataKind.Tools, _set.DirectoryName);
+        _ = data.EnsureCreated();
+        start.Environment["CRYSTAL_TOOL_DATA"] = data.GlobalDirectory;
+        start.Environment["CRYSTAL_PROJECT_DATA"] = data.ProjectDirectory;
     }
 
     private static string Combine(ProcessOutputReader.Streams streams)
