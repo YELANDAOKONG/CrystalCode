@@ -4,7 +4,8 @@ namespace CrystalCode.Engine.Home;
 /// Resolved global and project runtime-data directories for one extension.
 /// The global directory lives under the data directory and is shared across
 /// workspaces. The project directory lives under the workspace's
-/// <c>.crystal</c> tree. The host creates both lazily on first use.
+/// <c>.crystal</c> tree. The host creates both when the extension first
+/// receives them, at plugin attach or before a tool call.
 /// </summary>
 public sealed record ExtensionDataPaths
 {
@@ -12,9 +13,7 @@ public sealed record ExtensionDataPaths
     private const string DataDirectoryName = "data";
     private const string ToolsKindName = "tools";
     private const string PluginsKindName = "plugins";
-
-    private static readonly char[] SegmentSeparators =
-        [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, '/', '\\', ':'];
+    private const int MaximumNameLength = 64;
 
     private ExtensionDataPaths(string globalDirectory, string projectDirectory)
     {
@@ -32,12 +31,14 @@ public sealed record ExtensionDataPaths
     /// Resolves the global and project data directories for one extension.
     /// Paths are computed only; nothing is created.
     /// </summary>
-    /// <param name="home">The resolved data directory.</param>
+    /// <param name="home">The resolved Crystal home directory.</param>
     /// <param name="workspaceRoot">The current workspace root.</param>
     /// <param name="kind">The extension kind that owns the directory.</param>
     /// <param name="directoryName">
-    /// The extension directory name, its identity. It must be one relative path
-    /// segment so neither resolved path can leave its tree.
+    /// The extension directory name, its identity. It must follow the extension
+    /// directory-name rule: 1-64 characters, a letter first, then letters,
+    /// digits, '.', '_', or '-'. That also keeps both resolved paths inside
+    /// their trees.
     /// </param>
     public static ExtensionDataPaths Resolve(
         CrystalHome home,
@@ -48,7 +49,7 @@ public sealed record ExtensionDataPaths
         ArgumentNullException.ThrowIfNull(home);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(directoryName);
-        EnsureSingleSegment(directoryName);
+        EnsureDirectoryName(directoryName);
         var kindName = kind switch
         {
             ExtensionDataKind.Tools => ToolsKindName,
@@ -89,14 +90,32 @@ public sealed record ExtensionDataPaths
         }
     }
 
-    private static void EnsureSingleSegment(string directoryName)
+    /// <summary>
+    /// Enforces the extension directory-name rule that discovery applies to
+    /// plugins and tool sets. Letters, digits, '.', '_', and '-' cannot act
+    /// as path separators, so both resolved paths stay inside their trees.
+    /// </summary>
+    private static void EnsureDirectoryName(string directoryName)
     {
-        if (directoryName is "." or ".."
-            || directoryName.IndexOfAny(SegmentSeparators) >= 0
-            || Path.IsPathRooted(directoryName))
+        var conforms = directoryName.Length <= MaximumNameLength
+            && char.IsAsciiLetter(directoryName[0]);
+        if (conforms)
+        {
+            foreach (var character in directoryName)
+            {
+                if (!char.IsAsciiLetterOrDigit(character)
+                    && character is not ('.' or '_' or '-'))
+                {
+                    conforms = false;
+                    break;
+                }
+            }
+        }
+
+        if (!conforms)
         {
             throw new ArgumentException(
-                "Extension directory name must be a single relative path segment.",
+                "Extension directory name must be 1-64 characters, start with a letter, then letters, digits, '.', '_', or '-'.",
                 nameof(directoryName));
         }
     }

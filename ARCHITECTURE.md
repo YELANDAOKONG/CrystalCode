@@ -936,7 +936,8 @@ is `<workspace>/.crystal/data`. Each extension's global directory is
 `{home}/data/{plugins|tools}/<directory>` and its project directory is
 `<workspace>/.crystal/data/{plugins|tools}/<directory>`. Both are separate from
 the `tools/` and `plugins/` install trees. The host resolves both paths and
-creates the directories lazily on first use; it never writes secrets there. A
+creates the directories when the extension first receives them, at plugin
+attach or before a tool call; it never writes secrets there. A
 dotnet host tool reads them from `ToolHostContext.GlobalDataDirectory` and
 `ToolHostContext.ProjectDataDirectory`. An exec child reads them as the
 per-process environment variables `CRYSTAL_TOOL_DATA` (global) and

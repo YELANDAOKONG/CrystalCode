@@ -92,7 +92,13 @@ public sealed class ExtensionDataPathsTests
     [InlineData("a/b")]
     [InlineData("a\\b")]
     [InlineData("../escape")]
-    public void Resolve_RejectsNonSegmentDirectoryNames(string directoryName)
+    [InlineData("9tool")]
+    [InlineData("_tool")]
+    [InlineData("-tool")]
+    [InlineData("a*b")]
+    [InlineData("tool name")]
+    [InlineData("café")]
+    public void Resolve_RejectsInvalidDirectoryNames(string directoryName)
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
@@ -103,5 +109,46 @@ public sealed class ExtensionDataPathsTests
                 workspace.Path,
                 ExtensionDataKind.Tools,
                 directoryName));
+    }
+
+    [Theory]
+    [InlineData("a")]
+    [InlineData("Acme.Tools-2_x")]
+    [InlineData("tool.set")]
+    public void Resolve_AcceptsConformingDirectoryNames(string directoryName)
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+
+        var paths = ExtensionDataPaths.Resolve(
+            home.Home,
+            workspace.Path,
+            ExtensionDataKind.Tools,
+            directoryName);
+
+        Assert.EndsWith(directoryName, paths.GlobalDirectory);
+        Assert.EndsWith(directoryName, paths.ProjectDirectory);
+    }
+
+    [Fact]
+    public void Resolve_EnforcesDirectoryNameLength()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var longest = new string('a', 64);
+
+        var paths = ExtensionDataPaths.Resolve(
+            home.Home,
+            workspace.Path,
+            ExtensionDataKind.Tools,
+            longest);
+
+        Assert.EndsWith(longest, paths.GlobalDirectory);
+        Assert.Throws<ArgumentException>(
+            () => ExtensionDataPaths.Resolve(
+                home.Home,
+                workspace.Path,
+                ExtensionDataKind.Tools,
+                new string('a', 65)));
     }
 }

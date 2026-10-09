@@ -115,9 +115,10 @@
 - Built-in bash uses the same rule for `bashTimeoutSeconds`: omit it to keep
   120 seconds; `null` or `"unlimited"` removes the per-command timer.
 - Extension runtime data lives under `data/{plugins,tools}/<directory>/` in
-  the home and project `.crystal` trees. The host creates it lazily and it is
-  separate from the install tree. It is not a secret store: do not persist
-  credentials there, and the project directory is workspace content.
+  the home and project `.crystal` trees. The host creates it when the
+  extension first receives it and it is separate from the install tree. It is
+  not a secret store: do not persist credentials there, and the project
+  directory is workspace content.
 
 ## Dependencies
 

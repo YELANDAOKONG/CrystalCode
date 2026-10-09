@@ -246,7 +246,7 @@ is opt-in, like `IPluginModelClient`.
 The global directory is `{home}/data/plugins/<directory>` and is shared
 across workspaces. The project directory is
 `<workspace>/.crystal/data/plugins/<directory>` and belongs to the current
-workspace. The host creates both lazily before the call; a directory that
+workspace. The host creates both before that call; a directory that
 cannot be created is not reported, so create it when it is missing. They are
 separate from the `plugins/` install directory and are not a secret store:
 do not write credentials there, and the project directory is inside the

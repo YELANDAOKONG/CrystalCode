@@ -1515,8 +1515,9 @@ Operator plugins and external tool sets keep their own runtime data under a
 project root is `<workspace>/.crystal/data`. Each extension gets
 `{home}/data/{plugins|tools}/<directory>` (global, shared across workspaces)
 and `<workspace>/.crystal/data/{plugins|tools}/<directory>` (project). The
-host creates both lazily on first use. They are separate from the `tools/`
-and `plugins/` install trees and are not a secret store.
+host creates both when the extension first receives them, at plugin attach
+or before a tool call. They are separate from the `tools/` and `plugins/`
+install trees and are not a secret store.
 
 `plugins/<directory>/plugin.json` loads one operator plugin. Dotnet tool
 sets still load class libraries from the tool-set directory only. See
