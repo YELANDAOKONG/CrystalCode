@@ -152,13 +152,29 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
     private static void WriteReasoningItem(Utf8JsonWriter writer, ReasoningContent content)
     {
-        if (content.State is null || content.State.Format != ReasoningStateFormat)
+        if (!ReasoningReplay.IsReplayable(content, ReasoningStateFormat))
         {
-            throw new NotSupportedException("Responses requires its opaque reasoning item for replay.");
+            var text = ReasoningReplay.ReadableText(content);
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            WriteReadableReasoningMessage(writer, text);
+            return;
         }
 
-        using var document = JsonDocument.Parse(content.State.Data);
+        using var document = JsonDocument.Parse(content.State!.Data);
         document.RootElement.WriteTo(writer);
+    }
+
+    internal static void WriteReadableReasoningMessage(Utf8JsonWriter writer, string text)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("type", "message");
+        writer.WriteString("role", ChatRole.Assistant.Value);
+        writer.WriteString("content", text);
+        writer.WriteEndObject();
     }
 
     private static void WriteTools(Utf8JsonWriter writer, IReadOnlyList<ToolDefinition> tools)

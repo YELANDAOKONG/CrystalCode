@@ -91,14 +91,24 @@ internal sealed class GeminiCodec : IProtocolCodec
                     AddPart(contents, "user", lastPart);
                     pending.Remove(result.CallId);
                     break;
-                case ChatReasoningItem reasoning when reasoning.Content.State?.Format == PartStateFormat:
-                    var raw = JsonNode.Parse(reasoning.Content.State.Data.Span) as JsonObject
+                case ChatReasoningItem reasoning when ReasoningReplay.IsReplayable(reasoning.Content, PartStateFormat):
+                    var raw = JsonNode.Parse(reasoning.Content.State!.Data.Span) as JsonObject
                         ?? throw new JsonException("Gemini part state is invalid.");
                     ApplyPartState(contents, ref lastPart, raw);
                     break;
-                case ChatReasoningItem:
-                    throw new NotSupportedException(
-                        "Gemini requires its signed part state to replay reasoning.");
+                case ChatReasoningItem fallback:
+                    // Another provider produced this block. Replay its readable
+                    // text as a model text part so a model switch does not fail
+                    // the turn; a block without readable text is omitted.
+                    var readable = ReasoningReplay.ReadableText(fallback.Content);
+                    if (readable.Length == 0)
+                    {
+                        break;
+                    }
+
+                    lastPart = new JsonObject { ["text"] = readable };
+                    AddPart(contents, "model", lastPart);
+                    break;
                 default:
                     throw new NotSupportedException(
                         $"Gemini does not support chat item type {item.GetType().Name}.");

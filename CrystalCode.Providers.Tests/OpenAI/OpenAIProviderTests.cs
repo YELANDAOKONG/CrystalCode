@@ -1,3 +1,5 @@
+using System.Text;
+
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
@@ -72,7 +74,7 @@ public sealed class OpenAIProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_RejectsReasoningReplayByDefault()
+    public async Task CompleteAsync_ReplaysReadableReasoningAsTextWhenReplayDisabled()
     {
         var handler = new RecordingHandler(
             JsonResponse.Create(
@@ -91,17 +93,21 @@ public sealed class OpenAIProviderTests
             new OpenAIOptions("test-key", "gpt-5.6-sol"),
             http);
 
-        var exception = await Assert.ThrowsAsync<NotSupportedException>(
-            () => provider.CompleteAsync(
-                new ChatRequest(
-                [
-                    new ChatMessage(ChatRole.User, "Hi"),
-                    new ChatReasoningItem(
-                        new ReasoningContent(
-                            [new ReasoningText("thought", ReasoningTextKind.Trace)]))
-                ])));
+        await provider.CompleteAsync(
+            new ChatRequest(
+            [
+                new ChatMessage(ChatRole.User, "Hi"),
+                new ChatReasoningItem(
+                    new ReasoningContent(
+                        [new ReasoningText("thought", ReasoningTextKind.Trace)],
+                        new OpaqueReasoningState(
+                            "openai.reasoning_content",
+                            Encoding.UTF8.GetBytes("thought")))),
+                new ChatMessage(ChatRole.Assistant, "answer")
+            ]));
 
-        Assert.Contains("cannot replay reasoning", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("\"content\":\"thought\\n\\nanswer\"", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"reasoning_content\"", handler.Body, StringComparison.Ordinal);
     }
 
     [Fact]

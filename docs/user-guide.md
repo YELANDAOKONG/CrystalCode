@@ -511,7 +511,7 @@ ships no entry for it, so Claude models come from `providers.json`. See
 | `baseUri` | Absolute API base URI; the adapter appends the protocol's chat path |
 | `organization` | Optional OpenAI organization for the `openai` protocol |
 | `project` | Optional OpenAI project for the `openai` protocol |
-| `replayReasoningContent` | Replay provider reasoning content (DeepSeek always does this) |
+| `replayReasoningContent` | Replay provider reasoning content (DeepSeek always replays it); reasoning that cannot be replayed is sent as readable assistant text |
 | `tokenLimit` | Chat Completions output field: `max_tokens` or `max_completion_tokens` (ignored by `responses` and `anthropic`) |
 | `apiKeyEnvironment` | Environment variable name checked first for this provider |
 | `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |
@@ -944,7 +944,10 @@ refused while a turn is running.
 
 Switching models never fails because of thinking: unsupported thinking
 is omitted, and an unsupported stored gear uses the provider default
-without changing the stored choice.
+without changing the stored choice. Reasoning history keeps working
+too: an adapter replays provider reasoning state only in the format it
+owns. Reasoning produced by another provider is sent as ordinary
+assistant text, and a reasoning block without readable text is dropped.
 
 ## Slash commands
 

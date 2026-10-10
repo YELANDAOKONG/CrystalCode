@@ -111,12 +111,7 @@ internal static class CompatibleChatRequestWriter
                     WriteChatMessage(writer, profile, ref assistant, message);
                     break;
                 case ChatReasoningItem reasoning:
-                    if (pendingToolCallIds.Count > 0)
-                    {
-                        FlushAssistant(writer, ref assistant);
-                    }
-                    FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
-                    AppendReasoning(writer, profile, ref assistant, reasoning);
+                    AppendReasoning(writer, profile, ref assistant, reasoning, pendingToolCallIds);
                     break;
                 case ToolCall toolCall:
                     assistant ??= new AssistantBuffer();
@@ -190,28 +185,43 @@ internal static class CompatibleChatRequestWriter
         Utf8JsonWriter writer,
         CompatibleProfile profile,
         ref AssistantBuffer? assistant,
-        ChatReasoningItem reasoning)
+        ChatReasoningItem reasoning,
+        List<string> pendingToolCallIds)
     {
-        if (!profile.WriteReasoningContent)
+        if (profile.WriteReasoningContent
+            && assistant is not { HasReasoning: true }
+            && CompatibleWire.TryReadReasoningContent(profile, reasoning.Content, out var reasoningContent))
         {
-            throw new NotSupportedException(
-                $"{profile.VendorName} cannot replay reasoning blocks on Chat Completions.");
+            if (pendingToolCallIds.Count > 0)
+            {
+                FlushAssistant(writer, ref assistant);
+            }
+
+            FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
+            if (assistant is { HasContent: true } or { ToolCalls.Count: > 0 })
+            {
+                FlushAssistant(writer, ref assistant);
+            }
+
+            assistant ??= new AssistantBuffer();
+            assistant.ReasoningContent = reasoningContent;
+            assistant.HasReasoning = true;
+            return;
         }
 
-        if (assistant is { HasReasoning: true })
+        // The state belongs to another provider or cannot be replayed here.
+        // The readable text still belongs to the conversation, so it becomes
+        // assistant text instead of failing the turn.
+        var text = ReasoningReplay.ReadableText(reasoning.Content);
+        if (text.Length == 0)
         {
-            throw new NotSupportedException(
-                $"{profile.VendorName} accepts one reasoning block at the start of an assistant turn.");
-        }
-
-        if (assistant is { HasContent: true } or { ToolCalls.Count: > 0 })
-        {
-            FlushAssistant(writer, ref assistant);
+            return;
         }
 
         assistant ??= new AssistantBuffer();
-        assistant.ReasoningContent = CompatibleWire.ReadReasoningContent(profile, reasoning.Content);
-        assistant.HasReasoning = true;
+        assistant.ReadableReasoning = assistant.ReadableReasoning is { Length: > 0 } existing
+            ? existing + "\n" + text
+            : text;
     }
 
     private static void FlushAssistant(
@@ -231,9 +241,15 @@ internal static class CompatibleChatRequestWriter
             writer.WriteString("reasoning_content", assistant.ReasoningContent);
         }
 
-        if (assistant.HasContent)
+        var content = assistant.Content;
+        if (assistant.ReadableReasoning is { Length: > 0 } readable)
         {
-            writer.WriteString("content", assistant.Content);
+            content = string.IsNullOrEmpty(content) ? readable : readable + "\n\n" + content;
+        }
+
+        if (content is not null)
+        {
+            writer.WriteString("content", content);
         }
         else if (assistant.HasReasoning || assistant.ToolCalls.Count > 0)
         {
@@ -449,6 +465,8 @@ internal static class CompatibleChatRequestWriter
         public string? ReasoningContent { get; set; }
 
         public bool HasReasoning { get; set; }
+
+        public string? ReadableReasoning { get; set; }
 
         public string? Content { get; set; }
 

@@ -191,14 +191,19 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         Utf8JsonWriter writer,
         MultimodalReasoningContent content)
     {
-        if (content.State is null
-            || content.State.Format != ResponsesCodec.ReasoningStateFormat)
+        if (!ReasoningReplay.IsReplayable(content, ResponsesCodec.ReasoningStateFormat))
         {
-            throw new NotSupportedException(
-                "Responses requires its opaque reasoning item for replay.");
+            var text = ReasoningReplay.ReadableText(content);
+            if (text.Length == 0)
+            {
+                return;
+            }
+
+            ResponsesCodec.WriteReadableReasoningMessage(writer, text);
+            return;
         }
 
-        using var document = JsonDocument.Parse(content.State.Data);
+        using var document = JsonDocument.Parse(content.State!.Data);
         document.RootElement.WriteTo(writer);
     }
 

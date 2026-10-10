@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 
 using Crystal;
@@ -87,6 +88,82 @@ public sealed class DeepSeekProviderTests
             exception.Message,
             StringComparison.Ordinal);
         Assert.Null(handler.Body);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReplaysOwnReasoningContent()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hello."),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("thought", ReasoningTextKind.Trace)],
+                new OpaqueReasoningState(
+                    DeepSeekProvider.ReasoningStateFormat,
+                    Encoding.UTF8.GetBytes("thought")))),
+            new ChatMessage(ChatRole.Assistant, "earlier")
+        ]));
+
+        Assert.Contains("\"reasoning_content\":\"thought\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"content\":\"earlier\"", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReplaysForeignReasoningAsAssistantText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hello."),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("thought", ReasoningTextKind.Trace)],
+                new OpaqueReasoningState(
+                    "openai.reasoning_content",
+                    Encoding.UTF8.GetBytes("thought")))),
+            new ChatMessage(ChatRole.Assistant, "earlier")
+        ]));
+
+        Assert.Contains("\"content\":\"thought\\n\\nearlier\"", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"reasoning_content\"", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_OmitsForeignReasoningWithoutReadableText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hello."),
+            new ChatReasoningItem(new ReasoningContent(
+                state: new OpaqueReasoningState(
+                    "gemini.part",
+                    Encoding.UTF8.GetBytes("""{"functionCall":{"name":"read"}}"""))))
+        ]));
+
+        Assert.DoesNotContain("\"reasoning_content\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains(
+            "\"messages\":[{\"role\":\"user\",\"content\":\"Hello.\"}]",
+            handler.Body,
+            StringComparison.Ordinal);
     }
 
     [Fact]

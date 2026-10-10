@@ -210,6 +210,9 @@ OpenAI-compatible Chat Completions request and stream parsing lives in
 Messages, Gemini GenerateContent, and Ollama Chat lives in `Protocol`; each
 wire codec still owns its request and event semantics. Gemini uses SSE and
 replays signed response parts so function calls retain thought signatures.
+Opaque reasoning state is provider-owned: an adapter replays state only in
+its own format and carries another provider's readable reasoning as
+assistant text.
 Ollama uses JSON lines and native `tool_name` results. Anthropic Messages
 marks prompt-cache breakpoints (`cache_control: ephemeral`) on the last
 system block and the last message content block of every request, so the
@@ -624,6 +627,11 @@ client that share it). The transcript stays the same conversation.
 - Thinking follows the existing rule: switching models never fails.
   Unsupported thinking is omitted; an unsupported stored gear uses the
   provider default and is not rewritten.
+- Reasoning history follows "switching never fails" too. An adapter
+  replays opaque reasoning state only when the state carries its own
+  format. A block produced by another provider replays as assistant
+  text (its readable segments); a block with no readable text is
+  omitted.
 - Compaction is not run as part of the switch. The next turn uses the
   new context window.
 

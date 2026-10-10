@@ -1,8 +1,11 @@
+using System.Text;
+
 using Crystal;
 using Crystal.Media;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
+using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Providers.Responses;
 
@@ -142,6 +145,43 @@ public sealed class ResponsesMultimodalProviderTests
         Assert.Contains(MediaSourceKind.Uri, image.SourceKinds);
         Assert.Single(provider.Capabilities.Outputs);
         Assert.Equal(ContentModality.Text, provider.Capabilities.Outputs[0].Modality);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReplaysForeignReasoningAsText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = CreateProvider(http);
+        var request = new MultimodalChatRequest(
+        [
+            new MultimodalMessage(
+                MultimodalChatRole.User,
+                [new TextContent("Hi")]),
+            new MultimodalReasoningItem(
+                new MultimodalReasoningContent(
+                    [
+                        new MultimodalReasoningPart(
+                            new TextContent("thought"),
+                            MultimodalReasoningKind.Trace)
+                    ],
+                    new OpaqueReasoningState(
+                        "anthropic.messages.thinking",
+                        Encoding.UTF8.GetBytes(
+                            """{"type":"thinking","thinking":"thought","signature":"sig"}""")))),
+            new MultimodalMessage(
+                MultimodalChatRole.Assistant,
+                [new TextContent("answer")])
+        ]);
+
+        await provider.CompleteAsync(request);
+
+        Assert.Contains(
+            "\"type\":\"message\",\"role\":\"assistant\",\"content\":\"thought\"",
+            handler.Body,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("signature", handler.Body, StringComparison.Ordinal);
     }
 
     private static ResponsesMultimodalProvider CreateProvider(HttpClient http) =>

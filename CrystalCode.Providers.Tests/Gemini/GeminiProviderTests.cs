@@ -506,6 +506,54 @@ public sealed class GeminiProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_ReplaysForeignReasoningAsText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"candidates":[{"content":{"parts":[{"text":"next"}]},"finishReason":"STOP"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("thought", ReasoningTextKind.Trace)],
+                new OpaqueReasoningState(
+                    "deepseek.reasoning_content",
+                    Encoding.UTF8.GetBytes("thought")))),
+            new ChatMessage(ChatRole.Assistant, "answer")
+        ]));
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        var parts = sent.RootElement.GetProperty("contents")[1].GetProperty("parts");
+        Assert.Equal(2, parts.GetArrayLength());
+        Assert.Equal("thought", parts[0].GetProperty("text").GetString());
+        Assert.Equal("answer", parts[1].GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task CompleteAsync_OmitsForeignReasoningWithoutReadableText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"candidates":[{"content":{"parts":[{"text":"next"}]},"finishReason":"STOP"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                state: new OpaqueReasoningState(
+                    "anthropic.messages.thinking",
+                    Encoding.UTF8.GetBytes(
+                        """{"type":"thinking","thinking":"thought","signature":"sig"}"""))))
+        ]));
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        Assert.Equal(1, sent.RootElement.GetProperty("contents").GetArrayLength());
+    }
+
+    [Fact]
     public async Task CompleteAsync_RejectsUnmatchedToolCallAndJsonOutput()
     {
         var handler = new RecordingHandler(JsonResponse.Create("{}"));

@@ -21,13 +21,15 @@ internal static class CompatibleWire
         return new OpaqueReasoningState(format, bytes);
     }
 
-    public static string ReadReasoningContent(
+    public static bool TryReadReasoningContent(
         CompatibleProfile profile,
-        ReasoningContent content)
+        ReasoningContent content,
+        out string reasoningContent)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(content);
 
+        reasoningContent = string.Empty;
         if (content.State is not null)
         {
             if (profile.ReasoningStateFormat is null
@@ -36,20 +38,20 @@ internal static class CompatibleWire
                     profile.ReasoningStateFormat,
                     StringComparison.Ordinal))
             {
-                throw new NotSupportedException(
-                    $"{profile.VendorName} does not understand this opaque reasoning format.");
+                return false;
             }
 
-            return Encoding.UTF8.GetString(content.State.Data.Span);
+            reasoningContent = Encoding.UTF8.GetString(content.State.Data.Span);
+            return true;
         }
 
         if (content.TextSegments.Count != 1)
         {
-            throw new NotSupportedException(
-                $"{profile.VendorName} accepts one readable reasoning segment per assistant turn.");
+            return false;
         }
 
-        return content.TextSegments[0].Text;
+        reasoningContent = content.TextSegments[0].Text;
+        return true;
     }
 
     public static FinishReason ReadFinishReason(string value)

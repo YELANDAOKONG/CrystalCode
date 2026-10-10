@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 using Crystal;
@@ -170,6 +171,55 @@ public sealed class AnthropicProviderTests
 
         Assert.DoesNotContain("\"thinking\"", handler.Body, StringComparison.Ordinal);
         Assert.DoesNotContain("\"output_config\"", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReplaysForeignReasoningAsText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("thought", ReasoningTextKind.Trace)],
+                new OpaqueReasoningState(
+                    "openai.responses.reasoning",
+                    Encoding.UTF8.GetBytes("""{"type":"reasoning","encrypted_content":"secret"}""")))),
+            new ChatMessage(ChatRole.Assistant, "answer")
+        ]));
+
+        Assert.Contains("\"type\":\"text\",\"text\":\"thought\"", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("encrypted_content", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_OmitsForeignReasoningWithoutReadableText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                state: new OpaqueReasoningState(
+                    "gemini.part",
+                    Encoding.UTF8.GetBytes("""{"thoughtSignature":"sig"}""")))),
+            new ChatMessage(ChatRole.Assistant, "answer")
+        ]));
+
+        Assert.Contains("\"text\":\"answer\"", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("thoughtSignature", handler.Body, StringComparison.Ordinal);
     }
 
     [Fact]

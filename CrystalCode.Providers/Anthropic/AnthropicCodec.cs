@@ -151,6 +151,11 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
         foreach (var item in items)
         {
+            if (!CanWrite(item))
+            {
+                continue;
+            }
+
             var nextRole = item switch
             {
                 ChatMessage message when message.Role == ChatRole.System => null,
@@ -178,11 +183,21 @@ internal sealed class AnthropicCodec : IProtocolCodec
         writer.WriteEndArray();
     }
 
+    private static bool CanWrite(ChatItem item) =>
+        item is not ChatReasoningItem reasoning
+        || ReasoningReplay.IsReplayable(reasoning.Content, ReasoningStateFormat)
+        || ReasoningReplay.ReadableText(reasoning.Content).Length > 0;
+
     private static ChatItem? LastBlockItem(IReadOnlyList<ChatItem> items)
     {
         for (var index = items.Count - 1; index >= 0; index--)
         {
             if (items[index] is ChatMessage message && message.Role == ChatRole.System)
+            {
+                continue;
+            }
+
+            if (!CanWrite(items[index]))
             {
                 continue;
             }
@@ -209,7 +224,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 writer.WriteEndObject();
                 break;
             case ChatReasoningItem reasoning:
-                WriteReasoningBlock(writer, reasoning.Content);
+                WriteReasoningBlock(writer, reasoning.Content, markCache);
                 break;
             case ToolCall call:
                 writer.WriteStartObject();
@@ -256,14 +271,28 @@ internal sealed class AnthropicCodec : IProtocolCodec
         writer.WriteEndObject();
     }
 
-    private static void WriteReasoningBlock(Utf8JsonWriter writer, ReasoningContent content)
+    private static void WriteReasoningBlock(
+        Utf8JsonWriter writer,
+        ReasoningContent content,
+        bool markCache)
     {
-        if (content.State is null || content.State.Format != ReasoningStateFormat)
+        if (!ReasoningReplay.IsReplayable(content, ReasoningStateFormat))
         {
-            throw new NotSupportedException("Anthropic requires its signed opaque thinking block for replay.");
+            // Another provider produced this block. Replay its readable text as
+            // a plain text block so a model switch does not fail the turn.
+            writer.WriteStartObject();
+            writer.WriteString("type", "text");
+            writer.WriteString("text", ReasoningReplay.ReadableText(content));
+            if (markCache)
+            {
+                WriteCacheControl(writer);
+            }
+
+            writer.WriteEndObject();
+            return;
         }
 
-        using var document = JsonDocument.Parse(content.State.Data);
+        using var document = JsonDocument.Parse(content.State!.Data);
         document.RootElement.WriteTo(writer);
     }
 

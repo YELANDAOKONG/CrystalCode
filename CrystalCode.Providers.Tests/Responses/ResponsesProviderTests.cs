@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 using Crystal;
@@ -107,6 +108,59 @@ public sealed class ResponsesProviderTests
 
         Assert.Contains("\"encrypted_content\":\"encrypted\"", secondHandler.Body, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"function_call_output\"", secondHandler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReplaysForeignReasoningAsText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("thought", ReasoningTextKind.Trace)],
+                new OpaqueReasoningState(
+                    "anthropic.messages.thinking",
+                    Encoding.UTF8.GetBytes(
+                        """{"type":"thinking","thinking":"thought","signature":"sig"}""")))),
+            new ChatMessage(ChatRole.Assistant, "answer")
+        ]));
+
+        Assert.Contains(
+            "\"type\":\"message\",\"role\":\"assistant\",\"content\":\"thought\"",
+            handler.Body,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("signature", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_OmitsForeignReasoningWithoutReadableText()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                state: new OpaqueReasoningState(
+                    "deepseek.reasoning_content",
+                    Encoding.UTF8.GetBytes("thought")))),
+            new ChatMessage(ChatRole.Assistant, "answer")
+        ]));
+
+        Assert.DoesNotContain("\"type\":\"reasoning\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"content\":\"answer\"", handler.Body, StringComparison.Ordinal);
     }
 
     [Fact]
