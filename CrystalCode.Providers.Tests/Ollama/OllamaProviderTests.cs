@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 
 using Crystal;
@@ -115,24 +116,56 @@ public sealed class OllamaProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_RejectsASecondReasoningBlock()
+    public async Task CompleteAsync_MergesMultipleReadableReasoningBlocks()
     {
-        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"message":{"role":"assistant","content":"done"},"done":true}"""));
         using var http = new HttpClient(handler);
         using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
 
-        var exception = await Assert.ThrowsAsync<NotSupportedException>(
-            () => provider.CompleteAsync(new ChatRequest(
-            [
-                new ChatMessage(ChatRole.User, "hi"),
-                new ChatReasoningItem(new ReasoningContent(
-                    [new ReasoningText("one", ReasoningTextKind.Trace)])),
-                new ChatReasoningItem(new ReasoningContent(
-                    [new ReasoningText("two", ReasoningTextKind.Trace)]))
-            ])));
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("one", ReasoningTextKind.Trace)])),
+            new ChatReasoningItem(new ReasoningContent(
+                state: new OpaqueReasoningState(
+                    "gemini.part",
+                    Encoding.UTF8.GetBytes("""{"text":"two","thoughtSignature":"sig"}""")))),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("two", ReasoningTextKind.Trace)]))
+        ]));
 
-        Assert.Contains("one reasoning block", exception.Message, StringComparison.Ordinal);
-        Assert.Null(handler.Body);
+        Assert.Contains("\"thinking\":\"onetwo\"", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("thoughtSignature", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_KeepsReasoningWithToolCallAndDropsStateOnlyBlock()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"message":{"role":"assistant","content":"done"},"done":true}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "hi"),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("thought", ReasoningTextKind.Trace)])),
+            new ToolCall("call_1", "read", "{}"),
+            new ChatReasoningItem(new ReasoningContent(
+                state: new OpaqueReasoningState(
+                    "gemini.part",
+                    Encoding.UTF8.GetBytes(
+                        """{"functionCall":{"name":"read","args":{}},"thoughtSignature":"sig"}""")))),
+            new ToolResult("call_1", "result")
+        ]));
+
+        Assert.Contains("\"thinking\":\"thought\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"tool_calls\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"tool_name\":\"read\"", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("thoughtSignature", handler.Body, StringComparison.Ordinal);
     }
 
     [Fact]

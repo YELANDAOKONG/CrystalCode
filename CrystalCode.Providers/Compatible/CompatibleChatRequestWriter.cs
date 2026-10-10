@@ -209,9 +209,11 @@ internal static class CompatibleChatRequestWriter
             return;
         }
 
-        // The state belongs to another provider or cannot be replayed here.
-        // The readable text still belongs to the conversation, so it becomes
-        // assistant text instead of failing the turn.
+        // The state cannot be replayed here: it belongs to another
+        // provider, the profile does not write reasoning content, or the
+        // turn already replayed one block. The readable text still
+        // belongs to the conversation, so it becomes assistant text
+        // instead of failing the turn.
         var text = ReasoningReplay.ReadableText(reasoning.Content);
         if (text.Length == 0)
         {
@@ -219,6 +221,15 @@ internal static class CompatibleChatRequestWriter
         }
 
         assistant ??= new AssistantBuffer();
+        if (assistant.HasContent)
+        {
+            // The assistant text arrived before this block; keep the order.
+            assistant.Content = string.IsNullOrEmpty(assistant.Content)
+                ? text
+                : assistant.Content + "\n\n" + text;
+            return;
+        }
+
         assistant.ReadableReasoning = assistant.ReadableReasoning is { Length: > 0 } existing
             ? existing + "\n" + text
             : text;

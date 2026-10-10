@@ -35,7 +35,6 @@ internal sealed class OllamaCodec : IProtocolCodec
         var messages = new JsonArray();
         var callNames = new Dictionary<string, string>(StringComparer.Ordinal);
         var pending = new Dictionary<string, string>(StringComparer.Ordinal);
-        var reasoned = new HashSet<JsonObject>();
         foreach (var item in request.Items)
         {
             switch (item)
@@ -60,21 +59,16 @@ internal sealed class OllamaCodec : IProtocolCodec
                     break;
                 case ChatReasoningItem reasoning:
                 {
-                    FlushPending(pending);
-                    var reasoningMessage = Assistant(messages);
-                    if (!reasoned.Add(reasoningMessage))
-                    {
-                        throw new NotSupportedException(
-                            "Ollama accepts one reasoning block per assistant message.");
-                    }
-
                     var thinking = string.Concat(
                         reasoning.Content.TextSegments.Select(static part => part.Text));
-                    if (thinking.Length > 0)
+                    if (thinking.Length == 0)
                     {
-                        reasoningMessage["thinking"] = thinking;
+                        break;
                     }
 
+                    var reasoningMessage = Assistant(messages);
+                    reasoningMessage["thinking"] =
+                        (reasoningMessage["thinking"]?.GetValue<string>() ?? string.Empty) + thinking;
                     break;
                 }
                 case ToolCall call:

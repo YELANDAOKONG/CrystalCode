@@ -141,6 +141,31 @@ public sealed class DeepSeekProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_KeepsReasoningAfterAssistantTextInOrder()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hello."),
+            new ChatMessage(ChatRole.Assistant, "answer"),
+            new ChatReasoningItem(new ReasoningContent(
+                [new ReasoningText("thought", ReasoningTextKind.Trace)],
+                new OpaqueReasoningState(
+                    "openai.reasoning_content",
+                    Encoding.UTF8.GetBytes("thought"))))
+        ]));
+
+        Assert.Contains("\"content\":\"answer\\n\\nthought\"", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"reasoning_content\"", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteAsync_OmitsForeignReasoningWithoutReadableText()
     {
         var handler = new RecordingHandler(JsonResponse.Create(

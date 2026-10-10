@@ -218,7 +218,15 @@ public sealed class AnthropicProviderTests
             new ChatMessage(ChatRole.Assistant, "answer")
         ]));
 
-        Assert.Contains("\"text\":\"answer\"", handler.Body, StringComparison.Ordinal);
+        using var sent = JsonDocument.Parse(handler.Body!);
+        var messages = sent.RootElement.GetProperty("messages");
+        Assert.Equal(2, messages.GetArrayLength());
+        var assistant = messages[1];
+        Assert.Equal("assistant", assistant.GetProperty("role").GetString());
+        var blocks = assistant.GetProperty("content");
+        var block = Assert.Single(blocks.EnumerateArray());
+        Assert.Equal("text", block.GetProperty("type").GetString());
+        Assert.Equal("answer", block.GetProperty("text").GetString());
         Assert.DoesNotContain("thoughtSignature", handler.Body, StringComparison.Ordinal);
     }
 
