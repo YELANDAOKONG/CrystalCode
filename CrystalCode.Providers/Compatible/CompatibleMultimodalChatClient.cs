@@ -135,6 +135,14 @@ internal sealed class CompatibleMultimodalChatClient
             throw _profile.Faults.Create(
                 $"{_profile.VendorName} chat stream ended before every candidate completed.");
         }
+
+        if (parser.TakeUsage() is { } usage)
+        {
+            foreach (var converted in output.Convert(new Crystal.Chat.ChatUsageReceived(usage)))
+            {
+                yield return converted;
+            }
+        }
     }
 
     public void Dispose()

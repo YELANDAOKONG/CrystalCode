@@ -154,4 +154,62 @@ public sealed class OpenAIProviderTests
         Assert.Contains("missing a tool result for 'call_1'", exception.Message, StringComparison.Ordinal);
         Assert.Null(handler.Body);
     }
+
+    [Fact]
+    public async Task StreamAsync_CoalescesRepeatedUsage()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}],"usage":{"prompt_tokens":15,"completion_tokens":0,"total_tokens":15}}
+
+            data: {"choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}],"usage":{"prompt_tokens":15,"completion_tokens":1,"total_tokens":16}}
+
+            data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":15,"completion_tokens":2,"total_tokens":17}}
+
+            data: [DONE]
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(new OpenAIOptions("test-key", "gpt-test"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>());
+        Assert.Equal(new TokenUsage(15, 2), usage.Usage);
+        Assert.IsType<ChatUsageReceived>(events[^1]);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsSingleFinalUsage()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"},"finish_reason":null}],"usage":null}
+
+            data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":null}
+
+            data: {"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":3,"total_tokens":12}}
+
+            data: [DONE]
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(new OpenAIOptions("test-key", "gpt-test"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>());
+        Assert.Equal(new TokenUsage(9, 3), usage.Usage);
+        Assert.IsType<ChatUsageReceived>(events[^1]);
+    }
 }

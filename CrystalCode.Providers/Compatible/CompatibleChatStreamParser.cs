@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
+using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 
@@ -10,7 +11,7 @@ internal sealed class CompatibleChatStreamParser
 {
     private readonly CompatibleProfile _profile;
     private readonly Dictionary<int, CandidateAssembly> _candidates = [];
-    private bool _usageReceived;
+    private TokenUsage? _pendingUsage;
 
     public CompatibleChatStreamParser(CompatibleProfile profile)
     {
@@ -38,17 +39,19 @@ internal sealed class CompatibleChatStreamParser
         var usage = CompatibleWire.ReadUsage(root, _profile.Faults);
         if (usage is not null)
         {
-            if (_usageReceived)
-            {
-                throw _profile.Faults.Create(
-                    $"{_profile.VendorName} chat stream reported usage more than once.");
-            }
-
-            _usageReceived = true;
-            events.Add(new ChatUsageReceived(usage));
+            // Some vendors (for example SiliconFlow) attach usage to several
+            // chunks of one stream. The final snapshot carries the totals.
+            _pendingUsage = usage;
         }
 
         return events;
+    }
+
+    public TokenUsage? TakeUsage()
+    {
+        var usage = _pendingUsage;
+        _pendingUsage = null;
+        return usage;
     }
 
     private void ParseChoice(JsonElement choice, List<ChatStreamEvent> events)

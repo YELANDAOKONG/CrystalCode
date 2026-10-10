@@ -127,6 +127,11 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
             throw _profile.Faults.Create(
                 $"{_profile.VendorName} chat stream ended before every candidate completed.");
         }
+
+        if (parser.TakeUsage() is { } usage)
+        {
+            yield return new ChatUsageReceived(usage);
+        }
     }
 
     public void Dispose()
