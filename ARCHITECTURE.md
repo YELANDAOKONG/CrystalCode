@@ -210,7 +210,14 @@ OpenAI-compatible Chat Completions request and stream parsing lives in
 Messages, Gemini GenerateContent, and Ollama Chat lives in `Protocol`; each
 wire codec still owns its request and event semantics. Gemini uses SSE and
 replays signed response parts so function calls retain thought signatures.
-Ollama uses JSON lines and native `tool_name` results. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
+Ollama uses JSON lines and native `tool_name` results. Anthropic Messages
+marks prompt-cache breakpoints (`cache_control: ephemeral`) on the last
+system block and the last message content block of every request, so the
+tool definitions, the system prompt, and the conversation prefix written by
+the previous round are read from the provider's prompt cache; the multimodal
+codec keeps the message breakpoint when image expansion splits a marked text
+block. Other adapters rely on their providers' automatic prefix caching and
+send no cache directives. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
 with no version. Provider SDKs are not used.
 
 ## Crystal consumption

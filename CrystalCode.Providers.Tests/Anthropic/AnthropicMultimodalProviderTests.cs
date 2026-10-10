@@ -48,8 +48,40 @@ public sealed class AnthropicMultimodalProviderTests
         Assert.Contains("\"type\":\"url\"", handler.Body, StringComparison.Ordinal);
         Assert.Contains("https://example.test/result.webp", handler.Body, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"tool_result\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains(
+            "\"is_error\":false,\"cache_control\":{\"type\":\"ephemeral\"}",
+            handler.Body,
+            StringComparison.Ordinal);
         var message = Assert.IsType<MultimodalMessage>(response.Candidates[0].Items[0]);
         Assert.Equal("done", Assert.IsType<TextContent>(message.Contents[0]).Text);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_KeepsConversationBreakpointAfterImageExpansion()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicMultimodalProvider(
+            new AnthropicOptions(
+                "test-key",
+                "claude-test",
+                new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new MultimodalChatRequest(
+        [
+            new MultimodalMessage(
+                MultimodalChatRole.User,
+                [new TextContent("inspect "), InlineImage([1, 2, 3])])
+        ]));
+
+        Assert.Contains(
+            "{\"type\":\"image\",\"source\":{\"type\":\"base64\",\"media_type\":\"image/png\",\"data\":\"AQID\"},\"cache_control\":{\"type\":\"ephemeral\"}}",
+            handler.Body,
+            StringComparison.Ordinal);
     }
 
     [Fact]

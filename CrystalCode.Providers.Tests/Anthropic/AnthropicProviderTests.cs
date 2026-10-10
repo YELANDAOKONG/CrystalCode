@@ -36,7 +36,10 @@ public sealed class AnthropicProviderTests
         Assert.Equal("2023-06-01", handler.Request.Headers.GetValues("anthropic-version").Single());
         Assert.Null(handler.Request.Headers.Authorization);
         Assert.Equal("Crystal Code", handler.Request.Headers.UserAgent.ToString());
-        Assert.Contains("\"system\":\"system\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains(
+            "\"system\":[{\"type\":\"text\",\"text\":\"system\",\"cache_control\":{\"type\":\"ephemeral\"}}]",
+            handler.Body,
+            StringComparison.Ordinal);
         Assert.Contains("\"input_schema\":", handler.Body, StringComparison.Ordinal);
         Assert.Equal(FinishReason.ToolCalls, response.Candidates[0].FinishReason);
         Assert.IsType<ChatReasoningItem>(response.Candidates[0].Items[0]);
@@ -123,6 +126,14 @@ public sealed class AnthropicProviderTests
         Assert.Contains("\"signature\":\"signed\"", secondHandler.Body, StringComparison.Ordinal);
         Assert.Contains("\"type\":\"tool_result\"", secondHandler.Body, StringComparison.Ordinal);
         Assert.Contains("\"tool_use_id\":\"toolu_1\"", secondHandler.Body, StringComparison.Ordinal);
+        Assert.Contains(
+            "\"type\":\"tool_result\",\"tool_use_id\":\"toolu_1\",\"content\":\"result\",\"is_error\":false,\"cache_control\":{\"type\":\"ephemeral\"}",
+            secondHandler.Body,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "\"type\":\"text\",\"text\":\"Hi\",\"cache_control\"",
+            secondHandler.Body,
+            StringComparison.Ordinal);
     }
 
     [Fact]

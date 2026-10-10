@@ -194,6 +194,11 @@ internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
             return;
         }
 
+        // Image expansion splits one text block into several; keep a prompt
+        // cache breakpoint that sat on the original block on the last part so
+        // the conversation prefix stays cacheable.
+        var hasCacheControl = blocks[index]?["cache_control"] is not null;
+        var count = replacement.Count;
         blocks.RemoveAt(index);
         for (var replacementIndex = replacement.Count - 1; replacementIndex >= 0; replacementIndex--)
         {
@@ -201,7 +206,17 @@ internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
             replacement.RemoveAt(replacementIndex);
             blocks.Insert(index, node);
         }
+
+        if (hasCacheControl && blocks[index + count - 1] is JsonObject last)
+        {
+            last["cache_control"] = CacheControl();
+        }
     }
+
+    private static JsonObject CacheControl() => new()
+    {
+        ["type"] = "ephemeral"
+    };
 
     private static JsonArray Expand(
         string text,

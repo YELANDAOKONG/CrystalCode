@@ -94,16 +94,38 @@ internal sealed class AnthropicCodec : IProtocolCodec
             .Where(static message => message.Role == ChatRole.System)
             .Select(static message => message.Text)
             .ToArray();
-        if (systems.Length > 0)
+        if (systems.Length == 0)
         {
-            writer.WriteString("system", string.Join("\n\n", systems));
+            return;
         }
+
+        writer.WritePropertyName("system");
+        writer.WriteStartArray();
+        for (var index = 0; index < systems.Length; index++)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("type", "text");
+            writer.WriteString("text", systems[index]);
+            // One breakpoint at the end of the system array caches the tool
+            // definitions plus the system prefix, which stay stable in a session.
+            if (index == systems.Length - 1)
+            {
+                WriteCacheControl(writer);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
     }
 
     private static void WriteMessages(Utf8JsonWriter writer, IReadOnlyList<ChatItem> items)
     {
         writer.WritePropertyName("messages");
         writer.WriteStartArray();
+        // A moving breakpoint on the final content block lets each round read
+        // the conversation prefix written by the previous round.
+        var lastBlockItem = LastBlockItem(items);
         string? role = null;
         var blocks = new List<ChatItem>();
         void Flush()
@@ -119,7 +141,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
             writer.WriteStartArray();
             foreach (var block in blocks)
             {
-                WriteBlock(writer, block);
+                WriteBlock(writer, block, ReferenceEquals(block, lastBlockItem));
             }
 
             writer.WriteEndArray();
@@ -156,7 +178,22 @@ internal sealed class AnthropicCodec : IProtocolCodec
         writer.WriteEndArray();
     }
 
-    private static void WriteBlock(Utf8JsonWriter writer, ChatItem item)
+    private static ChatItem? LastBlockItem(IReadOnlyList<ChatItem> items)
+    {
+        for (var index = items.Count - 1; index >= 0; index--)
+        {
+            if (items[index] is ChatMessage message && message.Role == ChatRole.System)
+            {
+                continue;
+            }
+
+            return items[index];
+        }
+
+        return null;
+    }
+
+    private static void WriteBlock(Utf8JsonWriter writer, ChatItem item, bool markCache)
     {
         switch (item)
         {
@@ -164,6 +201,11 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 writer.WriteStartObject();
                 writer.WriteString("type", "text");
                 writer.WriteString("text", message.Text);
+                if (markCache)
+                {
+                    WriteCacheControl(writer);
+                }
+
                 writer.WriteEndObject();
                 break;
             case ChatReasoningItem reasoning:
@@ -180,6 +222,11 @@ internal sealed class AnthropicCodec : IProtocolCodec
                     document.RootElement.WriteTo(writer);
                 }
 
+                if (markCache)
+                {
+                    WriteCacheControl(writer);
+                }
+
                 writer.WriteEndObject();
                 break;
             case ToolResult result:
@@ -188,12 +235,25 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 writer.WriteString("tool_use_id", result.CallId);
                 writer.WriteString("content", result.Text);
                 writer.WriteBoolean("is_error", result.Status != ToolResultStatus.Success);
+                if (markCache)
+                {
+                    WriteCacheControl(writer);
+                }
+
                 writer.WriteEndObject();
                 break;
             default:
                 throw new NotSupportedException(
                     $"Anthropic does not support chat item type {item.GetType().Name}.");
         }
+    }
+
+    private static void WriteCacheControl(Utf8JsonWriter writer)
+    {
+        writer.WritePropertyName("cache_control");
+        writer.WriteStartObject();
+        writer.WriteString("type", "ephemeral");
+        writer.WriteEndObject();
     }
 
     private static void WriteReasoningBlock(Utf8JsonWriter writer, ReasoningContent content)
