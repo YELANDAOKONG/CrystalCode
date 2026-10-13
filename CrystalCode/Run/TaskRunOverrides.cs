@@ -158,8 +158,20 @@ internal static class TaskRunOverrides
             return;
         }
 
-        if (!model.Thinking
-            || (effort != ThinkingSelection.Off && !model.AllowsEffort(effort.Value)))
+        // A model that does not think already omits reasoning hints.
+        // Off asks for that same result, so it is not a fallback.
+        if (!model.Thinking)
+        {
+            if (effort != ThinkingSelection.Off)
+            {
+                notes.Add(
+                    $"{label} '{effort.Value}' is not available for this model. The request uses the provider default.");
+            }
+
+            return;
+        }
+
+        if (effort != ThinkingSelection.Off && !model.AllowsEffort(effort.Value))
         {
             notes.Add(
                 $"{label} '{effort.Value}' is not available for this model. The request uses the provider default.");

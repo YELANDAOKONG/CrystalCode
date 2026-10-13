@@ -741,6 +741,22 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public void UnavailableThinking_SkipsOffWhenTheModelDoesNotThink()
+    {
+        var settings = HarnessSettings.CreateDefault()
+            .WithOverrides("openai", "gpt-5.6-sol")
+            .WithThinkingEffort(ThinkingSelection.Off);
+
+        Assert.Empty(TaskRunOverrides.UnavailableThinkingNotes(settings));
+
+        var named = settings.WithThinkingEffort(ThinkingSelection.Parse("high"));
+        Assert.Contains(
+            "Thinking effort 'high' is not available",
+            Assert.Single(TaskRunOverrides.UnavailableThinkingNotes(named)),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UnknownProvider_ExitsInvalid()
     {
         using var fixture = new RunFixture();
