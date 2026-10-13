@@ -78,6 +78,76 @@ public sealed class ResponsesProviderTests
     }
 
     [Fact]
+    public async Task StreamAsync_ReadsArgumentsWhenGptSendsThemOnlyOnDone()
+    {
+        const string arguments = """{"limit": 300, "offset": 1, "path": "BUSINESS.md"}""";
+        var encoded = JsonSerializer.Serialize(arguments);
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"read\",\"arguments\":\"\"}}\n\n"
+            + "data: {\"type\":\"response.function_call_arguments.done\",\"output_index\":0,\"arguments\":" + encoded + "}\n\n"
+            + "data: {\"type\":\"response.output_item.done\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"call_id\":\"call_1\",\"name\":\"read\",\"arguments\":" + encoded + "}}\n\n"
+            + "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n"));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        var argumentDeltas = events
+            .OfType<ChatToolCallDelta>()
+            .Where(item => item.ArgumentsDelta.Length > 0)
+            .ToArray();
+        var argumentsDelta = Assert.Single(argumentDeltas);
+        Assert.Equal(arguments, argumentsDelta.ArgumentsDelta);
+        Assert.Contains(events, item => item is ChatToolCallDelta { CallIdDelta: "call_1", NameDelta: "read" });
+        Assert.Contains(
+            events,
+            item => item is ChatCandidateCompleted { FinishReason: var reason } && reason == FinishReason.ToolCalls);
+    }
+
+    [Fact]
+    public async Task StreamAsync_DoesNotRepeatArgumentsWhenDeltasAlreadyArrived()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"call_1","name":"read","arguments":""}}
+
+            data: {"type":"response.function_call_arguments.delta","output_index":0,"delta":"{\"path\":\"a\"}"}
+
+            data: {"type":"response.function_call_arguments.done","output_index":0,"arguments":"{\"path\":\"a\"}"}
+
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","call_id":"call_1","name":"read","arguments":"{\"path\":\"a\"}"}}
+
+            data: {"type":"response.completed","response":{"status":"completed"}}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        var argumentDeltas = events
+            .OfType<ChatToolCallDelta>()
+            .Where(item => item.ArgumentsDelta.Length > 0)
+            .ToArray();
+        var argumentsDelta = Assert.Single(argumentDeltas);
+        Assert.Equal("{\"path\":\"a\"}", argumentsDelta.ArgumentsDelta);
+    }
+
+    [Fact]
     public async Task CompleteAsync_ReplaysOpaqueReasoningBeforeToolOutput()
     {
         var firstHandler = new RecordingHandler(JsonResponse.Create(

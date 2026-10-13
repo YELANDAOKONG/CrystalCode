@@ -294,7 +294,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 items.Add(new ToolCall(
                     item.GetProperty("call_id").GetString()!,
                     item.GetProperty("name").GetString()!,
-                    item.GetProperty("arguments").GetString() ?? ""));
+                    ReadArgumentText(item, "arguments")));
                 break;
         }
     }
@@ -462,11 +462,29 @@ internal sealed class ResponsesCodec : IProtocolCodec
         return new TokenUsage(input, output, reasoning);
     }
 
+    private static string ReadArgumentText(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var property))
+        {
+            return "";
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.String => property.GetString() ?? "",
+            JsonValueKind.Object or JsonValueKind.Array => property.GetRawText(),
+            _ => ""
+        };
+    }
+
     private sealed class StreamParser : IProtocolStreamParser
     {
         private readonly ResponsesCodec _codec;
         private readonly Dictionary<(int OutputIndex, StreamItemKind Kind), int> _itemIndexes = [];
         private readonly HashSet<int> _usedItemIndexes = [];
+        private readonly HashSet<int> _functionIdentitySent = [];
+        private readonly HashSet<int> _argumentFragments = [];
+        private readonly HashSet<int> _argumentsAccepted = [];
         private int _nextItemIndex;
         private int? _reasoningOutputIndex;
         private bool _hasTools;
@@ -527,12 +545,11 @@ internal sealed class ResponsesCodec : IProtocolCodec
                     ReadAddedItem(root, outputIndex, events);
                     break;
                 case "response.function_call_arguments.delta":
-                    events.Add(new ChatToolCallDelta(
-                        0,
-                        ItemIndex(outputIndex, StreamItemKind.ToolCall),
-                        "",
-                        "",
-                        root.GetProperty("delta").GetString() ?? ""));
+                    AppendArgumentFragment(outputIndex, ReadArgumentText(root, "delta"), events);
+                    break;
+                case "response.function_call_arguments.done":
+                    // GPT sends the finished arguments here and often emits no deltas.
+                    AcceptCompleteArguments(outputIndex, ReadArgumentText(root, "arguments"), events);
                     break;
                 case "response.output_item.done":
                     ReadDoneItem(root, outputIndex, events);
@@ -580,15 +597,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
             var type = item.GetProperty("type").GetString();
             if (type == "function_call")
             {
-                var callId = item.GetProperty("call_id").GetString() ?? "";
-                var name = item.GetProperty("name").GetString() ?? "";
-                _hasTools = true;
-                events.Add(new ChatToolCallDelta(
-                    0,
-                    ItemIndex(outputIndex, StreamItemKind.ToolCall),
-                    callId,
-                    name,
-                    ""));
+                EnsureFunctionIdentity(outputIndex, item, events);
             }
         }
 
@@ -596,6 +605,13 @@ internal sealed class ResponsesCodec : IProtocolCodec
         {
             var item = root.GetProperty("item");
             var type = item.GetProperty("type").GetString();
+            if (type == "function_call")
+            {
+                EnsureFunctionIdentity(outputIndex, item, events);
+                AcceptCompleteArguments(outputIndex, ReadArgumentText(item, "arguments"), events);
+                return;
+            }
+
             if (type == "reasoning")
             {
                 events.Add(new ChatReasoningStateReceived(
@@ -631,6 +647,62 @@ internal sealed class ResponsesCodec : IProtocolCodec
                         refusal.GetString()!));
                 }
             }
+        }
+
+        private void EnsureFunctionIdentity(int outputIndex, JsonElement item, List<ChatStreamEvent> events)
+        {
+            if (!_functionIdentitySent.Add(outputIndex))
+            {
+                return;
+            }
+
+            _hasTools = true;
+            var callId = item.TryGetProperty("call_id", out var id) ? id.GetString() ?? "" : "";
+            var name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? "" : "";
+            events.Add(new ChatToolCallDelta(
+                0,
+                ItemIndex(outputIndex, StreamItemKind.ToolCall),
+                callId,
+                name,
+                ""));
+        }
+
+        private void AppendArgumentFragment(int outputIndex, string delta, List<ChatStreamEvent> events)
+        {
+            if (_argumentsAccepted.Contains(outputIndex))
+            {
+                return;
+            }
+
+            if (delta.Length > 0)
+            {
+                _argumentFragments.Add(outputIndex);
+            }
+
+            events.Add(new ChatToolCallDelta(
+                0,
+                ItemIndex(outputIndex, StreamItemKind.ToolCall),
+                "",
+                "",
+                delta));
+        }
+
+        private void AcceptCompleteArguments(int outputIndex, string arguments, List<ChatStreamEvent> events)
+        {
+            if (arguments.Length == 0
+                || _argumentFragments.Contains(outputIndex)
+                || !_argumentsAccepted.Add(outputIndex))
+            {
+                return;
+            }
+
+            _hasTools = true;
+            events.Add(new ChatToolCallDelta(
+                0,
+                ItemIndex(outputIndex, StreamItemKind.ToolCall),
+                "",
+                "",
+                arguments));
         }
 
         // output_index is not a Crystal item. GPT streams reuse one index for
