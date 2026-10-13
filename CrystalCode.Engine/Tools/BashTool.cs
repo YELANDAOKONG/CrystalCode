@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 
 using Crystal.Tools;
 
@@ -63,23 +62,7 @@ public sealed class BashTool : ITool
         }
 
         using var process = new Process();
-        process.StartInfo = new ProcessStartInfo
-        {
-            FileName = ResolveBashFileName(),
-            WorkingDirectory = _workspace.Root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
-        };
-        process.StartInfo.ArgumentList.Add("-lc");
-        process.StartInfo.ArgumentList.Add(command);
-        if (OperatingSystem.IsWindows())
-        {
-            // Git Bash login profiles cd to HOME unless this is set.
-            process.StartInfo.Environment["CHERE_INVOKING"] = "1";
-        }
+        process.StartInfo = BashProcess.CreateStartInfo(_workspace.Root, command);
 
         try
         {
@@ -116,21 +99,21 @@ public sealed class BashTool : ITool
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            TryKill(process);
+            BashProcess.TryKill(process);
             throw;
         }
         catch (OperationCanceledException) when (_timeoutSeconds is int limit)
         {
-            TryKill(process);
+            BashProcess.TryKill(process);
             return new ToolOutput(
                 ToolOutputText.Timeout(limit),
                 ToolResultStatus.Failure);
         }
         finally
         {
-            if (!HasExited(process))
+            if (!BashProcess.HasExited(process))
             {
-                TryKill(process);
+                BashProcess.TryKill(process);
             }
 
             if (timeout.IsCancellationRequested)
@@ -169,94 +152,4 @@ public sealed class BashTool : ITool
             + "skip hooks, use interactive git, or force-push.";
     }
 
-    private static string ResolveBashFileName()
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            return "bash";
-        }
-
-        foreach (var candidate in EnumerateWindowsBashCandidates())
-        {
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return "bash";
-    }
-
-    private static IEnumerable<string> EnumerateWindowsBashCandidates()
-    {
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        yield return Path.Combine(programFiles, "Git", "bin", "bash.exe");
-
-        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
-        if (programFilesX86.Length > 0)
-        {
-            yield return Path.Combine(programFilesX86, "Git", "bin", "bash.exe");
-        }
-
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        yield return Path.Combine(localAppData, "Programs", "Git", "bin", "bash.exe");
-
-        // System32\bash.exe is the WSL stub; it emits UTF-16 text when no distro exists.
-        var windowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        var path = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
-        foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-        {
-            var trimmed = directory.Trim();
-            if (trimmed.Length == 0)
-            {
-                continue;
-            }
-
-            string fullDirectory;
-            try
-            {
-                fullDirectory = Path.GetFullPath(trimmed);
-            }
-            catch (Exception exception) when (exception is ArgumentException or IOException or NotSupportedException)
-            {
-                continue;
-            }
-
-            if (fullDirectory.StartsWith(windowsDirectory, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            yield return Path.Combine(fullDirectory, "bash.exe");
-        }
-    }
-
-    private static bool HasExited(Process process)
-    {
-        try
-        {
-            return process.HasExited;
-        }
-        catch (InvalidOperationException)
-        {
-            return true;
-        }
-    }
-
-    private static void TryKill(Process process)
-    {
-        try
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-        }
-    }
 }

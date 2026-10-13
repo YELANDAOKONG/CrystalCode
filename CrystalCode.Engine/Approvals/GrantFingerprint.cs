@@ -28,6 +28,13 @@ internal static class GrantFingerprint
                 grepPath.Replace('\\', '/'),
             BashTool.ToolName when BashTool.TryReadCommand(call.Arguments, out var command) =>
                 command,
+            BackgroundBashStartTool.ToolName when BashTool.TryReadCommand(call.Arguments, out var backgroundCommand) =>
+                backgroundCommand,
+            BackgroundBashStatusTool.ToolName
+                or BackgroundBashLogsTool.ToolName
+                or BackgroundBashStopTool.ToolName
+                when ToolArguments.TryReadRequiredString(call.Arguments, "taskId", out var taskId) =>
+                taskId,
             _ => call.Name
         };
     }

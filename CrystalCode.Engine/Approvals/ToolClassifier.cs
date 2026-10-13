@@ -71,6 +71,11 @@ public sealed class ToolClassifier
             WriteTool.ToolName => ClassifyWrite(call.Arguments),
             EditTool.ToolName => ClassifyEdit(call.Arguments),
             BashTool.ToolName => ClassifyBash(call.Arguments),
+            BackgroundBashStartTool.ToolName => ClassifyBash(call.Arguments),
+            BackgroundBashStatusTool.ToolName or BackgroundBashLogsTool.ToolName =>
+                new ToolClassification(Risk.Read, Authority.Workspace, "Read background shell task"),
+            BackgroundBashStopTool.ToolName =>
+                new ToolClassification(Risk.Write, Authority.Workspace, "Stop background shell task"),
             _ => null
         };
 

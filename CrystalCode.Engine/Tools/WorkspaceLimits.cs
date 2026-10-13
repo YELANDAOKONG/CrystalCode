@@ -26,6 +26,12 @@ public static class WorkspaceLimits
 
     public const int MaximumToolOutputCharacters = 100_000;
 
+    public const int MaximumBackgroundTaskOutputCharacters = 1_048_576;
+
+    public const int MaximumBackgroundLogCharacters = 100_000;
+
+    public const int MaximumBackgroundTasks = 32;
+
     public const int BashTimeoutSeconds = 120;
 
     // CancelAfter rejects a delay at or above uint.MaxValue milliseconds.

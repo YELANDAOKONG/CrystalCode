@@ -114,6 +114,10 @@
   A null limit is unlimited; omitted budget fields retain the finite defaults.
 - Built-in bash uses the same rule for `bashTimeoutSeconds`: omit it to keep
   120 seconds; `null` or `"unlimited"` removes the per-command timer.
+- Background Bash tasks are session-local and must remain observable through
+  their status or bounded logs. They are not persisted, and session shutdown
+  stops their process trees. A model must not create an unobserved background
+  task.
 - Extension runtime data lives under `data/{plugins,tools}/<directory>/` in
   the home and project `.crystal` trees. The host creates it when the
   extension first receives it and it is separate from the install tree. It is

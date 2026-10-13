@@ -33,12 +33,14 @@ separate library with no terminal code. The product can:
 - configure per-turn model-call, tool-call, and wall-clock budgets, including
   unlimited budgets;
 - configure the built-in bash per-command timeout, including unlimited;
+- start session-local background shell tasks in Work, inspect their status and
+  bounded logs, and stop them with child-process cleanup;
 - retry a failed model round on rate limits, server errors, timeouts,
   network faults, and incomplete streams, waiting with backoff, a
   countdown on the progress row, and a transcript note;
 - switch the configured provider and model from `/model` without restarting;
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
-  write, shell); operator tool sets may add extra catalog entries to
+  write, shell, and session-local background shell tasks); operator tool sets may add extra catalog entries to
   either;
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;

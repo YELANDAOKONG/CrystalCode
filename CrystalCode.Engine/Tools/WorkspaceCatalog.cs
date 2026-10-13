@@ -46,7 +46,8 @@ public static class WorkspaceCatalog
         ExternalCatalog? external = null,
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
         PluginCatalog? disk = null,
-        ImageDescriber? imageDescriber = null)
+        ImageDescriber? imageDescriber = null,
+        BackgroundTaskRegistry? backgroundTasks = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -70,7 +71,8 @@ public static class WorkspaceCatalog
                 HostToolCatalog.Work,
                 bashTimeoutSeconds,
                 disk,
-                imageDescriber));
+                imageDescriber,
+                backgroundTasks));
     }
 
     private static IReadOnlyList<ITool> CreateTools(
@@ -83,7 +85,8 @@ public static class WorkspaceCatalog
         HostToolCatalog catalog,
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
         PluginCatalog? disk = null,
-        ImageDescriber? imageDescriber = null)
+        ImageDescriber? imageDescriber = null,
+        BackgroundTaskRegistry? backgroundTasks = null)
     {
         var tools = new List<ITool>(
             (registry ?? PluginRegistry.CreateBuiltIn())
@@ -91,6 +94,13 @@ public static class WorkspaceCatalog
         if (catalog == HostToolCatalog.Work)
         {
             ApplyBashTimeout(tools, workspace, bashTimeoutSeconds);
+            if (backgroundTasks is not null)
+            {
+                tools.Add(new BackgroundBashStartTool(backgroundTasks));
+                tools.Add(new BackgroundBashStatusTool(backgroundTasks));
+                tools.Add(new BackgroundBashLogsTool(backgroundTasks));
+                tools.Add(new BackgroundBashStopTool(backgroundTasks));
+            }
         }
 
         if (disk is not null)

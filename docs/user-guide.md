@@ -1045,6 +1045,11 @@ custom field order.
 workspace after approval (you, or the Review model in Review or
 Audit). Workspace `write` and `edit` still follow the approval mode.
 `bash` starts in the workspace root and is approved as a side effect.
+Background Bash tasks are available in Work only. `bash_start` returns a
+session-local task ID without waiting; use `bash_status` or `bash_logs` to
+observe it and `bash_stop` to terminate it. The task uses the configured
+`bashTimeoutSeconds`, keeps bounded output, is not persisted, and is stopped
+when the session closes.
 Credential paths
 (`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, and list
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
@@ -1066,11 +1071,16 @@ is the workspace root.
 | `edit` | Work | Replace one unique `old_string` in a file |
 | `write` | Work | Create or overwrite a UTF-8 text file |
 | `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 120 seconds) |
+| `bash_start` | Work | Start a session-local background shell command after approval and return its task ID |
+| `bash_status` | Work | Read the status, exit code, and log offsets of a background task |
+| `bash_logs` | Work | Read bounded background task output by offset |
+| `bash_stop` | Work | Stop a background task and its child processes after approval |
 
 Practical limits: read up to 1,000,000 characters or 20,000 lines;
 write up to 2 MiB; grep up to 1,000 matches and 8 MiB per file; glob
 up to 1,000 matches per page; list up to 1,000 entries per page; tool
-output truncated at 100,000 characters.
+output truncated at 100,000 characters. Background task output is capped at
+1 MiB per task, and `bash_logs` returns at most 100,000 characters per call.
 
 ## External tools
 

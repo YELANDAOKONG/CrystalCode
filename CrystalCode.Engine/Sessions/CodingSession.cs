@@ -72,6 +72,7 @@ public sealed class CodingSession : ITurnObserver
     private PluginHookPipeline _hooks = PluginHookPipeline.Empty;
     private bool _pluginSessionOpen;
     private readonly SessionToolHost _toolHost;
+    private readonly BackgroundTaskRegistry _backgroundTasks;
     private ApprovalMode _approval;
     private ThinkingSelection _thinkingEffort;
     private bool _planMode;
@@ -142,6 +143,7 @@ public sealed class CodingSession : ITurnObserver
             home,
             () => _sessionId ?? string.Empty,
             () => _approval.Value);
+        _backgroundTasks = new BackgroundTaskRegistry(_workspace, settings.BashTimeoutSeconds);
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
         _trust = new WorkspaceTrustStore(home);
@@ -395,6 +397,7 @@ public sealed class CodingSession : ITurnObserver
     public async Task<string> CloseAsync(CancellationToken cancellationToken = default)
     {
         await ClosePluginSessionAsync(cancellationToken);
+        await _backgroundTasks.StopAllAsync();
         return Close();
     }
 
@@ -414,6 +417,7 @@ public sealed class CodingSession : ITurnObserver
         }
         finally
         {
+            _backgroundTasks.Dispose();
             DisposeClient();
         }
     }
@@ -3007,7 +3011,8 @@ public sealed class CodingSession : ITurnObserver
                 _external,
                 _settings.BashTimeoutSeconds,
                 _loadedPlugins,
-                imageDescriber),
+                imageDescriber,
+                _backgroundTasks),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);

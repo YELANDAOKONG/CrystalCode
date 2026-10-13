@@ -19,7 +19,8 @@ public static class WorkPrompt
         # Tools
         - Use read for files, list for directory contents, glob to find by name, and grep to search contents. Do not use bash for those.
         - Read a file before you edit it. Use edit to change an existing file: old_string must appear exactly once, so include enough surrounding lines to make it unique. Use write only to create a file or replace the whole file.
-        - Use bash for builds, tests, git, and scripts. The working directory is the workspace root. Do not use it to read, write, or search files. Avoid commands that wait for input or never exit, such as watchers, dev servers, pagers, and interactive prompts; pass non-interactive flags instead.
+        - Use bash for builds, tests, git, and one-shot scripts. The working directory is the workspace root. Do not use it to read, write, or search files. Avoid commands that wait for input or never exit, such as watchers, dev servers, pagers, and interactive prompts; pass non-interactive flags instead.
+        - Use bash_start only for a command that must keep running after the current tool call. Observe it with bash_status or bash_logs, and stop it with bash_stop when it is no longer needed. Background tasks belong to this session and are stopped when the session closes.
         - Use todowrite to record multi-step work and todoread to inspect the list without changing it.
         - Other tools may be available, such as skills, plugin tools, and operator tools. Use one when its description fits the task.
         - Send every call whose arguments you can already write in one response, including a later command that should run after an edit you have already specified. The host runs that batch in order and returns the results together. Wait for a result before the next call when you need it to choose the path, the exact text, the command, or whether to continue.

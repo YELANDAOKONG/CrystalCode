@@ -450,8 +450,9 @@ These are product modes, not Crystal types.
   Skills is enabled, it also registers skill. External tools whose
   `catalogs` include `plan` are appended after the built-ins.
 - Work registers read, list, glob, grep, todowrite, todoread, question, and
-  skill when enabled, then edit, write, and bash, then external tools whose
-  `catalogs` include `work`.
+  skill when enabled, then edit, write, bash, and the session-local
+  `bash_start`, `bash_status`, `bash_logs`, and `bash_stop` tools, then external
+  tools whose `catalogs` include `work`.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
@@ -463,6 +464,13 @@ labels; dismissing the overlay returns a failed tool result.
 Built-in Plan still has no edit, write, or bash. An external Plan tool
 keeps a Write + Workspace floor, so Plan is not built-in reads only
 once such a tool is installed. Approval still runs.
+
+Background Bash tasks are owned by the live session. `bash_start` returns a
+task ID without waiting for process exit. `bash_status` reports the task state,
+`bash_logs` reads the bounded output buffer by offset, and `bash_stop` kills the
+process tree. Tasks are not saved in session documents, do not cross a process
+restart, and are stopped when the session closes. The configured
+`bashTimeoutSeconds` applies to them as it does to foreground `bash`.
 
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.

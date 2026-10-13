@@ -31,6 +31,10 @@ public static class ExternalToolNames
         EditTool.ToolName,
         WriteTool.ToolName,
         BashTool.ToolName,
+        BackgroundBashStartTool.ToolName,
+        BackgroundBashStatusTool.ToolName,
+        BackgroundBashLogsTool.ToolName,
+        BackgroundBashStopTool.ToolName,
         SkillTool.ToolName
     };
 

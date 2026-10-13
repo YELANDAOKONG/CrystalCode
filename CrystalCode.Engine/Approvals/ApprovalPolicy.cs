@@ -184,7 +184,7 @@ public sealed class ApprovalPolicy
                 && (_mode == ApprovalMode.Edit || _mode == ApprovalMode.Review);
         }
 
-        if (toolName == BashTool.ToolName)
+        if (toolName is BashTool.ToolName or BackgroundBashStartTool.ToolName or BackgroundBashStopTool.ToolName)
         {
             return _mode == ApprovalMode.Full;
         }
@@ -193,5 +193,9 @@ public sealed class ApprovalPolicy
     }
 
     private static bool IsSideEffect(string toolName) =>
-        toolName is EditTool.ToolName or WriteTool.ToolName or BashTool.ToolName;
+        toolName is EditTool.ToolName
+            or WriteTool.ToolName
+            or BashTool.ToolName
+            or BackgroundBashStartTool.ToolName
+            or BackgroundBashStopTool.ToolName;
 }

@@ -37,11 +37,16 @@ public sealed class WorkspaceCatalogTests
         var catalog = WorkspaceCatalog.CreateWork(
             new Workspace(root.Path),
             new TodoList(),
-            new FixedUserPrompt("ok"));
+            new FixedUserPrompt("ok"),
+            backgroundTasks: new BackgroundTaskRegistry(new Workspace(root.Path)));
 
         Assert.NotNull(catalog.Find(EditTool.ToolName));
         Assert.NotNull(catalog.Find(WriteTool.ToolName));
         Assert.NotNull(catalog.Find(BashTool.ToolName));
+        Assert.NotNull(catalog.Find(BackgroundBashStartTool.ToolName));
+        Assert.NotNull(catalog.Find(BackgroundBashStatusTool.ToolName));
+        Assert.NotNull(catalog.Find(BackgroundBashLogsTool.ToolName));
+        Assert.NotNull(catalog.Find(BackgroundBashStopTool.ToolName));
         Assert.NotNull(catalog.Find(ListTool.ToolName));
         Assert.Contains(
             "120 second timeout",
