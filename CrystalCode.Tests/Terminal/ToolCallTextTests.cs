@@ -13,6 +13,12 @@ public sealed class ToolCallTextTests
         Assert.Equal("Bash  uname -a", ToolCallText.Summary("bash", """{"command":"uname -a"}"""));
         Assert.Equal("Write  src/App.cs", ToolCallText.Summary("write", """{"path":"src/App.cs","contents":"x"}"""));
         Assert.Equal("Skill  git-release", ToolCallText.Summary("skill", """{"name":"git-release"}"""));
+        Assert.Equal(
+            "Bash Status  task_123",
+            ToolCallText.Summary("bash_status", """{"taskId":"task_123"}"""));
+        Assert.Equal(
+            "Bash Logs  task_123",
+            ToolCallText.Summary("bash_logs", """{"taskId":"task_123","offset":4}"""));
     }
 
     [Fact]

@@ -7,6 +7,5 @@ public enum BackgroundTaskStatus
     Exited,
     Failed,
     TimedOut,
-    Cancelled,
     Stopped
 }

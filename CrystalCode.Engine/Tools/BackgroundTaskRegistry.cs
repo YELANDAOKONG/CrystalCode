@@ -50,22 +50,22 @@ public sealed class BackgroundTaskRegistry : IDisposable
                 return false;
             }
 
-            if (_tasks.Count >= WorkspaceLimits.MaximumBackgroundTasks)
+            var activeCount = _tasks.Values.Count(static task => task.IsActive);
+            if (activeCount >= WorkspaceLimits.MaximumBackgroundTasks)
             {
-                error = $"The session already has {WorkspaceLimits.MaximumBackgroundTasks} background tasks.";
+                error = $"The session already has {WorkspaceLimits.MaximumBackgroundTasks} active background tasks.";
                 return false;
             }
 
             var taskId = "task_" + Guid.NewGuid().ToString("N")[..12];
             var task = new BackgroundBashTask(taskId, command, _workspace.Root, _timeoutSeconds);
-            _tasks.Add(taskId, task);
             if (!task.Start())
             {
-                snapshot = task.Snapshot();
-                error = "The background shell process failed to start.";
+                error = task.StartError;
                 return false;
             }
 
+            _tasks.Add(taskId, task);
             snapshot = task.Snapshot();
             return true;
         }
@@ -123,21 +123,22 @@ public sealed class BackgroundTaskRegistry : IDisposable
         return false;
     }
 
-    public bool TryStop(string taskId, out BackgroundTaskSnapshot snapshot)
+    public async Task<BackgroundTaskSnapshot?> StopAsync(string taskId)
     {
         ArgumentNullException.ThrowIfNull(taskId);
+        BackgroundBashTask? task;
         lock (_gate)
         {
-            if (_tasks.TryGetValue(taskId, out var task))
-            {
-                task.Stop();
-                snapshot = task.Snapshot();
-                return true;
-            }
+            _tasks.TryGetValue(taskId, out task);
         }
 
-        snapshot = null!;
-        return false;
+        if (task is null)
+        {
+            return null;
+        }
+
+        await task.StopAsync();
+        return task.Snapshot();
     }
 
     public async Task StopAllAsync()

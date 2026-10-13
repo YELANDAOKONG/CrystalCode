@@ -518,6 +518,22 @@ public sealed class ApprovalPolicyTests
         Assert.Equal("Plan mode does not allow write.", decision.RejectionOutput?.Text);
     }
 
+    [Theory]
+    [InlineData(BackgroundBashStartTool.ToolName, "{\"command\":\"sleep 1\"}")]
+    [InlineData(BackgroundBashStopTool.ToolName, "{\"taskId\":\"task_1\"}")]
+    public async Task DecideAsync_Plan_RejectsBackgroundBashSideEffects(
+        string toolName,
+        string arguments)
+    {
+        using var context = new ApprovalContext(ApprovalMode.Plan);
+        var policy = context.CreatePolicy(new ThrowingApprovalPrompt());
+
+        var decision = await policy.DecideAsync(new ToolCall("1", toolName, arguments));
+
+        Assert.Equal(ToolInvocationAction.Reject, decision.Action);
+        Assert.Equal($"Plan mode does not allow {toolName}.", decision.RejectionOutput?.Text);
+    }
+
     [Fact]
     public async Task DecideAsync_Default_RejectsWhenUserDenies()
     {

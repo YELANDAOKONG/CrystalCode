@@ -470,7 +470,9 @@ task ID without waiting for process exit. `bash_status` reports the task state,
 `bash_logs` reads the bounded output buffer by offset, and `bash_stop` kills the
 process tree. Tasks are not saved in session documents, do not cross a process
 restart, and are stopped when the session closes. The configured
-`bashTimeoutSeconds` applies to them as it does to foreground `bash`.
+`bashTimeoutSeconds` applies to them as it does to foreground `bash`. At most
+32 tasks may be active at once; completed tasks remain queryable but do not
+consume an active-task slot. Background task stdin is closed after startup.
 
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.
@@ -676,7 +678,7 @@ Modes:
 - Review: workspace file changes for built-in `write` and `edit`
   pass without review, same as Edit. Another model checks
   each remaining side-effect call (Codex guardian-style), including
-  bash, reads, list, glob, grep, write, and edit of paths outside the
+  bash, bash_start, bash_stop, reads, list, glob, grep, write, and edit of paths outside the
   workspace, and external Write. Workspace reads and Skills search
   directories still
   auto-execute. A bounded transcript excerpt is attached: the first

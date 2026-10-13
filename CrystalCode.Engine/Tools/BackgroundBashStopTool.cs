@@ -32,7 +32,7 @@ public sealed class BackgroundBashStopTool : ITool
 
     public ToolDefinition Definition { get; }
 
-    public ValueTask<ToolOutput> InvokeAsync(
+    public async ValueTask<ToolOutput> InvokeAsync(
         ToolCall call,
         CancellationToken cancellationToken = default)
     {
@@ -40,20 +40,21 @@ public sealed class BackgroundBashStopTool : ITool
         ArgumentNullException.ThrowIfNull(call);
         if (!ToolArguments.TryReadRequiredString(call.Arguments, "taskId", out var taskId))
         {
-            return ValueTask.FromResult(new ToolOutput(
+            return new ToolOutput(
                 "Arguments must include a taskId string.",
-                ToolResultStatus.Failure));
+                ToolResultStatus.Failure);
         }
 
-        if (!_tasks.TryStop(taskId, out var snapshot))
+        var snapshot = await _tasks.StopAsync(taskId);
+        if (snapshot is null)
         {
-            return ValueTask.FromResult(new ToolOutput(
+            return new ToolOutput(
                 "The background task was not found in this session.",
-                ToolResultStatus.Failure));
+                ToolResultStatus.Failure);
         }
 
-        return ValueTask.FromResult(new ToolOutput(
+        return new ToolOutput(
             BackgroundTaskText.Snapshot(snapshot),
-            ToolResultStatus.Success));
+            ToolResultStatus.Success);
     }
 }

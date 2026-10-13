@@ -19,6 +19,7 @@ internal sealed class BackgroundBashTask
     private int? _exitCode;
     private int _logStartOffset;
     private bool _stopRequested;
+    private string? _startError;
 
     public BackgroundBashTask(
         string taskId,
@@ -36,7 +37,10 @@ internal sealed class BackgroundBashTask
         _startedUtc = DateTimeOffset.UtcNow;
         _process = new Process
         {
-            StartInfo = BashProcess.CreateStartInfo(workingDirectory, command)
+            StartInfo = BashProcess.CreateStartInfo(
+                workingDirectory,
+                command,
+                redirectStandardInput: true)
         };
     }
 
@@ -52,10 +56,13 @@ internal sealed class BackgroundBashTask
         {
             if (!_process.Start())
             {
+                _startError = "The shell process failed to start.";
                 SetTerminalState(BackgroundTaskStatus.Failed, null);
                 _process.Dispose();
                 return false;
             }
+
+            _process.StandardInput.Close();
 
             lock (_gate)
             {
@@ -67,10 +74,24 @@ internal sealed class BackgroundBashTask
         }
         catch (Exception exception)
         {
-            AppendOutput("The shell process failed to start: " + exception.Message);
+            _startError = "The shell process failed to start: " + exception.Message;
+            BashProcess.TryKill(_process);
             SetTerminalState(BackgroundTaskStatus.Failed, null);
             _process.Dispose();
             return false;
+        }
+    }
+
+    public string StartError => _startError ?? "The background shell process failed to start.";
+
+    public bool IsActive
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _status is BackgroundTaskStatus.Starting or BackgroundTaskStatus.Running;
+            }
         }
     }
 
@@ -180,7 +201,9 @@ internal sealed class BackgroundBashTask
             {
                 await Task.WhenAll(stdout, stderr);
             }
-            catch (Exception exception) when (exception is OperationCanceledException or IOException)
+            catch (Exception exception) when (exception is OperationCanceledException
+                or IOException
+                or ObjectDisposedException)
             {
             }
 
@@ -207,18 +230,24 @@ internal sealed class BackgroundBashTask
     {
         lock (_gate)
         {
-            var available = WorkspaceLimits.MaximumBackgroundTaskOutputCharacters - _output.Length;
-            if (available > 0)
+            var maximum = WorkspaceLimits.MaximumBackgroundTaskOutputCharacters;
+            if (text.Length >= maximum)
             {
-                _output.Append(text.AsSpan(0, Math.Min(text.Length, available)));
+                var discarded = _output.Length + text.Length - maximum;
+                _output.Clear();
+                _logStartOffset += discarded;
+                _output.Append(text.AsSpan(text.Length - maximum));
+                return;
             }
 
-            if (_output.Length == WorkspaceLimits.MaximumBackgroundTaskOutputCharacters)
+            var overflow = _output.Length + text.Length - maximum;
+            if (overflow > 0)
             {
-                var trim = Math.Max(1, _output.Length / 4);
-                _output.Remove(0, trim);
-                _logStartOffset += trim;
+                _output.Remove(0, overflow);
+                _logStartOffset += overflow;
             }
+
+            _output.Append(text);
         }
     }
 

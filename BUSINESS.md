@@ -40,8 +40,8 @@ separate library with no terminal code. The product can:
   countdown on the progress row, and a transcript note;
 - switch the configured provider and model from `/model` without restarting;
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
-  write, shell, and session-local background shell tasks); operator tool sets may add extra catalog entries to
-  either;
+  write, shell, and session-local background shell tasks); operator tool sets
+  may add extra catalog entries to either;
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
 - ask one or more operator questions in one request, with described choices,

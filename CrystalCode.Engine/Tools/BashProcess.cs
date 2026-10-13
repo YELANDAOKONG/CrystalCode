@@ -8,7 +8,10 @@ namespace CrystalCode.Engine.Tools;
 /// </summary>
 internal static class BashProcess
 {
-    public static ProcessStartInfo CreateStartInfo(string workspaceRoot, string command)
+    public static ProcessStartInfo CreateStartInfo(
+        string workspaceRoot,
+        string command,
+        bool redirectStandardInput = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentNullException.ThrowIfNull(command);
@@ -17,6 +20,7 @@ internal static class BashProcess
         {
             FileName = ResolveBashFileName(),
             WorkingDirectory = workspaceRoot,
+            RedirectStandardInput = redirectStandardInput,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

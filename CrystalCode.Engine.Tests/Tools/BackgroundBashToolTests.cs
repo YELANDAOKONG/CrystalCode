@@ -67,8 +67,67 @@ public sealed class BackgroundBashToolTests
                 $$"""{"taskId":"{{taskId}}"}"""));
 
         Assert.Equal(ToolResultStatus.Success, stopped.Status);
-        await Task.Delay(300);
+        Assert.Contains("status: Stopped", stopped.Text, StringComparison.Ordinal);
         Assert.False(IsAlive(pid));
+    }
+
+    [Fact]
+    public async Task CompletedTasks_DoNotConsumeActiveTaskSlots()
+    {
+        using var root = new TemporaryWorkspace();
+        var registry = new BackgroundTaskRegistry(new Workspace(root.Path), timeoutSeconds: null);
+
+        for (var index = 0; index <= WorkspaceLimits.MaximumBackgroundTasks; index++)
+        {
+            Assert.True(
+                registry.TryStart(
+                    "printf done",
+                    out var snapshot,
+                    out var error),
+                error);
+            await WaitForTerminalStatusAsync(registry, snapshot.TaskId);
+        }
+    }
+
+    [Fact]
+    public async Task Logs_RetainNewestOutputWhenTheBufferOverflows()
+    {
+        using var root = new TemporaryWorkspace();
+        var registry = new BackgroundTaskRegistry(new Workspace(root.Path), timeoutSeconds: null);
+        var command = $"printf '%*s' {WorkspaceLimits.MaximumBackgroundTaskOutputCharacters} ''; printf newest";
+
+        Assert.True(registry.TryStart(command, out var started, out var error), error);
+        var snapshot = await WaitForTerminalStatusAsync(registry, started.TaskId);
+        var offset = Math.Max(snapshot.LogStartOffset, snapshot.LogEndOffset - 100);
+
+        Assert.True(registry.TryReadLogs(
+            snapshot.TaskId,
+            offset,
+            100,
+            out var log));
+        Assert.Contains("newest", log.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task BackgroundProcess_ReceivesClosedStandardInput()
+    {
+        using var root = new TemporaryWorkspace();
+        var registry = new BackgroundTaskRegistry(new Workspace(root.Path), timeoutSeconds: null);
+
+        Assert.True(
+            registry.TryStart(
+                "if read value; then printf unexpected; else printf stdin-closed; fi",
+                out var started,
+                out var error),
+            error);
+        var snapshot = await WaitForTerminalStatusAsync(registry, started.TaskId);
+
+        Assert.True(registry.TryReadLogs(
+            snapshot.TaskId,
+            snapshot.LogStartOffset,
+            100,
+            out var log));
+        Assert.Contains("stdin-closed", log.Text, StringComparison.Ordinal);
     }
 
     private static async Task<ToolOutput> WaitForStatusAsync(
@@ -93,6 +152,28 @@ public sealed class BackgroundBashToolTests
         }
 
         throw new Xunit.Sdk.XunitException("The background task did not reach the expected status.");
+    }
+
+    private static async Task<BackgroundTaskSnapshot> WaitForTerminalStatusAsync(
+        BackgroundTaskRegistry registry,
+        string taskId)
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+        while (DateTimeOffset.UtcNow - startedAt < TimeSpan.FromSeconds(5))
+        {
+            Assert.True(registry.TryGetSnapshot(taskId, out var snapshot));
+            if (snapshot.Status is BackgroundTaskStatus.Exited
+                or BackgroundTaskStatus.Failed
+                or BackgroundTaskStatus.TimedOut
+                or BackgroundTaskStatus.Stopped)
+            {
+                return snapshot;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new Xunit.Sdk.XunitException("The background task did not reach a terminal status.");
     }
 
     private static string ReadValue(string text, string name)

@@ -57,6 +57,10 @@ public static class ProgressText
         return toolName.ToLowerInvariant() switch
         {
             BashTool.ToolName => "Running Command",
+            BackgroundBashStartTool.ToolName => "Starting Background Command",
+            BackgroundBashStatusTool.ToolName => "Checking Background Command",
+            BackgroundBashLogsTool.ToolName => "Reading Background Logs",
+            BackgroundBashStopTool.ToolName => "Stopping Background Command",
             ReadTool.ToolName => "Reading",
             ListTool.ToolName => "Listing",
             WriteTool.ToolName => "Writing File",

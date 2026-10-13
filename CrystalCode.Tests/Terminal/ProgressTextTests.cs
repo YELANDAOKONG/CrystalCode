@@ -15,6 +15,16 @@ public sealed class ProgressTextTests
     }
 
     [Theory]
+    [InlineData(BackgroundBashStartTool.ToolName, "Starting Background Command")]
+    [InlineData(BackgroundBashStatusTool.ToolName, "Checking Background Command")]
+    [InlineData(BackgroundBashLogsTool.ToolName, "Reading Background Logs")]
+    [InlineData(BackgroundBashStopTool.ToolName, "Stopping Background Command")]
+    public void Running_MapsBackgroundBashTools(string name, string expected)
+    {
+        Assert.Equal(expected, ProgressText.Running(name));
+    }
+
+    [Theory]
     [InlineData(ReadTool.ToolName, "Reading")]
     [InlineData(ListTool.ToolName, "Listing")]
     [InlineData(EditTool.ToolName, "Editing")]

@@ -72,6 +72,11 @@ public static class ToolCallText
             return title + "  " + OneLine(desc);
         }
 
+        if (ToolArguments.TryReadRequiredString(arguments, "taskId", out var taskId))
+        {
+            return title + "  " + OneLine(taskId);
+        }
+
         var compact = CompactFinished(arguments);
         return compact.Length == 0 ? title : title + "  " + compact;
     }

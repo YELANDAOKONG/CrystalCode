@@ -842,7 +842,7 @@ otherwise the same conversation.
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
 | **Plan** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
-| **Work** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus edit, write, and bash, plus any external tools listed for Work | After approval |
+| **Work** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
 
@@ -860,7 +860,7 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
 | **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
-| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including bash and read, list, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
 | **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
 
@@ -1049,7 +1049,9 @@ Background Bash tasks are available in Work only. `bash_start` returns a
 session-local task ID without waiting; use `bash_status` or `bash_logs` to
 observe it and `bash_stop` to terminate it. The task uses the configured
 `bashTimeoutSeconds`, keeps bounded output, is not persisted, and is stopped
-when the session closes.
+when the session closes. At most 32 tasks may be active at once; completed
+tasks remain queryable without consuming an active-task slot. Background task
+stdin is closed, so commands that require terminal input are unsupported.
 Credential paths
 (`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, and list
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
