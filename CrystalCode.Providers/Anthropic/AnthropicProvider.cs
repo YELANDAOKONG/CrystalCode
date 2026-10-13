@@ -11,7 +11,7 @@ public sealed class AnthropicProvider : IStreamingChatClient, IDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolChatClient(
-            new AnthropicCodec(options.VendorName),
+            new AnthropicCodec(options.VendorName, options.SummarizeThinking),
             options.ToProtocolOptions(),
             httpClient);
     }

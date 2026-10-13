@@ -195,6 +195,29 @@ public sealed class AnthropicProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_OmitsThinkingDisplayWhenConfigured()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions(
+                "test-key",
+                "claude-test",
+                new Uri("https://example.test/v1/"),
+                summarizeThinking: false),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "Hi")],
+            reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.High)));
+
+        Assert.Contains("\"thinking\":{\"type\":\"adaptive\"}", handler.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"display\"", handler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"output_config\":{\"effort\":\"high\"}", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteAsync_MapsMaximumToMaxAndForwardsOtherEfforts()
     {
         var maximumHandler = new RecordingHandler(JsonResponse.Create(

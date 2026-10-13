@@ -61,6 +61,118 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void ProviderDocument_WritesOmittedThinkingDisplayAndDropsTheDefault()
+    {
+        var omitted = new ProviderCatalog([
+            Endpoint("anthropic", ProviderProtocol.Anthropic, ThinkingDisplay.Omitted)
+        ]);
+        var summarized = new ProviderCatalog([
+            Endpoint("anthropic", ProviderProtocol.Anthropic, ThinkingDisplay.Summarized)
+        ]);
+
+        var omittedDocument = SettingsMapper.WriteProviders(omitted);
+        var summarizedDocument = SettingsMapper.WriteProviders(summarized);
+
+        Assert.Equal(
+            "omitted",
+            omittedDocument.GetProperty("anthropic").GetProperty("options").GetProperty("thinkingDisplay").GetString());
+        Assert.Equal(ThinkingDisplay.Omitted, SettingsMapper.ReadProviders(omittedDocument).Single().ThinkingDisplay);
+        Assert.False(summarizedDocument.GetProperty("anthropic").TryGetProperty("options", out _));
+        Assert.Null(SettingsMapper.ReadProviders(summarizedDocument).Single().ThinkingDisplay);
+    }
+
+    [Fact]
+    public void ProviderDocument_TreatsExplicitSummarizedThinkingDisplayAsTheDefault()
+    {
+        using var json = JsonDocument.Parse(
+            """
+            {
+              "anthropic": {
+                "protocol": "anthropic",
+                "baseUri": "https://api.anthropic.com/v1/",
+                "options": { "thinkingDisplay": "Summarized" },
+                "models": { "claude": { "contextWindow": 200000 } }
+              }
+            }
+            """);
+
+        var provider = SettingsMapper.ReadProviders(json.RootElement).Single();
+        var written = SettingsMapper.WriteProviders(new ProviderCatalog([provider]));
+
+        Assert.Null(provider.ThinkingDisplay);
+        Assert.False(written.GetProperty("anthropic").TryGetProperty("options", out _));
+    }
+
+    [Theory]
+    [InlineData(
+        "\"options\": {\"thinkingDisplay\": \"omitted\"}",
+        "openai",
+        "not valid for protocol")]
+    [InlineData(
+        "\"options\": {\"unknown\": true}",
+        "anthropic",
+        "not valid for protocol")]
+    [InlineData(
+        "\"options\": {\"thinkingDisplay\": {\"mode\": \"omitted\"}}",
+        "anthropic",
+        "JSON scalar")]
+    [InlineData(
+        "\"options\": {\"temperature\": 0.2}",
+        "anthropic",
+        "Set it on the model")]
+    [InlineData(
+        "\"options\": [\"omitted\"]",
+        "anthropic",
+        "must be an object")]
+    [InlineData(
+        "\"options\": {\"thinkingDisplay\": \"full\"}",
+        "anthropic",
+        "summarized or omitted")]
+    public void ProviderDocument_RejectsInvalidEndpointOptions(
+        string fields,
+        string protocol,
+        string message)
+    {
+        using var json = JsonDocument.Parse(
+            $$"""
+            {
+              "gateway": {
+                "protocol": "{{protocol}}",
+                "baseUri": "https://example.test/",
+                {{fields}},
+                "models": { "model": { "contextWindow": 1024 } }
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => SettingsMapper.ReadProviders(json.RootElement));
+
+        Assert.Contains(message, error.Message, StringComparison.Ordinal);
+        Assert.Contains("gateway", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProviderDefinition_RejectsThinkingDisplayOnAnotherProtocol()
+    {
+        var error = Assert.Throws<ArgumentException>(() =>
+            Endpoint("openai", ProviderProtocol.OpenAI, ThinkingDisplay.Omitted));
+
+        Assert.Contains("anthropic protocol", error.Message, StringComparison.Ordinal);
+    }
+
+    private static ProviderDefinition Endpoint(
+        string name,
+        ProviderProtocol protocol,
+        ThinkingDisplay? thinkingDisplay) =>
+        new(
+            new ProviderName(name),
+            protocol,
+            new Uri("https://example.test/"),
+            new Dictionary<string, ModelSettings> { ["model"] = new(1024) },
+            thinkingDisplay: thinkingDisplay);
+
+    [Fact]
     public void ProviderDocument_PreservesDeclaredAudioAndVideoInput()
     {
         var catalog = new ProviderCatalog([

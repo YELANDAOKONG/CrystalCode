@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace CrystalCode.Engine.Home;
 
 internal sealed class ProviderDocument
@@ -19,6 +21,12 @@ internal sealed class ProviderDocument
     public string? ApiKey { get; set; }
 
     public bool? RequiresApiKey { get; set; }
+
+    /// <summary>
+    /// Raw endpoint options. Names are interpreted by protocol and are not
+    /// properties of this document.
+    /// </summary>
+    public JsonElement? Options { get; set; }
 
     public Dictionary<string, ModelDocument>? Models { get; set; }
 }

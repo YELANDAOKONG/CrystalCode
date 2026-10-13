@@ -1085,7 +1085,12 @@ Repeated JSON provider keys are rejected; the array form preserves both
 endpoints. Repeated model keys within one endpoint are also rejected.
 Context size and sampling live on each model, not
 on the host. Thinking capability also lives on the model. The current thinking
-gear is a host setting. The API key for `openrouter` belongs in
+gear is a host setting. An endpoint may also carry an `options` object of
+JSON scalars. The object is not a fixed field list: names are read from the
+JSON and interpreted by `protocol`. Unknown names fail loading. The only
+recognized name is Anthropic `thinkingDisplay`, `summarized` (the default,
+not written back) or `omitted` (do not send `display`). Sampling parameters
+do not belong there. The API key for `openrouter` belongs in
 `credentials.json` under that provider name.
 
 ```json
@@ -1163,7 +1168,7 @@ portable name `maximum`, whose wire spelling differs:
 
 | Protocol | `maximum` | Any other effort |
 | :--- | :--- | :--- |
-| `anthropic` | `max` | unchanged. Adaptive or budgeted thinking also sets `display` to `summarized` |
+| `anthropic` | `max` | unchanged. Adaptive or budgeted thinking also sets `display` to `summarized`, unless the endpoint sets `options.thinkingDisplay` to `omitted` |
 | `responses` | `xhigh` | unchanged |
 | `openai` | `xhigh` | unchanged |
 | `deepseek` | `max` | unchanged |

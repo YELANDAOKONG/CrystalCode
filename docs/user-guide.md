@@ -516,6 +516,7 @@ ships no entry for it, so Claude models come from `providers.json`. See
 | `apiKeyEnvironment` | Environment variable name checked first for this provider |
 | `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |
 | `requiresApiKey` | Whether a missing key is an error (default `true`, except `ollama`; set `false` for an unauthenticated endpoint) |
+| `options` | Optional object of protocol-specific settings. Values are JSON strings, numbers, or booleans. Unknown names, and names that do not apply to `protocol`, fail loading. `temperature`, `topP`, and `maxTokens` stay on the model |
 | `models` | Table of selectable model ids |
 
 Provider names are letters, digits, hyphen, or underscore.
@@ -570,7 +571,8 @@ that text. Adapters send the portable names as themselves, except
 OpenAI, and `high` on Ollama and Gemini 3 (sent as `HIGH`). Gemini 3
 uppercases any other token. Gemini 2.5 maps the portable names to
 thinking budgets and rejects any other token.
-Anthropic also requests summarized thinking text when thinking is on.
+Anthropic requests summarized thinking text when thinking is on, unless
+that endpoint sets `options.thinkingDisplay` to `omitted`.
 An empty `thinkingEfforts` list is on/off only. When
 `thinkingCanDisable` is false, Off is left out of the gear. A stored
 Off choice uses the provider default and the status bar shows
@@ -641,7 +643,10 @@ editing `providers.json`, then select the model with
 change `baseUri` and the model id to match it. List an endpoint token
 such as `xhigh` in `thinkingEfforts` when that model accepts it. The
 adapter sends `maximum` as `max` and any other token unchanged, and it
-asks for summarized thinking text whenever thinking is on. Omit
+asks for summarized thinking text whenever thinking is on. Set
+`options.thinkingDisplay` to `omitted` on this endpoint to leave the
+Anthropic `display` field off. `summarized` is the default and is not
+written back. The name is valid only for the `anthropic` protocol. Omit
 `temperature` and `topP` for models that reject sampling parameters.
 Thinking tokens count toward `maxTokens`.
 

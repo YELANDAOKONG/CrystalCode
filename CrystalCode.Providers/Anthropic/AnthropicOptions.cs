@@ -15,7 +15,8 @@ public sealed record AnthropicOptions
         double? topP = null,
         int? maxTokens = null,
         string? vendorName = null,
-        TimeSpan? requestTimeout = null)
+        TimeSpan? requestTimeout = null,
+        bool summarizeThinking = true)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -53,6 +54,7 @@ public sealed record AnthropicOptions
         MaxTokens = maxTokens;
         VendorName = string.IsNullOrWhiteSpace(vendorName) ? "Anthropic" : vendorName.Trim();
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
+        SummarizeThinking = summarizeThinking;
     }
 
     public string ApiKey { get; }
@@ -63,6 +65,12 @@ public sealed record AnthropicOptions
     public int? MaxTokens { get; }
     public string VendorName { get; }
     public TimeSpan RequestTimeout { get; }
+
+    /// <summary>
+    /// Gets whether a turned-on thinking block asks for summarized text.
+    /// False leaves the Anthropic <c>display</c> field off.
+    /// </summary>
+    public bool SummarizeThinking { get; }
 
     internal ProtocolOptions ToProtocolOptions() =>
         new(ApiKey, Model, BaseUri, Temperature, TopP, MaxTokens, RequestTimeout, VendorName);

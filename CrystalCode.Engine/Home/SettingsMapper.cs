@@ -144,9 +144,10 @@ internal static class SettingsMapper
             }
         }
 
+        var protocol = ProviderProtocol.Parse(entry.Protocol);
         return new ProviderDefinition(
             ProviderName.Parse(name),
-            ProviderProtocol.Parse(entry.Protocol),
+            protocol,
             baseUri,
             models,
             entry.Organization,
@@ -157,7 +158,8 @@ internal static class SettingsMapper
                 : TokenLimitStyle.Parse(entry.TokenLimit),
             entry.ApiKeyEnvironment,
             entry.ApiKey,
-            entry.RequiresApiKey);
+            entry.RequiresApiKey,
+            EndpointOptionsReader.Read(name, protocol, entry.Options));
     }
 
     private static ProviderDocument WriteProvider(ProviderDefinition provider)
@@ -196,6 +198,7 @@ internal static class SettingsMapper
                 (provider.Protocol != ProviderProtocol.Ollama)
                     ? null
                     : provider.RequiresApiKey,
+            Options = EndpointOptionsReader.Write(provider.ThinkingDisplay),
             Models = models
         };
     }

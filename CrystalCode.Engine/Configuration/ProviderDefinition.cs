@@ -18,7 +18,8 @@ public sealed record ProviderDefinition
         TokenLimitStyle? tokenLimit = null,
         string? apiKeyEnvironment = null,
         string? apiKey = null,
-        bool? requiresApiKey = null)
+        bool? requiresApiKey = null,
+        ThinkingDisplay? thinkingDisplay = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(protocol);
@@ -28,6 +29,22 @@ public sealed record ProviderDefinition
         if (!baseUri.IsAbsoluteUri)
         {
             throw new ArgumentException("Base URI must be absolute.", nameof(baseUri));
+        }
+
+        if (thinkingDisplay is not null
+            && thinkingDisplay != ThinkingDisplay.Summarized
+            && thinkingDisplay != ThinkingDisplay.Omitted)
+        {
+            throw new ArgumentException(
+                "Thinking display must be summarized or omitted.",
+                nameof(thinkingDisplay));
+        }
+
+        if (thinkingDisplay is not null && protocol != ProviderProtocol.Anthropic)
+        {
+            throw new ArgumentException(
+                "Thinking display is only valid for the anthropic protocol.",
+                nameof(thinkingDisplay));
         }
 
         Name = name;
@@ -43,6 +60,9 @@ public sealed record ProviderDefinition
         ApiKeyEnvironment = apiKeyEnvironment;
         ApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey.Trim();
         RequiresApiKey = requiresApiKey ?? protocol != ProviderProtocol.Ollama;
+        ThinkingDisplay = thinkingDisplay == ThinkingDisplay.Omitted
+            ? ThinkingDisplay.Omitted
+            : null;
     }
 
     public ProviderName Name { get; }
@@ -70,6 +90,12 @@ public sealed record ProviderDefinition
     public string? ApiKey { get; }
 
     public bool RequiresApiKey { get; }
+
+    /// <summary>
+    /// Gets the Anthropic thinking-text request. Null uses summarized text
+    /// and is not written to <c>providers.json</c>.
+    /// </summary>
+    public ThinkingDisplay? ThinkingDisplay { get; }
 
     public bool TryGetModel(string model, out ModelSettings settings)
     {

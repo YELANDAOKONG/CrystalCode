@@ -15,7 +15,7 @@ public sealed class AnthropicMultimodalProvider
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolMultimodalChatClient(
-            new AnthropicMultimodalCodec(options.VendorName),
+            new AnthropicMultimodalCodec(options.VendorName, options.SummarizeThinking),
             options.ToProtocolOptions(),
             httpClient);
     }

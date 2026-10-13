@@ -15,8 +15,13 @@ internal sealed class AnthropicCodec : IProtocolCodec
     private const int DefaultMaxTokens = 8192;
     private const string AnthropicVersion = "2023-06-01";
     private readonly string _vendorName;
+    private readonly bool _summarizeThinking;
 
-    public AnthropicCodec(string vendorName) => _vendorName = vendorName;
+    public AnthropicCodec(string vendorName, bool summarizeThinking = true)
+    {
+        _vendorName = vendorName;
+        _summarizeThinking = summarizeThinking;
+    }
 
     public string Path => "messages";
 
@@ -46,7 +51,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
             writer.WriteNumber("max_tokens", options.MaxTokens ?? DefaultMaxTokens);
             WriteMessages(writer, request.Items);
             WriteTools(writer, request.Tools);
-            WriteReasoning(writer, request.Reasoning);
+            WriteReasoning(writer, request.Reasoning, _summarizeThinking);
             if (options.Temperature is { } temperature)
             {
                 writer.WriteNumber("temperature", temperature);
@@ -322,7 +327,10 @@ internal sealed class AnthropicCodec : IProtocolCodec
         writer.WriteEndArray();
     }
 
-    private static void WriteReasoning(Utf8JsonWriter writer, ReasoningOptions? reasoning)
+    private static void WriteReasoning(
+        Utf8JsonWriter writer,
+        ReasoningOptions? reasoning,
+        bool summarizeThinking)
     {
         if (reasoning is null)
         {
@@ -356,9 +364,8 @@ internal sealed class AnthropicCodec : IProtocolCodec
             }
 
             // Opus 4.7 and later omit thinking text unless display asks for it.
-            // The host has no provider-specific output flag, so a turned-on
-            // thinking block always requests the summarized trace.
-            if (!disabled)
+            // summarized is the default. omitted leaves the field off.
+            if (!disabled && summarizeThinking)
             {
                 writer.WriteString("display", "summarized");
             }

@@ -19,11 +19,11 @@ internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
     private readonly AnthropicCodec _textCodec;
     private readonly string _vendorName;
 
-    public AnthropicMultimodalCodec(string vendorName)
+    public AnthropicMultimodalCodec(string vendorName, bool summarizeThinking = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
         _vendorName = vendorName;
-        _textCodec = new AnthropicCodec(vendorName);
+        _textCodec = new AnthropicCodec(vendorName, summarizeThinking);
     }
 
     public string Path => _textCodec.Path;

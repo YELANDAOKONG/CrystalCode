@@ -211,6 +211,7 @@ public sealed class ProviderCatalog
             replacement.TokenLimit,
             replacement.ApiKeyEnvironment ?? existing.ApiKeyEnvironment,
             replacement.ApiKey ?? existing.ApiKey,
-            replacement.RequiresApiKey);
+            replacement.RequiresApiKey,
+            replacement.ThinkingDisplay ?? existing.ThinkingDisplay);
     }
 }
