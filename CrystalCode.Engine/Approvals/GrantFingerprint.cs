@@ -20,7 +20,7 @@ internal static class GrantFingerprint
                 when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var imagePath) =>
                 imagePath.Replace('\\', '/'),
             ListTool.ToolName when ToolArguments.TryReadOptionalString(call.Arguments, "path", out var listPath)
-                && listPath is not null =>
+                && !string.IsNullOrWhiteSpace(listPath) =>
                 listPath.Replace('\\', '/'),
             GlobTool.ToolName when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var globPath) =>
                 globPath.Replace('\\', '/'),

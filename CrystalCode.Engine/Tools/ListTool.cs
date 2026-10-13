@@ -80,6 +80,11 @@ public sealed class ListTool : ITool
                     ToolResultStatus.Failure));
         }
 
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            path = null;
+        }
+
         if (path is not null && Workspace.IsCredentialPath(path))
         {
             return ValueTask.FromResult(

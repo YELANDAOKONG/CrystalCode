@@ -87,7 +87,7 @@ public sealed class ToolClassifier
         }
 
         if (!ToolArguments.TryReadOptionalString(arguments, "path", out var optionalPath)
-            || optionalPath is null)
+            || string.IsNullOrWhiteSpace(optionalPath))
         {
             return new ToolClassification(Risk.Read, Authority.Workspace, $"{verb} workspace");
         }

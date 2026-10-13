@@ -46,7 +46,7 @@ public sealed class ExternalApprovalClassifier : IApprovalClassifier
         foreach (var name in spec.PathArguments)
         {
             if (!ToolArguments.TryReadOptionalString(arguments, name, out var path)
-                || path is null)
+                || string.IsNullOrWhiteSpace(path))
             {
                 continue;
             }

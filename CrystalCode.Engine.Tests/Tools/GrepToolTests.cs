@@ -26,6 +26,23 @@ public sealed class GrepToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_BlankPathAndGlob_SearchesWorkspace()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "App.cs"), "class App {}\n");
+        var tool = new GrepTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall(
+                "1",
+                GrepTool.ToolName,
+                """{"pattern":"class","path":"","glob":""}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains("App.cs:1:class App {}", output.Text);
+    }
+
+    [Fact]
     public async Task InvokeAsync_SearchesPathOutsideWorkspace()
     {
         using var root = new TemporaryWorkspace();

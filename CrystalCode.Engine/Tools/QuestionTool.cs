@@ -258,7 +258,8 @@ public sealed class QuestionTool : ITool
         out bool value)
     {
         value = defaultValue;
-        if (!element.TryGetProperty(name, out var property))
+        if (!element.TryGetProperty(name, out var property)
+            || property.ValueKind == JsonValueKind.Null)
         {
             return true;
         }

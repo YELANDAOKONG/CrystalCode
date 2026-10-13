@@ -64,7 +64,8 @@ public static class ToolArguments
 
         using (document)
         {
-            if (!document.RootElement.TryGetProperty(name, out var property))
+            if (!document.RootElement.TryGetProperty(name, out var property)
+                || property.ValueKind == JsonValueKind.Null)
             {
                 return true;
             }
@@ -74,13 +75,9 @@ public static class ToolArguments
                 return false;
             }
 
-            var text = property.GetString();
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                return false;
-            }
-
-            value = text;
+            // Blank text stays a value. Callers that have a default decide
+            // whether to use it. Required fields reject blanks separately.
+            value = property.GetString() ?? "";
             return true;
         }
     }
@@ -95,7 +92,8 @@ public static class ToolArguments
 
         using (document)
         {
-            if (!document.RootElement.TryGetProperty(name, out var property))
+            if (!document.RootElement.TryGetProperty(name, out var property)
+                || property.ValueKind == JsonValueKind.Null)
             {
                 return true;
             }
@@ -121,7 +119,8 @@ public static class ToolArguments
 
         using (document)
         {
-            if (!document.RootElement.TryGetProperty(name, out var property))
+            if (!document.RootElement.TryGetProperty(name, out var property)
+                || property.ValueKind == JsonValueKind.Null)
             {
                 return true;
             }
@@ -153,7 +152,8 @@ public static class ToolArguments
 
         using (document)
         {
-            if (!document.RootElement.TryGetProperty(name, out var property))
+            if (!document.RootElement.TryGetProperty(name, out var property)
+                || property.ValueKind == JsonValueKind.Null)
             {
                 return true;
             }

@@ -84,8 +84,13 @@ public sealed class GrepTool : ITool
                     ToolResultStatus.Failure));
         }
 
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            relativePath = null;
+        }
+
         GlobPattern? fileGlob = null;
-        if (globText is not null
+        if (!string.IsNullOrWhiteSpace(globText)
             && !GlobPattern.TryCreate(globText, out fileGlob, out var globError))
         {
             return ValueTask.FromResult(new ToolOutput(globError, ToolResultStatus.Failure));

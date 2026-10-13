@@ -28,6 +28,19 @@ public sealed class WriteToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_WritesEmptyContents()
+    {
+        using var root = new TemporaryWorkspace();
+        var tool = new WriteTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", WriteTool.ToolName, """{"path":"empty.txt","contents":""}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal(string.Empty, File.ReadAllText(Path.Combine(root.Path, "empty.txt")));
+    }
+
+    [Fact]
     public async Task InvokeAsync_WritesPathOutsideWorkspace()
     {
         using var root = new TemporaryWorkspace();

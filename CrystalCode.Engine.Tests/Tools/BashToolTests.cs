@@ -26,6 +26,19 @@ public sealed class BashToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_EmptyCommand_Fails()
+    {
+        using var root = new TemporaryWorkspace();
+        var tool = new BashTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", BashTool.ToolName, """{"command":""}"""));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+        Assert.Equal("Arguments must include a command string.", output.Text);
+    }
+
+    [Fact]
     public async Task InvokeAsync_ReportsNonZeroExit()
     {
         using var root = new TemporaryWorkspace();

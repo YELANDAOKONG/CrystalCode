@@ -133,6 +133,27 @@ public sealed class ListToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_BlankPathAndNullCounts_ListWorkspaceRoot()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "keep.txt"), "k\n");
+        var tool = new ListTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall(
+                "1",
+                ListTool.ToolName,
+                """{"path":"","offset":null,"limit":null}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal("keep.txt", output.Text);
+        Assert.True(ToolArguments.TryReadOptionalString("""{"path":""}""", "path", out var blank));
+        Assert.Equal(string.Empty, blank);
+        Assert.True(ToolArguments.TryReadOptionalString("""{"path":null}""", "path", out var missing));
+        Assert.Null(missing);
+    }
+
+    [Fact]
     public async Task InvokeAsync_EmptyDirectory_ReportsEmpty()
     {
         using var root = new TemporaryWorkspace();

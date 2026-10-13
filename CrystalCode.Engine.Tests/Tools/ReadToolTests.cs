@@ -25,6 +25,20 @@ public sealed class ReadToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_NullOffsetAndLimit_ReadsFromTheStart()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "note.txt"), "alpha\n");
+        var tool = new ReadTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", ReadTool.ToolName, """{"path":"note.txt","offset":null,"limit":null}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains("1|alpha", output.Text);
+    }
+
+    [Fact]
     public async Task InvokeAsync_ReadsPathOutsideWorkspace()
     {
         using var root = new TemporaryWorkspace();

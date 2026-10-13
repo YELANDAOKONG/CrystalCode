@@ -88,6 +88,11 @@ public sealed class GlobTool : ITool
         }
 
         var searchRoot = _workspace.Root;
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            relativePath = null;
+        }
+
         if (relativePath is not null)
         {
             if (Workspace.IsCredentialPath(relativePath))

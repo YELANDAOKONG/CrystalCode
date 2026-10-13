@@ -67,6 +67,11 @@ public sealed class DescribeImageTool : ITool
                 ToolResultStatus.Failure);
         }
 
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            question = null;
+        }
+
         if (!ImageAccess.TryLoad(_workspace, path, out var image, out var error) || image is null)
         {
             return new ToolOutput(error, ToolResultStatus.Failure);
