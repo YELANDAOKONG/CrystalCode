@@ -134,6 +134,9 @@ separate library with no terminal code. The product can:
   in JSON, and
   carry generic plugin-returned images into the next model round when a model
   explicitly declares image-input support;
+- record `audioInput` and `videoInput` on a model entry. Those flags are
+  declarations only: the host stores them and publishes them to plugins, and
+  it does not attach, persist, or send audio or video;
 - color pasted image markers and edit them as single composer units while
   identically spelled user text remains ordinary text; discard unsent images
   whose attached markers were deleted;
@@ -151,7 +154,9 @@ implemented in the current build:
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
   and Ollama Chat;
-- audio and video input, and image, audio, or video model output;
+- accepting, persisting, or sending audio or video input, and image, audio,
+  or video model output. Declaring `audioInput` or `videoInput` does not
+  implement that path;
 - editing provider definitions in the TUI;
 - workspace-level configuration, read from `<workspace>/.crystal/config.json`
   once its field scope, precedence, write policy, and trust semantics are
@@ -161,7 +166,8 @@ implemented in the current build:
   or another mechanism, once its behavior and ownership are defined;
 
 TODO: add audio/video input and non-text model output only after their terminal
-interaction, persistence, size, and provider semantics are defined. TODO: add
+interaction, persistence, size, and provider semantics are defined. A stored
+`audioInput` or `videoInput` declaration is not that path. TODO: add
 MCP without bypassing the existing plugin, approval, and media boundaries.
 
 TODO: add workspace-level configuration only after its field scope, precedence,
@@ -239,7 +245,8 @@ are separate from the `plugins/` and `tools/` install trees. Tools that
 implement only Crystal's
 interfaces stay unchanged. Native
 multimodal entries are exposed only while the selected model and provider
-support image input. `describe_image` is available on Plan and Work when
+support image input. Declared `audioInput` or `videoInput` does not expose
+them. `describe_image` is available on Plan and Work when
 `config.json` `imageModel` names a model that accepts images, and returns
 a text description from that model. `view_image` is available only while
 the selected model and provider support image input, and returns the image

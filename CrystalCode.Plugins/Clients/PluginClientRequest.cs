@@ -20,7 +20,9 @@ public sealed record PluginClientRequest
         bool replayReasoningContent,
         string tokenLimit,
         bool imageInput,
-        bool requiresApiKey)
+        bool requiresApiKey,
+        bool audioInput = false,
+        bool videoInput = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -45,6 +47,8 @@ public sealed record PluginClientRequest
         ReplayReasoningContent = replayReasoningContent;
         TokenLimit = tokenLimit.Trim();
         ImageInput = imageInput;
+        AudioInput = audioInput;
+        VideoInput = videoInput;
         RequiresApiKey = requiresApiKey;
     }
 
@@ -73,6 +77,18 @@ public sealed record PluginClientRequest
     public string TokenLimit { get; }
 
     public bool ImageInput { get; }
+
+    /// <summary>
+    /// Whether the model entry declares audio input. Built-in adapters do
+    /// not accept or send audio.
+    /// </summary>
+    public bool AudioInput { get; }
+
+    /// <summary>
+    /// Whether the model entry declares video input. Built-in adapters do
+    /// not accept or send video.
+    /// </summary>
+    public bool VideoInput { get; }
 
     public bool RequiresApiKey { get; }
 

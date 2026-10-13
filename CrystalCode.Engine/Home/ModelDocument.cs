@@ -17,4 +17,8 @@ internal sealed class ModelDocument
     public bool? ImageInput { get; set; }
 
     public bool? ThinkingCanDisable { get; set; }
+
+    public bool? AudioInput { get; set; }
+
+    public bool? VideoInput { get; set; }
 }

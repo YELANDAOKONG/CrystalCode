@@ -61,6 +61,71 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void ProviderDocument_PreservesDeclaredAudioAndVideoInput()
+    {
+        var catalog = new ProviderCatalog([
+            new ProviderDefinition(
+                new ProviderName("local"),
+                ProviderProtocol.OpenAI,
+                new Uri("https://example.test/v1/"),
+                new Dictionary<string, ModelSettings>
+                {
+                    ["heard"] = new(8192, audioInput: true),
+                    ["seen"] = new(8192, imageInput: true),
+                    ["watched"] = new(8192, videoInput: true)
+                })
+        ]);
+
+        var document = SettingsMapper.WriteProviders(catalog);
+        var models = document.GetProperty("local").GetProperty("models");
+        var heard = models.GetProperty("heard");
+        var seen = models.GetProperty("seen");
+        var watched = models.GetProperty("watched");
+        Assert.True(heard.GetProperty("audioInput").GetBoolean());
+        Assert.False(heard.TryGetProperty("videoInput", out _));
+        Assert.False(heard.TryGetProperty("imageInput", out _));
+        Assert.True(seen.GetProperty("imageInput").GetBoolean());
+        Assert.False(seen.TryGetProperty("audioInput", out _));
+        Assert.False(seen.TryGetProperty("videoInput", out _));
+        Assert.True(watched.GetProperty("videoInput").GetBoolean());
+        Assert.False(watched.TryGetProperty("audioInput", out _));
+        Assert.False(watched.TryGetProperty("imageInput", out _));
+
+        var provider = SettingsMapper.ReadProviders(document).Single();
+
+        Assert.True(provider.Models["heard"].AudioInput);
+        Assert.False(provider.Models["heard"].VideoInput);
+        Assert.False(provider.Models["heard"].ImageInput);
+        Assert.False(provider.Models["seen"].AudioInput);
+        Assert.False(provider.Models["seen"].VideoInput);
+        Assert.True(provider.Models["seen"].ImageInput);
+        Assert.False(provider.Models["watched"].AudioInput);
+        Assert.True(provider.Models["watched"].VideoInput);
+        Assert.False(provider.Models["watched"].ImageInput);
+
+        using var declared = JsonDocument.Parse(
+            """
+            {
+              "local": {
+                "protocol": "openai",
+                "baseUri": "https://example.test/v1/",
+                "models": {
+                  "both": {
+                    "contextWindow": 8192,
+                    "audioInput": true,
+                    "videoInput": true
+                  }
+                }
+              }
+            }
+            """);
+        var both = SettingsMapper.ReadProviders(declared.RootElement).Single().Models["both"];
+        Assert.True(both.AudioInput);
+        Assert.True(both.VideoInput);
+        Assert.False(both.ImageInput);
+    }
+
+    [Fact]
     public void LoadOrCreate_UsesStarterCatalogWithoutWritingProviderDefinitions()
     {
         using var root = new TemporaryHome();

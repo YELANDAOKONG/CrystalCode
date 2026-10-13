@@ -25,6 +25,8 @@ internal static class PluginClientRequests
             provider.ReplayReasoningContent,
             provider.TokenLimit.Value,
             model.ImageInput,
-            provider.RequiresApiKey);
+            provider.RequiresApiKey,
+            model.AudioInput,
+            model.VideoInput);
     }
 }

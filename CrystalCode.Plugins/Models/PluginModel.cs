@@ -21,7 +21,9 @@ public sealed record PluginModel
         double? temperature,
         double? topP,
         bool imageInput,
-        string thinking)
+        string thinking,
+        bool audioInput = false,
+        bool videoInput = false)
         : this(
             provider,
             protocol,
@@ -32,7 +34,9 @@ public sealed record PluginModel
             topP,
             imageInput,
             thinking,
-            unavailable: false)
+            unavailable: false,
+            audioInput,
+            videoInput)
     {
     }
 
@@ -47,7 +51,9 @@ public sealed record PluginModel
             null,
             false,
             string.Empty,
-            unavailable)
+            unavailable,
+            audioInput: false,
+            videoInput: false)
     {
     }
 
@@ -61,7 +67,9 @@ public sealed record PluginModel
         double? topP,
         bool imageInput,
         string thinking,
-        bool unavailable)
+        bool unavailable,
+        bool audioInput,
+        bool videoInput)
     {
         if (!unavailable)
         {
@@ -115,6 +123,8 @@ public sealed record PluginModel
         Temperature = temperature;
         TopP = topP;
         ImageInput = imageInput;
+        AudioInput = audioInput;
+        VideoInput = videoInput;
         Thinking = thinking;
     }
 
@@ -133,6 +143,18 @@ public sealed record PluginModel
     public double? TopP { get; }
 
     public bool ImageInput { get; }
+
+    /// <summary>
+    /// Whether the model entry declares audio input. The host does not
+    /// accept or send audio.
+    /// </summary>
+    public bool AudioInput { get; }
+
+    /// <summary>
+    /// Whether the model entry declares video input. The host does not
+    /// accept or send video.
+    /// </summary>
+    public bool VideoInput { get; }
 
     /// <summary>
     /// Host thinking gear. <c>default</c> and <c>off</c> are host sentinels.

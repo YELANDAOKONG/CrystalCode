@@ -3,6 +3,8 @@ namespace CrystalCode.Engine.Configuration;
 /// <summary>
 /// Per-model limits, sampling, and thinking capability. Context size is
 /// required. The current thinking gear is a host setting, not a model field.
+/// Audio and video input are stored declarations; the host does not
+/// accept or send them.
 /// </summary>
 public sealed record ModelSettings
 {
@@ -14,7 +16,9 @@ public sealed record ModelSettings
         bool thinking = false,
         IReadOnlyList<string>? thinkingEfforts = null,
         bool imageInput = false,
-        bool thinkingCanDisable = true)
+        bool thinkingCanDisable = true,
+        bool audioInput = false,
+        bool videoInput = false)
     {
         if (contextWindow <= 0)
         {
@@ -56,6 +60,8 @@ public sealed record ModelSettings
         ThinkingEfforts = NormalizeEfforts(thinking, thinkingEfforts);
         ImageInput = imageInput;
         ThinkingCanDisable = thinkingCanDisable;
+        AudioInput = audioInput;
+        VideoInput = videoInput;
     }
 
     public int ContextWindow { get; }
@@ -78,6 +84,18 @@ public sealed record ModelSettings
     /// Gemini 3 models reject that request.
     /// </summary>
     public bool ThinkingCanDisable { get; }
+
+    /// <summary>
+    /// Gets whether the operator declared audio input. The host stores the
+    /// declaration and does not accept or send audio.
+    /// </summary>
+    public bool AudioInput { get; }
+
+    /// <summary>
+    /// Gets whether the operator declared video input. The host stores the
+    /// declaration and does not accept or send video.
+    /// </summary>
+    public bool VideoInput { get; }
 
     public bool AllowsEffort(string effort)
     {

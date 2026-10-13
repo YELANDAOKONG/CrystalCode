@@ -493,7 +493,8 @@ cancel and returns a failure. In-process code that ignores cancellation may
 continue running; `AssemblyLoadContext` cannot terminate it. Set
 `"timeoutSeconds": "unlimited"` to disable only the per-call timeout.
 Pure multimodal tools are exposed only when
-the selected model and provider support image input. Text-only sessions ignore
+the selected model and provider support image input. Declared `audioInput`
+or `videoInput` does not count. Text-only sessions ignore
 them. A type implementing both retains its ordinary `ITool` entry in a
 text-only session. `AssemblyLoadContext` is not a sandbox.
 

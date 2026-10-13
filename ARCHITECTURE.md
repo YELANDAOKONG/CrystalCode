@@ -288,7 +288,8 @@ image lookup and mutation. A failed paste leaves a gap rather than reusing its
 number. Input batches dispatch keys in order, so Ctrl+V finishes attaching
 before a following Enter submits the prompt.
 Dotnet multimodal tools are omitted from active catalogs when the selected
-model or provider does not support image input.
+model or provider does not support image input. Declared `audioInput` or
+`videoInput` does not keep them.
 `describe_image` is a text tool on Plan and Work when `config.json`
 `imageModel` names a provider and model whose catalog entry has
 `imageInput`. It sends that file to a side multimodal client with the
@@ -321,7 +322,12 @@ image, and a reader failure have separate operator errors. Reader commands are
 optional at runtime, and their absence
 does not prevent the application from starting. A model must
 opt in with `imageInput: true`; unsupported combinations are rejected before
-sending a request. Audio/video input and non-text model output are TODO. MCP
+sending a request. `audioInput` and `videoInput` are stored declarations.
+They are published on plugin model facts and on `PluginClientRequest`, and
+they do not change adapter capabilities, tool registration, attachment,
+persistence, or the outbound request. Built-in adapters still accept only
+text and image input. Accepting audio or video, and non-text model output,
+remain TODO. MCP
 media transport is TODO.
 
 CrystalCode does not capture screenshots, control browsers, phones, virtual
@@ -1623,7 +1629,10 @@ exists. The snapshot does not enable, disable, invoke, or reorder other
 plugins or tools. The host then calls `IPlugin.AttachSession` with a live
 view of the session model and the review model. Each read returns the
 current provider, protocol, model name, context window, maximum tokens,
-temperature, top-p, image input, and thinking gear. `Review.Independent`
+temperature, top-p, image input, declared audio input, declared video
+input, and thinking gear. Audio and video flags copy the model entry.
+They do not make a turn, a tool result, or a plugin multimodal client
+accept audio or video. `Review.Independent`
 is true only when review uses its own model. While it is false, review
 uses the session model and a stored selection is omitted. The view has no
 API key, endpoint, organization, or project. A plugin that implements

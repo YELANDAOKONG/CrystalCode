@@ -138,7 +138,9 @@ internal static class SettingsMapper
                     modelEntry.Thinking ?? false,
                     modelEntry.ThinkingEfforts,
                     modelEntry.ImageInput ?? false,
-                    modelEntry.ThinkingCanDisable ?? true);
+                    modelEntry.ThinkingCanDisable ?? true,
+                    modelEntry.AudioInput ?? false,
+                    modelEntry.VideoInput ?? false);
             }
         }
 
@@ -174,7 +176,9 @@ internal static class SettingsMapper
                     ? null
                     : [.. settings.ThinkingEfforts],
                 ImageInput = settings.ImageInput ? true : null,
-                ThinkingCanDisable = settings.ThinkingCanDisable ? null : false
+                ThinkingCanDisable = settings.ThinkingCanDisable ? null : false,
+                AudioInput = settings.AudioInput ? true : null,
+                VideoInput = settings.VideoInput ? true : null
             };
         }
 

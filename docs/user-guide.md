@@ -547,6 +547,13 @@ are not supported by the current adapter.
 | `thinkingEfforts` | Portable names `minimal`, `low`, `medium`, `high`, and `maximum` (`max` is stored as `maximum`), or another effort token this endpoint accepts. A token starts with a letter and then uses only letters, digits, and hyphens |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
+| `audioInput` | Declared audio input (default `false`). Stored and visible to plugins. The host does not accept or send audio |
+| `videoInput` | Declared video input (default `false`). Stored and visible to plugins. The host does not accept or send video |
+
+`audioInput` and `videoInput` only record the claim. Crystal Code stores
+them and shows them to plugins. It does not attach, paste, persist, or send
+audio or video, and those flags do not register multimodal tools.
+`imageInput` is still the only flag that allows image input.
 
 Gemini and Ollama native adapters accept inline images in user messages.
 Tool images are sent on Gemini `functionResponse` parts and on the Ollama
@@ -686,6 +693,7 @@ models. Each model id must be unique within a provider.
 For an OpenAI Chat Completions, DeepSeek, Responses, or Anthropic model
 configured with `imageInput: true`, run `/attach <workspace-image-path>` and
 enter the prompt, or press Ctrl+V to attach an image from the clipboard.
+`audioInput` and `videoInput` do not attach audio or video.
 Clipboard image paste uses Windows PowerShell on Windows, the built-in
 `osascript` command on macOS, and `wl-paste` or `xclip` on Linux. If a reader
 is unavailable, Crystal Code reports that separately from a clipboard with

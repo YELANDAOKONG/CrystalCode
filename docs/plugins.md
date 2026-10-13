@@ -133,7 +133,9 @@ a letter, then letters, digits, `_`, or `-`. Put that token in
 `providers.json` as `protocol`.
 
 `PluginClientRequest` carries the endpoint, model sampling, and API key
-for that call. Do not log the key. `CreateMultimodal` is used only when
+for that call. Do not log the key. It also carries declared `audioInput`
+and `videoInput`. Those flags do not make `Create` or `CreateMultimodal`
+accept audio or video. `CreateMultimodal` is used only when
 the selected model accepts image input and no built-in factory owns the
 protocol.
 
@@ -191,8 +193,11 @@ next read. The host does
 not call `AttachSession` again for those changes.
 
 `Session` carries the provider, protocol, model name, context window,
-maximum tokens, temperature, top-p, image input, and the current thinking
-gear. `default` and `off` are host sentinels. Other values are the
+maximum tokens, temperature, top-p, image input, declared audio input,
+declared video input, and the current thinking gear. Audio and video
+flags copy the model entry. They do not make a turn, a tool result, or
+`CreateMultimodal` accept audio or video.
+`default` and `off` are host sentinels. Other values are the
 portable names `minimal`, `low`, `medium`, `high`, and `maximum`, or
 another effort token. Tokens are stored in lowercase.
 

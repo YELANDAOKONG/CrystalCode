@@ -29,7 +29,9 @@ internal static class PluginModelFacts
             model.Temperature,
             model.TopP,
             model.ImageInput,
-            thinking.Trim());
+            thinking.Trim(),
+            model.AudioInput,
+            model.VideoInput);
     }
 
     public static PluginReview DescribeReview(

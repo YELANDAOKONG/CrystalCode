@@ -97,6 +97,27 @@ public sealed class ModelSettingsTests
         var model = new ModelSettings(1000, imageInput: true);
 
         Assert.True(model.ImageInput);
+        Assert.False(model.AudioInput);
+        Assert.False(model.VideoInput);
+    }
+
+    [Fact]
+    public void Constructor_DefaultsDeclaredAudioAndVideoInputToFalse()
+    {
+        var model = new ModelSettings(1000);
+
+        Assert.False(model.AudioInput);
+        Assert.False(model.VideoInput);
+    }
+
+    [Fact]
+    public void Constructor_PreservesDeclaredAudioAndVideoInput()
+    {
+        var model = new ModelSettings(1000, audioInput: true, videoInput: true);
+
+        Assert.False(model.ImageInput);
+        Assert.True(model.AudioInput);
+        Assert.True(model.VideoInput);
     }
 
     [Fact]
