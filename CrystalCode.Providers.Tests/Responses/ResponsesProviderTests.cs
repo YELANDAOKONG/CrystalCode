@@ -70,8 +70,9 @@ public sealed class ResponsesProviderTests
             events.Add(streamEvent);
         }
 
-        Assert.Contains(events, item => item is ChatTextDelta { Text: "hello" });
-        Assert.Contains(events, item => item is ChatToolCallDelta { CallIdDelta: "call_1", NameDelta: "read" });
+        Assert.Contains(events, item => item is ChatTextDelta { Text: "hello", ItemIndex: 0 });
+        Assert.Contains(events, item => item is ChatToolCallDelta { CallIdDelta: "call_1", NameDelta: "read", ItemIndex: 1 });
+        Assert.Contains(events, item => item is ChatToolCallDelta { ArgumentsDelta: "{}", ItemIndex: 1 });
         Assert.Contains(events, item => item is ChatUsageReceived);
         Assert.Contains(events, item => item is ChatCandidateCompleted { FinishReason: var reason } && reason == FinishReason.ToolCalls);
     }
@@ -316,6 +317,67 @@ public sealed class ResponsesProviderTests
         Assert.Equal((0, ReasoningTextKind.Summary, "one"), (deltas[0].TextSegmentIndex, deltas[0].Kind, deltas[0].Text));
         Assert.Equal((1, ReasoningTextKind.Summary, "two"), (deltas[1].TextSegmentIndex, deltas[1].Kind, deltas[1].Text));
         Assert.Equal((1_000_000, ReasoningTextKind.Trace, "trace"), (deltas[2].TextSegmentIndex, deltas[2].Kind, deltas[2].Text));
+        Assert.All(deltas, static item => Assert.Equal(0, item.ItemIndex));
+    }
+
+    [Fact]
+    public async Task StreamAsync_SplitsMessageOffASharedReasoningIndex()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"response.reasoning_summary_text.delta","output_index":0,"summary_index":0,"delta":"think"}
+
+            data: {"type":"response.output_item.done","output_index":0,"item":{"type":"reasoning","id":"rs_1"}}
+
+            data: {"type":"response.output_text.delta","output_index":0,"delta":"hello"}
+
+            data: {"type":"response.completed","response":{"status":"completed"}}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        Assert.Equal(0, events.OfType<ChatReasoningTextDelta>().Single().ItemIndex);
+        Assert.Equal(0, events.OfType<ChatReasoningStateReceived>().Single().ItemIndex);
+        Assert.Equal(1, events.OfType<ChatTextDelta>().Single().ItemIndex);
+    }
+
+    [Fact]
+    public async Task StreamAsync_AttachesReasoningStateWhenDoneIndexMoves()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"response.reasoning_text.delta","output_index":0,"content_index":0,"delta":"think"}
+
+            data: {"type":"response.output_item.done","output_index":1,"item":{"type":"reasoning","id":"rs_1"}}
+
+            data: {"type":"response.output_text.delta","output_index":1,"delta":"hello"}
+
+            data: {"type":"response.completed","response":{"status":"completed"}}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        Assert.Equal(0, events.OfType<ChatReasoningTextDelta>().Single().ItemIndex);
+        Assert.Equal(0, events.OfType<ChatReasoningStateReceived>().Single().ItemIndex);
+        Assert.Equal(1, events.OfType<ChatTextDelta>().Single().ItemIndex);
     }
 
     [Fact]

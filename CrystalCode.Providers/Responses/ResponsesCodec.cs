@@ -465,6 +465,10 @@ internal sealed class ResponsesCodec : IProtocolCodec
     private sealed class StreamParser : IProtocolStreamParser
     {
         private readonly ResponsesCodec _codec;
+        private readonly Dictionary<(int OutputIndex, StreamItemKind Kind), int> _itemIndexes = [];
+        private readonly HashSet<int> _usedItemIndexes = [];
+        private int _nextItemIndex;
+        private int? _reasoningOutputIndex;
         private bool _hasTools;
         private bool _refused;
         private bool _refusalTextEmitted;
@@ -490,7 +494,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 case "response.reasoning_summary_text.delta":
                     events.Add(new ChatReasoningTextDelta(
                         0,
-                        outputIndex,
+                        ReasoningItemIndex(outputIndex),
                         ReadIndex(root, "summary_index"),
                         ReasoningTextKind.Summary,
                         root.GetProperty("delta").GetString() ?? ""));
@@ -498,20 +502,24 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 case "response.reasoning_text.delta":
                     events.Add(new ChatReasoningTextDelta(
                         0,
-                        outputIndex,
+                        ReasoningItemIndex(outputIndex),
                         checked(ReadIndex(root, "content_index") + ReasoningTraceSegmentOffset),
                         ReasoningTextKind.Trace,
                         root.GetProperty("delta").GetString() ?? ""));
                     break;
                 case "response.output_text.delta":
-                    events.Add(new ChatTextDelta(0, outputIndex, ChatRole.Assistant, root.GetProperty("delta").GetString() ?? ""));
+                    events.Add(new ChatTextDelta(
+                        0,
+                        ItemIndex(outputIndex, StreamItemKind.Message),
+                        ChatRole.Assistant,
+                        root.GetProperty("delta").GetString() ?? ""));
                     break;
                 case "response.refusal.delta":
                     _refused = true;
                     _refusalTextEmitted = true;
                     events.Add(new ChatTextDelta(
                         0,
-                        outputIndex,
+                        ItemIndex(outputIndex, StreamItemKind.Message),
                         ChatRole.Assistant,
                         root.GetProperty("delta").GetString() ?? ""));
                     break;
@@ -519,7 +527,12 @@ internal sealed class ResponsesCodec : IProtocolCodec
                     ReadAddedItem(root, outputIndex, events);
                     break;
                 case "response.function_call_arguments.delta":
-                    events.Add(new ChatToolCallDelta(0, outputIndex, "", "", root.GetProperty("delta").GetString() ?? ""));
+                    events.Add(new ChatToolCallDelta(
+                        0,
+                        ItemIndex(outputIndex, StreamItemKind.ToolCall),
+                        "",
+                        "",
+                        root.GetProperty("delta").GetString() ?? ""));
                     break;
                 case "response.output_item.done":
                     ReadDoneItem(root, outputIndex, events);
@@ -554,6 +567,8 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 case "error":
                     var error = root.GetProperty("error");
                     throw _codec.CreateException(error.GetProperty("message").GetString() ?? "Responses stream failed.", errorCode: error.TryGetProperty("code", out var code) ? code.GetString() : null);
+                default:
+                    break;
             }
 
             return events;
@@ -568,7 +583,12 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 var callId = item.GetProperty("call_id").GetString() ?? "";
                 var name = item.GetProperty("name").GetString() ?? "";
                 _hasTools = true;
-                events.Add(new ChatToolCallDelta(0, outputIndex, callId, name, ""));
+                events.Add(new ChatToolCallDelta(
+                    0,
+                    ItemIndex(outputIndex, StreamItemKind.ToolCall),
+                    callId,
+                    name,
+                    ""));
             }
         }
 
@@ -578,7 +598,10 @@ internal sealed class ResponsesCodec : IProtocolCodec
             var type = item.GetProperty("type").GetString();
             if (type == "reasoning")
             {
-                events.Add(new ChatReasoningStateReceived(0, outputIndex, CreateState(item)));
+                events.Add(new ChatReasoningStateReceived(
+                    0,
+                    ReasoningStateIndex(outputIndex),
+                    CreateState(item)));
                 return;
             }
 
@@ -603,11 +626,70 @@ internal sealed class ResponsesCodec : IProtocolCodec
                     _refusalTextEmitted = true;
                     events.Add(new ChatTextDelta(
                         0,
-                        outputIndex,
+                        ItemIndex(outputIndex, StreamItemKind.Message),
                         ChatRole.Assistant,
                         refusal.GetString()!));
                 }
             }
+        }
+
+        // output_index is not a Crystal item. GPT streams reuse one index for
+        // reasoning and the following message, or omit it and land on 0.
+        // The first kind keeps the provider index. A conflicting kind takes
+        // the next free index so the two items stay ordered and distinct.
+        private int ItemIndex(int outputIndex, StreamItemKind kind)
+        {
+            if (_itemIndexes.TryGetValue((outputIndex, kind), out var existing))
+            {
+                return existing;
+            }
+
+            var itemIndex = ReserveItemIndex(outputIndex);
+            _itemIndexes[(outputIndex, kind)] = itemIndex;
+            return itemIndex;
+        }
+
+        private int ReserveItemIndex(int preferred)
+        {
+            if (_usedItemIndexes.Add(preferred))
+            {
+                if (preferred >= _nextItemIndex)
+                {
+                    _nextItemIndex = preferred + 1;
+                }
+
+                return preferred;
+            }
+
+            while (!_usedItemIndexes.Add(_nextItemIndex))
+            {
+                _nextItemIndex++;
+            }
+
+            var assigned = _nextItemIndex;
+            _nextItemIndex++;
+            return assigned;
+        }
+
+        private int ReasoningItemIndex(int outputIndex)
+        {
+            _reasoningOutputIndex = outputIndex;
+            return ItemIndex(outputIndex, StreamItemKind.Reasoning);
+        }
+
+        // Some servers emit the reasoning item's done event on the next
+        // output_index, which the message then uses. The opaque state belongs
+        // on the reasoning item that was streamed.
+        private int ReasoningStateIndex(int outputIndex)
+        {
+            var target = outputIndex;
+            if (_reasoningOutputIndex is int open && open != outputIndex)
+            {
+                target = open;
+            }
+
+            _reasoningOutputIndex = null;
+            return ItemIndex(target, StreamItemKind.Reasoning);
         }
 
         private static int ReadIndex(JsonElement root, string name)
@@ -618,6 +700,13 @@ internal sealed class ResponsesCodec : IProtocolCodec
             }
 
             return 0;
+        }
+
+        private enum StreamItemKind
+        {
+            Reasoning,
+            Message,
+            ToolCall
         }
     }
 }
