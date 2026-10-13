@@ -45,7 +45,7 @@ public sealed class BackgroundBashStopTool : ITool
                 ToolResultStatus.Failure);
         }
 
-        var snapshot = await _tasks.StopAsync(taskId);
+        var snapshot = await _tasks.StopAsync(taskId, cancellationToken);
         if (snapshot is null)
         {
             return new ToolOutput(

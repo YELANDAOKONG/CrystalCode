@@ -72,6 +72,37 @@ public sealed class BackgroundBashToolTests
     }
 
     [Fact]
+    public async Task Stop_CancellationCancelsWaitingAfterKillIsRequested()
+    {
+        using var root = new TemporaryWorkspace();
+        var registry = new BackgroundTaskRegistry(new Workspace(root.Path), timeoutSeconds: null);
+        var pidFile = Path.Combine(root.Path, "pid.txt");
+
+        Assert.True(
+            registry.TryStart(
+                "echo $$ > pid.txt; sleep 30",
+                out var started,
+                out var error),
+            error);
+        var startedAt = DateTimeOffset.UtcNow;
+        while (!File.Exists(pidFile) && DateTimeOffset.UtcNow - startedAt < TimeSpan.FromSeconds(5))
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.True(File.Exists(pidFile));
+        var pid = int.Parse(File.ReadAllText(pidFile).Trim());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => registry.StopAsync(started.TaskId, cancellation.Token));
+        await Task.Delay(300);
+
+        Assert.False(IsAlive(pid));
+    }
+
+    [Fact]
     public async Task CompletedTasks_DoNotConsumeActiveTaskSlots()
     {
         using var root = new TemporaryWorkspace();

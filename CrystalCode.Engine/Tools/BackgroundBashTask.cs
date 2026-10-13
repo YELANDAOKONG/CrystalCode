@@ -149,10 +149,10 @@ internal sealed class BackgroundBashTask
         BashProcess.TryKill(_process);
     }
 
-    public async Task StopAsync()
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         Stop();
-        await _runTask;
+        await _runTask.WaitAsync(cancellationToken);
     }
 
     private async Task ObserveAsync()

@@ -123,7 +123,9 @@ public sealed class BackgroundTaskRegistry : IDisposable
         return false;
     }
 
-    public async Task<BackgroundTaskSnapshot?> StopAsync(string taskId)
+    public async Task<BackgroundTaskSnapshot?> StopAsync(
+        string taskId,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(taskId);
         BackgroundBashTask? task;
@@ -137,7 +139,7 @@ public sealed class BackgroundTaskRegistry : IDisposable
             return null;
         }
 
-        await task.StopAsync();
+        await task.StopAsync(cancellationToken);
         return task.Snapshot();
     }
 
