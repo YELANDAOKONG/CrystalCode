@@ -297,9 +297,9 @@ checks the directory. `unlimited` removes that one cap.
 | `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
-| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default, and an unknown value exits 1. Does not write the file |
+| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default, and a value that is not an effort token exits 1. Does not write the file |
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
-| `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. An unknown value exits 1 |
+| `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. A value that is not an effort token exits 1 |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
@@ -544,7 +544,7 @@ are not supported by the current adapter.
 | `topP` | Optional, 0 to 1 |
 | `maxTokens` | Optional positive output-token cap |
 | `thinking` | Whether the model accepts reasoning hints |
-| `thinkingEfforts` | Crystal effort names this model accepts: `minimal`, `low`, `medium`, `high`, `maximum` (`max` is stored as `maximum`) |
+| `thinkingEfforts` | Portable names `minimal`, `low`, `medium`, `high`, and `maximum` (`max` is stored as `maximum`), or another effort token this endpoint accepts. A token starts with a letter and then uses only letters, digits, and hyphens |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 
@@ -557,7 +557,13 @@ multimodal function responses.
 models never fails: if the model does not support thinking, requests
 omit reasoning hints; if the stored gear is not in that model's list,
 the request uses the provider default and the stored choice is
-unchanged. An empty `thinkingEfforts` list is on/off only. When
+unchanged. The host forwards a listed token and does not interpret it.
+Adapters send the portable names as themselves, except `maximum`:
+`max` on Anthropic and DeepSeek, `xhigh` on Responses and OpenAI,
+`high` on Ollama, and `MAXIMUM` on Gemini 3. Gemini 2.5 maps the
+portable names to thinking budgets and rejects any other token.
+Anthropic also requests summarized thinking text when thinking is on.
+An empty `thinkingEfforts` list is on/off only. When
 `thinkingCanDisable` is false, Off is left out of the gear. A stored
 Off choice uses the provider default and the status bar shows
 `Think Default`.
@@ -624,7 +630,12 @@ Anthropic entry, so Claude models are reached by adding one to
 editing `providers.json`, then select the model with
 `/model anthropic claude-sonnet-4`, or set `provider` and `model` in
 `config.json`. The same entry reaches any Anthropic Messages gateway:
-change `baseUri` and the model id to match it.
+change `baseUri` and the model id to match it. List an endpoint token
+such as `xhigh` in `thinkingEfforts` when that model accepts it. The
+adapter sends `maximum` as `max` and any other token unchanged, and it
+asks for summarized thinking text whenever thinking is on. Omit
+`temperature` and `topP` for models that reject sampling parameters.
+Thinking tokens count toward `maxTokens`.
 
 ### Example: add OpenCode Zen protocol endpoints
 
@@ -899,9 +910,10 @@ may deny those calls or escalate them to you. Writes under `.ssh`,
 ## Thinking
 
 `/thinking` (alias `/think`) cycles the host gear, or sets one by
-name: `off`, `none`, `default`, `minimal`, `low`, `medium`, `high`,
-`maximum`, `max`. Tab completes the argument from the efforts the
-selected model lists. The choice is written to `config.json`.
+name: `off`, `none`, `default`, the portable names `minimal`, `low`,
+`medium`, `high`, and `maximum` (`max` is the same as `maximum`), or
+another effort token the selected model lists. Tab completes the
+argument from those efforts. The choice is written to `config.json`.
 
 The approval model has its own gear. `/approval thinking` cycles it, or
 sets one by name, restricted to that model's efforts, and stores it in

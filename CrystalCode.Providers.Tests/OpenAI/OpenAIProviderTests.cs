@@ -74,6 +74,40 @@ public sealed class OpenAIProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_MapsMaximumToXhighAndForwardsOtherEfforts()
+    {
+        var maximum = await SendEffort(ReasoningEffort.Maximum);
+        Assert.Contains("\"reasoning_effort\":\"xhigh\"", maximum, StringComparison.Ordinal);
+
+        var custom = await SendEffort(new ReasoningEffort("ultra"));
+        Assert.Contains("\"reasoning_effort\":\"ultra\"", custom, StringComparison.Ordinal);
+
+        static async Task<string?> SendEffort(ReasoningEffort effort)
+        {
+            var handler = new RecordingHandler(
+                JsonResponse.Create(
+                    """
+                    {
+                      "choices": [
+                        {
+                          "message": { "role": "assistant", "content": "done" },
+                          "finish_reason": "stop"
+                        }
+                      ]
+                    }
+                    """));
+            using var http = new HttpClient(handler);
+            using var provider = new OpenAIProvider(
+                new OpenAIOptions("test-key", "gpt-5.6-sol", maxTokens: 256),
+                http);
+            await provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "Hi")],
+                reasoning: new ReasoningOptions(effort: effort)));
+            return handler.Body;
+        }
+    }
+
+    [Fact]
     public async Task CompleteAsync_ReplaysReadableReasoningAsTextWhenReplayDisabled()
     {
         var handler = new RecordingHandler(

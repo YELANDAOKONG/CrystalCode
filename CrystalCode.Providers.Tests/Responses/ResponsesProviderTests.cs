@@ -181,6 +181,30 @@ public sealed class ResponsesProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_MapsMaximumToXhighAndForwardsOtherEfforts()
+    {
+        var maximum = await SendEffort(ReasoningEffort.Maximum);
+        Assert.Contains("\"effort\":\"xhigh\"", maximum, StringComparison.Ordinal);
+
+        var custom = await SendEffort(new ReasoningEffort("ultra"));
+        Assert.Contains("\"effort\":\"ultra\"", custom, StringComparison.Ordinal);
+
+        static async Task<string?> SendEffort(ReasoningEffort effort)
+        {
+            var handler = new RecordingHandler(JsonResponse.Create(
+                """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}"""));
+            using var http = new HttpClient(handler);
+            using var provider = new ResponsesProvider(
+                new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+                http);
+            await provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "Hi")],
+                reasoning: new ReasoningOptions(ReasoningMode.Enabled, effort)));
+            return handler.Body;
+        }
+    }
+
+    [Fact]
     public async Task CompleteAsync_KeepsRefusalTextAsContentFilter()
     {
         var handler = new RecordingHandler(JsonResponse.Create(

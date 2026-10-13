@@ -8,7 +8,6 @@ internal sealed record CompatibleProfile
         string? reasoningStateFormat,
         bool writeReasoningContent,
         bool writeThinkingObject,
-        bool supportsMinimalEffort,
         string maximumEffortValue,
         CompatibleTokenLimit tokenLimit,
         CompatibleFaults faults)
@@ -30,7 +29,6 @@ internal sealed record CompatibleProfile
         ReasoningStateFormat = reasoningStateFormat;
         WriteReasoningContent = writeReasoningContent;
         WriteThinkingObject = writeThinkingObject;
-        SupportsMinimalEffort = supportsMinimalEffort;
         MaximumEffortValue = maximumEffortValue;
         TokenLimit = tokenLimit;
         Faults = faults;
@@ -45,8 +43,6 @@ internal sealed record CompatibleProfile
     public bool WriteReasoningContent { get; }
 
     public bool WriteThinkingObject { get; }
-
-    public bool SupportsMinimalEffort { get; }
 
     public string MaximumEffortValue { get; }
 

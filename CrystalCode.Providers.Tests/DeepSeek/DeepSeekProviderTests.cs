@@ -67,6 +67,43 @@ public sealed class DeepSeekProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_MapsMaximumToMaxAndForwardsOtherEfforts()
+    {
+        var maximum = await SendEffort(ReasoningEffort.Maximum);
+        Assert.Contains("\"reasoning_effort\":\"max\"", maximum, StringComparison.Ordinal);
+
+        var custom = await SendEffort(new ReasoningEffort("xhigh"));
+        Assert.Contains("\"reasoning_effort\":\"xhigh\"", custom, StringComparison.Ordinal);
+
+        var minimal = await SendEffort(ReasoningEffort.Minimal);
+        Assert.Contains("\"reasoning_effort\":\"minimal\"", minimal, StringComparison.Ordinal);
+
+        static async Task<string?> SendEffort(ReasoningEffort effort)
+        {
+            var handler = new RecordingHandler(
+                JsonResponse.Create(
+                    """
+                    {
+                      "choices": [
+                        {
+                          "message": { "role": "assistant", "content": "ok" },
+                          "finish_reason": "stop"
+                        }
+                      ]
+                    }
+                    """));
+            using var http = new HttpClient(handler);
+            using var provider = new DeepSeekProvider(
+                new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+                http);
+            await provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "Hi")],
+                reasoning: new ReasoningOptions(ReasoningMode.Enabled, effort)));
+            return handler.Body;
+        }
+    }
+
+    [Fact]
     public async Task CompleteAsync_RejectsUnmatchedToolCall()
     {
         var handler = new RecordingHandler(JsonResponse.Create("{}"));

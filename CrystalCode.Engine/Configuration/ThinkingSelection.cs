@@ -3,9 +3,11 @@ using Crystal.Reasoning;
 namespace CrystalCode.Engine.Configuration;
 
 /// <summary>
-/// Host-selected thinking gear. Not a model capability.
-/// <c>default</c> and <c>off</c> are host sentinels; other values are
-/// Crystal <see cref="ReasoningEffort"/> names.
+/// Host-selected thinking gear. Not a model capability and not a wire value.
+/// <c>default</c> and <c>off</c> are host sentinels. Other values are the
+/// portable Crystal names (<c>minimal</c>, <c>low</c>, <c>medium</c>,
+/// <c>high</c>, <c>maximum</c>) or another effort token the endpoint accepts.
+/// The host does not interpret that token; the adapter forwards it.
 /// </summary>
 public sealed record ThinkingSelection
 {
@@ -40,7 +42,8 @@ public sealed record ThinkingSelection
         }
 
         throw new ArgumentException(
-            "Thinking effort must be default, off, none, minimal, low, medium, high, maximum, or max.",
+            "Thinking effort must be default, off, none, minimal, low, medium, high, maximum, max, "
+            + "or an effort token that starts with a letter and then uses only letters, digits, and hyphens.",
             nameof(value));
     }
 
@@ -67,8 +70,37 @@ public sealed record ThinkingSelection
             return true;
         }
 
+        if (IsEffortToken(normalized))
+        {
+            effort = normalized;
+            return true;
+        }
+
         effort = string.Empty;
         return false;
+    }
+
+    /// <summary>
+    /// An endpoint token, not a host sentinel and not the <c>max</c> alias.
+    /// Adapters decide how to spell it on the wire.
+    /// </summary>
+    private static bool IsEffortToken(string value)
+    {
+        if (value.Length == 0 || value is "default" or "off" or "none" || value[0] is < 'a' or > 'z')
+        {
+            return false;
+        }
+
+        for (var index = 1; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (character is not ((>= 'a' and <= 'z') or (>= '0' and <= '9') or '-'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

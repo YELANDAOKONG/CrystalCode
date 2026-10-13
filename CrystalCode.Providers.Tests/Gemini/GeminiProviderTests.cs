@@ -336,19 +336,30 @@ public sealed class GeminiProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_RejectsMaximumEffortAndNonGemini3Effort()
+    public async Task CompleteAsync_ForwardsGemini3EffortAsThinkingLevel()
     {
-        var gemini3 = new RecordingHandler(JsonResponse.Create("{}"));
-        using var gemini3Http = new HttpClient(gemini3);
-        using var gemini3Provider = new GeminiProvider(
-            new GeminiOptions("key", "gemini-3.8-flash"),
-            gemini3Http);
-        var maximum = await Assert.ThrowsAsync<NotSupportedException>(
-            () => gemini3Provider.CompleteAsync(new ChatRequest(
-                [new ChatMessage(ChatRole.User, "hi")],
-                reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.Maximum))));
-        Assert.Contains("maximum", maximum.Message, StringComparison.Ordinal);
+        var maximum = await SendEffort(ReasoningEffort.Maximum);
+        Assert.Contains("\"thinkingLevel\":\"MAXIMUM\"", maximum, StringComparison.Ordinal);
 
+        var custom = await SendEffort(new ReasoningEffort("xhigh"));
+        Assert.Contains("\"thinkingLevel\":\"XHIGH\"", custom, StringComparison.Ordinal);
+
+        static async Task<string?> SendEffort(ReasoningEffort effort)
+        {
+            var handler = new RecordingHandler(JsonResponse.Create(
+                """{"candidates":[{"content":{"parts":[{"text":"done"}]},"finishReason":"STOP"}]}"""));
+            using var http = new HttpClient(handler);
+            using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-3.8-flash"), http);
+            await provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "hi")],
+                reasoning: new ReasoningOptions(ReasoningMode.Enabled, effort)));
+            return handler.Body;
+        }
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsEffortOnGeminiWithoutAStringOrBudgetField()
+    {
         var older = new RecordingHandler(JsonResponse.Create("{}"));
         using var olderHttp = new HttpClient(older);
         using var olderProvider = new GeminiProvider(
@@ -377,6 +388,12 @@ public sealed class GeminiProviderTests
 
         Assert.Contains("\"thinkingBudget\":24576", handler.Body, StringComparison.Ordinal);
         Assert.DoesNotContain("thinkingLevel", handler.Body, StringComparison.Ordinal);
+
+        var rejected = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "hi")],
+                reasoning: new ReasoningOptions(ReasoningMode.Enabled, new ReasoningEffort("xhigh")))));
+        Assert.Contains("xhigh", rejected.Message, StringComparison.Ordinal);
     }
 
     [Fact]

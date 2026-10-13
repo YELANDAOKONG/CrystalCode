@@ -128,7 +128,8 @@ public sealed record ModelSettings
             if (string.IsNullOrWhiteSpace(effort))
             {
                 throw new ArgumentException(
-                    "Thinking effort must be minimal, low, medium, high, or maximum.",
+                    "Thinking effort must be minimal, low, medium, high, maximum, max, "
+                    + "or an effort token that starts with a letter and then uses only letters, digits, and hyphens.",
                     nameof(thinkingEfforts));
             }
 
@@ -142,7 +143,8 @@ public sealed record ModelSettings
             if (!ThinkingSelection.TryNormalizeEffort(effort, out var name))
             {
                 throw new ArgumentException(
-                    "Thinking effort must be minimal, low, medium, high, maximum, or max. "
+                    "Thinking effort must be minimal, low, medium, high, maximum, max, "
+                    + "or an effort token that starts with a letter and then uses only letters, digits, and hyphens. "
                     + "Use none or off to disable thinking.",
                     nameof(thinkingEfforts));
             }

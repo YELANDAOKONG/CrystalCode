@@ -174,6 +174,74 @@ public sealed class AnthropicProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_WritesAdaptiveThinkingWithSummarizedDisplay()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "Hi")],
+            reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.High)));
+
+        Assert.Contains(
+            "\"thinking\":{\"type\":\"adaptive\",\"display\":\"summarized\"}",
+            handler.Body,
+            StringComparison.Ordinal);
+        Assert.Contains("\"output_config\":{\"effort\":\"high\"}", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsMaximumToMaxAndForwardsOtherEfforts()
+    {
+        var maximumHandler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var maximumHttp = new HttpClient(maximumHandler);
+        using var maximumProvider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            maximumHttp);
+        await maximumProvider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "Hi")],
+            reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.Maximum)));
+        Assert.Contains("\"effort\":\"max\"", maximumHandler.Body, StringComparison.Ordinal);
+
+        var customHandler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var customHttp = new HttpClient(customHandler);
+        using var customProvider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            customHttp);
+        await customProvider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "Hi")],
+            reasoning: new ReasoningOptions(ReasoningMode.Enabled, new ReasoningEffort("xhigh"))));
+        Assert.Contains("\"effort\":\"xhigh\"", customHandler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"display\":\"summarized\"", customHandler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WritesBudgetedThinkingWithSummarizedDisplay()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "Hi")],
+            reasoning: new ReasoningOptions(tokenBudget: 2048)));
+
+        Assert.Contains(
+            "\"thinking\":{\"type\":\"enabled\",\"budget_tokens\":2048,\"display\":\"summarized\"}",
+            handler.Body,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteAsync_ReplaysForeignReasoningAsText()
     {
         var handler = new RecordingHandler(JsonResponse.Create(

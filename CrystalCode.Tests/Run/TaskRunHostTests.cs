@@ -658,7 +658,7 @@ public sealed class TaskRunHostTests
 
         Assert.False(TaskRunOverrides.TryApply(
             current,
-            new TaskRunSettings { ApprovalThinking = "bogus" },
+            new TaskRunSettings { ApprovalThinking = "bad effort" },
             out _,
             out _,
             out var gearError));

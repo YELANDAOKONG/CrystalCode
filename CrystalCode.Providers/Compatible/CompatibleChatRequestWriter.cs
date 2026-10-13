@@ -436,39 +436,11 @@ internal static class CompatibleChatRequestWriter
                 $"{profile.VendorName} does not apply reasoning effort when thinking is disabled.");
         }
 
-        if (effort == ReasoningEffort.Minimal)
-        {
-            if (!profile.SupportsMinimalEffort)
-            {
-                throw new NotSupportedException(
-                    $"{profile.VendorName} does not support reasoning effort '{effort.Value}'.");
-            }
-
-            return "minimal";
-        }
-
-        if (effort == ReasoningEffort.Low)
-        {
-            return "low";
-        }
-
-        if (effort == ReasoningEffort.Medium)
-        {
-            return "medium";
-        }
-
-        if (effort == ReasoningEffort.High)
-        {
-            return "high";
-        }
-
-        if (effort == ReasoningEffort.Maximum)
-        {
-            return profile.MaximumEffortValue;
-        }
-
-        throw new NotSupportedException(
-            $"{profile.VendorName} does not support reasoning effort '{effort.Value}'.");
+        // Only the portable maximum name changes spelling per profile.
+        // Every other Crystal or caller-defined value is the wire token.
+        return effort == ReasoningEffort.Maximum
+            ? profile.MaximumEffortValue
+            : effort.Value;
     }
 
     private sealed class AssistantBuffer

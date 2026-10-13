@@ -1130,21 +1130,37 @@ For a mixed-protocol gateway, `providers.openrouter` may instead be an array:
 ```
 
 `thinking` and `thinkingEfforts` declare whether the model supports
-thinking and which Crystal effort names it accepts (`minimal`, `low`,
-`medium`, `high`, `maximum`). `max` is accepted as `maximum`. Built-in
-DeepSeek V4 models enable thinking with `low`, `high`, and `maximum`. An empty `thinkingEfforts`
-list is on/off only. `thinkingCanDisable` defaults to true. Set it to
+thinking and which effort names it accepts. The portable Crystal names
+are `minimal`, `low`, `medium`, `high`, and `maximum`. `max` is stored
+as `maximum`. A model may also list another effort token. That token
+starts with a letter and then uses only letters, digits, and hyphens.
+The host does not interpret it. An empty `thinkingEfforts`
+list is on/off only. Built-in
+DeepSeek V4 models enable thinking with `low`, `high`, and `maximum`. `thinkingCanDisable` defaults to true. Set it to
 false when the model rejects a request to turn thinking off. Built-in
 Gemini 3 models do. `/thinking` then omits Off. A stored Off gear falls
 back to the provider default and the status bar shows `Think Default`.
 An explicit `/thinking off` is refused.
 
 `thinkingEffort` is the operator choice: `default`, `off` (`none` is
-the same), or a Crystal effort name. It is not stored on the model. `/thinking` (alias
+the same), a portable Crystal name, or another effort token. It is not stored on the model. `/thinking` (alias
 `/think`) cycles the gear or sets one by name. `/model` never
 fails because of thinking: if the model does not support thinking, requests omit reasoning
 hints; if the stored gear is not in that model's list, the request
 uses the provider default and the stored choice is unchanged.
+
+Each adapter forwards an effort token unchanged. It rewrites only the
+portable name `maximum`, whose wire spelling differs:
+
+| Protocol | `maximum` | Any other effort |
+| :--- | :--- | :--- |
+| `anthropic` | `max` | unchanged. Adaptive or budgeted thinking also sets `display` to `summarized` |
+| `responses` | `xhigh` | unchanged |
+| `openai` | `xhigh` | unchanged |
+| `deepseek` | `max` | unchanged |
+| `ollama` | `high` | unchanged |
+| Gemini 3 | `MAXIMUM` | uppercased `thinkingLevel` |
+| Gemini 2.5 | the high thinking budget | portable `minimal`, `low`, `medium`, and `high` map to fixed budgets. Any other token is rejected because the field is an integer |
 
 `skills` enables the `skill` tool and available-skill guidance
 (default `true`). Set it to `false` to disable skill discovery.

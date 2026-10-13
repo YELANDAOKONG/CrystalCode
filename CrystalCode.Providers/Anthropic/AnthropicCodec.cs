@@ -355,7 +355,10 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 writer.WriteString("type", "adaptive");
             }
 
-            if (!disabled && reasoning.Output == ReasoningOutput.Summary)
+            // Opus 4.7 and later omit thinking text unless display asks for it.
+            // The host has no provider-specific output flag, so a turned-on
+            // thinking block always requests the summarized trace.
+            if (!disabled)
             {
                 writer.WriteString("display", "summarized");
             }
@@ -415,31 +418,8 @@ internal sealed class AnthropicCodec : IProtocolCodec
         }
     }
 
-    private static string ResolveEffort(ReasoningEffort effort)
-    {
-        if (effort == ReasoningEffort.Low)
-        {
-            return "low";
-        }
-
-        if (effort == ReasoningEffort.Medium)
-        {
-            return "medium";
-        }
-
-        if (effort == ReasoningEffort.High)
-        {
-            return "high";
-        }
-
-        if (effort == ReasoningEffort.Maximum)
-        {
-            return "max";
-        }
-
-        throw new NotSupportedException(
-            $"Anthropic does not support reasoning effort '{effort.Value}'.");
-    }
+    private static string ResolveEffort(ReasoningEffort effort) =>
+        effort == ReasoningEffort.Maximum ? "max" : effort.Value;
 
     private static void ReadBlock(JsonElement block, List<ChatItem> items)
     {

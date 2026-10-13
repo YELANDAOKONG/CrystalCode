@@ -282,4 +282,26 @@ public sealed class OllamaProviderTests
         Assert.Contains("does not support a JSON output schema", json.Message, StringComparison.Ordinal);
         Assert.Null(handler.Body);
     }
+
+    [Fact]
+    public async Task CompleteAsync_MapsMaximumToHighAndForwardsOtherEfforts()
+    {
+        var maximum = await SendEffort(ReasoningEffort.Maximum);
+        Assert.Contains("\"think\":\"high\"", maximum, StringComparison.Ordinal);
+
+        var custom = await SendEffort(new ReasoningEffort("xhigh"));
+        Assert.Contains("\"think\":\"xhigh\"", custom, StringComparison.Ordinal);
+
+        static async Task<string?> SendEffort(ReasoningEffort effort)
+        {
+            var handler = new RecordingHandler(JsonResponse.Create(
+                """{"message":{"role":"assistant","content":"done"},"done":true}"""));
+            using var http = new HttpClient(handler);
+            using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+            await provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "Hi")],
+                reasoning: new ReasoningOptions(ReasoningMode.Enabled, effort)));
+            return handler.Body;
+        }
+    }
 }

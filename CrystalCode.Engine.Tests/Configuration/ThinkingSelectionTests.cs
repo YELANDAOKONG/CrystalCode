@@ -60,6 +60,21 @@ public sealed class ThinkingSelectionTests
     }
 
     [Fact]
+    public void Parse_AcceptsAnEndpointEffortToken()
+    {
+        Assert.Equal(new ThinkingSelection("xhigh"), ThinkingSelection.Parse("XHigh"));
+        Assert.Equal(new ThinkingSelection("very-high"), ThinkingSelection.Parse("very-high"));
+    }
+
+    [Fact]
+    public void Parse_RejectsATokenThatIsNotAnEffort()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => ThinkingSelection.Parse("bad effort"));
+
+        Assert.Contains("Thinking effort must be", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ToReasoningOptions_DisablesWhenOff()
     {
         var model = new ModelSettings(1000, thinking: true);

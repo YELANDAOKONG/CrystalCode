@@ -483,12 +483,6 @@ internal sealed class GeminiCodec : IProtocolCodec
         {
             if (IsGemini3)
             {
-                if (effort.Value is not ("low" or "medium" or "high"))
-                {
-                    throw new NotSupportedException(
-                        $"Gemini does not support reasoning effort '{effort.Value}'.");
-                }
-
                 generation["thinkingConfig"] = new JsonObject
                 {
                     ["thinkingLevel"] = effort.Value.ToUpperInvariant()
@@ -503,6 +497,7 @@ internal sealed class GeminiCodec : IProtocolCodec
             }
 
             var level = effort == ReasoningEffort.Maximum ? "high" : effort.Value;
+            // Gemini 2.5 has no effort string. Unmapped tokens cannot be forwarded.
             var thinkingBudget = level switch
             {
                 "minimal" or "low" => Gemini25LowThinkingBudget,

@@ -62,6 +62,28 @@ public sealed class ModelSettingsTests
     }
 
     [Fact]
+    public void Constructor_AcceptsAnEndpointEffortToken()
+    {
+        var model = new ModelSettings(
+            1000,
+            thinking: true,
+            thinkingEfforts: ["xhigh", "very-high"]);
+
+        Assert.Equal(["xhigh", "very-high"], model.ThinkingEfforts);
+        Assert.True(model.AllowsEffort("XHigh"));
+        Assert.False(model.AllowsEffort("bad effort"));
+    }
+
+    [Fact]
+    public void Constructor_RejectsAnEffortTokenWithASpace()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => new ModelSettings(1000, thinking: true, thinkingEfforts: ["bad effort"]));
+
+        Assert.Contains("Thinking effort must be", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Constructor_DefaultsImageInputToFalse()
     {
         var model = new ModelSettings(1000);
