@@ -297,9 +297,9 @@ checks the directory. `unlimited` removes that one cap.
 | `--approval-model <on\|off>` | Use the saved approval model, or turn it off for this process |
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
-| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default, and a value that is not an effort token exits 1. Does not write the file |
+| `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default and a note is printed, and a value that is not an effort token exits 1. Does not write the file |
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
-| `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored. A value that is not an effort token exits 1 |
+| `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
@@ -454,7 +454,7 @@ Top-level fields:
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
 | `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
-| `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or a Crystal effort name |
+| `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), a portable name (`minimal`, `low`, `medium`, `high`, `maximum`; `max` is stored as `maximum`), or another effort token. Tokens are stored in lowercase |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `plugins` | Enable operator plugin discovery (default `true`) |
@@ -557,11 +557,12 @@ multimodal function responses.
 models never fails: if the model does not support thinking, requests
 omit reasoning hints; if the stored gear is not in that model's list,
 the request uses the provider default and the stored choice is
-unchanged. The host forwards a listed token and does not interpret it.
-Adapters send the portable names as themselves, except `maximum`:
-`max` on Anthropic and DeepSeek, `xhigh` on Responses and OpenAI,
-`high` on Ollama, and `MAXIMUM` on Gemini 3. Gemini 2.5 maps the
-portable names to thinking budgets and rejects any other token.
+unchanged. The host stores a listed token in lowercase and forwards
+that text. Adapters send the portable names as themselves, except
+`maximum`: `max` on Anthropic and DeepSeek, `xhigh` on Responses and
+OpenAI, and `high` on Ollama and Gemini 3 (sent as `HIGH`). Gemini 3
+uppercases any other token. Gemini 2.5 maps the portable names to
+thinking budgets and rejects any other token.
 Anthropic also requests summarized thinking text when thinking is on.
 An empty `thinkingEfforts` list is on/off only. When
 `thinkingCanDisable` is false, Off is left out of the gear. A stored

@@ -339,7 +339,7 @@ public sealed class GeminiProviderTests
     public async Task CompleteAsync_ForwardsGemini3EffortAsThinkingLevel()
     {
         var maximum = await SendEffort(ReasoningEffort.Maximum);
-        Assert.Contains("\"thinkingLevel\":\"MAXIMUM\"", maximum, StringComparison.Ordinal);
+        Assert.Contains("\"thinkingLevel\":\"HIGH\"", maximum, StringComparison.Ordinal);
 
         var custom = await SendEffort(new ReasoningEffort("xhigh"));
         Assert.Contains("\"thinkingLevel\":\"XHIGH\"", custom, StringComparison.Ordinal);

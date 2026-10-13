@@ -481,11 +481,13 @@ internal sealed class GeminiCodec : IProtocolCodec
 
         if (reasoning.Effort is { } effort)
         {
+            // Neither Gemini generation has a maximum level. The top portable name is high.
+            var level = effort == ReasoningEffort.Maximum ? "high" : effort.Value;
             if (IsGemini3)
             {
                 generation["thinkingConfig"] = new JsonObject
                 {
-                    ["thinkingLevel"] = effort.Value.ToUpperInvariant()
+                    ["thinkingLevel"] = level.ToUpperInvariant()
                 };
                 return;
             }
@@ -496,7 +498,6 @@ internal sealed class GeminiCodec : IProtocolCodec
                     "This Gemini model does not accept a reasoning effort. Set a reasoning token budget instead.");
             }
 
-            var level = effort == ReasoningEffort.Maximum ? "high" : effort.Value;
             // Gemini 2.5 has no effort string. Unmapped tokens cannot be forwarded.
             var thinkingBudget = level switch
             {

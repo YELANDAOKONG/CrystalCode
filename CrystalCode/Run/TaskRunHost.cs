@@ -92,6 +92,11 @@ internal static class TaskRunHost
                 return RunExit.Invalid;
             }
 
+            foreach (var note in TaskRunOverrides.UnavailableThinkingNotes(applied))
+            {
+                await error.WriteLineAsync(note);
+            }
+
             if (!TaskRunOverrides.TryReadWorkspaceTrust(
                     settings.WorkspaceTrust,
                     out var checkWorkspaceTrust,

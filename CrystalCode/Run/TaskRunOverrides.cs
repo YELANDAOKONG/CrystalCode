@@ -115,6 +115,63 @@ internal static class TaskRunOverrides
         }
     }
 
+    public static IReadOnlyList<string> UnavailableThinkingNotes(HarnessSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var notes = new List<string>();
+        AddUnavailableThinkingNote(
+            notes,
+            settings.ThinkingEffort,
+            settings.ActiveModel,
+            "Thinking effort");
+        var approval = settings.ApprovalModel;
+        if (approval.Enabled && approval.HasSelection)
+        {
+            try
+            {
+                var model = settings.Catalog.GetModel(
+                    ProviderName.Parse(approval.Provider!),
+                    approval.Model!);
+                AddUnavailableThinkingNote(
+                    notes,
+                    approval.ThinkingEffort,
+                    model,
+                    "Approval thinking effort");
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+            {
+                // A missing approval model fails setup on its own.
+            }
+        }
+
+        return notes;
+    }
+
+    private static void AddUnavailableThinkingNote(
+        List<string> notes,
+        ThinkingSelection effort,
+        ModelSettings model,
+        string label)
+    {
+        if (effort == ThinkingSelection.Default)
+        {
+            return;
+        }
+
+        if (!model.Thinking
+            || (effort != ThinkingSelection.Off && !model.AllowsEffort(effort.Value)))
+        {
+            notes.Add(
+                $"{label} '{effort.Value}' is not available for this model. The request uses the provider default.");
+            return;
+        }
+
+        if (effort == ThinkingSelection.Off && !model.ThinkingCanDisable)
+        {
+            notes.Add("The selected model cannot disable thinking. The request uses the provider default.");
+        }
+    }
+
     private static ApprovalModelSettings ParseApprovalModel(
         HarnessSettings current,
         SessionLaunchSettings request)

@@ -1134,7 +1134,9 @@ thinking and which effort names it accepts. The portable Crystal names
 are `minimal`, `low`, `medium`, `high`, and `maximum`. `max` is stored
 as `maximum`. A model may also list another effort token. That token
 starts with a letter and then uses only letters, digits, and hyphens.
-The host does not interpret it. An empty `thinkingEfforts`
+The host stores every token in lowercase and does not interpret it.
+`max` remains an alias of `maximum`, not a separate token, so a
+case-sensitive wire value cannot be spelled here. An empty `thinkingEfforts`
 list is on/off only. Built-in
 DeepSeek V4 models enable thinking with `low`, `high`, and `maximum`. `thinkingCanDisable` defaults to true. Set it to
 false when the model rejects a request to turn thinking off. Built-in
@@ -1148,6 +1150,7 @@ the same), a portable Crystal name, or another effort token. It is not stored on
 fails because of thinking: if the model does not support thinking, requests omit reasoning
 hints; if the stored gear is not in that model's list, the request
 uses the provider default and the stored choice is unchanged.
+`crystal run` prints that fallback on its error stream and continues.
 
 Each adapter forwards an effort token unchanged. It rewrites only the
 portable name `maximum`, whose wire spelling differs:
@@ -1159,7 +1162,7 @@ portable name `maximum`, whose wire spelling differs:
 | `openai` | `xhigh` | unchanged |
 | `deepseek` | `max` | unchanged |
 | `ollama` | `high` | unchanged |
-| Gemini 3 | `MAXIMUM` | uppercased `thinkingLevel` |
+| Gemini 3 | `HIGH` | uppercased `thinkingLevel`. There is no maximum level |
 | Gemini 2.5 | the high thinking budget | portable `minimal`, `low`, `medium`, and `high` map to fixed budgets. Any other token is rejected because the field is an integer |
 
 `skills` enables the `skill` tool and available-skill guidance

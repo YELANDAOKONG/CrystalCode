@@ -192,8 +192,9 @@ not call `AttachSession` again for those changes.
 
 `Session` carries the provider, protocol, model name, context window,
 maximum tokens, temperature, top-p, image input, and the current thinking
-gear. `default` and `off` are host sentinels. Other values are effort
-names such as `low` or `high`.
+gear. `default` and `off` are host sentinels. Other values are the
+portable names `minimal`, `low`, `medium`, `high`, and `maximum`, or
+another effort token. Tokens are stored in lowercase.
 
 `Review.Independent` is true only when review uses its own model. That
 model's thinking gear is its stored `thinkingEffort`, `default` when

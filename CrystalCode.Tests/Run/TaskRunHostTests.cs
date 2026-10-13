@@ -713,6 +713,34 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task UnavailableThinking_PrintsANoteAndContinues()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(AllowReview, TextRound("Hello there."));
+        var settings = fixture.Settings("Say hello");
+        settings = new TaskRunSettings
+        {
+            TaskText = settings.TaskText,
+            Home = settings.Home,
+            Workspace = settings.Workspace,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            Skills = settings.Skills,
+            ExternalTools = settings.ExternalTools,
+            Duration = settings.Duration,
+            Thinking = "bogus"
+        };
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        Assert.Contains("Thinking effort 'bogus' is not available", result.Error, StringComparison.Ordinal);
+        Assert.Contains("provider default", result.Error, StringComparison.Ordinal);
+        Assert.Contains("Hello there.", result.Output, StringComparison.Ordinal);
+        fixture.AssertSettingsUnchanged();
+    }
+
+    [Fact]
     public async Task UnknownProvider_ExitsInvalid()
     {
         using var fixture = new RunFixture();
