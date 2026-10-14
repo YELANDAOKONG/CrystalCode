@@ -9,4 +9,5 @@ public sealed record ExternalToolInfo(
     ExternalToolSource Source,
     ExternalCatalogSelection Catalogs,
     ExternalApprovalMode DeclaredApproval,
-    ExternalApprovalMode EffectiveApproval);
+    ExternalApprovalMode EffectiveApproval,
+    bool HasApprovalClassifier);

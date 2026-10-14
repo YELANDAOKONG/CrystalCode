@@ -51,7 +51,8 @@ public static class ToolListText
                         Catalogs(planNames.Contains(definition.Name), workNames.Contains(definition.Name)),
                         $"{Title(info.Source.Value)}/{info.SetName}",
                         Title(info.DeclaredApproval.Value),
-                        Title(info.EffectiveApproval.Value)
+                        Title(info.EffectiveApproval.Value),
+                        info.HasApprovalClassifier ? "Yes" : "-"
                     };
                 })
             .ToArray();
@@ -66,7 +67,7 @@ public static class ToolListText
         AddTable(
             lines,
             $"External tools ({externalRows.Length}, {(settings.ExternalTools ? "On" : "Off")})",
-            ["Name", "Catalog", "Source", "Author", "Effective"],
+            ["Name", "Catalog", "Source", "Author", "Effective", "Pre-classifier"],
             externalRows);
         lines.Add(string.Empty);
         AddTable(

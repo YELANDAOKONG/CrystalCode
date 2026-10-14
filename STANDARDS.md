@@ -72,7 +72,11 @@
 - Write, edit, read, list, glob, and grep of paths outside the workspace
   require approval. In Review or Audit the reviewing model judges them;
   otherwise the operator is asked. Edit, Review, and Full do not
-  auto-pass an outside write or edit. Path checks follow symbolic links
+  auto-pass an outside write or edit. External dotnet tools may supply a
+  side-effect-free pre-classifier when their actual write paths are embedded
+  in arguments; it must fail closed, it can only raise risk or authority for
+  the call, and it never replaces the Write + Workspace floor, the declared
+  path checks, or the source trust policy. Path checks follow symbolic links
   to their final target. A link that leaves the workspace is outside
   the workspace.
 - When Skills is enabled, any path

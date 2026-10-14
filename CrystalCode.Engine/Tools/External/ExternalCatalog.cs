@@ -3,6 +3,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins.Interfaces;
+using CrystalCode.Tools;
 
 namespace CrystalCode.Engine.Tools.External;
 
@@ -17,7 +18,8 @@ public sealed class ExternalCatalog
         [],
         [],
         [],
-        new ExternalApprovalClassifier(new Dictionary<string, ExternalToolSpec>(StringComparer.Ordinal)),
+        new ExternalApprovalClassifier(
+            new Dictionary<string, ExternalToolSpec>(StringComparer.Ordinal)),
         new HashSet<string>(StringComparer.Ordinal));
 
     private ExternalCatalog(
@@ -93,6 +95,8 @@ public sealed class ExternalCatalog
         var planMultimodal = new List<IMultimodalTool>();
         var workMultimodal = new List<IMultimodalTool>();
         var classifications = new Dictionary<string, ExternalToolSpec>(StringComparer.Ordinal);
+        var approvalClassifiers =
+            new Dictionary<string, IHostToolApprovalClassifier>(StringComparer.Ordinal);
         var origins = new Dictionary<string, ParsedToolSet>(StringComparer.Ordinal);
         var attempted = new List<ExternalSetLoad>();
         foreach (var set in sets)
@@ -112,6 +116,7 @@ public sealed class ExternalCatalog
                     planMultimodal,
                     workMultimodal,
                     classifications,
+                    approvalClassifiers,
                     origins);
             }
             else
@@ -127,6 +132,7 @@ public sealed class ExternalCatalog
                     planMultimodal,
                     workMultimodal,
                     classifications,
+                    approvalClassifiers,
                     origins);
             }
 
@@ -160,7 +166,8 @@ public sealed class ExternalCatalog
                     set.Source,
                     pair.Value.Catalogs,
                     declared,
-                    effective));
+                    effective,
+                    approvalClassifiers.ContainsKey(pair.Key)));
         }
 
         return new ExternalCatalog(
@@ -169,7 +176,7 @@ public sealed class ExternalCatalog
             planMultimodal,
             workMultimodal,
             notes,
-            new ExternalApprovalClassifier(classifications),
+            new ExternalApprovalClassifier(classifications, approvalClassifiers, host),
             automaticTools)
         {
             Tools = tools,
@@ -188,6 +195,7 @@ public sealed class ExternalCatalog
         List<IMultimodalTool> planMultimodal,
         List<IMultimodalTool> workMultimodal,
         Dictionary<string, ExternalToolSpec> classifications,
+        Dictionary<string, IHostToolApprovalClassifier> approvalClassifiers,
         Dictionary<string, ParsedToolSet> origins)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);

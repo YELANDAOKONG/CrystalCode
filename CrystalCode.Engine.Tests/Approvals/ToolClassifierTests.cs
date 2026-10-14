@@ -3,9 +3,11 @@ using Crystal.Tools;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Skills;
+using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Tools;
 
 using Xunit;
 
@@ -346,6 +348,176 @@ public sealed class ToolClassifierTests
     }
 
     [Fact]
+    public void Classify_ExternalToolApprovalClassifierRaisesManifestPaths()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("apply_patch");
+        var approvalClassifier = new FixedHostApprovalClassifier(
+            new HostToolApprovalClassification(
+                "write",
+                "outsideWorkspace",
+                "Apply patch outside workspace"));
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
+
+        var classification = classifier.Classify(
+            new ToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
+        Assert.Equal("Apply patch outside workspace", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierCannotLowerManifestFloor()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("inspect");
+        var approvalClassifier = new FixedHostApprovalClassifier(
+            new HostToolApprovalClassification("read", "workspace", "Inspect workspace"));
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
+
+        var classification = classifier.Classify(new ToolCall("1", "inspect", "{}"));
+
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.Workspace, classification.Authority);
+        Assert.Equal("External tool", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierCannotClearCredentialPath()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("preview", ["path"]);
+        var approvalClassifier = new FixedHostApprovalClassifier(
+            new HostToolApprovalClassification("write", "workspace", "Inside workspace"));
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
+
+        var classification = classifier.Classify(
+            new ToolCall("1", "preview", """{"path":".ssh/id_rsa"}"""));
+
+        Assert.Equal(Risk.Forbidden, classification.Risk);
+        Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
+        Assert.Equal("External tool credential path", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierMixesRaiseAndLower()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("apply_patch");
+        var approvalClassifier = new FixedHostApprovalClassifier(
+            new HostToolApprovalClassification(
+                "read",
+                "outsideWorkspace",
+                "Apply patch outside workspace"));
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
+
+        var classification = classifier.Classify(
+            new ToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
+        Assert.Equal("External tool", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierAcceptsHostSpellings()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("apply_patch");
+        var approvalClassifier = new FixedHostApprovalClassifier(
+            new HostToolApprovalClassification(
+                "Write",
+                "outside_workspace",
+                "Apply patch outside workspace"));
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
+
+        var classification = classifier.Classify(
+            new ToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
+        Assert.Equal("Apply patch outside workspace", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierUnknownValuesFailClosed()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("apply_patch");
+        var approvalClassifier = new FixedHostApprovalClassifier(
+            new HostToolApprovalClassification("nonsense", "nonsense", "Apply patch"));
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
+
+        var classification = classifier.Classify(
+            new ToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(Risk.Privileged, classification.Risk);
+        Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierFailureFailsClosed()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("apply_patch");
+        var classifier = CreateExternalClassifier(
+            root,
+            spec,
+            new ThrowingHostApprovalClassifier());
+
+        var classification = classifier.Classify(
+            new ToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(Risk.Privileged, classification.Risk);
+        Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
+        Assert.Equal("External tool approval classification failed", classification.Summary);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierKeepsPromptRequirement()
+    {
+        using var root = new TemporaryWorkspace();
+        var spec = CreateExternalSpec("apply_patch");
+        var approvalClassifier = new FixedHostApprovalClassifier(
+            new HostToolApprovalClassification(
+                "write",
+                "workspace",
+                "Apply patch inside workspace",
+                RequirePrompt: true));
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
+
+        var classification = classifier.Classify(
+            new ToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.Workspace, classification.Authority);
+        Assert.True(classification.RequirePrompt);
+    }
+
+    [Fact]
+    public void Classify_ExternalToolApprovalClassifierReceivesLiveHostFacts()
+    {
+        using var root = new TemporaryWorkspace();
+        using var home = new TemporaryHome();
+        var workspace = new Workspace(root.Path);
+        var spec = CreateExternalSpec("where");
+        var approvalClassifier = new CapturingHostApprovalClassifier();
+        var host = new SessionToolHost(workspace, home.Home, () => "sess-7", () => "audit");
+        var classifier = CreateExternalClassifier(root, spec, approvalClassifier, host);
+
+        _ = classifier.Classify(new ToolCall("1", "where", "{}"));
+
+        var captured = approvalClassifier.Context;
+        Assert.NotNull(captured);
+        Assert.Equal(workspace.Root, captured!.WorkspaceRoot);
+        Assert.Equal("sess-7", captured.SessionId);
+        Assert.Equal("audit", captured.Approval);
+        Assert.Equal(string.Empty, captured.GlobalDataDirectory);
+        Assert.Equal(string.Empty, captured.ProjectDataDirectory);
+    }
+
+    [Fact]
     public void Classify_ImageTools_MatchReadPathRules()
     {
         using var root = new TemporaryWorkspace();
@@ -373,6 +545,73 @@ public sealed class ToolClassifierTests
                 "shot.png",
                 GrantFingerprint.Create(new ToolCall("4", name, """{"path":"shot.png"}""")));
         }
+    }
+
+    private static ExternalToolSpec CreateExternalSpec(
+        string name,
+        IReadOnlyList<string>? pathArguments = null) =>
+        new(
+            name,
+            name,
+            ToolSchema.Parse("""{"type":"object","properties":{}}"""),
+            ExternalCatalogSelection.Both,
+            pathArguments: pathArguments);
+
+    private static ToolClassifier CreateExternalClassifier(
+        TemporaryWorkspace root,
+        ExternalToolSpec spec,
+        IHostToolApprovalClassifier? approvalClassifier = null,
+        SessionToolHost? host = null)
+    {
+        var approvalClassifiers =
+            new Dictionary<string, IHostToolApprovalClassifier>(StringComparer.Ordinal);
+        if (approvalClassifier is not null)
+        {
+            approvalClassifiers[spec.Name] = approvalClassifier;
+        }
+
+        return new ToolClassifier(
+            new Workspace(root.Path),
+            [new ExternalApprovalClassifier(
+                new Dictionary<string, ExternalToolSpec> { [spec.Name] = spec },
+                approvalClassifiers,
+                host)]);
+    }
+
+    private sealed class FixedHostApprovalClassifier : IHostToolApprovalClassifier
+    {
+        private readonly HostToolApprovalClassification _classification;
+
+        public FixedHostApprovalClassifier(HostToolApprovalClassification classification)
+        {
+            _classification = classification;
+        }
+
+        public HostToolApprovalClassification ClassifyApproval(
+            ToolCall call,
+            ToolHostContext context) =>
+            _classification;
+    }
+
+    private sealed class CapturingHostApprovalClassifier : IHostToolApprovalClassifier
+    {
+        public ToolHostContext? Context { get; private set; }
+
+        public HostToolApprovalClassification ClassifyApproval(
+            ToolCall call,
+            ToolHostContext context)
+        {
+            Context = context;
+            return new HostToolApprovalClassification("write", "workspace", "Where tool");
+        }
+    }
+
+    private sealed class ThrowingHostApprovalClassifier : IHostToolApprovalClassifier
+    {
+        public HostToolApprovalClassification ClassifyApproval(
+            ToolCall call,
+            ToolHostContext context) =>
+            throw new InvalidOperationException("Classification failed.");
     }
 
     private sealed class EchoClassifier : IApprovalClassifier

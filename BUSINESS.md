@@ -124,7 +124,10 @@ separate library with no terminal code. The product can:
   workspace-bounded calls, with the operator choosing per source whether
   declarations take effect through `externalToolApproval` in
   `config.json` (Home and Project each `author` or `host`; defaults are
-  Home `author`, Project `host`);
+  Home `author`, Project `host`); external dotnet tools may provide a
+  side-effect-free pre-classifier when their write paths are embedded in
+  structured arguments, and that classifier can only tighten classification,
+  never replace the floor or the source policy;
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
   Anthropic Messages, native Gemini GenerateContent, and native Ollama Chat
   adapters, including user-added gateways;

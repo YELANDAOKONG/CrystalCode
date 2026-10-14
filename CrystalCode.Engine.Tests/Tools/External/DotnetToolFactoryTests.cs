@@ -5,7 +5,10 @@ using Crystal.Multimodal;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
@@ -438,6 +441,150 @@ public sealed class DotnetToolFactoryTests
             .InvokeAsync(new MultimodalToolCall("2", "where_image", "{}"));
         var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
         Assert.Equal(expected, content.Text);
+    }
+
+    [Fact]
+    public void Load_DotnetApprovalClassifier_ClassifiesThroughTheHostContract()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var output = Path.Combine(workspace.Path, ".crystal", "tools", "ClassifierTools");
+        PublishFixture(
+            output,
+            """
+            using System.Text.Json;
+
+            using Crystal.Tools;
+
+            using CrystalCode.Tools;
+
+            namespace FixtureTools;
+
+            public sealed class PatchTool : ITool, IHostToolApprovalClassifier
+            {
+                public PatchTool()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                    Definition = new ToolDefinition("patch", document.RootElement.Clone(), "Patch.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public ValueTask<ToolOutput> InvokeAsync(
+                    ToolCall call,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new ToolOutput("ok"));
+
+                public HostToolApprovalClassification ClassifyApproval(
+                    ToolCall call,
+                    ToolHostContext context) =>
+                    new(
+                        "write",
+                        "outsideWorkspace",
+                        context.WorkspaceRoot + " " + context.SessionId + " " + context.Approval);
+            }
+            """,
+            referenceHostContract: true);
+        File.WriteAllText(
+            Path.Combine(output, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "types": ["PatchTool"]
+            }
+            """);
+        var root = new Workspace(workspace.Path);
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            root,
+            enabled: true,
+            host: new SessionToolHost(root, home.Home, () => "sess-4", () => "audit"));
+
+        Assert.Empty(catalog.Notes);
+        Assert.True(Assert.Single(catalog.Tools).HasApprovalClassifier);
+        Assert.True(
+            catalog.Classifier.TryClassify(
+                new ToolCall("1", "patch", "{}"),
+                root,
+                out var classification));
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
+        Assert.Equal(root.Root + " sess-4 audit", classification.Summary);
+
+        var text = ToolListText.Format(
+            [.. catalog.PlanTools.Select(tool => tool.Definition)],
+            [.. catalog.WorkTools.Select(tool => tool.Definition)],
+            catalog,
+            HarnessSettings.CreateDefault());
+        Assert.Contains("Pre-classifier", text, StringComparison.Ordinal);
+        Assert.Contains("Yes", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_DotnetMultimodalClassifier_ClassifiesThroughTheHostContract()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var output = Path.Combine(workspace.Path, ".crystal", "tools", "ImageTools");
+        PublishFixture(
+            output,
+            """
+            using System.Text.Json;
+
+            using Crystal.Multimodal;
+            using Crystal.Multimodal.Tools;
+            using Crystal.Tools;
+
+            using CrystalCode.Tools;
+
+            namespace FixtureTools;
+
+            public sealed class PatchImage : IMultimodalTool, IHostToolApprovalClassifier
+            {
+                public PatchImage()
+                {
+                    using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                    Definition = new ToolDefinition("patch_image", document.RootElement.Clone(), "Patch image.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public ValueTask<MultimodalToolOutput> InvokeAsync(
+                    MultimodalToolCall call,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new MultimodalToolOutput([new TextContent("ok")]));
+
+                public HostToolApprovalClassification ClassifyApproval(
+                    ToolCall call,
+                    ToolHostContext context) =>
+                    new("write", "outsideWorkspace", "Patch image outside workspace");
+            }
+            """,
+            referenceHostContract: true);
+        File.WriteAllText(
+            Path.Combine(output, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "types": ["PatchImage"]
+            }
+            """);
+        var root = new Workspace(workspace.Path);
+        var catalog = ExternalCatalog.Load(home.Home, root, enabled: true);
+
+        Assert.Empty(catalog.Notes);
+        Assert.Single(catalog.WorkMultimodalTools);
+        Assert.True(Assert.Single(catalog.Tools).HasApprovalClassifier);
+        Assert.True(
+            catalog.Classifier.TryClassify(
+                new ToolCall("1", "patch_image", "{}"),
+                root,
+                out var classification));
+        Assert.Equal(Risk.Write, classification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
+        Assert.Equal("Patch image outside workspace", classification.Summary);
     }
 
     private static void WriteExecSet(string workspace, string directoryName, string toolName)

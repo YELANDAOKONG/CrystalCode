@@ -77,14 +77,19 @@ appended in lower case. The report does not start a process. The outbound
 ### CrystalCode.Tools
 
 The contract external dotnet tools may reference when a call needs host
-facts. It defines `ToolHostContext`, `IHostTool`, and
-`IHostMultimodalTool`. `ToolHostContext` carries the workspace root, the
-session id, the approval mode, and the extension's global and project
-runtime-data directories. It references only Crystal and Crystal.Tools. It
-does not reference the engine, the display, the executable, or a terminal
-library. Tools that implement only Crystal's `ITool` or `IMultimodalTool`
-do not reference it. There is no paired test project; dispatch and
-load-context identity are tested in CrystalCode.Engine.Tests.
+facts. It defines `ToolHostContext`, `IHostTool`,
+`IHostMultimodalTool`, and the optional `IHostToolApprovalClassifier`.
+`ToolHostContext` carries the workspace root, the session id, the approval mode,
+and the extension's global and project runtime-data directories. An approval
+classifier receives the model call and a context carrying the workspace root,
+session id, and approval mode before invocation and returns the call's risk
+and authority; the engine merges that proposal with its own classification and
+it can only raise risk or authority, never lower them. It references only
+Crystal and Crystal.Tools. It does not reference the engine, the display, the
+executable, or a terminal library. Tools that implement only Crystal's `ITool`
+or `IMultimodalTool` do not reference it. There is no paired test project;
+dispatch, approval classification, and load-context identity are tested in
+CrystalCode.Engine.Tests.
 
 ### CrystalCode.Plugins
 

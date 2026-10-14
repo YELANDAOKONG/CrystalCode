@@ -103,7 +103,7 @@ internal static class ToolListWidget
             return new Markup($"[{Theme.Muted}]None[/]");
         }
 
-        var table = BaseTable("Name", "Catalog", "Source", "Author", "Effective");
+        var table = BaseTable("Name", "Catalog", "Source", "Author", "Effective", "Pre-classifier");
         foreach (var tool in tools)
         {
             var info = information[tool.Name];
@@ -112,7 +112,8 @@ internal static class ToolListWidget
                 Escape(Catalogs(plan.Contains(tool.Name), work.Contains(tool.Name))),
                 Escape($"{Title(info.Source.Value)}/{info.SetName}"),
                 Escape(Title(info.DeclaredApproval.Value)),
-                Escape(Title(info.EffectiveApproval.Value)));
+                Escape(Title(info.EffectiveApproval.Value)),
+                Escape(info.HasApprovalClassifier ? "Yes" : "-"));
         }
 
         return table;

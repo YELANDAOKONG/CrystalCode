@@ -340,7 +340,9 @@ load.
 Full auto-passes workspace-bounded Write for any such tool, not only
 built-in `write` / `edit`. Edit and Review still auto-pass only
 those built-in names. Default asks the operator for external Write.
-Review and Audit send it to the reviewing model.
+Review and Audit send it to the reviewing model. A tool-provided
+pre-classifier can only raise risk or authority for its own calls and fails
+closed; it never removes the floor or the `pathArguments` checks.
 
 Secrets never appear in `tools.json`. The host does not inject
 credentials into the child environment or into a loaded assembly.
@@ -449,6 +451,26 @@ runtime-data directories also references `CrystalCode.Tools` and implements
 method takes the model call plus a `ToolHostContext`. The host builds that
 value at the start of the call, so a later `/cd` or `/approval` shows up on
 the next call and does not change an instance the tool already holds.
+
+A text or multimodal tool instance may additionally implement
+`IHostToolApprovalClassifier` when its arguments contain paths or other
+information that the host must classify before applying the approval policy,
+for example one patch text whose file paths the host cannot see. The
+classifier receives the model call and a `ToolHostContext` carrying the live
+workspace root, session id, and approval mode; the two data directories are
+empty in that context because the classifier runs before the call and nothing
+is created for it. The classifier must not perform side effects. It returns
+risk and authority as case-insensitive text: `read`, `write`, `privileged`,
+or `forbidden`, and `workspace`, `outsideWorkspace`, `network`, or
+`privilegedEscalation`. An underscore is ignored, so the engine spellings
+`outside_workspace` and `privileged_escalation` are accepted too. The host
+merges the result with its own classification: a tool can raise risk or
+authority for the call, never lower them. The Write + Workspace floor, the
+`pathArguments` checks, and the source trust policy always stay in force, so
+only `approval: always` under an author policy relaxes ordinary calls. A
+classifier that throws, returns null, or returns an unknown risk or authority
+fails closed to Privileged + PrivilegedEscalation. `/tools` marks a tool that
+supplies one in its Pre-classifier column.
 `WorkspaceRoot` is the session workspace, not the process current directory.
 `SessionId` and `Approval` are empty when the host has none. Known approval
 modes are `plan`, `default`, `edit`, `review`, `audit`, and `full`.
@@ -484,9 +506,14 @@ or multimodal tool is wrapped:
 
 1. Rewrite `pathArguments` on the text or multimodal tool call (overlay or empty).
 2. Apply the set's timeout and forward user and turn cancellation.
-3. When the instance implements `IHostTool` or `IHostMultimodalTool`, call that method with a new `ToolHostContext`. Otherwise call the original `InvokeAsync`.
-4. Truncate text output blocks.
-5. Run approval before `InvokeAsync`, same as every other tool.
+3. Classify with the manifest floor and `pathArguments`; when the text
+   instance implements `IHostToolApprovalClassifier`, merge in its
+   side-effect-free result. The tool result can raise risk or authority,
+   never lower them.
+4. When the instance implements `IHostTool` or `IHostMultimodalTool`, call that
+   method with a new `ToolHostContext`. Otherwise call the original `InvokeAsync`.
+5. Truncate text output blocks.
+6. Run approval before `InvokeAsync`, same as every other tool.
 
 The wrapper is the catalog entry. On timeout, the wrapper asks the tool to
 cancel and returns a failure. In-process code that ignores cancellation may
@@ -500,8 +527,8 @@ text-only session. `AssemblyLoadContext` is not a sandbox.
 
 Operator types must not reference `CrystalCode`, `CrystalCode.Engine`,
 `CrystalCode.Display`, or `Spectre.Console`. They may reference
-`CrystalCode.Tools`. No slash commands, client factories, or
-classifiers from the assembly.
+`CrystalCode.Tools`. The assembly contributes tools only: no plugin entries
+such as slash commands, client factories, or plugin approval classifiers.
 
 ### Publish layout
 

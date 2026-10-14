@@ -1132,8 +1132,13 @@ Runners:
 Every external tool is at least Write + Workspace and still goes
 through `ToolInvocationPolicy` by default. Authors may set `approval` to
 `always`; Home tools follow that declaration by default, while Project tools
-use host policy unless configured otherwise. `/tools` lists the effective
-catalog and approval, `/tools home|project author|host` changes source trust,
+use host policy unless configured otherwise. A dotnet text or multimodal tool
+may implement `IHostToolApprovalClassifier` when its actual write paths are
+embedded in arguments; the host merges that side-effect-free result with its
+own classification, the result can only raise risk or authority, and
+classification failures fail closed. `/tools` lists the effective
+catalog and approval and marks tools that supply their own classifier,
+`/tools home|project author|host` changes source trust,
 and `/tools on|off|reload` controls discovery.
 `/tools enable|disable|show <directory>` changes one tool set.
 `crystal tools list|show|enable|disable` does the same outside a session

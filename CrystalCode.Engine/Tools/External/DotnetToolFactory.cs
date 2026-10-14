@@ -5,6 +5,8 @@ using System.Text.Json;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Tools;
+
 namespace CrystalCode.Engine.Tools.External;
 
 /// <summary>
@@ -26,6 +28,7 @@ internal static class DotnetToolFactory
         List<IMultimodalTool> planMultimodal,
         List<IMultimodalTool> workMultimodal,
         Dictionary<string, ExternalToolSpec> classifications,
+        Dictionary<string, IHostToolApprovalClassifier> approvalClassifiers,
         Dictionary<string, ParsedToolSet> origins)
     {
         ArgumentNullException.ThrowIfNull(workspace);
@@ -38,6 +41,7 @@ internal static class DotnetToolFactory
         ArgumentNullException.ThrowIfNull(planMultimodal);
         ArgumentNullException.ThrowIfNull(workMultimodal);
         ArgumentNullException.ThrowIfNull(classifications);
+        ArgumentNullException.ThrowIfNull(approvalClassifiers);
         ArgumentNullException.ThrowIfNull(origins);
 
         if (!TryResolveAssembly(set, out var assemblyPath, out var error))
@@ -197,6 +201,12 @@ internal static class DotnetToolFactory
             }
 
             classifications[pair.Spec.Name] = pair.Spec;
+            var classifierInstance = (object?)pair.Text ?? pair.Multimodal;
+            if (classifierInstance is IHostToolApprovalClassifier approvalClassifier)
+            {
+                approvalClassifiers[pair.Spec.Name] = approvalClassifier;
+            }
+
             origins[pair.Spec.Name] = set;
         }
 

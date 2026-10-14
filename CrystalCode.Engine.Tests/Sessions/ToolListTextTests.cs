@@ -50,6 +50,8 @@ public sealed class ToolListTextTests
         Assert.Contains("read  Plan     Host", text, StringComparison.Ordinal);
         Assert.Contains("External tools (1, On)", text, StringComparison.Ordinal);
         Assert.Contains("web   Plan+Work  Home/web  Always  Always", text, StringComparison.Ordinal);
+        Assert.Contains("Effective  Pre-classifier", text, StringComparison.Ordinal);
+        Assert.Contains("Always     -", text, StringComparison.Ordinal);
         Assert.Contains("Home     Author", text, StringComparison.Ordinal);
         Assert.Contains("Project  Host", text, StringComparison.Ordinal);
         Assert.Contains("/tools home|project author|host", text, StringComparison.Ordinal);
