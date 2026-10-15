@@ -84,7 +84,8 @@ public sealed class SettingsStore
             document.Plugins ?? defaults.Plugins,
             document.WorkspaceTrust ?? defaults.WorkspaceTrust,
             document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
-            imageModel: ReadImageModel(document.ImageModel));
+            imageModel: ReadImageModel(document.ImageModel),
+            contextSelections: document.ContextSelections);
     }
 
     public void Save(HarnessSettings settings)
@@ -110,6 +111,9 @@ public sealed class SettingsStore
             ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
                 ? null
                 : settings.ThinkingEffort.Value,
+            ContextSelections = settings.ContextSelections.Count == 0
+                ? null
+                : settings.ContextSelections.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
             Skills = settings.Skills ? null : false,
             ExternalTools = settings.ExternalTools ? null : false,
             Plugins = settings.Plugins ? null : false,

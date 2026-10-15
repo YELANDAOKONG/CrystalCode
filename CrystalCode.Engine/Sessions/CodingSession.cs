@@ -516,6 +516,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Approval:
                 ChangeApproval(command.Argument);
                 return (true, false);
+            case SessionVerb.Context:
+                ChangeContext(command.Argument);
+                return (true, false);
             case SessionVerb.Thinking:
                 ChangeThinking(command.Argument);
                 return (true, false);
@@ -883,6 +886,36 @@ public sealed class CodingSession : ITurnObserver
         _approvalClientKey = ApprovalClientKey(settings);
     }
 
+    private void ChangeContext(string argument)
+    {
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before switching context windows.");
+            return;
+        }
+
+        var windows = _settings.ActiveModel.ContextWindows;
+        int selected;
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            var index = Array.IndexOf(windows.ToArray(), _settings.ContextWindow);
+            selected = windows[(index + 1) % windows.Count];
+        }
+        else if (!ContextWindowSelection.TryParse(argument, out selected) || !windows.Contains(selected))
+        {
+            Error("Context window is not available for this model. Available: "
+                + string.Join(", ", windows.Select(ContextWindowSelection.Format)));
+            return;
+        }
+
+        var provider = _settings.Provider;
+        var model = _settings.Model;
+        SaveSettings(current => current.WithContextWindow(provider, model, selected));
+        RefreshChrome();
+        ShowUsage(ShownUsage(), ShownCumulative());
+        Note("Context  " + ContextWindowSelection.Format(selected));
+    }
+
     private void ChangeThinking(string argument)
     {
         var model = _settings.ActiveModel;
@@ -1112,6 +1145,7 @@ public sealed class CodingSession : ITurnObserver
         RebuildExecutors();
         RefreshSlashCommands();
         RefreshChrome();
+        ShowUsage(ShownUsage(), ShownCumulative());
         Note("Model  " + selection);
     }
 
@@ -1819,7 +1853,7 @@ public sealed class CodingSession : ITurnObserver
                 PromptSet: _promptResolution.PromptSet,
                 Provider: _settings.Provider.Value,
                 Model: _settings.Model,
-                ContextWindow: _settings.ActiveModel.ContextWindow,
+                ContextWindow: _settings.ContextWindow,
                 Usage: _ledger.Usage,
                 UserTurns: _ledger.UserTurns,
                 ModelCalls: _ledger.ModelCalls,
@@ -2378,7 +2412,7 @@ public sealed class CodingSession : ITurnObserver
 
     private CompactionLimits CurrentLimits() =>
         new(
-            _settings.ActiveModel.ContextWindow,
+            _settings.ContextWindow,
             _settings.ActiveModel.MaxTokens,
             _settings.CompactionThreshold);
 
@@ -3530,7 +3564,8 @@ public sealed class CodingSession : ITurnObserver
             ToolCompletions.All,
             ExportCompletions.All,
             ApprovalModelCompletions(),
-            ApprovalThinkingCompletions());
+            ApprovalThinkingCompletions(),
+            ContextWindowSelection.Completions(_settings.ActiveModel));
         Publish(new SlashCommandsChanged(menu));
     }
 
@@ -3588,7 +3623,8 @@ public sealed class CodingSession : ITurnObserver
             _planMode,
             _approval,
             CurrentThinkingStatus(),
-            CurrentPromptStatus());
+            CurrentPromptStatus(),
+            _settings.ContextWindow);
 
     private void RefreshChrome()
     {
@@ -4160,7 +4196,7 @@ public sealed class CodingSession : ITurnObserver
             result,
             usage,
             _ledger.CumulativeUsage,
-            _settings.ActiveModel.ContextWindow));
+            _settings.ContextWindow));
     }
 
     private void Publish(SessionEvent sessionEvent)
@@ -4210,7 +4246,7 @@ public sealed class CodingSession : ITurnObserver
         Publish(new UsageChanged(
             usage,
             cumulativeUsage,
-            _settings.ActiveModel.ContextWindow,
+            _settings.ContextWindow,
             interim));
     }
 

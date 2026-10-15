@@ -17,7 +17,8 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? toolArguments = null,
         IReadOnlyList<SlashCompletion>? exportArguments = null,
         IReadOnlyList<SlashCompletion>? approvalModelArguments = null,
-        IReadOnlyList<SlashCompletion>? approvalThinkingArguments = null)
+        IReadOnlyList<SlashCompletion>? approvalThinkingArguments = null,
+        IReadOnlyList<SlashCompletion>? contextArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -33,7 +34,8 @@ public static class SlashMenu
                 toolArguments,
                 exportArguments,
                 approvalModelArguments,
-                approvalThinkingArguments);
+                approvalThinkingArguments,
+                contextArguments);
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
         }
 
@@ -59,8 +61,14 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? toolArguments,
         IReadOnlyList<SlashCompletion>? exportArguments,
         IReadOnlyList<SlashCompletion>? approvalModelArguments,
-        IReadOnlyList<SlashCompletion>? approvalThinkingArguments)
+        IReadOnlyList<SlashCompletion>? approvalThinkingArguments,
+        IReadOnlyList<SlashCompletion>? contextArguments)
     {
+        if (spec.Verb == SessionVerb.Context && contextArguments is not null)
+        {
+            return contextArguments;
+        }
+
         if (spec.Verb == SessionVerb.Approval)
         {
             return ApprovalArguments(

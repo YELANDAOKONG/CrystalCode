@@ -1193,6 +1193,25 @@ Gemini 3 models do. `/thinking` then omits Off. A stored Off gear falls
 back to the provider default and the status bar shows `Think Default`.
 An explicit `/thinking off` is refused.
 
+`contextWindow` remains the model's maximum context size. An optional
+`contextWindows` array declares selectable local context budgets, for example
+`"contextWindow": 1000000, "contextWindows": [272000, 1000000]`.
+Values must be distinct positive integers no greater than `contextWindow`;
+the host sorts them in ascending order. Without a nonempty array the sole
+budget is `contextWindow`. The initial budget is the lowest declared value.
+`/context` cycles the current model's budgets; `/context 272k`, `/context 1m`,
+and exact integer token counts select one explicitly. Invalid or unavailable
+values are refused. Switching is refused during a turn or compaction.
+`config.json.contextSelections` remembers choices by `provider/model` key,
+without rewriting provider definitions. A removed or unsupported saved choice
+falls back to the lowest declared budget. Switching models restores that
+model's choice. Compaction, overflow checks, usage events, `/status`, and CTX
+percentages use the selected budget. Lowering it keeps the archive and allows
+the existing pre-request compaction check to summarize before the next model
+round. These budgets do not send provider-specific long-context parameters
+and do not guarantee a billing threshold against token estimation errors or
+large tool results.
+
 `thinkingEffort` is the operator choice: `default`, `off` (`none` is
 the same), a portable Crystal name, or another effort token. It is not stored on the model. `/thinking` (alias
 `/think`) cycles the gear or sets one by name. `/model` never
@@ -1470,6 +1489,9 @@ Terminal.Gui is referenced from CrystalCode.Display with a floating
 version and is not used. Do not call `Application.Init` or mix a second
 console writer with the self-owned loop.
 
+The status bar shows the selected context budget as `Context 272K` beside
+the thinking gear. The custom status-line field `context-window` shows the
+same value and is included in its default field list.
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
 thinking is on), the non-default prompt set as `Prompt <name>`, model,

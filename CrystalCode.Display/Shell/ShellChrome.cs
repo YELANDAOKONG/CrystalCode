@@ -25,6 +25,8 @@ public sealed class ShellChrome
 
     public string Thinking { get; set; } = string.Empty;
 
+    public string ContextWindow { get; set; } = string.Empty;
+
     public string PromptSet { get; set; } = string.Empty;
 
     public string Usage { get; set; } = "CTX --";
@@ -115,6 +117,11 @@ public sealed class ShellChrome
             items.Add((Thinking, $"[{Theme.Chrome}]{MarkupText.Escape(Thinking)}[/]", "keep"));
         }
 
+        if (!string.IsNullOrWhiteSpace(ContextWindow))
+        {
+            items.Add((ContextWindow, $"[{Theme.Chrome}]{MarkupText.Escape(ContextWindow)}[/]", "keep"));
+        }
+
         if (!string.IsNullOrWhiteSpace(PromptSet))
         {
             var prompt = "Prompt " + PromptSet;
@@ -190,6 +197,7 @@ public sealed class ShellChrome
             {
                 "approval" => Approval,
                 "thinking" => Thinking,
+                "context-window" => ContextWindow,
                 "prompt-set" => string.IsNullOrWhiteSpace(PromptSet)
                     ? string.Empty
                     : "Prompt " + PromptSet,

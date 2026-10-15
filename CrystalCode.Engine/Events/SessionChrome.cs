@@ -12,4 +12,5 @@ public sealed record SessionChrome(
     bool PlanMode,
     ApprovalMode Approval,
     string Thinking,
-    string PromptSet);
+    string PromptSet,
+    int ContextWindow = 0);

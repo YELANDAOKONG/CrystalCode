@@ -31,7 +31,8 @@ internal sealed class SessionProjection : ISessionObserver
                     started.Chrome.PlanMode,
                     started.Chrome.Approval,
                     started.Chrome.Thinking,
-                    started.Chrome.PromptSet);
+                    started.Chrome.PromptSet,
+                    started.Chrome.ContextWindow);
                 break;
             case ChromeChanged changed:
                 _renderer.SetChrome(
@@ -40,7 +41,8 @@ internal sealed class SessionProjection : ISessionObserver
                     changed.Chrome.Thinking,
                     changed.Chrome.Model,
                     changed.Chrome.WorkspaceRoot,
-                    changed.Chrome.PromptSet);
+                    changed.Chrome.PromptSet,
+                    changed.Chrome.ContextWindow);
                 break;
             case PreferencesChanged preferences:
                 ApplyPreferences(preferences.Preferences);

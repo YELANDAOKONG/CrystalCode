@@ -11,6 +11,7 @@ public sealed record StatusLineSettings
         {
             "approval",
             "thinking",
+            "context-window",
             "model",
             "context-used",
             "session-total",
@@ -23,6 +24,7 @@ public sealed record StatusLineSettings
         {
             "approval",
             "thinking",
+            "context-window",
             "prompt-set",
             "activity",
             "model",

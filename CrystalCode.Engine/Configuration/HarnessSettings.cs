@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 using Crystal.Reasoning;
 
 using CrystalCode.Engine.Approvals;
@@ -62,7 +64,8 @@ public sealed record HarnessSettings
         IReadOnlyList<string>? promptAttachments = null,
         string? promptSetOverride = null,
         bool usePromptAttachments = true,
-        ImageModelSettings? imageModel = null)
+        ImageModelSettings? imageModel = null,
+        IReadOnlyDictionary<string, int>? contextSelections = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -94,6 +97,10 @@ public sealed record HarnessSettings
         CompactionThreshold = compactionThreshold;
         Catalog = catalog;
         ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
+        ContextSelections = new ReadOnlyDictionary<string, int>(
+            contextSelections is null
+                ? new Dictionary<string, int>(StringComparer.Ordinal)
+                : contextSelections.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
         Skills = skills;
         ExternalTools = externalTools;
         EstimatedTokens = estimatedTokens;
@@ -145,6 +152,27 @@ public sealed record HarnessSettings
     public ProviderCatalog Catalog { get; }
 
     public ThinkingSelection ThinkingEffort { get; }
+
+    public IReadOnlyDictionary<string, int> ContextSelections { get; }
+
+    public int ContextWindow =>
+        ContextSelections.TryGetValue(Provider.Value + "/" + Model, out var selected)
+        && ActiveModel.ContextWindows.Contains(selected)
+            ? selected
+            : ActiveModel.ContextWindows[0];
+
+    public HarnessSettings WithContextWindow(ProviderName provider, string model, int window)
+    {
+        if (!Catalog.GetModel(provider, model).ContextWindows.Contains(window))
+        {
+            throw new ArgumentOutOfRangeException(nameof(window), window,
+                "Context window is not available for this model.");
+        }
+
+        var selections = ContextSelections.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        selections[provider.Value + "/" + model] = window;
+        return Copy(contextSelections: selections);
+    }
 
     public bool Skills { get; }
 
@@ -366,7 +394,8 @@ public sealed record HarnessSettings
         bool? usePromptAttachments = null,
         bool setUsePromptAttachments = false,
         ImageModelSettings? imageModel = null,
-        bool setImageModel = false) =>
+        bool setImageModel = false,
+        IReadOnlyDictionary<string, int>? contextSelections = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -394,7 +423,8 @@ public sealed record HarnessSettings
             setPromptAttachments ? promptAttachments : PromptAttachments,
             setPromptSetOverride ? promptSetOverride : PromptSetOverride,
             setUsePromptAttachments ? usePromptAttachments ?? UsePromptAttachments : UsePromptAttachments,
-            setImageModel ? imageModel : ImageModel);
+            setImageModel ? imageModel : ImageModel,
+            contextSelections ?? ContextSelections);
 
     public override string ToString() => nameof(HarnessSettings);
 

@@ -39,6 +39,11 @@ separate library with no terminal code. The product can:
   network faults, and incomplete streams, waiting with backoff, a
   countdown on the progress row, and a transcript note;
 - switch the configured provider and model from `/model` without restarting;
+- declare per-model context budgets in `providers.json` with `contextWindows`,
+  switch them through `/context`, remember each model's choice, and show the
+  selected budget in the default or custom status bar. The selected budget
+  drives local compaction and context accounting; it does not change provider
+  pricing or enable provider-specific long-context features;
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
   write, shell, and session-local background shell tasks); operator tool sets
   may add extra catalog entries to either;

@@ -10,6 +10,7 @@ public enum SessionVerb
     Plan,
     Approval,
     Thinking,
+    Context,
     Tokens,
     Model,
     PromptSet,

@@ -4,6 +4,8 @@ internal sealed class ModelDocument
 {
     public int? ContextWindow { get; set; }
 
+    public List<int>? ContextWindows { get; set; }
+
     public double? Temperature { get; set; }
 
     public double? TopP { get; set; }

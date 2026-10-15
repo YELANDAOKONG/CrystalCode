@@ -7,6 +7,9 @@ namespace CrystalCode.Engine.Sessions;
 /// </summary>
 public static class UsageText
 {
+    public static string FormatWindow(int contextWindow) =>
+        contextWindow <= 0 ? string.Empty : "Context " + Configuration.ContextWindowSelection.Format(contextWindow);
+
     public static string Format(TokenUsage? usage, int contextWindow)
         => Format(usage, usage, contextWindow);
 

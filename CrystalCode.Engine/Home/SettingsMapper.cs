@@ -140,7 +140,8 @@ internal static class SettingsMapper
                     modelEntry.ImageInput ?? false,
                     modelEntry.ThinkingCanDisable ?? true,
                     modelEntry.AudioInput ?? false,
-                    modelEntry.VideoInput ?? false);
+                    modelEntry.VideoInput ?? false,
+                    modelEntry.ContextWindows);
             }
         }
 
@@ -170,6 +171,9 @@ internal static class SettingsMapper
             models[model] = new ModelDocument
             {
                 ContextWindow = settings.ContextWindow,
+                ContextWindows = settings.ContextWindows.SequenceEqual([settings.ContextWindow])
+                    ? null
+                    : [.. settings.ContextWindows],
                 Temperature = settings.Temperature,
                 TopP = settings.TopP,
                 MaxTokens = settings.MaxTokens,

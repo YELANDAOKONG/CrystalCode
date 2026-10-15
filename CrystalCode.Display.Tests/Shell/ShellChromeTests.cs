@@ -7,6 +7,27 @@ namespace CrystalCode.Display.Tests.Shell;
 
 public sealed class ShellChromeTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StatusLine_ShowsSelectedContextWindow(bool custom)
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = custom,
+            StatusLineFields = ["thinking", "context-window", "context-used"],
+            Thinking = "Think High",
+            ContextWindow = "Context 272K",
+            Usage = "CTX 25%",
+            ContextUsed = "CTX 25%"
+        };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Contains("Think High  ·  Context 272K  ·  CTX 25%", line.Plain, StringComparison.Ordinal);
+        Assert.True(TextWidth.Measure(chrome.StatusLine(20).Plain) <= 20);
+    }
+
     [Fact]
     public void StatusLine_CustomModeUsesConfiguredFieldsInOrder()
     {

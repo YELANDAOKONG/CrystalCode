@@ -316,7 +316,8 @@ public sealed class SessionRenderer : IDisposable
         bool planMode,
         ApprovalMode approval,
         string thinking = "",
-        string promptSet = "")
+        string promptSet = "",
+        int contextWindow = 0)
     {
         lock (_gate)
         {
@@ -326,6 +327,8 @@ public sealed class SessionRenderer : IDisposable
             _chrome.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            _chrome.ContextWindow = UsageText.FormatWindow(contextWindow);
+            ContextWindow = contextWindow;
             _chrome.PromptSet = promptSet;
             _composer.PlanMode = planMode;
             if (Framed)
@@ -358,7 +361,8 @@ public sealed class SessionRenderer : IDisposable
         string thinking = "",
         string? model = null,
         string? workspaceRoot = null,
-        string? promptSet = null)
+        string? promptSet = null,
+        int? contextWindow = null)
     {
         lock (_gate)
         {
@@ -366,6 +370,12 @@ public sealed class SessionRenderer : IDisposable
             _composer.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            if (contextWindow is int window)
+            {
+                _chrome.ContextWindow = UsageText.FormatWindow(window);
+                ContextWindow = window;
+            }
+
             if (promptSet is not null)
             {
                 _chrome.PromptSet = promptSet;
@@ -506,6 +516,7 @@ public sealed class SessionRenderer : IDisposable
             _chrome.PlanMode = status.PlanMode;
             _chrome.Approval = ApprovalLabel.For(status.Approval);
             _chrome.Thinking = status.Thinking;
+            _chrome.ContextWindow = UsageText.FormatWindow(status.ContextWindow);
             _chrome.PromptSet = status.PromptSet == PromptSetNames.Default
                 ? string.Empty
                 : status.PromptSet;

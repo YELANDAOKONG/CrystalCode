@@ -18,7 +18,8 @@ public sealed record ModelSettings
         bool imageInput = false,
         bool thinkingCanDisable = true,
         bool audioInput = false,
-        bool videoInput = false)
+        bool videoInput = false,
+        IReadOnlyList<int>? contextWindows = null)
     {
         if (contextWindow <= 0)
         {
@@ -53,6 +54,17 @@ public sealed record ModelSettings
         }
 
         ContextWindow = contextWindow;
+        var windows = contextWindows is { Count: > 0 } ? contextWindows.ToArray() : [contextWindow];
+        if (windows.Any(window => window <= 0 || window > contextWindow)
+            || windows.Distinct().Count() != windows.Length)
+        {
+            throw new ArgumentException(
+                "Context windows must be distinct positive token counts within contextWindow.",
+                nameof(contextWindows));
+        }
+
+        Array.Sort(windows);
+        ContextWindows = Array.AsReadOnly(windows);
         Temperature = temperature;
         TopP = topP;
         MaxTokens = maxTokens;
@@ -65,6 +77,8 @@ public sealed record ModelSettings
     }
 
     public int ContextWindow { get; }
+
+    public IReadOnlyList<int> ContextWindows { get; }
 
     public double? Temperature { get; }
 

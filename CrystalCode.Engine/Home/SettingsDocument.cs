@@ -10,6 +10,8 @@ internal sealed class SettingsDocument
 
     public string? ThinkingEffort { get; set; }
 
+    public Dictionary<string, int>? ContextSelections { get; set; }
+
     public bool? Skills { get; set; }
 
     public bool? ExternalTools { get; set; }
