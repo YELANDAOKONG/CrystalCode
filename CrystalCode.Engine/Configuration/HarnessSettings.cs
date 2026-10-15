@@ -65,7 +65,7 @@ public sealed record HarnessSettings
         string? promptSetOverride = null,
         bool usePromptAttachments = true,
         ImageModelSettings? imageModel = null,
-        IReadOnlyDictionary<string, int>? contextSelections = null)
+        IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -97,10 +97,10 @@ public sealed record HarnessSettings
         CompactionThreshold = compactionThreshold;
         Catalog = catalog;
         ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
-        ContextSelections = new ReadOnlyDictionary<string, int>(
+        ContextSelections = new ReadOnlyDictionary<ContextSelectionKey, int>(
             contextSelections is null
-                ? new Dictionary<string, int>(StringComparer.Ordinal)
-                : contextSelections.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+                ? new Dictionary<ContextSelectionKey, int>()
+                : contextSelections.ToDictionary(pair => pair.Key, pair => pair.Value));
         Skills = skills;
         ExternalTools = externalTools;
         EstimatedTokens = estimatedTokens;
@@ -153,10 +153,10 @@ public sealed record HarnessSettings
 
     public ThinkingSelection ThinkingEffort { get; }
 
-    public IReadOnlyDictionary<string, int> ContextSelections { get; }
+    public IReadOnlyDictionary<ContextSelectionKey, int> ContextSelections { get; }
 
     public int ContextWindow =>
-        ContextSelections.TryGetValue(Provider.Value + "/" + Model, out var selected)
+        ContextSelections.TryGetValue(new ContextSelectionKey(Provider, Model), out var selected)
         && ActiveModel.ContextWindows.Contains(selected)
             ? selected
             : ActiveModel.ContextWindows[0];
@@ -169,8 +169,8 @@ public sealed record HarnessSettings
                 "Context window is not available for this model.");
         }
 
-        var selections = ContextSelections.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        selections[provider.Value + "/" + model] = window;
+        var selections = ContextSelections.ToDictionary(pair => pair.Key, pair => pair.Value);
+        selections[new ContextSelectionKey(provider, model)] = window;
         return Copy(contextSelections: selections);
     }
 
@@ -395,7 +395,7 @@ public sealed record HarnessSettings
         bool setUsePromptAttachments = false,
         ImageModelSettings? imageModel = null,
         bool setImageModel = false,
-        IReadOnlyDictionary<string, int>? contextSelections = null) =>
+        IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null) =>
         new(
             provider ?? Provider,
             model ?? Model,

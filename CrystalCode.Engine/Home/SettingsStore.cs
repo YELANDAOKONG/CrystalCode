@@ -85,7 +85,7 @@ public sealed class SettingsStore
             document.WorkspaceTrust ?? defaults.WorkspaceTrust,
             document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
             imageModel: ReadImageModel(document.ImageModel),
-            contextSelections: document.ContextSelections);
+            contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections));
     }
 
     public void Save(HarnessSettings settings)
@@ -113,7 +113,7 @@ public sealed class SettingsStore
                 : settings.ThinkingEffort.Value,
             ContextSelections = settings.ContextSelections.Count == 0
                 ? null
-                : settings.ContextSelections.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+                : SettingsMapper.WriteContextSelections(settings.ContextSelections),
             Skills = settings.Skills ? null : false,
             ExternalTools = settings.ExternalTools ? null : false,
             Plugins = settings.Plugins ? null : false,

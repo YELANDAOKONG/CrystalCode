@@ -1202,11 +1202,16 @@ budget is `contextWindow`. The initial budget is the lowest declared value.
 `/context` cycles the current model's budgets; `/context 272k`, `/context 1m`,
 and exact integer token counts select one explicitly. Invalid or unavailable
 values are refused. Switching is refused during a turn or compaction.
-`config.json.contextSelections` remembers choices by `provider/model` key,
-without rewriting provider definitions. A removed or unsupported saved choice
-falls back to the lowest declared budget. Switching models restores that
-model's choice. Compaction, overflow checks, usage events, `/status`, and CTX
-percentages use the selected budget. Lowering it keeps the archive and allows
+`config.json.contextSelections` remembers choices without rewriting provider
+definitions. The stored form is a nested object,
+`{"provider": {"model": tokens}}`; the older flat `{"provider/model": tokens}`
+map is still read and is written back nested on the next save. Values must be
+positive token counts, provider keys are normalized to lowercase, and model
+ids stay byte-exact, so a model id that contains `/` is stored as written.
+A removed or unsupported saved choice falls back to the lowest declared
+budget. Switching models restores that model's choice. Compaction, overflow
+checks, usage events, `/status`, and CTX percentages use the selected budget.
+Lowering it keeps the archive and allows
 the existing pre-request compaction check to summarize before the next model
 round. These budgets do not send provider-specific long-context parameters
 and do not guarantee a billing threshold against token estimation errors or

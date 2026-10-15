@@ -455,7 +455,7 @@ Top-level fields:
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
 | `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), a portable name (`minimal`, `low`, `medium`, `high`, `maximum`; `max` is stored as `maximum`), or another effort token. Tokens are stored in lowercase |
-| `contextSelections` | Saved local context budgets keyed by `provider/model`, for example `{"openai/my-model": 272000}`. `/context` writes this map; an absent or unsupported choice uses that model's lowest declared budget |
+| `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `plugins` | Enable operator plugin discovery (default `true`) |
@@ -971,10 +971,10 @@ Add selectable budgets to a model entry in `providers.json`, then restart:
 
 `/context` cycles the sorted budgets. `/context 272k`, `/context 1m`, and
 `/context 272000` select a declared value; Tab completes the current model's
-choices. Each model remembers its choice in `config.json.contextSelections`.
-A model without a saved valid choice starts at its lowest budget. Switching
-models restores that model's choice. Finish any turn or compaction before
-switching budgets.
+choices. Each model remembers its choice in `config.json.contextSelections`,
+a nested `{"provider": {"model": tokens}}` map. A model without a saved valid
+choice starts at its lowest budget. Switching models restores that model's
+choice. Finish any turn or compaction before switching budgets.
 
 The selected budget drives compaction, `/status`, and CTX percentages.
 Lowering it retains the full archive and checks whether compaction is needed
