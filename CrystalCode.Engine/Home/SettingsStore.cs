@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Home;
@@ -93,7 +94,9 @@ public sealed class SettingsStore
             document.WorkspaceTrust ?? defaults.WorkspaceTrust,
             document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
             imageModel: ReadImageModel(document.ImageModel),
-            contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections));
+            contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
+            retry: ReadRetry(document.Retry),
+            approvalRetry: ReadRetry(document.ApprovalRetry));
     }
 
     public void Save(HarnessSettings settings)
@@ -152,7 +155,9 @@ public sealed class SettingsStore
                 WorkspaceLimits.BackgroundBashTimeoutSeconds),
             Providers = previous?.Providers,
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
-            ImageModel = WriteImageModel(settings.ImageModel)
+            ImageModel = WriteImageModel(settings.ImageModel),
+            Retry = WriteRetry(settings.Retry),
+            ApprovalRetry = WriteRetry(settings.ApprovalRetry)
         };
         var json = JsonSerializer.Serialize(document, HomeJson.Options);
         File.WriteAllText(_home.ConfigPath, json);
@@ -286,6 +291,52 @@ public sealed class SettingsStore
             ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
                 ? null
                 : settings.ThinkingEffort.Value
+        };
+    }
+
+    private static RetrySettings ReadRetry(RetryDocument? document)
+    {
+        if (document is null)
+        {
+            return RetrySettings.Default;
+        }
+
+        return new RetrySettings(
+            document.Enabled ?? true,
+            document.MaximumRetries ?? SessionRetryOptions.DefaultMaximumRetries,
+            document.InitialDelaySeconds ?? SessionRetryOptions.DefaultInitialDelaySeconds,
+            document.BackoffFactor ?? SessionRetryOptions.DefaultBackoffFactor,
+            document.JitterFactor ?? SessionRetryOptions.DefaultJitterFactor,
+            document.MaximumDelaySeconds ?? SessionRetryOptions.DefaultMaximumDelaySeconds);
+    }
+
+    private static RetryDocument? WriteRetry(RetrySettings settings)
+    {
+        if (settings == RetrySettings.Default)
+        {
+            return null;
+        }
+
+        return new RetryDocument
+        {
+            Enabled = settings.Enabled ? null : false,
+            MaximumRetries = settings.MaximumRetries == SessionRetryOptions.DefaultMaximumRetries
+                ? null
+                : settings.MaximumRetries,
+            InitialDelaySeconds = settings.InitialDelaySeconds
+                == SessionRetryOptions.DefaultInitialDelaySeconds
+                    ? null
+                    : settings.InitialDelaySeconds,
+            BackoffFactor = settings.BackoffFactor == SessionRetryOptions.DefaultBackoffFactor
+                ? null
+                : settings.BackoffFactor,
+            JitterFactor = settings.JitterFactor == SessionRetryOptions.DefaultJitterFactor
+                ? null
+                : settings.JitterFactor,
+            MaximumDelaySeconds = settings.MaximumDelaySeconds
+                == SessionRetryOptions.DefaultMaximumDelaySeconds
+                    ? null
+                    : settings.MaximumDelaySeconds
         };
     }
 

@@ -5,6 +5,7 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Prompts;
+using CrystalCode.Engine.Sessions;
 
 namespace CrystalCode.Engine.Approvals;
 
@@ -18,12 +19,14 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
     private readonly string _systemText;
     private readonly ReasoningOptions? _reasoning;
     private readonly Func<ApprovalReviewRequest, string> _userText;
+    private readonly SessionRetryOptions _retry;
 
     public ModelApprovalReviewer(
         IChatClient client,
         string? systemText = null,
         ReasoningOptions? reasoning = null,
-        Func<ApprovalReviewRequest, string>? userText = null)
+        Func<ApprovalReviewRequest, string>? userText = null,
+        SessionRetryOptions? retry = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
@@ -33,6 +36,7 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
             : systemText.Trim();
         _reasoning = reasoning;
         _userText = userText ?? ApprovalReviewPrompt.UserText;
+        _retry = retry ?? SessionRetryOptions.Default;
     }
 
     public async ValueTask<ApprovalReviewVerdict> ReviewAsync(
@@ -51,13 +55,16 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
         ChatResponse response;
         try
         {
-            response = await _client.CompleteAsync(
-                new ChatRequest(
-                [
-                    new ChatMessage(ChatRole.System, _systemText),
-                    new ChatMessage(ChatRole.User, _userText(request))
-                ],
-                reasoning: _reasoning),
+            var chatRequest = new ChatRequest(
+            [
+                new ChatMessage(ChatRole.System, _systemText),
+                new ChatMessage(ChatRole.User, _userText(request))
+            ],
+            reasoning: _reasoning);
+            response = await SessionRetry.RunAsync(
+                token => _client.CompleteAsync(chatRequest, token),
+                _retry,
+                onRetry: null,
                 cancellationToken);
         }
         catch (OperationCanceledException)

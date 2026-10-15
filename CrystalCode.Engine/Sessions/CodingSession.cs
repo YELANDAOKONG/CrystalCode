@@ -3023,7 +3023,8 @@ public sealed class CodingSession : ITurnObserver
             request => ApprovalReviewPrompt.UserText(
                 request,
                 CurrentPromptBinding(CurrentPromptContext().WithMode("review")),
-                _prompts.ReviewUser));
+                _prompts.ReviewUser),
+            _settings.ApprovalRetry.ToOptions());
         var policy = new ApprovalPolicy(
             _approval,
             _workspace,
@@ -3844,7 +3845,7 @@ public sealed class CodingSession : ITurnObserver
                 this,
                 CurrentReasoning(),
                 CompactRoundAsync,
-                SessionRetryOptions.Default,
+                _settings.Retry.ToOptions(),
                 ReserveImageNumber,
                 AddImage,
                 ImageSnapshot,
@@ -3861,7 +3862,7 @@ public sealed class CodingSession : ITurnObserver
             this,
             CurrentReasoning(),
             CompactRoundAsync,
-            SessionRetryOptions.Default,
+            _settings.Retry.ToOptions(),
             CommitArchive,
             PrepareOutboundAsync,
             (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token));
@@ -4092,7 +4093,7 @@ public sealed class CodingSession : ITurnObserver
     private ContextCompactor CreateCompactor(IChatClient client) =>
         new(
             client,
-            SessionRetryOptions.Default,
+            _settings.Retry.ToOptions(),
             attempt => Publish(new RetryScheduled(attempt)),
             () => ApplyPluginPrompt(
                 CompactionPrompt.ComposeSystem(

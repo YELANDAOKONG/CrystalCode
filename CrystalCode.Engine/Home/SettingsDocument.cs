@@ -57,4 +57,8 @@ internal sealed class SettingsDocument
     public ApprovalModelDocument? ApprovalModel { get; set; }
 
     public ImageModelDocument? ImageModel { get; set; }
+
+    public RetryDocument? Retry { get; set; }
+
+    public RetryDocument? ApprovalRetry { get; set; }
 }

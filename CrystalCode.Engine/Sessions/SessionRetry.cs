@@ -12,14 +12,6 @@ namespace CrystalCode.Engine.Sessions;
 /// </summary>
 public static class SessionRetry
 {
-    public static readonly TimeSpan InitialDelay = TimeSpan.FromSeconds(2);
-
-    public const double BackoffFactor = 2;
-
-    public const double JitterFactor = 0.25;
-
-    public static readonly TimeSpan MaximumDelayWithoutHeaders = TimeSpan.FromSeconds(30);
-
     public static readonly TimeSpan MaximumDelay = TimeSpan.FromMilliseconds(int.MaxValue);
 
     private static readonly HashSet<string> NonRetryableCodes = new(StringComparer.OrdinalIgnoreCase)
@@ -56,8 +48,13 @@ public static class SessionRetry
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled)
     ];
 
-    public static TimeSpan Delay(int attempt, TimeSpan? retryAfter, double jitter)
+    public static TimeSpan Delay(
+        SessionRetryOptions options,
+        int attempt,
+        TimeSpan? retryAfter,
+        double jitter)
     {
+        ArgumentNullException.ThrowIfNull(options);
         if (attempt <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(attempt), attempt, "Attempt must be positive.");
@@ -73,10 +70,11 @@ public static class SessionRetry
             return Cap(header, MaximumDelay);
         }
 
-        var baseMilliseconds = InitialDelay.TotalMilliseconds * Math.Pow(BackoffFactor, attempt - 1);
-        var withJitter = baseMilliseconds + (baseMilliseconds * JitterFactor * jitter);
+        var baseMilliseconds = options.InitialDelay.TotalMilliseconds
+            * Math.Pow(options.BackoffFactor, attempt - 1);
+        var withJitter = baseMilliseconds + (baseMilliseconds * options.JitterFactor * jitter);
         var exponential = TimeSpan.FromMilliseconds(Math.Ceiling(withJitter));
-        return Cap(Min(exponential, MaximumDelayWithoutHeaders), MaximumDelay);
+        return Cap(Min(exponential, options.MaximumDelayWithoutHeaders), MaximumDelay);
     }
 
     public static bool TryDescribe(Exception exception, out SessionRetryable retryable)
@@ -129,7 +127,7 @@ public static class SessionRetry
                     throw;
                 }
 
-                var delay = Delay(attempt, retryable.RetryAfter, options.Jitter());
+                var delay = Delay(options, attempt, retryable.RetryAfter, options.Jitter());
                 onRetry?.Invoke(new SessionRetryAttempt(attempt, retryable.Message, delay));
                 await options.WaitAsync(delay, cancellationToken);
             }

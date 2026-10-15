@@ -11,7 +11,7 @@ public sealed class SessionRetryTests
     public void Delay_CapsAtThirtySecondsWithoutHeaders()
     {
         var delays = Enumerable.Range(1, 10)
-            .Select(attempt => SessionRetry.Delay(attempt, retryAfter: null, jitter: 0))
+            .Select(attempt => SessionRetry.Delay(SessionRetryOptions.Default, attempt, retryAfter: null, jitter: 0))
             .ToArray();
 
         Assert.Equal(
@@ -33,10 +33,10 @@ public sealed class SessionRetryTests
     [Fact]
     public void Delay_AddsJitter()
     {
-        Assert.Equal(TimeSpan.FromSeconds(2), SessionRetry.Delay(1, null, 0));
-        Assert.Equal(TimeSpan.FromMilliseconds(2500), SessionRetry.Delay(1, null, 1));
-        Assert.Equal(TimeSpan.FromSeconds(20), SessionRetry.Delay(4, null, 1));
-        Assert.Equal(TimeSpan.FromSeconds(30), SessionRetry.Delay(5, null, 1));
+        Assert.Equal(TimeSpan.FromSeconds(2), SessionRetry.Delay(SessionRetryOptions.Default, 1, null, 0));
+        Assert.Equal(TimeSpan.FromMilliseconds(2500), SessionRetry.Delay(SessionRetryOptions.Default, 1, null, 1));
+        Assert.Equal(TimeSpan.FromSeconds(20), SessionRetry.Delay(SessionRetryOptions.Default, 4, null, 1));
+        Assert.Equal(TimeSpan.FromSeconds(30), SessionRetry.Delay(SessionRetryOptions.Default, 5, null, 1));
     }
 
     [Fact]
@@ -44,7 +44,20 @@ public sealed class SessionRetryTests
     {
         Assert.Equal(
             TimeSpan.FromSeconds(50),
-            SessionRetry.Delay(1, TimeSpan.FromSeconds(50), jitter: 0));
+            SessionRetry.Delay(SessionRetryOptions.Default, 1, TimeSpan.FromSeconds(50), jitter: 0));
+    }
+
+    [Fact]
+    public void Delay_UsesConfiguredPolicy()
+    {
+        var options = new SessionRetryOptions(
+            initialDelay: TimeSpan.FromSeconds(1),
+            backoffFactor: 3,
+            maximumDelayWithoutHeaders: TimeSpan.FromSeconds(5));
+
+        Assert.Equal(TimeSpan.FromSeconds(1), SessionRetry.Delay(options, 1, null, 0));
+        Assert.Equal(TimeSpan.FromSeconds(3), SessionRetry.Delay(options, 2, null, 0));
+        Assert.Equal(TimeSpan.FromSeconds(5), SessionRetry.Delay(options, 3, null, 0));
     }
 
     [Fact]

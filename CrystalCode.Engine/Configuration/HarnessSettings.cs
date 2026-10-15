@@ -66,7 +66,9 @@ public sealed record HarnessSettings
         string? promptSetOverride = null,
         bool usePromptAttachments = true,
         ImageModelSettings? imageModel = null,
-        IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null)
+        IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
+        RetrySettings? retry = null,
+        RetrySettings? approvalRetry = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -110,6 +112,8 @@ public sealed record HarnessSettings
             contextSelections is null
                 ? new Dictionary<ContextSelectionKey, int>()
                 : contextSelections.ToDictionary(pair => pair.Key, pair => pair.Value));
+        Retry = retry ?? RetrySettings.Default;
+        ApprovalRetry = approvalRetry ?? RetrySettings.Default;
         Skills = skills;
         ExternalTools = externalTools;
         EstimatedTokens = estimatedTokens;
@@ -164,6 +168,10 @@ public sealed record HarnessSettings
     public ThinkingSelection ThinkingEffort { get; }
 
     public IReadOnlyDictionary<ContextSelectionKey, int> ContextSelections { get; }
+
+    public RetrySettings Retry { get; }
+
+    public RetrySettings ApprovalRetry { get; }
 
     public int ContextWindow =>
         ContextSelections.TryGetValue(new ContextSelectionKey(Provider, Model), out var selected)
@@ -367,6 +375,18 @@ public sealed record HarnessSettings
             backgroundBashTimeoutSeconds: backgroundBashTimeoutSeconds,
             setBackgroundBashTimeout: true);
 
+    public HarnessSettings WithRetry(RetrySettings retry)
+    {
+        ArgumentNullException.ThrowIfNull(retry);
+        return Copy(retry: retry);
+    }
+
+    public HarnessSettings WithApprovalRetry(RetrySettings approvalRetry)
+    {
+        ArgumentNullException.ThrowIfNull(approvalRetry);
+        return Copy(approvalRetry: approvalRetry);
+    }
+
     public HarnessSettings WithApprovalModel(ApprovalModelSettings approvalModel)
     {
         ArgumentNullException.ThrowIfNull(approvalModel);
@@ -414,7 +434,9 @@ public sealed record HarnessSettings
         bool setUsePromptAttachments = false,
         ImageModelSettings? imageModel = null,
         bool setImageModel = false,
-        IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null) =>
+        IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
+        RetrySettings? retry = null,
+        RetrySettings? approvalRetry = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -444,7 +466,9 @@ public sealed record HarnessSettings
             setPromptSetOverride ? promptSetOverride : PromptSetOverride,
             setUsePromptAttachments ? usePromptAttachments ?? UsePromptAttachments : UsePromptAttachments,
             setImageModel ? imageModel : ImageModel,
-            contextSelections ?? ContextSelections);
+            contextSelections ?? ContextSelections,
+            retry ?? Retry,
+            approvalRetry ?? ApprovalRetry);
 
     public override string ToString() => nameof(HarnessSettings);
 

@@ -361,9 +361,10 @@ One user message is one turn:
 2. Stream one chat request. Publish each delta as an event as it arrives. If that
    round fails with a retryable provider error (HTTP 429, 404, 408,
    5xx, timeout, network, or an incomplete stream), wait with
-   exponential backoff (2s base, factor 2, 25% jitter, 30s cap when
-   Retry-After is absent), honor Retry-After or retry-after-ms when
-   present, and repeat the same round up to five times. The engine
+   exponential backoff and repeat the same round. The `retry` policy in
+   `config.json` sets the limit and timing (defaults: five retries, 2s
+   base, factor 2, 25% jitter, 30s cap when Retry-After is absent);
+   Retry-After or retry-after-ms is honored when present. The engine
    publishes `RetryScheduled`; the terminal progress row shows
    `Retrying In Ns (Attempt K)` and counts the remaining wait down, and
    the transcript prints `retrying model request` plus the operator
@@ -716,7 +717,10 @@ Modes:
   / high), `user_authorization` (low / medium / high), and
   `rationale`. Allow executes. Deny becomes model-visible rejection
   text. Ask, Forbidden-allow, and forced-prompt allow fall back to the
-  operator. Review is not a grant and is not full pass-through.
+  operator. A transient review request failure is retried with the
+  `approvalRetry` policy (default five retries, same backoff shape as a
+  model round); if it still fails the host asks the operator. Review is
+  not a grant and is not full pass-through.
 - Audit: the same reviewer and transcript rules as Review, but
   workspace `write` and `edit` are also checked. They do not auto-pass.
 - Full: workspace-bounded, policy-allowed actions pass without review.
@@ -798,7 +802,7 @@ output), the host:
    tokens would be freed.
 2. Asks the model for one structured summary of older turns, folding any
    previous summary, and keeps a recent tail verbatim. That summary
-   request uses the same session retry policy as a model round.
+   request follows the same `retry` policy as a model round.
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.

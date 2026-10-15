@@ -261,12 +261,81 @@ public sealed class SettingsStoreTests
         Assert.Equal(TimeSpan.FromDays(7), settings.ExecutionBudget.MaximumDuration);
         Assert.Equal(600, settings.BashTimeoutSeconds);
         Assert.Equal(10800, settings.BackgroundBashTimeoutSeconds);
+        Assert.Equal(RetrySettings.Default, settings.Retry);
+        Assert.Equal(RetrySettings.Default, settings.ApprovalRetry);
         Assert.True(File.Exists(root.Home.ConfigPath));
         Assert.False(File.Exists(root.Home.ProvidersPath));
         using var config = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
         Assert.False(config.RootElement.TryGetProperty("providers", out _));
         Assert.False(config.RootElement.TryGetProperty("bashTimeoutSeconds", out _));
         Assert.False(config.RootElement.TryGetProperty("backgroundBashTimeoutSeconds", out _));
+        Assert.False(config.RootElement.TryGetProperty("retry", out _));
+        Assert.False(config.RootElement.TryGetProperty("approvalRetry", out _));
+    }
+
+    [Fact]
+    public void Load_ReadsConfiguredRetryPolicies()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ConfigPath, """
+            {
+              "retry": {
+                "enabled": false,
+                "maximumRetries": 2,
+                "initialDelaySeconds": 1,
+                "backoffFactor": 3,
+                "jitterFactor": 0,
+                "maximumDelaySeconds": 5
+              },
+              "approvalRetry": { "maximumRetries": 1 }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.Retry.Enabled);
+        Assert.Equal(2, settings.Retry.MaximumRetries);
+        Assert.Equal(1d, settings.Retry.InitialDelaySeconds);
+        Assert.Equal(3d, settings.Retry.BackoffFactor);
+        Assert.Equal(0d, settings.Retry.JitterFactor);
+        Assert.Equal(5d, settings.Retry.MaximumDelaySeconds);
+        Assert.True(settings.ApprovalRetry.Enabled);
+        Assert.Equal(1, settings.ApprovalRetry.MaximumRetries);
+        Assert.Equal(
+            SessionRetryOptions.DefaultInitialDelaySeconds,
+            settings.ApprovalRetry.InitialDelaySeconds);
+    }
+
+    [Fact]
+    public void Save_RoundTripsCustomRetryPolicyAndOmitsTheDefault()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithRetry(new RetrySettings(maximumRetries: 1));
+        store.Save(settings.WithVerboseTools(false));
+
+        var reloaded = store.Load();
+
+        Assert.Equal(new RetrySettings(maximumRetries: 1), reloaded.Retry);
+        Assert.Equal(RetrySettings.Default, reloaded.ApprovalRetry);
+        using var saved = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
+        Assert.Equal(
+            1,
+            saved.RootElement.GetProperty("retry").GetProperty("maximumRetries").GetInt32());
+        Assert.False(saved.RootElement.TryGetProperty("approvalRetry", out _));
+    }
+
+    [Fact]
+    public void Load_RejectsInvalidRetryPolicy()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ConfigPath, """{ "retry": { "maximumRetries": -1 } }""");
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.Load());
     }
 
     [Fact]
