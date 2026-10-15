@@ -66,14 +66,14 @@ public sealed class ApprovalPolicy
                     ToolResultStatus.Failure));
         }
 
-        var classification = _classifier.Classify(call);
+        var classification = await _classifier.ClassifyAsync(call, cancellationToken);
         if (CanPassWithoutReview(call.Name, classification))
         {
             _prompt.NotifyPassed(call, classification, ApprovalPassReason.Policy);
             return ToolInvocationDecision.Execute;
         }
 
-        if (_grants.Contains(_workspace.Root, call))
+        if (classification.AllowsReusableGrant && _grants.Contains(_workspace.Root, call))
         {
             _prompt.NotifyPassed(call, classification, ApprovalPassReason.Grant);
             return ToolInvocationDecision.Execute;
@@ -102,9 +102,7 @@ public sealed class ApprovalPolicy
                 new ToolOutput(RejectedText, ToolResultStatus.Failure));
         }
 
-        var scope = classification.Risk == Risk.Forbidden
-            ? GrantScope.Once
-            : choice.Scope;
+        var scope = classification.AllowsReusableGrant ? choice.Scope : GrantScope.Once;
         _grants.Remember(_workspace.Root, call, scope);
         return ToolInvocationDecision.Execute;
     }
@@ -132,7 +130,9 @@ public sealed class ApprovalPolicy
                 verdict);
         }
 
-        if (verdict.IsAllow && classification.Risk != Risk.Forbidden)
+        if (verdict.IsAllow
+            && classification.Risk != Risk.Forbidden
+            && !classification.RequirePrompt)
         {
             _prompt.NotifyPassed(call, classification, ApprovalPassReason.Review, verdict);
             return (ToolInvocationDecision.Execute, verdict);

@@ -7,8 +7,14 @@ namespace CrystalCode.Terminal.Approvals;
 /// </summary>
 public static class ApprovalKeys
 {
-    public static bool TryMap(ConsoleKey key, out ApprovalChoice choice)
+    public static bool TryMap(ConsoleKey key, out ApprovalChoice choice, bool allowReusableGrant = true)
     {
+        if (!allowReusableGrant && key is ConsoleKey.D2 or ConsoleKey.S or ConsoleKey.D3 or ConsoleKey.A)
+        {
+            choice = ApprovalChoice.Deny;
+            return false;
+        }
+
         switch (key)
         {
             case ConsoleKey.D1:

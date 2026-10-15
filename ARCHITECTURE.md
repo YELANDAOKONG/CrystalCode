@@ -84,7 +84,20 @@ and the extension's global and project runtime-data directories. An approval
 classifier receives the model call and a context carrying the workspace root,
 session id, and approval mode before invocation and returns the call's risk
 and authority; the engine merges that proposal with its own classification and
-it can only raise risk or authority, never lower them. It references only
+it can only raise risk or authority, never lower them. `ClassifyApprovalAsync`
+receives user/turn cancellation and an independent two-second timeout. Its
+entry is dispatched on a worker so blocking before returning a task does not
+block approval. After timeout or cancellation that classifier instance stays
+disabled until the external catalog reloads; late work is observed and its
+result is discarded. In-process code still cannot be forcibly terminated.
+Null results, exceptions, timeouts, disabled instances, and either invalid
+classification field fail closed to Privileged + PrivilegedEscalation, merged
+with the host floor. User/turn cancellation propagates without approval.
+Classification summaries are authored by the host; a tool's `Summary` is not
+sent to the operator or the reviewer. The engine awaits `IApprovalClassifier`
+`ClassifyAsync`; its default implementation adapts existing synchronous plugin
+classifiers. Synchronous external classification fails closed when a tool has
+an asynchronous pre-classifier. It references only
 Crystal and Crystal.Tools. It does not reference the engine, the display, the
 executable, or a terminal library. Tools that implement only Crystal's `ITool`
 or `IMultimodalTool` do not reference it. There is no paired test project;
@@ -695,14 +708,17 @@ Modes:
   returns `outcome` (allow / deny / ask), `risk_level` (low / medium
   / high), `user_authorization` (low / medium / high), and
   `rationale`. Allow executes. Deny becomes model-visible rejection
-  text. Ask and Forbidden-allow fall back to the operator. Review is
-  not a grant and is not full pass-through.
+  text. Ask, Forbidden-allow, and forced-prompt allow fall back to the
+  operator. Review is not a grant and is not full pass-through.
 - Audit: the same reviewer and transcript rules as Review, but
   workspace `write` and `edit` are also checked. They do not auto-pass.
 - Full: workspace-bounded, policy-allowed actions pass without review.
   That includes any loaded external tool whose classification stays
   Write + Workspace, not only built-in `write` / `edit`. Forbidden,
-  Privileged, and outside-workspace paths never fully auto-pass.
+  Privileged, outside-workspace, and forced-prompt calls never fully auto-pass.
+  Session and Persistent grants apply only to ordinary Workspace Read/Write
+  calls; they are rechecked after every classification and cannot bypass a
+  raised classification.
 
 The reviewing model is the session model unless `approvalModel` is
 enabled in `config.json`. The object is `enabled`, `provider`, `model`,
@@ -755,7 +771,14 @@ the shell prints a panel with Title Case fields: Status, Reason, Risk,
 and Authority, plus the classifier summary. A review allow also prints
 Outcome, review Risk, Authority, and rationale.
 
-Persistent grants are stored in `~/.crystal/permissions.json`.
+Persistent grants are stored in `~/.crystal/permissions.json`. Existing grants
+remain readable, but only apply when the current classification is Workspace
+Read/Write without `RequirePrompt`. OutsideWorkspace, Network, Privileged,
+Forbidden, unknown classifications, and `RequirePrompt` cannot use or create
+reusable grants. Their operator allow applies once, regardless of a front
+end's returned scope. `RequirePrompt` also prevents a reviewer Allow from
+executing: Deny still rejects, while Allow and Ask reach the operator. The
+headless front end denies any such operator prompt.
 
 ## Compaction
 
@@ -1530,7 +1553,9 @@ cards for `edit` and `write` show a capped `+` / `-` preview
 of `old_string` / `new_string` or `contents`. Overlay keys share the
 session frame loop, so transcript scroll and resize still work while a
 prompt is up. Ask overlays use the same card; `Y` / `S` / `A` / `N` map
-Once / Session / Always / Deny. The follow-up queue is a `Queued` panel
+Once / Session / Always / Deny for ordinary workspace calls. Calls that cannot
+reuse grants offer only `Y` / `N` (Once / Deny) and ignore Session/Always keys.
+The follow-up queue is a `Queued` panel
 above the composer.
 
 Composer keys: Enter submits when idle and queues while a turn is

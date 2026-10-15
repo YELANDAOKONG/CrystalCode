@@ -444,7 +444,7 @@ public sealed class DotnetToolFactoryTests
     }
 
     [Fact]
-    public void Load_DotnetApprovalClassifier_ClassifiesThroughTheHostContract()
+    public async Task Load_DotnetApprovalClassifier_ClassifiesThroughTheHostContract()
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
@@ -475,13 +475,15 @@ public sealed class DotnetToolFactoryTests
                     CancellationToken cancellationToken = default) =>
                     ValueTask.FromResult(new ToolOutput("ok"));
 
-                public HostToolApprovalClassification ClassifyApproval(
+                public ValueTask<HostToolApprovalClassification> ClassifyApprovalAsync(
                     ToolCall call,
-                    ToolHostContext context) =>
-                    new(
-                        "write",
+                    ToolHostContext context,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new HostToolApprovalClassification(
+                        context.WorkspaceRoot.Length > 0 && context.SessionId == "sess-4" && context.Approval == "audit"
+                            ? "write" : "forbidden",
                         "outsideWorkspace",
-                        context.WorkspaceRoot + " " + context.SessionId + " " + context.Approval);
+                        "Tool explanation"));
             }
             """,
             referenceHostContract: true);
@@ -503,14 +505,12 @@ public sealed class DotnetToolFactoryTests
 
         Assert.Empty(catalog.Notes);
         Assert.True(Assert.Single(catalog.Tools).HasApprovalClassifier);
-        Assert.True(
-            catalog.Classifier.TryClassify(
-                new ToolCall("1", "patch", "{}"),
-                root,
-                out var classification));
+        var classification = await catalog.Classifier.ClassifyAsync(
+            new ToolCall("1", "patch", "{}"), root);
+        Assert.NotNull(classification);
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
-        Assert.Equal(root.Root + " sess-4 audit", classification.Summary);
+        Assert.Equal("External tool; classified as write / outside_workspace", classification.Summary);
 
         var text = ToolListText.Format(
             [.. catalog.PlanTools.Select(tool => tool.Definition)],
@@ -522,7 +522,7 @@ public sealed class DotnetToolFactoryTests
     }
 
     [Fact]
-    public void Load_DotnetMultimodalClassifier_ClassifiesThroughTheHostContract()
+    public async Task Load_DotnetMultimodalClassifier_ClassifiesThroughTheHostContract()
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
@@ -555,10 +555,11 @@ public sealed class DotnetToolFactoryTests
                     CancellationToken cancellationToken = default) =>
                     ValueTask.FromResult(new MultimodalToolOutput([new TextContent("ok")]));
 
-                public HostToolApprovalClassification ClassifyApproval(
+                public ValueTask<HostToolApprovalClassification> ClassifyApprovalAsync(
                     ToolCall call,
-                    ToolHostContext context) =>
-                    new("write", "outsideWorkspace", "Patch image outside workspace");
+                    ToolHostContext context,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new HostToolApprovalClassification("write", "outsideWorkspace", "Patch image outside workspace"));
             }
             """,
             referenceHostContract: true);
@@ -577,14 +578,12 @@ public sealed class DotnetToolFactoryTests
         Assert.Empty(catalog.Notes);
         Assert.Single(catalog.WorkMultimodalTools);
         Assert.True(Assert.Single(catalog.Tools).HasApprovalClassifier);
-        Assert.True(
-            catalog.Classifier.TryClassify(
-                new ToolCall("1", "patch_image", "{}"),
-                root,
-                out var classification));
+        var classification = await catalog.Classifier.ClassifyAsync(
+            new ToolCall("1", "patch_image", "{}"), root);
+        Assert.NotNull(classification);
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
-        Assert.Equal("Patch image outside workspace", classification.Summary);
+        Assert.Equal("External tool; classified as write / outside_workspace", classification.Summary);
     }
 
     private static void WriteExecSet(string workspace, string directoryName, string toolName)

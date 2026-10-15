@@ -20,6 +20,20 @@ public sealed class ApprovalKeysTests
         Assert.Equal(ApprovalChoice.Deny, deny);
     }
 
+    [Theory]
+    [InlineData(ConsoleKey.S)]
+    [InlineData(ConsoleKey.A)]
+    [InlineData(ConsoleKey.D2)]
+    [InlineData(ConsoleKey.D3)]
+    public void TryMap_OnceOnlyApproval_IgnoresReusableGrantKeys(ConsoleKey key)
+    {
+        Assert.False(ApprovalKeys.TryMap(key, out _, allowReusableGrant: false));
+        Assert.True(ApprovalKeys.TryMap(ConsoleKey.Y, out var once, allowReusableGrant: false));
+        Assert.Equal(ApprovalChoice.AllowOnce, once);
+        Assert.True(ApprovalKeys.TryMap(ConsoleKey.N, out var deny, allowReusableGrant: false));
+        Assert.Equal(ApprovalChoice.Deny, deny);
+    }
+
     [Fact]
     public void For_TitleCasesApprovalMode()
     {

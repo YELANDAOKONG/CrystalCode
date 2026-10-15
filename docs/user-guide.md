@@ -860,9 +860,9 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
 | **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
-| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes. Deny becomes model-visible rejection text. Ask and Forbidden-allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. Review is not a grant and is not full pass-through. |
 | **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
-| **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, and outside-workspace paths never fully auto-pass. |
+| **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, outside-workspace, and forced-prompt calls never fully auto-pass. |
 
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through. `/approval` with no argument cycles Default,
@@ -906,7 +906,13 @@ rationale):
 | A or 3 | Always (persistent) |
 | N, Escape, or 4 | Deny |
 
-Persistent grants are stored in `~/.crystal/permissions.json`.
+Persistent grants are stored in `~/.crystal/permissions.json`. Session and
+Persistent are offered only for ordinary Workspace Read/Write calls without a
+forced prompt. OutsideWorkspace, Network, Privileged, Forbidden, and forced
+prompts offer Once/Deny only; Session/Always keys are ignored. Existing grants
+are checked against the current classification on every call and cannot
+bypass an upgrade. A forced prompt still asks you after a reviewer Allow;
+reviewer Deny rejects. `crystal run` denies any call that reaches this prompt.
 
 When a call auto-passes (policy, remembered grant, or review allow),
 the shell prints a panel with Status, Reason, Risk, and Authority,
@@ -1136,7 +1142,11 @@ use host policy unless configured otherwise. A dotnet text or multimodal tool
 may implement `IHostToolApprovalClassifier` when its actual write paths are
 embedded in arguments; the host merges that side-effect-free result with its
 own classification, the result can only raise risk or authority, and
-classification failures fail closed. `/tools` lists the effective
+classification failures fail closed. Classification receives cancellation and
+a separate two-second budget, independent of the execution timeout. A timed-out
+or cancelled classifier is disabled until the tools reload; later calls fail
+classification closed. The host authors the summary rather than adopting tool
+wording. `/tools` lists the effective
 catalog and approval and marks tools that supply their own classifier,
 `/tools home|project author|host` changes source trust,
 and `/tools on|off|reload` controls discovery.

@@ -58,7 +58,7 @@ public sealed class ApprovalPrompt : IApprovalPrompt
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var key = await _renderer.ReadKeyAsync(cancellationToken);
-                if (ApprovalKeys.TryMap(key.Key, out var choice))
+                if (ApprovalKeys.TryMap(key.Key, out var choice, classification.AllowsReusableGrant))
                 {
                     if (choice.IsAllow)
                     {

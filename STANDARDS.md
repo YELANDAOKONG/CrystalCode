@@ -76,8 +76,14 @@
   side-effect-free pre-classifier when their actual write paths are embedded
   in arguments; it must fail closed, it can only raise risk or authority for
   the call, and it never replaces the Write + Workspace floor, the declared
-  path checks, or the source trust policy. Path checks follow symbolic links
-  to their final target. A link that leaves the workspace is outside
+  path checks, or the source trust policy. Its asynchronous entry receives
+  cancellation and a separate two-second budget. Timeout/cancellation disables
+  the classifier until reload; late tasks stay observed. Invalid fields,
+  exceptions, and timeouts fail the proposal closed on both classification
+  axes. Final summaries are host-authored. Reusable grants only apply to
+  Workspace Read/Write without a forced prompt; forced prompts also prevent
+  reviewer Allow from executing without the operator. Path checks follow
+  symbolic links to their final target. A link that leaves the workspace is outside
   the workspace.
 - When Skills is enabled, any path
   inside a Skills search directory (`skill` / `skills` trees)

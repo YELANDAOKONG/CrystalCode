@@ -118,6 +118,23 @@ public sealed class ApprovalCardTests
         Assert.Contains("Y Once", text, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("privileged", "workspace", false)]
+    [InlineData("write", "outside_workspace", false)]
+    [InlineData("forbidden", "privileged_escalation", false)]
+    [InlineData("write", "workspace", true)]
+    public void AskWidget_RestrictedClassification_OffersOnceOnly(string risk, string authority, bool requirePrompt)
+    {
+        var classification = new ToolClassification(new Risk(risk), new Authority(authority), "Patch", requirePrompt);
+        var text = string.Join('\n', WidgetPaint.Plain(
+            ApprovalCard.AskWidget(new ToolCall("1", "apply_patch", "{}"), classification), 100));
+
+        Assert.Contains("Y Once", text, StringComparison.Ordinal);
+        Assert.Contains("N Deny", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("S Session", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("A Always", text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AskWidget_ShowsHiddenCharactersAsTextAndPaintsNoControls()
     {

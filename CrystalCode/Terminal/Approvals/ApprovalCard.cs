@@ -94,7 +94,7 @@ public static class ApprovalCard
             classification.Summary,
             review,
             ApprovalDiff.Lines(call),
-            KeysHint,
+            classification.AllowsReusableGrant ? KeysHint : "Y Once  ·  N Deny",
             expand: true);
     }
 

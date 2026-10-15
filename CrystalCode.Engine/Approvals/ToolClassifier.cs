@@ -35,6 +35,31 @@ public sealed class ToolClassifier
         return _advise?.Invoke(call, classification) ?? classification;
     }
 
+    public async ValueTask<ToolClassification> ClassifyAsync(
+        ToolCall call,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        cancellationToken.ThrowIfCancellationRequested();
+        var classification = ClassifyBuiltIn(call);
+        if (classification is null)
+        {
+            foreach (var classifier in _classifiers)
+            {
+                classification = await classifier.ClassifyAsync(call, _workspace, cancellationToken);
+                if (classification is not null)
+                {
+                    break;
+                }
+            }
+        }
+
+        classification ??= new ToolClassification(
+            Risk.Privileged, Authority.PrivilegedEscalation, "Unknown tool");
+        cancellationToken.ThrowIfCancellationRequested();
+        return _advise?.Invoke(call, classification) ?? classification;
+    }
+
     private ToolClassification ClassifyCore(ToolCall call)
     {
         var builtIn = ClassifyBuiltIn(call);

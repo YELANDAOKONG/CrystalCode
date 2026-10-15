@@ -127,7 +127,10 @@ separate library with no terminal code. The product can:
   Home `author`, Project `host`); external dotnet tools may provide a
   side-effect-free pre-classifier when their write paths are embedded in
   structured arguments, and that classifier can only tighten classification,
-  never replace the floor or the source policy;
+  never replace the floor or the source policy. Classification is cancellable
+  and has a separate two-second budget. Reusable grants cover ordinary
+  workspace Read/Write only; a raised classification is reviewed again.
+  A forced prompt always requires the operator, even after a review allow;
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
   Anthropic Messages, native Gemini GenerateContent, and native Ollama Chat
   adapters, including user-added gateways;

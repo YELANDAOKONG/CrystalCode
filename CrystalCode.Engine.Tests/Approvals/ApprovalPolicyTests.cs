@@ -564,6 +564,130 @@ public sealed class ApprovalPolicyTests
         Assert.Equal(Authority.Workspace, prompt.LastClassification?.Authority);
     }
 
+    [Theory]
+    [InlineData(false, "write", "outside_workspace", false)]
+    [InlineData(true, "write", "outside_workspace", false)]
+    [InlineData(false, "write", "network", false)]
+    [InlineData(true, "write", "network", false)]
+    [InlineData(false, "privileged", "workspace", false)]
+    [InlineData(true, "privileged", "privileged_escalation", false)]
+    [InlineData(false, "forbidden", "privileged_escalation", false)]
+    [InlineData(true, "forbidden", "privileged_escalation", false)]
+    [InlineData(false, "write", "workspace", true)]
+    [InlineData(true, "write", "workspace", true)]
+    public async Task DecideAsync_ExistingGrant_RechecksRaisedClassification(
+        bool persistent, string risk, string authority, bool requirePrompt)
+    {
+        using var root = new TemporaryWorkspace();
+        using var home = new TemporaryHome();
+        var workspace = new Workspace(root.Path);
+        var grants = new GrantStore(home.Home);
+        var firstCall = new ToolCall("1", "apply_patch", "{\"patch\":\"inside\"}");
+        var first = new ApprovalPolicy(
+            ApprovalMode.Default, workspace, grants,
+            new RecordingApprovalPrompt(persistent ? ApprovalChoice.AllowPersistent : ApprovalChoice.AllowSession),
+            classifiers: [new FixedApprovalClassifier("apply_patch",
+                new ToolClassification(Risk.Write, Authority.Workspace, "Workspace patch"))]);
+        Assert.Equal(ToolInvocationAction.Execute, (await first.DecideAsync(firstCall)).Action);
+
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var second = new ApprovalPolicy(
+            ApprovalMode.Full, workspace, persistent ? new GrantStore(home.Home) : grants, prompt,
+            classifiers: [new FixedApprovalClassifier("apply_patch",
+                new ToolClassification(new Risk(risk), new Authority(authority), "Raised patch", requirePrompt))]);
+        var result = await second.DecideAsync(new ToolCall("2", "apply_patch", "{\"patch\":\"outside\"}"));
+
+        Assert.Equal(ToolInvocationAction.Reject, result.Action);
+        Assert.Equal(1, prompt.Count);
+        Assert.Equal(0, prompt.PassCount);
+    }
+
+    [Theory]
+    [InlineData("review", "allow")]
+    [InlineData("audit", "allow")]
+    [InlineData("review", "deny")]
+    [InlineData("audit", "ask")]
+    public async Task DecideAsync_RequirePrompt_ReviewerCannotReplaceOperator(string mode, string outcome)
+    {
+        using var context = new ApprovalContext(new ApprovalMode(mode));
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var reviewer = new FixedApprovalReviewer(new ApprovalReviewVerdict(
+            outcome, ReviewRiskLevel.Low, ReviewAuthorization.High, "Review result"));
+        var policy = context.CreatePolicy(prompt, reviewer,
+            advise: static (_, classification) => classification with { RequirePrompt = true });
+
+        var result = await policy.DecideAsync(WriteCall());
+
+        Assert.Equal(ToolInvocationAction.Reject, result.Action);
+        Assert.Equal(1, prompt.ReviewCount);
+        Assert.Equal(outcome == "deny" ? 0 : 1, prompt.Count);
+        Assert.Equal(0, prompt.PassCount);
+    }
+
+    [Theory]
+    [InlineData("default")]
+    [InlineData("full")]
+    public async Task DecideAsync_RequirePrompt_OverridesAutomaticTool(string mode)
+    {
+        using var context = new ApprovalContext(new ApprovalMode(mode));
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = context.CreatePolicy(prompt,
+            classifiers: [new FixedApprovalClassifier("apply_patch",
+                new ToolClassification(Risk.Write, Authority.Workspace, "Patch", RequirePrompt: true))],
+            automaticTools: new HashSet<string> { "apply_patch" });
+
+        var result = await policy.DecideAsync(new ToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(ToolInvocationAction.Reject, result.Action);
+        Assert.Equal(1, prompt.Count);
+    }
+
+    [Theory]
+    [InlineData("write", "outside_workspace", false)]
+    [InlineData("write", "network", false)]
+    [InlineData("privileged", "workspace", false)]
+    [InlineData("forbidden", "privileged_escalation", false)]
+    [InlineData("write", "workspace", true)]
+    public async Task DecideAsync_RestrictedCall_DoesNotRememberPersistentChoice(
+        string risk, string authority, bool requirePrompt)
+    {
+        using var home = new TemporaryHome();
+        using var root = new TemporaryWorkspace();
+        var grants = new GrantStore(home.Home);
+        var call = new ToolCall("1", "apply_patch", "{}");
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowPersistent);
+        var policy = new ApprovalPolicy(ApprovalMode.Default, new Workspace(root.Path), grants, prompt,
+            classifiers: [new FixedApprovalClassifier("apply_patch",
+                new ToolClassification(new Risk(risk), new Authority(authority), "Patch", requirePrompt))]);
+
+        Assert.Equal(ToolInvocationAction.Execute, (await policy.DecideAsync(call)).Action);
+        Assert.Equal(ToolInvocationAction.Execute, (await policy.DecideAsync(call)).Action);
+        Assert.Equal(2, prompt.Count);
+        Assert.False(grants.Contains(root.Path, call));
+        Assert.False(File.Exists(home.Home.PermissionsPath));
+    }
+
+    [Fact]
+    public async Task DecideAsync_WorkspacePatch_PersistentGrantStillWorksAfterReload()
+    {
+        using var home = new TemporaryHome();
+        using var root = new TemporaryWorkspace();
+        var workspace = new Workspace(root.Path);
+        var call = new ToolCall("1", "apply_patch", "{}");
+        IApprovalClassifier[] classifiers = [new FixedApprovalClassifier("apply_patch",
+            new ToolClassification(Risk.Write, Authority.Workspace, "Patch"))];
+        var first = new ApprovalPolicy(ApprovalMode.Default, workspace, new GrantStore(home.Home),
+            new RecordingApprovalPrompt(ApprovalChoice.AllowPersistent), classifiers: classifiers);
+        await first.DecideAsync(call);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var second = new ApprovalPolicy(ApprovalMode.Default, workspace, new GrantStore(home.Home), prompt,
+            classifiers: classifiers);
+
+        Assert.Equal(ToolInvocationAction.Execute, (await second.DecideAsync(call)).Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(ApprovalPassReason.Grant, prompt.LastPassReason);
+    }
+
     private static ToolCall WriteCall() =>
         new("1", WriteTool.ToolName, """{"path":"src/App.cs","contents":"x"}""");
 

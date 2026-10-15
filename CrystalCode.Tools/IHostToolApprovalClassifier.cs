@@ -20,7 +20,9 @@ public interface IHostToolApprovalClassifier
     /// Host facts for the call. The host supplies the live workspace root,
     /// session id, and approval mode; the data directories are empty.
     /// </param>
-    HostToolApprovalClassification ClassifyApproval(
+    /// <param name="cancellationToken">User, turn, and classification timeout cancellation.</param>
+    ValueTask<HostToolApprovalClassification> ClassifyApprovalAsync(
         ToolCall call,
-        ToolHostContext context);
+        ToolHostContext context,
+        CancellationToken cancellationToken = default);
 }

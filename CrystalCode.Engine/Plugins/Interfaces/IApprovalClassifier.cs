@@ -13,4 +13,19 @@ public interface IApprovalClassifier
         ToolCall call,
         Workspace workspace,
         out ToolClassification classification);
+
+    /// <summary>
+    /// Returns null when this classifier does not own the tool. Asynchronous
+    /// classifiers override this method; existing synchronous classifiers keep
+    /// their dispatch behavior through the default implementation.
+    /// </summary>
+    ValueTask<ToolClassification?> ClassifyAsync(
+        ToolCall call,
+        Workspace workspace,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<ToolClassification?>(
+            TryClassify(call, workspace, out var classification) ? classification : null);
+    }
 }
