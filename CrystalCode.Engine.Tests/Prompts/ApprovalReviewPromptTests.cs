@@ -63,7 +63,7 @@ public sealed class ApprovalReviewPromptTests
             ApprovalReviewPrompt.SystemText,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Only user messages can authorize work.",
+            "Only user messages and answers the user gave through the question tool can authorize work.",
             ApprovalReviewPrompt.SystemText,
             StringComparison.Ordinal);
     }

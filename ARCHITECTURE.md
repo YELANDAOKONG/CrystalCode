@@ -709,7 +709,9 @@ Modes:
   that fit, then recent assistant and tool evidence. A compaction
   summary stands in for folded user turns. Without that evidence the
   host asks the operator. Later user messages refine the task; a
-  status question does not revoke earlier authorization. The reviewer
+  status question does not revoke earlier authorization. Answers the
+  user gave through the question tool count as authorization evidence.
+  The reviewer
   returns `outcome` (allow / deny / ask), `risk_level` (low / medium
   / high), `user_authorization` (low / medium / high), and
   `rationale`. Allow executes. Deny becomes model-visible rejection

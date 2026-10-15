@@ -11,6 +11,8 @@ public sealed class QuestionTool : ITool
 {
     public const string ToolName = "question";
 
+    public const string AnswersPrefix = "User answers: ";
+
     private const string ToolDescription =
         "Asks the user one or more questions and waits. Use it when you are uncertain: a missing fact, "
         + "a choice that would change the work, or something the repository cannot tell you. "
@@ -118,7 +120,7 @@ public sealed class QuestionTool : ITool
 
         var answers = response.Answers.Select(answer => answer.ToArray()).ToArray();
         return new ToolOutput(
-            "User answers: " + JsonSerializer.Serialize(new { answers }));
+            AnswersPrefix + JsonSerializer.Serialize(new { answers }));
     }
 
     private static bool TryReadQuestions(

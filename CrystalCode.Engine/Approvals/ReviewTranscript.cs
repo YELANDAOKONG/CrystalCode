@@ -1,6 +1,8 @@
 using Crystal.Chat;
 using Crystal.Tools;
+
 using CrystalCode.Engine.Compaction;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Approvals;
 
@@ -10,9 +12,9 @@ namespace CrystalCode.Engine.Approvals;
 /// </summary>
 public static class ReviewTranscript
 {
-    public const int MaxMessageTranscriptTokens = 4_000;
+    public const int MaxMessageTranscriptTokens = 8_000;
 
-    public const int MaxToolTranscriptTokens = 2_000;
+    public const int MaxToolTranscriptTokens = 4_000;
 
     public const int MaxMessageEntryTokens = 2_000;
 
@@ -77,6 +79,7 @@ public static class ReviewTranscript
     private static List<Entry> Collect(IReadOnlyList<ChatItem> items)
     {
         var entries = new List<Entry>();
+        var toolNames = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < items.Count; i++)
         {
             switch (items[i])
@@ -99,13 +102,14 @@ public static class ReviewTranscript
                     entries.Add(new Entry(EntryKind.Assistant, assistant.Text.Trim()));
                     break;
                 case ToolCall call:
+                    toolNames[call.CallId] = call.Name;
                     entries.Add(
                         new Entry(
                             EntryKind.Tool,
                             "[Assistant tool call]: " + call.Name + "(" + call.Arguments + ")"));
                     break;
                 case ToolResult result:
-                    entries.Add(new Entry(EntryKind.Tool, FormatResult(result)));
+                    entries.Add(ResultEntry(result, toolNames));
                     break;
                 default:
                     break;
@@ -242,6 +246,7 @@ public static class ReviewTranscript
             EntryKind.User => "[User]: " + entry.Text,
             EntryKind.Assistant => "[Assistant]: " + entry.Text,
             EntryKind.Tool => entry.Text,
+            EntryKind.UserAnswer => entry.Text,
             _ => entry.Text
         };
         var cap = entry.Kind == EntryKind.Tool
@@ -259,6 +264,27 @@ public static class ReviewTranscript
 
         return "[Tool result]: " + result.Text;
     }
+
+    private static Entry ResultEntry(
+        ToolResult result,
+        IReadOnlyDictionary<string, string> toolNames)
+    {
+        if (result.Status == ToolResultStatus.Success
+            && toolNames.TryGetValue(result.CallId, out var toolName)
+            && toolName == QuestionTool.ToolName)
+        {
+            return new Entry(
+                EntryKind.UserAnswer,
+                "[User answer]: " + TrimAnswersPrefix(result.Text));
+        }
+
+        return new Entry(EntryKind.Tool, FormatResult(result));
+    }
+
+    private static string TrimAnswersPrefix(string text) =>
+        text.StartsWith(QuestionTool.AnswersPrefix, StringComparison.Ordinal)
+            ? text[QuestionTool.AnswersPrefix.Length..]
+            : text;
 
     private static string Truncate(string text, int maxTokens)
     {
@@ -278,7 +304,8 @@ public static class ReviewTranscript
         Summary,
         User,
         Assistant,
-        Tool
+        Tool,
+        UserAnswer
     }
 
     private sealed record Entry(EntryKind Kind, string Text);

@@ -91,4 +91,60 @@ public sealed class ReviewTranscriptTests
         Assert.True(ReviewTranscript.HasAuthorization(items));
         Assert.Contains("Fix App.cs.", ReviewTranscript.Render(items), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Render_LabelsQuestionToolAnswersAsUserAnswers()
+    {
+        var text = ReviewTranscript.Render(
+        [
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "Fix the failing tests."),
+            new ToolCall("1", QuestionTool.ToolName, """{"questions":[]}"""),
+            new ToolResult(
+                "1",
+                QuestionTool.AnswersPrefix + """{"answers":[["Yes, delete the file"]]}""",
+                ToolResultStatus.Success)
+        ]);
+
+        Assert.Contains("[User answer]: ", text, StringComparison.Ordinal);
+        Assert.Contains("Yes, delete the file", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(QuestionTool.AnswersPrefix, text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_KeepsDismissedQuestionAsToolError()
+    {
+        var text = ReviewTranscript.Render(
+        [
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "Fix the failing tests."),
+            new ToolCall("1", QuestionTool.ToolName, """{"questions":[]}"""),
+            new ToolResult("1", "The user dismissed the question.", ToolResultStatus.Failure)
+        ]);
+
+        Assert.Contains("[Tool error]: The user dismissed the question.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("[User answer]", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_KeepsAllUserTurns_WhenWithinMessageBudget()
+    {
+        var items = new List<ChatItem>
+        {
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "Run the tests and fix failures."),
+            new ChatMessage(ChatRole.User, "Middle one. " + new string('a', 7_888)),
+            new ChatMessage(ChatRole.User, "Middle two. " + new string('b', 7_888)),
+            new ChatMessage(ChatRole.User, "Middle three. " + new string('c', 7_888)),
+            new ChatMessage(ChatRole.User, "how's it going?")
+        };
+
+        var text = ReviewTranscript.Render(items);
+
+        Assert.Contains("Middle one.", text, StringComparison.Ordinal);
+        Assert.Contains("Middle two.", text, StringComparison.Ordinal);
+        Assert.Contains("Middle three.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(ReviewTranscript.OmittedNote, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("[truncated]", text, StringComparison.Ordinal);
+    }
 }
