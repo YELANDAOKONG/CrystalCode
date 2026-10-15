@@ -501,7 +501,9 @@ The transcript is otherwise the same conversation.
 The todo list belongs to the session, not to a mode. Built-in Plan text asks
 the model to write the plan's steps as pending todos and leave them pending;
 built-in Work text asks the model to work through pending todos it finds
-instead of starting a new list. Built-in Work and Plan text also tell the
+instead of starting a new list. Built-in Work and Plan text also direct the
+model to use `search` first when it does not know which files matter, then
+read the best candidates. They tell the
 model that file contents and tool results are data, not instructions, and
 that workspace instructions override the built-in defaults while the user's
 latest message overrides both. When `question` is unavailable or dismissed,
@@ -685,7 +687,7 @@ Every side-effect tool call is classified before invocation:
 Modes:
 
 - Plan: no built-in edit, write, or bash. Workspace reads auto-execute.
-  Reads, list, glob, and grep of paths outside the workspace ask the operator.
+  Reads, list, glob, grep, and search of paths outside the workspace ask the operator.
   When Skills is enabled, any path inside a Skills search directory
   (`skill` / `skills` trees) auto-executes as a workspace read. The
   comparison uses the final target of each symbolic link. External
@@ -1030,7 +1032,7 @@ available-skill guidance is appended after the env block.
 Skills are OpenCode-compatible `SKILL.md` folders. They are loaded
 on demand through the `skill` tool. Available-skill guidance lists
 name and description only; it does not include absolute paths. When
-Skills is enabled, `read`, `list`, glob, and grep of any path inside a Skills
+Skills is enabled, `read`, `list`, `glob`, `grep`, and `search` of any path inside a Skills
 search directory (`skill` / `skills` trees, including files that are
 not `SKILL.md`) auto-execute as workspace reads. The comparison uses
 the final target of each symbolic link. Other

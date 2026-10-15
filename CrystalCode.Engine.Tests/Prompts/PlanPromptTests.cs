@@ -15,6 +15,7 @@ public sealed class PlanPromptTests
         Assert.Contains("{{instructions_section}}", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todowrite", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todoread", PlanPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("Use search to find the relevant files", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("question", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("smallest useful set", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("returns the results together", PlanPrompt.Text, StringComparison.Ordinal);

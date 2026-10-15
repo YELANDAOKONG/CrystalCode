@@ -15,6 +15,7 @@ public sealed class WorkPromptTests
         Assert.Contains("{{instructions_section}}", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todowrite", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todoread", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("Use search to find candidate files", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("When you are uncertain", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("smallest useful set", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("returns the results together", WorkPrompt.Text, StringComparison.Ordinal);

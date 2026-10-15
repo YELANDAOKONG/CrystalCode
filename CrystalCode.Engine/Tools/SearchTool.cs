@@ -15,7 +15,7 @@ public sealed class SearchTool : ITool
 
     private static readonly string ToolDescription =
         "Finds candidate workspace files by matching a .NET regular expression against both relative paths "
-        + "and file contents. Use it first when you do not know which files matter, then read the best candidates. "
+        + "and file contents. Use it when you do not know which files matter, then read the best candidates. "
         + "One line per file, ranked with name matches first, then by matching-line count; each file line shows "
         + $"its count (capped at {WorkspaceLimits.MaximumSearchMatchesPerFile} with a + suffix) and up to "
         + $"{WorkspaceLimits.MaximumSearchPreviewLinesPerFile} matching lines as previews. "
