@@ -465,13 +465,13 @@ slash command.
 
 These are product modes, not Crystal types.
 
-- Plan registers read, list, glob, grep, todowrite, todoread, and question. When
-  Skills is enabled, it also registers skill. External tools whose
-  `catalogs` include `plan` are appended after the built-ins.
-- Work registers read, list, glob, grep, todowrite, todoread, question, and
-  skill when enabled, then edit, write, bash, and the session-local
-  `bash_start`, `bash_status`, `bash_logs`, and `bash_stop` tools, then external
-  tools whose `catalogs` include `work`.
+- Plan registers read, list, glob, grep, search, todowrite, todoread, and
+  question. When Skills is enabled, it also registers skill. External tools
+  whose `catalogs` include `plan` are appended after the built-ins.
+- Work registers read, list, glob, grep, search, todowrite, todoread,
+  question, and skill when enabled, then edit, write, bash, and the
+  session-local `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`
+  tools, then external tools whose `catalogs` include `work`.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
@@ -490,7 +490,7 @@ task ID without waiting for process exit. `bash_status` reports the task state,
 process tree. Tasks are not saved in session documents, do not cross a process
 restart, and are stopped when the session closes. The configured
 `backgroundBashTimeoutSeconds` timer applies to them, independent of the
-foreground `bashTimeoutSeconds`; omitting it keeps 3600 seconds, and `null`
+foreground `bashTimeoutSeconds`; omitting it keeps 10800 seconds (3 hours), and `null`
 or `"unlimited"` disables that timer. At most
 32 tasks may be active at once; completed tasks remain queryable but do not
 consume an active-task slot. Background task stdin is closed after startup.
@@ -699,7 +699,7 @@ Modes:
 - Review: workspace file changes for built-in `write` and `edit`
   pass without review, same as Edit. Another model checks
   each remaining side-effect call (Codex guardian-style), including
-  bash, bash_start, bash_stop, reads, list, glob, grep, write, and edit of paths outside the
+  bash, bash_start, bash_stop, reads, list, glob, grep, search, write, and edit of paths outside the
   workspace, and external Write. Workspace reads and Skills search
   directories still
   auto-execute. A bounded transcript excerpt is attached: the first
@@ -949,7 +949,7 @@ For example, an unlimited time budget with finite call limits is:
 ```
 
 `bashTimeoutSeconds` is omitted when it is the 600 second default and
-`backgroundBashTimeoutSeconds` when it is the 3600 second default. `null` and
+`backgroundBashTimeoutSeconds` when it is the 10800 second default. `null` and
 `"unlimited"` both mean no timer. The two timers are independent of each other.
 
 `providers.json` stores the provider catalog as a root object keyed

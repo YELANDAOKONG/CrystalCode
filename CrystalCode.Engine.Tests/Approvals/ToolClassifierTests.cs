@@ -182,6 +182,36 @@ public sealed class ToolClassifierTests
     }
 
     [Fact]
+    public void Classify_SearchTool_MatchesReadPathRules()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var classifier = new ToolClassifier(new Workspace(root.Path));
+        var outsideJson = "{\"query\":\"alpha\",\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
+
+        var inside = classifier.Classify(
+            new ToolCall("1", SearchTool.ToolName, """{"query":"alpha"}"""));
+        Assert.Equal(Risk.Read, inside.Risk);
+        Assert.Equal(Authority.Workspace, inside.Authority);
+        Assert.Equal("Search workspace", inside.Summary);
+
+        var outsideClassification = classifier.Classify(
+            new ToolCall("2", SearchTool.ToolName, outsideJson));
+        Assert.Equal(Risk.Read, outsideClassification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, outsideClassification.Authority);
+
+        var credential = classifier.Classify(
+            new ToolCall("3", SearchTool.ToolName, """{"query":"x","path":".ssh/id_rsa"}"""));
+        Assert.Equal(Risk.Forbidden, credential.Risk);
+        Assert.Equal(Authority.PrivilegedEscalation, credential.Authority);
+
+        Assert.Equal(
+            "src/lib",
+            GrantFingerprint.Create(
+                new ToolCall("4", SearchTool.ToolName, """{"query":"x","path":"src/lib"}""")));
+    }
+
+    [Fact]
     public void Classify_WriteInsideWorkspace_IsWrite()
     {
         using var root = new TemporaryWorkspace();

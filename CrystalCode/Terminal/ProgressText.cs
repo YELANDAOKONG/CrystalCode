@@ -67,6 +67,7 @@ public static class ProgressText
             EditTool.ToolName => "Editing",
             GlobTool.ToolName => "Searching",
             GrepTool.ToolName => "Searching",
+            SearchTool.ToolName => "Searching",
             TodoWriteTool.ToolName => "Updating Todos",
             TodoReadTool.ToolName => "Reading Todos",
             QuestionTool.ToolName => "Asking",

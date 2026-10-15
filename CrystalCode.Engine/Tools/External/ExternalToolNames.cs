@@ -25,6 +25,7 @@ public static class ExternalToolNames
         ListTool.ToolName,
         GlobTool.ToolName,
         GrepTool.ToolName,
+        SearchTool.ToolName,
         TodoWriteTool.ToolName,
         TodoReadTool.ToolName,
         QuestionTool.ToolName,

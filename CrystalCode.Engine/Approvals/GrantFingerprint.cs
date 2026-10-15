@@ -26,6 +26,8 @@ internal static class GrantFingerprint
                 globPath.Replace('\\', '/'),
             GrepTool.ToolName when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var grepPath) =>
                 grepPath.Replace('\\', '/'),
+            SearchTool.ToolName when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var searchPath) =>
+                searchPath.Replace('\\', '/'),
             BashTool.ToolName when BashTool.TryReadCommand(call.Arguments, out var command) =>
                 command,
             BackgroundBashStartTool.ToolName when BashTool.TryReadCommand(call.Arguments, out var backgroundCommand) =>

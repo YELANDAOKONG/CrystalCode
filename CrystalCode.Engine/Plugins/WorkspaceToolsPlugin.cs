@@ -31,6 +31,10 @@ public sealed class WorkspaceToolsPlugin : IPlugin
                     HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new GrepTool(workspace)),
                 new FactoryToolContribution(
+                    SearchTool.ToolName,
+                    HostToolCatalogs.PlanAndWork,
+                    (workspace, _, _) => new SearchTool(workspace)),
+                new FactoryToolContribution(
                     TodoWriteTool.ToolName,
                     HostToolCatalogs.PlanAndWork,
                     (_, todos, _) => new TodoWriteTool(todos)),

@@ -30,6 +30,7 @@ public sealed class ProgressTextTests
     [InlineData(EditTool.ToolName, "Editing")]
     [InlineData(WriteTool.ToolName, "Writing File")]
     [InlineData(GrepTool.ToolName, "Searching")]
+    [InlineData(SearchTool.ToolName, "Searching")]
     [InlineData(TodoWriteTool.ToolName, "Updating Todos")]
     [InlineData(TodoReadTool.ToolName, "Reading Todos")]
     public void Running_MapsKnownTools(string name, string expected)

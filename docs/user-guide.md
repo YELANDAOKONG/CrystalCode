@@ -472,7 +472,7 @@ Top-level fields:
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). Automatic compaction still prints only `Compacted context` |
 | `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
-| `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 3600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
+| `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 
 Add named endpoints and model tables in `providers.json`, not in new
 `config.json` configurations.
@@ -846,8 +846,8 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
-| **Work** | Built-in read, list, glob, grep, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
+| **Plan** | Built-in read, list, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Work** | Built-in read, list, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
 
@@ -865,7 +865,7 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
 | **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
-| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, glob, grep, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. Review is not a grant and is not full pass-through. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. Review is not a grant and is not full pass-through. |
 | **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, outside-workspace, and forced-prompt calls never fully auto-pass. |
 
@@ -1079,19 +1079,19 @@ custom field order.
 
 ## Built-in tools
 
-`read`, `list`, `glob`, `grep`, `edit`, and `write` may use a path outside the
+`read`, `list`, `glob`, `grep`, `search`, `edit`, and `write` may use a path outside the
 workspace after approval (you, or the Review model in Review or
 Audit). Workspace `write` and `edit` still follow the approval mode.
 `bash` starts in the workspace root and is approved as a side effect.
 Background Bash tasks are available in Work only. `bash_start` returns a
 session-local task ID without waiting; use `bash_status` or `bash_logs` to
 observe it and `bash_stop` to terminate it. The task uses the configured
-`backgroundBashTimeoutSeconds` (default 3600 seconds), keeps bounded output, is
+`backgroundBashTimeoutSeconds` (default 10800 seconds, 3 hours), keeps bounded output, is
 not persisted, and is stopped when the session closes. At most 32 tasks may be active at once; completed
 tasks remain queryable without consuming an active-task slot. Background task
 stdin is closed, so commands that require terminal input are unsupported.
 Credential paths
-(`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, and list
+(`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, search, and list
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
 files are rejected for read/edit (NUL probe). Shell working directory
 is the workspace root.
@@ -1104,6 +1104,7 @@ is the workspace root.
 | `list` | Plan, Work | List a directory's immediate entries (`path` optional, 1-based `offset` and `limit` paging) |
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`, 1-based `offset` and `limit` paging) |
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
+| `search` | Plan, Work | Ranked candidate files by name and content (`query`, optional `path`, `glob`, `caseSensitive`, 1-based `offset` and `limit` paging) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
 | `todoread` | Plan, Work | Read the current session todo list |
 | `question` | Plan, Work | Ask one or more questions with single/multiple choices and custom answers |
@@ -1111,13 +1112,15 @@ is the workspace root.
 | `edit` | Work | Replace one unique `old_string` in a file |
 | `write` | Work | Create or overwrite a UTF-8 text file |
 | `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 600 seconds) |
-| `bash_start` | Work | Start a session-local background shell command after approval and return its task ID. Timeout is `backgroundBashTimeoutSeconds` (default 3600 seconds) |
+| `bash_start` | Work | Start a session-local background shell command after approval and return its task ID. Timeout is `backgroundBashTimeoutSeconds` (default 10800 seconds, 3 hours) |
 | `bash_status` | Work | Read the status, exit code, and log offsets of a background task |
 | `bash_logs` | Work | Read bounded background task output by offset |
 | `bash_stop` | Work | Stop a background task and its child processes after approval |
 
 Practical limits: read up to 1,000,000 characters or 20,000 lines;
-write up to 2 MiB; grep up to 1,000 matches and 8 MiB per file; glob
+write up to 2 MiB; grep up to 1,000 matches and 8 MiB per file; search
+up to 200 candidate files per page (default 50) with up to 2 preview
+lines per file and 8 MiB per scanned file; glob
 up to 1,000 matches per page; list up to 1,000 entries per page; tool
 output truncated at 100,000 characters. Background task output is capped at
 1 MiB per task, and `bash_logs` returns at most 100,000 characters per call.
@@ -1389,7 +1392,7 @@ replacements. They never replace Work, Plan, or Review.
 
 Skills are OpenCode-compatible instruction folders. They are not
 prompt overlays. The model sees a list of available skills and loads
-one with the `skill` tool. When Skills is enabled, `read`/`list`/`glob`/`grep`
+one with the `skill` tool. When Skills is enabled, `read`/`list`/`glob`/`grep`/`search`
 of any path inside a Skills search directory (`skill` / `skills`
 trees, including scripts and other files that are not `SKILL.md`)
 auto-passes; it does not ask you. Set `"skills": false` in

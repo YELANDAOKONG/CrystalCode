@@ -96,7 +96,7 @@ public sealed class GrepTool : ITool
             return ValueTask.FromResult(new ToolOutput(globError, ToolResultStatus.Failure));
         }
 
-        if (!TryCollectFiles(relativePath, out var files, out var error))
+        if (!TextSearchFiles.TryCollect(_workspace, relativePath, out var files, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
         }
@@ -141,57 +141,6 @@ public sealed class GrepTool : ITool
         return ValueTask.FromResult(new ToolOutput(builder.ToString().TrimEnd()));
     }
 
-    private bool TryCollectFiles(
-        string? relativePath,
-        out List<string> files,
-        out string error)
-    {
-        files = [];
-        error = string.Empty;
-        if (relativePath is null)
-        {
-            AddSearchable(_workspace.EnumerateFiles(_workspace.Root), files);
-            return true;
-        }
-
-        if (Workspace.IsCredentialPath(relativePath))
-        {
-            error = "Searching credential paths is not allowed.";
-            return false;
-        }
-
-        if (!_workspace.TryResolveReadableLocation(relativePath, out var location, out error))
-        {
-            return false;
-        }
-
-        if (Workspace.IsCredentialPath(location))
-        {
-            error = "Searching credential paths is not allowed.";
-            return false;
-        }
-
-        if (File.Exists(location))
-        {
-            files.Add(location);
-            return true;
-        }
-
-        AddSearchable(_workspace.EnumerateFiles(location), files);
-        return true;
-    }
-
-    private static void AddSearchable(IEnumerable<string> paths, List<string> files)
-    {
-        foreach (var path in paths)
-        {
-            if (!Workspace.IsCredentialPath(path))
-            {
-                files.Add(path);
-            }
-        }
-    }
-
     private static bool TrySearchFile(
         string fullPath,
         string relative,
@@ -201,8 +150,7 @@ public sealed class GrepTool : ITool
         out bool truncated)
     {
         truncated = false;
-        var info = new FileInfo(fullPath);
-        if (info.Length > WorkspaceLimits.MaximumGrepFileBytes || Workspace.LooksBinary(fullPath))
+        if (!TextSearchFiles.IsSearchable(fullPath))
         {
             return false;
         }
