@@ -39,4 +39,6 @@ public sealed record SessionStatus(
     bool VerboseThinkingEnabled = true,
     bool PluginsEnabled = true,
     int Plugins = 0,
-    string? ApprovalThinking = null);
+    string? ApprovalThinking = null,
+    string? Retry = null,
+    string? ApprovalRetry = null);

@@ -24,7 +24,7 @@ internal static class StatusWidget
         var layout = new Grid();
         layout.AddColumn(new GridColumn().PadRight(1));
         layout.AddColumn();
-        layout.AddRow(WorkspaceCard(status), ModelCard(status));
+        layout.AddRow(WorkspaceCard(status), ModelCard(status, full));
         layout.AddRow(TokenCard(status, full), OptionsCard(status));
         if (full)
         {
@@ -47,7 +47,7 @@ internal static class StatusWidget
             ("Prompt set", status.PromptSet)
         ]);
 
-    private static Panel ModelCard(SessionStatus status)
+    private static Panel ModelCard(SessionStatus status, bool full)
     {
         var rows = new List<(string Field, string Value)>
         {
@@ -63,6 +63,19 @@ internal static class StatusWidget
         if (status.ApprovalThinking is not null)
         {
             rows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
+        }
+
+        if (full)
+        {
+            if (!string.IsNullOrWhiteSpace(status.Retry))
+            {
+                rows.Add(("Retry", status.Retry));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status.ApprovalRetry))
+            {
+                rows.Add(("Approval retry", status.ApprovalRetry));
+            }
         }
 
         return Card("Model", rows);

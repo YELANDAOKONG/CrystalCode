@@ -40,6 +40,19 @@ public static class StatusText
             modelRows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
         }
 
+        if (full)
+        {
+            if (!string.IsNullOrWhiteSpace(status.Retry))
+            {
+                modelRows.Add(("Retry", status.Retry));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status.ApprovalRetry))
+            {
+                modelRows.Add(("Approval retry", status.ApprovalRetry));
+            }
+        }
+
         AddSection(lines, "Model", modelRows);
         AddSection(
             lines,

@@ -900,7 +900,8 @@ and the work thinking gear do not change it. Compaction stays on the
 session model. While the switch is off, no separate client is created
 and Review and Audit follow `/model`. Finish the current turn before
 changing the approval model. `/status` adds Approval model and Approval
-thinking rows only while the switch is on. The status bar does not.
+thinking rows only while the switch is on, and `/status full` lists the
+effective `retry` and `approvalRetry` policies. The status bar does not.
 
 When you are asked, the overlay uses a two-column field grid
 (Status, Reason, Risk, Authority, and for review also Outcome plus

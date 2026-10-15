@@ -146,4 +146,45 @@ public sealed class StatusTextTests
         Assert.DoesNotContain("Activity", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Session ID", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Format_ShowsRetryPoliciesOnlyInFull()
+    {
+        var status = new SessionStatus(
+            "session-3",
+            DateTimeOffset.UnixEpoch,
+            "/work",
+            false,
+            ApprovalMode.Review,
+            "Think Medium",
+            "default",
+            "openai",
+            "gpt-5",
+            1_000,
+            null,
+            0,
+            0,
+            0,
+            0,
+            0,
+            true,
+            true,
+            false,
+            true,
+            true,
+            1,
+            1,
+            0,
+            null,
+            Retry: "5 retries, 2s base x2, 25% jitter, 30s cap",
+            ApprovalRetry: "Disabled");
+
+        var full = StatusText.Format(status, full: true);
+        var brief = StatusText.Format(status, full: false);
+
+        Assert.Contains("30s cap", full, StringComparison.Ordinal);
+        Assert.Contains("Approval retry", full, StringComparison.Ordinal);
+        Assert.DoesNotContain("30s cap", brief, StringComparison.Ordinal);
+        Assert.DoesNotContain("Approval retry", brief, StringComparison.Ordinal);
+    }
 }

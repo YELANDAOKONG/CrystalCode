@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Crystal;
@@ -1881,8 +1882,25 @@ public sealed class CodingSession : ITurnObserver
                     : null,
                 ApprovalThinking: _settings.ApprovalModel.Enabled
                     ? CurrentApprovalThinkingStatus()
-                    : null),
+                    : null,
+                Retry: DescribeRetry(_settings.Retry),
+                ApprovalRetry: DescribeRetry(_settings.ApprovalRetry)),
             full));
+    }
+
+    private static string DescribeRetry(RetrySettings settings)
+    {
+        if (!settings.Enabled)
+        {
+            return "Disabled";
+        }
+
+        var retries = settings.MaximumRetries == 1 ? "retry" : "retries";
+        var initial = settings.InitialDelaySeconds.ToString("0.###", CultureInfo.InvariantCulture);
+        var factor = settings.BackoffFactor.ToString("0.###", CultureInfo.InvariantCulture);
+        var jitter = (settings.JitterFactor * 100).ToString("0.###", CultureInfo.InvariantCulture);
+        var cap = settings.MaximumDelaySeconds.ToString("0.###", CultureInfo.InvariantCulture);
+        return $"{settings.MaximumRetries} {retries}, {initial}s base x{factor}, {jitter}% jitter, {cap}s cap";
     }
 
     private void ChangeStatusLine(string argument)

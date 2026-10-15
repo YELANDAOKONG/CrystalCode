@@ -132,4 +132,45 @@ public sealed class StatusWidgetTests
         Assert.Contains("Approval thinking", text, StringComparison.Ordinal);
         Assert.Contains("High", text, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Create_ShowsRetryPoliciesOnlyInFull()
+    {
+        var status = new SessionStatus(
+            "session-6",
+            DateTimeOffset.UnixEpoch,
+            "/work",
+            false,
+            ApprovalMode.Review,
+            "Think Medium",
+            "default",
+            "openai",
+            "gpt-5",
+            1_000,
+            null,
+            0,
+            0,
+            0,
+            0,
+            0,
+            true,
+            true,
+            false,
+            true,
+            true,
+            1,
+            1,
+            0,
+            null,
+            Retry: "5 retries, 2s base x2, 25% jitter, 30s cap",
+            ApprovalRetry: "Disabled");
+
+        var full = string.Join('\n', WidgetPaint.Plain(StatusWidget.Create(status, full: true), 96));
+        var brief = string.Join('\n', WidgetPaint.Plain(StatusWidget.Create(status, full: false), 96));
+
+        Assert.Contains("30s cap", full, StringComparison.Ordinal);
+        Assert.Contains("Approval retry", full, StringComparison.Ordinal);
+        Assert.DoesNotContain("30s cap", brief, StringComparison.Ordinal);
+        Assert.DoesNotContain("Approval retry", brief, StringComparison.Ordinal);
+    }
 }

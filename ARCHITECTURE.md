@@ -750,7 +750,7 @@ stored gear or sets one
 by name and persists it; it needs a stored or enabled approval model,
 but works while the switch is off. `/status` adds
 Approval model and Approval thinking rows only while the switch is on.
-The status bar does not.
+`/status full` lists the effective retry policies. The status bar does not.
 
 `crystal run` can set the switch for one process with
 `--approval-model on|off`, `--approval-provider`, `--approval-model-id`,
@@ -1108,9 +1108,10 @@ the catalogs when required.
 and Options cards report operating modes, provider identity, cumulative
 provider-reported input/output/total token usage, the latest request's
 proportional context bar, and feature switches. `/status full` also shows the
-latest request token breakdown and adds Activity and Tools cards for session
-identity and start time, invocation counters, queue and todo counts, and
-tool-catalog totals. The persistent chrome remains the smallest live summary.
+effective `retry` and `approvalRetry` policies, the latest request token
+breakdown, and adds Activity and Tools cards for session identity and start
+time, invocation counters, queue and todo counts, and tool-catalog totals. The
+persistent chrome remains the smallest live summary.
 `/status` labels cumulative values as session usage and reserves the latest
 request breakdown for `/status full`; its output does not depend on status-line
 customization.
