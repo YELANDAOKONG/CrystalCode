@@ -15,7 +15,8 @@ public sealed class TreeTool : ITool
 
     private static readonly string ToolDescription =
         "Lists the directory structure under a path, one workspace-relative path per line, depth-first. "
-        + "Subdirectories come before files within each directory, and directories end with a slash. "
+        + "Subdirectories come before files within each directory, each group is sorted by entry name, "
+        + "and directories end with a slash. "
         + "Use it to see the shape of an unfamiliar directory; use list for one directory's immediate entries, "
         + "glob to find files by name, and search to find candidate files by name and content. "
         + "Optional path defaults to the workspace root; paths outside the workspace require approval. "
@@ -24,6 +25,8 @@ public sealed class TreeTool : ITool
         + $"Set files true to include file entries; each directory lists at most "
         + $"{WorkspaceLimits.MaximumTreeFilesPerDirectory} files and notes the rest. "
         + "Skips .git, .vs, bin, obj, node_modules, dist, and credential paths. "
+        + "A directory link is listed once, under its resolved path; a link whose target leaves "
+        + "the workspace root (or an outside start path) is skipped. "
         + $"Output stops at {WorkspaceLimits.MaximumTreeEntries} entries with a truncation note; "
         + "narrow the path or reduce depth instead of paging.";
 
@@ -157,9 +160,13 @@ public sealed class TreeTool : ITool
                 return;
             }
 
+            // ToRelative reports the workspace root as ".", which would read
+            // as "[+N more files in .]".
+            var relative = _workspace.ToRelative(fileParent);
+            var shown = relative == "." ? "the workspace root" : relative;
             ToolOutputText.AppendLine(
                 builder,
-                $"[+{skippedInParent} more files in {_workspace.ToRelative(fileParent)}]");
+                $"[+{skippedInParent} more files in {shown}]");
             skippedInParent = 0;
         }
 

@@ -121,6 +121,19 @@ public sealed class TreeToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_CredentialPath_Fails()
+    {
+        using var root = new TemporaryWorkspace();
+        var tool = new TreeTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", TreeTool.ToolName, """{"path":"~/.ssh"}"""));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+        Assert.Equal("Listing credential paths is not allowed.", output.Text);
+    }
+
+    [Fact]
     public async Task InvokeAsync_CapsFilesPerDirectoryWithANote()
     {
         using var root = new TemporaryWorkspace();
@@ -143,6 +156,28 @@ public sealed class TreeToolTests
         Assert.Equal(
             WorkspaceLimits.MaximumTreeFilesPerDirectory + 2,
             output.Text.Split('\n').Length);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_NotesCappedFilesInTheWorkspaceRoot()
+    {
+        using var root = new TemporaryWorkspace();
+        for (var index = 0;
+            index < WorkspaceLimits.MaximumTreeFilesPerDirectory + 3;
+            index++)
+        {
+            File.WriteAllText(Path.Combine(root.Path, $"f{index:D3}.txt"), "x");
+        }
+
+        var tool = new TreeTool(new Workspace(root.Path));
+        var output = await tool.InvokeAsync(
+            new ToolCall("1", TreeTool.ToolName, """{"files":true}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Contains(
+            "[+3 more files in the workspace root]",
+            output.Text,
+            StringComparison.Ordinal);
     }
 
     [Fact]

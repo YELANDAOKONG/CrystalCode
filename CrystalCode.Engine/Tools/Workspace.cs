@@ -247,10 +247,13 @@ public sealed class Workspace
 
     /// <summary>
     /// Enumerates entries for the tree tool: within each walked directory,
-    /// subdirectories come before files, each group sorted by name. The walk
-    /// uses the same fence and skip rules as <see cref="EnumerateFiles"/> and
-    /// visits each resolved directory once. A directory link whose target was
-    /// already walked is skipped.
+    /// subdirectories come before files, each group sorted by entry name.
+    /// Fencing and symbolic-link handling match <see cref="EnumerateFiles"/>;
+    /// on top of its rules, a directory is skipped when its entry name or
+    /// its resolved name is an ignored directory name, when it resolves to a
+    /// credential path, and when its resolved target was already walked. A
+    /// directory link target is therefore reported once, under its resolved
+    /// path.
     /// </summary>
     internal IEnumerable<TreeEntry> EnumerateTree(
         string directoryFullPath,

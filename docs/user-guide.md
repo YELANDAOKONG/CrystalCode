@@ -1095,7 +1095,9 @@ tasks remain queryable without consuming an active-task slot. Background task
 stdin is closed, so commands that require terminal input are unsupported.
 Credential paths
 (`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, search, list, and tree
-skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
+skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Tree lists
+a directory link once, under its resolved path, and skips a link whose
+target leaves the workspace root (or an outside start path). Binary
 files are rejected for read/edit (NUL probe). Shell working directory
 is the workspace root.
 
