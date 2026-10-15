@@ -23,6 +23,7 @@ public static class ExternalToolNames
         DescribeImageTool.ToolName,
         ViewImageTool.ToolName,
         ListTool.ToolName,
+        TreeTool.ToolName,
         GlobTool.ToolName,
         GrepTool.ToolName,
         SearchTool.ToolName,

@@ -22,6 +22,7 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(catalog.Find(GrepTool.ToolName));
         Assert.NotNull(catalog.Find(SearchTool.ToolName));
         Assert.NotNull(catalog.Find(ListTool.ToolName));
+        Assert.NotNull(catalog.Find(TreeTool.ToolName));
         Assert.NotNull(catalog.Find(TodoWriteTool.ToolName));
         Assert.NotNull(catalog.Find(TodoReadTool.ToolName));
         Assert.NotNull(catalog.Find(QuestionTool.ToolName));
@@ -49,6 +50,7 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(catalog.Find(BackgroundBashLogsTool.ToolName));
         Assert.NotNull(catalog.Find(BackgroundBashStopTool.ToolName));
         Assert.NotNull(catalog.Find(ListTool.ToolName));
+        Assert.NotNull(catalog.Find(TreeTool.ToolName));
         Assert.NotNull(catalog.Find(SearchTool.ToolName));
         Assert.Contains(
             "600 second timeout",

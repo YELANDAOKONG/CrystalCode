@@ -63,6 +63,7 @@ public static class ProgressText
             BackgroundBashStopTool.ToolName => "Stopping Background Command",
             ReadTool.ToolName => "Reading",
             ListTool.ToolName => "Listing",
+            TreeTool.ToolName => "Listing",
             WriteTool.ToolName => "Writing File",
             EditTool.ToolName => "Editing",
             GlobTool.ToolName => "Searching",

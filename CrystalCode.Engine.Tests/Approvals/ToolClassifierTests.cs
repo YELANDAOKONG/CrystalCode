@@ -212,6 +212,36 @@ public sealed class ToolClassifierTests
     }
 
     [Fact]
+    public void Classify_TreeTool_MatchesReadPathRules()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var classifier = new ToolClassifier(new Workspace(root.Path));
+        var outsideJson = "{\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
+
+        var inside = classifier.Classify(
+            new ToolCall("1", TreeTool.ToolName, """{"depth":2}"""));
+        Assert.Equal(Risk.Read, inside.Risk);
+        Assert.Equal(Authority.Workspace, inside.Authority);
+        Assert.Equal("Tree workspace", inside.Summary);
+
+        var outsideClassification = classifier.Classify(
+            new ToolCall("2", TreeTool.ToolName, outsideJson));
+        Assert.Equal(Risk.Read, outsideClassification.Risk);
+        Assert.Equal(Authority.OutsideWorkspace, outsideClassification.Authority);
+
+        var credential = classifier.Classify(
+            new ToolCall("3", TreeTool.ToolName, """{"path":".ssh"}"""));
+        Assert.Equal(Risk.Forbidden, credential.Risk);
+        Assert.Equal(Authority.PrivilegedEscalation, credential.Authority);
+
+        Assert.Equal(
+            "src/lib",
+            GrantFingerprint.Create(
+                new ToolCall("4", TreeTool.ToolName, """{"path":"src/lib"}""")));
+    }
+
+    [Fact]
     public void Classify_WriteInsideWorkspace_IsWrite()
     {
         using var root = new TemporaryWorkspace();

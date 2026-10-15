@@ -208,7 +208,7 @@ change is scheduled, and a later decision may revisit it.
 
 Whether built-in tool limits become operator configuration is under
 consideration and is not decided. The current behavior stands: result size
-caps, read, grep, glob, search, and list limits, background task counts and
+caps, read, grep, glob, search, list, and tree limits, background task counts and
 log bounds, the image size limit, and the todo caps are host-owned constants.
 Timeouts and turn budgets are already configurable and are not part of this
 question. No change is scheduled, and a later decision may revisit it. Such a

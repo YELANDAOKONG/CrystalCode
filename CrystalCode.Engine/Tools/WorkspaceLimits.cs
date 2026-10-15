@@ -34,6 +34,14 @@ public static class WorkspaceLimits
 
     public const int MaximumListEntries = 1000;
 
+    public const int DefaultTreeDepth = 2;
+
+    public const int MaximumTreeDepth = 4;
+
+    public const int MaximumTreeEntries = 1000;
+
+    public const int MaximumTreeFilesPerDirectory = 20;
+
     public const int MaximumToolOutputCharacters = 100_000;
 
     public const int MaximumBackgroundTaskOutputCharacters = 1_048_576;

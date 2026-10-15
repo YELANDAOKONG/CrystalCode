@@ -848,8 +848,8 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | Built-in read, list, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
-| **Work** | Built-in read, list, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
+| **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
 Tab, Shift+Tab, or `/plan` toggles Plan and Work.
 
@@ -867,7 +867,7 @@ Grant: Once, Session, Persistent.
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
 | **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
-| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Answers given through the question tool count as user authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. A transient reviewer request failure is retried per `approvalRetry` (five times by default); if it still fails you are asked. Review is not a grant and is not full pass-through. |
+| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, tree, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Answers given through the question tool count as user authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. A transient reviewer request failure is retried per `approvalRetry` (five times by default); if it still fails you are asked. Review is not a grant and is not full pass-through. |
 | **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
 | **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, outside-workspace, and forced-prompt calls never fully auto-pass. |
 
@@ -1082,7 +1082,7 @@ custom field order.
 
 ## Built-in tools
 
-`read`, `list`, `glob`, `grep`, `search`, `edit`, and `write` may use a path outside the
+`read`, `list`, `tree`, `glob`, `grep`, `search`, `edit`, and `write` may use a path outside the
 workspace after approval (you, or the Review model in Review or
 Audit). Workspace `write` and `edit` still follow the approval mode.
 `bash` starts in the workspace root and is approved as a side effect.
@@ -1094,7 +1094,7 @@ not persisted, and is stopped when the session closes. At most 32 tasks may be a
 tasks remain queryable without consuming an active-task slot. Background task
 stdin is closed, so commands that require terminal input are unsupported.
 Credential paths
-(`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, search, and list
+(`.ssh`, `.gnupg`, `credentials.json`) stay Forbidden. Glob, grep, search, list, and tree
 skip `.git`, `.vs`, `bin`, `obj`, `node_modules`, and `dist`. Binary
 files are rejected for read/edit (NUL probe). Shell working directory
 is the workspace root.
@@ -1105,6 +1105,7 @@ is the workspace root.
 | `describe_image` | Plan, Work | Describe an image through `imageModel` (`path`, optional `question`). Omitted when `imageModel` is unset |
 | `view_image` | Plan, Work | Show an image to the current model (`path`). Present only while that model accepts images |
 | `list` | Plan, Work | List a directory's immediate entries (`path` optional, 1-based `offset` and `limit` paging) |
+| `tree` | Plan, Work | List the directory structure under a path (`path` optional, `depth` default 2 capped at 4, `files` to include file entries). Depth-first; subdirectories before files; up to 1,000 entries and 20 files per directory |
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`, 1-based `offset` and `limit` paging) |
 | `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
 | `search` | Plan, Work | Ranked candidate files by name and content (`query`, optional `path`, `glob`, `caseSensitive`, 1-based `offset` and `limit` paging) |
@@ -1124,7 +1125,8 @@ Practical limits: read up to 1,000,000 characters or 20,000 lines;
 write up to 2 MiB; grep up to 1,000 matches and 8 MiB per file; search
 up to 200 candidate files per page (default 50) with up to 2 preview
 lines per file and 8 MiB per scanned file; glob
-up to 1,000 matches per page; list up to 1,000 entries per page; tool
+up to 1,000 matches per page; list up to 1,000 entries per page; tree up to
+1,000 entries, 4 levels deep, and 20 files per directory; tool
 output truncated at 100,000 characters. Background task output is capped at
 1 MiB per task, and `bash_logs` returns at most 100,000 characters per call.
 
@@ -1395,7 +1397,7 @@ replacements. They never replace Work, Plan, or Review.
 
 Skills are OpenCode-compatible instruction folders. They are not
 prompt overlays. The model sees a list of available skills and loads
-one with the `skill` tool. When Skills is enabled, `read`/`list`/`glob`/`grep`/`search`
+one with the `skill` tool. When Skills is enabled, `read`/`list`/`tree`/`glob`/`grep`/`search`
 of any path inside a Skills search directory (`skill` / `skills`
 trees, including scripts and other files that are not `SKILL.md`)
 auto-passes; it does not ask you. Set `"skills": false` in

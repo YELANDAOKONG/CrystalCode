@@ -23,6 +23,10 @@ public sealed class WorkspaceToolsPlugin : IPlugin
                     HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new ListTool(workspace)),
                 new FactoryToolContribution(
+                    TreeTool.ToolName,
+                    HostToolCatalogs.PlanAndWork,
+                    (workspace, _, _) => new TreeTool(workspace)),
+                new FactoryToolContribution(
                     GlobTool.ToolName,
                     HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new GlobTool(workspace)),

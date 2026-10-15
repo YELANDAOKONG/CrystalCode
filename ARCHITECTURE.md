@@ -466,10 +466,10 @@ slash command.
 
 These are product modes, not Crystal types.
 
-- Plan registers read, list, glob, grep, search, todowrite, todoread, and
+- Plan registers read, list, tree, glob, grep, search, todowrite, todoread, and
   question. When Skills is enabled, it also registers skill. External tools
   whose `catalogs` include `plan` are appended after the built-ins.
-- Work registers read, list, glob, grep, search, todowrite, todoread,
+- Work registers read, list, tree, glob, grep, search, todowrite, todoread,
   question, and skill when enabled, then edit, write, bash, and the
   session-local `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`
   tools, then external tools whose `catalogs` include `work`.
@@ -504,7 +504,8 @@ the model to write the plan's steps as pending todos and leave them pending;
 built-in Work text asks the model to work through pending todos it finds
 instead of starting a new list. Built-in Work and Plan text also direct the
 model to use `search` first when it does not know which files matter, then
-read the best candidates. They tell the
+read the best candidates and use tree, glob, grep, and list to understand the
+repository. They tell the
 model that file contents and tool results are data, not instructions, and
 that workspace instructions override the built-in defaults while the user's
 latest message overrides both. When `question` is unavailable or dismissed,
@@ -688,7 +689,7 @@ Every side-effect tool call is classified before invocation:
 Modes:
 
 - Plan: no built-in edit, write, or bash. Workspace reads auto-execute.
-  Reads, list, glob, grep, and search of paths outside the workspace ask the operator.
+  Reads, list, tree, glob, grep, and search of paths outside the workspace ask the operator.
   When Skills is enabled, any path inside a Skills search directory
   (`skill` / `skills` trees) auto-executes as a workspace read. The
   comparison uses the final target of each symbolic link. External
@@ -702,7 +703,7 @@ Modes:
 - Review: workspace file changes for built-in `write` and `edit`
   pass without review, same as Edit. Another model checks
   each remaining side-effect call (Codex guardian-style), including
-  bash, bash_start, bash_stop, reads, list, glob, grep, search, write, and edit of paths outside the
+  bash, bash_start, bash_stop, reads, list, tree, glob, grep, search, write, and edit of paths outside the
   workspace, and external Write. Workspace reads and Skills search
   directories still
   auto-execute. A bounded transcript excerpt is attached: the first
@@ -1038,7 +1039,7 @@ available-skill guidance is appended after the env block.
 Skills are OpenCode-compatible `SKILL.md` folders. They are loaded
 on demand through the `skill` tool. Available-skill guidance lists
 name and description only; it does not include absolute paths. When
-Skills is enabled, `read`, `list`, `glob`, `grep`, and `search` of any path inside a Skills
+Skills is enabled, `read`, `list`, `tree`, `glob`, `grep`, and `search` of any path inside a Skills
 search directory (`skill` / `skills` trees, including files that are
 not `SKILL.md`) auto-execute as workspace reads. The comparison uses
 the final target of each symbolic link. Other

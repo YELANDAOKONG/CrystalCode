@@ -89,6 +89,7 @@ public sealed class ToolClassifier
             DescribeImageTool.ToolName => ClassifyRead(call.Arguments, "Describe image", pathRequired: true),
             ViewImageTool.ToolName => ClassifyRead(call.Arguments, "View image", pathRequired: true),
             ListTool.ToolName => ClassifyRead(call.Arguments, "List", pathRequired: false),
+            TreeTool.ToolName => ClassifyRead(call.Arguments, "Tree", pathRequired: false),
             GlobTool.ToolName => ClassifyRead(call.Arguments, "Glob", pathRequired: false),
             GrepTool.ToolName => ClassifyRead(call.Arguments, "Grep", pathRequired: false),
             SearchTool.ToolName => ClassifyRead(call.Arguments, "Search", pathRequired: false),

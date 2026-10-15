@@ -69,7 +69,7 @@
 
 ## Safety
 
-- Write, edit, read, list, glob, grep, and search of paths outside the
+- Write, edit, read, list, tree, glob, grep, and search of paths outside the
   workspace require approval. In Review or Audit the reviewing model judges them;
   otherwise the operator is asked. Edit, Review, and Full do not
   auto-pass an outside write or edit. External dotnet tools may supply a

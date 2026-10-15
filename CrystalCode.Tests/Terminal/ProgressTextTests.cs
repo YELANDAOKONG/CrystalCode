@@ -27,6 +27,7 @@ public sealed class ProgressTextTests
     [Theory]
     [InlineData(ReadTool.ToolName, "Reading")]
     [InlineData(ListTool.ToolName, "Listing")]
+    [InlineData(TreeTool.ToolName, "Listing")]
     [InlineData(EditTool.ToolName, "Editing")]
     [InlineData(WriteTool.ToolName, "Writing File")]
     [InlineData(GrepTool.ToolName, "Searching")]

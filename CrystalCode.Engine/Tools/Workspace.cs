@@ -245,6 +245,117 @@ public sealed class Workspace
         }
     }
 
+    /// <summary>
+    /// Enumerates entries for the tree tool: within each walked directory,
+    /// subdirectories come before files, each group sorted by name. The walk
+    /// uses the same fence and skip rules as <see cref="EnumerateFiles"/> and
+    /// visits each resolved directory once. A directory link whose target was
+    /// already walked is skipped.
+    /// </summary>
+    internal IEnumerable<TreeEntry> EnumerateTree(
+        string directoryFullPath,
+        int maximumDepth,
+        bool includeFiles)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryFullPath);
+        if (maximumDepth < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumDepth),
+                maximumDepth,
+                "Depth must be positive.");
+        }
+
+        var start = Canonicalize(Path.GetFullPath(directoryFullPath));
+        var fence = IsInsideRoot(start) ? Root : start;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        visited.Add(start);
+        return WalkTree(start, fence, maximumDepth, includeFiles, visited, depth: 1);
+    }
+
+    private IEnumerable<TreeEntry> WalkTree(
+        string directory,
+        string fence,
+        int maximumDepth,
+        bool includeFiles,
+        HashSet<string> visited,
+        int depth)
+    {
+        List<string> children;
+        try
+        {
+            children = [.. Directory.EnumerateDirectories(directory)];
+        }
+        catch (Exception exception) when (IsSkippableIo(exception))
+        {
+            children = [];
+        }
+
+        // Sorted, and directories before files, so the shape of the tree
+        // stays visible when the caller stops early at its entry cap.
+        children.Sort(StringComparer.Ordinal);
+        foreach (var child in children)
+        {
+            if (IsIgnoredDirectoryName(Path.GetFileName(child)))
+            {
+                continue;
+            }
+
+            if (!TryAcceptEnumerated(child, fence, out var resolved))
+            {
+                continue;
+            }
+
+            if (IsIgnoredDirectoryName(Path.GetFileName(resolved))
+                || IsCredentialPath(resolved)
+                || !visited.Add(resolved))
+            {
+                continue;
+            }
+
+            yield return new TreeEntry(resolved, IsDirectory: true);
+            if (depth < maximumDepth)
+            {
+                foreach (var entry in WalkTree(
+                    resolved, fence, maximumDepth, includeFiles, visited, depth + 1))
+                {
+                    yield return entry;
+                }
+            }
+        }
+
+        if (!includeFiles)
+        {
+            yield break;
+        }
+
+        List<string> files;
+        try
+        {
+            files = [.. Directory.EnumerateFiles(directory)];
+        }
+        catch (Exception exception) when (IsSkippableIo(exception))
+        {
+            files = [];
+        }
+
+        files.Sort(StringComparer.Ordinal);
+        foreach (var file in files)
+        {
+            if (!TryAcceptEnumerated(file, fence, out var resolved))
+            {
+                continue;
+            }
+
+            if (IsCredentialPath(resolved))
+            {
+                continue;
+            }
+
+            yield return new TreeEntry(file, IsDirectory: false);
+        }
+    }
+
     public static bool LooksBinary(string fullPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
