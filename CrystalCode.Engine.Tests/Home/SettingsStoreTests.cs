@@ -259,12 +259,14 @@ public sealed class SettingsStoreTests
         Assert.Equal(1024, settings.ExecutionBudget.MaximumModelCalls);
         Assert.Equal(8192, settings.ExecutionBudget.MaximumToolCalls);
         Assert.Equal(TimeSpan.FromDays(7), settings.ExecutionBudget.MaximumDuration);
-        Assert.Equal(120, settings.BashTimeoutSeconds);
+        Assert.Equal(600, settings.BashTimeoutSeconds);
+        Assert.Equal(3600, settings.BackgroundBashTimeoutSeconds);
         Assert.True(File.Exists(root.Home.ConfigPath));
         Assert.False(File.Exists(root.Home.ProvidersPath));
         using var config = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
         Assert.False(config.RootElement.TryGetProperty("providers", out _));
         Assert.False(config.RootElement.TryGetProperty("bashTimeoutSeconds", out _));
+        Assert.False(config.RootElement.TryGetProperty("backgroundBashTimeoutSeconds", out _));
     }
 
     [Fact]
@@ -385,6 +387,79 @@ public sealed class SettingsStoreTests
         File.WriteAllText(
             root.Home.ConfigPath,
             "{ \"bashTimeoutSeconds\": " + value + " }");
+
+        Assert.Throws<JsonException>(() => store.Load());
+    }
+
+    [Theory]
+    [InlineData("\"unlimited\"")]
+    [InlineData("null")]
+    public void Load_BackgroundBashTimeoutUnlimitedRoundTrips(string value)
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            "{ \"backgroundBashTimeoutSeconds\": " + value + " }");
+
+        var settings = store.Load();
+
+        Assert.Null(settings.BackgroundBashTimeoutSeconds);
+        store.Save(settings.WithVerboseTools(false));
+        Assert.Null(store.Load().BackgroundBashTimeoutSeconds);
+        using var saved = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
+        Assert.Equal(
+            "unlimited",
+            saved.RootElement.GetProperty("backgroundBashTimeoutSeconds").GetString());
+    }
+
+    [Fact]
+    public void Load_BackgroundBashTimeoutCustomSecondsRoundTrips()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ConfigPath, "{ \"backgroundBashTimeoutSeconds\": 1800 }");
+
+        var settings = store.Load();
+
+        Assert.Equal(1800, settings.BackgroundBashTimeoutSeconds);
+        Assert.Equal(600, settings.BashTimeoutSeconds);
+        store.Save(settings);
+        Assert.Equal(1800, store.Load().BackgroundBashTimeoutSeconds);
+    }
+
+    [Fact]
+    public void Load_KeepsBashAndBackgroundBashTimeoutsIndependent()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            "{ \"bashTimeoutSeconds\": 30, \"backgroundBashTimeoutSeconds\": \"unlimited\" }");
+
+        var settings = store.Load();
+
+        Assert.Equal(30, settings.BashTimeoutSeconds);
+        Assert.Null(settings.BackgroundBashTimeoutSeconds);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("4294968")]
+    [InlineData("\"forever\"")]
+    [InlineData("true")]
+    public void Load_RejectsInvalidBackgroundBashTimeout(string value)
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            "{ \"backgroundBashTimeoutSeconds\": " + value + " }");
 
         Assert.Throws<JsonException>(() => store.Load());
     }

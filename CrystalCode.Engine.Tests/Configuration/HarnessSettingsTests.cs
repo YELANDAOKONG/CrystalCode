@@ -182,6 +182,37 @@ public sealed class HarnessSettingsTests
     }
 
     [Fact]
+    public void CreateDefault_UsesBashTimeoutDefaults()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        Assert.Equal(600, settings.BashTimeoutSeconds);
+        Assert.Equal(3600, settings.BackgroundBashTimeoutSeconds);
+    }
+
+    [Fact]
+    public void WithBackgroundBashTimeout_PreservesUnlimitedWhenOtherSettingsChange()
+    {
+        var settings = HarnessSettings.CreateDefault().WithBackgroundBashTimeout(null);
+
+        var next = settings.WithVerboseTools(false);
+
+        Assert.Null(settings.BackgroundBashTimeoutSeconds);
+        Assert.Null(next.BackgroundBashTimeoutSeconds);
+        Assert.False(next.VerboseTools);
+        Assert.Equal(600, next.BashTimeoutSeconds);
+    }
+
+    [Fact]
+    public void WithBackgroundBashTimeout_RejectsUnsupportedSeconds()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => settings.WithBackgroundBashTimeout(0));
+    }
+
+    [Fact]
     public void ApprovalModel_RejectsAnEnabledUnknownModelAndKeepsADisabledOne()
     {
         var settings = HarnessSettings.CreateDefault();

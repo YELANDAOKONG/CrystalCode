@@ -13,7 +13,7 @@ public sealed class BackgroundTaskRegistry : IDisposable
 
     public BackgroundTaskRegistry(
         Workspace workspace,
-        int? timeoutSeconds = WorkspaceLimits.BashTimeoutSeconds)
+        int? timeoutSeconds = WorkspaceLimits.BackgroundBashTimeoutSeconds)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         if (!BashTool.IsSupported(timeoutSeconds))
@@ -21,7 +21,7 @@ public sealed class BackgroundTaskRegistry : IDisposable
             throw new ArgumentOutOfRangeException(
                 nameof(timeoutSeconds),
                 timeoutSeconds,
-                "Bash timeout must be a positive supported number of seconds, or unlimited.");
+                "Background bash timeout must be a positive supported number of seconds, or unlimited.");
         }
 
         _workspace = workspace;

@@ -57,6 +57,7 @@ public sealed record HarnessSettings
         StatusLineSettings? statusLine = null,
         TurnLimits? executionBudget = null,
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
+        int? backgroundBashTimeoutSeconds = WorkspaceLimits.BackgroundBashTimeoutSeconds,
         ApprovalModelSettings? approvalModel = null,
         bool plugins = DefaultPlugins,
         bool workspaceTrust = DefaultWorkspaceTrust,
@@ -89,6 +90,14 @@ public sealed record HarnessSettings
                 "Bash timeout must be a positive supported number of seconds, or unlimited.");
         }
 
+        if (!BashTool.IsSupported(backgroundBashTimeoutSeconds))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(backgroundBashTimeoutSeconds),
+                backgroundBashTimeoutSeconds,
+                "Background bash timeout must be a positive supported number of seconds, or unlimited.");
+        }
+
         _ = catalog.GetModel(provider, model);
 
         Provider = provider;
@@ -114,6 +123,7 @@ public sealed record HarnessSettings
         StatusLine = statusLine ?? new StatusLineSettings();
         ExecutionBudget = executionBudget ?? TurnLimits.CreateDefault();
         BashTimeoutSeconds = bashTimeoutSeconds;
+        BackgroundBashTimeoutSeconds = backgroundBashTimeoutSeconds;
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
         ImageModel = imageModel ?? ImageModelSettings.None;
         Plugins = plugins;
@@ -219,6 +229,8 @@ public sealed record HarnessSettings
     public TurnLimits ExecutionBudget { get; }
 
     public int? BashTimeoutSeconds { get; }
+
+    public int? BackgroundBashTimeoutSeconds { get; }
 
     public ApprovalModelSettings ApprovalModel { get; }
 
@@ -350,6 +362,11 @@ public sealed record HarnessSettings
     public HarnessSettings WithBashTimeout(int? bashTimeoutSeconds) =>
         Copy(bashTimeoutSeconds: bashTimeoutSeconds, setBashTimeout: true);
 
+    public HarnessSettings WithBackgroundBashTimeout(int? backgroundBashTimeoutSeconds) =>
+        Copy(
+            backgroundBashTimeoutSeconds: backgroundBashTimeoutSeconds,
+            setBackgroundBashTimeout: true);
+
     public HarnessSettings WithApprovalModel(ApprovalModelSettings approvalModel)
     {
         ArgumentNullException.ThrowIfNull(approvalModel);
@@ -382,6 +399,8 @@ public sealed record HarnessSettings
         TurnLimits? executionBudget = null,
         int? bashTimeoutSeconds = null,
         bool setBashTimeout = false,
+        int? backgroundBashTimeoutSeconds = null,
+        bool setBackgroundBashTimeout = false,
         ApprovalModelSettings? approvalModel = null,
         bool setApprovalModel = false,
         bool? plugins = null,
@@ -416,6 +435,7 @@ public sealed record HarnessSettings
             statusLine ?? StatusLine,
             executionBudget ?? ExecutionBudget,
             setBashTimeout ? bashTimeoutSeconds : BashTimeoutSeconds,
+            setBackgroundBashTimeout ? backgroundBashTimeoutSeconds : BackgroundBashTimeoutSeconds,
             setApprovalModel ? approvalModel : ApprovalModel,
             plugins ?? Plugins,
             workspaceTrust ?? WorkspaceTrust,

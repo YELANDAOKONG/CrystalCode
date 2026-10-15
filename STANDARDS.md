@@ -123,7 +123,9 @@
 - Keep text and image-capable turn budgets on the same configured limits.
   A null limit is unlimited; omitted budget fields retain the finite defaults.
 - Built-in bash uses the same rule for `bashTimeoutSeconds`: omit it to keep
-  120 seconds; `null` or `"unlimited"` removes the per-command timer.
+  600 seconds; `null` or `"unlimited"` removes the per-command timer.
+- Background Bash uses the independent `backgroundBashTimeoutSeconds` timer:
+  omit it to keep 3600 seconds; `null` or `"unlimited"` removes that timer.
 - Background Bash tasks are session-local and must remain observable through
   their status or bounded logs. They are not persisted, and session shutdown
   stops their process trees. A model must not create an unobserved background

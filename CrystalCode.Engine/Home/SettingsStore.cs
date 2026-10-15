@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Home;
 
@@ -79,7 +80,14 @@ public sealed class SettingsStore
                 document.CustomStatusLine ?? false,
                 document.StatusLine),
             ExecutionBudgetMapper.Read(document.ExecutionBudget),
-            BashTimeoutMapper.Read(parsed.RootElement),
+            BashTimeoutMapper.Read(
+                parsed.RootElement,
+                BashTimeoutMapper.PropertyName,
+                WorkspaceLimits.BashTimeoutSeconds),
+            BashTimeoutMapper.Read(
+                parsed.RootElement,
+                BashTimeoutMapper.BackgroundPropertyName,
+                WorkspaceLimits.BackgroundBashTimeoutSeconds),
             ReadApprovalModel(document.ApprovalModel),
             document.Plugins ?? defaults.Plugins,
             document.WorkspaceTrust ?? defaults.WorkspaceTrust,
@@ -136,7 +144,12 @@ public sealed class SettingsStore
             CompactionThreshold = settings.CompactionThreshold,
             ShowCompactionSummary = settings.ShowCompactionSummary ? null : false,
             ExecutionBudget = ExecutionBudgetMapper.Write(settings.ExecutionBudget),
-            BashTimeoutSeconds = BashTimeoutMapper.Write(settings.BashTimeoutSeconds),
+            BashTimeoutSeconds = BashTimeoutMapper.Write(
+                settings.BashTimeoutSeconds,
+                WorkspaceLimits.BashTimeoutSeconds),
+            BackgroundBashTimeoutSeconds = BashTimeoutMapper.Write(
+                settings.BackgroundBashTimeoutSeconds,
+                WorkspaceLimits.BackgroundBashTimeoutSeconds),
             Providers = previous?.Providers,
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
             ImageModel = WriteImageModel(settings.ImageModel)

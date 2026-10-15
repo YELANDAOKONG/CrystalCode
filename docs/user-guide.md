@@ -171,7 +171,7 @@ CLI options:
 | `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
 | `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
 | `--duration <seconds>` | Wall-clock cap for each turn. `unlimited` removes that cap |
-| `--bash-timeout <seconds>` | Per-command bash cap. `unlimited` disables that timer |
+| `--bash-timeout <seconds>` | Foreground per-command bash cap. `unlimited` disables that timer |
 
 These flags shape this process only. They are not written to `config.json`
 or `prompt.json` at startup. A later slash command that saves a preference
@@ -307,7 +307,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--model-calls <count>` | Model rounds for this turn. Default 1024 |
 | `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
 | `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
-| `--bash-timeout <seconds>` | Per-command bash cap. Default 120. `unlimited` disables that timer |
+| `--bash-timeout <seconds>` | Foreground per-command bash cap. Default 600. `unlimited` disables that timer |
 | `--show-thinking` | Print reasoning text for this run, and label each reply `[Assistant]`. Independent of `verboseThinking` |
 | `--format` | `default` for plain text, or `json` for one JSON object per line |
 
@@ -471,7 +471,8 @@ Top-level fields:
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). Automatic compaction still prints only `Compacted context` |
-| `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 120 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
+| `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
+| `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 3600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 
 Add named endpoints and model tables in `providers.json`, not in new
 `config.json` configurations.
@@ -1085,8 +1086,8 @@ Audit). Workspace `write` and `edit` still follow the approval mode.
 Background Bash tasks are available in Work only. `bash_start` returns a
 session-local task ID without waiting; use `bash_status` or `bash_logs` to
 observe it and `bash_stop` to terminate it. The task uses the configured
-`bashTimeoutSeconds`, keeps bounded output, is not persisted, and is stopped
-when the session closes. At most 32 tasks may be active at once; completed
+`backgroundBashTimeoutSeconds` (default 3600 seconds), keeps bounded output, is
+not persisted, and is stopped when the session closes. At most 32 tasks may be active at once; completed
 tasks remain queryable without consuming an active-task slot. Background task
 stdin is closed, so commands that require terminal input are unsupported.
 Credential paths
@@ -1109,8 +1110,8 @@ is the workspace root.
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `edit` | Work | Replace one unique `old_string` in a file |
 | `write` | Work | Create or overwrite a UTF-8 text file |
-| `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 120 seconds) |
-| `bash_start` | Work | Start a session-local background shell command after approval and return its task ID |
+| `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 600 seconds) |
+| `bash_start` | Work | Start a session-local background shell command after approval and return its task ID. Timeout is `backgroundBashTimeoutSeconds` (default 3600 seconds) |
 | `bash_status` | Work | Read the status, exit code, and log offsets of a background task |
 | `bash_logs` | Work | Read bounded background task output by offset |
 | `bash_stop` | Work | Stop a background task and its child processes after approval |

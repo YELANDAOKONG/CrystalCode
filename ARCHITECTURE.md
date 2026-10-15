@@ -404,10 +404,11 @@ nullable-limit semantics of Crystal's `AgentRunLimits` without using Agent
 for streaming UI turns.
 
 Built-in `bash` has its own per-command timer, `bashTimeoutSeconds` in
-`config.json`. Omitting it keeps 120 seconds. `null` or `"unlimited"` disables
+`config.json`. Omitting it keeps 600 seconds. `null` or `"unlimited"` disables
 that timer. A positive integer up to the runtime timer limit replaces it.
 User cancellation and the turn budget still stop the command. External tool
-sets keep their own `timeoutSeconds`.
+sets keep their own `timeoutSeconds`, which defaults to 120 seconds and does
+not follow `bashTimeoutSeconds`.
 7. After a completed turn, consider compaction from that last round's
    reported usage and the estimated model context. `/compact` (alias
    `/summarize`) summarizes earlier turns immediately, without waiting for
@@ -488,7 +489,9 @@ task ID without waiting for process exit. `bash_status` reports the task state,
 `bash_logs` reads the bounded output buffer by offset, and `bash_stop` kills the
 process tree. Tasks are not saved in session documents, do not cross a process
 restart, and are stopped when the session closes. The configured
-`bashTimeoutSeconds` applies to them as it does to foreground `bash`. At most
+`backgroundBashTimeoutSeconds` timer applies to them, independent of the
+foreground `bashTimeoutSeconds`; omitting it keeps 3600 seconds, and `null`
+or `"unlimited"` disables that timer. At most
 32 tasks may be active at once; completed tasks remain queryable but do not
 consume an active-task slot. Background task stdin is closed after startup.
 
@@ -945,8 +948,9 @@ For example, an unlimited time budget with finite call limits is:
 }
 ```
 
-`bashTimeoutSeconds` is omitted when it is the 120 second default. `null` and
-`"unlimited"` both mean no per-command timer.
+`bashTimeoutSeconds` is omitted when it is the 600 second default and
+`backgroundBashTimeoutSeconds` when it is the 3600 second default. `null` and
+`"unlimited"` both mean no timer. The two timers are independent of each other.
 
 `providers.json` stores the provider catalog as a root object keyed
 by provider name, with an array for multiple protocols under one name. The
@@ -1078,7 +1082,8 @@ name replaces the home set as a whole. `tools.json` field `enabled`
 runtime-data directories under `data/tools/`. See
 [docs/external-tools.md](docs/external-tools.md).
 An unreadable or invalid project manifest with the same directory name
-also hides the home set. `timeoutSeconds` defaults to 120 for both runners;
+also hides the home set. `timeoutSeconds` defaults to 120 for both runners,
+independent of `bashTimeoutSeconds`;
 `"unlimited"` disables the per-call timer while preserving turn and user
 cancellation. Exec processes are killed on cancellation or timeout. Dotnet
 calls receive a cancellation token and stop waiting on timeout; in-process

@@ -97,7 +97,7 @@ public static class ToolsManifestParser
             return false;
         }
 
-        int? timeout = WorkspaceLimits.BashTimeoutSeconds;
+        int? timeout = WorkspaceLimits.ExternalToolTimeoutSeconds;
         if (root.TryGetProperty("timeoutSeconds", out var timeoutElement))
         {
             if (timeoutElement.ValueKind == JsonValueKind.String

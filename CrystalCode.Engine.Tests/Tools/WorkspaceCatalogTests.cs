@@ -49,7 +49,7 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(catalog.Find(BackgroundBashStopTool.ToolName));
         Assert.NotNull(catalog.Find(ListTool.ToolName));
         Assert.Contains(
-            "120 second timeout",
+            "600 second timeout",
             catalog.Find(BashTool.ToolName)!.Definition.Description,
             StringComparison.Ordinal);
         Assert.Contains(

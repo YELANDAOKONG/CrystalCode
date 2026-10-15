@@ -29,7 +29,7 @@ public sealed class BackgroundBashStartTool : ITool
                 """),
             "Starts one shell command in the workspace root and returns a session-local task ID. "
             + "Use bash_status or bash_logs to observe it, and bash_stop to end it. "
-            + "The configured bashTimeoutSeconds limit still applies. Background stdin is closed, "
+            + "The configured backgroundBashTimeoutSeconds limit still applies. Background stdin is closed, "
             + "and no more than 32 tasks may be active at once.");
     }
 

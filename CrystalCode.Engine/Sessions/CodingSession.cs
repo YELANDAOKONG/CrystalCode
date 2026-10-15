@@ -143,7 +143,9 @@ public sealed class CodingSession : ITurnObserver
             home,
             () => _sessionId ?? string.Empty,
             () => _approval.Value);
-        _backgroundTasks = new BackgroundTaskRegistry(_workspace, settings.BashTimeoutSeconds);
+        _backgroundTasks = new BackgroundTaskRegistry(
+            _workspace,
+            settings.BackgroundBashTimeoutSeconds);
         _thinkingEffort = settings.ThinkingEffort;
         _grants = new GrantStore(home);
         _trust = new WorkspaceTrustStore(home);

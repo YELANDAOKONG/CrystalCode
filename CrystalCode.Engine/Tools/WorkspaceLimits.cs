@@ -32,7 +32,11 @@ public static class WorkspaceLimits
 
     public const int MaximumBackgroundTasks = 32;
 
-    public const int BashTimeoutSeconds = 120;
+    public const int BashTimeoutSeconds = 600;
+
+    public const int BackgroundBashTimeoutSeconds = 3600;
+
+    public const int ExternalToolTimeoutSeconds = 120;
 
     // CancelAfter rejects a delay at or above uint.MaxValue milliseconds.
     public const int MaximumBashTimeoutSeconds = (int)((uint.MaxValue - 1) / 1000);

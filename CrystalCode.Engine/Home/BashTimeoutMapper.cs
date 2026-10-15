@@ -6,25 +6,29 @@ namespace CrystalCode.Engine.Home;
 
 internal static class BashTimeoutMapper
 {
-    public static int? Read(JsonElement root)
+    public const string PropertyName = "bashTimeoutSeconds";
+
+    public const string BackgroundPropertyName = "backgroundBashTimeoutSeconds";
+
+    public static int? Read(JsonElement root, string propertyName, int? defaultValue)
     {
         if (root.ValueKind is not JsonValueKind.Object)
         {
-            return WorkspaceLimits.BashTimeoutSeconds;
+            return defaultValue;
         }
 
         var specified = false;
         var value = default(JsonElement);
         foreach (var property in root.EnumerateObject())
         {
-            if (!property.Name.Equals("bashTimeoutSeconds", StringComparison.OrdinalIgnoreCase))
+            if (!property.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
             if (specified)
             {
-                throw new JsonException("Duplicate bash timeout setting 'bashTimeoutSeconds'.");
+                throw new JsonException($"Duplicate bash timeout setting '{propertyName}'.");
             }
 
             specified = true;
@@ -33,15 +37,15 @@ internal static class BashTimeoutMapper
 
         if (!specified)
         {
-            return WorkspaceLimits.BashTimeoutSeconds;
+            return defaultValue;
         }
 
-        return ReadValue(value);
+        return ReadValue(value, propertyName);
     }
 
-    public static JsonElement? Write(int? seconds)
+    public static JsonElement? Write(int? seconds, int? defaultValue)
     {
-        if (seconds == WorkspaceLimits.BashTimeoutSeconds)
+        if (seconds == defaultValue)
         {
             return null;
         }
@@ -54,7 +58,7 @@ internal static class BashTimeoutMapper
         return JsonSerializer.SerializeToElement(seconds.Value);
     }
 
-    private static int? ReadValue(JsonElement value)
+    private static int? ReadValue(JsonElement value, string propertyName)
     {
         if (value.ValueKind is JsonValueKind.Null)
         {
@@ -75,6 +79,6 @@ internal static class BashTimeoutMapper
         }
 
         throw new JsonException(
-            "bashTimeoutSeconds must be a positive supported integer, null, or \"unlimited\".");
+            $"{propertyName} must be a positive supported integer, null, or \"unlimited\".");
     }
 }
