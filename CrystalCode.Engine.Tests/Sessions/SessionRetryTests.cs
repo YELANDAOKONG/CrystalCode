@@ -61,6 +61,30 @@ public sealed class SessionRetryTests
     }
 
     [Fact]
+    public void Delay_ClampsHugeBackoffBeforeOverflow()
+    {
+        Assert.Equal(
+            TimeSpan.FromSeconds(30),
+            SessionRetry.Delay(SessionRetryOptions.Default, 40, null, 0));
+
+        var configured = new SessionRetryOptions(
+            initialDelay: TimeSpan.FromSeconds(3_600),
+            backoffFactor: 100,
+            maximumDelayWithoutHeaders: TimeSpan.FromSeconds(5));
+
+        Assert.Equal(TimeSpan.FromSeconds(5), SessionRetry.Delay(configured, 6, null, 0));
+    }
+
+    [Fact]
+    public void Constructor_RejectsNonFiniteJitterAndBackoff()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new SessionRetryOptions(backoffFactor: double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new SessionRetryOptions(jitterFactor: double.PositiveInfinity));
+    }
+
+    [Fact]
     public void TryDescribe_Retries429()
     {
         var exception = new DeepSeekException("slow down", statusCode: 429);

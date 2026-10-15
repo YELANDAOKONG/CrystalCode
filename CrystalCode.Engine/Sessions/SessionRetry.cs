@@ -60,7 +60,7 @@ public static class SessionRetry
             throw new ArgumentOutOfRangeException(nameof(attempt), attempt, "Attempt must be positive.");
         }
 
-        if (jitter is < 0 or > 1)
+        if (!double.IsFinite(jitter) || jitter is < 0 or > 1)
         {
             throw new ArgumentOutOfRangeException(nameof(jitter), jitter, "Jitter must be between 0 and 1.");
         }
@@ -70,11 +70,16 @@ public static class SessionRetry
             return Cap(header, MaximumDelay);
         }
 
+        var ceiling = Min(options.MaximumDelayWithoutHeaders, MaximumDelay);
         var baseMilliseconds = options.InitialDelay.TotalMilliseconds
             * Math.Pow(options.BackoffFactor, attempt - 1);
         var withJitter = baseMilliseconds + (baseMilliseconds * options.JitterFactor * jitter);
-        var exponential = TimeSpan.FromMilliseconds(Math.Ceiling(withJitter));
-        return Cap(Min(exponential, options.MaximumDelayWithoutHeaders), MaximumDelay);
+        if (!double.IsFinite(withJitter) || withJitter > ceiling.TotalMilliseconds)
+        {
+            return ceiling;
+        }
+
+        return TimeSpan.FromMilliseconds(Math.Ceiling(withJitter));
     }
 
     public static bool TryDescribe(Exception exception, out SessionRetryable retryable)

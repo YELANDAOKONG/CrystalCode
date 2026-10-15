@@ -49,4 +49,17 @@ public sealed class RetrySettingsTests
                 jitterFactor: jitterFactor,
                 maximumDelaySeconds: maximumDelaySeconds));
     }
+
+    [Fact]
+    public void Constructor_RejectsNonFiniteValues()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new RetrySettings(initialDelaySeconds: double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new RetrySettings(backoffFactor: double.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new RetrySettings(jitterFactor: double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new RetrySettings(maximumDelaySeconds: double.NegativeInfinity));
+    }
 }

@@ -26,7 +26,7 @@ public sealed record RetrySettings
                 "Maximum retries must be between 0 and 100.");
         }
 
-        if (initialDelaySeconds is < 0 or > 3_600)
+        if (!double.IsFinite(initialDelaySeconds) || initialDelaySeconds is < 0 or > 3_600)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(initialDelaySeconds),
@@ -34,7 +34,7 @@ public sealed record RetrySettings
                 "Initial delay must be between 0 and 3600 seconds.");
         }
 
-        if (backoffFactor is < 1 or > 100)
+        if (!double.IsFinite(backoffFactor) || backoffFactor is < 1 or > 100)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(backoffFactor),
@@ -42,7 +42,7 @@ public sealed record RetrySettings
                 "Backoff factor must be between 1 and 100.");
         }
 
-        if (jitterFactor is < 0 or > 1)
+        if (!double.IsFinite(jitterFactor) || jitterFactor is < 0 or > 1)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(jitterFactor),
@@ -50,7 +50,7 @@ public sealed record RetrySettings
                 "Jitter factor must be between 0 and 1.");
         }
 
-        if (maximumDelaySeconds is < 0 or > 86_400)
+        if (!double.IsFinite(maximumDelaySeconds) || maximumDelaySeconds is < 0 or > 86_400)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maximumDelaySeconds),

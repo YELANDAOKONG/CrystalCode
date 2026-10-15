@@ -41,7 +41,7 @@ public sealed class SessionRetryOptions
                 "Initial delay cannot be negative.");
         }
 
-        if (backoffFactor < 1)
+        if (!double.IsFinite(backoffFactor) || backoffFactor < 1)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(backoffFactor),
@@ -49,7 +49,7 @@ public sealed class SessionRetryOptions
                 "Backoff factor must be at least 1.");
         }
 
-        if (jitterFactor is < 0 or > 1)
+        if (!double.IsFinite(jitterFactor) || jitterFactor is < 0 or > 1)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(jitterFactor),
