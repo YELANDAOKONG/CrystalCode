@@ -205,6 +205,15 @@ Whether Plan may include bash is under consideration and is not decided.
 The current behavior stands: built-in Plan has no edit, write, or bash. No
 change is scheduled, and a later decision may revisit it.
 
+Whether built-in tool limits become operator configuration is under
+consideration and is not decided. The current behavior stands: result size
+caps, read, grep, glob, search, and list limits, background task counts and
+log bounds, the image size limit, and the todo caps are host-owned constants.
+Timeouts and turn budgets are already configurable and are not part of this
+question. No change is scheduled, and a later decision may revisit it. Such a
+decision must define which limits may vary, at which scope, and how a larger
+limit interacts with context compaction.
+
 More hook methods will be added later on the existing hook interfaces, and
 are not reserved as empty types in advance. Whether plugins declare
 dependencies on one another, and related loading questions, are under
