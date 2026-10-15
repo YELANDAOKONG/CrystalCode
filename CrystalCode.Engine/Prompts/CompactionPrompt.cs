@@ -70,6 +70,9 @@ public static class CompactionPrompt
         - Use terse bullets, not prose paragraphs.
         - Preserve exact file paths, symbols, commands, error strings, URLs, and identifiers when known.
         - Record what was verified and how. Do not mark work completed when its verification failed or never ran.
+        - Keep the user's explicit requests and constraints exact in scope; never widen or narrow what the user authorized.
+        - Record errors and dead ends and how they were resolved; keep unresolved failures under Blocked.
+        - Base Next Move only on the user's most recent request and the work state; do not propose new scope.
         - Do not mention the summary process or that context was compacted.
         """;
 
