@@ -74,8 +74,8 @@ or `CrystalCode` on Windows.
 The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output,
-editing provider definitions in the TUI, and automatically fetching
-model-list information from a provider.
+editing provider definitions in the TUI, automatically fetching
+model-list information from a provider, and a plugin-extensible status bar.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.

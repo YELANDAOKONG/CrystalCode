@@ -175,6 +175,7 @@ implemented in the current build:
   once its field scope, precedence, write policy, and trust semantics are
   defined;
 - automatically fetching model-list information from a provider;
+- a plugin-extensible status bar;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
 
