@@ -263,6 +263,17 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    internal string ChromeContextWindow
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _chrome.ContextWindow;
+            }
+        }
+    }
+
     internal string ChromeTokenEstimate
     {
         get
@@ -517,6 +528,7 @@ public sealed class SessionRenderer : IDisposable
             _chrome.Approval = ApprovalLabel.For(status.Approval);
             _chrome.Thinking = status.Thinking;
             _chrome.ContextWindow = UsageText.FormatWindow(status.ContextWindow);
+            ContextWindow = status.ContextWindow;
             _chrome.PromptSet = status.PromptSet == PromptSetNames.Default
                 ? string.Empty
                 : status.PromptSet;

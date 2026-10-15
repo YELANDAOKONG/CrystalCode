@@ -48,11 +48,14 @@ internal static class ContextWindowSelection
         return true;
     }
 
-    public static IReadOnlyList<SlashCompletion> Completions(ModelSettings model) =>
-        model.ContextWindows.Select(window =>
+    public static IReadOnlyList<SlashCompletion> Completions(ModelSettings model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return model.ContextWindows.Select(window =>
         {
             var label = Format(window);
             return new SlashCompletion(label.ToLowerInvariant(), "Context " + label,
                 [label.ToLowerInvariant(), window.ToString(CultureInfo.InvariantCulture)]);
         }).ToArray();
+    }
 }

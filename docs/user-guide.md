@@ -455,6 +455,7 @@ Top-level fields:
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
 | `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), a portable name (`minimal`, `low`, `medium`, `high`, `maximum`; `max` is stored as `maximum`), or another effort token. Tokens are stored in lowercase |
+| `contextSelections` | Saved local context budgets keyed by `provider/model`, for example `{"openai/my-model": 272000}`. `/context` writes this map; an absent or unsupported choice uses that model's lowest declared budget |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `plugins` | Enable operator plugin discovery (default `true`) |
@@ -468,7 +469,7 @@ Top-level fields:
 | `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
-| `compactionThreshold` | Fraction of the selected model's `contextWindow` that triggers compaction (greater than 0, at most 1; default `0.8`) |
+| `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). Automatic compaction still prints only `Compacted context` |
 | `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 120 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
 
@@ -540,7 +541,8 @@ are not supported by the current adapter.
 
 | Field | Meaning |
 | :--- | :--- |
-| `contextWindow` | Required. Positive token window used for compaction and the status bar |
+| `contextWindow` | Required positive maximum model context size in tokens. Upper bound for selectable local budgets; used as the sole budget when `contextWindows` is omitted or empty |
+| `contextWindows` | Optional distinct positive token budgets no greater than `contextWindow`, for example `[272000, 1000000]`. `/context` cycles these values; the lowest is the initial budget. Compaction and the status bar use the selected budget |
 | `temperature` | Optional, 0 to 2 |
 | `topP` | Optional, 0 to 1 |
 | `maxTokens` | Optional positive output-token cap |
@@ -609,7 +611,8 @@ it. Restart after editing `providers.json`. Select the model with
 `model` in `config.json`.
 CLI `--provider` and `--model` override that selection for one run;
 `/approval` (including `/approval model` and `/approval thinking`),
-`/thinking`, and `/model` write their values to `config.json`.
+`/thinking`, `/context`, and `/model` write their values to `config.json`.
+`/context` stores each model's selected budget in `contextSelections`.
 
 ### Example: add an Anthropic (Claude) provider
 
@@ -725,7 +728,8 @@ optional progress row, status bar, and a multiline composer. Redirected
 output stays sequential.
 
 The status bar shows approval, thinking (when the selected model
-supports it), model, workspace, context percent (`CTX`), token counts
+supports it), selected context budget (`Context 272K`), model, workspace,
+context percent (`CTX`), token counts
 (`IN` / `OUT`), a Title Case total when the bar has room, tool count,
 and elapsed time. Named chrome labels are
 Title Case; short status abbreviations are uppercase. Mode is Plan or
@@ -760,7 +764,7 @@ chrome are Title Case. Approval cards for edit and write show a short
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
+| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/context`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
 | Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open |
@@ -954,6 +958,32 @@ from a saved session, follow the switch. The gear, the progress row,
 and `/export` stay. `crystal run --show-thinking` does not use this
 setting.
 
+## Context budgets
+
+Add selectable budgets to a model entry in `providers.json`, then restart:
+
+```json
+"my-model": {
+  "contextWindow": 1000000,
+  "contextWindows": [272000, 1000000]
+}
+```
+
+`/context` cycles the sorted budgets. `/context 272k`, `/context 1m`, and
+`/context 272000` select a declared value; Tab completes the current model's
+choices. Each model remembers its choice in `config.json.contextSelections`.
+A model without a saved valid choice starts at its lowest budget. Switching
+models restores that model's choice. Finish any turn or compaction before
+switching budgets.
+
+The selected budget drives compaction, `/status`, and CTX percentages.
+Lowering it retains the full archive and checks whether compaction is needed
+before the next model request. The default status bar displays `Context 272K`
+beside thinking; custom lines can include `context-window`, which is also in
+the default custom field order. These are local budgets: they do not enable
+provider-specific long-context features or guarantee a billing threshold,
+because token estimates and large tool results can exceed the budget.
+
 ## Model
 
 `/model` lists configured models, or selects one for the next idle
@@ -998,6 +1028,7 @@ returns the transcript viewport to the latest output.
 | `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model; `thinking` cycles or sets its gear |
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
+| `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count; refused during a turn or compaction |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/verbose` | | Show or set tool, command, approval, or thinking detail: `tools`, `commands`, `approvals`, `thinking`, then `on` or `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
@@ -1037,7 +1068,7 @@ It is not provider-billed usage. The choice is written to `config.json`.
 
 `/statusline` does not replace `/status`. The status line is a configurable
 live summary, while `/status` remains a stable diagnostic report. Supported
-custom fields are `approval`, `thinking`, `prompt-set`, `activity`, `model`,
+custom fields are `approval`, `thinking`, `context-window`, `prompt-set`, `activity`, `model`,
 `workspace`, `context-used`, `context-left`, `context-tokens`,
 `request-input`, `request-output`, `request-total`, `session-input`,
 `session-output`, `session-total`, `tools`, `elapsed`, and `queued`.

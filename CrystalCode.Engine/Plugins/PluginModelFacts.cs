@@ -5,6 +5,7 @@ namespace CrystalCode.Engine.Plugins;
 
 /// <summary>
 /// Maps the session's selected models onto the plugin-facing facts.
+/// ContextWindow describes maximum model capability, not the local session budget.
 /// A disabled review selection is omitted here so a stored name never
 /// leaks through the off switch.
 /// </summary>

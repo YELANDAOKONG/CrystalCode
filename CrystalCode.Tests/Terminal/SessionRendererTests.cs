@@ -20,6 +20,86 @@ namespace CrystalCode.Tests.Terminal;
 public sealed class SessionRendererTests
 {
     [Fact]
+    public void WriteHeader_SetsSelectedContextWindowChrome()
+    {
+        var renderer = new SessionRenderer();
+
+        renderer.WriteHeader(
+            "deepseek-v4-flash",
+            "/workspace",
+            planMode: false,
+            ApprovalMode.Default,
+            contextWindow: 272_000);
+
+        Assert.Equal(272_000, renderer.ContextWindow);
+        Assert.Equal("Context 272K", renderer.ChromeContextWindow);
+    }
+
+    [Fact]
+    public void SetChrome_UpdatesContextWindowOnlyWhenProvided()
+    {
+        var renderer = new SessionRenderer();
+        renderer.WriteHeader(
+            "deepseek-v4-flash",
+            "/workspace",
+            planMode: false,
+            ApprovalMode.Default,
+            contextWindow: 272_000);
+
+        renderer.SetChrome(planMode: false, ApprovalMode.Default);
+        Assert.Equal(272_000, renderer.ContextWindow);
+
+        renderer.SetChrome(planMode: false, ApprovalMode.Default, contextWindow: 1_000_000);
+        Assert.Equal(1_000_000, renderer.ContextWindow);
+        Assert.Equal("Context 1M", renderer.ChromeContextWindow);
+    }
+
+    [Fact]
+    public void WriteStatus_UpdatesContextWindowChromeAndProperty()
+    {
+        var renderer = new SessionRenderer();
+        renderer.WriteHeader(
+            "deepseek-v4-flash",
+            "/workspace",
+            planMode: false,
+            ApprovalMode.Default,
+            contextWindow: 1_000_000);
+
+        renderer.WriteStatus(Status(128_000), full: false);
+
+        Assert.Equal(128_000, renderer.ContextWindow);
+        Assert.Equal("Context 128K", renderer.ChromeContextWindow);
+    }
+
+    private static SessionStatus Status(int contextWindow) =>
+        new(
+            "session-1",
+            DateTimeOffset.UnixEpoch,
+            "/workspace",
+            false,
+            ApprovalMode.Default,
+            "Think Off",
+            "default",
+            "openai",
+            "gpt-5",
+            contextWindow,
+            null,
+            0,
+            0,
+            0,
+            0,
+            0,
+            true,
+            true,
+            false,
+            true,
+            true,
+            5,
+            8,
+            2,
+            null);
+
+    [Fact]
     public void SetChrome_UpdatesWorkspaceRoot()
     {
         var renderer = new SessionRenderer();

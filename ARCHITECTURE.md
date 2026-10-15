@@ -1492,6 +1492,7 @@ console writer with the self-owned loop.
 The status bar shows the selected context budget as `Context 272K` beside
 the thinking gear. The custom status-line field `context-window` shows the
 same value and is included in its default field list.
+
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
 thinking is on), the non-default prompt set as `Prompt <name>`, model,
@@ -1697,7 +1698,11 @@ plugins or tools. The host then calls `IPlugin.AttachSession` with a live
 view of the session model and the review model. Each read returns the
 current provider, protocol, model name, context window, maximum tokens,
 temperature, top-p, image input, declared audio input, declared video
-input, and thinking gear. Audio and video flags copy the model entry.
+input, and thinking gear. The plugin model's `ContextWindow` describes the
+configured maximum model capability, not the selected local session budget.
+`/context` does not change that capability value; chrome and usage events
+carry the selected budget used by compaction and `/status`.
+Audio and video flags copy the model entry.
 They do not make a turn, a tool result, or a plugin multimodal client
 accept audio or video. `Review.Independent`
 is true only when review uses its own model. While it is false, review
