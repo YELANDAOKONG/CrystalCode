@@ -22,6 +22,16 @@ public static class WorkspaceLimits
 
     public const int MaximumGlobMatches = 1000;
 
+    public const int DefaultSearchFileLimit = 50;
+
+    public const int MaximumSearchFiles = 200;
+
+    public const int MaximumSearchMatchesPerFile = 200;
+
+    public const int MaximumSearchPreviewLinesPerFile = 2;
+
+    public const int MaximumSearchPreviewCharacters = 200;
+
     public const int MaximumListEntries = 1000;
 
     public const int MaximumToolOutputCharacters = 100_000;
@@ -34,7 +44,7 @@ public static class WorkspaceLimits
 
     public const int BashTimeoutSeconds = 600;
 
-    public const int BackgroundBashTimeoutSeconds = 3600;
+    public const int BackgroundBashTimeoutSeconds = 10800;
 
     public const int ExternalToolTimeoutSeconds = 120;
 

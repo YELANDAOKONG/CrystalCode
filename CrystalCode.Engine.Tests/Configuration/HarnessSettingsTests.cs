@@ -187,7 +187,7 @@ public sealed class HarnessSettingsTests
         var settings = HarnessSettings.CreateDefault();
 
         Assert.Equal(600, settings.BashTimeoutSeconds);
-        Assert.Equal(3600, settings.BackgroundBashTimeoutSeconds);
+        Assert.Equal(10800, settings.BackgroundBashTimeoutSeconds);
     }
 
     [Fact]

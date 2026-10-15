@@ -260,7 +260,7 @@ public sealed class SettingsStoreTests
         Assert.Equal(8192, settings.ExecutionBudget.MaximumToolCalls);
         Assert.Equal(TimeSpan.FromDays(7), settings.ExecutionBudget.MaximumDuration);
         Assert.Equal(600, settings.BashTimeoutSeconds);
-        Assert.Equal(3600, settings.BackgroundBashTimeoutSeconds);
+        Assert.Equal(10800, settings.BackgroundBashTimeoutSeconds);
         Assert.True(File.Exists(root.Home.ConfigPath));
         Assert.False(File.Exists(root.Home.ProvidersPath));
         using var config = JsonDocument.Parse(File.ReadAllText(root.Home.ConfigPath));
