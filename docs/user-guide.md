@@ -75,7 +75,7 @@ The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output,
 editing provider definitions in the TUI, automatically fetching
-model-list information from a provider, and a plugin-extensible status bar.
+model-list information from a provider.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.
@@ -479,7 +479,7 @@ Top-level fields:
 | `verboseThinking` | Show Thinking panels in the interactive transcript (default `true`; omitted when on). Off hides live and restored cards. The gear, progress row, and export stay. `crystal run --show-thinking` is separate |
 | `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
-| `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
+| `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled. Built-in names are checked on load. An extra name is kept when it matches a plugin field name, even if that plugin is not loaded yet |
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). `/compact summary` toggles it; `on` or `off` sets it |
 | `showAutomaticCompactionSummary` | Print the same summary after automatic compaction (default `false`; omitted when off). `/compact auto` toggles it (`automatic` is the same); `on` or `off` sets it. Does not change `/compact` |
@@ -1093,6 +1093,11 @@ custom fields are `approval`, `thinking`, `context-window`, `prompt-set`, `activ
 `workspace`, `context-used`, `context-left`, `context-tokens`,
 `request-input`, `request-output`, `request-total`, `session-input`,
 `session-output`, `session-total`, `tools`, `elapsed`, and `queued`.
+A disk plugin may add more names. They do not appear until you put them in
+this list. `/statusline` with no arguments lists built-in fields, then each
+loaded plugin field with its directory and description, then any saved name
+that is not loaded. `/statusline` rejects a name that is not built in and
+not currently loaded.
 Setting an ordered field list enables the custom line. `/statusline off`
 restores the existing adaptive line; `/statusline reset` enables the built-in
 custom field order.

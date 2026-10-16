@@ -3,13 +3,14 @@ using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Commands;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Placeholders;
+using CrystalCode.Plugins.Status;
 using CrystalCode.Plugins.Tools;
 
 namespace CrystalCode.Plugins;
 
 /// <summary>
 /// Tools, protocol factories, classifiers, slash commands, hooks, raw hooks,
-/// and prompt placeholders from one plugin.
+/// prompt placeholders, and custom status fields from one plugin.
 /// </summary>
 public sealed record PluginContribution
 {
@@ -45,6 +46,19 @@ public sealed record PluginContribution
     public IReadOnlyList<IPluginRawHook> RawHooks { get; }
 
     public IReadOnlyList<IPluginPlaceholder> Placeholders { get; }
+
+    /// <summary>
+    /// Status fields added with <see cref="WithStatusFields"/>. The original
+    /// constructor leaves this empty so an already compiled plugin keeps
+    /// calling that constructor.
+    /// </summary>
+    public IReadOnlyList<IPluginStatusField> StatusFields { get; init; } = [];
+
+    public PluginContribution WithStatusFields(IEnumerable<IPluginStatusField> statusFields)
+    {
+        ArgumentNullException.ThrowIfNull(statusFields);
+        return this with { StatusFields = statusFields.ToArray() };
+    }
 
     public override string ToString() => nameof(PluginContribution);
 }

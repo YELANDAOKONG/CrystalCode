@@ -1238,6 +1238,20 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Save_RoundTripsAnUnloadedPluginStatusField()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithStatusLine(
+            new StatusLineSettings(true, ["model", "branch"]));
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal(["model", "branch"], loaded.StatusLine.Fields);
+    }
+
+    [Fact]
     public void Save_RoundTripsAnEnabledApprovalModel()
     {
         using var root = new TemporaryHome();

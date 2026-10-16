@@ -130,7 +130,10 @@ separate library with no terminal code. The product can:
   tools, protocol clients, classifiers, slash commands, hooks, raw
   hooks, and prompt placeholders. After catalogs load, a plugin can read
   the discovered plugins, external tool sets, loaded external tools, and
-  the skills currently available to the skill tool. A plugin can read the
+  the skills currently available to the skill tool. A loaded plugin may
+  also register custom status-line fields. They stay off the adaptive
+  bar until the operator names them in `statusLine` or `/statusline`.
+  A plugin can read the
   live session model and whether review is using its own model. A plugin
   that asks for model clients can call the session model and, while that
   switch is on, the review model, on clients kept apart from the turn.
@@ -196,7 +199,6 @@ implemented in the current build:
   once its field scope, precedence, write policy, and trust semantics are
   defined;
 - automatically fetching model-list information from a provider;
-- a plugin-extensible status bar;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
 

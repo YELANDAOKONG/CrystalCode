@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Status;
+
 namespace CrystalCode.Engine.Configuration;
 
 /// <summary>
@@ -57,7 +59,30 @@ public sealed record StatusLineSettings
 
     public StatusLineSettings WithFields(IReadOnlyList<string> fields) => new(true, fields);
 
-    private static IReadOnlyList<string> Normalize(IReadOnlyList<string>? fields)
+    /// <summary>
+    /// Enables the custom line with <paramref name="fields"/>. A name that is
+    /// not built in must be in <paramref name="pluginFields"/>.
+    /// </summary>
+    public StatusLineSettings WithFields(
+        IReadOnlyList<string> fields,
+        IReadOnlySet<string> pluginFields)
+    {
+        ArgumentNullException.ThrowIfNull(pluginFields);
+        return new StatusLineSettings(true, fields, pluginFields);
+    }
+
+    private StatusLineSettings(
+        bool enabled,
+        IReadOnlyList<string>? fields,
+        IReadOnlySet<string>? pluginFields)
+    {
+        Enabled = enabled;
+        Fields = Normalize(fields, pluginFields);
+    }
+
+    private static IReadOnlyList<string> Normalize(
+        IReadOnlyList<string>? fields,
+        IReadOnlySet<string>? pluginFields = null)
     {
         if (fields is null || fields.Count == 0)
         {
@@ -75,7 +100,11 @@ public sealed record StatusLineSettings
             var value = field.Trim().ToLowerInvariant();
             if (!AvailableFields.Contains(value, StringComparer.Ordinal))
             {
-                throw new ArgumentException($"Unknown status line field  {field}", nameof(fields));
+                if (!PluginStatusFieldNames.IsName(value)
+                    || (pluginFields is not null && !pluginFields.Contains(value)))
+                {
+                    throw new ArgumentException($"Unknown status line field  {field}", nameof(fields));
+                }
             }
 
             if (!normalized.Contains(value, StringComparer.Ordinal))

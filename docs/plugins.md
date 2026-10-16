@@ -7,7 +7,8 @@ commands, hooks, raw hooks, and prompt placeholders. After the host has
 loaded plugins, external tools, and skills, it calls `Attach` with a
 read-only snapshot of those catalogs, then `AttachSession` with the live
 session and review model. A plugin that implements `IPluginModelClient`
-also receives clients for those models.
+also receives clients for those models. A plugin with an admitted status
+field then receives `AttachStatus`.
 
 The host owns catalog registration, approval, workspace fencing, output
 truncation, and timeouts. Plugin code does not bypass
@@ -94,7 +95,7 @@ a tool needs `ToolHostContext`. Do not reference `CrystalCode.Engine`,
 `CrystalCode`, `CrystalCode.Display`, or `CrystalCode.Providers`.
 
 `Contribute` returns tools, client factories, classifiers, commands,
-hooks, raw hooks, and prompt placeholders. A null entry is omitted with a note. One bad plugin does not
+hooks, raw hooks, prompt placeholders, and status fields. A null entry is omitted with a note. One bad plugin does not
 stop the others.
 
 `Attach` runs after `Contribute`, once plugins, external tools, and skills
@@ -168,6 +169,31 @@ again. A throw, or a missing return, leaves the original token and records
 an English note.
 
 Before the first `Attach`, the snapshot on that context is empty.
+
+### Status fields
+
+`IPluginStatusField` names one custom status-line field. Add it with
+`PluginContribution.WithStatusFields`. The original constructor stays
+unchanged. The name starts with a letter, then letters, digits, or single
+hyphens, at most 32 characters. Admission is case-insensitive and the host
+stores the lowercase form. A built-in status field, `on`, `off`, `reset`,
+an illegal token, or a duplicate is omitted with a note. The first loaded
+plugin wins.
+
+The host does not place the field on the adaptive status bar, the progress
+row, `/status`, or `/stats`. The operator adds the lowercase name to
+`statusLine` or `/statusline`. A saved name is kept when the plugin is not
+loaded; the custom line omits it and `/statusline` marks it unavailable.
+
+After data directories, the host calls `AttachStatus` with
+`IPluginStatusUpdates` when at least one of this plugin's fields was
+accepted. `Set` replaces that field's text. `Clear`, or blank text, removes
+it. The host keeps one line: control characters and escapes are dropped,
+newlines and tabs become spaces, and text longer than 64 characters is cut.
+The description shown by `/statusline` is at most 80 characters. The same
+text is not published again. A name this plugin did not register is ignored,
+and that name is noted once. A sink from an older catalog ignores later
+calls. The plugin does not choose color, markup, or an extra row.
 
 ### Catalog snapshot
 

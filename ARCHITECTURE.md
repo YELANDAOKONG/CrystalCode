@@ -1629,6 +1629,12 @@ default. Operators may independently enable an ordered custom status line
 through `customStatusLine`, `statusLine`, or `/statusline`. Custom token fields
 name their scope explicitly as context, request, or session usage. Disabling
 the custom line returns to the existing adaptive rendering path.
+A disk plugin may register extra field names. Those names stay off the
+adaptive bar, the progress row, `/status`, and `/stats`. They appear on the
+custom line only when the operator lists them. The engine publishes the
+latest plain text as `StatusFieldsChanged`. The terminal stores that text
+and paints it on the next input poll. Empty text occupies no cell. A narrow
+custom line still drops `custom` slots from the right.
 Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled
 muted. The bar shows the first four items and a `+N more` line when
@@ -1837,6 +1843,10 @@ plugin when it loads. Those clients are new instances on the same provider
 and model, kept apart from the instances inside a turn or a review. A plugin
 that implements `IPluginDataDirectory` receives its global and project
 runtime-data directories through `AttachDataDirectories`.
+A plugin that admitted at least one status field then receives
+`AttachStatus`. The sink accepts only that plugin's names. A later catalog
+reload retires the previous sink. `PluginRegistry`, external tool sets, and
+`crystal run` do not receive one.
 `IndependentReview` matches the review flag. `Review` is absent while that
 flag is false. When the flag is true and the review client cannot be
 created, the read fails and the session client stays in place. The host

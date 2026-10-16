@@ -75,6 +75,7 @@ public sealed class SessionRenderer : IDisposable
     private bool _sideClearRequested;
     private bool _sideCancelRequested;
     private bool _sideSuspended;
+    private bool _pluginStatusDirty;
     private int _sideSpinnerFrame;
     private DateTimeOffset _sideSpinnerAt;
 
@@ -413,6 +414,27 @@ public sealed class SessionRenderer : IDisposable
             _chrome.CustomStatusLine = enabled;
             _chrome.StatusLineFields = [.. fields];
             PaintUnlocked(force: true);
+        }
+    }
+
+    public void SetPluginStatus(IReadOnlyList<StatusFieldValue> fields)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        lock (_gate)
+        {
+            var values = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var field in fields)
+            {
+                if (field is null || string.IsNullOrWhiteSpace(field.Name))
+                {
+                    continue;
+                }
+
+                values[field.Name] = field.Text ?? string.Empty;
+            }
+
+            _chrome.PluginFields = values;
+            _pluginStatusDirty = true;
         }
     }
 
@@ -2283,7 +2305,13 @@ public sealed class SessionRenderer : IDisposable
                 tooSmall = haveSize && BelowUsableSize(pollWidth, pollHeight);
                 var sizeChanged = pollWidth != _paintedWidth || pollHeight != _paintedHeight;
                 var now = DateTimeOffset.UtcNow;
+                var pluginStatusDirty = _pluginStatusDirty;
+                _pluginStatusDirty = false;
                 if (sizeChanged || _chrome.SpinnerDue(now) || SideSpinnerDue(now))
+                {
+                    PaintUnlocked(force: true);
+                }
+                else if (pluginStatusDirty)
                 {
                     PaintUnlocked(force: true);
                 }

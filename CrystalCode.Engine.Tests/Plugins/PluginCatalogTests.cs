@@ -4,6 +4,7 @@ using Crystal.Chat;
 using Crystal.Multimodal.Chat;
 
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tests.Home;
@@ -158,6 +159,16 @@ public sealed class PluginCatalogTests
         Assert.Equal(ChatRole.User, added.Role);
         Assert.Equal("raw-line", added.Text);
         Assert.Equal("sample_token", Assert.Single(catalog.Placeholders).Name);
+        Assert.Equal("branch", Assert.Single(catalog.StatusFields).Name);
+        var published = new List<IReadOnlyList<StatusFieldValue>>();
+        var board = new PluginStatusBoard(
+            fields => published.Add(fields),
+            static _ => { });
+        catalog.AttachStatus(board, static _ => { });
+        var snapshot = Assert.Single(published);
+        var value = Assert.Single(snapshot);
+        Assert.Equal("branch", value.Name);
+        Assert.Equal("main", value.Text);
         var environment = new PluginEnvironment(
             [new PluginPeer("Fixture", "home", "Sample", true, true, true, string.Empty)],
             [new ExternalToolSetPeer("Extra", "project", true, true, false, string.Empty)],
@@ -267,6 +278,7 @@ public sealed class PluginCatalogTests
             using CrystalCode.Plugins.Hooks;
             using CrystalCode.Plugins.Models;
             using CrystalCode.Plugins.Placeholders;
+            using CrystalCode.Plugins.Status;
             using CrystalCode.Plugins.Tools;
             using CrystalCode.Tools;
 
@@ -304,11 +316,22 @@ public sealed class PluginCatalogTests
                     _projectDataDirectory = projectDataDirectory;
                 }
 
-                public PluginContribution Contribute() => new(
+                public PluginContribution Contribute() => new PluginContribution(
                     tools: [new SampleTool(), new HostedTool(), new DataTool(this), new PeerTool(this)],
                     hooks: [new SampleHook()],
                     rawHooks: [new SampleRawHook()],
-                    placeholders: [new SamplePlaceholder()]);
+                    placeholders: [new SamplePlaceholder()])
+                    .WithStatusFields([new SampleStatus()]);
+
+                public void AttachStatus(IPluginStatusUpdates updates) =>
+                    updates.Set("branch", "main");
+            }
+
+            public sealed class SampleStatus : IPluginStatusField
+            {
+                public string Name => "branch";
+
+                public string Description => "Current branch";
             }
 
             public sealed class SamplePlaceholder : IPluginPlaceholder

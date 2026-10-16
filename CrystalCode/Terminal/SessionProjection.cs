@@ -47,6 +47,9 @@ internal sealed class SessionProjection : ISessionObserver
             case PreferencesChanged preferences:
                 ApplyPreferences(preferences.Preferences);
                 break;
+            case StatusFieldsChanged status:
+                _renderer.SetPluginStatus(status.Fields);
+                break;
             case SlashCommandsChanged commands:
                 _renderer.SetSlashCommands(SlashOptionMap.From(commands.Commands));
                 break;

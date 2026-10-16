@@ -70,6 +70,7 @@ public sealed class CodingSession : ITurnObserver
     private ExternalCatalog _external = ExternalCatalog.Empty;
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
     private PluginPlaceholderTable _placeholders = PluginPlaceholderTable.Empty;
+    private PluginStatusBoard _statusBoard = new(static _ => { }, static _ => { });
     private readonly PluginModelView _modelView;
     private readonly PluginClientView _clientView;
     private PluginHookPipeline _hooks = PluginHookPipeline.Empty;
@@ -2145,10 +2146,7 @@ public sealed class CodingSession : ITurnObserver
 
         if (tokens.Count == 0)
         {
-            Note(
-                "Custom status line  " + (_settings.StatusLine.Enabled ? "On" : "Off")
-                + "\nFields  " + string.Join(' ', _settings.StatusLine.Fields)
-                + "\nAvailable  " + string.Join(' ', StatusLineSettings.AvailableFields));
+            Note(DescribeStatusLine());
             return;
         }
 
@@ -2162,7 +2160,7 @@ public sealed class CodingSession : ITurnObserver
                 "reset" when tokens.Count == 1 => new StatusLineSettings(true),
                 "on" or "off" or "reset" => throw new ArgumentException(
                     "Status line on, off, and reset do not accept additional fields."),
-                _ => _settings.StatusLine.WithFields(tokens)
+                _ => _settings.StatusLine.WithFields(tokens, _loadedPlugins.StatusFieldNames)
             };
         }
         catch (ArgumentException exception)
@@ -2174,6 +2172,51 @@ public sealed class CodingSession : ITurnObserver
         SaveSettings(current => current.WithStatusLine(statusLine));
         PublishPreferences();
         Note("Custom status line  " + (statusLine.Enabled ? "On" : "Off"));
+    }
+
+    private string DescribeStatusLine()
+    {
+        var text = new StringBuilder();
+        text.Append("Custom status line  ");
+        text.Append(_settings.StatusLine.Enabled ? "On" : "Off");
+        text.Append("\nFields  ");
+        text.Append(string.Join(' ', _settings.StatusLine.Fields));
+        text.Append("\nAvailable  ");
+        text.Append(string.Join(' ', StatusLineSettings.AvailableFields));
+        if (_loadedPlugins.StatusFields.Count > 0)
+        {
+            text.Append("\nPlugins");
+            foreach (var field in _loadedPlugins.StatusFields)
+            {
+                text.Append('\n');
+                text.Append(field.Name);
+                text.Append("  ");
+                text.Append(field.DirectoryName);
+                if (!string.IsNullOrWhiteSpace(field.Description))
+                {
+                    text.Append("  ");
+                    text.Append(field.Description);
+                }
+            }
+        }
+
+        var unavailable = new List<string>();
+        foreach (var field in _settings.StatusLine.Fields)
+        {
+            if (!StatusLineSettings.AvailableFields.Contains(field, StringComparer.Ordinal)
+                && !_loadedPlugins.StatusFieldNames.Contains(field))
+            {
+                unavailable.Add(field);
+            }
+        }
+
+        if (unavailable.Count > 0)
+        {
+            text.Append("\nUnavailable  ");
+            text.Append(string.Join(' ', unavailable));
+        }
+
+        return text.ToString();
     }
 
     private void WriteToolsUsage()
@@ -3439,10 +3482,17 @@ public sealed class CodingSession : ITurnObserver
 
     private void ReloadPlugins()
     {
+        _statusBoard.Retire();
         _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins, _toolHost);
         _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note, _loadedPlugins.RawHooks);
         _placeholders = new PluginPlaceholderTable(_loadedPlugins.Placeholders, Note);
         _placeholders.SetModels(_modelView);
+        _statusBoard = new PluginStatusBoard(PublishStatusFields, Note);
+    }
+
+    private void PublishStatusFields(IReadOnlyList<StatusFieldValue> fields)
+    {
+        Publish(new StatusFieldsChanged(fields));
     }
 
     private void ReloadPluginsWithProgress()
@@ -3746,6 +3796,7 @@ public sealed class CodingSession : ITurnObserver
         _loadedPlugins.AttachSession(_modelView, Note);
         _loadedPlugins.AttachClients(_clientView, Note);
         _loadedPlugins.AttachDataDirectories(_home, _workspace.Root, Note);
+        _loadedPlugins.AttachStatus(_statusBoard, Note);
     }
 
     private void WriteExternalNotes()

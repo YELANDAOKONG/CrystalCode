@@ -58,6 +58,7 @@ public sealed class PluginCatalog
         IReadOnlySet<string> toolNames,
         IReadOnlyList<LoadedPlugin> instances,
         IReadOnlyList<PluginPlaceholderRegistration> placeholders,
+        IReadOnlyList<PluginStatusFieldRegistration> statusFields,
         IReadOnlyList<PluginActivationFailure> failures)
     {
         PlanTools = planTools;
@@ -72,6 +73,14 @@ public sealed class PluginCatalog
         Notes = notes;
         ToolNames = toolNames;
         Placeholders = placeholders;
+        StatusFields = statusFields;
+        var statusNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in statusFields)
+        {
+            statusNames.Add(field.Name);
+        }
+
+        StatusFieldNames = statusNames;
         Failures = failures;
         _clients = [.. clients];
         _instances = instances;
@@ -90,6 +99,7 @@ public sealed class PluginCatalog
         [],
         [],
         new HashSet<string>(StringComparer.Ordinal),
+        [],
         [],
         [],
         []);
@@ -117,6 +127,10 @@ public sealed class PluginCatalog
     public IReadOnlySet<string> ToolNames { get; }
 
     public IReadOnlyList<PluginPlaceholderRegistration> Placeholders { get; }
+
+    public IReadOnlyList<PluginStatusFieldRegistration> StatusFields { get; }
+
+    public IReadOnlySet<string> StatusFieldNames { get; }
 
     public IReadOnlyList<PluginActivationFailure> Failures { get; }
 
@@ -153,11 +167,13 @@ public sealed class PluginCatalog
         var plugins = new List<PluginInfo>();
         var instances = new List<LoadedPlugin>();
         var placeholders = new List<PluginPlaceholderRegistration>();
+        var statusFields = new List<PluginStatusFieldRegistration>();
         var failures = new List<PluginActivationFailure>();
         var toolNames = new HashSet<string>(StringComparer.Ordinal);
         var commandNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pluginNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var placeholderNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var statusFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in discovered)
         {
             if (!TryActivate(item, out var plugin, out var error) || plugin is null)
@@ -204,6 +220,12 @@ public sealed class PluginCatalog
                 placeholderNames,
                 notes,
                 placeholders);
+            AddStatusFields(
+                item.DirectoryName,
+                contribution,
+                statusFieldNames,
+                notes,
+                statusFields);
             if (plugin is IPluginModelClient)
             {
                 notes.Add(
@@ -238,6 +260,7 @@ public sealed class PluginCatalog
             toolNames,
             instances,
             placeholders,
+            statusFields,
             failures);
 
         void Skip(DiscoveredPlugin item, string reason)
@@ -331,6 +354,40 @@ public sealed class PluginCatalog
             {
                 note(
                     $"Plugin '{instance.DirectoryName}' could not receive data directories: {exception.Message}");
+            }
+        }
+    }
+
+    public void AttachStatus(PluginStatusBoard board, Action<string> note)
+    {
+        ArgumentNullException.ThrowIfNull(board);
+        ArgumentNullException.ThrowIfNull(note);
+        foreach (var instance in _instances)
+        {
+            var owned = new List<string>();
+            foreach (var field in StatusFields)
+            {
+                if (string.Equals(field.DirectoryName, instance.DirectoryName, StringComparison.Ordinal))
+                {
+                    owned.Add(field.Name);
+                }
+            }
+
+            if (owned.Count == 0)
+            {
+                continue;
+            }
+
+            var sink = board.Open(instance.DirectoryName, owned);
+            try
+            {
+                instance.Plugin.AttachStatus(sink);
+            }
+            catch (Exception exception)
+            {
+                board.Close(sink);
+                note(
+                    $"Plugin '{instance.DirectoryName}' could not receive status updates: {exception.Message}");
             }
         }
     }
@@ -581,6 +638,28 @@ public sealed class PluginCatalog
                 && registration is not null)
             {
                 placeholders.Add(registration);
+            }
+        }
+    }
+
+    private static void AddStatusFields(
+        string directoryName,
+        DiskContribution contribution,
+        HashSet<string> names,
+        IList<string> notes,
+        List<PluginStatusFieldRegistration> statusFields)
+    {
+        foreach (var field in contribution.StatusFields)
+        {
+            if (PluginStatusFieldAdmission.TryAdmit(
+                    directoryName,
+                    field,
+                    names,
+                    notes,
+                    out var registration)
+                && registration is not null)
+            {
+                statusFields.Add(registration);
             }
         }
     }

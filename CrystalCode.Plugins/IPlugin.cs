@@ -1,5 +1,6 @@
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Models;
+using CrystalCode.Plugins.Status;
 
 namespace CrystalCode.Plugins;
 
@@ -12,7 +13,7 @@ public interface IPlugin
     /// <summary>Gets the plugin name shown to the operator.</summary>
     string Name { get; }
 
-    /// <summary>Returns the tools, factories, commands, hooks, and placeholders from this plugin.</summary>
+    /// <summary>Returns the tools, factories, commands, hooks, placeholders, and status fields from this plugin.</summary>
     PluginContribution Contribute();
 
     /// <summary>
@@ -36,5 +37,16 @@ public interface IPlugin
     void AttachSession(IPluginModels models)
     {
         ArgumentNullException.ThrowIfNull(models);
+    }
+
+    /// <summary>
+    /// Receives a sink for status fields this plugin successfully registered.
+    /// The host calls this after data directories, and again when this
+    /// plugin instance is loaded again. Plugins with no admitted field
+    /// are not called. The default does nothing.
+    /// </summary>
+    void AttachStatus(IPluginStatusUpdates updates)
+    {
+        ArgumentNullException.ThrowIfNull(updates);
     }
 }

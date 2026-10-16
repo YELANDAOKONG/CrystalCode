@@ -37,6 +37,9 @@ public sealed class ShellChrome
 
     public IReadOnlyList<string> StatusLineFields { get; set; } = [];
 
+    public IReadOnlyDictionary<string, string> PluginFields { get; set; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public string ContextUsed { get; set; } = "CTX --";
 
     public string ContextLeft { get; set; } = "CTX -- Left";
@@ -218,13 +221,27 @@ public sealed class ShellChrome
                 "tools" => ToolCount switch { 0 => string.Empty, 1 => "1 Tool", _ => $"{ToolCount} Tools" },
                 "elapsed" => Elapsed,
                 "queued" => Queued > 0 ? $"Queued {Queued}" : string.Empty,
-                _ => string.Empty
+                _ => PluginField(field)
             };
             if (!string.IsNullOrWhiteSpace(value))
             {
                 items.Add((value, $"[{Theme.Chrome}]{MarkupText.Escape(value)}[/]", "custom"));
             }
         }
+    }
+
+    private string PluginField(string name)
+    {
+        if (PluginFields is null
+            || string.IsNullOrEmpty(name)
+            || !PluginFields.TryGetValue(name, out var value)
+            || string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var line = TerminalText.SanitizeLine(value);
+        return TextWidth.Truncate(line, 64);
     }
 
     private static PaintLine FitStatusLine(

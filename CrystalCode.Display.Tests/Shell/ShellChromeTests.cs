@@ -50,6 +50,27 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ShowsAdmittedPluginTextAndSkipsEmptyFields()
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = true,
+            StatusLineFields = ["model", "branch", "quiet"],
+            Model = "gpt-5.6-sol",
+            PluginFields = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["branch"] = "main\nline",
+                ["quiet"] = "   "
+            }
+        };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Contains("gpt-5.6-sol  ·  main line", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("quiet", line.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StatusLine_ActivityPlainMatchesBullet()
     {
         var chrome = new ShellChrome
