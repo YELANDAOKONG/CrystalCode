@@ -74,8 +74,13 @@
   Session `read` permits file reads; `write` includes reads and retains normal
   action approval. Explicit read-only writes are rejected before grants, raw
   approval advice, or review and checked again by the built-in write/edit path
-  resolver. Rules are saved with the session, not config or permissions.json;
-  resume restores them, while fork, clear, and workspace changes clear them.
+  resolver. Rules are saved with the session, not `config.json` or
+  `permissions.json`. Resume restores those saved rules and does not reapply
+  defaults. A new session, clear, fork, and a successful workspace change seed
+  `~/.crystal/access.json` for that canonical workspace root unless
+  `--allow-read` or `--allow-write` was passed; those flags replace the defaults
+  for that process and are not written back. A refused or no-op workspace
+  change keeps the current rules.
   Canonical directory boundaries and most-specific matching include the implicit
   writable workspace. Persist the lexical absolute entry path when it differs
   from the canonical target, for revocation after symlink deletion or retargeting;

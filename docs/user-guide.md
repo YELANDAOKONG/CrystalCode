@@ -1068,7 +1068,8 @@ returns the transcript viewport to the latest output.
 | `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. An answer taller than the panel scrolls inside it with the wheel, PageUp, PageDown, or Ctrl+Up/Down, and the title and border stay visible. While the model has not started, the panel shows the same spinner as the progress row. Once reasoning starts, the caption changes to Thinking until answer text arrives. An empty `/btw` reopens it. Esc, Enter, Space, or Ctrl+C closes it. Ctrl+C also cancels a side question that is still running and leaves the main turn running. Left and Right step through earlier answers. `x` clears them |
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
-| `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here. The operator space does not ask. Changing the directory is refused while a turn is running |
+| `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here. The operator space does not ask. Changing the directory is refused while a turn is running. A successful change replaces session directory rules with the destination workspace's defaults |
+| `/access` | | List session directory rules, or `add <path> read` / `write` and `remove <path>`. `default` lists this workspace's defaults in `~/.crystal/access.json`. `default add` and `default remove` change that file and the current session. Refused during a turn or compaction |
 | `/space` | | Switch to the operator space. Creates `{home}/space` when it is missing. Takes no path. Refused while a turn is running |
 | `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry. `forget` leaves the operator space trusted |
 | `/rules` | | Show global and project rule files, set both with `on` / `off`, or set one side with `global` or `project` and `on` / `off`. Writes `config.json`. Does not change `instructions.md` or `.crystal.md`. Refused during a turn or compaction |
@@ -1540,7 +1541,9 @@ session restores the full conversation on screen. The model continues from
 the summary and recent tail, and only the live system prompt is refreshed.
 
 Fork preserves the full conversation, the model context, todos, Plan/Work mode,
-turn counters, and usage baseline. The source session remains unchanged. The
+turn counters, and usage baseline. It does not copy directory access. The new
+branch receives the current workspace's defaults from `~/.crystal/access.json`.
+The source session remains unchanged. The
 new branch receives a new creation time, uses the current workspace, and
 refreshes its live system prompt. Session lists mark the current id and retain
 complete ids so they can be copied into `/resume` or `/fork`.
@@ -1621,6 +1624,7 @@ Override with `CRYSTAL_HOME` or `--home`.
   credentials.json
   permissions.json
   trusted.json
+  access.json
   instructions.md
   AGENTS.md
   prompts/
@@ -1694,7 +1698,15 @@ sets, and plugins of the same directory name win over home):
 ```
 
 `config.json` is not part of the project overlay; workspace-level
-configuration is deferred.
+configuration is deferred. `access.json` is not that file. It stores
+default extra directories per canonical workspace root. A new session,
+`/clear`, `/fork`, and a successful `/cd` or `/space` copy those defaults
+into the session. `/resume` keeps the saved session rules and does not
+add defaults back. `--allow-read` and `--allow-write`, when any is set,
+replace the defaults for that process and are not saved. A missing
+directory or a credential path is skipped with an error and left in the
+file. A corrupt file or two modes for one directory seeds nothing. The
+session still opens.
 
 Operator plugins and external tool sets keep their own runtime data under a
 `data/` root, split by kind. The global root is `~/.crystal/data`; the

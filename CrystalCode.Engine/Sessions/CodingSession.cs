@@ -184,32 +184,13 @@ public sealed class CodingSession : ITurnObserver
             RebuildExecutors();
         }
 
-        var initialAccess = new List<DirectoryAccess>();
-        foreach (var rule in launchAccess ?? [])
+        if (launchAccess is { Count: > 0 })
         {
-            if (rule is null || !TryResolveDirectoryAccess(rule.Path, rule.Mode, out var resolved, out _))
-            {
-                throw new ArgumentException("Launch directory access is invalid.", nameof(launchAccess));
-            }
-
-            resolved = resolved with { SourcePath = rule.SourcePath ?? resolved.SourcePath };
-            if (!DirectoryAccessPolicy.TryValidateSaved([resolved], out _))
-            {
-                throw new ArgumentException("Launch directory access is invalid.", nameof(launchAccess));
-            }
-
-            initialAccess.Add(resolved);
+            ApplyLaunchAccess(launchAccess);
         }
-
-        foreach (var rule in initialAccess)
+        else if (resume is null)
         {
-            _workspace.Access.Set(rule.Path, rule.Mode, rule.SourcePath);
-        }
-
-        if (initialAccess.Count > 0)
-        {
-            ReplaceLiveSystem();
-            SaveSession();
+            SeedWorkspaceDefaults();
         }
     }
 
@@ -795,9 +776,74 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
+    private void ApplyLaunchAccess(IReadOnlyList<DirectoryAccess> launchAccess)
+    {
+        var initialAccess = new List<DirectoryAccess>();
+        foreach (var rule in launchAccess)
+        {
+            if (rule is null || !TryResolveDirectoryAccess(rule.Path, rule.Mode, out var resolved, out _))
+            {
+                throw new ArgumentException("Launch directory access is invalid.", nameof(launchAccess));
+            }
+
+            resolved = resolved with { SourcePath = rule.SourcePath ?? resolved.SourcePath };
+            if (!DirectoryAccessPolicy.TryValidateSaved([resolved], out _))
+            {
+                throw new ArgumentException("Launch directory access is invalid.", nameof(launchAccess));
+            }
+
+            initialAccess.Add(resolved);
+        }
+
+        foreach (var rule in initialAccess)
+        {
+            _workspace.Access.Set(rule.Path, rule.Mode, rule.SourcePath);
+        }
+
+        if (initialAccess.Count > 0)
+        {
+            ReplaceLiveSystem();
+            SaveSession();
+        }
+    }
+
+    /// <summary>
+    /// Copies this workspace's Home defaults into the session. Flags and
+    /// resume do not call this. Skipped entries stay in the file.
+    /// </summary>
+    private void SeedWorkspaceDefaults()
+    {
+        var store = new WorkspaceAccessStore(_home);
+        if (!store.TrySeed(_workspace.Root, out var rules, out var error, out var skipped))
+        {
+            Error(error);
+            return;
+        }
+
+        foreach (var skippedError in skipped)
+        {
+            Error(skippedError);
+        }
+
+        if (rules.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var rule in rules)
+        {
+            _workspace.Access.Set(rule.Path, rule.Mode, rule.SourcePath);
+        }
+
+        ReplaceLiveSystem();
+        SaveSession();
+    }
+
+    private const string AccessUsage =
+        "Use /access, /access add <path> read|write, /access remove <path>, /access default, /access default add <path> read|write, or /access default remove <path>.";
+
     private void ChangeAccess(string argument)
     {
-        const string usage = "Use /access, /access add <path> read|write, or /access remove <path>.";
         var text = argument.Trim();
         if (text.Length == 0)
         {
@@ -811,6 +857,16 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        if (text.Equals("default", StringComparison.Ordinal)
+            || text.StartsWith("default ", StringComparison.Ordinal))
+        {
+            var rest = text.Length == "default".Length
+                ? string.Empty
+                : text["default".Length..].Trim();
+            ChangeDefaultAccess(rest);
+            return;
+        }
+
         if (_turnActive || _compactSource is not null)
         {
             Error("Finish the current turn before changing directory access.");
@@ -819,15 +875,12 @@ public sealed class CodingSession : ITurnObserver
 
         if (text.StartsWith("add ", StringComparison.Ordinal))
         {
-            var split = text.LastIndexOf(' ');
-            if (split <= "add ".Length)
+            if (!TrySplitAccessAdd(text, out var path, out var mode))
             {
-                Error(usage);
+                Error(AccessUsage);
                 return;
             }
 
-            var path = UnquoteAccessPath(text[4..split]);
-            var mode = text[(split + 1)..];
             if (!TrySetDirectoryAccess(path, mode, out var error))
             {
                 Error(error);
@@ -871,7 +924,130 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        Error(usage);
+        Error(AccessUsage);
+    }
+
+    private void ChangeDefaultAccess(string text)
+    {
+        var store = new WorkspaceAccessStore(_home);
+        if (text.Length == 0)
+        {
+            if (!store.TryList(_workspace.Root, out var rules, out var listError))
+            {
+                Error(listError);
+                return;
+            }
+
+            if (rules.Count == 0)
+            {
+                Note("No default directories for this workspace.");
+                return;
+            }
+
+            foreach (var rule in rules)
+            {
+                Note("Default  " + rule.Mode + "  " + rule.Path);
+            }
+
+            return;
+        }
+
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing directory access.");
+            return;
+        }
+
+        if (text.StartsWith("add ", StringComparison.Ordinal))
+        {
+            if (!TrySplitAccessAdd(text, out var path, out var mode))
+            {
+                Error(AccessUsage);
+                return;
+            }
+
+            if (!TryResolveDirectoryAccess(path, mode, out var rule, out var resolveError))
+            {
+                Error(resolveError);
+                return;
+            }
+
+            if (!store.TrySet(_workspace.Root, rule, out var saveError))
+            {
+                Error(saveError);
+                return;
+            }
+
+            if (!TrySetDirectoryAccess(path, mode, out var sessionError))
+            {
+                Error(sessionError);
+                return;
+            }
+
+            Note("Default access updated  " + mode + "  " + path);
+            return;
+        }
+
+        if (text.StartsWith("remove ", StringComparison.Ordinal))
+        {
+            var path = UnquoteAccessPath(text[7..]);
+            if (!_workspace.TryGetEntryPath(path, out var entryPath, out var pathError))
+            {
+                Error(pathError);
+                return;
+            }
+
+            entryPath = Path.TrimEndingDirectorySeparator(entryPath);
+            string? canonical = null;
+            if (_workspace.TryGetFullPath(path, out var fullPath, out _))
+            {
+                canonical = Path.TrimEndingDirectorySeparator(fullPath);
+            }
+
+            if (!store.TryRemove(_workspace.Root, entryPath, canonical, out var removed, out var removeError))
+            {
+                Error(removeError);
+                return;
+            }
+
+            if (!removed)
+            {
+                Error("No default access rule for that directory.");
+                return;
+            }
+
+            var sessionRemoved = _workspace.Access.RemoveByEntryPath(entryPath);
+            if (!sessionRemoved && canonical is not null)
+            {
+                sessionRemoved = _workspace.Access.Remove(canonical);
+            }
+
+            if (sessionRemoved)
+            {
+                ReplaceLiveSystem();
+                SaveSession();
+            }
+
+            Note("Default access removed  " + entryPath);
+            return;
+        }
+
+        Error(AccessUsage);
+    }
+
+    private static bool TrySplitAccessAdd(string text, out string path, out string mode)
+    {
+        path = string.Empty;
+        mode = string.Empty;
+        var split = text.LastIndexOf(' ');
+        if (split <= "add ".Length)
+        {
+            return false;
+        }
+
+        path = UnquoteAccessPath(text[4..split]);
+        mode = text[(split + 1)..];
+        return true;
     }
 
     private static string UnquoteAccessPath(string path)
@@ -2633,7 +2809,13 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        await RebindPluginSessionAsync(() => ApplyWorkspace(candidate), cancellationToken);
+        await RebindPluginSessionAsync(
+            () =>
+            {
+                ApplyWorkspace(candidate);
+                SeedWorkspaceDefaults();
+            },
+            cancellationToken);
         SaveSession();
         RefreshChrome();
         Note("Workspace  " + _workspace.Root);
@@ -3038,6 +3220,7 @@ public sealed class CodingSession : ITurnObserver
         _ledger.Clear();
         _todos.Clear();
         BindReviewConversation();
+        SeedWorkspaceDefaults();
         SaveSession();
         ShowTodos();
     }
@@ -3287,6 +3470,7 @@ public sealed class CodingSession : ITurnObserver
             {
                 CancelAndClearSide(announce: true);
                 ApplyDocument(fork);
+                SeedWorkspaceDefaults();
                 SaveSession();
                 RefreshChrome();
                 ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);

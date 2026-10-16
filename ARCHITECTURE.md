@@ -728,10 +728,24 @@ Path resolution failures report the path error, not command usage. Paths contain
 spaces can be double-quoted. Mutations are refused during a turn
 or compaction. Changes immediately save `SessionDocument.access`, refresh the
 live model instructions and the `{{directories}}` placeholder, and affect the already-bound executor through the shared
-policy. No global access file or workspace configuration is read. Repeatable
-`--allow-read` and `--allow-write` flags seed or override the launched session;
-conflicting modes for the same canonical root are rejected. Flags are recorded
-only as session access metadata, never preferences in config.json.
+policy. On a new session, any `--allow-read` or `--allow-write` flag makes
+those flags the complete seed. They replace workspace defaults, are not merged
+with them, and are recorded only as session access metadata, never as
+preferences in `config.json` or `access.json`. A resumed session keeps its
+saved rules; flags still overlay those rules, and defaults are not loaded.
+Conflicting modes for the same canonical root are rejected at launch. When no
+flag is set and the session is not resuming, `~/.crystal/access.json` supplies
+the seed. That file
+is keyed by the canonical workspace root, not the git trust root, and lives
+under Home so a project cannot grant itself extra directories. A missing file
+seeds nothing. A corrupt file or two modes for one directory seeds nothing and
+reports an error; the session still opens. A missing directory, a credential
+path, or a bad mode is skipped with a visible error and left in the file.
+`/access default` lists the stored rules. `/access default add <path> read|write`
+validates like `/access add`, writes the file, and adds the rule to the current
+session. `/access default remove <path>` removes the stored rule and the same
+canonical rule from the current session only. Other saved sessions are left
+alone. Mutations are refused during a turn or compaction.
 
 Built-in file reads in authorized directories use ordinary workspace read
 approval. Writes in writable directories follow the current approval mode.
@@ -751,9 +765,11 @@ Invalid saved rules fail closed rather than silently losing read-only restrictio
 `SessionResume.TryLoad` validates access before returning a document, and direct
 session construction validates it before allocating session resources. Interactive
 startup reports a red error and exits with code 1; in-session resume reports an
-error without changing the current session or its rules. Fork and clear start with
-no added rules. A successful workspace change clears
-rules; a refused or no-op change does not. Additional roots do not discover
+error without changing the current session or its rules. Resume does not
+reapply workspace defaults, so a default removed during that session stays
+removed. Fork does not copy the source session's access. Clear, fork, and a
+successful workspace change start from the destination workspace's defaults.
+A refused or no-op change does not. Additional roots do not discover
 prompts, instructions, plugins, tools, or skills. Existing session files with no
 access field load with an empty rule list; rules without `sourcePath` remain valid
 and can be removed by their listed canonical target. Shell, background shell, external tools,

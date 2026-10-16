@@ -99,14 +99,26 @@ separate library with no terminal code. The product can:
   follow the selected approval mode. Explicit read-only writes are rejected
   before grants or review. Rules use canonical absolute paths, with the most
   specific directory winning over parents and the implicit writable workspace.
-  They are session metadata, not workspace configuration or reusable approval
-  grants: resume restores them; fork, clear, and workspace changes clear them.
-  `/access add <path> read|write` adds or updates a rule; `/access remove <path>`
-  removes one using its recorded entry path even after a symlink is deleted or
-  retargeted, and `/access` lists the current rules. Invalid paths report path
-  errors. Invalid saved access blocks resume with a visible error; in-session
-  resume keeps the current session intact. Rule changes are refused
-  during turns or compaction. Shell and extension processes are not sandboxed
+  They are session metadata, not reusable approval grants. Resume restores the
+  saved rules and does not reapply defaults. A new session, `/clear`, `/fork`,
+  and a successful workspace change start from that workspace's defaults in
+  `~/.crystal/access.json`, keyed by the canonical workspace root, unless this
+  process passed `--allow-read` or `--allow-write`. Those flags are the complete
+  seed for that process, replace the defaults, and are not written back. A
+  refused or no-op workspace change keeps the current rules. The file lives
+  under Home so a project cannot grant itself extra directories. It is not
+  `config.json` and not `<workspace>/.crystal`.
+  `/access` lists the current session rules. `/access add <path> read|write`
+  adds or updates a session rule; `/access remove <path>` removes one using its
+  recorded entry path even after a symlink is deleted or retargeted.
+  `/access default` lists this workspace's defaults. `/access default add` and
+  `/access default remove` change that file and the current session only.
+  Invalid paths report path errors. A missing or credential default is skipped
+  at seed time with a visible error and left in the file. A corrupt file or
+  conflicting modes seeds nothing. Invalid saved access blocks resume with a
+  visible error; in-session resume keeps the current session intact. Rule
+  changes are refused during turns or compaction. Shell and extension processes
+  are not sandboxed
   by these rules, and no additional catalogs or instructions are discovered.
   The same list is the host placeholder `{{directories}}`. It is empty when
   the session has no added rules. Built-in prompts do not include that slot

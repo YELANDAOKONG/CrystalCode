@@ -123,6 +123,7 @@ Preferences and provider definitions are separate:
 | `~/.crystal/config.json` | Active provider and model, approval mode, and session preferences |
 | `~/.crystal/providers.json` | Additional provider endpoints and model definitions |
 | `~/.crystal/credentials.json` | Plain-text API keys, one entry per provider |
+| `~/.crystal/access.json` | Default extra directories for new sessions, per workspace |
 
 The built-in catalog includes DeepSeek, OpenAI, Gemini, and Ollama; Anthropic Messages (Claude) is also a built-in protocol reachable by adding a provider entry. You can select any model listed in the effective catalog with `/model`, or use `--provider` and `--model` when starting the app. [Provider configuration](docs/user-guide.md#configuration) explains protocols, model fields, and examples.
 
