@@ -156,6 +156,7 @@ internal sealed class SessionProjection : ISessionObserver
         _renderer.VerboseTools = preferences.VerboseTools;
         _renderer.VerboseCommands = preferences.VerboseCommands;
         _renderer.VerboseApprovals = preferences.VerboseApprovals;
+        _renderer.VerboseReview = preferences.VerboseReview;
         _renderer.VerboseThinking = preferences.VerboseThinking;
         _renderer.SetStatusLine(preferences.StatusLineEnabled, preferences.StatusLineFields);
     }

@@ -35,6 +35,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultVerboseApprovals = true;
 
+    public const bool DefaultVerboseReview = true;
+
     public const bool DefaultVerboseThinking = true;
 
     public const string DefaultPromptSet = "default";
@@ -52,6 +54,7 @@ public sealed record HarnessSettings
         bool verboseTools = DefaultVerboseTools,
         bool verboseCommands = DefaultVerboseCommands,
         bool verboseApprovals = DefaultVerboseApprovals,
+        bool verboseReview = DefaultVerboseReview,
         bool verboseThinking = DefaultVerboseThinking,
         string promptSet = DefaultPromptSet,
         ExternalToolApprovalSettings? externalToolApproval = null,
@@ -125,6 +128,7 @@ public sealed record HarnessSettings
         VerboseTools = verboseTools;
         VerboseCommands = verboseCommands;
         VerboseApprovals = verboseApprovals;
+        VerboseReview = verboseReview;
         VerboseThinking = verboseThinking;
         PromptSet = promptSet.Trim();
         ExternalToolApproval = externalToolApproval ?? ExternalToolApprovalSettings.Default;
@@ -233,6 +237,8 @@ public sealed record HarnessSettings
     public bool VerboseCommands { get; }
 
     public bool VerboseApprovals { get; }
+
+    public bool VerboseReview { get; }
 
     public bool VerboseThinking { get; }
 
@@ -356,6 +362,9 @@ public sealed record HarnessSettings
     public HarnessSettings WithVerboseApprovals(bool verboseApprovals) =>
         Copy(verboseApprovals: verboseApprovals);
 
+    public HarnessSettings WithVerboseReview(bool verboseReview) =>
+        Copy(verboseReview: verboseReview);
+
     public HarnessSettings WithVerboseThinking(bool verboseThinking) =>
         Copy(verboseThinking: verboseThinking);
 
@@ -460,6 +469,7 @@ public sealed record HarnessSettings
         bool? verboseTools = null,
         bool? verboseCommands = null,
         bool? verboseApprovals = null,
+        bool? verboseReview = null,
         bool? verboseThinking = null,
         string? promptSet = null,
         ExternalToolApprovalSettings? externalToolApproval = null,
@@ -505,6 +515,7 @@ public sealed record HarnessSettings
             verboseTools ?? VerboseTools,
             verboseCommands ?? VerboseCommands,
             verboseApprovals ?? VerboseApprovals,
+            verboseReview ?? VerboseReview,
             verboseThinking ?? VerboseThinking,
             promptSet ?? PromptSet,
             externalToolApproval ?? ExternalToolApproval,

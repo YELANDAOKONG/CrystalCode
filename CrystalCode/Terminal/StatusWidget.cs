@@ -139,6 +139,7 @@ internal static class StatusWidget
             ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
             ("Verbose commands", Toggle(status.VerboseCommandsEnabled)),
             ("Verbose approvals", Toggle(status.VerboseApprovalsEnabled)),
+            ("Verbose review", Toggle(status.VerboseReviewEnabled)),
             ("Verbose thinking", Toggle(status.VerboseThinkingEnabled))
         ]);
 

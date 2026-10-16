@@ -37,6 +37,7 @@ public sealed record SessionStatus(
     string? ApprovalModel = null,
     bool VerboseApprovalsEnabled = true,
     bool VerboseThinkingEnabled = true,
+    bool VerboseReviewEnabled = true,
     bool PluginsEnabled = true,
     int Plugins = 0,
     string? ApprovalThinking = null,

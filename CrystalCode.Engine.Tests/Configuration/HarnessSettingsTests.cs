@@ -66,6 +66,19 @@ public sealed class HarnessSettingsTests
         Assert.False(next.VerboseApprovals);
         Assert.True(settings.VerboseApprovals);
         Assert.True(next.VerboseTools);
+        Assert.True(next.VerboseReview);
+    }
+
+    [Fact]
+    public void WithVerboseReview_SetsHostFlag()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithVerboseReview(false);
+
+        Assert.False(next.VerboseReview);
+        Assert.True(settings.VerboseReview);
+        Assert.True(next.VerboseApprovals);
     }
 
     [Fact]

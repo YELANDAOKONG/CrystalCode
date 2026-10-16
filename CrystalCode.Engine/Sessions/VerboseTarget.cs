@@ -8,5 +8,6 @@ public enum VerboseTarget
     Tools,
     Commands,
     Approvals,
+    Review,
     Thinking
 }

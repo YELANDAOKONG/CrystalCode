@@ -475,7 +475,8 @@ Top-level fields:
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `verboseTools` | Show read, search, and skill result panels (default `true`; omitted when on) |
 | `verboseCommands` | Show full bash output (default `true`; omitted when on). Off keeps a hidden-line hint and the last line |
-| `verboseApprovals` | Show auto-pass approval cards (default `true`; omitted when on). Off hides Status, Reason, Risk, Authority, and review Outcome cards already on screen. The ask overlay stays |
+| `verboseApprovals` | Show policy and grant auto-pass cards (default `true`; omitted when on). Off hides those cards already on screen. Review allow cards follow `verboseReview`. The ask overlay stays |
+| `verboseReview` | Show review allow cards (default `true`; omitted when on). Off hides those cards already on screen, including Outcome and rationale. Independent of `verboseApprovals`. The ask overlay, reviewer Deny text, and `crystal run` stay |
 | `verboseThinking` | Show Thinking panels in the interactive transcript (default `true`; omitted when on). Off hides live and restored cards. The gear, progress row, and export stay. `crystal run --show-thinking` is separate |
 | `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
@@ -937,10 +938,13 @@ reviewer Deny rejects. `crystal run` denies any call that reaches this prompt.
 
 When a call auto-passes (policy, remembered grant, or review allow),
 the shell prints a panel with Status, Reason, Risk, and Authority,
-plus the classifier summary. `/verbose approvals` hides or shows that
-panel. It stays on unless `verboseApprovals` is `false` in
-`config.json`. Cards already printed in this session follow the
-switch. Asking you still uses the overlay.
+plus the classifier summary. A review allow also prints Outcome, the
+reviewer's risk and authorization, and the rationale. `/verbose approvals`
+hides or shows policy and grant panels. `/verbose review` hides or shows
+review allow panels. Each stays on unless its field is `false` in
+`config.json`. Cards already printed in this session follow their own
+switch. A saved `verboseApprovals` value of `false` no longer hides review
+allow cards. Asking you still uses the overlay.
 
 Shell classification treats `sudo`, destructive filesystem commands,
 pipe-to-shell downloads, force-push, and credential-path writes as
@@ -1052,7 +1056,7 @@ returns the transcript viewport to the latest output.
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count; refused during a turn or compaction |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
-| `/verbose` | | Show or set tool, command, approval, or thinking detail: `tools`, `commands`, `approvals`, `thinking`, then `on` or `off` |
+| `/verbose` | | Show or set tool, command, approval, review, or thinking detail: `tools`, `commands`, `approvals`, `review`, `thinking`, then `on` or `off` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, enable one set, or `/prompts export [dir]` |
 | `/promptattach` | | List prompt attachments, or `enable` / `disable` / `up` / `down` one name |

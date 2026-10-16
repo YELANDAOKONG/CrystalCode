@@ -430,6 +430,7 @@ public sealed class CodingSession : ITurnObserver
             VerboseTarget.Tools => current.WithVerboseTools(enabled),
             VerboseTarget.Commands => current.WithVerboseCommands(enabled),
             VerboseTarget.Approvals => current.WithVerboseApprovals(enabled),
+            VerboseTarget.Review => current.WithVerboseReview(enabled),
             VerboseTarget.Thinking => current.WithVerboseThinking(enabled),
             _ => current
         });
@@ -1269,6 +1270,8 @@ public sealed class CodingSession : ITurnObserver
                 + (_settings.VerboseCommands ? "On" : "Off")
                 + "  ·  Verbose approvals  "
                 + (_settings.VerboseApprovals ? "On" : "Off")
+                + "  ·  Verbose review  "
+                + (_settings.VerboseReview ? "On" : "Off")
                 + "  ·  Verbose thinking  "
                 + (_settings.VerboseThinking ? "On" : "Off"));
             return;
@@ -1293,6 +1296,12 @@ public sealed class CodingSession : ITurnObserver
                     VerboseTarget.Approvals,
                     enabled is bool approvalsEnabled ? approvalsEnabled : !_settings.VerboseApprovals);
                 Note("Verbose approvals  " + (_settings.VerboseApprovals ? "On" : "Off"));
+                break;
+            case VerboseTarget.Review:
+                SetVerbose(
+                    VerboseTarget.Review,
+                    enabled is bool reviewEnabled ? reviewEnabled : !_settings.VerboseReview);
+                Note("Verbose review  " + (_settings.VerboseReview ? "On" : "Off"));
                 break;
             case VerboseTarget.Thinking:
                 SetVerbose(
@@ -2139,6 +2148,7 @@ public sealed class CodingSession : ITurnObserver
                 VerboseCommandsEnabled: _settings.VerboseCommands,
                 VerboseApprovalsEnabled: _settings.VerboseApprovals,
                 VerboseThinkingEnabled: _settings.VerboseThinking,
+                VerboseReviewEnabled: _settings.VerboseReview,
                 PlanTools: planToolCount,
                 WorkTools: workToolCount,
                 ExternalTools: _external.Tools.Count,
@@ -4527,6 +4537,7 @@ public sealed class CodingSession : ITurnObserver
             _settings.VerboseTools,
             _settings.VerboseCommands,
             _settings.VerboseApprovals,
+            _settings.VerboseReview,
             _settings.VerboseThinking,
             _settings.StatusLine.Enabled,
             _settings.StatusLine.Fields);

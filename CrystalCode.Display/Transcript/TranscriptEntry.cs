@@ -9,4 +9,5 @@ public sealed record TranscriptEntry(
     TranscriptKind Kind,
     string Text,
     IRenderable? Widget = null,
-    string? ToolName = null);
+    string? ToolName = null,
+    bool Review = false);

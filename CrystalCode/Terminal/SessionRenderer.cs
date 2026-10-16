@@ -197,6 +197,25 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    public bool VerboseReview
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _log.VerboseReview;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _log.VerboseReview = value;
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
     public bool VerboseThinking
     {
         get
@@ -483,14 +502,14 @@ public sealed class SessionRenderer : IDisposable
         Add(TranscriptKind.Error, text);
     }
 
-    public void WriteApprovalPass(IRenderable card)
+    public void WriteApprovalPass(IRenderable card, bool review = false)
     {
         ArgumentNullException.ThrowIfNull(card);
         lock (_gate)
         {
             CommitLiveUnlocked();
-            _log.Add(TranscriptKind.Approval, string.Empty, card);
-            if (!Framed && _log.VerboseApprovals)
+            _log.Add(TranscriptKind.Approval, string.Empty, card, review: review);
+            if (!Framed && ShowsApprovalUnlocked(review))
             {
                 AnsiConsole.Write(card);
                 AnsiConsole.WriteLine();
@@ -2352,6 +2371,9 @@ public sealed class SessionRenderer : IDisposable
         || _log.VerboseThinking;
 
     private bool Framed => _screen is { IsActive: true };
+
+    private bool ShowsApprovalUnlocked(bool review) =>
+        review ? _log.VerboseReview : _log.VerboseApprovals;
 
     private void WriteFallback(TranscriptKind kind, string text, string? toolName = null)
     {

@@ -30,6 +30,8 @@ internal sealed class SettingsDocument
 
     public bool? VerboseApprovals { get; set; }
 
+    public bool? VerboseReview { get; set; }
+
     public bool? VerboseThinking { get; set; }
 
     public string? PromptSet { get; set; }

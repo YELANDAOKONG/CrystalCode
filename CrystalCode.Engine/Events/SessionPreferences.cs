@@ -8,6 +8,7 @@ public sealed record SessionPreferences(
     bool VerboseTools,
     bool VerboseCommands,
     bool VerboseApprovals,
+    bool VerboseReview,
     bool VerboseThinking,
     bool StatusLineEnabled,
     IReadOnlyList<string> StatusLineFields);

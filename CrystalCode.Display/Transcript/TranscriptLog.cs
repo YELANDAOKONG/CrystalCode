@@ -31,6 +31,7 @@ public sealed class TranscriptLog
     private bool _verboseTools = true;
     private bool _verboseCommands = true;
     private bool _verboseApprovals = true;
+    private bool _verboseReview = true;
     private bool _verboseThinking = true;
 
     public bool VerboseTools
@@ -78,6 +79,21 @@ public sealed class TranscriptLog
         }
     }
 
+    public bool VerboseReview
+    {
+        get => _verboseReview;
+        set
+        {
+            if (_verboseReview == value)
+            {
+                return;
+            }
+
+            _verboseReview = value;
+            InvalidateCache();
+        }
+    }
+
     public bool VerboseThinking
     {
         get => _verboseThinking;
@@ -97,10 +113,14 @@ public sealed class TranscriptLog
     /// Inline row text when the alternate screen is off. Null when a verbose
     /// switch hides the row. Command results stay, compacted when that switch is off.
     /// </summary>
-    public string? InlineText(TranscriptKind kind, string text, string? toolName = null)
+    public string? InlineText(
+        TranscriptKind kind,
+        string text,
+        string? toolName = null,
+        bool review = false)
     {
         ArgumentNullException.ThrowIfNull(text);
-        if (HidesThinking(kind) || (kind == TranscriptKind.Approval && !_verboseApprovals))
+        if (HidesThinking(kind) || HidesApproval(kind, review))
         {
             return null;
         }
@@ -132,7 +152,8 @@ public sealed class TranscriptLog
         TranscriptKind kind,
         string text,
         IRenderable? widget = null,
-        string? toolName = null)
+        string? toolName = null,
+        bool review = false)
     {
         ArgumentNullException.ThrowIfNull(text);
         CommitLive();
@@ -142,7 +163,7 @@ public sealed class TranscriptLog
             return;
         }
 
-        var entry = new TranscriptEntry(kind, text, widget, toolName);
+        var entry = new TranscriptEntry(kind, text, widget, toolName, review);
         _entries.Add(entry);
         if (_cachedWidth > 0)
         {
@@ -472,7 +493,7 @@ public sealed class TranscriptLog
         var indent = new string(' ', IndentColumns);
         var lines = new List<PaintLine>();
 
-        if (entry.Kind == TranscriptKind.Approval && !_verboseApprovals)
+        if (HidesApproval(entry.Kind, entry.Review))
         {
             return lines;
         }
@@ -538,6 +559,16 @@ public sealed class TranscriptLog
 
     private bool HidesThinking(TranscriptKind kind) =>
         kind == TranscriptKind.Thinking && !_verboseThinking;
+
+    private bool HidesApproval(TranscriptKind kind, bool review)
+    {
+        if (kind != TranscriptKind.Approval)
+        {
+            return false;
+        }
+
+        return review ? !_verboseReview : !_verboseApprovals;
+    }
 
     private static string ColorFor(TranscriptKind kind) =>
         kind switch

@@ -82,6 +82,60 @@ public sealed class TranscriptLogVerboseTests
     }
 
     [Fact]
+    public void BuildLines_KeepsReviewCardWhenApprovalVerboseIsOff()
+    {
+        var log = new TranscriptLog { VerboseApprovals = false };
+        log.Add(TranscriptKind.Approval, "Policy allowed");
+        log.Add(TranscriptKind.Approval, "Review allowed", review: true);
+
+        var text = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.DoesNotContain("Policy allowed", text, StringComparison.Ordinal);
+        Assert.Contains("Review allowed", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_OmitsReviewCardWhenReviewVerboseIsOff()
+    {
+        var log = new TranscriptLog { VerboseReview = false };
+        log.Add(TranscriptKind.Approval, "Policy allowed");
+        log.Add(TranscriptKind.Approval, "Review allowed", review: true);
+
+        var text = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.Contains("Policy allowed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Review allowed", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_RestoresReviewCardWhenReviewVerboseTurnsOn()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.Approval, "Review allowed", review: true);
+        log.BuildLines(60);
+        log.VerboseReview = false;
+        log.VerboseReview = true;
+
+        var text = string.Join('\n', log.BuildLines(60).Select(line => line.Plain));
+
+        Assert.Contains("Review allowed", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InlineText_HidesReviewTextOnlyWhenReviewVerboseIsOff()
+    {
+        var log = new TranscriptLog { VerboseApprovals = false, VerboseReview = true };
+
+        Assert.Null(log.InlineText(TranscriptKind.Approval, "Policy allowed"));
+        Assert.Equal(
+            "Review allowed",
+            log.InlineText(TranscriptKind.Approval, "Review allowed", review: true));
+
+        log.VerboseReview = false;
+        Assert.Null(log.InlineText(TranscriptKind.Approval, "Review allowed", review: true));
+    }
+
+    [Fact]
     public void BuildLines_OmitsThinkingWhileTextStaysAvailable()
     {
         var log = new TranscriptLog { VerboseThinking = false };

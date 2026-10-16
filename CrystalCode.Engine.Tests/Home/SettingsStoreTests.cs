@@ -1043,6 +1043,7 @@ public sealed class SettingsStoreTests
               "verboseTools": false,
               "verboseCommands": false,
               "verboseApprovals": false,
+              "verboseReview": false,
               "verboseThinking": false
             }
             """);
@@ -1052,14 +1053,39 @@ public sealed class SettingsStoreTests
         Assert.False(settings.VerboseTools);
         Assert.False(settings.VerboseCommands);
         Assert.False(settings.VerboseApprovals);
+        Assert.False(settings.VerboseReview);
         Assert.False(settings.VerboseThinking);
-        store.Save(settings.WithVerboseApprovals(true).WithVerboseThinking(true));
+        store.Save(settings.WithVerboseApprovals(true).WithVerboseReview(true).WithVerboseThinking(true));
         var saved = File.ReadAllText(root.Home.ConfigPath);
         Assert.DoesNotContain("verboseApprovals", saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("verboseReview", saved, StringComparison.Ordinal);
         Assert.DoesNotContain("verboseThinking", saved, StringComparison.Ordinal);
         var loaded = store.Load();
         Assert.True(loaded.VerboseApprovals);
+        Assert.True(loaded.VerboseReview);
         Assert.True(loaded.VerboseThinking);
+    }
+
+    [Fact]
+    public void Load_VerboseReviewStaysOnWhenApprovalsAreOff()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "verboseApprovals": false
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.VerboseApprovals);
+        Assert.True(settings.VerboseReview);
     }
 
     [Fact]

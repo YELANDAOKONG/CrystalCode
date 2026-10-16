@@ -30,7 +30,8 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         ArgumentNullException.ThrowIfNull(reason);
         _renderer.SetProgress(ProgressText.Running(call.Name));
         _renderer.WriteApprovalPass(
-            ApprovalCard.PassWidget(call, classification, reason, review));
+            ApprovalCard.PassWidget(call, classification, reason, review),
+            reason == ApprovalPassReason.Review);
     }
 
     public void NotifyReviewing(ToolCall call)
