@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Home;
 
@@ -19,14 +20,14 @@ internal sealed class PromptHistoryStore
         ArgumentNullException.ThrowIfNull(home);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspace);
         _home = home;
-        _workspace = Path.GetFullPath(workspace);
+        _workspace = Canonical(workspace);
     }
 
     public async Task<IReadOnlyList<string>> LoadAsync(CancellationToken cancellationToken)
     {
         var entries = await ReadAsync(cancellationToken);
         return entries
-            .Where(entry => string.Equals(entry.Workspace, _workspace, StringComparison.Ordinal))
+            .Where(entry => string.Equals(Canonical(entry.Workspace), _workspace, StringComparison.Ordinal))
             .Select(entry => entry.Text)
             .ToArray();
     }
@@ -41,7 +42,7 @@ internal sealed class PromptHistoryStore
 
         var entries = (await ReadAsync(cancellationToken)).ToList();
         if (entries.Count > 0
-            && string.Equals(entries[^1].Workspace, _workspace, StringComparison.Ordinal)
+            && string.Equals(Canonical(entries[^1].Workspace), _workspace, StringComparison.Ordinal)
             && string.Equals(entries[^1].Text, text, StringComparison.Ordinal))
         {
             return;
@@ -122,7 +123,7 @@ internal sealed class PromptHistoryStore
         var kept = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var index = entries.Count - 1; index >= 0; index--)
         {
-            var workspace = entries[index].Workspace;
+            var workspace = Canonical(entries[index].Workspace);
             kept.TryGetValue(workspace, out var count);
             count++;
             if (count > maximum)
@@ -132,6 +133,21 @@ internal sealed class PromptHistoryStore
             }
 
             kept[workspace] = count;
+        }
+    }
+
+    private static string Canonical(string path)
+    {
+        var full = Path.GetFullPath(path);
+        try
+        {
+            return Workspace.Canonicalize(full);
+        }
+        catch (Exception exception) when (exception is IOException
+            or ArgumentException
+            or NotSupportedException)
+        {
+            return full;
         }
     }
 }

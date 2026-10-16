@@ -23,11 +23,9 @@ public sealed class DirectoryAccessTextTests
         ]);
 
         Assert.StartsWith(
-            """
-            Session directory access (most-specific directory rule wins):
-            - read: /tmp/vendor
-            - write: /tmp/sibling
-            """,
+            "Session directory access (most-specific directory rule wins):\n"
+            + "- read: /tmp/vendor\n"
+            + "- write: /tmp/sibling\n",
             text,
             StringComparison.Ordinal);
         Assert.Contains("Relative paths remain workspace-relative.", text, StringComparison.Ordinal);

@@ -186,6 +186,14 @@ public sealed class WorkspaceAccessStore
         }
 
         var path = Trim(rule.Path);
+        var canonical = CanonicalKey(path);
+        if (canonical is null)
+        {
+            error = "Directory is not a valid path.";
+            return false;
+        }
+
+        path = canonical;
         if (!Directory.Exists(path))
         {
             error = "Directory not found.";
@@ -220,10 +228,16 @@ public sealed class WorkspaceAccessStore
             return false;
         }
 
-        var path = Trim(rule.Path);
+        var listed = Trim(rule.Path);
+        var path = CanonicalKey(listed);
+        if (path is null)
+        {
+            return false;
+        }
+
         if (!Directory.Exists(path))
         {
-            skip = "Default directory not found: " + path + ".";
+            skip = "Default directory not found: " + listed + ".";
             return false;
         }
 
@@ -249,6 +263,13 @@ public sealed class WorkspaceAccessStore
             }
 
             var path = Trim(rule.Path);
+            var canonical = CanonicalKey(path);
+            if (canonical is null)
+            {
+                continue;
+            }
+
+            path = canonical;
             if (modes.TryGetValue(path, out var existing) && existing != rule.Mode)
             {
                 return true;
@@ -431,7 +452,10 @@ public sealed class WorkspaceAccessStore
     private static string Trim(string path) => Path.TrimEndingDirectorySeparator(path);
 
     private static bool Same(string left, string right) =>
-        string.Equals(Trim(left), Trim(right), Comparison);
+        string.Equals(Trim(left), Trim(right), Comparison)
+        || CanonicalKey(left) is { } leftKey
+            && CanonicalKey(right) is { } rightKey
+            && string.Equals(leftKey, rightKey, Comparison);
 
     private static IEqualityComparer<string> PathComparer() => OperatingSystem.IsWindows()
         ? StringComparer.OrdinalIgnoreCase

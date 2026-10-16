@@ -38,7 +38,7 @@ public sealed class SessionAccessDefaultTests
         var rule = Assert.Single(headless.ReadSaved().Access);
         Assert.Equal(new Workspace(flagged.Path).Root, rule.Path);
         Assert.Equal("write", rule.Mode);
-        Assert.Contains(new Workspace(defaults.Path).Root, File.ReadAllText(headless.Home.AccessPath), StringComparison.Ordinal);
+        Assert.Contains(Json(new Workspace(defaults.Path).Root), File.ReadAllText(headless.Home.AccessPath), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public sealed class SessionAccessDefaultTests
             "/access default add " + extra.Path + " read",
             CancellationToken.None);
         Assert.Equal("read", Assert.Single(headless.ReadSaved().Access).Mode);
-        Assert.Contains(new Workspace(extra.Path).Root, File.ReadAllText(headless.Home.AccessPath), StringComparison.Ordinal);
+        Assert.Contains(Json(new Workspace(extra.Path).Root), File.ReadAllText(headless.Home.AccessPath), StringComparison.Ordinal);
 
         await headless.Session.SubmitAsync("/access add " + sessionOnly.Path + " write", CancellationToken.None);
         await headless.Session.SubmitAsync(
@@ -220,7 +220,7 @@ public sealed class SessionAccessDefaultTests
         Assert.Contains(
             headless.Observer.Events.OfType<ErrorWritten>(),
             error => error.Text.Contains(missing, StringComparison.Ordinal));
-        Assert.Contains(missing, File.ReadAllText(headless.Home.AccessPath), StringComparison.Ordinal);
+        Assert.Contains(Json(missing), File.ReadAllText(headless.Home.AccessPath), StringComparison.Ordinal);
     }
 
     private static void Remember(CrystalHome home, string workspace, string directory, string mode)
@@ -230,6 +230,8 @@ public sealed class SessionAccessDefaultTests
             store.TrySet(workspace, new DirectoryAccess(new Workspace(directory).Root, mode), out var error),
             error);
     }
+
+    private static string Json(string value) => System.Text.Json.JsonSerializer.Serialize(value);
 
     private static IReadOnlyList<ChatStreamEvent> TextRound(string text) =>
         [new ChatTextDelta(0, 0, ChatRole.Assistant, text), new ChatCandidateCompleted(0, FinishReason.Stop)];
