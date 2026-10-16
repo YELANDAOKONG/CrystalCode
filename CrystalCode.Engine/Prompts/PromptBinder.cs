@@ -108,6 +108,9 @@ public static partial class PromptBinder
             case PromptPlaceholder.InstructionsSection:
                 value = context.InstructionsSection;
                 return true;
+            case PromptPlaceholder.Directories:
+                value = context.Directories;
+                return true;
             case PromptPlaceholder.Workspace:
                 value = context.Workspace;
                 return true;

@@ -532,7 +532,7 @@ still refuses to pass a `forbidden` call whatever the verdict says.
 
 Live Work and Plan system text is assembled from overlayable templates using
 host-owned placeholders (`{{name}}`). Review and compaction prompts use the
-same placeholder syntax. Composite session slots are `{{env}}`, `{{skills}}`,
+same placeholder syntax. Composite session slots are `{{env}}`, `{{skills}}`, `{{directories}}`,
 and `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
 include `{{workspace}}`, `{{is_git_repo}}`, `{{git_root}}`, `{{platform}}`,
 `{{os}}`, `{{architecture}}`, `{{date}}`, `{{time}}`, `{{provider}}`,
@@ -549,7 +549,11 @@ is `plan` or `work` for Work and Plan, `review` for Review system text,
 `compaction` for compaction system text, and `image` for image-description
 system text. The `{{env}}` block includes the
 operating system, architecture, and local time, and adds git root, session,
-and approval lines when the host has them. Review user templates add `{{conversation}}`,
+and approval lines when the host has them. `{{directories}}` is empty when
+the session has no added directory rules. Otherwise it is the same session
+directory access text appended to workspace instructions. Built-in templates
+do not declare this slot. It refreshes when the live system message is
+replaced, including after `/access`. Review user templates add `{{conversation}}`,
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
@@ -723,7 +727,7 @@ retargeted entry revokes the original rule, not the new target's independent rul
 Path resolution failures report the path error, not command usage. Paths containing
 spaces can be double-quoted. Mutations are refused during a turn
 or compaction. Changes immediately save `SessionDocument.access`, refresh the
-live model instructions, and affect the already-bound executor through the shared
+live model instructions and the `{{directories}}` placeholder, and affect the already-bound executor through the shared
 policy. No global access file or workspace configuration is read. Repeatable
 `--allow-read` and `--allow-write` flags seed or override the launched session;
 conflicting modes for the same canonical root are rejected. Flags are recorded

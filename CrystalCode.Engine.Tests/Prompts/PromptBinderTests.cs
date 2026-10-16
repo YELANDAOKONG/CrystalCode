@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Engine.Tools;
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Placeholders;
@@ -39,6 +40,7 @@ public sealed class PromptBinderTests
         Assert.Contains("Skills provide", text, StringComparison.Ordinal);
         Assert.Contains("## Workspace instructions", text, StringComparison.Ordinal);
         Assert.Contains("prefer tests", text, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, PromptBinder.Apply("{{directories}}", context));
     }
 
     [Fact]
@@ -152,6 +154,25 @@ public sealed class PromptBinderTests
         var text = PromptBinder.Apply("{{ WORKSPACE }}", context);
 
         Assert.Equal(Path.GetFullPath("/tmp/demo"), text);
+    }
+
+    [Fact]
+    public void Apply_SubstitutesDirectoryAccessAndLeavesItUnexpanded()
+    {
+        var listed = DirectoryAccessText.Render(
+            [new DirectoryAccess("/tmp/other", "read")]);
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty,
+            directories: listed + " {{workspace}}");
+
+        var text = PromptBinder.Apply("{{ DIRECTORIES }}", context);
+
+        Assert.Equal(listed + " {{workspace}}", text);
     }
 
     [Fact]

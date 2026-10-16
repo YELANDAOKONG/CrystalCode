@@ -2402,7 +2402,8 @@ public sealed class CodingSession : ITurnObserver
                 skills: string.Empty,
                 instructions: string.Empty,
                 sessionId: _sessionId ?? string.Empty,
-                approval: _approval.Value),
+                approval: _approval.Value,
+                directories: DirectoryAccessText.Render(_workspace.Access.Snapshot())),
             _placeholders,
             _prompts.ImageSystem);
 
@@ -2691,33 +2692,19 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
-    private PromptContext CurrentPromptContext() =>
-        PromptContext.Create(
+    private PromptContext CurrentPromptContext()
+    {
+        var directories = DirectoryAccessText.Render(_workspace.Access.Snapshot());
+        return PromptContext.Create(
             _workspace.Root,
             _settings.Provider.Value,
             _settings.Model,
             _planMode ? "plan" : "work",
             _skills is null ? string.Empty : SkillGuidance.Render(_skills),
-            _prompts.Instructions + DirectoryAccessGuidance(),
+            _prompts.Instructions + (directories.Length == 0 ? string.Empty : "\n\n" + directories),
             sessionId: _sessionId,
-            approval: _approval.Value);
-
-    private string DirectoryAccessGuidance()
-    {
-        var rules = _workspace.Access.Snapshot();
-        if (rules.Count == 0)
-        {
-            return string.Empty;
-        }
-
-        return "\n\nSession directory access (most-specific directory rule wins):\n"
-            + string.Join("\n", rules.Select(rule => $"- {rule.Mode}: {rule.Path}"))
-            + "\nRead permits built-in file reads and searches; write includes read and follows the approval mode."
-            + " Explicit read-only directories cannot be edited or written, even after approval."
-            + " Unlisted outside paths still require approval. Relative paths remain workspace-relative."
-            + " Search only the requested root, not all accessible directories."
-            + " These rules do not sandbox shell or extension processes; do not use them to bypass directory access."
-            + " Only the operator can change access with /access.";
+            approval: _approval.Value,
+            directories: directories);
     }
 
     private string CurrentSystemText() =>

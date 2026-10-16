@@ -186,6 +186,70 @@ public sealed class SessionAccessTests
     }
 
     [Fact]
+    public async Task Access_DirectoriesPlaceholderListsRulesOnceInACustomPrompt()
+    {
+        using var outside = new TemporaryWorkspace();
+        var root = new Workspace(outside.Path).Root;
+        var client = new ScriptedStreamingClient(TextRound("done"));
+        using var headless = new HeadlessSession(
+            client,
+            prepare: (home, workspace) =>
+            {
+                _ = workspace;
+                Directory.CreateDirectory(home.PromptsDirectory);
+                File.WriteAllText(
+                    Path.Combine(home.PromptsDirectory, "work.md"),
+                    "rules\n{{directories}}\nend");
+            });
+        await headless.Session.SubmitAsync("/access add " + outside.Path + " read", CancellationToken.None);
+
+        await headless.RunTurnAsync("hi");
+
+        var system = Assert.Single(
+            client.LastRequest!.Items.OfType<ChatMessage>(),
+            message => message.Role == ChatRole.System).Text;
+        Assert.Contains("rules\n", system, StringComparison.Ordinal);
+        Assert.Equal(1, CountOf(system, "- read: " + root));
+        Assert.DoesNotContain("{{directories}}", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("## Workspace instructions", system, StringComparison.Ordinal);
+        Assert.EndsWith("\nend", system, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Access_DirectoriesPlaceholderIsEmptyWithoutAddedRules()
+    {
+        var client = new ScriptedStreamingClient(TextRound("done"));
+        using var headless = new HeadlessSession(
+            client,
+            prepare: (home, workspace) =>
+            {
+                _ = workspace;
+                Directory.CreateDirectory(home.PromptsDirectory);
+                File.WriteAllText(Path.Combine(home.PromptsDirectory, "work.md"), "mark {{directories}} end");
+            });
+
+        await headless.RunTurnAsync("hi");
+
+        var system = Assert.Single(
+            client.LastRequest!.Items.OfType<ChatMessage>(),
+            message => message.Role == ChatRole.System).Text;
+        Assert.Equal("mark  end", system);
+    }
+
+    private static int CountOf(string text, string value)
+    {
+        var count = 0;
+        var start = 0;
+        while ((start = text.IndexOf(value, start, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            start += value.Length;
+        }
+
+        return count;
+    }
+
+    [Fact]
     public async Task Access_ResumeInvalidRulesReportsErrorAndKeepsCurrentSession()
     {
         using var headless = new HeadlessSession(new ScriptedStreamingClient());

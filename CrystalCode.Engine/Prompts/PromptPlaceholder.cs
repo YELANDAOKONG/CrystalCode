@@ -14,6 +14,8 @@ public static class PromptPlaceholder
 
     public const string InstructionsSection = "instructions_section";
 
+    public const string Directories = "directories";
+
     public const string Workspace = "workspace";
 
     public const string IsGitRepo = "is_git_repo";
@@ -72,6 +74,7 @@ public static class PromptPlaceholder
         Skills,
         Instructions,
         InstructionsSection,
+        Directories,
         Workspace,
         IsGitRepo,
         GitRoot,

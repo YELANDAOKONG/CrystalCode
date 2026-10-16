@@ -104,7 +104,10 @@ separate library with no terminal code. The product can:
   errors. Invalid saved access blocks resume with a visible error; in-session
   resume keeps the current session intact. Rule changes are refused
   during turns or compaction. Shell and extension processes are not sandboxed
-  by these rules, and no additional catalogs or instructions are discovered;
+  by these rules, and no additional catalogs or instructions are discovered.
+  The same list is the host placeholder `{{directories}}`. It is empty when
+  the session has no added rules. Built-in prompts do not include that slot
+  and still append the list to workspace instructions when rules exist;
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - recall submitted prompts from the composer with Up/Down and retain up to 200
   recent text-only entries across runs for the same workspace;

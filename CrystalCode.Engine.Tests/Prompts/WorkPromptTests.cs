@@ -13,6 +13,7 @@ public sealed class WorkPromptTests
         Assert.Contains("{{env}}", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("{{skills}}", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("{{instructions_section}}", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("{{directories}}", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todowrite", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todoread", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("Use search to find candidate files", WorkPrompt.Text, StringComparison.Ordinal);

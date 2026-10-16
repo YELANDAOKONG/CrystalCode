@@ -23,7 +23,8 @@ public sealed record PromptContext
         string sessionId,
         string approval,
         string skills,
-        string instructions)
+        string instructions,
+        string directories)
     {
         Workspace = workspace;
         IsGitRepo = isGitRepo;
@@ -41,6 +42,7 @@ public sealed record PromptContext
         Approval = approval;
         Skills = skills;
         Instructions = instructions;
+        Directories = directories;
     }
 
     public string Workspace { get; }
@@ -75,6 +77,8 @@ public sealed record PromptContext
 
     public string Instructions { get; }
 
+    public string Directories { get; }
+
     public string ModelLine => Provider + " / " + Model;
 
     public string EnvironmentBlock =>
@@ -96,7 +100,8 @@ public sealed record PromptContext
         string instructions,
         DateTimeOffset? now = null,
         string sessionId = "",
-        string approval = "")
+        string approval = "",
+        string directories = "")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -106,6 +111,7 @@ public sealed record PromptContext
         ArgumentNullException.ThrowIfNull(instructions);
         ArgumentNullException.ThrowIfNull(sessionId);
         ArgumentNullException.ThrowIfNull(approval);
+        ArgumentNullException.ThrowIfNull(directories);
 
         var snapshot = PromptEnvironment.CreateSnapshot(
             workspaceRoot,
@@ -130,7 +136,8 @@ public sealed record PromptContext
             snapshot.SessionId,
             snapshot.Approval,
             skills.Trim(),
-            instructions.Trim());
+            instructions.Trim(),
+            directories.Trim());
     }
 
     public static PromptContext InstructionsOnly(string instructions)
@@ -152,7 +159,8 @@ public sealed record PromptContext
             string.Empty,
             string.Empty,
             string.Empty,
-            instructions.Trim());
+            instructions.Trim(),
+            string.Empty);
     }
 
     public PromptContext WithMode(string mode)
@@ -174,6 +182,7 @@ public sealed record PromptContext
             SessionId,
             Approval,
             Skills,
-            Instructions);
+            Instructions,
+            Directories);
     }
 }

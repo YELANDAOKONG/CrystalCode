@@ -13,6 +13,7 @@ public sealed class PlanPromptTests
         Assert.Contains("{{env}}", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("{{skills}}", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("{{instructions_section}}", PlanPrompt.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("{{directories}}", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todowrite", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("todoread", PlanPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("Use search to find the relevant files", PlanPrompt.Text, StringComparison.Ordinal);
