@@ -152,6 +152,10 @@ internal sealed class BackgroundBashTask
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         Stop();
+        // WaitAsync ignores a token that is already cancelled once the task
+        // has completed. A kill can finish before that check, so honor
+        // cancellation after the kill has been requested.
+        cancellationToken.ThrowIfCancellationRequested();
         await _runTask.WaitAsync(cancellationToken);
     }
 
