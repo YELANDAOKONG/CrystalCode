@@ -883,11 +883,13 @@ follow-up is queued interrupts the turn, or compaction if that is
 still running, so the queue is sent now. Interrupt does not drop
 queued text.
 
-`/quit`, `/clear`, `/resume`, and `/fork` stop a busy turn before they run.
-During compaction, commands that change the session, workspace, or model
-are refused with the same kind of message as `/cd` while a turn is running.
-`/status`, `/help`, `/todos`, and other commands that only report state or
-adjust the display run immediately. `/quit` still exits.
+`/quit`, `/clear`, `/resume`, and `/fork` stop a busy turn before they run,
+including when the composer submits them while other session work is still
+on the stack. During compaction, `/clear`, `/resume`, and `/fork` are refused
+instead, with the same kind of message as `/cd` while a turn is running.
+Other commands that change the session, workspace, or model are refused for
+that same reason. `/status`, `/help`, `/todos`, and other commands that only
+report state or adjust the display run immediately. `/quit` still exits.
 
 ### One turn
 

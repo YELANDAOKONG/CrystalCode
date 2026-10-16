@@ -274,6 +274,50 @@ public sealed class CodingSessionHeadlessTests
     }
 
     [Fact]
+    public async Task Enqueue_ClearDuringTurnStopsAndStartsANewSession()
+    {
+        var client = new BlockingStreamingClient();
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("long task", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        var sessionId = headless.Session.SessionId;
+
+        headless.Session.Enqueue("/clear");
+        await headless.Session.CompleteTurnAsync(CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.NotEqual(sessionId, headless.Session.SessionId);
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text == "New conversation");
+        Assert.False(headless.Session.TurnActive);
+        Assert.DoesNotContain(
+            headless.Observer.Events.OfType<ErrorWritten>(),
+            error => error.Text.Contains("/clear", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Enqueue_ModelDuringTurnIsRefusedWithoutStopping()
+    {
+        var client = new BlockingStreamingClient();
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("long task", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+
+        headless.Session.Enqueue("/model");
+
+        Assert.True(headless.Session.TurnActive);
+        Assert.False(headless.Session.TurnTask!.IsCompleted);
+        Assert.Contains(
+            headless.Observer.Events.OfType<ErrorWritten>(),
+            error => error.Text == "Finish the current turn before using /model.");
+        Assert.True(headless.Session.TryInterrupt());
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Turn_ProviderFailurePublishesTheErrorAndFinishes()
     {
         using var headless = new HeadlessSession(new ThrowingStreamingClient());

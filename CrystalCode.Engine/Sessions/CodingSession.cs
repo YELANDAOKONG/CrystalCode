@@ -60,6 +60,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly MessageQueue _queue = new();
     private Task _promptHistoryTail = Task.CompletedTask;
     private bool _quitRequested;
+    private string? _deferredStop;
     private readonly GrantStore _grants;
     private readonly WorkspaceTrustStore _trust;
     private readonly CrystalHome _home;
@@ -296,7 +297,13 @@ public sealed class CodingSession : ITurnObserver
         ArgumentNullException.ThrowIfNull(text);
         try
         {
-            return await SubmitCoreAsync(text, cancellationToken);
+            if (await SubmitCoreAsync(text, cancellationToken))
+            {
+                _deferredStop = null;
+                return true;
+            }
+
+            return await DrainDeferredStopAsync(cancellationToken);
         }
         finally
         {
@@ -407,10 +414,23 @@ public sealed class CodingSession : ITurnObserver
             await FinishTurnAsync(cancellationToken);
             if (ConsumeQuit())
             {
+                _deferredStop = null;
                 return true;
             }
 
-            return await StartTurnIfQueuedAsync(cancellationToken);
+            if (await DrainDeferredStopAsync(cancellationToken))
+            {
+                return true;
+            }
+
+            await StartTurnIfQueuedAsync(cancellationToken);
+            if (ConsumeQuit())
+            {
+                _deferredStop = null;
+                return true;
+            }
+
+            return await DrainDeferredStopAsync(cancellationToken);
         }
         finally
         {
@@ -4964,8 +4984,9 @@ public sealed class CodingSession : ITurnObserver
     /// Adds a follow-up that is sent when the current tool batch or turn ends.
     /// The pump cannot re-enter <see cref="SubmitAsync"/>, so a slash command
     /// is handled here. Commands that only report state run immediately.
-    /// Commands that would change the session are refused, including while
-    /// compaction runs. <c>/quit</c> still cancels that work and leaves.
+    /// <c>/clear</c>, <c>/resume</c>, and <c>/fork</c> cancel the busy turn and
+    /// run when that work unwinds, unless compaction is in progress, in which
+    /// case they are refused. <c>/quit</c> still cancels that work and leaves.
     /// Blank text does not enqueue; when a follow-up is already waiting it
     /// interrupts so that text is delivered now.
     /// </summary>
@@ -4990,14 +5011,22 @@ public sealed class CodingSession : ITurnObserver
         {
             if (command.Verb == SessionVerb.Quit)
             {
+                _deferredStop = null;
                 _quitRequested = true;
                 TryInterrupt();
                 return;
             }
 
-            if (RunsDuringCompaction(command.Verb))
+            if (RunsWhileBusy(command.Verb))
             {
-                RunHarmlessCommand(command);
+                RunWhileBusy(command);
+                return;
+            }
+
+            if (!_compacting && StopsBusyTurn(command.Verb))
+            {
+                _deferredStop = trimmed;
+                TryInterrupt();
                 return;
             }
 
@@ -5035,7 +5064,7 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        if (command.Verb == SessionVerb.Quit || RunsDuringCompaction(command.Verb))
+        if (command.Verb == SessionVerb.Quit || RunsWhileBusy(command.Verb))
         {
             return false;
         }
@@ -5061,7 +5090,7 @@ public sealed class CodingSession : ITurnObserver
         return space < 0 ? trimmed : trimmed[..space];
     }
 
-    private static bool RunsDuringCompaction(SessionVerb verb) =>
+    private static bool RunsWhileBusy(SessionVerb verb) =>
         verb is SessionVerb.Help
             or SessionVerb.Status
             or SessionVerb.Stats
@@ -5073,7 +5102,7 @@ public sealed class CodingSession : ITurnObserver
             or SessionVerb.Btw
             or SessionVerb.Attach;
 
-    private void RunHarmlessCommand(SessionCommand command)
+    private void RunWhileBusy(SessionCommand command)
     {
         switch (command.Verb)
         {
@@ -5116,8 +5145,35 @@ public sealed class CodingSession : ITurnObserver
                 AttachImage(command.Argument);
                 break;
             default:
-                break;
+                throw new InvalidOperationException(
+                    "Busy command " + command.Verb + " has no handler.");
         }
+    }
+
+    private async Task<bool> DrainDeferredStopAsync(CancellationToken cancellationToken)
+    {
+        var exit = false;
+        while (_deferredStop is not null)
+        {
+            var pending = _deferredStop;
+            _deferredStop = null;
+            if (_turnActive)
+            {
+                _turnSource?.Cancel();
+                await FinishTurnAsync(cancellationToken);
+            }
+
+            if (_compacting)
+            {
+                RefuseCommand(pending);
+                continue;
+            }
+
+            var handled = await TryHandleCommandAsync(pending, cancellationToken);
+            exit |= handled.Exit;
+        }
+
+        return exit;
     }
 
     private async Task<bool> StartTurnIfQueuedAsync(CancellationToken cancellationToken)
@@ -6027,12 +6083,12 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private static bool StopsBusyTurn(string input)
-    {
-        return SessionCommand.TryParse(input, out var command)
-            && command.Verb is SessionVerb.Quit
-                or SessionVerb.Clear
-                or SessionVerb.Resume
-                or SessionVerb.Fork;
-    }
+    private static bool StopsBusyTurn(string input) =>
+        SessionCommand.TryParse(input, out var command) && StopsBusyTurn(command.Verb);
+
+    private static bool StopsBusyTurn(SessionVerb verb) =>
+        verb is SessionVerb.Quit
+            or SessionVerb.Clear
+            or SessionVerb.Resume
+            or SessionVerb.Fork;
 }
