@@ -228,6 +228,30 @@ public sealed record HarnessSettings
         return Copy(contextSelections: selections);
     }
 
+    /// <summary>
+    /// Selects one declared budget of the current model for this process.
+    /// The caller keeps this copy off the persisted baseline. A model with
+    /// one budget is refused, because there is no other tier to select.
+    /// </summary>
+    public HarnessSettings WithContextBudget(string budget)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(budget);
+        var windows = ActiveModel.ContextWindows;
+        if (windows.Count < 2)
+        {
+            throw new ArgumentException("The selected model has one context budget.");
+        }
+
+        if (!ContextWindowSelection.TryParse(budget, out var selected) || !windows.Contains(selected))
+        {
+            throw new ArgumentException(
+                "Context window is not available for this model. Available: "
+                + string.Join(", ", windows.Select(ContextWindowSelection.Format)));
+        }
+
+        return WithContextWindow(Provider, Model, selected);
+    }
+
     public bool Skills { get; }
 
     public bool ExternalTools { get; }

@@ -60,6 +60,9 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--thinking <EFFORT>")]
     public string? Thinking { get; init; }
 
+    [CommandOption("--context <BUDGET>")]
+    public string? Context { get; init; }
+
     [CommandOption("--prompt-set <NAME>")]
     public string? PromptSet { get; init; }
 

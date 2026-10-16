@@ -169,6 +169,7 @@ CLI options:
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Does not change `compactionModel.thinkingEffort` on disk |
 | `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
 | `--thinking <effort>` | Same values as `/thinking` |
+| `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context` (`272k`, `1m`, or an exact token count). A model with one budget, or a budget it does not declare, is rejected. Does not write `contextSelections` |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. `/promptset` switching is refused and does not write the file. Listing and export stay available |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing and refuses enable, disable, up, and down. Listing stays available |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set for this process, even when its file says `enabled` false. Does not write the file. Rejected together with `--prompt-attachments off` |
@@ -310,6 +311,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Same values as `/compact thinking`. An unsupported gear falls back to the provider default and a note is printed. Does not write the file |
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
+| `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context`. A model with one budget, or a budget it does not declare, exits 1. Does not write `contextSelections` |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set, even when `enabled` is false. A missing name exits 1. Cannot be combined with `--prompt-attachments off`. Does not write the file |
@@ -1049,6 +1051,11 @@ choices. Each model remembers its choice in `config.json.contextSelections`,
 a nested `{"provider": {"model": tokens}}` map. A model without a saved valid
 choice starts at its lowest budget. Switching models restores that model's
 choice. Finish any turn or compaction before switching budgets.
+
+`--context` selects one declared budget for the model chosen at launch, and
+only when that model has more than one. It applies to this process and is
+not written to `contextSelections`. Switching models uses the other model's
+saved budget. A later `/context` still writes the operator's choice.
 
 The selected budget drives compaction, `/status`, and CTX percentages.
 Lowering it retains the full archive and checks whether compaction is needed

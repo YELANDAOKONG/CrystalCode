@@ -1391,6 +1391,13 @@ budget is `contextWindow`. The initial budget is the lowest declared value.
 `/context` cycles the current model's budgets; `/context 272k`, `/context 1m`,
 and exact integer token counts select one explicitly. Invalid or unavailable
 values are refused. Switching is refused during a turn or compaction.
+`crystal`, `crystal space`, and `crystal run` accept `--context` for the
+model selected at launch when that model declares more than one budget.
+The text is the same as `/context`, and it must name a declared budget.
+A model with one budget is rejected. The value changes only the live
+selection for that model and is not written to `contextSelections`.
+Switching models restores the other model's saved budget. A later
+`/context` still writes.
 `config.json.contextSelections` remembers choices without rewriting provider
 definitions. The stored form is a nested object,
 `{"provider": {"model": tokens}}`; the older flat `{"provider/model": tokens}`
@@ -1551,8 +1558,9 @@ assembly. It reads one task from an argument or from stdin, applies
 process-only overrides, starts one user turn, and exits. The interactive
 `crystal` and `crystal space` commands apply the same session overrides:
 approval, the approval model and its thinking gear, Plan or Work, thinking,
-prompt set, prompt attachments, skills, external tools, plugins, and turn
-quotas. Overrides are not written to `config.json`. That includes the
+the selected model's context budget, prompt set, prompt attachments, skills,
+external tools, plugins, and turn quotas. Overrides are not written to
+`config.json`. That includes the
 approval-model switch
 (`--approval-model`, `--approval-provider`, `--approval-model-id`) and gear
 (`--approval-thinking`).

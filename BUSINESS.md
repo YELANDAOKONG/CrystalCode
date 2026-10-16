@@ -83,7 +83,7 @@ separate library with no terminal code. The product can:
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model and its thinking gear, Plan or Work,
-  thinking, prompt set, prompt attachments,
+  thinking, the selected model's context budget, prompt set, prompt attachments,
   named prompt attachments, skills, external tools, rule files, and turn quotas for that process only.
   They are not written to `config.json` or `prompt.json`. Stdout is a readable plain-text trace, or one JSON object
   per line when `--format json` is set. Review and Audit still use the

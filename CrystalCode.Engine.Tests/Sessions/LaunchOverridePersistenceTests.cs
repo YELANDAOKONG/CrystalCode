@@ -131,6 +131,48 @@ public sealed class LaunchOverridePersistenceTests
         Assert.Equal("low", toggled.ApprovalModel.ThinkingEffort);
     }
 
+    [Fact]
+    public async Task PreferenceSave_KeepsLaunchContextBudgetOffDisk()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>
+            {
+                ["model"] = new(1_000_000, contextWindows: [272_000, 1_000_000]),
+                ["other"] = new(128_000)
+            });
+        var baseline = new HarnessSettings(
+            provider.Name,
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([provider]));
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: baseline.WithContextBudget("1m"),
+            persistedSettings: baseline);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/tokens on", CancellationToken.None);
+
+        var saved = Read(headless);
+        Assert.Null(saved.ContextSelections);
+        Assert.True(saved.EstimatedTokens);
+
+        await headless.Session.SubmitAsync("/context 272k", CancellationToken.None);
+
+        using var written = JsonDocument.Parse(File.ReadAllText(headless.Home.ConfigPath));
+        Assert.Equal(
+            272_000,
+            written.RootElement
+                .GetProperty("contextSelections")
+                .GetProperty("scripted")
+                .GetProperty("model")
+                .GetInt32());
+    }
+
     private static SettingsDocument Read(HeadlessSession headless)
     {
         var json = File.ReadAllText(headless.Home.ConfigPath);

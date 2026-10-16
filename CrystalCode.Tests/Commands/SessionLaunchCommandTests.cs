@@ -18,6 +18,7 @@ public sealed class SessionLaunchCommandTests
         Assert.Contains("--prompt-set", interactive, StringComparison.Ordinal);
         Assert.Contains("--approval", interactive, StringComparison.Ordinal);
         Assert.Contains("--thinking", interactive, StringComparison.Ordinal);
+        Assert.Contains("--context", interactive, StringComparison.Ordinal);
         Assert.Contains("--bash-timeout", interactive, StringComparison.Ordinal);
         Assert.Contains("--allow-read", interactive, StringComparison.Ordinal);
         Assert.Contains("--allow-write", interactive, StringComparison.Ordinal);
@@ -33,6 +34,7 @@ public sealed class SessionLaunchCommandTests
 
         var run = Help(["run", "--help"]);
         Assert.Contains("--prompt-set", run, StringComparison.Ordinal);
+        Assert.Contains("--context", run, StringComparison.Ordinal);
         Assert.Contains("--format", run, StringComparison.Ordinal);
         Assert.Contains("--show-thinking", run, StringComparison.Ordinal);
         Assert.Contains("--workspace-trust", run, StringComparison.Ordinal);

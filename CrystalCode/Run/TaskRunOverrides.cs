@@ -76,6 +76,11 @@ internal static class TaskRunOverrides
                     ThinkingSelection.Parse(Required(request.Thinking, "Thinking effort")));
             }
 
+            if (request.Context is not null)
+            {
+                next = next.WithContextBudget(Required(request.Context, "Context budget"));
+            }
+
             if (request.Skills is not null)
             {
                 next = next.WithSkills(ParseSwitch(request.Skills, "--skills"));

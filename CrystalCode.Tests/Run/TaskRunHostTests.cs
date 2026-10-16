@@ -897,6 +897,48 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public void Overrides_SelectsADeclaredContextBudgetInMemory()
+    {
+        var current = TieredContextSettings();
+        var applied = AssertApplied(current, new TaskRunSettings { Context = "1m" });
+        Assert.Equal(1_000_000, applied.ContextWindow);
+        Assert.Equal(272_000, current.ContextWindow);
+        Assert.Empty(current.ContextSelections);
+
+        var exact = AssertApplied(current, new TaskRunSettings { Context = "272000" });
+        Assert.Equal(272_000, exact.ContextWindow);
+
+        var other = applied.WithSelection(applied.Provider, "small");
+        Assert.Equal(128_000, other.ContextWindow);
+        Assert.Equal(1_000_000, other.WithSelection(applied.Provider, "large").ContextWindow);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current.WithSelection(current.Provider, "small"),
+            new TaskRunSettings { Context = "128000" },
+            out _,
+            out _,
+            out var single));
+        Assert.Equal("The selected model has one context budget.", single);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { Context = "128k" },
+            out _,
+            out _,
+            out var unavailable));
+        Assert.Contains("not available", unavailable, StringComparison.Ordinal);
+        Assert.Contains("272K", unavailable, StringComparison.Ordinal);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { Context = " " },
+            out _,
+            out _,
+            out var blank));
+        Assert.Contains("Context budget is required.", blank, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UnavailableThinking_PrintsANoteAndContinues()
     {
         using var fixture = new RunFixture();
@@ -1050,6 +1092,26 @@ public sealed class TaskRunHostTests
         Assert.False(planMode);
         Assert.Equal(string.Empty, error);
         return applied;
+    }
+
+    private static HarnessSettings TieredContextSettings()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("local"),
+            ProviderProtocol.Ollama,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
+            {
+                ["large"] = new(1_000_000, contextWindows: [272_000, 1_000_000]),
+                ["small"] = new(128_000)
+            },
+            requiresApiKey: false);
+        return new HarnessSettings(
+            provider.Name,
+            "large",
+            ApprovalMode.Default,
+            HarnessSettings.DefaultCompactionThreshold,
+            ProviderCatalog.CreateStarter().Overlay([provider]));
     }
 
     private static TaskRunSettings WorkspaceSettings(
