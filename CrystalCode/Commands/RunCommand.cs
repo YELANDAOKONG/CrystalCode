@@ -216,17 +216,27 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         }
 
         var plugins = PluginRegistry.CreateBuiltIn();
-        var host = TerminalHost.Create(
-            harnessSettings,
-            settingsStore,
-            credentials,
-            home,
-            workspace,
-            plugins,
-            resumed,
-            persisted,
-            launchPlan,
-            launchAccess);
+        TerminalHost host;
+        try
+        {
+            host = TerminalHost.Create(
+                harnessSettings,
+                settingsStore,
+                credentials,
+                home,
+                workspace,
+                plugins,
+                resumed,
+                persisted,
+                launchPlan,
+                launchAccess);
+        }
+        catch (ArgumentException exception)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(exception.Message)}[/]");
+            return 1;
+        }
+
         return await host.RunAsync(cancellationToken);
     }
 

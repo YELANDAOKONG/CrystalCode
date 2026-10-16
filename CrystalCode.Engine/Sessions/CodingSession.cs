@@ -186,17 +186,23 @@ public sealed class CodingSession : ITurnObserver
         var initialAccess = new List<DirectoryAccess>();
         foreach (var rule in launchAccess ?? [])
         {
-            if (rule is null || !TryResolveDirectoryAccess(rule.Path, rule.Mode, out var fullPath, out _))
+            if (rule is null || !TryResolveDirectoryAccess(rule.Path, rule.Mode, out var resolved, out _))
             {
                 throw new ArgumentException("Launch directory access is invalid.", nameof(launchAccess));
             }
 
-            initialAccess.Add(new DirectoryAccess(fullPath, rule.Mode));
+            resolved = resolved with { SourcePath = rule.SourcePath ?? resolved.SourcePath };
+            if (!DirectoryAccessPolicy.TryValidateSaved([resolved], out _))
+            {
+                throw new ArgumentException("Launch directory access is invalid.", nameof(launchAccess));
+            }
+
+            initialAccess.Add(resolved);
         }
 
         foreach (var rule in initialAccess)
         {
-            _workspace.Access.Set(rule.Path, rule.Mode);
+            _workspace.Access.Set(rule.Path, rule.Mode, rule.SourcePath);
         }
 
         if (initialAccess.Count > 0)
@@ -218,6 +224,11 @@ public sealed class CodingSession : ITurnObserver
         HarnessSettings? persistedSettings = null,
         IReadOnlyList<DirectoryAccess>? launchAccess = null)
     {
+        if (resume is not null && !DirectoryAccessPolicy.TryValidateSaved(resume.Access, out var error))
+        {
+            throw new ArgumentException(error, nameof(resume));
+        }
+
         return new CodingSession(
             settings,
             settingsStore,
@@ -654,20 +665,20 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        if (!TryResolveDirectoryAccess(path, mode, out var fullPath, out error))
+        if (!TryResolveDirectoryAccess(path, mode, out var rule, out error))
         {
             return false;
         }
 
-        _workspace.Access.Set(fullPath, mode);
+        _workspace.Access.Set(rule.Path, rule.Mode, rule.SourcePath);
         ReplaceLiveSystem();
         SaveSession();
         return true;
     }
 
-    private bool TryResolveDirectoryAccess(string path, string mode, out string fullPath, out string error)
+    private bool TryResolveDirectoryAccess(string path, string mode, out DirectoryAccess rule, out string error)
     {
-        fullPath = string.Empty;
+        rule = null!;
         error = string.Empty;
         if (mode is not ("read" or "write"))
         {
@@ -675,7 +686,8 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        if (!_workspace.TryResolve(path, out fullPath, out error))
+        if (!_workspace.TryResolve(path, out var fullPath, out error)
+            || !_workspace.TryGetEntryPath(path, out var sourcePath, out error))
         {
             return false;
         }
@@ -686,7 +698,8 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        fullPath = Path.TrimEndingDirectorySeparator(fullPath);
+        rule = new DirectoryAccess(Path.TrimEndingDirectorySeparator(fullPath), mode,
+            Path.TrimEndingDirectorySeparator(sourcePath));
         return true;
     }
 
@@ -733,10 +746,28 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (text.StartsWith("remove ", StringComparison.Ordinal)
-            && _workspace.TryGetFullPath(UnquoteAccessPath(text[7..]), out var fullPath, out _))
+        if (text.StartsWith("remove ", StringComparison.Ordinal))
         {
-            if (!_workspace.Access.Remove(Path.TrimEndingDirectorySeparator(fullPath)))
+            var path = UnquoteAccessPath(text[7..]);
+            if (!_workspace.TryGetEntryPath(path, out var entryPath, out var error))
+            {
+                Error(error);
+                return;
+            }
+
+            var removed = _workspace.Access.RemoveByEntryPath(Path.TrimEndingDirectorySeparator(entryPath));
+            if (!removed)
+            {
+                if (!_workspace.TryGetFullPath(path, out var fullPath, out error))
+                {
+                    Error(error);
+                    return;
+                }
+
+                removed = _workspace.Access.Remove(Path.TrimEndingDirectorySeparator(fullPath));
+            }
+
+            if (!removed)
             {
                 Error("No session access rule for that directory.");
                 return;
@@ -744,7 +775,7 @@ public sealed class CodingSession : ITurnObserver
 
             ReplaceLiveSystem();
             SaveSession();
-            Note("Access removed  " + fullPath);
+            Note("Access removed  " + entryPath);
             return;
         }
 
@@ -3103,24 +3134,17 @@ public sealed class CodingSession : ITurnObserver
     {
         ArgumentNullException.ThrowIfNull(document);
         var access = (document.Access ?? []).ToArray();
-        foreach (var rule in access)
+        if (!DirectoryAccessPolicy.TryValidateSaved(access, out var accessError))
         {
-            if (rule is null || string.IsNullOrWhiteSpace(rule.Path)
-                || !Path.IsPathFullyQualified(rule.Path)
-                || rule.Mode is not ("read" or "write")
-                || Workspace.IsCredentialPath(rule.Path))
-            {
-                throw new ArgumentException("Saved session directory access is invalid.", nameof(document));
-            }
-
-            _ = Path.GetFullPath(rule.Path);
+            throw new ArgumentException(accessError, nameof(document));
         }
 
         _workspace.Access.Clear();
         foreach (var rule in access)
         {
             // Keep the authorized canonical root, not a newly retargeted symlink.
-            _workspace.Access.Set(Path.TrimEndingDirectorySeparator(Path.GetFullPath(rule.Path)), rule.Mode);
+            _workspace.Access.Set(Path.TrimEndingDirectorySeparator(Path.GetFullPath(rule.Path)), rule.Mode,
+                rule.SourcePath is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(rule.SourcePath)));
         }
 
         Publish(new ImageHistoryInvalidated());

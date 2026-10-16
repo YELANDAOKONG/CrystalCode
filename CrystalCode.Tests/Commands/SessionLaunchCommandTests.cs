@@ -3,6 +3,7 @@ using Spectre.Console.Cli;
 
 using CrystalCode.Commands;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Tools;
 
 using Xunit;
 
@@ -94,6 +95,41 @@ public sealed class SessionLaunchCommandTests
         finally
         {
             Directory.Delete(home, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ResumeInvalidAccess_ExitsWithoutChangingSessionOrSettings()
+    {
+        var home = Directory.CreateTempSubdirectory("crystal-launch-home-").FullName;
+        var workspace = Directory.CreateTempSubdirectory("crystal-launch-workspace-").FullName;
+        try
+        {
+            var crystalHome = new CrystalHome(home);
+            new SettingsStore(crystalHome).LoadOrCreate();
+            var before = File.ReadAllBytes(crystalHome.ConfigPath);
+            var store = new SessionStore(crystalHome);
+            store.Save(new SessionDocument
+            {
+                Id = "invalidaccess", Workspace = workspace,
+                Access = [new DirectoryAccess(workspace, "invalid")],
+                Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "hi" }]
+            });
+            var app = new CommandApp<RunCommand>();
+
+            var code = await app.RunAsync([
+                "--home", home, "--workspace", workspace, "--provider", "ollama",
+                "--model", "qwen3:8b", "--resume", "invalidaccess"]);
+
+            Assert.Equal(1, code);
+            Assert.Equal(before, File.ReadAllBytes(crystalHome.ConfigPath));
+            Assert.True(store.TryLoad("invalidaccess", out var document));
+            Assert.Equal("invalid", Assert.Single(document.Access).Mode);
+        }
+        finally
+        {
+            Directory.Delete(home, recursive: true);
+            Directory.Delete(workspace, recursive: true);
         }
     }
 

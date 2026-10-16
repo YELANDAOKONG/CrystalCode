@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions;
 
@@ -36,6 +37,12 @@ public static class SessionResume
         if (TranscriptCodec.Read(document.Items).Count == 0)
         {
             error = "Session is empty";
+            document = null!;
+            return false;
+        }
+
+        if (!DirectoryAccessPolicy.TryValidateSaved(document.Access, out error))
+        {
             document = null!;
             return false;
         }

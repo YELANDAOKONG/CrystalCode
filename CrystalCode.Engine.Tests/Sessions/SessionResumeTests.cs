@@ -1,6 +1,8 @@
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Home;
+using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Engine.Tools;
 
 using Xunit;
 
@@ -8,6 +10,37 @@ namespace CrystalCode.Engine.Tests.Sessions;
 
 public sealed class SessionResumeTests
 {
+    [Theory]
+    [InlineData("relative")]
+    [InlineData("mode")]
+    [InlineData("source")]
+    [InlineData("invalidPath")]
+    [InlineData("nullRule")]
+    public void TryLoad_InvalidAccessReportsErrorAndDoesNotReturnDocument(string scenario)
+    {
+        using var home = new TemporaryHome();
+        using var root = new TemporaryWorkspace();
+        var rule = scenario switch
+        {
+            "relative" => new DirectoryAccess("relative", "read"),
+            "mode" => new DirectoryAccess(root.Path, "readWrite"),
+            "source" => new DirectoryAccess(root.Path, "read", "relative"),
+            "invalidPath" => new DirectoryAccess(root.Path + "\0invalid", "read"),
+            "nullRule" => null!,
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+        var store = new SessionStore(home.Home);
+        store.Save(new SessionDocument
+        {
+            Id = "invalidaccess", Workspace = root.Path, Access = [rule],
+            Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "hi" }]
+        });
+
+        Assert.False(SessionResume.TryLoad(store, root.Path, "invalidaccess", out var document, out var error));
+        Assert.Null(document);
+        Assert.Equal("Saved session directory access is invalid.", error);
+    }
+
     [Fact]
     public void TryLoad_ReadsSessionById()
     {

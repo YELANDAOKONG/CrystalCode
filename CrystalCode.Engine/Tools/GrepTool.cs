@@ -13,8 +13,11 @@ public sealed class GrepTool : ITool
     public const string ToolName = "grep";
 
     private const string ToolDescription =
-        "Searches workspace text files with a .NET regular expression. "
-        + "Optional path and file-name glob. Skips binary files and common build directories. "
+        "Searches text files under the requested path with a .NET regular expression. "
+        + "Optional path may be workspace-relative or absolute and defaults to the workspace root; an optional file-name glob narrows the search. "
+        + "Session read or write access permits searching an outside directory; unlisted outside paths require approval. "
+        + "Searches only the requested root, not all authorized directories. "
+        + "Skips binary files and common build directories. "
         + "Chain glob and grep for open-ended search. Batch independent searches in parallel.";
 
     private readonly Workspace _workspace;
@@ -36,7 +39,7 @@ public sealed class GrepTool : ITool
                     },
                     "path": {
                       "type": "string",
-                      "description": "Optional file or directory to search."
+                      "description": "Optional workspace-relative or absolute file or directory. Defaults to the workspace root."
                     },
                     "glob": {
                       "type": "string",

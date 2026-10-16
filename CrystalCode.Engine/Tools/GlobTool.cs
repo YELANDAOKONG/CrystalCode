@@ -12,8 +12,11 @@ public sealed class GlobTool : ITool
     public const string ToolName = "glob";
 
     private static readonly string ToolDescription =
-        "Lists workspace files matching a glob, for example **/*.cs. "
-        + "Optional path limits the search directory. Skips .git, .vs, bin, obj, node_modules, and dist. "
+        "Lists files matching a glob in the requested directory, for example **/*.cs. "
+        + "Optional path may be workspace-relative or absolute and defaults to the workspace root. "
+        + "Session read or write access permits searching an outside directory; unlisted outside paths require approval. "
+        + "Searches only the requested root, not all authorized directories. "
+        + "Skips .git, .vs, bin, obj, node_modules, and dist. "
         + "Use offset (1-based) and limit to page through matches; "
         + $"limit defaults to {WorkspaceLimits.MaximumGlobMatches} files and is capped there. "
         + "Batch independent searches in parallel.";
@@ -37,7 +40,7 @@ public sealed class GlobTool : ITool
                     },
                     "path": {
                       "type": "string",
-                      "description": "Optional workspace-relative directory to search from."
+                      "description": "Optional workspace-relative or absolute path to search. Defaults to the workspace root."
                     },
                     "offset": {
                       "type": "integer",

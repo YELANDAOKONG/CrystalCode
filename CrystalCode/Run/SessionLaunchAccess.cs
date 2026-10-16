@@ -39,7 +39,12 @@ internal static class SessionLaunchAccess
                 return false;
             }
 
-            rules[path] = new DirectoryAccess(path, rule.Mode);
+            var sourcePath = Path.TrimEndingDirectorySeparator(
+                Path.GetFullPath(Workspace.Expand(rule.Path.Trim()), workspace.Root));
+            rules[path] = new DirectoryAccess(path, rule.Mode,
+                string.Equals(path, sourcePath, OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal) ? null : sourcePath);
         }
 
         access = Array.AsReadOnly(rules.Values.ToArray());

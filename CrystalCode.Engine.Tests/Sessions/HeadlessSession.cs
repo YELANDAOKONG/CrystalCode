@@ -8,6 +8,7 @@ using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Approvals;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Tests.Sessions;
 
@@ -26,7 +27,8 @@ internal sealed class HeadlessSession : IDisposable
         bool showCompactionSummary = true,
         HarnessSettings? settings = null,
         HarnessSettings? persistedSettings = null,
-        Action<CrystalHome, string>? prepare = null)
+        Action<CrystalHome, string>? prepare = null,
+        IReadOnlyList<DirectoryAccess>? launchAccess = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -67,7 +69,8 @@ internal sealed class HeadlessSession : IDisposable
                 new ScriptedTrustPrompt(accept: false)),
             plugins,
             resume,
-            persistedSettings);
+            persistedSettings,
+            launchAccess);
     }
 
     public static HarnessSettings ScriptedSettings(bool thinking = false)

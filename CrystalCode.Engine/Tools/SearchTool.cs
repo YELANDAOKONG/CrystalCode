@@ -14,13 +14,15 @@ public sealed class SearchTool : ITool
     public const string ToolName = "search";
 
     private static readonly string ToolDescription =
-        "Finds candidate workspace files by matching a .NET regular expression against both relative paths "
+        "Finds candidate files under the requested path by matching a .NET regular expression against both relative paths "
         + "and file contents. Use it when you do not know which files matter, then read the best candidates. "
         + "One line per file, ranked with name matches first, then by matching-line count; each file line shows "
         + $"its count (capped at {WorkspaceLimits.MaximumSearchMatchesPerFile} with a + suffix) and up to "
         + $"{WorkspaceLimits.MaximumSearchPreviewLinesPerFile} matching lines as previews. "
         + "Case-insensitive by default; set caseSensitive true for exact case. "
-        + "Optional path and file-name glob narrow the search. "
+        + "Optional path may be workspace-relative or absolute and defaults to the workspace root; an optional file-name glob narrows the search. "
+        + "Session read or write access permits searching an outside directory; unlisted outside paths require approval. "
+        + "Searches only the requested root, not all authorized directories. "
         + $"Use offset (1-based) and limit to page through the ranked files; limit defaults to "
         + $"{WorkspaceLimits.DefaultSearchFileLimit} files and is capped at {WorkspaceLimits.MaximumSearchFiles}. "
         + "Skips binary files, credential paths, and common build directories. "
@@ -45,7 +47,7 @@ public sealed class SearchTool : ITool
                     },
                     "path": {
                       "type": "string",
-                      "description": "Optional file or directory to search."
+                      "description": "Optional workspace-relative or absolute file or directory. Defaults to the workspace root."
                     },
                     "glob": {
                       "type": "string",

@@ -95,7 +95,10 @@ separate library with no terminal code. The product can:
   They are session metadata, not workspace configuration or reusable approval
   grants: resume restores them; fork, clear, and workspace changes clear them.
   `/access add <path> read|write` adds or updates a rule; `/access remove <path>`
-  removes one, and `/access` lists the current rules. Rule changes are refused
+  removes one using its recorded entry path even after a symlink is deleted or
+  retargeted, and `/access` lists the current rules. Invalid paths report path
+  errors. Invalid saved access blocks resume with a visible error; in-session
+  resume keeps the current session intact. Rule changes are refused
   during turns or compaction. Shell and extension processes are not sandboxed
   by these rules, and no additional catalogs or instructions are discovered;
 - persist configuration, permissions, and sessions under `~/.crystal`;

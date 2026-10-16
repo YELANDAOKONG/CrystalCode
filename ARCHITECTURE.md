@@ -683,7 +683,10 @@ client that share it). The transcript stays the same conversation.
 `CodingSession` owns directory authorization for one session. Its workspace
 resolver carries the live `DirectoryAccessPolicy`, separate from the primary
 workspace root and approval grants. Immutable `DirectoryAccess` values contain
-canonical absolute `path` and `mode` (`read` or `write`). Write includes read.
+canonical absolute `path` and `mode` (`read` or `write`), plus optional `sourcePath`
+for the absolute, lexically normalized entry path when it differs from the target.
+The entry path is revocation metadata only; authorization always matches `path`.
+Write includes read.
 The implicit workspace is writable; the most-specific directory rule wins,
 including an explicit read-only rule for the workspace or one of its children.
 Matching uses directory boundaries and Windows case-insensitivity, resolves tool
@@ -691,8 +694,11 @@ paths through symlinks, and checks credential paths independently.
 
 `/access` lists the primary workspace and session rules. `/access add <path>
 read|write` validates an existing directory and adds or replaces its canonical
-rule; `/access remove <path>` removes it, even if the directory no longer exists.
-Paths containing spaces can be double-quoted. Mutations are refused during a turn
+rule; `/access remove <path>` first matches the recorded entry path, then the
+canonical target, even if the directory or entry symlink no longer exists. A
+retargeted entry revokes the original rule, not the new target's independent rule.
+Path resolution failures report the path error, not command usage. Paths containing
+spaces can be double-quoted. Mutations are refused during a turn
 or compaction. Changes immediately save `SessionDocument.access`, refresh the
 live model instructions, and affect the already-bound executor through the shared
 policy. No global access file or workspace configuration is read. Repeatable
@@ -707,14 +713,23 @@ grants, or review; write and edit recheck at path resolution before file I/O.
 Unlisted outside paths retain their existing approval behavior. Credential paths
 remain forbidden. Relative paths stay relative to the one primary workspace.
 Search and enumeration keep their existing root fence and do not automatically
-search all authorized directories or traverse cross-root links.
+search all authorized directories or traverse cross-root links. The glob, grep,
+and search tool descriptions and path schemas explicitly allow workspace-relative
+or absolute roots, default to the workspace, and explain session access versus
+approval for unlisted outside roots.
 
-Resume restores the saved absolute rules, including rules for missing directories;
-invalid saved rules fail closed rather than silently losing read-only restrictions.
-Fork and clear start with no added rules. A successful workspace change clears
+Resume restores the saved absolute rules and entry paths, including rules for
+missing directories; it never resolves a saved entry to a newly retargeted root.
+Invalid saved rules fail closed rather than silently losing read-only restrictions.
+`SessionResume.TryLoad` validates access before returning a document, and direct
+session construction validates it before allocating session resources. Interactive
+startup reports a red error and exits with code 1; in-session resume reports an
+error without changing the current session or its rules. Fork and clear start with
+no added rules. A successful workspace change clears
 rules; a refused or no-op change does not. Additional roots do not discover
 prompts, instructions, plugins, tools, or skills. Existing session files with no
-access field load with an empty rule list. Shell, background shell, external tools,
+access field load with an empty rule list; rules without `sourcePath` remain valid
+and can be removed by their listed canonical target. Shell, background shell, external tools,
 and plugins retain their existing approval behavior and are not sandboxed by this
 policy. An operating-system sandbox remains deferred.
 

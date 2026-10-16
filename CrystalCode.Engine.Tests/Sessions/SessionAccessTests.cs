@@ -23,7 +23,9 @@ public sealed class SessionAccessTests
         var child = Directory.CreateDirectory(Path.Combine(headless.WorkspacePath, "reference files")).FullName;
         await headless.Session.SubmitAsync("/access add \"" + child + "\" read", CancellationToken.None);
         var saved = headless.ReadSaved();
-        Assert.Equal(new DirectoryAccess(new Workspace(child).Root, "read"), Assert.Single(saved.Access));
+        var rule = Assert.Single(saved.Access);
+        Assert.Equal(new Workspace(child).Root, rule.Path);
+        Assert.Equal("read", rule.Mode);
 
         await headless.Session.SubmitAsync("/access add \"" + child + "\" write", CancellationToken.None);
         Assert.Equal("write", Assert.Single(headless.ReadSaved().Access).Mode);
@@ -55,6 +57,85 @@ public sealed class SessionAccessTests
         await headless.Session.SubmitAsync("/access remove " + child, CancellationToken.None);
 
         Assert.Empty(headless.ReadSaved().Access);
+    }
+
+    [Fact]
+    public async Task Access_LaunchRetainsCanonicalTargetAndEntryForRevocation()
+    {
+        using var entries = new TemporaryWorkspace();
+        using var original = new TemporaryWorkspace();
+        using var other = new TemporaryWorkspace();
+        var link = Path.Combine(entries.Path, "reference-link");
+        Directory.CreateSymbolicLink(link, other.Path);
+        var rule = new DirectoryAccess(new Workspace(original.Path).Root, "read", Path.GetFullPath(link));
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), launchAccess: [rule]);
+
+        Assert.Equal(rule, Assert.Single(headless.ReadSaved().Access));
+        Directory.Delete(link);
+        await headless.Session.SubmitAsync("/access remove " + link, CancellationToken.None);
+
+        Assert.Empty(headless.ReadSaved().Access);
+    }
+
+    [Fact]
+    public async Task Access_RemoveDeletedSymlinkAfterResumeRevokesOriginalTarget()
+    {
+        using var target = new TemporaryWorkspace();
+        using var first = new HeadlessSession(new ScriptedStreamingClient());
+        var link = Path.Combine(first.WorkspacePath, "reference-link");
+        Directory.CreateSymbolicLink(link, target.Path);
+        await first.Session.SubmitAsync("/access add " + link + " read", CancellationToken.None);
+        var saved = first.ReadSaved();
+        Assert.Equal(Path.GetFullPath(link), Assert.Single(saved.Access).SourcePath);
+        Directory.Delete(link);
+        using var resumed = new HeadlessSession(new ScriptedStreamingClient(), resume: saved);
+
+        await resumed.Session.SubmitAsync("/access remove " + link, CancellationToken.None);
+
+        Assert.Empty(resumed.ReadSaved().Access);
+        Assert.Empty(resumed.Observer.Events.OfType<ErrorWritten>());
+    }
+
+    [Fact]
+    public async Task Access_RemoveRetargetedSymlinkRevokesOriginalRuleOnly()
+    {
+        using var original = new TemporaryWorkspace();
+        using var other = new TemporaryWorkspace();
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        var link = Path.Combine(headless.WorkspacePath, "reference-link");
+        Directory.CreateSymbolicLink(link, original.Path);
+        await headless.Session.SubmitAsync("/access add " + link + " read", CancellationToken.None);
+        await headless.Session.SubmitAsync("/access add " + other.Path + " read", CancellationToken.None);
+        Directory.Delete(link);
+        Directory.CreateSymbolicLink(link, other.Path);
+
+        await headless.Session.SubmitAsync("/access remove " + link, CancellationToken.None);
+
+        Assert.Equal(new Workspace(other.Path).Root, Assert.Single(headless.ReadSaved().Access).Path);
+    }
+
+    [Fact]
+    public async Task Access_RemoveInvalidPathReportsPathErrorAndKeepsRules()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.SubmitAsync("/access add . read", CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/access remove invalid\0path", CancellationToken.None);
+
+        Assert.Equal("Path is not valid.", Assert.Single(headless.Observer.Events.OfType<ErrorWritten>()).Text);
+        Assert.Single(headless.ReadSaved().Access);
+    }
+
+    [Fact]
+    public async Task Access_RemoveUnresolvableSymlinkReportsPathError()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        var link = Path.Combine(headless.WorkspacePath, "loop");
+        Directory.CreateSymbolicLink(link, link);
+
+        await headless.Session.SubmitAsync("/access remove " + link, CancellationToken.None);
+
+        Assert.Equal("Path is not valid.", Assert.Single(headless.Observer.Events.OfType<ErrorWritten>()).Text);
     }
 
     [Theory]
@@ -102,6 +183,30 @@ public sealed class SessionAccessTests
             result.Results.Any(item => item.Text.Contains("reference text", StringComparison.Ordinal)));
         Assert.Contains(client.LastRequest!.Items.OfType<ChatMessage>(), message =>
             message.Role == ChatRole.System && message.Text.Contains(outside.Path, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Access_ResumeInvalidRulesReportsErrorAndKeepsCurrentSession()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.SubmitAsync("/access add . read", CancellationToken.None);
+        var currentId = headless.Session.SessionId;
+        var store = new SessionStore(headless.Home);
+        store.Save(new SessionDocument
+        {
+            Id = "invalidaccess", Workspace = headless.WorkspacePath,
+            Access = [new DirectoryAccess("relative", "read")],
+            Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "hi" }]
+        });
+
+        await headless.Session.SubmitAsync("/resume invalidaccess", CancellationToken.None);
+
+        Assert.Equal(currentId, headless.Session.SessionId);
+        Assert.Equal("read", Assert.Single(headless.ReadSaved().Access).Mode);
+        Assert.Equal("Saved session directory access is invalid.",
+            Assert.Single(headless.Observer.Events.OfType<ErrorWritten>()).Text);
+        Assert.True(store.TryLoad("invalidaccess", out var invalid));
+        Assert.Equal("relative", Assert.Single(invalid.Access).Path);
     }
 
     [Fact]

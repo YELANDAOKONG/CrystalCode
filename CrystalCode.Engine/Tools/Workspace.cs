@@ -169,6 +169,9 @@ public sealed class Workspace
     public bool TryGetFullPath(string path, out string fullPath, out string error) =>
         TryNormalize(path, allowOutside: true, out fullPath, out error);
 
+    internal bool TryGetEntryPath(string path, out string fullPath, out string error) =>
+        TryNormalize(path, allowOutside: true, out fullPath, out error, resolveLinks: false);
+
     public bool Contains(string fullPath) => IsInsideRoot(fullPath);
 
     public static bool IsCredentialPath(string path)
@@ -464,7 +467,7 @@ public sealed class Workspace
         return true;
     }
 
-    private bool TryNormalize(string path, bool allowOutside, out string fullPath, out string error)
+    private bool TryNormalize(string path, bool allowOutside, out string fullPath, out string error, bool resolveLinks = true)
     {
         fullPath = string.Empty;
         error = string.Empty;
@@ -481,7 +484,7 @@ public sealed class Workspace
         string candidate;
         try
         {
-            candidate = Canonicalize(Path.GetFullPath(combined));
+            candidate = resolveLinks ? Canonicalize(Path.GetFullPath(combined)) : Path.GetFullPath(combined);
         }
         catch (Exception exception) when (exception is ArgumentException
             or NotSupportedException

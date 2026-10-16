@@ -77,7 +77,14 @@
   resolver. Rules are saved with the session, not config or permissions.json;
   resume restores them, while fork, clear, and workspace changes clear them.
   Canonical directory boundaries and most-specific matching include the implicit
-  writable workspace. Unlisted outside paths retain approval: in Review or Audit
+  writable workspace. Persist the lexical absolute entry path when it differs
+  from the canonical target, for revocation after symlink deletion or retargeting;
+  never use that alias for authorization or re-resolve it on resume. Validate saved
+  access before returning a resumable document or allocating a session. Invalid
+  access must produce a visible error, not crash interactive startup or replace
+  the current session. Search descriptions and path schemas must agree that roots
+  may be workspace-relative or absolute and only the requested root is searched.
+  Unlisted outside paths retain approval: in Review or Audit
   the reviewing model judges them; otherwise the operator is asked. Edit, Review,
   and Full do not auto-pass unlisted outside writes or edits. These rules do not
   sandbox shell, background shell, plugins, or external processes.
