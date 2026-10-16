@@ -128,6 +128,91 @@ public sealed class CodingSessionContextTests
         Assert.True(summary > compacted);
     }
 
+    [Fact]
+    public async Task Compaction_ForkCommandInterruptsAndForksInsteadOfSendingText()
+    {
+        var client = new GatedSummaryClient();
+        using var headless = await OpenReadyToCompactAsync(client);
+        var compacting = headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        var sessionId = headless.Session.SessionId;
+
+        headless.Session.Enqueue("/fork");
+        headless.Session.Enqueue(string.Empty);
+        await Finish(compacting);
+
+        Assert.NotEqual(sessionId, headless.Session.SessionId);
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text.StartsWith("Forked  ", StringComparison.Ordinal));
+        Assert.Contains(
+            headless.Observer.Events.OfType<QueueChanged>(),
+            queue => queue.Items.Contains("/fork"));
+        Assert.DoesNotContain(
+            headless.Observer.Events.OfType<UserMessageSent>(),
+            user => user.Text.Contains("/fork", StringComparison.Ordinal));
+        Assert.False(headless.Session.TurnActive);
+    }
+
+    [Fact]
+    public async Task Compaction_QueuedCommandRunsAfterCompactionInsteadOfSendingText()
+    {
+        var client = new GatedSummaryClient();
+        using var headless = await OpenReadyToCompactAsync(client);
+        var compacting = headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+
+        headless.Session.Enqueue("/status");
+        client.Release();
+        await Finish(compacting);
+
+        Assert.Contains(headless.Observer.Events.OfType<NoteWritten>(), note => note.Text == "Compacted context");
+        Assert.Contains(headless.Observer.Events, static item => item is StatusReported);
+        Assert.DoesNotContain(
+            headless.Observer.Events.OfType<UserMessageSent>(),
+            user => user.Text.Contains("/status", StringComparison.Ordinal));
+        Assert.False(headless.Session.TurnActive);
+    }
+
+    [Fact]
+    public async Task Compaction_BlankEnterStillSendsQueuedText()
+    {
+        var client = new GatedSummaryClient();
+        using var headless = await OpenReadyToCompactAsync(client);
+        var compacting = headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+
+        headless.Session.Enqueue("follow up");
+        headless.Session.Enqueue("   ");
+        await Finish(compacting);
+
+        Assert.Contains(
+            headless.Observer.Events.OfType<UserMessageSent>(),
+            user => user.Text == "follow up");
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text == "Compaction cancelled");
+        Assert.True(headless.Session.TurnActive);
+        await headless.Session.TurnTask!.WaitAsync(TimeSpan.FromSeconds(10));
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+    }
+
+    private static async Task<HeadlessSession> OpenReadyToCompactAsync(GatedSummaryClient client)
+    {
+        var headless = new HeadlessSession(client, settings: NarrowSettings());
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("hello");
+        await headless.RunTurnAsync("second");
+        return headless;
+    }
+
+    private static async Task Finish(Task work)
+    {
+        var completed = await Task.WhenAny(work, Task.Delay(TimeSpan.FromSeconds(10)));
+        Assert.Same(work, completed);
+        await work;
+    }
+
     private static async Task<string[]> CompactAutomatically(bool showSummary)
     {
         var head = "EARLIER-CONTENT" + new string('x', 50_000);
@@ -196,6 +281,65 @@ public sealed class CodingSessionContextTests
                 new ChatCandidate([new ChatMessage(ChatRole.Assistant, "Earlier facts retained.")], FinishReason.Stop)
             ]));
         }
+    }
+
+    /// <summary>
+    /// The first summary waits until <see cref="Release"/> or cancellation.
+    /// Later summaries return immediately so a follow-up turn can finish.
+    /// </summary>
+    private sealed class GatedSummaryClient : IStreamingChatClient
+    {
+        private readonly TaskCompletionSource _started =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource _gate =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _completions;
+
+        public Task Started => _started.Task;
+
+        public void Release() => _gate.TrySetResult();
+
+        public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            return new ScriptedStreamingClient([
+                new ChatTextDelta(0, 0, ChatRole.Assistant, "done"),
+                new ChatCandidateCompleted(0, FinishReason.Stop)
+            ]).StreamAsync(request, cancellationToken);
+        }
+
+        public async Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _completions) > 1)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return Summary();
+            }
+
+            var gate = _gate;
+            using var registration = cancellationToken.Register(
+                static state => ((TaskCompletionSource)state!).TrySetResult(),
+                gate);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                gate.TrySetResult();
+            }
+
+            _started.TrySetResult();
+            await gate.Task;
+            cancellationToken.ThrowIfCancellationRequested();
+            return Summary();
+        }
+
+        private static ChatResponse Summary() =>
+            new([
+                new ChatCandidate(
+                    [new ChatMessage(ChatRole.Assistant, "Earlier facts retained.")],
+                    FinishReason.Stop)
+            ]);
     }
 
     private static HarnessSettings Settings()

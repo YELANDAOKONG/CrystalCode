@@ -58,6 +58,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly SessionLedger _ledger = new();
     private readonly TodoList _todos = new();
     private readonly MessageQueue _queue = new();
+    private readonly List<string> _commandQueue = [];
     private readonly GrantStore _grants;
     private readonly WorkspaceTrustStore _trust;
     private readonly CrystalHome _home;
@@ -99,6 +100,7 @@ public sealed class CodingSession : ITurnObserver
     private Task<TurnResult>? _turnTask;
     private CancellationTokenSource? _turnSource;
     private CancellationTokenSource? _compactSource;
+    private bool _drainingQueue;
     private bool _turnActive;
     private string? _turnUserText;
     private string? _turnFault;
@@ -359,12 +361,14 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
-    /// Collects a finished turn, then starts the queued follow-up if any.
+    /// Collects a finished turn, runs slash commands queued while that turn or
+    /// compaction was in progress, then starts the queued follow-up if any.
+    /// Returns true when a queued command asked to quit.
     /// </summary>
-    public async Task CompleteTurnAsync(CancellationToken cancellationToken)
+    public async Task<bool> CompleteTurnAsync(CancellationToken cancellationToken)
     {
         await FinishTurnAsync(cancellationToken);
-        await StartTurnIfQueuedAsync(cancellationToken);
+        return await StartTurnIfQueuedAsync(cancellationToken);
     }
 
     /// <summary>
@@ -594,9 +598,9 @@ public sealed class CodingSession : ITurnObserver
                 Note("Compaction cancelled");
             }
 
-            await StartTurnIfQueuedAsync(cancellationToken);
+            var exit = await StartTurnIfQueuedAsync(cancellationToken);
             PruneDraftImages(string.Empty);
-            return (true, false);
+            return (true, exit);
         }
 
         if (parsed.Verb == SessionVerb.Resume)
@@ -2336,7 +2340,7 @@ public sealed class CodingSession : ITurnObserver
                 UserTurns: _ledger.UserTurns,
                 ModelCalls: _ledger.ModelCalls,
                 ToolCalls: _ledger.ToolCalls,
-                QueuedMessages: _queue.Count,
+                QueuedMessages: _queue.Count + _commandQueue.Count,
                 Todos: _todos.Count,
                 SkillsEnabled: _settings.Skills,
                 ExternalToolsEnabled: _settings.ExternalTools,
@@ -3115,7 +3119,7 @@ public sealed class CodingSession : ITurnObserver
         Note("Compacting context...");
         SetActivity(SessionActivity.Compacting);
         CompactionOutcome outcome;
-        using var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _compactSource = compactSource;
         try
         {
@@ -3128,8 +3132,16 @@ public sealed class CodingSession : ITurnObserver
         }
         finally
         {
-            _compactSource = null;
+            if (ReferenceEquals(_compactSource, compactSource))
+            {
+                _compactSource = null;
+            }
+
             SetActivity(_turnActive ? SessionActivity.WaitingForModel : SessionActivity.Idle);
+            // A canceled model call can resume inside Cancel(). Disposing the
+            // source there deadlocks: Dispose waits for Cancel to finish.
+            await Task.Yield();
+            compactSource.Dispose();
         }
 
         if (outcome.Kind == CompactionKind.Applied)
@@ -3612,6 +3624,7 @@ public sealed class CodingSession : ITurnObserver
             Math.Max(0, document.ToolCalls),
             SessionMapper.ReadUsage(document.Usage),
             SessionMapper.ReadUsage(document.CumulativeUsage));
+        _commandQueue.Clear();
         _queue.Clear();
         BindReviewConversation();
         RebuildExecutors();
@@ -4805,11 +4818,22 @@ public sealed class CodingSession : ITurnObserver
 
     private void ShowQueue()
     {
-        Publish(new QueueChanged(_queue.Snapshot()));
+        Publish(new QueueChanged(QueueSnapshot()));
+    }
+
+    private IReadOnlyList<string> QueueSnapshot()
+    {
+        if (_commandQueue.Count == 0)
+        {
+            return _queue.Snapshot();
+        }
+
+        return [.. _commandQueue, .. _queue.Snapshot()];
     }
 
     private void DiscardQueue()
     {
+        _commandQueue.Clear();
         _queue.Clear();
         ShowQueue();
     }
@@ -4846,8 +4870,11 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Adds a follow-up that is sent when the current tool batch or turn ends.
-    /// Blank text does not enqueue; when a follow-up is already waiting it
-    /// interrupts the turn or compaction so that follow-up is sent now.
+    /// A slash command stays out of that text and runs as a command. Commands
+    /// that stop a busy turn interrupt immediately, because the pump cannot
+    /// re-enter <see cref="SubmitAsync"/> while compaction or a turn is on
+    /// the stack. Blank text does not enqueue; when a follow-up or command is
+    /// already waiting it interrupts so that work is delivered now.
     /// </summary>
     public void Enqueue(string input)
     {
@@ -4858,25 +4885,73 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        _queue.Enqueue(AttachPendingImages(input));
+        var trimmed = input.Trim();
+        if (SessionCommand.TryParse(trimmed, out _))
+        {
+            _commandQueue.Add(trimmed);
+            if (StopsBusyTurn(trimmed))
+            {
+                TryInterrupt();
+            }
+
+            ShowQueue();
+            return;
+        }
+
+        _queue.Enqueue(AttachPendingImages(trimmed));
         ShowQueue();
     }
 
     private void ReleaseQueuedFollowUp()
     {
-        if (_queue.Count > 0)
+        if (_queue.Count > 0 || _commandQueue.Count > 0)
         {
             TryInterrupt();
         }
     }
 
-    private async Task StartTurnIfQueuedAsync(CancellationToken cancellationToken)
+    private async Task<bool> StartTurnIfQueuedAsync(CancellationToken cancellationToken)
     {
-        var next = _queue.Drain();
-        ShowQueue();
-        if (next is not null)
+        // /compact drains from inside this method. The outer loop owns the rest.
+        if (_drainingQueue)
         {
-            await StartTurnAsync(next, cancellationToken, attachPendingImages: false);
+            return false;
+        }
+
+        _drainingQueue = true;
+        try
+        {
+            var exit = false;
+            while (_commandQueue.Count > 0)
+            {
+                var command = _commandQueue[0];
+                _commandQueue.RemoveAt(0);
+                ShowQueue();
+                var handled = await TryHandleCommandAsync(command, cancellationToken);
+                if (handled.Exit)
+                {
+                    exit = true;
+                    break;
+                }
+            }
+
+            if (exit || _turnActive)
+            {
+                return exit;
+            }
+
+            var next = _queue.Drain();
+            ShowQueue();
+            if (next is not null)
+            {
+                await StartTurnAsync(next, cancellationToken, attachPendingImages: false);
+            }
+
+            return false;
+        }
+        finally
+        {
+            _drainingQueue = false;
         }
     }
 

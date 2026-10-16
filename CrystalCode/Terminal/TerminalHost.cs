@@ -169,9 +169,14 @@ internal sealed class TerminalHost
 
             if (read.TurnEnded)
             {
-                await PumpAsync(
+                var quitAfterTurn = await PumpAsync(
                     _session.CompleteTurnAsync(promptSource.Token),
                     promptSource.Token);
+                if (quitAfterTurn)
+                {
+                    return 0;
+                }
+
                 continue;
             }
 
