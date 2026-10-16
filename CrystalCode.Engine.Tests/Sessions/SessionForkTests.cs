@@ -1,3 +1,6 @@
+using Crystal.Chat;
+using Crystal.Reasoning;
+
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 
@@ -64,5 +67,60 @@ public sealed class SessionForkTests
         var archived = Assert.Single(fork.Archive!);
         Assert.Equal("original", archived.Text);
         Assert.NotSame(source.Archive![0], archived);
+    }
+
+    [Fact]
+    public void Create_CopiesReasoningTextAndState()
+    {
+        var segment = new SessionReasoningSegment { Text = "looked", Kind = "summary" };
+        var sourceItem = new SessionItemDocument
+        {
+            Kind = "reasoning",
+            Segments = [segment],
+            StateFormat = "gemini.part",
+            StateData = Convert.ToBase64String("signed"u8.ToArray())
+        };
+        var archived = new SessionItemDocument
+        {
+            Kind = "reasoning",
+            StateFormat = "anthropic.messages.thinking",
+            StateData = Convert.ToBase64String("{\"signature\":\"sig\"}"u8.ToArray())
+        };
+        var source = new SessionDocument
+        {
+            Id = "source",
+            Workspace = "/tmp/source",
+            Items = [sourceItem],
+            Archive = [archived]
+        };
+
+        var fork = SessionFork.Create(source, "branch", "/tmp/current", DateTimeOffset.UnixEpoch);
+
+        var item = Assert.Single(fork.Items);
+        Assert.NotSame(sourceItem, item);
+        Assert.NotSame(sourceItem.Segments, item.Segments);
+        var copied = Assert.Single(item.Segments!);
+        Assert.NotSame(segment, copied);
+        Assert.Equal("looked", copied.Text);
+        Assert.Equal("summary", copied.Kind);
+        Assert.Equal(sourceItem.StateFormat, item.StateFormat);
+        Assert.Equal(sourceItem.StateData, item.StateData);
+
+        var archiveItem = Assert.Single(fork.Archive!);
+        Assert.NotSame(archived, archiveItem);
+        Assert.Null(archiveItem.Segments);
+        Assert.Equal(archived.StateFormat, archiveItem.StateFormat);
+        Assert.Equal(archived.StateData, archiveItem.StateData);
+
+        var restored = TranscriptCodec.Read(fork.Items);
+        var reasoning = Assert.IsType<ChatReasoningItem>(Assert.Single(restored));
+        Assert.Equal("looked", Assert.Single(reasoning.Content.TextSegments).Text);
+        Assert.Equal(ReasoningTextKind.Summary, reasoning.Content.TextSegments[0].Kind);
+        Assert.Equal(sourceItem.StateFormat, reasoning.Content.State!.Format);
+
+        var restoredArchive = TranscriptCodec.Read(fork.Archive!);
+        var archivedReasoning = Assert.IsType<ChatReasoningItem>(Assert.Single(restoredArchive));
+        Assert.Empty(archivedReasoning.Content.TextSegments);
+        Assert.Equal(archived.StateFormat, archivedReasoning.Content.State!.Format);
     }
 }

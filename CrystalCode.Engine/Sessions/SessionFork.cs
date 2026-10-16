@@ -43,7 +43,21 @@ internal static class SessionFork
             CallId = item.CallId,
             Name = item.Name,
             Arguments = item.Arguments,
-            Status = item.Status
+            Status = item.Status,
+            Segments = CloneSegments(item.Segments),
+            StateFormat = item.StateFormat,
+            StateData = item.StateData
+        };
+
+    private static List<SessionReasoningSegment>? CloneSegments(
+        List<SessionReasoningSegment>? segments) =>
+        segments?.Select(CloneSegment).ToList();
+
+    private static SessionReasoningSegment CloneSegment(SessionReasoningSegment segment) =>
+        new()
+        {
+            Text = segment.Text,
+            Kind = segment.Kind
         };
 
     private static SessionImageDocument CloneImage(SessionImageDocument image) =>
