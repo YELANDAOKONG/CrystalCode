@@ -44,6 +44,8 @@ public sealed class ComposerBuffer
 
     public bool IsEmpty => _text.Length == 0;
 
+    public bool BrowsingHistory => _historyIndex < _history.Count;
+
     public ComposerAction Handle(ConsoleKeyInfo key) =>
         Handle(InputKey.From(key));
 

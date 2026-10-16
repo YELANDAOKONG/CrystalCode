@@ -1863,7 +1863,9 @@ empty. Plain Up/Down move through the composer's visual rows, including
 wrapped rows. At the first or last row they navigate submitted prompt
 history; Up on an empty prompt recalls the latest entry, and Down past
 the newest entry restores the unsent draft and its cursor. The slash
-picker owns plain Up/Down while open. Submitted text-only history is
+picker owns plain Up/Down while open, but it stays closed while the
+composer is showing a recalled entry, including one that starts with `/`.
+Editing that entry opens the picker again. Submitted text-only history is
 stored by workspace in `~/.crystal/prompt-history.jsonl` with an
 owner-only file mode where supported. Image-bearing prompts remain in
 memory only and are forgotten when the session changes, since their

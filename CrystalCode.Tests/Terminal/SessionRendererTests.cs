@@ -333,6 +333,67 @@ public sealed class SessionRendererTests
     }
 
     [Fact]
+    public async Task DispatchBurstAsync_HistoryUpContinuesPastSlashCommand()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SetSlashCommands(
+        [
+            new SlashOption("status", "Show status", ["status"]),
+            new SlashOption("help", "Help", ["help"])
+        ]);
+        renderer.SeedPromptHistory(["older", "/status"]);
+
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Equal("older", submitted);
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_TypedSlashStillUsesPickerArrows()
+    {
+        var renderer = new SessionRenderer();
+        renderer.SetSlashCommands(
+        [
+            new SlashOption("status", "Show status", ["status"])
+        ]);
+        renderer.SeedPromptHistory(["older"]);
+        renderer.SeedComposer("/");
+
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var accepted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Null(accepted);
+        Assert.Equal("/status ", submitted);
+    }
+
+    [Fact]
     public async Task DispatchBurstAsync_StatsPageIgnoresComposerInputUntilClosed()
     {
         var renderer = new SessionRenderer();

@@ -834,7 +834,7 @@ its own.
 | Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/context`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
-| Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open |
+| Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open. A recalled prompt that starts with `/` stays in history until you edit it |
 | Escape | Clear the composer |
 | Mouse wheel, PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |
 | Ctrl+C during a turn | Cancel the turn |
@@ -1102,9 +1102,11 @@ drops the state; a block without readable text is dropped.
 Type `/` to open the picker. Built-in verbs:
 
 Plain Up/Down moves the picker selection and automatically scrolls the visible
-candidate window. Tab accepts the selected completion. Enter also accepts a
-partial selection; a complete command still submits with one Enter. Submitting
-returns the transcript viewport to the latest output.
+candidate window. Recalling prompt history does not open the picker, so Up/Down
+keep moving through history even when an entry starts with `/`. Editing that
+entry opens the picker again. Tab accepts the selected completion. Enter also
+accepts a partial selection; a complete command still submits with one Enter.
+Submitting returns the transcript viewport to the latest output.
 
 | Command | Aliases | Action |
 | :--- | :--- | :--- |

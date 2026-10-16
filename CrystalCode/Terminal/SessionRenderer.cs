@@ -1753,7 +1753,9 @@ public sealed class SessionRenderer : IDisposable
 
     private void RefreshPickerUnlocked()
     {
-        if (_modalOverlay.Count > 0 || _overlayWidget is not null)
+        // A recalled slash command must keep Up/Down on history. Editing it
+        // leaves history and opens the picker again.
+        if (_composer.BrowsingHistory || _modalOverlay.Count > 0 || _overlayWidget is not null)
         {
             _picker = null;
             return;

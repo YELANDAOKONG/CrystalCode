@@ -251,10 +251,12 @@ public sealed class ComposerBufferTests
         buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false));
         Assert.Equal("newer", buffer.Text);
         Assert.Equal(0, buffer.Cursor);
+        Assert.True(buffer.BrowsingHistory);
 
         buffer.Handle(new ConsoleKeyInfo('\0', ConsoleKey.DownArrow, false, false, false));
         Assert.Equal("draft", buffer.Text);
         Assert.Equal(4, buffer.Cursor);
+        Assert.False(buffer.BrowsingHistory);
     }
 
     [Fact]
