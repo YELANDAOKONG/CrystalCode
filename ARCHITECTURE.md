@@ -446,7 +446,11 @@ they are sent. The queue is sent when the current tool batch finishes or
 when the turn (thinking or conversation) ends. Empty Enter while a
 follow-up is queued interrupts the turn, or compaction if that is still
 running, so the queue is sent now. Empty Enter with nothing queued does
-not stop the turn. Ctrl+C interrupts and does not drop queued text.
+not stop the turn. A slash command typed during compaction is not queued.
+Commands that change the session, workspace, or model are refused.
+`/status`, `/help`, `/todos`, and other commands that only report state or
+adjust the display run immediately. `/quit` cancels compaction and exits.
+Ctrl+C interrupts and does not drop queued text.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
 

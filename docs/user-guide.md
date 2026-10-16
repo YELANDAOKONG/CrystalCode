@@ -884,6 +884,10 @@ still running, so the queue is sent now. Interrupt does not drop
 queued text.
 
 `/quit`, `/clear`, `/resume`, and `/fork` stop a busy turn before they run.
+During compaction, commands that change the session, workspace, or model
+are refused with the same kind of message as `/cd` while a turn is running.
+`/status`, `/help`, `/todos`, and other commands that only report state or
+adjust the display run immediately. `/quit` still exits.
 
 ### One turn
 

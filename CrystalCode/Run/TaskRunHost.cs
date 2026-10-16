@@ -209,8 +209,12 @@ internal static class TaskRunHost
                         await session.TurnTask;
                     }
 
-                    await session.CompleteTurnAsync(CancellationToken.None);
-                    if (log.StopReason is null)
+                    if (await session.CompleteTurnAsync(CancellationToken.None))
+                    {
+                        code = RunExit.Interrupted;
+                        status = "quit";
+                    }
+                    else if (log.StopReason is null)
                     {
                         await error.WriteLineAsync("The task did not finish a turn.");
                     }
@@ -234,11 +238,14 @@ internal static class TaskRunHost
                     {
                     }
 
-                    await session.CompleteTurnAsync(CancellationToken.None);
+                    if (await session.CompleteTurnAsync(CancellationToken.None))
+                    {
+                        status = "quit";
+                    }
                 }
 
                 code = RunExit.Interrupted;
-                status = "interrupted";
+                status ??= "interrupted";
             }
             catch (Exception exception) when (IsSetupFailure(exception))
             {

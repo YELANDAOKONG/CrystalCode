@@ -129,7 +129,7 @@ public sealed class CodingSessionContextTests
     }
 
     [Fact]
-    public async Task Compaction_ForkCommandInterruptsAndForksInsteadOfSendingText()
+    public async Task Compaction_ForkCommandIsRefusedAndDoesNotSendText()
     {
         var client = new GatedSummaryClient();
         using var headless = await OpenReadyToCompactAsync(client);
@@ -139,23 +139,29 @@ public sealed class CodingSessionContextTests
 
         headless.Session.Enqueue("/fork");
         headless.Session.Enqueue(string.Empty);
-        await Finish(compacting);
+        Assert.False(compacting.IsCompleted);
+        client.Release();
+        var quit = await Finish(compacting);
 
-        Assert.NotEqual(sessionId, headless.Session.SessionId);
+        Assert.False(quit);
+        Assert.Equal(sessionId, headless.Session.SessionId);
         Assert.Contains(
-            headless.Observer.Events.OfType<NoteWritten>(),
-            note => note.Text.StartsWith("Forked  ", StringComparison.Ordinal));
-        Assert.Contains(
-            headless.Observer.Events.OfType<QueueChanged>(),
-            queue => queue.Items.Contains("/fork"));
+            headless.Observer.Events.OfType<ErrorWritten>(),
+            error => error.Text == "Finish the current turn before using /fork.");
+        Assert.Contains(headless.Observer.Events.OfType<NoteWritten>(), note => note.Text == "Compacted context");
         Assert.DoesNotContain(
             headless.Observer.Events.OfType<UserMessageSent>(),
             user => user.Text.Contains("/fork", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            headless.Observer.Events.OfType<QueueChanged>(),
+            queue => queue.Items.Contains("/fork"));
         Assert.False(headless.Session.TurnActive);
+        var history = new CrystalCode.Engine.Home.PromptHistoryStore(headless.Home, headless.WorkspacePath);
+        Assert.Contains("/fork", await history.LoadAsync(CancellationToken.None));
     }
 
     [Fact]
-    public async Task Compaction_QueuedCommandRunsAfterCompactionInsteadOfSendingText()
+    public async Task Compaction_StatusRunsImmediatelyInsteadOfSendingText()
     {
         var client = new GatedSummaryClient();
         using var headless = await OpenReadyToCompactAsync(client);
@@ -163,15 +169,60 @@ public sealed class CodingSessionContextTests
         await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
 
         headless.Session.Enqueue("/status");
+        Assert.False(compacting.IsCompleted);
+        Assert.Contains(headless.Observer.Events, static item => item is StatusReported);
         client.Release();
         await Finish(compacting);
 
         Assert.Contains(headless.Observer.Events.OfType<NoteWritten>(), note => note.Text == "Compacted context");
-        Assert.Contains(headless.Observer.Events, static item => item is StatusReported);
         Assert.DoesNotContain(
             headless.Observer.Events.OfType<UserMessageSent>(),
             user => user.Text.Contains("/status", StringComparison.Ordinal));
         Assert.False(headless.Session.TurnActive);
+    }
+
+    [Fact]
+    public async Task Compaction_QuitCancelsAndExits()
+    {
+        var client = new GatedSummaryClient();
+        using var headless = await OpenReadyToCompactAsync(client);
+        var compacting = headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+
+        headless.Session.Enqueue("/quit");
+        var quit = await Finish(compacting);
+
+        Assert.True(quit);
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text == "Compaction cancelled");
+        Assert.False(headless.Session.TurnActive);
+    }
+
+    [Fact]
+    public async Task CompactionInsideTurn_ForkIsRefusedWithoutCancellingTheTurn()
+    {
+        var client = new GatedSummaryClient();
+        using var headless = OpenLargeSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        var sessionId = headless.Session.SessionId;
+        var started = headless.Session.SubmitAsync("continue", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var refused = await headless.Session.SubmitAsync("/fork", CancellationToken.None);
+        Assert.False(refused);
+        Assert.False(headless.Session.TurnTask!.IsCompleted);
+        Assert.Equal(sessionId, headless.Session.SessionId);
+        Assert.Contains(
+            headless.Observer.Events.OfType<ErrorWritten>(),
+            error => error.Text == "Finish the current turn before using /fork.");
+        Assert.True(headless.Session.TurnActive);
+
+        client.Release();
+        await Finish(started);
+        await headless.Session.TurnTask!.WaitAsync(TimeSpan.FromSeconds(10));
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+        Assert.Equal(sessionId, headless.Session.SessionId);
     }
 
     [Fact]
@@ -206,11 +257,26 @@ public sealed class CodingSessionContextTests
         return headless;
     }
 
-    private static async Task Finish(Task work)
+    private static HeadlessSession OpenLargeSession(IStreamingChatClient client)
+    {
+        var head = "EARLIER-CONTENT" + new string('x', 50_000);
+        var resume = new SessionDocument
+        {
+            Items =
+            [
+                new SessionItemDocument { Kind = "message", Role = "user", Text = head },
+                new SessionItemDocument { Kind = "message", Role = "assistant", Text = "old answer" },
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "recent turn" }
+            ]
+        };
+        return new HeadlessSession(client, resume, settings: NarrowSettings());
+    }
+
+    private static async Task<bool> Finish(Task<bool> work)
     {
         var completed = await Task.WhenAny(work, Task.Delay(TimeSpan.FromSeconds(10)));
         Assert.Same(work, completed);
-        await work;
+        return await work;
     }
 
     private static async Task<string[]> CompactAutomatically(bool showSummary)
