@@ -55,7 +55,9 @@ separate library with no terminal code. The product can:
   window, or when the operator runs `/compact`. Manual compaction summarizes
   earlier turns without waiting for that threshold, prints the summary unless
   `showCompactionSummary` is off, and keeps the full conversation for resume,
-  fork, and export;
+  fork, and export. Automatic compaction prints `Compacted context` and, when
+  `showAutomaticCompactionSummary` is on, the same summary. That switch
+  defaults off and is omitted from `config.json` until enabled;
 - ask before the first interactive session in a directory, when workspace
   trust is on (the default). Trust is the git root when the workspace is
   inside a repository, and the workspace itself otherwise. A yes is

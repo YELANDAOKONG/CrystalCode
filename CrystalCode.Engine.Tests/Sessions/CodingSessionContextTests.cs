@@ -104,6 +104,73 @@ public sealed class CodingSessionContextTests
         Assert.Equal(TurnStopReason.Completed, headless.Observer.Events.OfType<TurnFinished>().Single().Result.StopReason);
     }
 
+    [Fact]
+    public async Task AutomaticCompaction_HidesTheSummaryByDefault()
+    {
+        var notes = await CompactAutomatically(showSummary: false);
+
+        Assert.Contains(notes, note => note == "Compacted context");
+        Assert.DoesNotContain(
+            notes,
+            note => note.Contains("Earlier facts retained", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AutomaticCompaction_PrintsTheSummaryWhenConfigured()
+    {
+        var notes = await CompactAutomatically(showSummary: true);
+        var compacted = Array.IndexOf(notes, "Compacted context");
+        var summary = Array.FindIndex(
+            notes,
+            note => note.Contains("Earlier facts retained", StringComparison.Ordinal));
+
+        Assert.True(compacted >= 0);
+        Assert.True(summary > compacted);
+    }
+
+    private static async Task<string[]> CompactAutomatically(bool showSummary)
+    {
+        var head = "EARLIER-CONTENT" + new string('x', 60_000);
+        var resume = new SessionDocument
+        {
+            Items =
+            [
+                new SessionItemDocument { Kind = "message", Role = "user", Text = head },
+                new SessionItemDocument { Kind = "message", Role = "assistant", Text = "old answer" },
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "recent turn" }
+            ]
+        };
+        var settings = NarrowSettings();
+        if (showSummary)
+        {
+            settings = settings.WithShowAutomaticCompactionSummary(true);
+        }
+
+        using var headless = new HeadlessSession(new CompactingClient(), resume, settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("continue");
+        Assert.Equal(
+            TurnStopReason.Completed,
+            headless.Observer.Events.OfType<TurnFinished>().Single().Result.StopReason);
+        return [.. headless.Observer.Events.OfType<NoteWritten>().Select(note => note.Text)];
+    }
+
+    private static HarnessSettings NarrowSettings()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings> { ["model"] = new(32_000) },
+            requiresApiKey: false);
+        return new HarnessSettings(
+            provider.Name,
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([provider]));
+    }
+
     private sealed class CompactingClient : IStreamingChatClient
     {
         public int Summaries { get; private set; }

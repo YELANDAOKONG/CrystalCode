@@ -17,6 +17,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultShowCompactionSummary = true;
 
+    public const bool DefaultShowAutomaticCompactionSummary = false;
+
     public const bool DefaultSkills = true;
 
     public const bool DefaultExternalTools = true;
@@ -69,7 +71,8 @@ public sealed record HarnessSettings
         IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
         RetrySettings? retry = null,
         RetrySettings? approvalRetry = null,
-        CompactionModelSettings? compactionModel = null)
+        CompactionModelSettings? compactionModel = null,
+        bool showAutomaticCompactionSummary = DefaultShowAutomaticCompactionSummary)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -135,6 +138,7 @@ public sealed record HarnessSettings
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
         ShowCompactionSummary = showCompactionSummary;
+        ShowAutomaticCompactionSummary = showAutomaticCompactionSummary;
         PromptAttachments = CopyPromptAttachments(promptAttachments);
         PromptSetOverride = string.IsNullOrWhiteSpace(promptSetOverride)
             ? null
@@ -217,6 +221,8 @@ public sealed record HarnessSettings
     public bool WorkspaceTrust { get; }
 
     public bool ShowCompactionSummary { get; }
+
+    public bool ShowAutomaticCompactionSummary { get; }
 
     public bool EstimatedTokens { get; }
 
@@ -330,6 +336,9 @@ public sealed record HarnessSettings
 
     public HarnessSettings WithShowCompactionSummary(bool showCompactionSummary) =>
         Copy(showCompactionSummary: showCompactionSummary);
+
+    public HarnessSettings WithShowAutomaticCompactionSummary(bool showAutomaticCompactionSummary) =>
+        Copy(showAutomaticCompactionSummary: showAutomaticCompactionSummary);
 
     public HarnessSettings WithEstimatedTokens(bool estimatedTokens) =>
         Copy(estimatedTokens: estimatedTokens);
@@ -469,7 +478,8 @@ public sealed record HarnessSettings
         RetrySettings? retry = null,
         RetrySettings? approvalRetry = null,
         CompactionModelSettings? compactionModel = null,
-        bool setCompactionModel = false) =>
+        bool setCompactionModel = false,
+        bool? showAutomaticCompactionSummary = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -502,7 +512,8 @@ public sealed record HarnessSettings
             contextSelections ?? ContextSelections,
             retry ?? Retry,
             approvalRetry ?? ApprovalRetry,
-            setCompactionModel ? compactionModel : CompactionModel);
+            setCompactionModel ? compactionModel : CompactionModel,
+            showAutomaticCompactionSummary ?? ShowAutomaticCompactionSummary);
 
     public override string ToString() => nameof(HarnessSettings);
 

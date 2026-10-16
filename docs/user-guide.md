@@ -481,7 +481,8 @@ Top-level fields:
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
-| `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). Automatic compaction still prints only `Compacted context` |
+| `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on) |
+| `showAutomaticCompactionSummary` | Print the same summary after automatic compaction (default `false`; omitted when off). Does not change `/compact` |
 | `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
@@ -1556,9 +1557,11 @@ the smaller of the session window and the compaction model's declared
 window; if it does not, the host keeps the existing "no summary" path.
 `/status` adds a Compaction model row only while the switch is on.
 A successful compact is written to the session file. The screen keeps the
-earlier lines. When `showCompactionSummary` is on (the default), the
-summary is printed under those lines in a rounded panel titled
-`Earlier context`. Automatic compaction does not print it. `/resume` restores that full conversation, while the model continues
+earlier lines. When `showCompactionSummary` is on (the default), a manual
+`/compact` prints the summary under those lines in a rounded panel titled
+`Earlier context`. Automatic compaction prints `Compacted context` and, when
+`showAutomaticCompactionSummary` is on, the same panel. That switch defaults
+off. `/resume` restores that full conversation, while the model continues
 from the summary and tail, and refreshes only the live system prompt.
 
 ## Data directory

@@ -916,9 +916,13 @@ selection or a provider and model id on the same command.
 User and assistant text in the folded head are replaced
 by the summary; they are not kept beside it. The screen keeps the earlier
 lines. When `showCompactionSummary` is on (the default; omitted from
-`config.json` when on, `false` when off), the stored summary is printed
-under those lines in a rounded panel titled `Earlier context`. Automatic
-compaction does not print it.
+`config.json` when on, `false` when off), a manual `/compact` prints the
+stored summary under those lines in a rounded panel titled `Earlier context`.
+Automatic compaction prints `Compacted context` only, unless
+`showAutomaticCompactionSummary` is on. That switch defaults off, is omitted
+from `config.json` until enabled, and uses the same panel. It does not change
+`/compact`. A compaction with no summary text does not print one. A side
+question that summarizes a private copy does not print it.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a successful `/compact`, and on an orderly exit

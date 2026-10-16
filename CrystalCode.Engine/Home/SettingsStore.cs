@@ -93,6 +93,8 @@ public sealed class SettingsStore
             document.Plugins ?? defaults.Plugins,
             document.WorkspaceTrust ?? defaults.WorkspaceTrust,
             document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
+            showAutomaticCompactionSummary: document.ShowAutomaticCompactionSummary
+                ?? defaults.ShowAutomaticCompactionSummary,
             imageModel: ReadImageModel(document.ImageModel),
             contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
             retry: ReadRetry(document.Retry),
@@ -147,6 +149,7 @@ public sealed class SettingsStore
                     : [.. settings.StatusLine.Fields],
             CompactionThreshold = settings.CompactionThreshold,
             ShowCompactionSummary = settings.ShowCompactionSummary ? null : false,
+            ShowAutomaticCompactionSummary = settings.ShowAutomaticCompactionSummary ? true : null,
             ExecutionBudget = ExecutionBudgetMapper.Write(settings.ExecutionBudget),
             BashTimeoutSeconds = BashTimeoutMapper.Write(
                 settings.BashTimeoutSeconds,

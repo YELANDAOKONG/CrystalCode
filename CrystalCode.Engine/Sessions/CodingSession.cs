@@ -2789,9 +2789,7 @@ public sealed class CodingSession : ITurnObserver
             }
 
             Note("Compacted context");
-            if (force
-                && _settings.ShowCompactionSummary
-                && !string.IsNullOrWhiteSpace(outcome.Summary))
+            if (ShouldPrintSummary(force) && !string.IsNullOrWhiteSpace(outcome.Summary))
             {
                 Note(outcome.Summary);
             }
@@ -2812,6 +2810,11 @@ public sealed class CodingSession : ITurnObserver
 
         return outcome;
     }
+
+    private bool ShouldPrintSummary(bool forced) =>
+        forced
+            ? _settings.ShowCompactionSummary
+            : _settings.ShowAutomaticCompactionSummary;
 
     private void SaveSession()
     {

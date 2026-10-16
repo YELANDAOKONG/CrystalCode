@@ -81,6 +81,18 @@ public sealed class HarnessSettingsTests
     }
 
     [Fact]
+    public void WithShowAutomaticCompactionSummary_SetsHostFlag()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithShowAutomaticCompactionSummary(true);
+
+        Assert.True(next.ShowAutomaticCompactionSummary);
+        Assert.False(settings.ShowAutomaticCompactionSummary);
+        Assert.True(next.ShowCompactionSummary);
+    }
+
+    [Fact]
     public void WithVerboseThinking_SetsHostFlag()
     {
         var settings = HarnessSettings.CreateDefault();

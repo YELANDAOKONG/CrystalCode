@@ -46,6 +46,8 @@ internal sealed class SettingsDocument
 
     public bool? ShowCompactionSummary { get; set; }
 
+    public bool? ShowAutomaticCompactionSummary { get; set; }
+
     public System.Text.Json.JsonElement? ExecutionBudget { get; set; }
 
     public System.Text.Json.JsonElement? BashTimeoutSeconds { get; set; }

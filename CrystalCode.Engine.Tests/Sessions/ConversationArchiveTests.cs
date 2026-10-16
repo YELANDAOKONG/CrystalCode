@@ -150,6 +150,24 @@ public sealed class ConversationArchiveTests
     }
 
     [Fact]
+    public async Task Compact_KeepsTheManualSummaryHiddenWhenOnlyAutomaticDisplayIsOn()
+    {
+        using var headless = new HeadlessSession(
+            new SummaryClient(),
+            ShortSession("older turn", "latest turn"),
+            settings: HeadlessSession.ScriptedSettings()
+                .WithShowCompactionSummary(false)
+                .WithShowAutomaticCompactionSummary(true));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("/compact");
+
+        var notes = Notes(headless);
+        Assert.Contains(notes, note => note == "Compacted context");
+        Assert.DoesNotContain(notes, note => note.Contains("kept the facts", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Save_KeepsAnImageReferencedOnlyByTheArchive()
     {
         var marker = ImageMarkerText.Tag(1);
