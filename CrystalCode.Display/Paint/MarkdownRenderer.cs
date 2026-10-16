@@ -881,23 +881,23 @@ public static class MarkdownRenderer
             used += widths[column];
         }
 
+        // One column must not absorb the whole overflow. Cutting the longest
+        // cell to the floor wraps it into a ribbon and the row grows to that height.
         while (used > inner)
         {
-            var widest = WidestShrinkable(widths, natural);
-            if (widest < 0)
+            var band = WidestShrinkableBand(widths, natural);
+            if (band.Count == 0)
             {
                 stack = true;
                 return true;
             }
 
-            var floor = ShrinkFloor(natural[widest]);
-            var cut = Math.Min(used - inner, widths[widest] - floor);
+            var cut = ShrinkBand(widths, natural, band, used - inner);
             if (cut < 1)
             {
                 return false;
             }
 
-            widths[widest] -= cut;
             used -= cut;
         }
 
@@ -918,20 +918,90 @@ public static class MarkdownRenderer
         return Math.Min(TableMinColumnWidth, least);
     }
 
-    private static int WidestShrinkable(int[] widths, int[] natural)
+    private static List<int> WidestShrinkableBand(int[] widths, int[] natural)
     {
-        var index = -1;
+        var band = new List<int>();
         var width = 0;
         for (var column = 0; column < widths.Length; column++)
         {
-            if (widths[column] > ShrinkFloor(natural[column]) && widths[column] > width)
+            if (widths[column] <= ShrinkFloor(natural[column]))
             {
-                index = column;
+                continue;
+            }
+
+            if (widths[column] > width)
+            {
+                band.Clear();
                 width = widths[column];
+            }
+
+            if (widths[column] == width)
+            {
+                band.Add(column);
             }
         }
 
-        return index;
+        return band;
+    }
+
+    private static int ShrinkBand(int[] widths, int[] natural, List<int> band, int overflow)
+    {
+        if (band.Count == 0 || overflow < 1)
+        {
+            return 0;
+        }
+
+        var bandWidth = widths[band[0]];
+        var nextLower = 0;
+        for (var column = 0; column < widths.Length; column++)
+        {
+            if (widths[column] < bandWidth && widths[column] > nextLower)
+            {
+                nextLower = widths[column];
+            }
+        }
+
+        var room = int.MaxValue;
+        foreach (var column in band)
+        {
+            var target = Math.Max(ShrinkFloor(natural[column]), nextLower);
+            var columnRoom = widths[column] - target;
+            if (columnRoom < 1)
+            {
+                return 0;
+            }
+
+            room = Math.Min(room, columnRoom);
+        }
+
+        var count = band.Count;
+        if ((long)room * count <= overflow)
+        {
+            foreach (var column in band)
+            {
+                widths[column] -= room;
+            }
+
+            return room * count;
+        }
+
+        var each = overflow / count;
+        var extra = overflow % count;
+        var largestShare = extra > 0 ? each + 1 : each;
+        if (largestShare < 1 || largestShare > room)
+        {
+            return 0;
+        }
+
+        var cut = 0;
+        for (var index = 0; index < band.Count; index++)
+        {
+            var share = index < extra ? each + 1 : each;
+            widths[band[index]] -= share;
+            cut += share;
+        }
+
+        return cut;
     }
 
     private static bool TryAppendAligned(

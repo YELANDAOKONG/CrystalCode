@@ -151,6 +151,31 @@ public sealed class MarkdownRendererTests
     }
 
     [Fact]
+    public void Render_SharesOverflowAcrossWideColumns()
+    {
+        const string markdown =
+            """
+            | item | long | mid | side |
+            |---|---|---|---|
+            | name | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | cccccccccccccccccccccccccccccc |
+            """;
+
+        var lines = MarkdownRenderer.Render(markdown, 70);
+
+        Assert.Contains(lines, line =>
+            line.Plain.Contains("name", StringComparison.Ordinal)
+            && line.Plain.Contains(new string('a', 12), StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.Plain.Contains(new string('b', 30), StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.Plain.Contains(new string('c', 30), StringComparison.Ordinal));
+        Assert.True(lines.Count <= 12);
+        Assert.All(lines, line =>
+        {
+            Assert.True(TextWidth.Measure(line.Plain) <= 70);
+            Assert.DoesNotContain("|", line.Plain, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
     public void Render_HonorsRightAlignmentAndInlineStyles()
     {
         const string markdown =
