@@ -284,8 +284,18 @@ public sealed class CodingSessionHeadlessTests
         var sessionId = headless.Session.SessionId;
 
         headless.Session.Enqueue("/clear");
+        headless.Session.Enqueue("/clear");
+        Assert.Contains(
+            headless.Observer.Events.OfType<QueueChanged>(),
+            queue => queue.Items.Count == 2
+                && queue.Items[0] == "/clear"
+                && queue.Items[1] == "/clear");
         await headless.Session.CompleteTurnAsync(CancellationToken.None)
             .WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(
+            2,
+            headless.Observer.Events.OfType<NoteWritten>().Count(
+                note => note.Text == "New conversation"));
 
         Assert.NotEqual(sessionId, headless.Session.SessionId);
         Assert.Contains(
@@ -315,6 +325,21 @@ public sealed class CodingSessionHeadlessTests
             error => error.Text == "Finish the current turn before using /model.");
         Assert.True(headless.Session.TryInterrupt());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task RunsWhileBusy_MatchesItsHandler()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        foreach (SessionVerb verb in Enum.GetValues<SessionVerb>())
+        {
+            var command = new SessionCommand(verb, string.Empty);
+            Assert.Equal(
+                CodingSession.RunsWhileBusy(verb),
+                headless.Session.TryRunWhileBusy(command));
+        }
     }
 
     [Fact]

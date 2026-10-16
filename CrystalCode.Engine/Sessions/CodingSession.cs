@@ -60,7 +60,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly MessageQueue _queue = new();
     private Task _promptHistoryTail = Task.CompletedTask;
     private bool _quitRequested;
-    private string? _deferredStop;
+    private readonly List<string> _deferredStops = [];
     private readonly GrantStore _grants;
     private readonly WorkspaceTrustStore _trust;
     private readonly CrystalHome _home;
@@ -299,7 +299,7 @@ public sealed class CodingSession : ITurnObserver
         {
             if (await SubmitCoreAsync(text, cancellationToken))
             {
-                _deferredStop = null;
+                ClearDeferredStops();
                 return true;
             }
 
@@ -414,7 +414,7 @@ public sealed class CodingSession : ITurnObserver
             await FinishTurnAsync(cancellationToken);
             if (ConsumeQuit())
             {
-                _deferredStop = null;
+                ClearDeferredStops();
                 return true;
             }
 
@@ -426,7 +426,7 @@ public sealed class CodingSession : ITurnObserver
             await StartTurnIfQueuedAsync(cancellationToken);
             if (ConsumeQuit())
             {
-                _deferredStop = null;
+                ClearDeferredStops();
                 return true;
             }
 
@@ -2460,7 +2460,7 @@ public sealed class CodingSession : ITurnObserver
                 UserTurns: _ledger.UserTurns,
                 ModelCalls: _ledger.ModelCalls,
                 ToolCalls: _ledger.ToolCalls,
-                QueuedMessages: _queue.Count,
+                QueuedMessages: _queue.Count + _deferredStops.Count,
                 Todos: _todos.Count,
                 SkillsEnabled: _settings.Skills,
                 ExternalToolsEnabled: _settings.ExternalTools,
@@ -4942,7 +4942,10 @@ public sealed class CodingSession : ITurnObserver
         Publish(new QueueChanged(QueueSnapshot()));
     }
 
-    private IReadOnlyList<string> QueueSnapshot() => _queue.Snapshot();
+    private IReadOnlyList<string> QueueSnapshot() =>
+        _deferredStops.Count == 0
+            ? _queue.Snapshot()
+            : [.. _deferredStops, .. _queue.Snapshot()];
 
     private void DiscardQueue()
     {
@@ -4984,9 +4987,10 @@ public sealed class CodingSession : ITurnObserver
     /// Adds a follow-up that is sent when the current tool batch or turn ends.
     /// The pump cannot re-enter <see cref="SubmitAsync"/>, so a slash command
     /// is handled here. Commands that only report state run immediately.
-    /// <c>/clear</c>, <c>/resume</c>, and <c>/fork</c> cancel the busy turn and
-    /// run when that work unwinds, unless compaction is in progress, in which
-    /// case they are refused. <c>/quit</c> still cancels that work and leaves.
+    /// <c>/clear</c>, <c>/resume</c>, and <c>/fork</c> cancel the busy turn,
+    /// stay visible in the queue, and run in order when that work unwinds.
+    /// During compaction they are refused. <c>/quit</c> still cancels that
+    /// work and leaves.
     /// Blank text does not enqueue; when a follow-up is already waiting it
     /// interrupts so that text is delivered now.
     /// </summary>
@@ -5011,7 +5015,7 @@ public sealed class CodingSession : ITurnObserver
         {
             if (command.Verb == SessionVerb.Quit)
             {
-                _deferredStop = null;
+                ClearDeferredStops();
                 _quitRequested = true;
                 TryInterrupt();
                 return;
@@ -5019,13 +5023,18 @@ public sealed class CodingSession : ITurnObserver
 
             if (RunsWhileBusy(command.Verb))
             {
-                RunWhileBusy(command);
+                if (!TryRunWhileBusy(command))
+                {
+                    RefuseCommand(trimmed);
+                }
+
                 return;
             }
 
             if (!_compacting && StopsBusyTurn(command.Verb))
             {
-                _deferredStop = trimmed;
+                _deferredStops.Add(trimmed);
+                ShowQueue();
                 TryInterrupt();
                 return;
             }
@@ -5040,7 +5049,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void ReleaseQueuedFollowUp()
     {
-        if (_queue.Count > 0)
+        if (_queue.Count > 0 || _deferredStops.Count > 0)
         {
             TryInterrupt();
         }
@@ -5090,7 +5099,7 @@ public sealed class CodingSession : ITurnObserver
         return space < 0 ? trimmed : trimmed[..space];
     }
 
-    private static bool RunsWhileBusy(SessionVerb verb) =>
+    internal static bool RunsWhileBusy(SessionVerb verb) =>
         verb is SessionVerb.Help
             or SessionVerb.Status
             or SessionVerb.Stats
@@ -5102,34 +5111,34 @@ public sealed class CodingSession : ITurnObserver
             or SessionVerb.Btw
             or SessionVerb.Attach;
 
-    private void RunWhileBusy(SessionCommand command)
+    internal bool TryRunWhileBusy(SessionCommand command)
     {
         switch (command.Verb)
         {
             case SessionVerb.Help:
                 Publish(new HelpRequested(PluginCommands()));
-                break;
+                return true;
             case SessionVerb.Status:
                 ShowStatus(command.Argument);
-                break;
+                return true;
             case SessionVerb.Stats:
                 ShowStats(command.Argument);
-                break;
+                return true;
             case SessionVerb.Todos:
                 ShowTodoList();
-                break;
+                return true;
             case SessionVerb.Sessions:
                 ShowSessions(command.Argument);
-                break;
+                return true;
             case SessionVerb.Tokens:
                 ChangeEstimatedTokens(command.Argument);
-                break;
+                return true;
             case SessionVerb.Verbose:
                 ChangeVerbose(command.Argument);
-                break;
+                return true;
             case SessionVerb.StatusLine:
                 ChangeStatusLine(command.Argument);
-                break;
+                return true;
             case SessionVerb.Btw:
                 if (string.IsNullOrWhiteSpace(command.Argument))
                 {
@@ -5140,23 +5149,39 @@ public sealed class CodingSession : ITurnObserver
                     AskSide(command.Argument.Trim());
                 }
 
-                break;
+                return true;
             case SessionVerb.Attach:
                 AttachImage(command.Argument);
-                break;
+                return true;
             default:
-                throw new InvalidOperationException(
-                    "Busy command " + command.Verb + " has no handler.");
+                return false;
         }
+    }
+
+    private void ClearDeferredStops()
+    {
+        if (_deferredStops.Count == 0)
+        {
+            return;
+        }
+
+        _deferredStops.Clear();
+        ShowQueue();
     }
 
     private async Task<bool> DrainDeferredStopAsync(CancellationToken cancellationToken)
     {
         var exit = false;
-        while (_deferredStop is not null)
+        while (_deferredStops.Count > 0)
         {
-            var pending = _deferredStop;
-            _deferredStop = null;
+            var pending = _deferredStops[0];
+            _deferredStops.RemoveAt(0);
+            ShowQueue();
+            if (exit)
+            {
+                continue;
+            }
+
             if (_turnActive)
             {
                 _turnSource?.Cancel();

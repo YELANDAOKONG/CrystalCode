@@ -448,7 +448,8 @@ follow-up is queued interrupts the turn, or compaction if that is still
 running, so the queue is sent now. Empty Enter with nothing queued does
 not stop the turn. `/quit`, `/clear`, `/resume`, and `/fork` stop a busy
 turn and then run, including a command submitted while other session work
-is still on the stack. During compaction those three except `/quit` are
+is still on the stack. `/clear`, `/resume`, and `/fork` stay in the queue
+and run in the order typed. During compaction those three except `/quit` are
 refused, as are other commands that change the session, workspace, or model.
 `/status`, `/help`, `/todos`, and other commands that only report state or
 adjust the display run immediately. `/quit` cancels compaction and exits.

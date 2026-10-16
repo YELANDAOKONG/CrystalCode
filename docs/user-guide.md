@@ -885,7 +885,8 @@ queued text.
 
 `/quit`, `/clear`, `/resume`, and `/fork` stop a busy turn before they run,
 including when the composer submits them while other session work is still
-on the stack. During compaction, `/clear`, `/resume`, and `/fork` are refused
+on the stack. `/clear`, `/resume`, and `/fork` stay in the Queued panel and
+run in the order they were typed. During compaction, `/clear`, `/resume`, and `/fork` are refused
 instead, with the same kind of message as `/cd` while a turn is running.
 Other commands that change the session, workspace, or model are refused for
 that same reason. `/status`, `/help`, `/todos`, and other commands that only
