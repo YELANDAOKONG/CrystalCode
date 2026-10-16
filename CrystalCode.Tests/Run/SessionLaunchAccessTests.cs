@@ -23,8 +23,10 @@ public sealed class SessionLaunchAccessTests
 
             Assert.True(SessionLaunchAccess.TryRead(settings, root, out var rules, out var error), error);
             Assert.Equal(2, rules.Count);
-            Assert.Contains(new DirectoryAccess(new Workspace(Path.Combine(root, "reference")).Root, "read"), rules);
-            Assert.Contains(new DirectoryAccess(new Workspace(Path.Combine(root, "output")).Root, "write"), rules);
+            var reference = Assert.Single(rules, rule => rule.Mode == "read");
+            var output = Assert.Single(rules, rule => rule.Mode == "write");
+            Assert.Equal(new Workspace(Path.Combine(root, "reference")).Root, reference.Path);
+            Assert.Equal(new Workspace(Path.Combine(root, "output")).Root, output.Path);
         }
         finally
         {
@@ -50,6 +52,36 @@ public sealed class SessionLaunchAccessTests
             Assert.Equal(new Workspace(target).Root, rule.Path);
             Assert.Equal(Path.GetFullPath(link), rule.SourcePath);
             Assert.Equal("read", rule.Mode);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void TryRead_EntryPathStaysLexicalWhenAnAncestorIsALink()
+    {
+        var root = Directory.CreateTempSubdirectory("crystal-access-").FullName;
+        try
+        {
+            var privateVar = Directory.CreateDirectory(Path.Combine(root, "private", "var")).FullName;
+            var ancestor = Path.Combine(root, "var");
+            Directory.CreateSymbolicLink(ancestor, privateVar);
+            var workspace = Path.Combine(ancestor, "workspace");
+            var target = Path.Combine(workspace, "target");
+            Directory.CreateDirectory(target);
+            var link = Path.Combine(workspace, "reference-link");
+            Directory.CreateSymbolicLink(link, target);
+
+            Assert.True(SessionLaunchAccess.TryRead(
+                new SessionLaunchSettings { AllowRead = ["reference-link"] }, workspace,
+                out var rules, out var error), error);
+
+            var rule = Assert.Single(rules);
+            Assert.Equal(new Workspace(target).Root, rule.Path);
+            Assert.Equal(Path.GetFullPath(link), rule.SourcePath);
+            Assert.NotEqual(rule.Path, rule.SourcePath);
         }
         finally
         {

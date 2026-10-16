@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Home;
 
@@ -222,11 +223,13 @@ public sealed class SessionStore
         try
         {
             return string.Equals(
-                Path.GetFullPath(candidate),
-                workspace,
+                Workspace.Canonicalize(candidate),
+                Workspace.Canonicalize(workspace),
                 StringComparison.Ordinal);
         }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        catch (Exception exception) when (exception is ArgumentException
+            or NotSupportedException
+            or IOException)
         {
             return false;
         }

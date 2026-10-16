@@ -12,6 +12,9 @@ internal static class SessionLaunchAccess
         out string error)
     {
         var workspace = new Workspace(workspaceRoot);
+        // Keep the operator's lexical path. Rebasing onto the canonical root
+        // would resolve an ancestor link such as /var -> /private/var.
+        var lexicalRoot = Path.GetFullPath(workspaceRoot);
         var rules = new Dictionary<string, DirectoryAccess>(OperatingSystem.IsWindows()
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal);
@@ -40,7 +43,7 @@ internal static class SessionLaunchAccess
             }
 
             var sourcePath = Path.TrimEndingDirectorySeparator(
-                Path.GetFullPath(Workspace.Expand(rule.Path.Trim()), workspace.Root));
+                Path.GetFullPath(Workspace.Expand(rule.Path.Trim()), lexicalRoot));
             rules[path] = new DirectoryAccess(path, rule.Mode,
                 string.Equals(path, sourcePath, OperatingSystem.IsWindows()
                     ? StringComparison.OrdinalIgnoreCase

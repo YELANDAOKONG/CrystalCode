@@ -1,4 +1,6 @@
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Engine.Tools;
 
 using Xunit;
 
@@ -31,6 +33,29 @@ public sealed class SessionStoreTests
         Assert.Equal("bbbb", latest.Id);
         Assert.True(store.TryLoad("aaaa", out var loaded));
         Assert.Equal("old", loaded.Items[0].Text);
+    }
+
+    [Fact]
+    public void TryLoadLatest_MatchesAWorkspaceReachedThroughAnAncestorLink()
+    {
+        using var home = new TemporaryHome();
+        using var root = new TemporaryWorkspace();
+        var realParent = Path.Combine(root.Path, "private", "project");
+        Directory.CreateDirectory(realParent);
+        var ancestor = Path.Combine(root.Path, "var");
+        Directory.CreateSymbolicLink(ancestor, Path.Combine(root.Path, "private"));
+        var viaLink = Path.Combine(ancestor, "project");
+        var store = new SessionStore(home.Home);
+        store.Save(new SessionDocument
+        {
+            Id = "linkws01",
+            Workspace = Workspace.Canonicalize(realParent),
+            Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "hi" }]
+        });
+
+        Assert.True(store.TryLoadLatest(viaLink, out var latest));
+        Assert.Equal("linkws01", latest.Id);
+        Assert.Single(store.List(viaLink));
     }
 
     [Fact]
