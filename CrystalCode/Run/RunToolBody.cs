@@ -39,7 +39,11 @@ internal static class RunToolBody
     }
 
     private static bool IsCommand(string? toolName) =>
-        string.Equals(toolName, "bash", StringComparison.OrdinalIgnoreCase);
+        string.Equals(toolName, "bash", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_start", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_status", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_logs", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_stop", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsEditOrWrite(string? toolName) =>
         string.Equals(toolName, "edit", StringComparison.OrdinalIgnoreCase)

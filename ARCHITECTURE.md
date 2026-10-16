@@ -1720,7 +1720,8 @@ result panels honor independent verbose toggles (`verboseTools` and
 `verboseCommands` in `config.json`, default on). When tool verbose is
 off, read/search/skill result panels are omitted while the Tool card
 remains; `edit` and `write` results always stay visible. When command
-verbose is off, bash results collapse to a hidden-line hint plus the
+verbose is off, results from `bash`, `bash_start`, `bash_status`,
+`bash_logs`, and `bash_stop` collapse to a hidden-line hint plus the
 last output line. Policy and grant auto-pass cards honor `verboseApprovals`
 (default on). Review allow cards honor `verboseReview` (default on). The
 switches are independent: turning approvals off does not hide a review allow

@@ -42,6 +42,38 @@ public sealed class TranscriptLogVerboseTests
         Assert.DoesNotContain("line1", text, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("bash_start")]
+    [InlineData("bash_status")]
+    [InlineData("bash_logs")]
+    [InlineData("bash_stop")]
+    public void BuildLines_CompactsBackgroundBashWhenCommandVerboseIsOff(string toolName)
+    {
+        var log = new TranscriptLog { VerboseCommands = false, VerboseTools = true };
+        log.Add(
+            TranscriptKind.Result,
+            "exit 0\nline1\nline2\npassed",
+            toolName: toolName);
+
+        var text = string.Join('\n', log.BuildLines(80).Select(line => line.Plain));
+
+        Assert.Contains("2 output lines hidden", text, StringComparison.Ordinal);
+        Assert.Contains("passed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("line1", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_KeepsBackgroundBashWhenToolVerboseIsOff()
+    {
+        var log = new TranscriptLog { VerboseTools = false, VerboseCommands = true };
+        log.Add(TranscriptKind.Result, "line1\nline2", toolName: "bash_logs");
+
+        var text = string.Join('\n', log.BuildLines(80).Select(line => line.Plain));
+
+        Assert.Contains("line1", text, StringComparison.Ordinal);
+        Assert.Contains("line2", text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void BuildLines_KeepsEditResultWhenToolVerboseIsOff()
     {

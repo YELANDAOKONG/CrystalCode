@@ -474,7 +474,7 @@ Top-level fields:
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `verboseTools` | Show read, search, and skill result panels (default `true`; omitted when on) |
-| `verboseCommands` | Show full bash output (default `true`; omitted when on). Off keeps a hidden-line hint and the last line |
+| `verboseCommands` | Show full output from `bash`, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop` (default `true`; omitted when on). Off keeps a hidden-line hint and the last line |
 | `verboseApprovals` | Show policy and grant auto-pass cards (default `true`; omitted when on). Off hides those cards already on screen. Review allow cards follow `verboseReview`. The ask overlay stays |
 | `verboseReview` | Show review allow cards (default `true`; omitted when on). Off hides those cards already on screen, including Outcome and rationale. Independent of `verboseApprovals`. The ask overlay, reviewer Deny text, and `crystal run` stay |
 | `verboseThinking` | Show Thinking panels in the interactive transcript (default `true`; omitted when on). Off hides live and restored cards. The gear, progress row, and export stay. `crystal run --show-thinking` is separate |

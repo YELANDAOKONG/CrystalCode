@@ -77,6 +77,21 @@ public sealed class RunToolBodyTests
         Assert.DoesNotContain("L07", body, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("bash_start")]
+    [InlineData("bash_status")]
+    [InlineData("bash_logs")]
+    [InlineData("bash_stop")]
+    public void BackgroundBash_KeepsTheTail(string toolName)
+    {
+        var body = RunToolBody.Format(toolName, ToolResultStatus.Success, Lines("L", 20));
+
+        Assert.Contains("<12 earlier lines omitted>", body, StringComparison.Ordinal);
+        Assert.Contains("L12", body, StringComparison.Ordinal);
+        Assert.Contains("L19", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("L11", body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void OtherSuccess_KeepsTheHead()
     {

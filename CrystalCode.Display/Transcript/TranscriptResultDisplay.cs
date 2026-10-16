@@ -63,7 +63,13 @@ internal static class TranscriptResultDisplay
     }
 
     private static bool IsCommand(string? toolName) =>
-        string.Equals(toolName, BashToolName, StringComparison.OrdinalIgnoreCase);
+        // Background task tools carry command output. They follow the command
+        // switch rather than disappearing with read and search results.
+        string.Equals(toolName, BashToolName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_start", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_status", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_logs", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "bash_stop", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsEditOrWrite(string? toolName) =>
         string.Equals(toolName, EditToolName, StringComparison.OrdinalIgnoreCase)
