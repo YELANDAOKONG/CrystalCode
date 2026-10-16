@@ -68,6 +68,14 @@ public sealed class StatusTextTests
             text.Split('\n'),
             line => line.Contains("Verbose thinking", StringComparison.Ordinal)
                 && line.TrimEnd().EndsWith("Off", StringComparison.Ordinal));
+        Assert.Contains(
+            text.Split('\n'),
+            line => line.Contains("Global rules", StringComparison.Ordinal)
+                && line.TrimEnd().EndsWith("On", StringComparison.Ordinal));
+        Assert.Contains(
+            text.Split('\n'),
+            line => line.Contains("Project rules", StringComparison.Ordinal)
+                && line.TrimEnd().EndsWith("On", StringComparison.Ordinal));
         Assert.DoesNotContain("Approval model", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Approval thinking", text, StringComparison.Ordinal);
     }

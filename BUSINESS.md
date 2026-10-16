@@ -84,7 +84,7 @@ separate library with no terminal code. The product can:
   Flags on that command override provider, model, workspace, home,
   approval, the approval model and its thinking gear, Plan or Work,
   thinking, prompt set, prompt attachments,
-  named prompt attachments, skills, external tools, and turn quotas for that process only.
+  named prompt attachments, skills, external tools, rule files, and turn quotas for that process only.
   They are not written to `config.json` or `prompt.json`. Stdout is a readable plain-text trace, or one JSON object
   per line when `--format json` is set. Review and Audit still use the
   reviewing model. That model can be a separate provider and model, and
@@ -293,8 +293,12 @@ a readable manifest is skipped. There is no migration from older
 `config.json` keys: `promptSet` and `promptAttachments` are ignored and
 omitted the next time preferences are saved. Workspace
 hints remain independent and are appended from `instructions.md`, `.crystal.md`, and
-OpenCode-compatible `AGENTS.md` / `CLAUDE.md` files. Those rule files
-are never prompt overlays. Skills are discovered from Crystal,
+OpenCode-compatible `AGENTS.md`, `CLAUDE.md`, and `CONTEXT.md` files. Those rule files
+are never prompt overlays. `config.json` `ruleFiles` turns the compatible files
+on or off independently for global and project discovery. Both default on, and
+the object is omitted until one is off. `/rules` shows or sets them and writes
+`config.json`. A process `--rules` value overrides that for one run and is not
+written. Crystal `instructions.md` and `.crystal.md` stay on. Skills are discovered from Crystal,
 OpenCode, Claude, and Agents skill directories and loaded through the
 `skill` tool when enabled. Operator tool sets live under `tools/` in
 the home and project `.crystal` trees and are loaded as extra `ITool`

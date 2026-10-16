@@ -76,7 +76,8 @@ public sealed record HarnessSettings
         RetrySettings? approvalRetry = null,
         CompactionModelSettings? compactionModel = null,
         bool showAutomaticCompactionSummary = DefaultShowAutomaticCompactionSummary,
-        MicroCompactionSettings? microCompaction = null)
+        MicroCompactionSettings? microCompaction = null,
+        RuleFileSettings? ruleFiles = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -140,6 +141,7 @@ public sealed record HarnessSettings
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
+        RuleFiles = ruleFiles ?? RuleFileSettings.Default;
         ImageModel = imageModel ?? ImageModelSettings.None;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
@@ -225,6 +227,8 @@ public sealed record HarnessSettings
     public bool Plugins { get; }
 
     public bool WorkspaceTrust { get; }
+
+    public RuleFileSettings RuleFiles { get; }
 
     public bool ShowCompactionSummary { get; }
 
@@ -343,6 +347,12 @@ public sealed record HarnessSettings
 
     public HarnessSettings WithWorkspaceTrust(bool workspaceTrust) =>
         Copy(workspaceTrust: workspaceTrust);
+
+    public HarnessSettings WithRuleFiles(RuleFileSettings ruleFiles)
+    {
+        ArgumentNullException.ThrowIfNull(ruleFiles);
+        return Copy(ruleFiles: ruleFiles);
+    }
 
     public HarnessSettings WithShowCompactionSummary(bool showCompactionSummary) =>
         Copy(showCompactionSummary: showCompactionSummary);
@@ -501,7 +511,8 @@ public sealed record HarnessSettings
         bool setCompactionModel = false,
         bool? showAutomaticCompactionSummary = null,
         MicroCompactionSettings? microCompaction = null,
-        bool setMicroCompaction = false) =>
+        bool setMicroCompaction = false,
+        RuleFileSettings? ruleFiles = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -537,7 +548,8 @@ public sealed record HarnessSettings
             approvalRetry ?? ApprovalRetry,
             setCompactionModel ? compactionModel : CompactionModel,
             showAutomaticCompactionSummary ?? ShowAutomaticCompactionSummary,
-            setMicroCompaction ? microCompaction : MicroCompaction);
+            setMicroCompaction ? microCompaction : MicroCompaction,
+            ruleFiles ?? RuleFiles);
 
     public override string ToString() => nameof(HarnessSettings);
 

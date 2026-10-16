@@ -173,6 +173,7 @@ CLI options:
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing and refuses enable, disable, up, and down. Listing stays available |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set for this process, even when its file says `enabled` false. Does not write the file. Rejected together with `--prompt-attachments off` |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--rules <value>` | `on` or `off` for both rule-file sides, or `global=on\|off` and `project=on\|off`. Does not affect `instructions.md` or `.crystal.md` |
 | `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
 | `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
 | `--duration <seconds>` | Wall-clock cap for each turn. `unlimited` removes that cap |
@@ -313,6 +314,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set, even when `enabled` is false. A missing name exits 1. Cannot be combined with `--prompt-attachments off`. Does not write the file |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--rules <value>` | `on` or `off` for both rule-file sides, or comma-separated `global=on\|off` and `project=on\|off`. An assignment leaves the other side as saved. Does not write the file, and does not affect `instructions.md` or `.crystal.md` |
 | `--workspace-trust <on\|off>` | Directory trust for this process only. Omitted and `on` refuse an untrusted directory. `off` skips the check and does not record trust. This does not follow `workspaceTrust` |
 | `--model-calls <count>` | Model rounds for this turn. Default 1024 |
 | `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
@@ -468,6 +470,7 @@ Top-level fields:
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), a portable name (`minimal`, `low`, `medium`, `high`, `maximum`; `max` is stored as `maximum`), or another effort token. Tokens are stored in lowercase |
 | `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
+| `ruleFiles` | OpenCode-compatible rule files. `global` and `project` each default to `true` and are omitted until off. Does not affect `instructions.md` or `.crystal.md` |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `plugins` | Enable operator plugin discovery (default `true`) |
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
@@ -1068,6 +1071,7 @@ returns the transcript viewport to the latest output.
 | `/cd` | | Show the workspace, or set it to an existing directory (`~` is expanded). An untrusted git root or directory asks first; No stays here. The operator space does not ask. Changing the directory is refused while a turn is running |
 | `/space` | | Switch to the operator space. Creates `{home}/space` when it is missing. Takes no path. Refused while a turn is running |
 | `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry. `forget` leaves the operator space trusted |
+| `/rules` | | Show global and project rule files, set both with `on` / `off`, or set one side with `global` or `project` and `on` / `off`. Writes `config.json`. Does not change `instructions.md` or `.crystal.md`. Refused during a turn or compaction |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
@@ -1433,6 +1437,14 @@ replacements. They never replace Work, Plan, or Review.
   matching name wins (`AGENTS.md`, then `CLAUDE.md`, then
   `CONTEXT.md`). Every file of that name on the walk is appended.
   `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
+
+`ruleFiles` in `config.json` turns those compatible files on or off.
+`global` and `project` each default to on and are omitted until off.
+`/rules` shows them and writes the same file. `/rules on` or `off` sets
+both sides. `/rules global off` or `/rules project off` sets one side
+and leaves the other as it is, including a launch override that is not
+on disk. `--rules` does the same for one process and is not written.
+`off` skips that discovery. `instructions.md` and `.crystal.md` stay.
 
 ## Skills
 

@@ -78,6 +78,9 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--plugins <on|off>")]
     public string? Plugins { get; init; }
 
+    [CommandOption("--rules <VALUE>")]
+    public string? Rules { get; init; }
+
     [CommandOption("--model-calls <COUNT>")]
     public string? ModelCalls { get; init; }
 

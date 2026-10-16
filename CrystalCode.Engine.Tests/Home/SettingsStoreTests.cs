@@ -948,6 +948,48 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_OmitsRuleFilesWhenBothAreOn()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+
+        var settings = store.LoadOrCreate();
+
+        Assert.True(settings.RuleFiles.Global);
+        Assert.True(settings.RuleFiles.Project);
+        Assert.DoesNotContain(
+            "ruleFiles",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_ReadsProjectRuleFilesDisabledAndOmitsTheOnSide()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "ruleFiles": { "project": false }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.True(settings.RuleFiles.Global);
+        Assert.False(settings.RuleFiles.Project);
+        store.Save(settings);
+        var saved = File.ReadAllText(root.Home.ConfigPath);
+        Assert.Contains("\"project\": false", saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"global\"", saved, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_ReadsPluginsDisabled()
     {
         using var root = new TemporaryHome();

@@ -101,7 +101,8 @@ public sealed class SettingsStore
             retry: ReadRetry(document.Retry),
             approvalRetry: ReadRetry(document.ApprovalRetry),
             compactionModel: ReadCompactionModel(document.CompactionModel),
-            microCompaction: ReadMicroCompaction(document.MicroCompaction));
+            microCompaction: ReadMicroCompaction(document.MicroCompaction),
+            ruleFiles: ReadRuleFiles(document.RuleFiles));
     }
 
     public void Save(HarnessSettings settings)
@@ -164,6 +165,7 @@ public sealed class SettingsStore
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
+            RuleFiles = WriteRuleFiles(settings.RuleFiles),
             ImageModel = WriteImageModel(settings.ImageModel),
             Retry = WriteRetry(settings.Retry),
             ApprovalRetry = WriteRetry(settings.ApprovalRetry)
@@ -468,6 +470,33 @@ public sealed class SettingsStore
             Project = settings.Project == ExternalToolApprovalSettings.Default.Project
                 ? null
                 : settings.Project.Value
+        };
+    }
+
+    private static RuleFileSettings ReadRuleFiles(RuleFilesDocument? document)
+    {
+        if (document is null)
+        {
+            return RuleFileSettings.Default;
+        }
+
+        return new RuleFileSettings(
+            document.Global ?? RuleFileSettings.Default.Global,
+            document.Project ?? RuleFileSettings.Default.Project);
+    }
+
+    private static RuleFilesDocument? WriteRuleFiles(RuleFileSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new RuleFilesDocument
+        {
+            Global = settings.Global ? null : false,
+            Project = settings.Project ? null : false
         };
     }
 }

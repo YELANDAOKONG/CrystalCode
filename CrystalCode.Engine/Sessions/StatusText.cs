@@ -86,6 +86,8 @@ public static class StatusText
                 ("Skills", Toggle(status.SkillsEnabled)),
                 ("External tools", Toggle(status.ExternalToolsEnabled)),
                 ("Plugins", Toggle(status.PluginsEnabled)),
+                ("Global rules", Toggle(status.GlobalRulesEnabled)),
+                ("Project rules", Toggle(status.ProjectRulesEnabled)),
                 ("Estimated tokens", Toggle(status.EstimatedTokensEnabled)),
                 ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
                 ("Verbose tools", Toggle(status.VerboseToolsEnabled)),

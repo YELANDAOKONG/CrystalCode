@@ -702,6 +702,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Trust:
                 return (true, await ChangeTrustAsync(command.Argument, cancellationToken));
+            case SessionVerb.Rules:
+                ChangeRules(command.Argument);
+                return (true, false);
             case SessionVerb.Fork:
                 await ForkSessionAsync(command.Argument, cancellationToken);
                 return (true, false);
@@ -2165,7 +2168,9 @@ public sealed class CodingSession : ITurnObserver
                 Retry: DescribeRetry(_settings.Retry),
                 ApprovalRetry: DescribeRetry(_settings.ApprovalRetry),
                 CompactionModel: CompactionModelStatus(),
-                MicroCompaction: DescribeMicroCompaction(_settings.MicroCompaction)),
+                MicroCompaction: DescribeMicroCompaction(_settings.MicroCompaction),
+                GlobalRulesEnabled: _settings.RuleFiles.Global,
+                ProjectRulesEnabled: _settings.RuleFiles.Project),
             full));
     }
 
@@ -2735,6 +2740,31 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
+    private void ChangeRules(string argument)
+    {
+        if (!RuleFileArguments.TryParse(argument, out var change, out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        if (change is null)
+        {
+            Note(RuleFileArguments.Format(_settings.RuleFiles));
+            return;
+        }
+
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing rule files.");
+            return;
+        }
+
+        SaveSettings(current => current.WithRuleFiles(change.Apply(current.RuleFiles)));
+        ReloadPrompts();
+        Note(RuleFileArguments.Format(_settings.RuleFiles));
+    }
+
     private PromptContext CurrentPromptContext()
     {
         var directories = DirectoryAccessText.Render(_workspace.Access.Snapshot());
@@ -2781,7 +2811,8 @@ public sealed class CodingSession : ITurnObserver
             _workspace.Root,
             _settings.PromptSetOverride,
             _settings.UsePromptAttachments,
-            _settings.PromptAttachments);
+            _settings.PromptAttachments,
+            _settings.RuleFiles);
 
     private bool IsForcedAttachment(string name)
     {

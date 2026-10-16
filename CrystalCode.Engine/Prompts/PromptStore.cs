@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 
 namespace CrystalCode.Engine.Prompts;
@@ -87,7 +88,8 @@ public sealed class PromptStore
         string workspaceRoot,
         string? promptSetOverride = null,
         bool usePromptAttachments = true,
-        IReadOnlyList<string>? forcedAttachments = null)
+        IReadOnlyList<string>? forcedAttachments = null,
+        RuleFileSettings? ruleFiles = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var project = new CrystalHome(Path.Combine(workspaceRoot, ProjectDirectoryName));
@@ -142,7 +144,7 @@ public sealed class PromptStore
                 work.Text,
                 plan.Text,
                 review.Text,
-                ReadInstructions(workspaceRoot, project),
+                ReadInstructions(workspaceRoot, project, ruleFiles),
                 enabled.Work,
                 enabled.Plan,
                 enabled.Review,
@@ -405,13 +407,16 @@ public sealed class PromptStore
         return unique;
     }
 
-    private string ReadInstructions(string workspaceRoot, CrystalHome project)
+    private string ReadInstructions(
+        string workspaceRoot,
+        CrystalHome project,
+        RuleFileSettings? ruleFiles)
     {
         var parts = new List<string>();
         AddNamedFile(parts, _home.Root, "instructions");
         AddNamedFile(parts, project.Root, "instructions");
         AddIfPresent(parts, Path.Combine(workspaceRoot, ".crystal.md"));
-        parts.AddRange(_discovery.Collect(workspaceRoot));
+        parts.AddRange(_discovery.Collect(workspaceRoot, ruleFiles));
         return string.Join("\n\n", parts);
     }
 

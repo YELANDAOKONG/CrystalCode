@@ -91,6 +91,12 @@ internal static class TaskRunOverrides
                 next = next.WithPlugins(ParseSwitch(request.Plugins, "--plugins"));
             }
 
+            if (request.Rules is not null)
+            {
+                next = next.WithRuleFiles(
+                    RuleFileSettings.ParseLaunch(request.Rules, next.RuleFiles));
+            }
+
             if (request.PromptSet is not null)
             {
                 next = next.WithPromptSetOverride(Required(request.PromptSet, "Prompt set"));

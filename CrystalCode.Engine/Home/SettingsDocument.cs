@@ -20,6 +20,8 @@ internal sealed class SettingsDocument
 
     public bool? WorkspaceTrust { get; set; }
 
+    public RuleFilesDocument? RuleFiles { get; set; }
+
     public ExternalToolApprovalDocument? ExternalToolApproval { get; set; }
 
     public bool? EstimatedTokens { get; set; }

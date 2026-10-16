@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
@@ -72,6 +73,42 @@ public sealed class InstructionDiscoveryTests
         var text = string.Join("\n\n", parts);
 
         Assert.Contains("claude global", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Collect_SkipsProjectRulesWhenThatSideIsOff()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        File.WriteAllText(Path.Combine(home.Home.Root, InstructionNames.Agents), "global agents");
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "project agents");
+        var discovery = InstructionDiscovery.Isolated(home.Home);
+
+        var text = string.Join(
+            "\n",
+            discovery.Collect(workspace.Path, new RuleFileSettings(globalEnabled: true, projectEnabled: false)));
+
+        Assert.Contains("global agents", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("project agents", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Collect_SkipsGlobalRulesWhenThatSideIsOff()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        File.WriteAllText(Path.Combine(home.Home.Root, InstructionNames.Agents), "global agents");
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "project agents");
+        var discovery = InstructionDiscovery.Isolated(home.Home);
+
+        var text = string.Join(
+            "\n",
+            discovery.Collect(workspace.Path, new RuleFileSettings(globalEnabled: false, projectEnabled: true)));
+
+        Assert.DoesNotContain("global agents", text, StringComparison.Ordinal);
+        Assert.Contains("project agents", text, StringComparison.Ordinal);
     }
 
     [Fact]

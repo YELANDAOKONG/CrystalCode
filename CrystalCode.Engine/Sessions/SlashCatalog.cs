@@ -36,6 +36,8 @@ public static class SlashCatalog
         new(SessionVerb.Space, "space", [], "Switch to the operator space"),
         new(SessionVerb.Trust, "trust", [], "Show workspace trust or turn it on or off",
             ["on", "off", "forget"]),
+        new(SessionVerb.Rules, "rules", [], "Show or set global and project rule files",
+            ["on", "off", "global", "project"]),
         new(SessionVerb.Resume, "resume", ["continue"], "Choose a session, workspace, or all", ["all"]),
         new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
         new(SessionVerb.Sessions, "sessions", [], "List workspace sessions or all", ["all"]),

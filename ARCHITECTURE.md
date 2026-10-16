@@ -1224,6 +1224,20 @@ and never replace Work, Plan, or Review.
   `CONTEXT.md`). Every file of that name on the walk is appended.
   `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
 
+`config.json` field `ruleFiles` is an object with `global` and `project`.
+Each defaults to on. A missing object or member means on. The object is
+omitted when both are on; a written object includes only members that are
+off. `global` false skips the four global candidates. `project` false skips
+the walk. `/rules` shows the switches, sets both with `on` or `off`, or sets
+one side with `global` or `project` followed by `on` or `off`, and writes
+`config.json`. It reloads Work and Plan instructions for the next prompt and
+does not change an archived turn. It does not change `instructions.md` or
+`.crystal.md`. A process `--rules` value is `on`, `off`, or a comma-separated
+list of `global=on|off` and `project=on|off`. An assignment leaves the other
+side as already configured. The flag is not written to `config.json`. A later
+preference save applies only the side that command sets, so a launch
+assignment on the other side stays off disk.
+
 `credentials.json` is the persistent API-key store. Values are plain text,
 keyed by provider name, and the file is created with owner-only
 permissions. Process environment variables override those file credentials.
@@ -1399,6 +1413,9 @@ portable name `maximum`, whose wire spelling differs:
 
 `skills` enables the `skill` tool and available-skill guidance
 (default `true`). Set it to `false` to disable skill discovery.
+
+`ruleFiles` enables OpenCode-compatible rule files. `global` and `project`
+each default to `true`. See the instruction discovery section.
 
 `externalTools` enables operator tool set discovery (default `true`).
 Set it to `false` to skip `tools/` manifests.

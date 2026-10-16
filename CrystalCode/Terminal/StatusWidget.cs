@@ -134,6 +134,8 @@ internal static class StatusWidget
             ("Skills", Toggle(status.SkillsEnabled)),
             ("External tools", Toggle(status.ExternalToolsEnabled)),
             ("Plugins", Toggle(status.PluginsEnabled)),
+            ("Global rules", Toggle(status.GlobalRulesEnabled)),
+            ("Project rules", Toggle(status.ProjectRulesEnabled)),
             ("Token estimate", Toggle(status.EstimatedTokensEnabled)),
             ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
             ("Verbose tools", Toggle(status.VerboseToolsEnabled)),

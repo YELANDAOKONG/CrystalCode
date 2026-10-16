@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Tools;
 
@@ -50,12 +51,21 @@ public sealed class InstructionDiscovery
             Path.Combine(home.Root, "xdg-config"));
     }
 
-    public IReadOnlyList<string> Collect(string workspaceRoot)
+    public IReadOnlyList<string> Collect(string workspaceRoot, RuleFileSettings? ruleFiles = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
+        var rules = ruleFiles ?? RuleFileSettings.Default;
         var parts = new List<string>();
-        AddFirstExisting(parts, GlobalCandidates());
-        AddProjectFamily(parts, Path.GetFullPath(workspaceRoot));
+        if (rules.Global)
+        {
+            AddFirstExisting(parts, GlobalCandidates());
+        }
+
+        if (rules.Project)
+        {
+            AddProjectFamily(parts, Path.GetFullPath(workspaceRoot));
+        }
+
         return parts;
     }
 

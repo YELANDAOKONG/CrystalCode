@@ -579,6 +579,27 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public void RulesOverride_ChangesOnlyTheNamedSide()
+    {
+        var current = HarnessSettings.CreateDefault()
+            .WithRuleFiles(RuleFileSettings.Default.WithGlobal(false));
+
+        var applied = AssertApplied(current, new TaskRunSettings { Rules = "project=off" });
+
+        Assert.False(applied.RuleFiles.Global);
+        Assert.False(applied.RuleFiles.Project);
+        Assert.False(current.RuleFiles.Global);
+        Assert.True(current.RuleFiles.Project);
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { Rules = "project=false" },
+            out _,
+            out _,
+            out var error));
+        Assert.Contains("--rules", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PromptAttachmentOverride_StaysInMemoryAndRejectsOff()
     {
         var current = HarnessSettings.CreateDefault();

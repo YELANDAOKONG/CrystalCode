@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tests.Home;
@@ -115,6 +116,26 @@ public sealed class PromptStoreTests
         Assert.Contains("run tests with dotnet test", prompts.WorkSystem, StringComparison.Ordinal);
         Assert.Contains("Instructions from:", prompts.WorkSystem, StringComparison.Ordinal);
         Assert.Equal(ApprovalReviewPrompt.SystemText, prompts.Review);
+    }
+
+    [Fact]
+    public void Resolve_DisablingProjectRulesKeepsCrystalInstructions()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        File.WriteAllText(home.Home.InstructionsPath, "prefer tests");
+        File.WriteAllText(Path.Combine(workspace.Path, ".crystal.md"), "this repo is CrystalCode");
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "run tests with dotnet test");
+        var store = CreateStore(home);
+
+        var prompts = store.Resolve(
+            workspace.Path,
+            ruleFiles: new RuleFileSettings(globalEnabled: true, projectEnabled: false)).Prompts;
+
+        Assert.Contains("prefer tests", prompts.Instructions, StringComparison.Ordinal);
+        Assert.Contains("this repo is CrystalCode", prompts.Instructions, StringComparison.Ordinal);
+        Assert.DoesNotContain("run tests with dotnet test", prompts.Instructions, StringComparison.Ordinal);
     }
 
     [Fact]

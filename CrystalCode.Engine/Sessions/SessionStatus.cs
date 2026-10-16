@@ -44,4 +44,6 @@ public sealed record SessionStatus(
     string? Retry = null,
     string? ApprovalRetry = null,
     string? CompactionModel = null,
-    string? MicroCompaction = null);
+    string? MicroCompaction = null,
+    bool GlobalRulesEnabled = true,
+    bool ProjectRulesEnabled = true);

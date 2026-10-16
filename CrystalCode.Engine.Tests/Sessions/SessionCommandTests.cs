@@ -42,6 +42,7 @@ public sealed class SessionCommandTests
     [InlineData("/space", SessionVerb.Space)]
     [InlineData("/todos", SessionVerb.Todos)]
     [InlineData("/todo", SessionVerb.Todos)]
+    [InlineData("/rules project off", SessionVerb.Rules)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)
     {
         var parsed = SessionCommand.TryParse(input, out var command);
