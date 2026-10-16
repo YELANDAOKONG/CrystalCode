@@ -1648,7 +1648,10 @@ caption changes. It is independent of the
 status-bar activity bullet (`• Bash`). The row is omitted when
 idle. Assistant text is
 rendered as markdown while it streams and after it commits (headings,
-lists, fenced code with a dim code background, inline code and bold).
+lists, fenced code with a dim code background, inline code and bold, and
+GFM tables). A table is aligned by display columns, wrapped inside a
+column, or stacked when the terminal cannot give every column its minimum.
+A table that cannot be parsed or laid out is painted as its original lines.
 User, thinking, tool, and result blocks are rounded panels. A live turn
 writes a Tool card when the model round closes with tool calls, before
 those calls execute, using the same one-line summary as session replay.

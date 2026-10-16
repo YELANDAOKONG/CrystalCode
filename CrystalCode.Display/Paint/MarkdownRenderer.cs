@@ -5,10 +5,16 @@ namespace CrystalCode.Display.Paint;
 /// <summary>
 /// Lightweight Markdown parser producing PaintLines for the transcript.
 /// Supports headings, fenced code with language badges and diff highlights,
-/// lists (ordered and unordered), blockquotes, horizontal rules, and inline styling.
+/// lists (ordered and unordered), blockquotes, horizontal rules, GFM tables,
+/// and inline styling. A table that cannot be parsed or laid out is painted
+/// as ordinary lines.
 /// </summary>
 public static class MarkdownRenderer
 {
+    private const string TableIndent = "  ";
+    private const string TableGap = "  ";
+    private const int TableMinColumnWidth = 4;
+
     public static IReadOnlyList<PaintLine> Render(string markdown, int width)
     {
         ArgumentNullException.ThrowIfNull(markdown);
@@ -23,9 +29,11 @@ public static class MarkdownRenderer
         var markup = new StringBuilder();
         var inFence = false;
         string? fenceLang = null;
+        var source = markdown.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
 
-        foreach (var raw in markdown.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
+        for (var index = 0; index < source.Length; index++)
         {
+            var raw = source[index];
             if (raw.StartsWith("```", StringComparison.Ordinal))
             {
                 if (!inFence)
@@ -53,42 +61,67 @@ public static class MarkdownRenderer
                 continue;
             }
 
-            if (IsHorizontalRule(raw))
+            if (CanStartTable(raw) && TryConsumeTable(source, index, out var consumed))
             {
-                var ruleWidth = Math.Max(Math.Min(width - 4, 40), 10);
-                var ruleText = "  " + new string('─', ruleWidth);
-                lines.Add(PaintLine.Colored(Theme.Rule, ruleText));
+                if (!TryAppendTable(lines, source, index, consumed, width, scratch, markup))
+                {
+                    for (var offset = 0; offset < consumed; offset++)
+                    {
+                        RenderLooseLine(lines, source[index + offset], width, pieces, scratch, markup);
+                    }
+                }
+
+                index += consumed - 1;
                 continue;
             }
 
-            if (TryHeading(raw, out var level, out var headingText))
-            {
-                RenderHeading(lines, level, headingText, width);
-                continue;
-            }
-
-            if (TryBlockquote(raw, out var quoteText))
-            {
-                RenderBlockquote(lines, quoteText, width, pieces, scratch, markup);
-                continue;
-            }
-
-            if (TryList(raw, out var listPrefix, out var itemText, out var isOrdered))
-            {
-                RenderListItem(lines, listPrefix, itemText, isOrdered, width, pieces, scratch, markup);
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                lines.Add(PaintLine.Blank);
-                continue;
-            }
-
-            RenderParagraph(lines, raw, width, pieces, scratch, markup);
+            RenderLooseLine(lines, raw, width, pieces, scratch, markup);
         }
 
         return lines;
+    }
+
+    private static void RenderLooseLine(
+        List<PaintLine> lines,
+        string raw,
+        int width,
+        List<InlinePiece> pieces,
+        StringBuilder scratch,
+        StringBuilder markup)
+    {
+        if (IsHorizontalRule(raw))
+        {
+            var ruleWidth = Math.Max(Math.Min(width - 4, 40), 10);
+            var ruleText = "  " + new string('─', ruleWidth);
+            lines.Add(PaintLine.Colored(Theme.Rule, ruleText));
+            return;
+        }
+
+        if (TryHeading(raw, out var level, out var headingText))
+        {
+            RenderHeading(lines, level, headingText, width);
+            return;
+        }
+
+        if (TryBlockquote(raw, out var quoteText))
+        {
+            RenderBlockquote(lines, quoteText, width, pieces, scratch, markup);
+            return;
+        }
+
+        if (TryList(raw, out var listPrefix, out var itemText, out var isOrdered))
+        {
+            RenderListItem(lines, listPrefix, itemText, isOrdered, width, pieces, scratch, markup);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            lines.Add(PaintLine.Blank);
+            return;
+        }
+
+        RenderParagraph(lines, raw, width, pieces, scratch, markup);
     }
 
     private static void RenderHeading(
@@ -613,6 +646,758 @@ public static class MarkdownRenderer
         return true;
     }
 
+    private static bool CanStartTable(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw) || IsHorizontalRule(raw))
+        {
+            return false;
+        }
+
+        if (TryHeading(raw, out _, out _))
+        {
+            return false;
+        }
+
+        if (TryBlockquote(raw, out _))
+        {
+            return false;
+        }
+
+        return !TryList(raw, out _, out _, out _);
+    }
+
+    private static bool TryConsumeTable(string[] source, int start, out int count)
+    {
+        count = 0;
+        if (start + 1 >= source.Length
+            || !TrySplitRow(source[start], out _)
+            || !TrySplitRow(source[start + 1], out var separator)
+            || !IsDelimiterRow(separator))
+        {
+            return false;
+        }
+
+        var index = start + 2;
+        while (index < source.Length && TrySplitRow(source[index], out _))
+        {
+            index++;
+        }
+
+        count = index - start;
+        return true;
+    }
+
+    private static bool TryAppendTable(
+        List<PaintLine> lines,
+        string[] source,
+        int start,
+        int count,
+        int width,
+        StringBuilder scratch,
+        StringBuilder markup)
+    {
+        try
+        {
+            if (!TryParseTable(source, start, count, scratch, out var table))
+            {
+                return false;
+            }
+
+            var rendered = new List<PaintLine>();
+            if (!TryLayoutTable(rendered, table, width, markup))
+            {
+                return false;
+            }
+
+            lines.AddRange(rendered);
+            return true;
+        }
+        catch (Exception)
+        {
+            // A broken table must not take down the transcript. The caller
+            // paints the original lines instead.
+            return false;
+        }
+    }
+
+    private static bool TryParseTable(
+        string[] source,
+        int start,
+        int count,
+        StringBuilder scratch,
+        out ParsedTable table)
+    {
+        table = default;
+        if (count < 2
+            || !TrySplitRow(source[start], out var headerCells)
+            || !TrySplitRow(source[start + 1], out var separators)
+            || separators.Count != headerCells.Count
+            || headerCells.Count == 0)
+        {
+            return false;
+        }
+
+        var aligns = new ColumnAlign[headerCells.Count];
+        for (var column = 0; column < separators.Count; column++)
+        {
+            if (!TryDelimiterAlign(separators[column], out aligns[column]))
+            {
+                return false;
+            }
+        }
+
+        var header = new TableCell[headerCells.Count];
+        for (var column = 0; column < headerCells.Count; column++)
+        {
+            if (!TryMakeCell(headerCells[column], scratch, out header[column]))
+            {
+                return false;
+            }
+        }
+
+        var rows = new TableCell[count - 2][];
+        for (var row = 0; row < rows.Length; row++)
+        {
+            if (!TrySplitRow(source[start + 2 + row], out var cells) || cells.Count != headerCells.Count)
+            {
+                return false;
+            }
+
+            var parsed = new TableCell[cells.Count];
+            for (var column = 0; column < cells.Count; column++)
+            {
+                if (!TryMakeCell(cells[column], scratch, out parsed[column]))
+                {
+                    return false;
+                }
+            }
+
+            rows[row] = parsed;
+        }
+
+        table = new ParsedTable(header, aligns, rows);
+        return true;
+    }
+
+    private static bool TryMakeCell(string raw, StringBuilder scratch, out TableCell cell)
+    {
+        cell = default;
+        if (TerminalText.HasControls(raw))
+        {
+            return false;
+        }
+
+        var pieces = new List<InlinePiece>();
+        var text = ApplyInline(raw, pieces, scratch);
+        if (TerminalText.HasControls(text) || !PiecesCover(text, pieces))
+        {
+            return false;
+        }
+
+        cell = new TableCell(text, pieces);
+        return true;
+    }
+
+    private static bool PiecesCover(string text, List<InlinePiece> pieces)
+    {
+        var cursor = 0;
+        foreach (var piece in pieces)
+        {
+            if (piece.Start != cursor || piece.End < piece.Start || piece.End > text.Length)
+            {
+                return false;
+            }
+
+            cursor = piece.End;
+        }
+
+        return cursor == text.Length;
+    }
+
+    private static bool TryLayoutTable(
+        List<PaintLine> lines,
+        ParsedTable table,
+        int width,
+        StringBuilder markup)
+    {
+        var columns = table.Header.Length;
+        var budget = width - TextWidth.Measure(TableIndent);
+        if (columns == 0 || budget < 1)
+        {
+            return false;
+        }
+
+        var gap = TextWidth.Measure(TableGap);
+        var gaps = columns > 1 ? (columns - 1) * gap : 0;
+        var inner = budget - gaps;
+        if (inner < 1)
+        {
+            return TryAppendStacked(lines, table, budget, width, markup);
+        }
+
+        if (!TryAssignWidths(NaturalWidths(table), inner, out var widths, out var stack))
+        {
+            return false;
+        }
+
+        return stack
+            ? TryAppendStacked(lines, table, budget, width, markup)
+            : TryAppendAligned(lines, table, widths, width, markup);
+    }
+
+    private static int[] NaturalWidths(ParsedTable table)
+    {
+        var natural = new int[table.Header.Length];
+        for (var column = 0; column < natural.Length; column++)
+        {
+            natural[column] = TextWidth.Measure(table.Header[column].Text);
+            foreach (var row in table.Rows)
+            {
+                natural[column] = Math.Max(natural[column], TextWidth.Measure(row[column].Text));
+            }
+        }
+
+        return natural;
+    }
+
+    private static bool TryAssignWidths(int[] natural, int inner, out int[] widths, out bool stack)
+    {
+        stack = false;
+        widths = new int[natural.Length];
+        if (natural.Length == 0 || inner < 1)
+        {
+            return false;
+        }
+
+        var used = 0;
+        for (var column = 0; column < natural.Length; column++)
+        {
+            if (natural[column] < 0)
+            {
+                return false;
+            }
+
+            widths[column] = Math.Max(natural[column], 1);
+            used += widths[column];
+        }
+
+        while (used > inner)
+        {
+            var widest = WidestShrinkable(widths, natural);
+            if (widest < 0)
+            {
+                stack = true;
+                return true;
+            }
+
+            var floor = ShrinkFloor(natural[widest]);
+            var cut = Math.Min(used - inner, widths[widest] - floor);
+            if (cut < 1)
+            {
+                return false;
+            }
+
+            widths[widest] -= cut;
+            used -= cut;
+        }
+
+        foreach (var columnWidth in widths)
+        {
+            if (columnWidth < 1)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int ShrinkFloor(int natural)
+    {
+        var least = Math.Max(natural, 1);
+        return Math.Min(TableMinColumnWidth, least);
+    }
+
+    private static int WidestShrinkable(int[] widths, int[] natural)
+    {
+        var index = -1;
+        var width = 0;
+        for (var column = 0; column < widths.Length; column++)
+        {
+            if (widths[column] > ShrinkFloor(natural[column]) && widths[column] > width)
+            {
+                index = column;
+                width = widths[column];
+            }
+        }
+
+        return index;
+    }
+
+    private static bool TryAppendAligned(
+        List<PaintLine> lines,
+        ParsedTable table,
+        int[] widths,
+        int width,
+        StringBuilder markup)
+    {
+        var plain = new StringBuilder();
+        if (!TryAppendRow(lines, table.Header, widths, table.Aligns, heading: true, width, markup, plain)
+            || !TryAppendRule(lines, widths, width, markup, plain))
+        {
+            return false;
+        }
+
+        foreach (var row in table.Rows)
+        {
+            if (!TryAppendRow(lines, row, widths, table.Aligns, heading: false, width, markup, plain))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryAppendRow(
+        List<PaintLine> lines,
+        TableCell[] cells,
+        int[] widths,
+        ColumnAlign[] aligns,
+        bool heading,
+        int width,
+        StringBuilder markup,
+        StringBuilder plain)
+    {
+        var wrapped = new List<(int Start, int End)>[cells.Length];
+        var height = 1;
+        for (var column = 0; column < cells.Length; column++)
+        {
+            if (!TryWrapCell(cells[column].Text, widths[column], out var parts))
+            {
+                return false;
+            }
+
+            wrapped[column] = parts;
+            height = Math.Max(height, parts.Count);
+        }
+
+        for (var line = 0; line < height; line++)
+        {
+            if (!TryEmitScreenRow(lines, cells, wrapped, line, widths, aligns, heading, width, markup, plain))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryEmitScreenRow(
+        List<PaintLine> lines,
+        TableCell[] cells,
+        List<(int Start, int End)>[] wrapped,
+        int line,
+        int[] widths,
+        ColumnAlign[] aligns,
+        bool heading,
+        int width,
+        StringBuilder markup,
+        StringBuilder plain)
+    {
+        plain.Clear();
+        markup.Clear();
+        plain.Append(TableIndent);
+        markup.Append(TableIndent);
+        for (var column = 0; column < cells.Length; column++)
+        {
+            if (column > 0)
+            {
+                plain.Append(TableGap);
+                markup.Append(TableGap);
+            }
+
+            var start = 0;
+            var end = 0;
+            if (line < wrapped[column].Count)
+            {
+                start = wrapped[column][line].Start;
+                end = wrapped[column][line].End;
+            }
+
+            var slice = cells[column].Text[start..end];
+            var pad = widths[column] - TextWidth.Measure(slice);
+            if (pad < 0 || widths[column] < 1)
+            {
+                return false;
+            }
+
+            var left = aligns[column] switch
+            {
+                ColumnAlign.Right => pad,
+                ColumnAlign.Center => pad / 2,
+                ColumnAlign.Left => 0,
+                _ => 0
+            };
+            AppendSpaces(plain, markup, left);
+            plain.Append(slice);
+            if (heading)
+            {
+                AppendSliceMarkup(markup, cells[column].Text, start, end, heading: true, pieces: null);
+            }
+            else
+            {
+                AppendSliceMarkup(markup, cells[column].Text, start, end, heading: false, cells[column].Pieces);
+            }
+
+            AppendSpaces(plain, markup, pad - left);
+        }
+
+        if (TextWidth.Measure(plain.ToString()) > width)
+        {
+            return false;
+        }
+
+        lines.Add(new PaintLine(markup.ToString(), plain.ToString()));
+        return true;
+    }
+
+    private static bool TryAppendRule(
+        List<PaintLine> lines,
+        int[] widths,
+        int width,
+        StringBuilder markup,
+        StringBuilder plain)
+    {
+        plain.Clear();
+        plain.Append(TableIndent);
+        for (var column = 0; column < widths.Length; column++)
+        {
+            if (widths[column] < 1)
+            {
+                return false;
+            }
+
+            if (column > 0)
+            {
+                plain.Append(TableGap);
+            }
+
+            plain.Append('─', widths[column]);
+        }
+
+        if (TextWidth.Measure(plain.ToString()) > width)
+        {
+            return false;
+        }
+
+        markup.Clear();
+        markup.Append('[').Append(Theme.Muted).Append(']');
+        markup.Append(MarkupText.Escape(plain.ToString()));
+        markup.Append("[/]");
+        lines.Add(new PaintLine(markup.ToString(), plain.ToString()));
+        return true;
+    }
+
+    private static bool TryAppendStacked(
+        List<PaintLine> lines,
+        ParsedTable table,
+        int budget,
+        int width,
+        StringBuilder markup)
+    {
+        var plain = new StringBuilder();
+        if (table.Rows.Length == 0)
+        {
+            foreach (var header in table.Header)
+            {
+                if (!TryAppendField(lines, header.Text, budget, width, heading: true, pieces: null, markup, plain))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        for (var row = 0; row < table.Rows.Length; row++)
+        {
+            if (row > 0)
+            {
+                lines.Add(PaintLine.Blank);
+            }
+
+            for (var column = 0; column < table.Header.Length; column++)
+            {
+                if (!TryAppendField(lines, table.Header[column].Text, budget, width, heading: true, pieces: null, markup, plain)
+                    || !TryAppendField(lines, table.Rows[row][column].Text, budget, width, heading: false, table.Rows[row][column].Pieces, markup, plain))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryAppendField(
+        List<PaintLine> lines,
+        string text,
+        int budget,
+        int width,
+        bool heading,
+        List<InlinePiece>? pieces,
+        StringBuilder markup,
+        StringBuilder plain)
+    {
+        if (text.Length == 0)
+        {
+            return true;
+        }
+
+        if (budget < 1 || !TryWrapCell(text, budget, out var parts))
+        {
+            return false;
+        }
+
+        foreach (var part in parts)
+        {
+            plain.Clear();
+            markup.Clear();
+            plain.Append(TableIndent);
+            markup.Append(TableIndent);
+            plain.Append(text, part.Start, part.End - part.Start);
+            AppendSliceMarkup(markup, text, part.Start, part.End, heading, pieces);
+            if (TextWidth.Measure(plain.ToString()) > width)
+            {
+                return false;
+            }
+
+            lines.Add(new PaintLine(markup.ToString(), plain.ToString()));
+        }
+
+        return true;
+    }
+
+    private static void AppendSliceMarkup(
+        StringBuilder markup,
+        string text,
+        int start,
+        int end,
+        bool heading,
+        List<InlinePiece>? pieces)
+    {
+        if (end <= start)
+        {
+            return;
+        }
+
+        if (heading || pieces is null)
+        {
+            markup.Append('[').Append(Theme.Heading).Append(']');
+            markup.Append(MarkupText.Escape(text[start..end]));
+            markup.Append("[/]");
+            return;
+        }
+
+        AppendMarkup(markup, text, start, end, pieces);
+    }
+
+    private static bool TryWrapCell(string text, int columnWidth, out List<(int Start, int End)> parts)
+    {
+        parts = [];
+        if (columnWidth < 1)
+        {
+            return false;
+        }
+
+        if (text.Length == 0)
+        {
+            parts.Add((0, 0));
+            return true;
+        }
+
+        var start = 0;
+        while (start < text.Length)
+        {
+            var end = TextWidth.FitEnd(text, start, text.Length, columnWidth);
+            if (end <= start)
+            {
+                return false;
+            }
+
+            if (TextWidth.Measure(text.AsSpan(start, end - start)) > columnWidth)
+            {
+                return false;
+            }
+
+            parts.Add((start, end));
+            start = end;
+        }
+
+        return true;
+    }
+
+    private static void AppendSpaces(StringBuilder plain, StringBuilder markup, int count)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var spaces = new string(' ', count);
+        plain.Append(spaces);
+        markup.Append(spaces);
+    }
+
+    private static bool TrySplitRow(string line, out List<string> cells)
+    {
+        cells = [];
+        var trimmed = line.Trim();
+        if (!ContainsUnescapedPipe(trimmed))
+        {
+            return false;
+        }
+
+        var start = 0;
+        var end = trimmed.Length;
+        if (trimmed[0] == '|')
+        {
+            start = 1;
+        }
+
+        if (end > start && trimmed[end - 1] == '|' && !IsEscaped(trimmed, end - 1))
+        {
+            end--;
+        }
+
+        SplitCells(trimmed[start..end], cells);
+        return cells.Count > 0;
+    }
+
+    private static void SplitCells(string body, List<string> cells)
+    {
+        var current = new StringBuilder();
+        var inCode = false;
+        for (var index = 0; index < body.Length; index++)
+        {
+            var ch = body[index];
+            if (ch == '`')
+            {
+                inCode = !inCode;
+                current.Append(ch);
+                continue;
+            }
+
+            if (ch == '\\' && index + 1 < body.Length && body[index + 1] is '|' or '\\')
+            {
+                current.Append(body[index + 1]);
+                index++;
+                continue;
+            }
+
+            if (ch == '|' && !inCode)
+            {
+                cells.Add(current.ToString().Trim());
+                current.Clear();
+                continue;
+            }
+
+            current.Append(ch);
+        }
+
+        cells.Add(current.ToString().Trim());
+    }
+
+    private static bool ContainsUnescapedPipe(string text)
+    {
+        var inCode = false;
+        for (var index = 0; index < text.Length; index++)
+        {
+            var ch = text[index];
+            if (ch == '`')
+            {
+                inCode = !inCode;
+                continue;
+            }
+
+            if (ch == '\\' && index + 1 < text.Length && text[index + 1] is '|' or '\\')
+            {
+                index++;
+                continue;
+            }
+
+            if (ch == '|' && !inCode)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsEscaped(string text, int index)
+    {
+        var slashes = 0;
+        for (var cursor = index - 1; cursor >= 0 && text[cursor] == '\\'; cursor--)
+        {
+            slashes++;
+        }
+
+        return slashes % 2 == 1;
+    }
+
+    private static bool IsDelimiterRow(List<string> cells)
+    {
+        if (cells.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var cell in cells)
+        {
+            if (!TryDelimiterAlign(cell, out _))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryDelimiterAlign(string cell, out ColumnAlign align)
+    {
+        align = ColumnAlign.Left;
+        if (cell.Length == 0)
+        {
+            return false;
+        }
+
+        var left = cell[0] == ':';
+        var right = cell[^1] == ':';
+        var start = left ? 1 : 0;
+        var end = right ? cell.Length - 1 : cell.Length;
+        if (end <= start)
+        {
+            return false;
+        }
+
+        for (var index = start; index < end; index++)
+        {
+            if (cell[index] != '-')
+            {
+                return false;
+            }
+        }
+
+        align = left && right
+            ? ColumnAlign.Center
+            : right
+                ? ColumnAlign.Right
+                : ColumnAlign.Left;
+        return true;
+    }
+
     private enum InlineKind
     {
         Plain,
@@ -622,5 +1407,19 @@ public static class MarkdownRenderer
         Strike
     }
 
+    private enum ColumnAlign
+    {
+        Left,
+        Center,
+        Right
+    }
+
     private readonly record struct InlinePiece(int Start, int End, InlineKind Kind);
+
+    private readonly record struct TableCell(string Text, List<InlinePiece> Pieces);
+
+    private readonly record struct ParsedTable(
+        TableCell[] Header,
+        ColumnAlign[] Aligns,
+        TableCell[][] Rows);
 }
