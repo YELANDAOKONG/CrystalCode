@@ -7,6 +7,7 @@ public enum VerboseTarget
 {
     Tools,
     Commands,
+    Results,
     Approvals,
     Review,
     Thinking

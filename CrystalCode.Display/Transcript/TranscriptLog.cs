@@ -30,6 +30,7 @@ public sealed class TranscriptLog
     private readonly List<int> _entryRows = [];
     private bool _verboseTools = true;
     private bool _verboseCommands = true;
+    private bool _verboseResults = true;
     private bool _verboseApprovals = true;
     private bool _verboseReview = true;
     private bool _verboseThinking = true;
@@ -60,6 +61,21 @@ public sealed class TranscriptLog
             }
 
             _verboseCommands = value;
+            InvalidateCache();
+        }
+    }
+
+    public bool VerboseResults
+    {
+        get => _verboseResults;
+        set
+        {
+            if (_verboseResults == value)
+            {
+                return;
+            }
+
+            _verboseResults = value;
             InvalidateCache();
         }
     }
@@ -111,7 +127,8 @@ public sealed class TranscriptLog
 
     /// <summary>
     /// Inline row text when the alternate screen is off. Null when a verbose
-    /// switch hides the row. Command results stay, compacted when that switch is off.
+    /// switch hides the row. While result verbose is on, command results stay
+    /// and compact when the command switch is off.
     /// </summary>
     public string? InlineText(
         TranscriptKind kind,
@@ -134,7 +151,8 @@ public sealed class TranscriptLog
             kind,
             toolName,
             _verboseTools,
-            _verboseCommands))
+            _verboseCommands,
+            _verboseResults))
         {
             return null;
         }

@@ -75,6 +75,51 @@ public sealed class TranscriptLogVerboseTests
     }
 
     [Fact]
+    public void BuildLines_OmitsSuccessResultsWhenResultVerboseIsOff()
+    {
+        var log = new TranscriptLog
+        {
+            VerboseResults = false,
+            VerboseTools = true,
+            VerboseCommands = true
+        };
+        log.Add(TranscriptKind.Tool, "Edit  PromptStore.cs");
+        log.Add(TranscriptKind.Result, "Edited PromptStore.cs.", toolName: "edit");
+        log.Add(TranscriptKind.Result, "hello", toolName: "read");
+        log.Add(TranscriptKind.Result, "exit 0\nline1\npassed", toolName: "bash");
+        log.Add(TranscriptKind.Result, "task log", toolName: "bash_logs");
+        log.Add(TranscriptKind.Error, "edit failed", toolName: "edit");
+
+        var text = string.Join('\n', log.BuildLines(80).Select(line => line.Plain));
+
+        Assert.Contains("Edit", text, StringComparison.Ordinal);
+        Assert.Contains("PromptStore.cs", text, StringComparison.Ordinal);
+        Assert.Contains("edit failed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Edited", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("hello", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("passed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("task log", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("output lines hidden", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_RestoresChildResultRulesWhenResultVerboseTurnsOn()
+    {
+        var log = new TranscriptLog { VerboseResults = false, VerboseCommands = false };
+        log.Add(TranscriptKind.Result, "Edited PromptStore.cs.", toolName: "edit");
+        log.Add(TranscriptKind.Result, "exit 0\nline1\nline2\npassed", toolName: "bash");
+        log.BuildLines(80);
+        log.VerboseResults = true;
+
+        var text = string.Join('\n', log.BuildLines(80).Select(line => line.Plain));
+
+        Assert.Contains("Edited PromptStore.cs.", text, StringComparison.Ordinal);
+        Assert.Contains("2 output lines hidden", text, StringComparison.Ordinal);
+        Assert.Contains("passed", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("line1", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildLines_KeepsEditResultWhenToolVerboseIsOff()
     {
         var log = new TranscriptLog { VerboseTools = false };

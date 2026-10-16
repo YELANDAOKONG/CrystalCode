@@ -33,6 +33,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultVerboseCommands = true;
 
+    public const bool DefaultVerboseResults = true;
+
     public const bool DefaultVerboseApprovals = true;
 
     public const bool DefaultVerboseReview = true;
@@ -53,6 +55,7 @@ public sealed record HarnessSettings
         bool estimatedTokens = DefaultEstimatedTokens,
         bool verboseTools = DefaultVerboseTools,
         bool verboseCommands = DefaultVerboseCommands,
+        bool verboseResults = DefaultVerboseResults,
         bool verboseApprovals = DefaultVerboseApprovals,
         bool verboseReview = DefaultVerboseReview,
         bool verboseThinking = DefaultVerboseThinking,
@@ -128,6 +131,7 @@ public sealed record HarnessSettings
         EstimatedTokens = estimatedTokens;
         VerboseTools = verboseTools;
         VerboseCommands = verboseCommands;
+        VerboseResults = verboseResults;
         VerboseApprovals = verboseApprovals;
         VerboseReview = verboseReview;
         VerboseThinking = verboseThinking;
@@ -239,6 +243,8 @@ public sealed record HarnessSettings
     public bool VerboseTools { get; }
 
     public bool VerboseCommands { get; }
+
+    public bool VerboseResults { get; }
 
     public bool VerboseApprovals { get; }
 
@@ -369,6 +375,9 @@ public sealed record HarnessSettings
     public HarnessSettings WithVerboseCommands(bool verboseCommands) =>
         Copy(verboseCommands: verboseCommands);
 
+    public HarnessSettings WithVerboseResults(bool verboseResults) =>
+        Copy(verboseResults: verboseResults);
+
     public HarnessSettings WithVerboseApprovals(bool verboseApprovals) =>
         Copy(verboseApprovals: verboseApprovals);
 
@@ -478,6 +487,7 @@ public sealed record HarnessSettings
         bool? estimatedTokens = null,
         bool? verboseTools = null,
         bool? verboseCommands = null,
+        bool? verboseResults = null,
         bool? verboseApprovals = null,
         bool? verboseReview = null,
         bool? verboseThinking = null,
@@ -525,6 +535,7 @@ public sealed record HarnessSettings
             estimatedTokens ?? EstimatedTokens,
             verboseTools ?? VerboseTools,
             verboseCommands ?? VerboseCommands,
+            verboseResults ?? VerboseResults,
             verboseApprovals ?? VerboseApprovals,
             verboseReview ?? VerboseReview,
             verboseThinking ?? VerboseThinking,

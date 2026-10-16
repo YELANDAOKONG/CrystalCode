@@ -155,6 +155,7 @@ internal sealed class SessionProjection : ISessionObserver
         _renderer.ShowEstimatedTokens = preferences.EstimatedTokens;
         _renderer.VerboseTools = preferences.VerboseTools;
         _renderer.VerboseCommands = preferences.VerboseCommands;
+        _renderer.VerboseResults = preferences.VerboseResults;
         _renderer.VerboseApprovals = preferences.VerboseApprovals;
         _renderer.VerboseReview = preferences.VerboseReview;
         _renderer.VerboseThinking = preferences.VerboseThinking;

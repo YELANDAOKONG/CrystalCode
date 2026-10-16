@@ -7,6 +7,7 @@ public sealed record SessionPreferences(
     bool EstimatedTokens,
     bool VerboseTools,
     bool VerboseCommands,
+    bool VerboseResults,
     bool VerboseApprovals,
     bool VerboseReview,
     bool VerboseThinking,

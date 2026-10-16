@@ -178,6 +178,25 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    public bool VerboseResults
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _log.VerboseResults;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _log.VerboseResults = value;
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
     public bool VerboseApprovals
     {
         get

@@ -140,6 +140,7 @@ internal static class StatusWidget
             ("Custom status line", Toggle(status.CustomStatusLineEnabled)),
             ("Verbose tools", Toggle(status.VerboseToolsEnabled)),
             ("Verbose commands", Toggle(status.VerboseCommandsEnabled)),
+            ("Verbose results", Toggle(status.VerboseResultsEnabled)),
             ("Verbose approvals", Toggle(status.VerboseApprovalsEnabled)),
             ("Verbose review", Toggle(status.VerboseReviewEnabled)),
             ("Verbose thinking", Toggle(status.VerboseThinkingEnabled))

@@ -476,8 +476,9 @@ Top-level fields:
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
-| `verboseTools` | Show read, search, and skill result panels (default `true`; omitted when on) |
-| `verboseCommands` | Show full output from `bash`, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop` (default `true`; omitted when on). Off keeps a hidden-line hint and the last line |
+| `verboseResults` | Parent switch for success result panels (default `true`; omitted when on). Off hides every success result already on screen, including read, search, skill, edit, write, bash, and background bash. Tool cards and failures stay. `verboseTools` and `verboseCommands` do not draw results while this is off. `crystal run` does not read it |
+| `verboseTools` | While `verboseResults` is on, show read, search, and skill result panels (default `true`; omitted when on). Edit and write results stay. No visible effect while `verboseResults` is off |
+| `verboseCommands` | While `verboseResults` is on, show full output from `bash`, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop` (default `true`; omitted when on). Off keeps a hidden-line hint and the last line. No visible effect while `verboseResults` is off |
 | `verboseApprovals` | Show policy and grant auto-pass cards (default `true`; omitted when on). Off hides those cards already on screen. Review allow cards follow `verboseReview`. The ask overlay stays |
 | `verboseReview` | Show review allow cards (default `true`; omitted when on). Off hides those cards already on screen, including Outcome and rationale. Independent of `verboseApprovals`. The ask overlay, reviewer Deny text, and `crystal run` stay |
 | `verboseThinking` | Show Thinking panels in the interactive transcript (default `true`; omitted when on). Off hides live and restored cards. The gear, progress row, and export stay. `crystal run --show-thinking` is separate |
@@ -774,6 +775,39 @@ thinking, tool, result, and compaction-summary blocks are rounded panels. Tool n
 chrome are Title Case. Approval cards for edit and write show a short
 `+` / `-` preview of the change.
 
+### Result detail
+
+Success result panels use three switches. `verboseResults` is the parent.
+`verboseTools` and `verboseCommands` change the picture only while that
+parent is on. None of the three hides a Tool card, a failure result, an
+approval card, a thinking panel, or an ask overlay.
+
+`/verbose results` turns the parent on or off, or toggles it when you
+omit `on` and `off`. It stays on unless `verboseResults` is `false` in
+`config.json`. A config that has no such field keeps the parent on, so
+edit and bash results do not disappear until you turn it off. While it
+is off, every success result is omitted: read, search, skill, edit,
+write, `bash`, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`.
+The tool and command switches remain stored. They do not draw a result
+again until `/verbose results on`. Ctrl+G does not expand command output
+in that state, because the panel is omitted rather than collapsed.
+Cards already in this session follow the switch.
+
+While the parent is on:
+
+| `verboseTools` | `verboseCommands` | Success results |
+| :--- | :--- | :--- |
+| On | On | Full text |
+| Off | On | Read, search, and skill results are omitted. Edit and write results stay. Command output stays in full |
+| On | Off | Command output collapses to a hidden-line hint and the last line. Edit and write results stay. Other results stay in full |
+| Off | Off | Both of the off rows above |
+
+`/verbose tools` and Ctrl+O on an empty composer toggle tool detail.
+`/verbose commands` and Ctrl+G toggle command detail. `/verbose` with
+no argument prints all of these switches. `crystal run` does not read
+`verboseResults`; its plain log still shortens long command output on
+its own.
+
 ### Composer keys
 
 | Key | Action |
@@ -1059,7 +1093,7 @@ returns the transcript viewport to the latest output.
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count; refused during a turn or compaction |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
-| `/verbose` | | Show or set tool, command, approval, review, or thinking detail: `tools`, `commands`, `approvals`, `review`, `thinking`, then `on` or `off` |
+| `/verbose` | | Show or set tool, command, result, approval, review, or thinking detail: `tools`, `commands`, `results`, `approvals`, `review`, `thinking`, then `on` or `off`. `results` is the parent of `tools` and `commands` |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, enable one set, or `/prompts export [dir]` |
 | `/promptattach` | | List prompt attachments, or `enable` / `disable` / `up` / `down` one name |

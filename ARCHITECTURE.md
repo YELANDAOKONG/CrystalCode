@@ -1748,14 +1748,20 @@ writes a Tool card when the model round closes with tool calls, before
 those calls execute, using the same one-line summary as session replay.
 Tool names in chrome and cards are Title Case; stream name chunks are
 coalesced per tool call so a repeated snapshot does not become
-`ReadReadRead` and sequential calls never concatenate. Tool and bash
-result panels honor independent verbose toggles (`verboseTools` and
-`verboseCommands` in `config.json`, default on). When tool verbose is
-off, read/search/skill result panels are omitted while the Tool card
-remains; `edit` and `write` results always stay visible. When command
-verbose is off, results from `bash`, `bash_start`, `bash_status`,
-`bash_logs`, and `bash_stop` collapse to a hidden-line hint plus the
-last output line. Policy and grant auto-pass cards honor `verboseApprovals`
+`ReadReadRead` and sequential calls never concatenate. Success
+result panels honor `verboseResults` (`config.json`, default on, omitted
+when on). It is the parent of `verboseTools` and `verboseCommands`.
+While it is off, every success result is omitted, including read, search,
+skill, `edit`, `write`, `bash`, `bash_start`, `bash_status`, `bash_logs`,
+and `bash_stop`. The Tool card stays. Failure results stay. The child
+switches stay stored and do not draw a result until the parent is on
+again; Ctrl+G does not expand a command result in that state because the
+panel is omitted, not collapsed. A missing `verboseResults` field keeps
+the parent on. While the parent is on, tool verbose off omits
+read/search/skill result panels and still shows `edit` and `write`
+results, and command verbose off collapses `bash` and the four background
+bash tools to a hidden-line hint plus the last output line. `crystal run`
+does not read `verboseResults`. Policy and grant auto-pass cards honor `verboseApprovals`
 (default on). Review allow cards honor `verboseReview` (default on). The
 switches are independent: turning approvals off does not hide a review allow
 card, and turning review off does not hide a policy or grant card. Cards
@@ -1763,13 +1769,15 @@ already in the transcript follow their own switch, and turning that switch
 back on shows them again. A saved `verboseApprovals` value of false no longer
 hides review allow cards. The ask overlay still appears. Ctrl+O toggles tool verbose and
 Ctrl+G toggles command verbose when the composer is empty; `/verbose`
-shows or changes the same settings (`tools`, `commands`, `approvals`,
-`review`, `thinking`, `on`, `off`). Thinking panels honor `verboseThinking`
+shows or changes the same settings (`tools`, `commands`, `results`,
+`approvals`, `review`, `thinking`, `on`, `off`). `results` is the parent
+of `tools` and `commands`. Thinking panels honor `verboseThinking`
 (default on). When it is off, live and committed Thinking cards are
 omitted, including cards restored with a session; turning it back on
 shows the stored text again. Inline output, used when the alternate
 screen is unavailable, applies the same switches to restored thinking,
-tool results, policy and grant approval text, and review allow text.
+tool results (including the `verboseResults` parent), policy and grant
+approval text, and review allow text.
 The progress row, the thinking gear, and export stay.
 `crystal run --show-thinking` remains a separate one-shot
 flag and does not read this setting.
@@ -1819,7 +1827,7 @@ transcript while `verboseThinking` is on. Built-in slash verbs live in `SlashCat
 aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
 `/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`,
-`/verbose` toggles tool, command, approval, review, or thinking detail). `/export`
+`/verbose` toggles tool, command, result, approval, review, or thinking detail). `/export`
 writes markdown or json for the current conversation; `/prompts export`
 writes built-in prompt templates. Export roots default to
 `~/.crystal/exports/` (`exportDirectory` omitted or `home`) and are

@@ -17,7 +17,8 @@ internal static class TranscriptResultDisplay
         TranscriptKind kind,
         string? toolName,
         bool verboseTools,
-        bool verboseCommands)
+        bool verboseCommands,
+        bool verboseResults)
     {
         if (kind == TranscriptKind.Error)
         {
@@ -27,6 +28,11 @@ internal static class TranscriptResultDisplay
         if (kind != TranscriptKind.Result)
         {
             return true;
+        }
+
+        if (!verboseResults)
+        {
+            return false;
         }
 
         if (IsEditOrWrite(toolName))

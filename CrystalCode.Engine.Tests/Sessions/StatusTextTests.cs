@@ -34,6 +34,7 @@ public sealed class StatusTextTests
             EstimatedTokensEnabled: false,
             VerboseToolsEnabled: true,
             VerboseCommandsEnabled: false,
+            VerboseResultsEnabled: false,
             VerboseApprovalsEnabled: false,
             VerboseThinkingEnabled: false,
             VerboseReviewEnabled: false,
@@ -59,6 +60,10 @@ public sealed class StatusTextTests
         Assert.Contains(
             text.Split('\n'),
             line => line.Contains("Verbose approvals", StringComparison.Ordinal)
+                && line.TrimEnd().EndsWith("Off", StringComparison.Ordinal));
+        Assert.Contains(
+            text.Split('\n'),
+            line => line.Contains("Verbose results", StringComparison.Ordinal)
                 && line.TrimEnd().EndsWith("Off", StringComparison.Ordinal));
         Assert.Contains(
             text.Split('\n'),
