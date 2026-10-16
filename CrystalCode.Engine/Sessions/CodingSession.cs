@@ -122,7 +122,8 @@ public sealed class CodingSession : ITurnObserver
         SessionFrontEnd frontEnd,
         PluginRegistry plugins,
         SessionDocument? resume,
-        HarnessSettings? persistedSettings)
+        HarnessSettings? persistedSettings,
+        IReadOnlyList<DirectoryAccess>? launchAccess)
     {
         ArgumentNullException.ThrowIfNull(frontEnd);
         ArgumentNullException.ThrowIfNull(frontEnd.Trust);
@@ -181,6 +182,28 @@ public sealed class CodingSession : ITurnObserver
             BindReviewConversation();
             RebuildExecutors();
         }
+
+        var initialAccess = new List<DirectoryAccess>();
+        foreach (var rule in launchAccess ?? [])
+        {
+            if (rule is null || !TryResolveDirectoryAccess(rule.Path, rule.Mode, out var fullPath, out _))
+            {
+                throw new ArgumentException("Launch directory access is invalid.", nameof(launchAccess));
+            }
+
+            initialAccess.Add(new DirectoryAccess(fullPath, rule.Mode));
+        }
+
+        foreach (var rule in initialAccess)
+        {
+            _workspace.Access.Set(rule.Path, rule.Mode);
+        }
+
+        if (initialAccess.Count > 0)
+        {
+            ReplaceLiveSystem();
+            SaveSession();
+        }
     }
 
     public static CodingSession Create(
@@ -192,7 +215,8 @@ public sealed class CodingSession : ITurnObserver
         SessionFrontEnd frontEnd,
         PluginRegistry? plugins = null,
         SessionDocument? resume = null,
-        HarnessSettings? persistedSettings = null)
+        HarnessSettings? persistedSettings = null,
+        IReadOnlyList<DirectoryAccess>? launchAccess = null)
     {
         return new CodingSession(
             settings,
@@ -203,7 +227,8 @@ public sealed class CodingSession : ITurnObserver
             frontEnd,
             plugins ?? PluginRegistry.CreateBuiltIn(),
             resume,
-            persistedSettings);
+            persistedSettings,
+            launchAccess);
     }
 
     /// <summary>
@@ -566,6 +591,9 @@ public sealed class CodingSession : ITurnObserver
                 ShowUsage(null, null);
                 Note("New conversation");
                 return (true, false);
+            case SessionVerb.Access:
+                ChangeAccess(command.Argument);
+                return (true, false);
             case SessionVerb.Cd:
                 await ChangeDirectoryAsync(command.Argument, cancellationToken);
                 return (true, false);
@@ -611,6 +639,124 @@ public sealed class CodingSession : ITurnObserver
             default:
                 return (false, false);
         }
+    }
+
+    /// <summary>
+    /// Adds or replaces a session directory rule. This does not bypass action approval
+    /// and does not sandbox shell processes or extensions.
+    /// </summary>
+    public bool TrySetDirectoryAccess(string path, string mode, out string error)
+    {
+        error = string.Empty;
+        if (_turnActive || _compactSource is not null)
+        {
+            error = "Finish the current turn before changing directory access.";
+            return false;
+        }
+
+        if (!TryResolveDirectoryAccess(path, mode, out var fullPath, out error))
+        {
+            return false;
+        }
+
+        _workspace.Access.Set(fullPath, mode);
+        ReplaceLiveSystem();
+        SaveSession();
+        return true;
+    }
+
+    private bool TryResolveDirectoryAccess(string path, string mode, out string fullPath, out string error)
+    {
+        fullPath = string.Empty;
+        error = string.Empty;
+        if (mode is not ("read" or "write"))
+        {
+            error = "Access mode must be read or write.";
+            return false;
+        }
+
+        if (!_workspace.TryResolve(path, out fullPath, out error))
+        {
+            return false;
+        }
+
+        if (Workspace.IsCredentialPath(path) || Workspace.IsCredentialPath(fullPath))
+        {
+            error = "Credential directories cannot be granted access.";
+            return false;
+        }
+
+        fullPath = Path.TrimEndingDirectorySeparator(fullPath);
+        return true;
+    }
+
+    private void ChangeAccess(string argument)
+    {
+        const string usage = "Use /access, /access add <path> read|write, or /access remove <path>.";
+        var text = argument.Trim();
+        if (text.Length == 0)
+        {
+            Note("Workspace  " + _workspace.Access.ModeFor(_workspace.Root, _workspace.Root) + "  " + _workspace.Root);
+            foreach (var rule in _workspace.Access.Snapshot())
+            {
+                Note("Access  " + rule.Mode + "  " + rule.Path);
+            }
+
+            Note("Directory access applies to built-in file tools, not shell or extension process isolation.");
+            return;
+        }
+
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing directory access.");
+            return;
+        }
+
+        if (text.StartsWith("add ", StringComparison.Ordinal))
+        {
+            var split = text.LastIndexOf(' ');
+            if (split <= "add ".Length)
+            {
+                Error(usage);
+                return;
+            }
+
+            var path = UnquoteAccessPath(text[4..split]);
+            var mode = text[(split + 1)..];
+            if (!TrySetDirectoryAccess(path, mode, out var error))
+            {
+                Error(error);
+                return;
+            }
+
+            Note("Access updated  " + mode + "  " + path);
+            return;
+        }
+
+        if (text.StartsWith("remove ", StringComparison.Ordinal)
+            && _workspace.TryGetFullPath(UnquoteAccessPath(text[7..]), out var fullPath, out _))
+        {
+            if (!_workspace.Access.Remove(Path.TrimEndingDirectorySeparator(fullPath)))
+            {
+                Error("No session access rule for that directory.");
+                return;
+            }
+
+            ReplaceLiveSystem();
+            SaveSession();
+            Note("Access removed  " + fullPath);
+            return;
+        }
+
+        Error(usage);
+    }
+
+    private static string UnquoteAccessPath(string path)
+    {
+        var trimmed = path.Trim();
+        return trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[^1] == '"'
+            ? trimmed[1..^1]
+            : trimmed;
     }
 
     private void ChangeApproval(string argument)
@@ -2286,6 +2432,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         await RebindPluginSessionAsync(() => ApplyWorkspace(candidate), cancellationToken);
+        SaveSession();
         RefreshChrome();
         Note("Workspace  " + _workspace.Root);
         return true;
@@ -2297,6 +2444,7 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     private void ApplyWorkspace(string candidate)
     {
+        _workspace.Access.Clear();
         _workspace.SetRoot(candidate);
         ReloadSkills();
         ReloadPluginsWithProgress();
@@ -2397,9 +2545,27 @@ public sealed class CodingSession : ITurnObserver
             _settings.Model,
             _planMode ? "plan" : "work",
             _skills is null ? string.Empty : SkillGuidance.Render(_skills),
-            _prompts.Instructions,
+            _prompts.Instructions + DirectoryAccessGuidance(),
             sessionId: _sessionId,
             approval: _approval.Value);
+
+    private string DirectoryAccessGuidance()
+    {
+        var rules = _workspace.Access.Snapshot();
+        if (rules.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return "\n\nSession directory access (most-specific directory rule wins):\n"
+            + string.Join("\n", rules.Select(rule => $"- {rule.Mode}: {rule.Path}"))
+            + "\nRead permits built-in file reads and searches; write includes read and follows the approval mode."
+            + " Explicit read-only directories cannot be edited or written, even after approval."
+            + " Unlisted outside paths still require approval. Relative paths remain workspace-relative."
+            + " Search only the requested root, not all accessible directories."
+            + " These rules do not sandbox shell or extension processes; do not use them to bypass directory access."
+            + " Only the operator can change access with /access.";
+    }
 
     private string CurrentSystemText() =>
         ApplyPluginPrompt(
@@ -2584,6 +2750,7 @@ public sealed class CodingSession : ITurnObserver
             Id = _sessionId,
             Workspace = _workspace.Root,
             PlanMode = _planMode,
+            Access = _workspace.Access.Snapshot(),
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_transcript),
             Archive = TranscriptCodec.Write(archiveSnapshot),
@@ -2605,6 +2772,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void BeginNewSession()
     {
+        _workspace.Access.Clear();
         DiscardQueue();
         CancelAndClearSide(announce: true);
         Publish(new ImageHistoryInvalidated());
@@ -2934,6 +3102,27 @@ public sealed class CodingSession : ITurnObserver
     private void ApplyDocument(SessionDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
+        var access = (document.Access ?? []).ToArray();
+        foreach (var rule in access)
+        {
+            if (rule is null || string.IsNullOrWhiteSpace(rule.Path)
+                || !Path.IsPathFullyQualified(rule.Path)
+                || rule.Mode is not ("read" or "write")
+                || Workspace.IsCredentialPath(rule.Path))
+            {
+                throw new ArgumentException("Saved session directory access is invalid.", nameof(document));
+            }
+
+            _ = Path.GetFullPath(rule.Path);
+        }
+
+        _workspace.Access.Clear();
+        foreach (var rule in access)
+        {
+            // Keep the authorized canonical root, not a newly retargeted symlink.
+            _workspace.Access.Set(Path.TrimEndingDirectorySeparator(Path.GetFullPath(rule.Path)), rule.Mode);
+        }
+
         Publish(new ImageHistoryInvalidated());
         var items = TranscriptCodec.Read(document.Items);
         _sessionId = document.Id!;

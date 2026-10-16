@@ -16,7 +16,7 @@ public sealed class ViewImageTool : IMultimodalTool
         "Shows an image file to you. "
         + "path may be workspace-relative or absolute. "
         + "Paths inside the workspace run without asking. "
-        + "Paths outside the workspace require approval. "
+        + "Paths outside the workspace require approval unless covered by session read or write access. "
         + "PNG, JPEG, GIF, and WebP files up to 20 MiB are accepted.";
 
     private readonly Workspace _workspace;

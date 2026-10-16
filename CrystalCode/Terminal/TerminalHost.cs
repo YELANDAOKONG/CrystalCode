@@ -4,6 +4,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 using CrystalCode.Terminal.Approvals;
 
 namespace CrystalCode.Terminal;
@@ -35,7 +36,8 @@ internal sealed class TerminalHost
         PluginRegistry plugins,
         SessionDocument? resume,
         HarnessSettings? persistedSettings = null,
-        bool? launchPlan = null)
+        bool? launchPlan = null,
+        IReadOnlyList<DirectoryAccess>? launchAccess = null)
     {
         var renderer = new SessionRenderer();
         var frontEnd = new SessionFrontEnd(
@@ -53,7 +55,8 @@ internal sealed class TerminalHost
             frontEnd,
             plugins,
             resume,
-            persistedSettings);
+            persistedSettings,
+            launchAccess);
         return new TerminalHost(renderer, session, launchPlan);
     }
 

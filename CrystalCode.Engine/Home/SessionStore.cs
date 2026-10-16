@@ -294,6 +294,7 @@ public sealed class SessionStore
         Id = source.Id,
         Workspace = source.Workspace,
         PlanMode = source.PlanMode,
+        Access = source.Access,
         CreatedUtc = source.CreatedUtc,
         UpdatedUtc = source.UpdatedUtc,
         Items = source.Items,

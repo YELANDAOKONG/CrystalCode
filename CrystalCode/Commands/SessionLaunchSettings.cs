@@ -18,6 +18,12 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--home <PATH>")]
     public string? Home { get; init; }
 
+    [CommandOption("--allow-read <PATH>")]
+    public string[] AllowRead { get; init; } = [];
+
+    [CommandOption("--allow-write <PATH>")]
+    public string[] AllowWrite { get; init; } = [];
+
     [CommandOption("--approval <MODE>")]
     public string? Approval { get; init; }
 

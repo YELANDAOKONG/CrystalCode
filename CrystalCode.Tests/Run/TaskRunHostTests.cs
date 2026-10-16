@@ -33,6 +33,43 @@ public sealed class TaskRunHostTests
         }
         """;
 
+    [Theory]
+    [InlineData("read", "read", true)]
+    [InlineData("write", "write", true)]
+    [InlineData("read", "write", false)]
+    public async Task DirectoryAccess_SeedsSessionWithoutChangingPreferences(string access, string tool, bool writesAllowed)
+    {
+        using var fixture = new RunFixture();
+        var directory = Directory.CreateDirectory(Path.Combine(fixture.Home, "reference")).FullName;
+        var file = Path.Combine(directory, "note.txt");
+        await File.WriteAllTextAsync(file, "original");
+        var settings = new TaskRunSettings
+        {
+            TaskText = "Use the reference", Home = fixture.Home, Workspace = fixture.Workspace,
+            Provider = "ollama", Model = "qwen3:8b", Approval = "full",
+            Skills = "off", ExternalTools = "off", Duration = "60",
+            AllowRead = access == "read" ? [directory] : [],
+            AllowWrite = access == "write" ? [directory] : []
+        };
+        var client = new ScriptedRunClient(AllowReview,
+            ToolRound("c1", tool, JsonSerializer.Serialize(new { path = file, contents = "changed" })),
+            TextRound("done"));
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        Assert.Equal(tool == "write" && writesAllowed ? "changed" : "original", await File.ReadAllTextAsync(file));
+        if (!writesAllowed)
+        {
+            Assert.Contains("read-only", result.Output, StringComparison.Ordinal);
+        }
+
+        var store = new SessionStore(new CrystalHome(fixture.Home));
+        Assert.True(store.TryLoadLatest(fixture.Workspace, out var saved));
+        Assert.Equal(access, Assert.Single(saved.Access).Mode);
+        fixture.AssertSettingsUnchanged();
+    }
+
     [Fact]
     public async Task Completed_PrintsTheReplyAndKeepsSavedSettings()
     {

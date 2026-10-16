@@ -34,6 +34,12 @@ public sealed class Workspace
 
     public string Root { get; private set; }
 
+    internal DirectoryAccessPolicy Access { get; } = new();
+
+    internal bool IsAccessible(string fullPath) => Access.ModeFor(fullPath, Root) is not null;
+
+    internal bool IsReadOnly(string fullPath) => Access.ModeFor(fullPath, Root) == "read";
+
     public bool TryResolve(string path, out string candidate, out string error)
     {
         candidate = string.Empty;
@@ -126,10 +132,27 @@ public sealed class Workspace
         TryResolve(path, mustExistAsFile: false, allowOutside: false, out fullPath, out error);
 
     public bool TryResolveOutputPath(string path, out string fullPath, out string error) =>
-        TryResolve(path, mustExistAsFile: false, allowOutside: true, out fullPath, out error);
+        TryResolveWrite(path, mustExistAsFile: false, out fullPath, out error);
 
     public bool TryResolveEditableFile(string path, out string fullPath, out string error) =>
-        TryResolve(path, mustExistAsFile: true, allowOutside: true, out fullPath, out error);
+        TryResolveWrite(path, mustExistAsFile: true, out fullPath, out error);
+
+    private bool TryResolveWrite(string path, bool mustExistAsFile, out string fullPath, out string error)
+    {
+        if (!TryResolve(path, mustExistAsFile, allowOutside: true, out fullPath, out error))
+        {
+            return false;
+        }
+
+        if (IsReadOnly(fullPath))
+        {
+            error = "Writing to a read-only session directory is not allowed. Change its access with /access.";
+            fullPath = string.Empty;
+            return false;
+        }
+
+        return true;
+    }
 
     public bool TryResolveExistingLocation(
         string path,

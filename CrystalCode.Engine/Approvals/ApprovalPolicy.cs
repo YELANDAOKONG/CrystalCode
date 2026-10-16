@@ -66,6 +66,16 @@ public sealed class ApprovalPolicy
                     ToolResultStatus.Failure));
         }
 
+        if (call.Name is WriteTool.ToolName or EditTool.ToolName
+            && ToolArguments.TryReadRequiredString(call.Arguments, "path", out var path)
+            && _workspace.TryGetFullPath(path, out var fullPath, out _)
+            && _workspace.IsReadOnly(fullPath))
+        {
+            return ToolInvocationDecision.Reject(new ToolOutput(
+                "Writing to a read-only session directory is not allowed. Change its access with /access.",
+                ToolResultStatus.Failure));
+        }
+
         var classification = await _classifier.ClassifyAsync(call, cancellationToken);
         if (CanPassWithoutReview(call.Name, classification))
         {

@@ -18,6 +18,8 @@ public sealed class SessionLaunchCommandTests
         Assert.Contains("--approval", interactive, StringComparison.Ordinal);
         Assert.Contains("--thinking", interactive, StringComparison.Ordinal);
         Assert.Contains("--bash-timeout", interactive, StringComparison.Ordinal);
+        Assert.Contains("--allow-read", interactive, StringComparison.Ordinal);
+        Assert.Contains("--allow-write", interactive, StringComparison.Ordinal);
         Assert.DoesNotContain("--format", interactive, StringComparison.Ordinal);
         Assert.DoesNotContain("--show-thinking", interactive, StringComparison.Ordinal);
         Assert.DoesNotContain("--workspace-trust", interactive, StringComparison.Ordinal);

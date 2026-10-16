@@ -678,7 +678,51 @@ client that share it). The transcript stays the same conversation.
 - Compaction is not run as part of the switch. The next turn uses the
   new context window.
 
+## Session directory access
+
+`CodingSession` owns directory authorization for one session. Its workspace
+resolver carries the live `DirectoryAccessPolicy`, separate from the primary
+workspace root and approval grants. Immutable `DirectoryAccess` values contain
+canonical absolute `path` and `mode` (`read` or `write`). Write includes read.
+The implicit workspace is writable; the most-specific directory rule wins,
+including an explicit read-only rule for the workspace or one of its children.
+Matching uses directory boundaries and Windows case-insensitivity, resolves tool
+paths through symlinks, and checks credential paths independently.
+
+`/access` lists the primary workspace and session rules. `/access add <path>
+read|write` validates an existing directory and adds or replaces its canonical
+rule; `/access remove <path>` removes it, even if the directory no longer exists.
+Paths containing spaces can be double-quoted. Mutations are refused during a turn
+or compaction. Changes immediately save `SessionDocument.access`, refresh the
+live model instructions, and affect the already-bound executor through the shared
+policy. No global access file or workspace configuration is read. Repeatable
+`--allow-read` and `--allow-write` flags seed or override the launched session;
+conflicting modes for the same canonical root are rejected. Flags are recorded
+only as session access metadata, never preferences in config.json.
+
+Built-in file reads in authorized directories use ordinary workspace read
+approval. Writes in writable directories follow the current approval mode.
+`ApprovalPolicy` rejects explicit read-only writes before classification hooks,
+grants, or review; write and edit recheck at path resolution before file I/O.
+Unlisted outside paths retain their existing approval behavior. Credential paths
+remain forbidden. Relative paths stay relative to the one primary workspace.
+Search and enumeration keep their existing root fence and do not automatically
+search all authorized directories or traverse cross-root links.
+
+Resume restores the saved absolute rules, including rules for missing directories;
+invalid saved rules fail closed rather than silently losing read-only restrictions.
+Fork and clear start with no added rules. A successful workspace change clears
+rules; a refused or no-op change does not. Additional roots do not discover
+prompts, instructions, plugins, tools, or skills. Existing session files with no
+access field load with an empty rule list. Shell, background shell, external tools,
+and plugins retain their existing approval behavior and are not sandboxed by this
+policy. An operating-system sandbox remains deferred.
+
 ## Approval
+
+The following mode descriptions use workspace access for built-in file tools to
+include session-authorized directories of the appropriate read/write capability.
+Explicit read-only writes are always rejected; outside paths mean unlisted paths.
 
 Every side-effect tool call is classified before invocation:
 

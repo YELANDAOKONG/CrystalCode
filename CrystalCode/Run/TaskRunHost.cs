@@ -141,6 +141,12 @@ internal static class TaskRunHost
         CodingSession session;
         try
         {
+            if (!SessionLaunchAccess.TryRead(settings, workspace, out var launchAccess, out var accessError))
+            {
+                await error.WriteLineAsync(accessError);
+                return RunExit.Invalid;
+            }
+
             // loaded is the disk baseline. A later save must not write this
             // process's launch overrides, including provider and model.
             session = CodingSession.Create(
@@ -157,7 +163,8 @@ internal static class TaskRunHost
                     new UnattendedTrustPrompt()),
                 plugins ?? PluginRegistry.CreateBuiltIn(),
                 resume: null,
-                persistedSettings: loaded);
+                persistedSettings: loaded,
+                launchAccess: launchAccess);
         }
         catch (Exception exception) when (IsSetupFailure(exception))
         {

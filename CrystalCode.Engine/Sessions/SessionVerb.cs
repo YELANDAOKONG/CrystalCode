@@ -23,6 +23,7 @@ public enum SessionVerb
     Cd,
     Space,
     Trust,
+    Access,
     Resume,
     Fork,
     Sessions,

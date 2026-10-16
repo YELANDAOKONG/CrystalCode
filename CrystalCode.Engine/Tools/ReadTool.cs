@@ -14,7 +14,7 @@ public sealed class ReadTool : ITool
     private const string ToolDescription =
         "Reads a text file. path may be workspace-relative or absolute. "
         + "Paths inside the workspace run without asking. "
-        + "Paths outside the workspace require approval. "
+        + "Paths outside the workspace require approval unless covered by session read or write access. "
         + "Use offset (1-based) and limit for large files. Call in parallel when you need several files. "
         + "Do not read in tiny windows. Use glob when the path is uncertain.";
 

@@ -86,6 +86,18 @@ separate library with no terminal code. The product can:
   command is its own switch, `--workspace-trust on|off`. Omitting it checks
   trust even when the interactive switch is off. `off` skips the check for
   that process and does not record the directory;
+- manage multiple accessible directories per session through `/access` and
+  repeatable `--allow-read` / `--allow-write` launch options. `read` permits
+  built-in file reads and searches; `write` includes reads and lets file changes
+  follow the selected approval mode. Explicit read-only writes are rejected
+  before grants or review. Rules use canonical absolute paths, with the most
+  specific directory winning over parents and the implicit writable workspace.
+  They are session metadata, not workspace configuration or reusable approval
+  grants: resume restores them; fork, clear, and workspace changes clear them.
+  `/access add <path> read|write` adds or updates a rule; `/access remove <path>`
+  removes one, and `/access` lists the current rules. Rule changes are refused
+  during turns or compaction. Shell and extension processes are not sandboxed
+  by these rules, and no additional catalogs or instructions are discovered;
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - recall submitted prompts from the composer with Up/Down and retain up to 200
   recent text-only entries across runs for the same workspace;
@@ -163,7 +175,6 @@ implemented in the current build:
 - parent/child Agents through `Crystal.Harness.AgentHarness`;
 - MCP servers;
 - an operating-system sandbox;
-- multiple accessible directories in one session, beyond the single workspace;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
   and Ollama Chat;

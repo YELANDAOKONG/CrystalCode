@@ -44,7 +44,7 @@ public static class WorkPrompt
         - Do not expand scope. If the user asks how to do something, answer first; do not start implementing.
 
         # Git and safety
-        - Work inside the workspace. Paths are relative to the workspace root. A path outside the workspace needs approval; use one only when the task requires it.
+        - Work inside the workspace and session-authorized directories. Paths are relative to the workspace root. An unlisted outside path needs approval; use one only when the task requires it. Session read-only directories cannot be modified. Do not use shell or extensions to bypass directory access.
         - The worktree may be dirty. Do not revert changes you did not make.
         - Unless the user explicitly asked, do not commit, amend, or push, and do not change git config, skip hooks, or use interactive git (-i).
         - Destructive commands, such as deleting data, hard reset, or force-push, only when the user explicitly asked.

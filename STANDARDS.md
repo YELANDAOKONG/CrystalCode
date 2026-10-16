@@ -70,9 +70,18 @@
 ## Safety
 
 - Write, edit, read, list, tree, glob, grep, and search of paths outside the
-  workspace require approval. In Review or Audit the reviewing model judges them;
-  otherwise the operator is asked. Edit, Review, and Full do not
-  auto-pass an outside write or edit. External dotnet tools may supply a
+  workspace require approval unless session directory access covers the action.
+  Session `read` permits file reads; `write` includes reads and retains normal
+  action approval. Explicit read-only writes are rejected before grants, raw
+  approval advice, or review and checked again by the built-in write/edit path
+  resolver. Rules are saved with the session, not config or permissions.json;
+  resume restores them, while fork, clear, and workspace changes clear them.
+  Canonical directory boundaries and most-specific matching include the implicit
+  writable workspace. Unlisted outside paths retain approval: in Review or Audit
+  the reviewing model judges them; otherwise the operator is asked. Edit, Review,
+  and Full do not auto-pass unlisted outside writes or edits. These rules do not
+  sandbox shell, background shell, plugins, or external processes.
+  External dotnet tools may supply a
   side-effect-free pre-classifier when their actual write paths are embedded
   in arguments; it must fail closed, it can only raise risk or authority for
   the call, and it never replaces the Write + Workspace floor, the declared

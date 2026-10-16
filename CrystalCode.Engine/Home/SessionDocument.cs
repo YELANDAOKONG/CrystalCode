@@ -1,3 +1,5 @@
+using CrystalCode.Engine.Tools;
+
 namespace CrystalCode.Engine.Home;
 
 /// <summary>
@@ -10,6 +12,8 @@ public sealed class SessionDocument
     public string? Workspace { get; set; }
 
     public bool PlanMode { get; set; }
+
+    public IReadOnlyList<DirectoryAccess> Access { get; set; } = [];
 
     public DateTimeOffset? CreatedUtc { get; set; }
 

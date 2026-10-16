@@ -209,6 +209,12 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return trust.ExitCode;
         }
 
+        if (!SessionLaunchAccess.TryRead(settings, workspace, out var launchAccess, out var accessError))
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(accessError)}[/]");
+            return 1;
+        }
+
         var plugins = PluginRegistry.CreateBuiltIn();
         var host = TerminalHost.Create(
             harnessSettings,
@@ -219,7 +225,8 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             plugins,
             resumed,
             persisted,
-            launchPlan);
+            launchPlan,
+            launchAccess);
         return await host.RunAsync(cancellationToken);
     }
 

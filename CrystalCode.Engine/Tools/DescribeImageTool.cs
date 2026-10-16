@@ -16,7 +16,7 @@ public sealed class DescribeImageTool : ITool
         "Describes an image file through a vision model and returns text. "
         + "path may be workspace-relative or absolute. "
         + "Paths inside the workspace run without asking. "
-        + "Paths outside the workspace require approval. "
+        + "Paths outside the workspace require approval unless covered by session read or write access. "
         + "Use question when you need a specific answer from the image. "
         + "PNG, JPEG, GIF, and WebP files up to 20 MiB are accepted.";
 

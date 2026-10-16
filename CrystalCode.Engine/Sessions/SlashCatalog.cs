@@ -31,6 +31,8 @@ public static class SlashCatalog
             ["on", "off", "reset"]),
         new(SessionVerb.Clear, "clear", ["new"], "New conversation"),
         new(SessionVerb.Cd, "cd", [], "Show or set workspace"),
+        new(SessionVerb.Access, "access", [], "Session directory access: add <path> read|write or remove <path>",
+            ["add", "remove"]),
         new(SessionVerb.Space, "space", [], "Switch to the operator space"),
         new(SessionVerb.Trust, "trust", [], "Show workspace trust or turn it on or off",
             ["on", "off", "forget"]),

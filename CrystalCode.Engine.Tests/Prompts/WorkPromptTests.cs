@@ -37,7 +37,10 @@ public sealed class WorkPromptTests
     public void Text_AllowsApprovedOutsidePathsAndUsesNeutralExample()
     {
         Assert.DoesNotContain("Stay inside the workspace", WorkPrompt.Text, StringComparison.Ordinal);
-        Assert.Contains("outside the workspace needs approval", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("An unlisted outside path needs approval", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("session-authorized directories", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("Session read-only directories cannot be modified", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("Do not use shell or extensions to bypass directory access", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("CrystalCode/", WorkPrompt.Text, StringComparison.Ordinal);
     }
 }

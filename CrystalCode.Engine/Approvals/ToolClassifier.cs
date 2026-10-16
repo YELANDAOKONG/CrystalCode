@@ -158,7 +158,7 @@ public sealed class ToolClassifier
                 $"{verb} skills path");
         }
 
-        if (!_workspace.Contains(fullPath))
+        if (!_workspace.IsAccessible(fullPath))
         {
             return new ToolClassification(
                 Risk.Read,
@@ -205,7 +205,7 @@ public sealed class ToolClassifier
                 $"{verb} credential path");
         }
 
-        if (_workspace.TryResolveWritablePath(path, out var fullPath, out var error))
+        if (_workspace.TryGetFullPath(path, out var fullPath, out _))
         {
             if (Workspace.IsCredentialPath(fullPath))
             {
@@ -217,16 +217,8 @@ public sealed class ToolClassifier
 
             return new ToolClassification(
                 Risk.Write,
-                Authority.Workspace,
-                $"{verb} workspace file");
-        }
-
-        if (error.Contains("outside", StringComparison.OrdinalIgnoreCase))
-        {
-            return new ToolClassification(
-                Risk.Write,
-                Authority.OutsideWorkspace,
-                $"{verb} outside workspace");
+                _workspace.IsAccessible(fullPath) ? Authority.Workspace : Authority.OutsideWorkspace,
+                _workspace.IsAccessible(fullPath) ? $"{verb} session file" : $"{verb} outside workspace");
         }
 
         return new ToolClassification(
