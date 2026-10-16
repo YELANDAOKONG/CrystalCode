@@ -95,6 +95,18 @@ public sealed class HarnessSettingsTests
     }
 
     [Fact]
+    public void WithVerboseCalls_SetsHostFlag()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var next = settings.WithVerboseCalls(false);
+
+        Assert.False(next.VerboseCalls);
+        Assert.True(settings.VerboseCalls);
+        Assert.True(next.VerboseResults);
+    }
+
+    [Fact]
     public void WithShowCompactionSummary_SetsHostFlag()
     {
         var settings = HarnessSettings.CreateDefault();

@@ -32,7 +32,7 @@ internal static class VerboseChangeArguments
 
         if (!TryParseTarget(tokens[0], out var parsedTarget))
         {
-            error = "Verbose command must be /verbose, /verbose tools, /verbose commands, /verbose results, /verbose approvals, /verbose review, or /verbose thinking.";
+            error = "Verbose command must be /verbose, /verbose tools, /verbose commands, /verbose results, /verbose calls, /verbose approvals, /verbose review, or /verbose thinking.";
             return false;
         }
 
@@ -48,7 +48,7 @@ internal static class VerboseChangeArguments
             return true;
         }
 
-        error = "Verbose command expects on or off after tools, commands, results, approvals, review, or thinking.";
+        error = "Verbose command expects on or off after tools, commands, results, calls, approvals, review, or thinking.";
         return false;
     }
 
@@ -69,6 +69,12 @@ internal static class VerboseChangeArguments
         if (token.Equals("results", StringComparison.OrdinalIgnoreCase))
         {
             target = VerboseTarget.Results;
+            return true;
+        }
+
+        if (token.Equals("calls", StringComparison.OrdinalIgnoreCase))
+        {
+            target = VerboseTarget.Calls;
             return true;
         }
 

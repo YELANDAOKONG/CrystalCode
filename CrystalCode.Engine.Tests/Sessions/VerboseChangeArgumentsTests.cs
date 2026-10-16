@@ -63,6 +63,14 @@ public sealed class VerboseChangeArgumentsTests
     }
 
     [Fact]
+    public void TryParse_ReadsCallsOff()
+    {
+        Assert.True(VerboseChangeArguments.TryParse("calls off", out var target, out var enabled, out _));
+        Assert.Equal(VerboseTarget.Calls, target);
+        Assert.False(enabled);
+    }
+
+    [Fact]
     public void TryParse_RejectsUnknownTarget()
     {
         Assert.False(VerboseChangeArguments.TryParse("all on", out _, out _, out var error));

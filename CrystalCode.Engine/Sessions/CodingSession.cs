@@ -411,6 +411,7 @@ public sealed class CodingSession : ITurnObserver
             VerboseTarget.Tools => current.WithVerboseTools(enabled),
             VerboseTarget.Commands => current.WithVerboseCommands(enabled),
             VerboseTarget.Results => current.WithVerboseResults(enabled),
+            VerboseTarget.Calls => current.WithVerboseCalls(enabled),
             VerboseTarget.Approvals => current.WithVerboseApprovals(enabled),
             VerboseTarget.Review => current.WithVerboseReview(enabled),
             VerboseTarget.Thinking => current.WithVerboseThinking(enabled),
@@ -1450,6 +1451,8 @@ public sealed class CodingSession : ITurnObserver
                 + (_settings.VerboseCommands ? "On" : "Off")
                 + "  ·  Verbose results  "
                 + (_settings.VerboseResults ? "On" : "Off")
+                + "  ·  Verbose calls  "
+                + (_settings.VerboseCalls ? "On" : "Off")
                 + "  ·  Verbose approvals  "
                 + (_settings.VerboseApprovals ? "On" : "Off")
                 + "  ·  Verbose review  "
@@ -1478,6 +1481,12 @@ public sealed class CodingSession : ITurnObserver
                     VerboseTarget.Results,
                     enabled is bool resultsEnabled ? resultsEnabled : !_settings.VerboseResults);
                 Note("Verbose results  " + (_settings.VerboseResults ? "On" : "Off"));
+                break;
+            case VerboseTarget.Calls:
+                SetVerbose(
+                    VerboseTarget.Calls,
+                    enabled is bool callsEnabled ? callsEnabled : !_settings.VerboseCalls);
+                Note("Verbose calls  " + (_settings.VerboseCalls ? "On" : "Off"));
                 break;
             case VerboseTarget.Approvals:
                 SetVerbose(
@@ -2335,6 +2344,7 @@ public sealed class CodingSession : ITurnObserver
                 VerboseToolsEnabled: _settings.VerboseTools,
                 VerboseCommandsEnabled: _settings.VerboseCommands,
                 VerboseResultsEnabled: _settings.VerboseResults,
+                VerboseCallsEnabled: _settings.VerboseCalls,
                 VerboseApprovalsEnabled: _settings.VerboseApprovals,
                 VerboseThinkingEnabled: _settings.VerboseThinking,
                 VerboseReviewEnabled: _settings.VerboseReview,
@@ -4762,6 +4772,7 @@ public sealed class CodingSession : ITurnObserver
             _settings.VerboseTools,
             _settings.VerboseCommands,
             _settings.VerboseResults,
+            _settings.VerboseCalls,
             _settings.VerboseApprovals,
             _settings.VerboseReview,
             _settings.VerboseThinking,

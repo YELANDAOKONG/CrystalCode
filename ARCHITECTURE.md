@@ -1753,7 +1753,11 @@ result panels honor `verboseResults` (`config.json`, default on, omitted
 when on). It is the parent of `verboseTools` and `verboseCommands`.
 While it is off, every success result is omitted, including read, search,
 skill, `edit`, `write`, `bash`, `bash_start`, `bash_status`, `bash_logs`,
-and `bash_stop`. The Tool card stays. Failure results stay. The child
+and `bash_stop`. The Tool card stays unless `verboseCalls` is off.
+That switch (default on, omitted when on) hides every Tool card,
+including read, search, edit, write, bash, background bash, and
+external tools. It does not hide success or failure results, and
+`verboseResults` does not hide Tool cards. Failure results stay. The child
 switches stay stored and do not draw a result until the parent is on
 again; Ctrl+G does not expand a command result in that state because the
 panel is omitted, not collapsed. A missing `verboseResults` field keeps
@@ -1770,8 +1774,9 @@ back on shows them again. A saved `verboseApprovals` value of false no longer
 hides review allow cards. The ask overlay still appears. Ctrl+O toggles tool verbose and
 Ctrl+G toggles command verbose when the composer is empty; `/verbose`
 shows or changes the same settings (`tools`, `commands`, `results`,
-`approvals`, `review`, `thinking`, `on`, `off`). `results` is the parent
-of `tools` and `commands`. Thinking panels honor `verboseThinking`
+`calls`, `approvals`, `review`, `thinking`, `on`, `off`). `results` is
+the parent of `tools` and `commands`. `calls` hides Tool cards only.
+Thinking panels honor `verboseThinking`
 (default on). When it is off, live and committed Thinking cards are
 omitted, including cards restored with a session; turning it back on
 shows the stored text again. Inline output, used when the alternate
@@ -1827,7 +1832,7 @@ transcript while `verboseThinking` is on. Built-in slash verbs live in `SlashCat
 aliases (`/new` is `/clear`, `/continue` is `/resume`,
 `/q` and `/exit` are `/quit`, `/think` is `/thinking`, `/summarize` is
 `/compact`, `/todo` is `/todos`, `/prompts` is `/promptset`,
-`/verbose` toggles tool, command, result, approval, review, or thinking detail). `/export`
+`/verbose` toggles tool, command, result, call, approval, review, or thinking detail). `/export`
 writes markdown or json for the current conversation; `/prompts export`
 writes built-in prompt templates. Export roots default to
 `~/.crystal/exports/` (`exportDirectory` omitted or `home`) and are

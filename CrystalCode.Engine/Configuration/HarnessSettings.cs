@@ -35,6 +35,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultVerboseResults = true;
 
+    public const bool DefaultVerboseCalls = true;
+
     public const bool DefaultVerboseApprovals = true;
 
     public const bool DefaultVerboseReview = true;
@@ -56,6 +58,7 @@ public sealed record HarnessSettings
         bool verboseTools = DefaultVerboseTools,
         bool verboseCommands = DefaultVerboseCommands,
         bool verboseResults = DefaultVerboseResults,
+        bool verboseCalls = DefaultVerboseCalls,
         bool verboseApprovals = DefaultVerboseApprovals,
         bool verboseReview = DefaultVerboseReview,
         bool verboseThinking = DefaultVerboseThinking,
@@ -132,6 +135,7 @@ public sealed record HarnessSettings
         VerboseTools = verboseTools;
         VerboseCommands = verboseCommands;
         VerboseResults = verboseResults;
+        VerboseCalls = verboseCalls;
         VerboseApprovals = verboseApprovals;
         VerboseReview = verboseReview;
         VerboseThinking = verboseThinking;
@@ -245,6 +249,8 @@ public sealed record HarnessSettings
     public bool VerboseCommands { get; }
 
     public bool VerboseResults { get; }
+
+    public bool VerboseCalls { get; }
 
     public bool VerboseApprovals { get; }
 
@@ -378,6 +384,9 @@ public sealed record HarnessSettings
     public HarnessSettings WithVerboseResults(bool verboseResults) =>
         Copy(verboseResults: verboseResults);
 
+    public HarnessSettings WithVerboseCalls(bool verboseCalls) =>
+        Copy(verboseCalls: verboseCalls);
+
     public HarnessSettings WithVerboseApprovals(bool verboseApprovals) =>
         Copy(verboseApprovals: verboseApprovals);
 
@@ -488,6 +497,7 @@ public sealed record HarnessSettings
         bool? verboseTools = null,
         bool? verboseCommands = null,
         bool? verboseResults = null,
+        bool? verboseCalls = null,
         bool? verboseApprovals = null,
         bool? verboseReview = null,
         bool? verboseThinking = null,
@@ -536,6 +546,7 @@ public sealed record HarnessSettings
             verboseTools ?? VerboseTools,
             verboseCommands ?? VerboseCommands,
             verboseResults ?? VerboseResults,
+            verboseCalls ?? VerboseCalls,
             verboseApprovals ?? VerboseApprovals,
             verboseReview ?? VerboseReview,
             verboseThinking ?? VerboseThinking,

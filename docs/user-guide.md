@@ -476,7 +476,8 @@ Top-level fields:
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
-| `verboseResults` | Parent switch for success result panels (default `true`; omitted when on). Off hides every success result already on screen, including read, search, skill, edit, write, bash, and background bash. Tool cards and failures stay. `verboseTools` and `verboseCommands` do not draw results while this is off. `crystal run` does not read it |
+| `verboseResults` | Parent switch for success result panels (default `true`; omitted when on). Off hides every success result already on screen, including read, search, skill, edit, write, bash, and background bash. Does not hide Tool cards; those follow `verboseCalls`. Failures stay. `verboseTools` and `verboseCommands` do not draw results while this is off. `crystal run` does not read it |
+| `verboseCalls` | Show Tool cards (default `true`; omitted when on). Off hides every Tool card already on screen: read, search, edit, write, bash, background bash, and external tools such as Apply Patch. Success and failure results stay. Independent of `verboseResults`, `verboseTools`, and `verboseCommands`. `crystal run` does not read it |
 | `verboseTools` | While `verboseResults` is on, show read, search, and skill result panels (default `true`; omitted when on). Edit and write results stay. No visible effect while `verboseResults` is off |
 | `verboseCommands` | While `verboseResults` is on, show full output from `bash`, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop` (default `true`; omitted when on). Off keeps a hidden-line hint and the last line. No visible effect while `verboseResults` is off |
 | `verboseApprovals` | Show policy and grant auto-pass cards (default `true`; omitted when on). Off hides those cards already on screen. Review allow cards follow `verboseReview`. The ask overlay stays |
@@ -779,8 +780,18 @@ chrome are Title Case. Approval cards for edit and write show a short
 
 Success result panels use three switches. `verboseResults` is the parent.
 `verboseTools` and `verboseCommands` change the picture only while that
-parent is on. None of the three hides a Tool card, a failure result, an
-approval card, a thinking panel, or an ask overlay.
+parent is on. None of the three hides a failure result, an approval
+card, a thinking panel, or an ask overlay. They also do not hide the
+Tool card. That card is the call itself (`Read`, `Grep`, `Edit`,
+`Bash`, `Apply Patch`), drawn before the result.
+
+`/verbose calls` shows or hides those Tool cards. It stays on unless
+`verboseCalls` is `false` in `config.json`. A missing field keeps it
+on. Off omits every Tool card already in this session, and turning it
+on shows them again. Results are unchanged: a hidden call can still
+leave an `Edited …` line or command output, and hiding results can
+still leave the Tool card. Use both switches when you want neither.
+`crystal run` does not read `verboseCalls`.
 
 `/verbose results` turns the parent on or off, or toggles it when you
 omit `on` and `off`. It stays on unless `verboseResults` is `false` in
@@ -1093,7 +1104,7 @@ returns the transcript viewport to the latest output.
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count; refused during a turn or compaction |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
-| `/verbose` | | Show or set tool, command, result, approval, review, or thinking detail: `tools`, `commands`, `results`, `approvals`, `review`, `thinking`, then `on` or `off`. `results` is the parent of `tools` and `commands` |
+| `/verbose` | | Show or set tool, command, result, call, approval, review, or thinking detail: `tools`, `commands`, `results`, `calls`, `approvals`, `review`, `thinking`, then `on` or `off`. `results` is the parent of `tools` and `commands`. `calls` hides Tool cards and does not change results |
 | `/model` | | List catalog models, or set `model` / `provider model` |
 | `/promptset` | `/prompts` | List prompt sets and effective sources, enable one set, or `/prompts export [dir]` |
 | `/promptattach` | | List prompt attachments, or `enable` / `disable` / `up` / `down` one name |

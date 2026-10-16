@@ -31,6 +31,7 @@ public sealed class TranscriptLog
     private bool _verboseTools = true;
     private bool _verboseCommands = true;
     private bool _verboseResults = true;
+    private bool _verboseCalls = true;
     private bool _verboseApprovals = true;
     private bool _verboseReview = true;
     private bool _verboseThinking = true;
@@ -76,6 +77,21 @@ public sealed class TranscriptLog
             }
 
             _verboseResults = value;
+            InvalidateCache();
+        }
+    }
+
+    public bool VerboseCalls
+    {
+        get => _verboseCalls;
+        set
+        {
+            if (_verboseCalls == value)
+            {
+                return;
+            }
+
+            _verboseCalls = value;
             InvalidateCache();
         }
     }
@@ -138,6 +154,11 @@ public sealed class TranscriptLog
     {
         ArgumentNullException.ThrowIfNull(text);
         if (HidesThinking(kind) || HidesApproval(kind, review))
+        {
+            return null;
+        }
+
+        if (HidesCall(kind))
         {
             return null;
         }
@@ -521,6 +542,11 @@ public sealed class TranscriptLog
             return lines;
         }
 
+        if (HidesCall(entry.Kind))
+        {
+            return lines;
+        }
+
         if (entry.Widget is not null)
         {
             lines.AddRange(WidgetPaint.Lines(entry.Widget, width));
@@ -577,6 +603,9 @@ public sealed class TranscriptLog
 
     private bool HidesThinking(TranscriptKind kind) =>
         kind == TranscriptKind.Thinking && !_verboseThinking;
+
+    private bool HidesCall(TranscriptKind kind) =>
+        kind == TranscriptKind.Tool && !_verboseCalls;
 
     private bool HidesApproval(TranscriptKind kind, bool review)
     {

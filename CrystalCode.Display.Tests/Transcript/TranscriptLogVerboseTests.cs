@@ -120,6 +120,36 @@ public sealed class TranscriptLogVerboseTests
     }
 
     [Fact]
+    public void BuildLines_OmitsToolCardWhenCallVerboseIsOff()
+    {
+        var log = new TranscriptLog { VerboseCalls = false, VerboseResults = true };
+        log.Add(TranscriptKind.Tool, "Read  ARCHITECTURE.md");
+        log.Add(TranscriptKind.Tool, "Apply Patch  ARCHITECTURE.md");
+        log.Add(TranscriptKind.Result, "Edited ARCHITECTURE.md.", toolName: "edit");
+
+        var text = string.Join('\n', log.BuildLines(80).Select(line => line.Plain));
+
+        Assert.DoesNotContain("Read", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Apply Patch", text, StringComparison.Ordinal);
+        Assert.Contains("Edited ARCHITECTURE.md.", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildLines_RestoresToolCardWhenCallVerboseTurnsOn()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.Tool, "Grep  toggles tool");
+        log.BuildLines(80);
+        log.VerboseCalls = false;
+        log.VerboseCalls = true;
+
+        var text = string.Join('\n', log.BuildLines(80).Select(line => line.Plain));
+
+        Assert.Contains("Grep", text, StringComparison.Ordinal);
+        Assert.Contains("toggles tool", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildLines_KeepsEditResultWhenToolVerboseIsOff()
     {
         var log = new TranscriptLog { VerboseTools = false };

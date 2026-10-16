@@ -1085,6 +1085,7 @@ public sealed class SettingsStoreTests
               "verboseTools": false,
               "verboseCommands": false,
               "verboseResults": false,
+              "verboseCalls": false,
               "verboseApprovals": false,
               "verboseReview": false,
               "verboseThinking": false
@@ -1096,17 +1097,20 @@ public sealed class SettingsStoreTests
         Assert.False(settings.VerboseTools);
         Assert.False(settings.VerboseCommands);
         Assert.False(settings.VerboseResults);
+        Assert.False(settings.VerboseCalls);
         Assert.False(settings.VerboseApprovals);
         Assert.False(settings.VerboseReview);
         Assert.False(settings.VerboseThinking);
-        store.Save(settings.WithVerboseResults(true).WithVerboseApprovals(true).WithVerboseReview(true).WithVerboseThinking(true));
+        store.Save(settings.WithVerboseResults(true).WithVerboseCalls(true).WithVerboseApprovals(true).WithVerboseReview(true).WithVerboseThinking(true));
         var saved = File.ReadAllText(root.Home.ConfigPath);
         Assert.DoesNotContain("verboseResults", saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("verboseCalls", saved, StringComparison.Ordinal);
         Assert.DoesNotContain("verboseApprovals", saved, StringComparison.Ordinal);
         Assert.DoesNotContain("verboseReview", saved, StringComparison.Ordinal);
         Assert.DoesNotContain("verboseThinking", saved, StringComparison.Ordinal);
         var loaded = store.Load();
         Assert.True(loaded.VerboseResults);
+        Assert.True(loaded.VerboseCalls);
         Assert.True(loaded.VerboseApprovals);
         Assert.True(loaded.VerboseReview);
         Assert.True(loaded.VerboseThinking);
