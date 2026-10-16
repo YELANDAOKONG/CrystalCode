@@ -221,6 +221,17 @@ CrystalCode.Display:
 | `Transcript` | Viewport log, role cards, sequential fallback |
 | `Paint` | Markup, markdown, theme, wrapping |
 
+Quick prompts keep the same dependency direction: Engine Home owns
+`QuickPromptStore`, bounded UTF-8 file reads, validation, and immutable catalog
+values; Display Composer owns the isolated quick-prompt picker and preview.
+The terminal maps catalog values, routes F6 only outside modal prompts, and
+inserts Fill at the current composer cursor. Send uses
+`CodingSession.SubmitQuickPromptAsync`, bypasses slash parsing, and never
+consumes pending or composer draft images. Ordinary queued submissions bind
+pending images at enqueue time so later quick sends cannot steal them. Quick
+queue entries do not request cancellation after tools; explicit queue release
+and ordinary follow-ups retain their existing interrupt behavior.
+
 Provider types live under `CrystalCode.Providers` plus one folder per wire
 family (`DeepSeek`, `OpenAI`, `Responses`, `Anthropic`, `Gemini`, and `Ollama`). Shared
 OpenAI-compatible Chat Completions request and stream parsing lives in

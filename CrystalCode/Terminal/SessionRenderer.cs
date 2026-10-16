@@ -14,6 +14,7 @@ using CrystalCode.Display.Shell;
 using CrystalCode.Display.Transcript;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
@@ -45,6 +46,12 @@ public sealed class SessionRenderer : IDisposable
     private readonly InputDecoder _decoder = new();
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
+    private QuickPromptPicker? _quickPicker;
+    private bool _quickOpenRequested;
+    private bool _quickSubmission;
+
+    public Func<CancellationToken, Task<QuickPromptCatalog>>? LoadQuickPromptsAsync { get; set; }
+    public Func<string, CancellationToken, Task>? QueueQuickPromptAsync { get; set; }
     private string? _streamKind;
     private readonly StreamToolNames _toolNames = new();
     private readonly Dictionary<string, string> _toolCallNames = new(StringComparer.Ordinal);
@@ -904,6 +911,7 @@ public sealed class SessionRenderer : IDisposable
         ArgumentNullException.ThrowIfNull(lines);
         lock (_gate)
         {
+            _quickPicker = null;
             _fullPageOverlay = false;
             _pageScroll = 0;
             _sideOpen = false;
@@ -919,6 +927,7 @@ public sealed class SessionRenderer : IDisposable
         ArgumentNullException.ThrowIfNull(widget);
         lock (_gate)
         {
+            _quickPicker = null;
             _fullPageOverlay = false;
             _pageScroll = 0;
             _sideOpen = false;
@@ -985,7 +994,14 @@ public sealed class SessionRenderer : IDisposable
 
             if (submitted is not null)
             {
-                onSubmit?.Invoke(submitted.Trim());
+                if (_quickSubmission && QueueQuickPromptAsync is not null)
+                {
+                    await QueueQuickPromptAsync(submitted, cancellationToken);
+                }
+                else
+                {
+                    onSubmit?.Invoke(submitted.Trim());
+                }
             }
         }
 
@@ -996,6 +1012,7 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
+            _quickPicker = null;
             if (!_composerPaused)
             {
                 _sideSuspended = _sideOpen;
@@ -1062,6 +1079,12 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
+            if (_quickPicker is not null)
+            {
+                _quickPicker = null;
+                PaintUnlocked(force: true);
+                return true;
+            }
             if (_fullPageOverlay)
             {
                 CloseFullPageUnlocked();
@@ -1134,7 +1157,7 @@ public sealed class SessionRenderer : IDisposable
 
             if (submitted is not null)
             {
-                return PromptRead.Submitted(submitted);
+                return PromptRead.Submitted(submitted) with { IsQuickPrompt = _quickSubmission };
             }
         }
     }
@@ -1148,6 +1171,7 @@ public sealed class SessionRenderer : IDisposable
         IReadOnlyList<IInputEvent> events;
         lock (_gate)
         {
+            _quickSubmission = false;
             events = _decoder.Push(burst);
         }
 
@@ -1175,7 +1199,7 @@ public sealed class SessionRenderer : IDisposable
                     _sideClearRequested = false;
                     cancelSide = _sideCancelRequested;
                     _sideCancelRequested = false;
-                    if (submitted is not null || pasteImage || clearSide || cancelSide)
+                    if (submitted is not null || pasteImage || clearSide || cancelSide || _quickOpenRequested)
                     {
                         break;
                     }
@@ -1183,6 +1207,26 @@ public sealed class SessionRenderer : IDisposable
 
                 RefreshPickerUnlocked();
                 PaintUnlocked(force: true);
+            }
+
+            if (_quickOpenRequested)
+            {
+                _quickOpenRequested = false;
+                if (LoadQuickPromptsAsync is not null)
+                {
+                    var catalog = await LoadQuickPromptsAsync(cancellationToken);
+                    lock (_gate)
+                    {
+                        if (!_composerPaused && !_fullPageOverlay && !_sideOpen
+                            && _overlayWidget is null && _modalOverlay.Count == 0)
+                        {
+                            _quickPicker = new QuickPromptPicker(catalog.Entries.Select(entry =>
+                                new QuickPromptOption(entry.Name, entry.Text, entry.Error)).ToArray(),
+                                catalog.Directory, catalog.Error);
+                            PaintUnlocked(force: true);
+                        }
+                    }
+                }
             }
 
             if (clearSide)
@@ -1427,6 +1471,40 @@ public sealed class SessionRenderer : IDisposable
             return null;
         }
 
+        if (_composerPaused || _overlayWidget is not null && !_fullPageOverlay || _modalOverlay.Count > 0)
+        {
+            _quickPicker = null;
+            return null;
+        }
+
+        if (_quickPicker is { } quick)
+        {
+            quick.Handle(item);
+            if (quick.Closed)
+            {
+                _quickPicker = null;
+                if (quick.Chosen is { } chosen)
+                {
+                    if (quick.Send)
+                    {
+                        _composer.SeedHistory([chosen.Text]);
+                        _quickSubmission = true;
+                        return chosen.Text;
+                    }
+                    _composer.Insert(chosen.Text);
+                    OnComposerEdited?.Invoke(_composer.SubmissionText);
+                }
+            }
+            return null;
+        }
+
+        if (item is InputKey { Key: ConsoleKey.F6, Modifiers: ConsoleModifiers.None }
+            && !_fullPageOverlay && !_sideOpen)
+        {
+            _quickOpenRequested = true;
+            return null;
+        }
+
         if (_fullPageOverlay)
         {
             return DispatchFullPageUnlocked(item, pageRows);
@@ -1583,6 +1661,7 @@ public sealed class SessionRenderer : IDisposable
         AddHelpUnlocked(
             "/btw         Side question; not saved. Esc or Ctrl+C closes, x clears",
             "enter        Submit; queue while working",
+            "f6           Quick prompts; Tab: Fill / Send",
             "empty enter  Send the queue now",
             "queue        Stays above the composer; sends after this tool or turn",
             "ctrl+j       Newline",
@@ -1705,6 +1784,18 @@ public sealed class SessionRenderer : IDisposable
         _chrome.TickSpinner(now);
         TickSideSpinner(now);
         RefreshRetryCaptionUnlocked(now);
+        if (_quickPicker is not null && !_composerPaused && _overlayWidget is null && _modalOverlay.Count == 0)
+        {
+            var quickLines = _quickPicker.Paint(width, height);
+            var frame = Enumerable.Range(0, height)
+                .Select(row => row < quickLines.Count ? quickLines[row] : PaintLine.Blank).ToArray();
+            _painter.PaintFrame(frame, width, height,
+                resetFrame: width != _paintedWidth || height != _paintedHeight);
+            _paintedWidth = width;
+            _paintedHeight = height;
+            _lastPaint = now;
+            return;
+        }
         if (_fullPageOverlay && _overlayWidget is not null)
         {
             PaintFullPageUnlocked(width, height, now);

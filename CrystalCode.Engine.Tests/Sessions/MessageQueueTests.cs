@@ -7,6 +7,19 @@ namespace CrystalCode.Engine.Tests.Sessions;
 public sealed class MessageQueueTests
 {
     [Fact]
+    public void Enqueue_QuickPromptPreservesBodyWithoutInterrupting()
+    {
+        var queue = new MessageQueue();
+        queue.Enqueue(" body\n", interruptAfterTools: false, preserveText: true);
+        Assert.False(queue.InterruptAfterTools);
+        Assert.Equal(" body\n", queue.Drain());
+        queue.Enqueue("normal");
+        Assert.True(queue.InterruptAfterTools);
+        queue.Clear();
+        Assert.False(queue.InterruptAfterTools);
+    }
+
+    [Fact]
     public void Drain_JoinsQueuedMessages()
     {
         var queue = new MessageQueue();

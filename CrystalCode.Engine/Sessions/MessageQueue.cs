@@ -9,9 +9,11 @@ public sealed class MessageQueue
 
     public int Count => _items.Count;
 
+    public bool InterruptAfterTools { get; private set; }
+
     public IReadOnlyList<string> Snapshot() => [.. _items];
 
-    public void Enqueue(string text)
+    public void Enqueue(string text, bool interruptAfterTools = true, bool preserveText = false)
     {
         ArgumentNullException.ThrowIfNull(text);
         var trimmed = text.Trim();
@@ -20,7 +22,8 @@ public sealed class MessageQueue
             return;
         }
 
-        _items.Add(trimmed);
+        _items.Add(preserveText ? text : trimmed);
+        InterruptAfterTools |= interruptAfterTools;
     }
 
     public string? Drain()
@@ -31,12 +34,13 @@ public sealed class MessageQueue
         }
 
         var text = string.Join("\n\n", _items);
-        _items.Clear();
+        Clear();
         return text;
     }
 
     public void Clear()
     {
         _items.Clear();
+        InterruptAfterTools = false;
     }
 }

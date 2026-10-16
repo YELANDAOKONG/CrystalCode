@@ -108,6 +108,20 @@ separate library with no terminal code. The product can:
 - persist configuration, permissions, and sessions under `~/.crystal`;
 - recall submitted prompts from the composer with Up/Down and retain up to 200
   recent text-only entries across runs for the same workspace;
+- open quick prompts with F6 from user-level `~/.crystal/shortcuts/` (or the
+  selected Home). Each open reloads direct UTF-8 `.md` files; the filename is
+  the name and the full body is the prompt. Search matches names and bodies,
+  arrows select, PgUp/PgDn or wheel scroll the preview, Tab switches Fill/Send,
+  Enter applies, and Esc cancels. Every open defaults to Fill. Fill inserts at
+  the cursor without replacing the draft; Send sends only the template and
+  preserves the draft and its images. Busy sends wait in the follow-up queue
+  without interrupting the current turn. Modal prompts do not open the picker.
+  Only Send enters prompt history. Templates are ordinary user text: no shell,
+  variable expansion, skill loading, or session-setting changes. Empty files,
+  invalid UTF-8, slash-command bodies, unsupported controls, symbolic links,
+  unreadable files, and files larger than 64 KiB are disabled with reasons.
+  Up to 256 files are shown. A missing directory shows its path and creates
+  no examples. There is no project override, in-TUI file editor, or run flag;
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace; a set may replace Work, Plan,
   Review, the Review user turn, topic naming, compaction, and image description;

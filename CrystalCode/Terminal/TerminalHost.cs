@@ -57,6 +57,8 @@ internal sealed class TerminalHost
             resume,
             persistedSettings,
             launchAccess);
+        renderer.LoadQuickPromptsAsync = new QuickPromptStore(home).LoadAsync;
+        renderer.QueueQuickPromptAsync = (text, token) => session.SubmitQuickPromptAsync(text, true, token);
         return new TerminalHost(renderer, session, launchPlan);
     }
 
@@ -170,6 +172,12 @@ internal sealed class TerminalHost
                 await PumpAsync(
                     _session.CompleteTurnAsync(promptSource.Token),
                     promptSource.Token);
+                continue;
+            }
+
+            if (read.IsQuickPrompt)
+            {
+                await PumpAsync(_session.SubmitQuickPromptAsync(read.Text, false, promptSource.Token), promptSource.Token);
                 continue;
             }
 

@@ -351,6 +351,33 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
+    /// Sends a text-only template without parsing commands or consuming the unsent draft.
+    /// A pump queues instead of starting a concurrent turn during other session work.
+    /// </summary>
+    public async Task SubmitQuickPromptAsync(
+        string text,
+        bool queueOnly,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var error = QuickPromptStore.ValidateText(text);
+        if (error is not null)
+        {
+            throw new ArgumentException(error, nameof(text));
+        }
+
+        await SavePromptHistoryAsync(text, cancellationToken);
+        if (_turnActive || queueOnly)
+        {
+            _queue.Enqueue(text, interruptAfterTools: false, preserveText: true);
+            ShowQueue();
+            return;
+        }
+
+        await StartTurnAsync(text, cancellationToken, attachPendingImages: false);
+    }
+
+    /// <summary>
     /// Collects a finished turn, then starts the queued follow-up if any.
     /// </summary>
     public async Task CompleteTurnAsync(CancellationToken cancellationToken)
@@ -4429,7 +4456,7 @@ public sealed class CodingSession : ITurnObserver
     private void PromoteAfterTools()
     {
         ShowTodos();
-        if (_queue.Count > 0)
+        if (_queue.InterruptAfterTools)
         {
             _turnSource?.Cancel();
         }
@@ -4500,7 +4527,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        _queue.Enqueue(input);
+        _queue.Enqueue(AttachPendingImages(input));
         ShowQueue();
     }
 
@@ -4518,13 +4545,16 @@ public sealed class CodingSession : ITurnObserver
         ShowQueue();
         if (next is not null)
         {
-            await StartTurnAsync(next, cancellationToken);
+            await StartTurnAsync(next, cancellationToken, attachPendingImages: false);
         }
     }
 
-    private async Task StartTurnAsync(string input, CancellationToken cancellationToken)
+    private async Task StartTurnAsync(
+        string input,
+        CancellationToken cancellationToken,
+        bool attachPendingImages = true)
     {
-        var message = AttachPendingImages(input);
+        var message = attachPendingImages ? AttachPendingImages(input) : input;
         message = await _hooks.OnUserMessageAsync(message, cancellationToken);
         Publish(new UserMessageSent(message));
         var user = new ChatMessage(ChatRole.User, message);

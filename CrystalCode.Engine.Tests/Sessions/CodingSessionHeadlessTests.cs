@@ -16,6 +16,38 @@ namespace CrystalCode.Engine.Tests.Sessions;
 public sealed class CodingSessionHeadlessTests
 {
     [Fact]
+    public async Task QuickPrompt_PreservesActualBodyInSessionAndHistory()
+    {
+        var client = new ScriptedStreamingClient(TextRound("done"));
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        const string body = "  审查代码\n第二行\n";
+        await headless.Session.SubmitQuickPromptAsync(body, false, CancellationToken.None);
+        await headless.Session.TurnTask!;
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+        Assert.Equal(body, Assert.Single(headless.Observer.Events.OfType<UserMessageSent>()).Text);
+        var history = new CrystalCode.Engine.Home.PromptHistoryStore(headless.Home, headless.WorkspacePath);
+        Assert.Contains(body, await history.LoadAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task QuickPrompt_BusyQueuesWithoutInterruptingAndRejectsCommands()
+    {
+        var client = new BlockingStreamingClient();
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("long task", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        await headless.Session.SubmitQuickPromptAsync("follow up", false, CancellationToken.None);
+        Assert.False(headless.Session.TurnTask!.IsCompleted);
+        Assert.Equal("follow up", Assert.Single(headless.Observer.Events.OfType<QueueChanged>().Last().Items));
+        await Assert.ThrowsAsync<ArgumentException>(() => headless.Session.SubmitQuickPromptAsync(
+            "\n /clear", false, CancellationToken.None));
+        headless.Session.TryInterrupt();
+        await headless.Session.FinishTurnAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Turn_PublishesOrderedEventsAndFinishesCompleted()
     {
         var client = new ScriptedStreamingClient(

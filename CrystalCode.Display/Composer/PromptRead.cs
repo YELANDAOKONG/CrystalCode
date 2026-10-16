@@ -5,6 +5,8 @@ namespace CrystalCode.Display.Composer;
 /// </summary>
 public sealed record PromptRead(string Text, bool TurnEnded)
 {
+    public bool IsQuickPrompt { get; init; }
+
     public static PromptRead Submitted(string text) => new(text, false);
 
     public static PromptRead Ended { get; } = new(string.Empty, true);
