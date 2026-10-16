@@ -53,17 +53,25 @@ internal static class PromptAttachmentText
         var title = string.Equals(entry.Title, entry.Name, StringComparison.Ordinal)
             ? string.Empty
             : entry.Title;
+        string label;
         if (title.Length == 0)
         {
-            return entry.Description;
+            label = entry.Description;
         }
-
-        if (entry.Description.Length == 0)
+        else if (entry.Description.Length == 0)
         {
-            return title;
+            label = title;
+        }
+        else
+        {
+            label = title + "  " + entry.Description;
+        }
+        if (!entry.Effective || entry.Enabled)
+        {
+            return label;
         }
 
-        return title + "  " + entry.Description;
+        return label.Length == 0 ? "forced" : label + "  forced";
     }
 
     private static string Source(PromptAttachmentSource source) =>

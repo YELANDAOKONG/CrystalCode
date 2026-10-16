@@ -641,7 +641,17 @@ its manifest says `enabled: false`. `default` forces the built-in text.
 set and does not write `prompt.json`. Listing and export stay available.
 `--prompt-attachments on|off` is the process switch: omitted or `on` follows
 the file flags and order; `off` appends nothing and refuses enable, disable,
-up, and down. Listing stays available. Neither flag writes
+up, and down. Listing stays available. Repeatable `--prompt-attachment <name>`
+appends those discovered names after the enabled set, even when a manifest
+says `enabled: false`. A name that is already enabled stays in its manifest
+order and is not appended twice. The same name passed more than once is kept
+once, in first-seen order. Combining it with `--prompt-attachments off` is
+rejected. A name that is not discovered in Home or the launch workspace fails
+startup. `/promptattach enable`, `disable`, `up`, and `down` are refused for a
+forced name and do not write `prompt.json`. Other names can still be changed.
+Listing stays available and marks a forced disabled row. A later workspace
+change that no longer contains a forced name skips that name and prints a
+note. These flags do not write
 `prompt.json` or `config.json`. Older `promptSet` and `promptAttachments`
 keys in `config.json` are ignored and omitted the next time preferences are
 saved. There is no migration tool.
@@ -651,8 +661,10 @@ saved. There is no migration tool.
 `/model` changes the configured provider and model for the next idle
 turn. Crystal `ChatRequest` has no model field; adapters bake the name
 and sampling into client options, so the session rebuilds
-`IStreamingChatClient` (and the compaction summarizer and Review
-client that share it). The transcript stays the same conversation.
+`IStreamingChatClient`. A compaction model that is on keeps its own
+client; otherwise the summarizer uses the new session client. An
+approval model that is on keeps its own Review client. The transcript
+stays the same conversation.
 
 - `/model` lists catalog models grouped by provider and marks the
   current selection.
@@ -799,8 +811,7 @@ Review and Audit follow `/model` and the work thinking gear. While
 enabled, review calls use a separate client and that provider's
 credentials. `/model` and the work thinking gear do not apply. The
 reviewer uses the stored gear; a stored gear the model does not offer
-falls back to the provider default, like the work gear. Compaction
-stays on the session model. Review usage is not added to the work
+falls back to the provider default, like the work gear. Review usage is not added to the work
 transcript. A missing credential, a missing catalog model, or a saved
 switch that names a model the catalog does not contain fails instead
 of falling back to the session model. `/approval model` shows the
@@ -860,9 +871,10 @@ output), the host:
 
 1. Clears old tool results outside a protected recent band, when enough
    tokens would be freed.
-2. Asks the model for one structured summary of older turns, folding any
+2. Asks for one structured summary of older turns, folding any
    previous summary, and keeps a recent tail verbatim. That summary
-   request follows the same `retry` policy as a model round.
+   request follows the same `retry` policy as a model round. The
+   session model writes it unless `compactionModel` is enabled.
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.
@@ -878,7 +890,30 @@ stays on `Compacting` and the composer remains usable.
 the threshold. When the retained tail already holds every turn, it still
 summarizes everything before the latest user turn. A session with nothing
 before that turn prints `Nothing earlier to compact`. It is refused while
-a turn is running. User and assistant text in the folded head are replaced
+a turn is running. `/compact model` and `/compact thinking` show or set
+the optional summarizer and its gear; any other argument is rejected.
+`compactionModel` in `config.json` is `enabled`, `provider`, `model`,
+and optional `thinkingEffort`. An omitted object means off, and
+`enabled: false` keeps a stored provider, model, and gear unused.
+While off, the summary request uses the session client and omits
+reasoning. While on, the host opens a separate client and maps that
+model's gear the same way as the approval model: no thinking omits
+reasoning, `off` disables it when the model allows that, and `default`
+or an unsupported gear uses the provider default without changing the
+saved gear. Changing the session model does not replace that client.
+A side question that must summarize first opens its own compaction
+client and releases it; the answer still uses the session model.
+The trigger, retained tail, and CTX percent stay on the session
+window. The summary prompt budget is the smaller of that window and
+the compaction model's declared window. A summary that cannot fit
+takes the existing path that does not write one. `/status` adds a
+Compaction model row only while the switch is on.
+`crystal`, `crystal space`, and `crystal run` accept
+`--compaction-model on|off`, `--compaction-provider`,
+`--compaction-model-id`, and `--compaction-thinking` for one process.
+Those flags are not written to `config.json`. `on` needs a saved
+selection or a provider and model id on the same command.
+User and assistant text in the folded head are replaced
 by the summary; they are not kept beside it. The screen keeps the earlier
 lines. When `showCompactionSummary` is on (the default; omitted from
 `config.json` when on, `false` when off), the stored summary is printed

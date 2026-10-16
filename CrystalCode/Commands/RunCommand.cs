@@ -209,6 +209,16 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return trust.ExitCode;
         }
 
+        if (!TaskRunOverrides.TryAcceptPromptAttachments(
+                home,
+                workspace,
+                settings.PromptAttachment,
+                out var attachmentError))
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(attachmentError)}[/]");
+            return 1;
+        }
+
         if (!SessionLaunchAccess.TryRead(settings, workspace, out var launchAccess, out var accessError))
         {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(accessError)}[/]");

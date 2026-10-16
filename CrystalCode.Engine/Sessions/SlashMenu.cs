@@ -18,7 +18,9 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? exportArguments = null,
         IReadOnlyList<SlashCompletion>? approvalModelArguments = null,
         IReadOnlyList<SlashCompletion>? approvalThinkingArguments = null,
-        IReadOnlyList<SlashCompletion>? contextArguments = null)
+        IReadOnlyList<SlashCompletion>? contextArguments = null,
+        IReadOnlyList<SlashCompletion>? compactionModelArguments = null,
+        IReadOnlyList<SlashCompletion>? compactionThinkingArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -35,7 +37,9 @@ public static class SlashMenu
                 exportArguments,
                 approvalModelArguments,
                 approvalThinkingArguments,
-                contextArguments);
+                contextArguments,
+                compactionModelArguments,
+                compactionThinkingArguments);
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
         }
 
@@ -62,7 +66,9 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? exportArguments,
         IReadOnlyList<SlashCompletion>? approvalModelArguments,
         IReadOnlyList<SlashCompletion>? approvalThinkingArguments,
-        IReadOnlyList<SlashCompletion>? contextArguments)
+        IReadOnlyList<SlashCompletion>? contextArguments,
+        IReadOnlyList<SlashCompletion>? compactionModelArguments,
+        IReadOnlyList<SlashCompletion>? compactionThinkingArguments)
     {
         if (spec.Verb == SessionVerb.Context && contextArguments is not null)
         {
@@ -75,6 +81,14 @@ public static class SlashMenu
                 spec.Arguments,
                 approvalModelArguments,
                 approvalThinkingArguments);
+        }
+
+        if (spec.Verb == SessionVerb.Compact)
+        {
+            return CompactionArguments(
+                spec.Arguments,
+                compactionModelArguments,
+                compactionThinkingArguments);
         }
 
         if (spec.Verb == SessionVerb.Thinking && thinkingArguments is not null)
@@ -138,6 +152,43 @@ public static class SlashMenu
             {
                 "model" => "Show or set the approval model; on and off switch it",
                 "thinking" => "Cycle or set the reviewer thinking gear",
+                _ => argument
+            };
+            options.Add(nested is { Count: > 0 }
+                ? new SlashCompletion(argument, help, [argument], nested)
+                : new SlashCompletion(argument, help, [argument]));
+        }
+
+        return options;
+    }
+
+    /// <summary>
+    /// Nests model and thinking completions under <c>/compact</c>. A bare
+    /// command still summarizes and has no required argument.
+    /// </summary>
+    private static IReadOnlyList<SlashCompletion> CompactionArguments(
+        IReadOnlyList<string>? arguments,
+        IReadOnlyList<SlashCompletion>? modelArguments,
+        IReadOnlyList<SlashCompletion>? thinkingArguments)
+    {
+        if (arguments is null || arguments.Count == 0)
+        {
+            return [];
+        }
+
+        var options = new List<SlashCompletion>(arguments.Count);
+        foreach (var argument in arguments)
+        {
+            var nested = argument switch
+            {
+                "model" => modelArguments,
+                "thinking" => thinkingArguments,
+                _ => null
+            };
+            var help = argument switch
+            {
+                "model" => "Show or set the compaction model; on and off switch it",
+                "thinking" => "Cycle or set the compaction thinking gear",
                 _ => argument
             };
             options.Add(nested is { Count: > 0 }

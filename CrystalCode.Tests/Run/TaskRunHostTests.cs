@@ -579,6 +579,76 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public void PromptAttachmentOverride_StaysInMemoryAndRejectsOff()
+    {
+        var current = HarnessSettings.CreateDefault();
+        var applied = AssertApplied(
+            current,
+            new TaskRunSettings { PromptAttachment = [" beta ", "beta", "alpha"] });
+
+        Assert.Equal(["beta", "alpha"], applied.PromptAttachments);
+        Assert.Empty(current.PromptAttachments);
+        Assert.True(applied.UsePromptAttachments);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings
+            {
+                PromptAttachments = "off",
+                PromptAttachment = ["alpha"]
+            },
+            out _,
+            out _,
+            out var offError));
+        Assert.Contains("--prompt-attachments is off", offError, StringComparison.Ordinal);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { PromptAttachment = ["Bad_Name"] },
+            out _,
+            out _,
+            out var invalidError));
+        Assert.Contains("invalid", invalidError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PromptAttachment_MissingNameDoesNotStart()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(AllowReview, TextRound("unused"));
+        var settings = Copy(fixture.Settings("Say hello"), promptAttachment: ["alpha"]);
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Invalid, result.Code);
+        Assert.Contains("Prompt attachment not found  alpha", result.Error, StringComparison.Ordinal);
+        Assert.Equal(0, client.RequestCount);
+        fixture.AssertSettingsUnchanged();
+    }
+
+    [Fact]
+    public async Task PromptAttachment_AppendsADisabledAttachmentWithoutWritingIt()
+    {
+        using var fixture = new RunFixture();
+        var directory = Path.Combine(fixture.Home, "prompt-attachments", "alpha");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "work.md"), "ALPHA");
+        File.WriteAllText(
+            Path.Combine(directory, "prompt.json"),
+            "{\n  \"enabled\": false\n}\n");
+        var client = new ScriptedRunClient(AllowReview, TextRound("Done."));
+        var settings = Copy(fixture.Settings("Say hello"), promptAttachment: ["alpha"]);
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        Assert.Contains("Prompt attachment 'alpha' is forced for this process.", result.Output, StringComparison.Ordinal);
+        Assert.Contains("\"enabled\": false", File.ReadAllText(Path.Combine(directory, "prompt.json")), StringComparison.Ordinal);
+        fixture.AssertSettingsUnchanged();
+        Assert.DoesNotContain("promptAttachments", File.ReadAllText(Path.Combine(fixture.Home, "config.json")), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ApprovalModelOverride_StaysProcessOnly()
     {
         using var fixture = new RunFixture();
@@ -667,6 +737,62 @@ public sealed class TaskRunHostTests
             new TaskRunSettings { ApprovalModel = "off" });
         Assert.False(offKeepsGear.ApprovalModel.Enabled);
         Assert.Equal("high", offKeepsGear.ApprovalModel.ThinkingEffort.Value);
+    }
+
+    [Fact]
+    public void Overrides_ConfiguresTheCompactionModelInMemory()
+    {
+        var stored = HarnessSettings.CreateDefault().WithCompactionModel(
+            new CompactionModelSettings(true, "openai", "gpt-5.6-sol"));
+
+        var off = AssertApplied(stored, new TaskRunSettings { CompactionModel = "off" });
+
+        Assert.False(off.CompactionModel.Enabled);
+        Assert.Equal("openai", off.CompactionModel.Provider);
+        Assert.Equal("gpt-5.6-sol", off.CompactionModel.Model);
+        Assert.True(stored.CompactionModel.Enabled);
+
+        var on = AssertApplied(
+            stored.WithCompactionModel(stored.CompactionModel.DisabledCopy()),
+            new TaskRunSettings { CompactionModel = "on" });
+        Assert.True(on.CompactionModel.Enabled);
+        Assert.Equal("gpt-5.6-sol", on.CompactionModel.Model);
+
+        var selected = AssertApplied(
+            HarnessSettings.CreateDefault(),
+            new TaskRunSettings
+            {
+                CompactionProvider = "openai",
+                CompactionModelId = "gpt-5.6-terra"
+            });
+        Assert.True(selected.CompactionModel.Enabled);
+        Assert.Equal("openai", selected.CompactionModel.Provider);
+        Assert.Equal("gpt-5.6-terra", selected.CompactionModel.Model);
+        Assert.Equal(ProviderName.DeepSeek, selected.Provider);
+
+        var geared = AssertApplied(
+            HarnessSettings.CreateDefault(),
+            new TaskRunSettings { CompactionThinking = "off" });
+        Assert.False(geared.CompactionModel.Enabled);
+        Assert.Equal(ThinkingSelection.Off, geared.CompactionModel.ThinkingEffort);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            HarnessSettings.CreateDefault(),
+            new TaskRunSettings { CompactionModel = "on" },
+            out _,
+            out _,
+            out var missing));
+        Assert.Equal("Pass --compaction-model-id.", missing);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            stored,
+            new TaskRunSettings { CompactionModel = "off", CompactionProvider = "openai" },
+            out _,
+            out _,
+            out var combined));
+        Assert.Equal(
+            "Do not pass --compaction-provider or --compaction-model-id when --compaction-model is off.",
+            combined);
     }
 
     [Fact]
@@ -936,7 +1062,8 @@ public sealed class TaskRunHostTests
         string? approvalModel = null,
         string? approvalProvider = null,
         string? approvalModelId = null,
-        string? approvalThinking = null) =>
+        string? approvalThinking = null,
+        string[]? promptAttachment = null) =>
         new()
         {
             TaskText = settings.TaskText,
@@ -956,7 +1083,8 @@ public sealed class TaskRunHostTests
             ApprovalModel = approvalModel,
             ApprovalProvider = approvalProvider,
             ApprovalModelId = approvalModelId,
-            ApprovalThinking = approvalThinking
+            ApprovalThinking = approvalThinking,
+            PromptAttachment = promptAttachment ?? []
         };
 
     private static ChatStreamEvent[] TextRound(string text, string? thinking = null)

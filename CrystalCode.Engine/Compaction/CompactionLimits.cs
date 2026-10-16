@@ -17,7 +17,8 @@ public sealed record CompactionLimits
         int contextWindow,
         int? maxTokens = null,
         double threshold = HarnessSettings.DefaultCompactionThreshold,
-        int? tailBudget = null)
+        int? tailBudget = null,
+        int? summaryWindow = null)
     {
         if (contextWindow <= 0)
         {
@@ -51,10 +52,19 @@ public sealed record CompactionLimits
                 "Tail budget cannot be negative.");
         }
 
+        if (summaryWindow is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(summaryWindow),
+                summaryWindow,
+                "Summary window must be positive.");
+        }
+
         ContextWindow = contextWindow;
         MaxTokens = maxTokens;
         Threshold = threshold;
         TailBudget = tailBudget;
+        SummaryWindow = summaryWindow;
     }
 
     public int ContextWindow { get; }
@@ -64,6 +74,13 @@ public sealed record CompactionLimits
     public double Threshold { get; }
 
     public int? TailBudget { get; }
+
+    /// <summary>
+    /// Declared window of a dedicated summarizer. The summary prompt uses the
+    /// smaller of this value and <see cref="ContextWindow"/>. Tail and threshold
+    /// stay on the session window.
+    /// </summary>
+    public int? SummaryWindow { get; }
 
     public int ResolveTailBudget()
     {
@@ -86,7 +103,10 @@ public sealed record CompactionLimits
 
     public int SummaryPromptBudget()
     {
+        var window = SummaryWindow is int declared
+            ? Math.Min(ContextWindow, declared)
+            : ContextWindow;
         var output = Math.Min(MaxTokens ?? SummaryOutputTokens, SummaryOutputTokens);
-        return Math.Max(1, ContextWindow - output);
+        return Math.Max(1, window - output);
     }
 }

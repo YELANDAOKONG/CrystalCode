@@ -1,0 +1,310 @@
+using System.Text.Json;
+
+using Crystal;
+using Crystal.Chat;
+using Crystal.Reasoning;
+
+using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Plugins.Interfaces;
+using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tests.Approvals;
+using CrystalCode.Engine.Tests.Home;
+using CrystalCode.Engine.Tests.Tools;
+
+using Xunit;
+
+namespace CrystalCode.Engine.Tests.Sessions;
+
+public sealed class CodingSessionCompactionModelTests
+{
+    [Fact]
+    public async Task Commands_SetTheCompactionModelAndKeepUnknownModelsWhileOff()
+    {
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: HeadlessSession.ScriptedSettings(thinking: true));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/compact model", CancellationToken.None);
+        Assert.Equal("Compaction model  Off", LastNote(headless));
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact model missing", CancellationToken.None);
+        Assert.Contains("missing", LastError(headless), StringComparison.Ordinal);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact model model", CancellationToken.None);
+        Assert.Contains("On", LastNote(headless), StringComparison.Ordinal);
+        Assert.Contains("scripted", LastNote(headless), StringComparison.Ordinal);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact thinking off", CancellationToken.None);
+        Assert.Equal("Compaction thinking  Off", LastNote(headless));
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/status", CancellationToken.None);
+        var status = headless.Observer.Events.OfType<StatusReported>().Single().Status;
+        Assert.Contains("scripted", status.CompactionModel, StringComparison.Ordinal);
+        Assert.Contains("model", status.CompactionModel, StringComparison.Ordinal);
+        Assert.Contains("Think Off", status.CompactionModel, StringComparison.Ordinal);
+
+        await headless.Session.SubmitAsync("/compact model off", CancellationToken.None);
+        var saved = Read(headless);
+        Assert.NotNull(saved.CompactionModel);
+        Assert.Null(saved.CompactionModel!.Enabled);
+        Assert.Equal("off", saved.CompactionModel.ThinkingEffort);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/status", CancellationToken.None);
+        Assert.Null(
+            headless.Observer.Events.OfType<StatusReported>().Single().Status.CompactionModel);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact later", CancellationToken.None);
+        Assert.Equal("Compact accepts no argument, or model and thinking.", LastError(headless));
+    }
+
+    [Fact]
+    public async Task Compact_UsesTheDedicatedClientAndKeepsItWhenTheSessionModelChanges()
+    {
+        var work = new SummaryClient(TextRound("Hello."), TextRound("Again."));
+        var other = new SummaryClient(TextRound("There."));
+        var summarizer = new SummaryClient();
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var observer = new RecordingSessionObserver();
+        var session = Open(
+            Settings(),
+            new Dictionary<string, IStreamingChatClient>
+            {
+                ["work"] = work,
+                ["other"] = other,
+                ["summarizer"] = summarizer
+            },
+            home,
+            workspace,
+            observer);
+        await session.StartAsync(CancellationToken.None);
+        await RunTurnAsync(session, "first");
+        await RunTurnAsync(session, "second");
+
+        await session.SubmitAsync("/compact", CancellationToken.None);
+
+        Assert.Equal(0, work.CompleteCount);
+        Assert.Equal(1, summarizer.CompleteCount);
+        Assert.Equal(ReasoningMode.Enabled, summarizer.LastComplete!.Reasoning!.Mode);
+        Assert.Equal("high", summarizer.LastComplete.Reasoning.Effort!.Value);
+
+        await session.SubmitAsync("/model other", CancellationToken.None);
+        await RunTurnAsync(session, "third");
+        await session.SubmitAsync("/compact", CancellationToken.None);
+
+        Assert.Equal(0, other.CompleteCount);
+        Assert.Equal(2, summarizer.CompleteCount);
+        Assert.Equal(2, work.StreamCount);
+        Assert.Equal(1, other.StreamCount);
+    }
+
+    [Fact]
+    public async Task Compact_OmitsReasoningWhenTheCompactionModelIsOff()
+    {
+        var work = new SummaryClient(TextRound("Hello."), TextRound("Again."));
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var session = Open(
+            Settings().WithCompactionModel(new CompactionModelSettings(false, "scripted", "summarizer")),
+            new Dictionary<string, IStreamingChatClient>
+            {
+                ["work"] = work,
+                ["summarizer"] = new SummaryClient()
+            },
+            home,
+            workspace,
+            new RecordingSessionObserver());
+        await session.StartAsync(CancellationToken.None);
+        await RunTurnAsync(session, "first");
+        await RunTurnAsync(session, "second");
+
+        await session.SubmitAsync("/compact", CancellationToken.None);
+
+        Assert.Equal(1, work.CompleteCount);
+        Assert.Null(work.LastComplete!.Reasoning);
+    }
+
+    private static HarnessSettings Settings()
+    {
+        var work = new ModelSettings(200_000, thinking: true, thinkingEfforts: ["low", "high"]);
+        var summarizer = new ModelSettings(8_000, thinking: true, thinkingEfforts: ["low", "high"]);
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>
+            {
+                ["work"] = work,
+                ["other"] = work,
+                ["summarizer"] = summarizer
+            });
+        return new HarnessSettings(
+            provider.Name,
+            "work",
+            CrystalCode.Engine.Approvals.ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([provider]),
+            compactionModel: new CompactionModelSettings(
+                true,
+                "scripted",
+                "summarizer",
+                ThinkingSelection.Parse("high")));
+    }
+
+    private static CodingSession Open(
+        HarnessSettings settings,
+        IReadOnlyDictionary<string, IStreamingChatClient> clients,
+        TemporaryHome home,
+        TemporaryWorkspace workspace,
+        RecordingSessionObserver observer)
+    {
+        var plugins = new PluginRegistry();
+        plugins.Add(new WorkspaceToolsPlugin());
+        plugins.Add(new RoutingPlugin(clients));
+        return CodingSession.Create(
+            settings,
+            new SettingsStore(home.Home),
+            new CredentialStore(home.Home),
+            home.Home,
+            workspace.Path,
+            new SessionFrontEnd(
+                observer,
+                new RecordingApprovalPrompt(CrystalCode.Engine.Approvals.ApprovalChoice.Deny),
+                new FixedUserPrompt("unused"),
+                new DecliningSessionChooser(),
+                new ScriptedTrustPrompt(accept: false)),
+            plugins);
+    }
+
+    private static async Task RunTurnAsync(CodingSession session, string text)
+    {
+        var quit = await session.SubmitAsync(text, CancellationToken.None);
+        Assert.False(quit);
+        if (session.TurnTask is { } turn)
+        {
+            await turn;
+        }
+
+        await session.CompleteTurnAsync(CancellationToken.None);
+    }
+
+    private static string LastNote(HeadlessSession headless) =>
+        headless.Observer.Events.OfType<NoteWritten>().Last().Text;
+
+    private static string LastError(HeadlessSession headless) =>
+        headless.Observer.Events.OfType<ErrorWritten>().Last().Text;
+
+    private static SettingsDocument Read(HeadlessSession headless)
+    {
+        var json = File.ReadAllText(headless.Home.ConfigPath);
+        return JsonSerializer.Deserialize<SettingsDocument>(json, HomeJson.Options)
+            ?? throw new InvalidOperationException("Settings file was empty.");
+    }
+
+    private static ChatStreamEvent[] TextRound(string text) =>
+    [
+        new ChatTextDelta(0, 0, ChatRole.Assistant, text),
+        new ChatCandidateCompleted(0, FinishReason.Stop)
+    ];
+
+    private sealed class SummaryClient : IStreamingChatClient
+    {
+        private readonly Queue<IReadOnlyList<ChatStreamEvent>> _rounds;
+
+        public SummaryClient(params IReadOnlyList<ChatStreamEvent>[] rounds)
+        {
+            _rounds = new Queue<IReadOnlyList<ChatStreamEvent>>(rounds);
+        }
+
+        public int StreamCount { get; private set; }
+
+        public int CompleteCount { get; private set; }
+
+        public ChatRequest? LastComplete { get; private set; }
+
+        public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            StreamCount++;
+            var events = _rounds.Count == 0
+                ? Array.Empty<ChatStreamEvent>()
+                : _rounds.Dequeue();
+            return EnumerateAsync(events, cancellationToken);
+        }
+
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CompleteCount++;
+            LastComplete = request;
+            return Task.FromResult(
+                new ChatResponse(
+                [
+                    new ChatCandidate(
+                        [new ChatMessage(ChatRole.Assistant, "## Objective\n- Kept.")],
+                        FinishReason.Stop)
+                ]));
+        }
+
+        private static async IAsyncEnumerable<ChatStreamEvent> EnumerateAsync(
+            IReadOnlyList<ChatStreamEvent> events,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken)
+        {
+            foreach (var streamEvent in events)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return streamEvent;
+                await Task.Yield();
+            }
+        }
+    }
+
+    private sealed class RoutingPlugin : IPlugin
+    {
+        private readonly IReadOnlyDictionary<string, IStreamingChatClient> _clients;
+
+        public RoutingPlugin(IReadOnlyDictionary<string, IStreamingChatClient> clients)
+        {
+            _clients = clients;
+        }
+
+        public string Name => "routing";
+
+        public PluginContribution Contribute() =>
+            new(clients: [new RoutingFactory(_clients)]);
+    }
+
+    private sealed class RoutingFactory : IChatClientFactory
+    {
+        private readonly IReadOnlyDictionary<string, IStreamingChatClient> _clients;
+
+        public RoutingFactory(IReadOnlyDictionary<string, IStreamingChatClient> clients)
+        {
+            _clients = clients;
+        }
+
+        public bool CanCreate(ProviderProtocol protocol) =>
+            protocol == ProviderProtocol.Ollama;
+
+        public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
+        {
+            ArgumentNullException.ThrowIfNull(settings);
+            return _clients[settings.Model];
+        }
+    }
+}

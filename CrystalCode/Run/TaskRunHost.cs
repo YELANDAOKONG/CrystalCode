@@ -126,6 +126,16 @@ internal static class TaskRunHost
             return RunExit.Invalid;
         }
 
+        if (!TaskRunOverrides.TryAcceptPromptAttachments(
+                home,
+                workspace,
+                settings.PromptAttachment,
+                out var attachmentError))
+        {
+            await error.WriteLineAsync(attachmentError);
+            return RunExit.Invalid;
+        }
+
         var credentials = new CredentialStore(home);
         if (!credentials.TryResolve(applied.ActiveProvider, out _, out var credentialError))
         {

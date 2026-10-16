@@ -65,6 +65,11 @@ internal static class StatusWidget
             rows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
         }
 
+        if (!string.IsNullOrWhiteSpace(status.CompactionModel))
+        {
+            rows.Add(("Compaction model", status.CompactionModel));
+        }
+
         if (full)
         {
             if (!string.IsNullOrWhiteSpace(status.Retry))

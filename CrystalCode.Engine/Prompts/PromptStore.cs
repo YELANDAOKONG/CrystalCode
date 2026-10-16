@@ -4,7 +4,8 @@ namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
 /// Resolves built-ins, a selected Home prompt set, direct Home and project
-/// overrides, then enabled prompt attachments. Workspace instructions, including
+/// overrides, then enabled prompt attachments. Forced attachment names are
+/// appended after that enabled set. Workspace instructions, including
 /// OpenCode-compatible <c>AGENTS.md</c> / <c>CLAUDE.md</c>, are appended inside
 /// the body and are not prompt attachments.
 /// </summary>
@@ -56,10 +57,37 @@ public sealed class PromptStore
         return new PromptSetDiscovery(_home).Collect(notes).TryGet(normalized, out _);
     }
 
+    /// <summary>
+    /// True when Home or the current workspace has a discovered attachment of
+    /// this name, including one whose manifest says <c>enabled</c> false.
+    /// A missing name does not fall back. Parent directories are not walked.
+    /// </summary>
+    public bool ContainsAttachment(string workspaceRoot, string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        var normalized = name.Trim();
+        if (!PromptAttachmentNames.IsValid(normalized))
+        {
+            return false;
+        }
+
+        var project = new CrystalHome(Path.Combine(workspaceRoot, ProjectDirectoryName));
+        var notes = new List<string>();
+        return new PromptAttachmentDiscovery()
+            .Collect(_home, project, notes)
+            .TryGet(normalized, out _);
+    }
+
     internal PromptResolution Resolve(
         string workspaceRoot,
         string? promptSetOverride = null,
-        bool usePromptAttachments = true)
+        bool usePromptAttachments = true,
+        IReadOnlyList<string>? forcedAttachments = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var project = new CrystalHome(Path.Combine(workspaceRoot, ProjectDirectoryName));
@@ -104,7 +132,11 @@ public sealed class PromptStore
             selection.Selected,
             project);
         var attachments = new PromptAttachmentDiscovery().Collect(_home, project, notes);
-        var enabled = ResolveAttachments(attachments, usePromptAttachments, notes);
+        var enabled = ResolveAttachments(
+            attachments,
+            usePromptAttachments,
+            forcedAttachments,
+            notes);
         return new PromptResolution(
             new PromptSet(
                 work.Text,
@@ -226,6 +258,7 @@ public sealed class PromptStore
     private static AttachmentSelection ResolveAttachments(
         PromptAttachmentCatalog catalog,
         bool usePromptAttachments,
+        IReadOnlyList<string>? forcedAttachments,
         List<string> notes)
     {
         if (!usePromptAttachments)
@@ -247,6 +280,33 @@ public sealed class PromptStore
             .OrderBy(item => item.Manifest.Order ?? int.MaxValue)
             .ThenBy(item => item.Name, StringComparer.Ordinal)
             .ToList();
+        if (usePromptAttachments)
+        {
+            var included = new HashSet<string>(
+                active.Select(item => item.Name),
+                StringComparer.Ordinal);
+            foreach (var name in NormalizeForced(forcedAttachments))
+            {
+                if (!PromptAttachmentNames.IsValid(name))
+                {
+                    notes.Add($"Prompt attachment '{name}' was skipped: directory name is invalid.");
+                    continue;
+                }
+
+                if (!catalog.TryGet(name, out var forced))
+                {
+                    notes.Add($"Prompt attachment '{name}' was not found.");
+                    continue;
+                }
+
+                notes.Add($"Prompt attachment '{name}' is forced for this process.");
+                if (included.Add(name))
+                {
+                    active.Add(forced);
+                }
+            }
+        }
+
         foreach (var definition in active)
         {
             if (definition.ReplacedHome)
@@ -302,6 +362,32 @@ public sealed class PromptStore
         {
             parts.Add(text);
         }
+    }
+
+    private static List<string> NormalizeForced(IReadOnlyList<string>? names)
+    {
+        var normalized = new List<string>();
+        if (names is null)
+        {
+            return normalized;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var raw in names)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            var name = raw.Trim();
+            if (seen.Add(name))
+            {
+                normalized.Add(name);
+            }
+        }
+
+        return normalized;
     }
 
     private static List<string> Dedupe(List<string> notes)

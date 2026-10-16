@@ -102,7 +102,7 @@ Run these from your shell. The interactive terminal is one entry point; the othe
 
 | Command | What it does |
 | :--- | :--- |
-| `crystal run <task>` | Run one task without a terminal and exit. Anything that would ask the operator is denied. Accepts process-only overrides such as `--provider`, `--model`, `--workspace`, and `--approval`; they are not written to `config.json` |
+| `crystal run <task>` | Run one task without a terminal and exit. Anything that would ask the operator is denied. Accepts process-only overrides such as `--provider`, `--model`, `--workspace`, `--approval`, and repeatable `--prompt-attachment`; they are not written to `config.json` |
 | `crystal space` | Open the terminal in the operator space at `~/.crystal/space` |
 | `crystal version` | Print the build identity and exit |
 | `crystal plugins` | List, show, enable, or disable one operator plugin outside a session |

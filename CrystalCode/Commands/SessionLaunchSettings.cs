@@ -39,6 +39,18 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--approval-thinking <EFFORT>")]
     public string? ApprovalThinking { get; init; }
 
+    [CommandOption("--compaction-model <on|off>")]
+    public string? CompactionModel { get; init; }
+
+    [CommandOption("--compaction-provider <PROVIDER>")]
+    public string? CompactionProvider { get; init; }
+
+    [CommandOption("--compaction-model-id <MODEL>")]
+    public string? CompactionModelId { get; init; }
+
+    [CommandOption("--compaction-thinking <EFFORT>")]
+    public string? CompactionThinking { get; init; }
+
     [CommandOption("--plan")]
     public bool Plan { get; init; }
 
@@ -53,6 +65,9 @@ public class SessionLaunchSettings : CommandSettings
 
     [CommandOption("--prompt-attachments <on|off>")]
     public string? PromptAttachments { get; init; }
+
+    [CommandOption("--prompt-attachment <NAME>")]
+    public string[] PromptAttachment { get; init; } = [];
 
     [CommandOption("--skills <on|off>")]
     public string? Skills { get; init; }

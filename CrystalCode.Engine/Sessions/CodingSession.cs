@@ -35,6 +35,8 @@ public sealed class CodingSession : ITurnObserver
     private IStreamingChatClient _client;
     private IStreamingChatClient? _approvalClient;
     private string? _approvalClientKey;
+    private IStreamingChatClient? _compactionClient;
+    private string? _compactionClientKey;
     private IStreamingMultimodalChatClient? _multimodalClient;
     private IStreamingMultimodalChatClient? _imageDescriptionClient;
     private HarnessSettings _settings;
@@ -162,11 +164,8 @@ public sealed class CodingSession : ITurnObserver
         ReloadPlugins();
         _client = CreateClient(settings);
         _multimodalClient = CreateMultimodalClient(settings);
-        _compactor = CreateCompactor(_client);
-        _promptResolution = _promptStore.Resolve(
-            workspace.Root,
-            settings.PromptSetOverride,
-            settings.UsePromptAttachments);
+        BindCompactor();
+        _promptResolution = ResolvePrompts();
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
         _sessionId = SessionStore.NewId();
@@ -513,6 +512,35 @@ public sealed class CodingSession : ITurnObserver
 
         if (parsed.Verb == SessionVerb.Compact)
         {
+            if (!string.IsNullOrWhiteSpace(parsed.Argument))
+            {
+                if (CompactionModelArguments.IsModelCommand(parsed.Argument))
+                {
+                    if (!CompactionModelArguments.TryParse(
+                            parsed.Argument,
+                            out var request,
+                            out var parseError))
+                    {
+                        Error(parseError);
+                    }
+                    else
+                    {
+                        ChangeCompactionModel(request);
+                    }
+                }
+                else if (CompactionThinkingArguments.IsThinkingCommand(parsed.Argument))
+                {
+                    ChangeCompactionThinking(CompactionThinkingArguments.Parse(parsed.Argument));
+                }
+                else
+                {
+                    Error("Compact accepts no argument, or model and thinking.");
+                }
+
+                PruneDraftImages(string.Empty);
+                return (true, false);
+            }
+
             try
             {
                 await CompactForcedAsync(cancellationToken);
@@ -1310,12 +1338,16 @@ public sealed class CodingSession : ITurnObserver
         var previousMultimodal = _multimodalClient;
         _client = nextClient;
         _multimodalClient = nextMultimodalClient;
-        _compactor = CreateCompactor(nextClient);
+        if (!_settings.CompactionModel.Enabled)
+        {
+            _compactor = CreateCompactor(nextClient);
+        }
         _settings = nextSettings;
         _persisted = _persisted.WithSelection(selection.Provider, selection.Model);
         _settingsStore.Save(_persisted);
         _clientView.ReleaseSession();
-        if (!ReferenceEquals(previous, _approvalClient))
+        if (!ReferenceEquals(previous, _approvalClient)
+            && !ReferenceEquals(previous, _compactionClient))
         {
             DisposeClient(previous);
         }
@@ -1635,10 +1667,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var resolution = _promptStore.Resolve(
-            _workspace.Root,
-            _settings.PromptSetOverride,
-            _settings.UsePromptAttachments);
+        var resolution = ResolvePrompts();
         _promptResolution = resolution;
         _prompts = resolution.Prompts;
         ReplaceLiveSystem();
@@ -1685,6 +1714,12 @@ public sealed class CodingSession : ITurnObserver
         if (!PromptAttachmentChangeArguments.TryParse(tokens, out var action, out var name, out var parseError))
         {
             Error(parseError);
+            return;
+        }
+
+        if (IsForcedAttachment(name))
+        {
+            Error($"Prompt attachment '{name}' is forced for this process.");
             return;
         }
 
@@ -1756,10 +1791,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var resolution = _promptStore.Resolve(
-            _workspace.Root,
-            _settings.PromptSetOverride,
-            _settings.UsePromptAttachments);
+        var resolution = ResolvePrompts();
         _promptResolution = resolution;
         _prompts = resolution.Prompts;
         ReplaceLiveSystem();
@@ -2061,7 +2093,8 @@ public sealed class CodingSession : ITurnObserver
                     ? CurrentApprovalThinkingStatus()
                     : null,
                 Retry: DescribeRetry(_settings.Retry),
-                ApprovalRetry: DescribeRetry(_settings.ApprovalRetry)),
+                ApprovalRetry: DescribeRetry(_settings.ApprovalRetry),
+                CompactionModel: CompactionModelStatus()),
             full));
     }
 
@@ -2231,7 +2264,7 @@ public sealed class CodingSession : ITurnObserver
         DisposeClient();
         _client = next;
         _multimodalClient = multimodal;
-        _compactor = CreateCompactor(_client);
+        BindCompactor();
     }
 
     private PluginModel CurrentPluginModel() =>
@@ -2361,6 +2394,7 @@ public sealed class CodingSession : ITurnObserver
         _clientView.ReleaseSession();
         _clientView.ReleaseReview();
         ReleaseApprovalClient();
+        ReleaseCompactionClient();
         DisposeClient(_client);
         DisposeClient(_multimodalClient);
         DisposeClient(_imageDescriptionClient);
@@ -2618,20 +2652,38 @@ public sealed class CodingSession : ITurnObserver
 
     private void ReloadPrompts()
     {
-        _promptResolution = _promptStore.Resolve(
-            _workspace.Root,
-            _settings.PromptSetOverride,
-            _settings.UsePromptAttachments);
+        _promptResolution = ResolvePrompts();
         _prompts = _promptResolution.Prompts;
         ReplaceLiveSystem();
         WritePromptNotes();
+    }
+
+    private PromptResolution ResolvePrompts() =>
+        _promptStore.Resolve(
+            _workspace.Root,
+            _settings.PromptSetOverride,
+            _settings.UsePromptAttachments,
+            _settings.PromptAttachments);
+
+    private bool IsForcedAttachment(string name)
+    {
+        foreach (var forced in _settings.PromptAttachments)
+        {
+            if (string.Equals(forced, name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private CompactionLimits CurrentLimits() =>
         new(
             _settings.ContextWindow,
             _settings.ActiveModel.MaxTokens,
-            _settings.CompactionThreshold);
+            _settings.CompactionThreshold,
+            summaryWindow: CompactionSummaryWindow());
 
     private async Task CompactForcedAsync(CancellationToken cancellationToken)
     {
@@ -3757,6 +3809,361 @@ public sealed class CodingSession : ITurnObserver
     private static string ApprovalClientKey(ApprovalModelSettings settings) =>
         settings.Provider + "\n" + settings.Model;
 
+    private void ChangeCompactionModel(CompactionModelArguments.Request request)
+    {
+        if (request.Show)
+        {
+            Note(_settings.CompactionModel.Describe());
+            return;
+        }
+
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing the compaction model.");
+            return;
+        }
+
+        CompactionModelSettings next;
+        if (request.Enabled is bool enabled)
+        {
+            if (enabled && !_settings.CompactionModel.HasSelection)
+            {
+                Error("Set a compaction model before turning it on.");
+                return;
+            }
+
+            next = enabled
+                ? _settings.CompactionModel.EnabledCopy()
+                : _settings.CompactionModel.DisabledCopy();
+        }
+        else if (!TrySelectCompactionModel(request.Selection ?? string.Empty, out next, out var selectError))
+        {
+            Error(selectError);
+            return;
+        }
+
+        if (!TryPrepareCompactionClient(next, out var client, out var prepareError))
+        {
+            Error(prepareError);
+            return;
+        }
+
+        // A launch gear is process-only. This command changes the switch or
+        // the selection, so the saved gear stays whatever config.json held.
+        var persistedNext = next.WithThinkingEffort(
+            _persisted.CompactionModel.ThinkingEffort);
+        HarnessSettings updated;
+        try
+        {
+            updated = _settings.WithCompactionModel(next);
+            _ = _persisted.WithCompactionModel(persistedNext);
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (client is not null && !ReferenceEquals(client, _client))
+            {
+                DisposeClient(client);
+            }
+
+            Error(exception.Message);
+            return;
+        }
+
+        _settings = updated;
+        _persisted = _persisted.WithCompactionModel(persistedNext);
+        _settingsStore.Save(_persisted);
+        ReplaceCompactionClient(next, client);
+        RefreshSlashCommands();
+        Note(next.Describe());
+    }
+
+    private void ChangeCompactionThinking(CompactionThinkingArguments.Request request)
+    {
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing the compaction model.");
+            return;
+        }
+
+        var compaction = _settings.CompactionModel;
+        if (!compaction.HasSelection)
+        {
+            Error("Set a compaction model before changing its thinking gear.");
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = _settings.Catalog.GetModel(
+                new ProviderName(compaction.Provider!),
+                compaction.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        if (!model.Thinking)
+        {
+            Error("The compaction model does not support thinking.");
+            return;
+        }
+
+        var selection = compaction.ThinkingEffort;
+        if (request.Effort is null)
+        {
+            selection = ThinkingSelection.Next(selection, model);
+        }
+        else
+        {
+            ThinkingSelection parsed;
+            try
+            {
+                parsed = ThinkingSelection.Parse(request.Effort);
+            }
+            catch (ArgumentException exception)
+            {
+                Error(exception.Message);
+                return;
+            }
+
+            if (parsed == ThinkingSelection.Off && !model.ThinkingCanDisable)
+            {
+                Error("The compaction model cannot disable thinking.");
+                return;
+            }
+
+            if (parsed != ThinkingSelection.Default
+                && parsed != ThinkingSelection.Off
+                && !model.AllowsEffort(parsed.Value))
+            {
+                Error(
+                    $"Thinking effort '{parsed.Value}' is not available for the compaction model.");
+                return;
+            }
+
+            selection = parsed;
+        }
+
+        SaveSettings(current => current.WithCompactionModel(
+            current.CompactionModel.WithThinkingEffort(selection)));
+        _compactor = CreateCompactor(CompactionClient(), CompactionReasoning());
+        RefreshSlashCommands();
+        Note("Compaction thinking  " + ThinkingLabel.For(selection));
+    }
+
+    private bool TrySelectCompactionModel(
+        string selectionText,
+        out CompactionModelSettings settings,
+        out string error)
+    {
+        settings = CompactionModelSettings.Off;
+        var currentProvider = _settings.CompactionModel.Provider is string stored
+            ? new ProviderName(stored)
+            : _settings.Provider;
+        if (!ModelSelection.TryResolve(
+                _settings.Catalog,
+                currentProvider,
+                selectionText,
+                out var selection,
+                out error)
+            || selection is null)
+        {
+            error = (error ?? string.Empty).Replace(
+                "/model",
+                "/compact model",
+                StringComparison.Ordinal);
+            return false;
+        }
+
+        settings = new CompactionModelSettings(
+            true,
+            selection.Provider.Value,
+            selection.Model,
+            _settings.CompactionModel.ThinkingEffort);
+        error = string.Empty;
+        return true;
+    }
+
+    private bool TryPrepareCompactionClient(
+        CompactionModelSettings settings,
+        out IStreamingChatClient? client,
+        out string error)
+    {
+        client = null;
+        error = string.Empty;
+        if (!settings.Enabled)
+        {
+            return true;
+        }
+
+        try
+        {
+            client = CreateCompactionClient(settings);
+            return true;
+        }
+        catch (Exception exception) when (exception is ArgumentException
+            or InvalidOperationException
+            or KeyNotFoundException
+            or NotSupportedException)
+        {
+            error = exception.Message;
+            return false;
+        }
+    }
+
+    private IStreamingChatClient CreateCompactionClient(CompactionModelSettings settings)
+    {
+        var selected = _settings.WithSelection(
+            new ProviderName(settings.Provider!),
+            settings.Model!);
+        return CreateClient(selected);
+    }
+
+    private void ReplaceCompactionClient(CompactionModelSettings settings, IStreamingChatClient? client)
+    {
+        ReleaseCompactionClient();
+        if (client is null)
+        {
+            _compactor = CreateCompactor(_client);
+            return;
+        }
+
+        _compactionClient = client;
+        _compactionClientKey = CompactionClientKey(settings);
+        _compactor = CreateCompactor(client, CompactionReasoning());
+    }
+
+    private void BindCompactor()
+    {
+        ReleaseCompactionClient();
+        if (!_settings.CompactionModel.Enabled)
+        {
+            _compactor = CreateCompactor(_client);
+            return;
+        }
+
+        if (!TryPrepareCompactionClient(_settings.CompactionModel, out var client, out var error)
+            || client is null)
+        {
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(error)
+                    ? "The compaction model could not be created."
+                    : error);
+        }
+
+        _compactionClient = client;
+        _compactionClientKey = CompactionClientKey(_settings.CompactionModel);
+        _compactor = CreateCompactor(client, CompactionReasoning());
+    }
+
+    private void ReleaseCompactionClient()
+    {
+        if (_compactionClient is null)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_compactionClient, _client))
+        {
+            DisposeClient(_compactionClient);
+        }
+
+        _compactionClient = null;
+        _compactionClientKey = null;
+    }
+
+    private IChatClient CompactionClient() =>
+        _settings.CompactionModel.Enabled && _compactionClient is not null
+            ? _compactionClient
+            : _client;
+
+    private IStreamingChatClient OpenSideCompactionClient(
+        IStreamingChatClient answerClient,
+        out bool owned)
+    {
+        if (!_settings.CompactionModel.Enabled)
+        {
+            owned = false;
+            return answerClient;
+        }
+
+        var client = CreateCompactionClient(_settings.CompactionModel);
+        owned = !ReferenceEquals(client, _client)
+            && !ReferenceEquals(client, _compactionClient)
+            && !ReferenceEquals(client, answerClient);
+        return client;
+    }
+
+    private ReasoningOptions? CompactionReasoning()
+    {
+        if (!_settings.CompactionModel.Enabled
+            || _settings.CompactionModel.Provider is null
+            || _settings.CompactionModel.Model is null)
+        {
+            return null;
+        }
+
+        var model = _settings.Catalog.GetModel(
+            new ProviderName(_settings.CompactionModel.Provider),
+            _settings.CompactionModel.Model);
+        return _settings.CompactionModel.ThinkingEffort.ToReasoningOptions(model);
+    }
+
+    private int? CompactionSummaryWindow()
+    {
+        var compaction = _settings.CompactionModel;
+        if (!compaction.Enabled || compaction.Provider is null || compaction.Model is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var declared = _settings.Catalog.GetModel(
+                new ProviderName(compaction.Provider),
+                compaction.Model).ContextWindow;
+            return Math.Min(declared, _settings.ContextWindow);
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    private string? CompactionModelStatus()
+    {
+        var compaction = _settings.CompactionModel;
+        if (!compaction.Enabled || !compaction.HasSelection)
+        {
+            return null;
+        }
+
+        var text = compaction.Provider + " / " + compaction.Model;
+        try
+        {
+            var model = _settings.Catalog.GetModel(
+                new ProviderName(compaction.Provider!),
+                compaction.Model!);
+            var thinking = ThinkingStatus.For(model, compaction.ThinkingEffort);
+            if (thinking.Length > 0 && thinking != "Think Default")
+            {
+                text += "  ·  " + thinking;
+            }
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return text;
+        }
+
+        return text;
+    }
+
+    private static string CompactionClientKey(CompactionModelSettings settings) =>
+        settings.Provider + "\n" + settings.Model;
+
     private ReasoningOptions? CurrentReasoning() =>
         _thinkingEffort.ToReasoningOptions(_settings.ActiveModel);
 
@@ -3799,7 +4206,9 @@ public sealed class CodingSession : ITurnObserver
             ExportCompletions.All,
             ApprovalModelCompletions(),
             ApprovalThinkingCompletions(),
-            ContextWindowSelection.Completions(_settings.ActiveModel));
+            ContextWindowSelection.Completions(_settings.ActiveModel),
+            CompactionModelCompletions(),
+            CompactionThinkingCompletions());
         Publish(new SlashCommandsChanged(menu));
     }
 
@@ -3843,6 +4252,53 @@ public sealed class CodingSession : ITurnObserver
                 _settings.Catalog.GetModel(
                     new ProviderName(approval.Provider),
                     approval.Model));
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return [];
+        }
+    }
+
+    private IReadOnlyList<SlashCompletion> CompactionModelCompletions()
+    {
+        var options = new List<SlashCompletion>
+        {
+            new("on", "Turn the compaction model on", ["on"]),
+            new("off", "Turn the compaction model off", ["off"])
+        };
+        var provider = _settings.Provider;
+        if (_settings.CompactionModel.Provider is string stored)
+        {
+            try
+            {
+                var parsed = ProviderName.Parse(stored);
+                _ = _settings.Catalog.Get(parsed);
+                provider = parsed;
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+            {
+                provider = _settings.Provider;
+            }
+        }
+
+        options.AddRange(ModelCompletions.For(_settings.Catalog, provider));
+        return options;
+    }
+
+    private IReadOnlyList<SlashCompletion> CompactionThinkingCompletions()
+    {
+        var compaction = _settings.CompactionModel;
+        if (compaction.Provider is null || compaction.Model is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            return ThinkingCompletions.For(
+                _settings.Catalog.GetModel(
+                    new ProviderName(compaction.Provider),
+                    compaction.Model));
         }
         catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
         {
@@ -4321,7 +4777,7 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private ContextCompactor CreateCompactor(IChatClient client) =>
+    private ContextCompactor CreateCompactor(IChatClient client, ReasoningOptions? reasoning = null) =>
         new(
             client,
             _settings.Retry.ToOptions(),
@@ -4348,7 +4804,8 @@ public sealed class CodingSession : ITurnObserver
                 todos,
                 previous,
                 CurrentPromptBinding(CurrentPromptContext().WithMode("compaction")),
-                _prompts.CompactionUser));
+                _prompts.CompactionUser),
+            reasoning);
 
     /// <summary>
     /// Collects the finished turn: records its transcript, compacts when over
@@ -4624,12 +5081,15 @@ public sealed class CodingSession : ITurnObserver
         CancellationToken cancellationToken)
     {
         IStreamingChatClient? client = null;
+        IStreamingChatClient? summaryClient = null;
         var owned = false;
+        var ownedSummary = false;
         try
         {
             client = CreateClient(_settings);
             owned = !ReferenceEquals(client, _client);
-            var compactor = CreateCompactor(client);
+            summaryClient = OpenSideCompactionClient(client, out ownedSummary);
+            var compactor = CreateCompactor(summaryClient, CompactionReasoning());
             var conversation = await PrepareSideConversationAsync(
                 sideBase,
                 prior,
@@ -4702,6 +5162,11 @@ public sealed class CodingSession : ITurnObserver
         }
         finally
         {
+            if (ownedSummary)
+            {
+                DisposeClient(summaryClient);
+            }
+
             if (owned)
             {
                 DisposeClient(client);

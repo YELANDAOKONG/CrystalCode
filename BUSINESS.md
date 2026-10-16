@@ -76,8 +76,8 @@ separate library with no terminal code. The product can:
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model and its thinking gear, Plan or Work,
-  thinking, prompt set, prompt
-  attachments, skills, external tools, and turn quotas for that process only.
+  thinking, prompt set, prompt attachments,
+  named prompt attachments, skills, external tools, and turn quotas for that process only.
   They are not written to `config.json` or `prompt.json`. Stdout is a readable plain-text trace, or one JSON object
   per line when `--format json` is set. Review and Audit still use the
   reviewing model. That model can be a separate provider and model, and
@@ -109,7 +109,10 @@ separate library with no terminal code. The product can:
   Review, the Review user turn, topic naming, compaction, and image description;
 - enable an ordered list of prompt attachments that append to the resolved
   Work, Plan, and Review text; directories are discovered in Home and in the
-  current workspace, and the workspace copy wins when both exist;
+  current workspace, and the workspace copy wins when both exist. A repeated
+  `--prompt-attachment <name>` flag appends those names for the process after
+  the enabled set, even when a manifest says `enabled` false, and does not
+  write `prompt.json`;
 - list saved sessions for the current workspace or every workspace; resume the
   current workspace, a named directory, or every workspace, entering that
   directory when the choice names one; and fork into a new independent session;
@@ -285,7 +288,8 @@ multimodal entries are exposed only while the selected model and provider
 support image input. Declared `audioInput` or `videoInput` does not expose
 them. `describe_image` is available on Plan and Work when
 `config.json` `imageModel` names a model that accepts images, and returns
-a text description from that model. `view_image` is available only while
+a text description from that model. Optional `compactionModel` writes
+summaries when enabled; omitted or off, summaries use the session model. `view_image` is available only while
 the selected model and provider support image input, and returns the image
 itself. Whether each source's author
 approval declarations take effect is stored under `externalToolApproval`

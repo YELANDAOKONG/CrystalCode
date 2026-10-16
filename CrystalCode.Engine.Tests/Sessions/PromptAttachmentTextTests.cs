@@ -25,6 +25,20 @@ public sealed class PromptAttachmentTextTests
     }
 
     [Fact]
+    public void Format_MarksAForcedDisabledRow()
+    {
+        var resolution = Resolution(
+        [
+            new PromptAttachmentEntry("alpha", "alpha", string.Empty, PromptAttachmentSource.Home, false, true, null)
+        ]);
+
+        var text = PromptAttachmentText.Format(resolution);
+
+        Assert.Contains("* 1  alpha  forced  Home", text, StringComparison.Ordinal);
+        Assert.Equal("alpha", PromptAttachmentText.Status(resolution));
+    }
+
+    [Fact]
     public void Format_ShowsNoneWhenNothingIsDiscovered()
     {
         var text = PromptAttachmentText.Format(Resolution([]));

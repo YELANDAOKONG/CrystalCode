@@ -72,6 +72,40 @@ public sealed class LaunchPromptOverrideTests
         Assert.Contains("Prompt Set: concise", LastNote(headless), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ForcedPromptAttachment_RefusesChangesToThatNameOnly()
+    {
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: HeadlessSession.ScriptedSettings().WithPromptAttachments(["alpha"]),
+            prepare: PrepareTwoAttachments);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text.Contains("Prompt attachment 'alpha' is forced", StringComparison.Ordinal));
+
+        await headless.Session.SubmitAsync("/promptattach disable alpha", CancellationToken.None);
+        Assert.Equal("Prompt attachment 'alpha' is forced for this process.", LastError(headless));
+        Assert.Contains(
+            "\"enabled\": false",
+            ReadManifest(headless, "prompt-attachments", "alpha"),
+            StringComparison.Ordinal);
+
+        await headless.Session.SubmitAsync("/promptattach up alpha", CancellationToken.None);
+        Assert.Equal("Prompt attachment 'alpha' is forced for this process.", LastError(headless));
+
+        await headless.Session.SubmitAsync("/promptattach enable beta", CancellationToken.None);
+        Assert.Contains(
+            "\"enabled\": true",
+            ReadManifest(headless, "prompt-attachments", "beta"),
+            StringComparison.Ordinal);
+        Assert.Contains("beta, alpha", LastNote(headless), StringComparison.Ordinal);
+
+        await headless.Session.SubmitAsync("/promptattach", CancellationToken.None);
+        Assert.Contains("alpha  forced", LastNote(headless), StringComparison.Ordinal);
+    }
+
     private static void PrepareSets(CrystalHome home, string workspace)
     {
         _ = workspace;
@@ -79,15 +113,27 @@ public sealed class LaunchPromptOverrideTests
         WriteSet(Path.Combine(home.PromptSetsDirectory, "other"), "other work");
     }
 
-    private static void PrepareAttachment(CrystalHome home, string workspace)
+    private static void PrepareTwoAttachments(CrystalHome home, string workspace)
     {
         _ = workspace;
-        var directory = Path.Combine(home.PromptAttachmentsDirectory, "alpha");
+        WriteAttachment(home, "alpha");
+        WriteAttachment(home, "beta");
+    }
+
+    private static void WriteAttachment(CrystalHome home, string name)
+    {
+        var directory = Path.Combine(home.PromptAttachmentsDirectory, name);
         Directory.CreateDirectory(directory);
-        File.WriteAllText(Path.Combine(directory, "work.md"), "ALPHA");
+        File.WriteAllText(Path.Combine(directory, "work.md"), name.ToUpperInvariant());
         File.WriteAllText(
             Path.Combine(directory, "prompt.json"),
             "{\n  \"enabled\": false\n}\n");
+    }
+
+    private static void PrepareAttachment(CrystalHome home, string workspace)
+    {
+        _ = workspace;
+        WriteAttachment(home, "alpha");
     }
 
     private static void WriteSet(string directory, string work)

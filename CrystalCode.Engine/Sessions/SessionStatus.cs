@@ -41,4 +41,5 @@ public sealed record SessionStatus(
     int Plugins = 0,
     string? ApprovalThinking = null,
     string? Retry = null,
-    string? ApprovalRetry = null);
+    string? ApprovalRetry = null,
+    string? CompactionModel = null);

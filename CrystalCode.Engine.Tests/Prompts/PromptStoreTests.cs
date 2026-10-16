@@ -463,6 +463,83 @@ public sealed class PromptStoreTests
     }
 
     [Fact]
+    public void Resolve_AppendsForcedAttachmentsAfterTheEnabledSet()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var alpha = AttachmentDirectory(home.Home, "alpha");
+        var beta = AttachmentDirectory(home.Home, "beta");
+        var gamma = ProjectAttachmentDirectory(workspace.Path, "gamma");
+        WritePrompt(alpha, "work.md", "ALPHA");
+        WritePrompt(beta, "work.md", "BETA");
+        WritePrompt(gamma, "work.md", "GAMMA");
+        WriteManifest(alpha, enabled: false);
+        WriteManifest(beta, enabled: true, order: 0);
+        WriteManifest(gamma, enabled: false);
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(
+            workspace.Path,
+            forcedAttachments: ["gamma", "alpha", "gamma", "beta"]);
+
+        Assert.Equal(["BETA", "GAMMA", "ALPHA"], resolution.Prompts.WorkAttachments);
+        Assert.Equal(["beta", "gamma", "alpha"], resolution.Attachments.Where(item => item.Effective).Select(item => item.Name));
+        Assert.False(resolution.Attachments.Single(item => item.Name == "alpha").Enabled);
+        Assert.True(resolution.Attachments.Single(item => item.Name == "alpha").Effective);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("Prompt attachment 'gamma' is forced", StringComparison.Ordinal));
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("Prompt attachment 'alpha' is forced", StringComparison.Ordinal));
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("Prompt attachment 'beta' is forced", StringComparison.Ordinal));
+        Assert.True(store.ContainsAttachment(workspace.Path, "gamma"));
+        Assert.False(store.ContainsAttachment(workspace.Path, "missing"));
+    }
+
+    [Fact]
+    public void Resolve_DoesNotAppendForcedAttachmentsWhenTheSwitchIsOff()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var alpha = AttachmentDirectory(home.Home, "alpha");
+        WritePrompt(alpha, "work.md", "ALPHA");
+        WriteManifest(alpha, enabled: false);
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(
+            workspace.Path,
+            usePromptAttachments: false,
+            forcedAttachments: ["alpha"]);
+
+        Assert.Empty(resolution.Prompts.WorkAttachments);
+        Assert.False(resolution.Attachments[0].Effective);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("off for this process", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            resolution.Notes,
+            note => note.Contains("forced for this process", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Resolve_NotesAForcedAttachmentThatIsMissing()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var store = CreateStore(home);
+
+        var resolution = store.Resolve(workspace.Path, forcedAttachments: ["alpha"]);
+
+        Assert.Empty(resolution.Prompts.WorkAttachments);
+        Assert.Contains(
+            resolution.Notes,
+            note => note.Contains("Prompt attachment 'alpha' was not found.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Resolve_SkipsInvalidAndEmptyAttachmentDirectories()
     {
         using var home = new TemporaryHome();

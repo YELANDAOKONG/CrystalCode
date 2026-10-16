@@ -68,7 +68,8 @@ public sealed record HarnessSettings
         ImageModelSettings? imageModel = null,
         IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
         RetrySettings? retry = null,
-        RetrySettings? approvalRetry = null)
+        RetrySettings? approvalRetry = null,
+        CompactionModelSettings? compactionModel = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -129,6 +130,7 @@ public sealed record HarnessSettings
         BashTimeoutSeconds = bashTimeoutSeconds;
         BackgroundBashTimeoutSeconds = backgroundBashTimeoutSeconds;
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
+        CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         ImageModel = imageModel ?? ImageModelSettings.None;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
@@ -145,6 +147,20 @@ public sealed record HarnessSettings
                 _ = catalog.GetModel(
                     new ProviderName(ApprovalModel.Provider!),
                     ApprovalModel.Model!);
+            }
+            catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+            {
+                throw new InvalidOperationException(exception.Message, exception);
+            }
+        }
+
+        if (CompactionModel.Enabled)
+        {
+            try
+            {
+                _ = catalog.GetModel(
+                    new ProviderName(CompactionModel.Provider!),
+                    CompactionModel.Model!);
             }
             catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
             {
@@ -214,6 +230,12 @@ public sealed record HarnessSettings
 
     public string PromptSet { get; }
 
+    /// <summary>
+    /// Process-only attachment names appended after the enabled set, even when
+    /// a manifest says <c>enabled</c> false. Empty follows the files only.
+    /// Ignored when <see cref="UsePromptAttachments"/> is false. Not written
+    /// to <c>config.json</c>.
+    /// </summary>
     public IReadOnlyList<string> PromptAttachments { get; }
 
     /// <summary>
@@ -223,8 +245,9 @@ public sealed record HarnessSettings
     public string? PromptSetOverride { get; }
 
     /// <summary>
-    /// Process-only attachment switch. False appends nothing. This value
-    /// is not written to <c>config.json</c>.
+    /// Process-only attachment switch. False appends nothing, including
+    /// <see cref="PromptAttachments"/>. This value is not written to
+    /// <c>config.json</c>.
     /// </summary>
     public bool UsePromptAttachments { get; }
 
@@ -241,6 +264,8 @@ public sealed record HarnessSettings
     public int? BackgroundBashTimeoutSeconds { get; }
 
     public ApprovalModelSettings ApprovalModel { get; }
+
+    public CompactionModelSettings CompactionModel { get; }
 
     public ImageModelSettings ImageModel { get; }
 
@@ -399,6 +424,12 @@ public sealed record HarnessSettings
         return Copy(imageModel: imageModel, setImageModel: true);
     }
 
+    public HarnessSettings WithCompactionModel(CompactionModelSettings compactionModel)
+    {
+        ArgumentNullException.ThrowIfNull(compactionModel);
+        return Copy(compactionModel: compactionModel, setCompactionModel: true);
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -436,7 +467,9 @@ public sealed record HarnessSettings
         bool setImageModel = false,
         IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
         RetrySettings? retry = null,
-        RetrySettings? approvalRetry = null) =>
+        RetrySettings? approvalRetry = null,
+        CompactionModelSettings? compactionModel = null,
+        bool setCompactionModel = false) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -468,7 +501,8 @@ public sealed record HarnessSettings
             setImageModel ? imageModel : ImageModel,
             contextSelections ?? ContextSelections,
             retry ?? Retry,
-            approvalRetry ?? ApprovalRetry);
+            approvalRetry ?? ApprovalRetry,
+            setCompactionModel ? compactionModel : CompactionModel);
 
     public override string ToString() => nameof(HarnessSettings);
 

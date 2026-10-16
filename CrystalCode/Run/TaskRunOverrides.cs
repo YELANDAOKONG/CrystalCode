@@ -55,6 +55,21 @@ internal static class TaskRunOverrides
                     next.ApprovalModel.WithThinkingEffort(effort));
             }
 
+            if (request.CompactionModel is not null
+                || request.CompactionProvider is not null
+                || request.CompactionModelId is not null)
+            {
+                next = next.WithCompactionModel(ParseCompactionModel(next, request));
+            }
+
+            if (request.CompactionThinking is not null)
+            {
+                var effort = ThinkingSelection.Parse(
+                    Required(request.CompactionThinking, "Compaction thinking"));
+                next = next.WithCompactionModel(
+                    next.CompactionModel.WithThinkingEffort(effort));
+            }
+
             if (request.Thinking is not null)
             {
                 next = next.WithThinkingEffort(
@@ -81,10 +96,22 @@ internal static class TaskRunOverrides
                 next = next.WithPromptSetOverride(Required(request.PromptSet, "Prompt set"));
             }
 
+            var requestedAttachments = request.PromptAttachment ?? [];
             if (request.PromptAttachments is not null)
             {
-                next = next.WithUsePromptAttachments(
-                    ParseSwitch(request.PromptAttachments, "--prompt-attachments"));
+                var attachmentsOn = ParseSwitch(request.PromptAttachments, "--prompt-attachments");
+                if (!attachmentsOn && requestedAttachments.Length > 0)
+                {
+                    throw new ArgumentException(
+                        "Do not pass --prompt-attachment when --prompt-attachments is off.");
+                }
+
+                next = next.WithUsePromptAttachments(attachmentsOn);
+            }
+
+            if (requestedAttachments.Length > 0)
+            {
+                next = next.WithPromptAttachments(NormalizeAttachmentNames(requestedAttachments));
             }
 
             if (request.ModelCalls is not null
@@ -141,6 +168,26 @@ internal static class TaskRunOverrides
             catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
             {
                 // A missing approval model fails setup on its own.
+            }
+        }
+
+        var compaction = settings.CompactionModel;
+        if (compaction.Enabled && compaction.HasSelection)
+        {
+            try
+            {
+                var model = settings.Catalog.GetModel(
+                    ProviderName.Parse(compaction.Provider!),
+                    compaction.Model!);
+                AddUnavailableThinkingNote(
+                    notes,
+                    compaction.ThinkingEffort,
+                    model,
+                    "Compaction thinking effort");
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+            {
+                // A missing compaction model fails setup on its own.
             }
         }
 
@@ -236,6 +283,58 @@ internal static class TaskRunOverrides
             current.ApprovalModel.ThinkingEffort);
     }
 
+    private static CompactionModelSettings ParseCompactionModel(
+        HarnessSettings current,
+        SessionLaunchSettings request)
+    {
+        var specifiedProvider = request.CompactionProvider is not null;
+        var specifiedModel = request.CompactionModelId is not null;
+        var specified = specifiedProvider || specifiedModel;
+        bool? enabled = request.CompactionModel is null
+            ? null
+            : ParseSwitch(request.CompactionModel, "--compaction-model");
+        if (enabled == false)
+        {
+            if (specified)
+            {
+                throw new ArgumentException(
+                    "Do not pass --compaction-provider or --compaction-model-id when --compaction-model is off.");
+            }
+
+            return current.CompactionModel.DisabledCopy();
+        }
+
+        if (enabled is null && !specified)
+        {
+            return current.CompactionModel;
+        }
+
+        var provider = specifiedProvider
+            ? ProviderName.Parse(Required(request.CompactionProvider!, "Compaction provider"))
+            : current.CompactionModel.Provider is string stored
+                ? ProviderName.Parse(stored)
+                : current.Provider;
+        var model = specifiedModel
+            ? Required(request.CompactionModelId!, "Compaction model")
+            : current.CompactionModel.Model
+                ?? throw new ArgumentException("Pass --compaction-model-id.");
+
+        try
+        {
+            _ = current.Catalog.GetModel(provider, model);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            throw new ArgumentException(exception.Message, exception);
+        }
+
+        return new CompactionModelSettings(
+            true,
+            provider.Value,
+            model,
+            current.CompactionModel.ThinkingEffort);
+    }
+
     private static TurnLimits ParseBudget(HarnessSettings current, SessionLaunchSettings request)
     {
         var modelCalls = current.ExecutionBudget.MaximumModelCalls;
@@ -302,6 +401,55 @@ internal static class TaskRunOverrides
 
         error = "Prompt set not found  " + name.Trim();
         return false;
+    }
+
+    internal static bool TryAcceptPromptAttachments(
+        CrystalHome home,
+        string workspaceRoot,
+        IReadOnlyList<string>? names,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(home);
+        error = string.Empty;
+        if (names is null || names.Count == 0)
+        {
+            return true;
+        }
+
+        var store = new PromptStore(home);
+        foreach (var name in names)
+        {
+            if (string.IsNullOrWhiteSpace(name) || store.ContainsAttachment(workspaceRoot, name))
+            {
+                continue;
+            }
+
+            error = "Prompt attachment not found  " + name.Trim();
+            return false;
+        }
+
+        return true;
+    }
+
+    private static IReadOnlyList<string> NormalizeAttachmentNames(IReadOnlyList<string> names)
+    {
+        var normalized = new List<string>(names.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var raw in names)
+        {
+            var name = Required(raw, "Prompt attachment");
+            if (!PromptAttachmentNames.IsValid(name))
+            {
+                throw new ArgumentException("Prompt attachment name is invalid  " + name);
+            }
+
+            if (seen.Add(name))
+            {
+                normalized.Add(name);
+            }
+        }
+
+        return normalized;
     }
 
     internal static bool TryReadWorkspaceTrust(string? value, out bool enabled, out string error)

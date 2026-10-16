@@ -40,6 +40,11 @@ public static class StatusText
             modelRows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
         }
 
+        if (!string.IsNullOrWhiteSpace(status.CompactionModel))
+        {
+            modelRows.Add(("Compaction model", status.CompactionModel));
+        }
+
         if (full)
         {
             if (!string.IsNullOrWhiteSpace(status.Retry))

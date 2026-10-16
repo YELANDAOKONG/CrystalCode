@@ -1290,6 +1290,43 @@ public sealed class SettingsStoreTests
             "approvalModel",
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "compactionModel",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_RoundTripsACompactionModelAndOmitsTheDefaultGear()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithCompactionModel(
+            new CompactionModelSettings(true, "openai", "gpt-5.6-sol"));
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.True(loaded.CompactionModel.Enabled);
+        Assert.Equal("openai", loaded.CompactionModel.Provider);
+        Assert.Equal("gpt-5.6-sol", loaded.CompactionModel.Model);
+        Assert.Equal(ThinkingSelection.Default, loaded.CompactionModel.ThinkingEffort);
+        Assert.DoesNotContain(
+            "thinkingEffort",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+
+        store.Save(loaded.WithCompactionModel(
+            new CompactionModelSettings(
+                false,
+                "openai",
+                "not-a-model",
+                ThinkingSelection.Parse("off"))));
+        var disabled = store.Load();
+
+        Assert.False(disabled.CompactionModel.Enabled);
+        Assert.Equal("not-a-model", disabled.CompactionModel.Model);
+        Assert.Equal(ThinkingSelection.Off, disabled.CompactionModel.ThinkingEffort);
     }
 
     [Fact]

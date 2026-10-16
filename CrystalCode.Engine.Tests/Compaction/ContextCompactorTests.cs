@@ -1,5 +1,6 @@
 using Crystal;
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Compaction;
@@ -256,6 +257,28 @@ public sealed class ContextCompactorTests
 
         Assert.Equal(CompactionKind.Exhausted, outcome.Kind);
         Assert.Null(outcome.Summary);
+    }
+
+    [Fact]
+    public async Task CompactAsync_ForwardsReasoningAndUsesTheSmallerSummaryWindow()
+    {
+        var client = new FixedChatClient("## Objective\n- Kept.");
+        var reasoning = new ReasoningOptions(ReasoningMode.Enabled, new ReasoningEffort("high"));
+        var compactor = new ContextCompactor(client, reasoning: reasoning);
+        var narrow = new CompactionLimits(100_000, tailBudget: 4_000, summaryWindow: 8_000);
+        var limits = new CompactionLimits(100_000, tailBudget: 8, summaryWindow: 50_000);
+
+        Assert.Equal(4_000, narrow.ResolveTailBudget());
+        Assert.Equal(8_000 - CompactionLimits.SummaryOutputTokens, narrow.SummaryPromptBudget());
+        Assert.Equal(
+            50_000 - CompactionLimits.SummaryOutputTokens,
+            limits.SummaryPromptBudget());
+
+        var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", limits);
+
+        Assert.Equal(CompactionKind.Applied, outcome.Kind);
+        Assert.Equal(ReasoningMode.Enabled, client.LastRequest!.Reasoning!.Mode);
+        Assert.Equal("high", client.LastRequest.Reasoning.Effort!.Value);
     }
 
     private static CompactionLimits TightLimits { get; } = new(100_000, tailBudget: 8);

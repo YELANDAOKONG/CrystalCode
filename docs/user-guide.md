@@ -163,10 +163,15 @@ CLI options:
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
 | `--approval-thinking <effort>` | Reviewer thinking gear for this process. Does not change `approvalModel.thinkingEffort` on disk |
+| `--compaction-model <on\|off>` | Use the saved compaction model, or turn it off for this process |
+| `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
+| `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
+| `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Does not change `compactionModel.thinkingEffort` on disk |
 | `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. `/promptset` switching is refused and does not write the file. Listing and export stay available |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing and refuses enable, disable, up, and down. Listing stays available |
+| `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set for this process, even when its file says `enabled` false. Does not write the file. Rejected together with `--prompt-attachments off` |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
 | `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
 | `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
@@ -298,10 +303,15 @@ checks the directory. `unlimited` removes that one cap.
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
 | `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default and a note is printed, and a value that is not an effort token exits 1. Does not write the file |
+| `--compaction-model <on\|off>` | Use the saved compaction model, or turn it off for this process. `on` needs a saved selection, or `--compaction-provider` and `--compaction-model-id` on the same command. Does not write the file |
+| `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
+| `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
+| `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Same values as `/compact thinking`. An unsupported gear falls back to the provider default and a note is printed. Does not write the file |
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
+| `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set, even when `enabled` is false. A missing name exits 1. Cannot be combined with `--prompt-attachments off`. Does not write the file |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
 | `--workspace-trust <on\|off>` | Directory trust for this process only. Omitted and `on` refuse an untrusted directory. `off` skips the check and does not record trust. This does not follow `workspaceTrust` |
 | `--model-calls <count>` | Model rounds for this turn. Default 1024 |
@@ -453,6 +463,7 @@ Top-level fields:
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
+| `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists). Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, and gear unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
 | `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), a portable name (`minimal`, `low`, `medium`, `high`, `maximum`; `max` is stored as `maximum`), or another effort token. Tokens are stored in lowercase |
 | `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
@@ -948,6 +959,11 @@ sets one by name, restricted to that model's efforts, and stores it in
 `approvalModel.thinkingEffort`. It applies while the approval-model
 switch is on.
 
+The compaction model has its own gear. `/compact thinking` cycles it, or
+sets one by name, restricted to that model's efforts, and stores it in
+`compactionModel.thinkingEffort`. It applies while the compaction-model
+switch is on. While the switch is off, summary requests omit reasoning.
+
 If the selected model does not support thinking, the command reports
 that and does nothing. The status bar shows `Think Off`, or `Think`
 plus the resolved gear when thinking is on. Models that cannot disable
@@ -1049,7 +1065,7 @@ returns the transcript viewport to the latest output.
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
-| `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running) |
+| `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `model` shows or sets the compaction model; `thinking` cycles or sets its gear |
 | `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
 | `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
@@ -1330,9 +1346,17 @@ set for that process, including a set whose file says `enabled: false`.
 `default` forces the built-in text. `--prompt-attachments off` appends
 nothing and refuses `/promptattach` enable, disable, up, and down. Listing
 stays available. Omitting the flag, or passing `on`, follows the files.
+Repeat `--prompt-attachment <name>` to append that attachment after the
+enabled set, even when its `prompt.json` says `enabled: false`. A name that
+is already enabled stays in its file order. The same flag with
+`--prompt-attachments off` is rejected, and a name that is not in Home or
+the launch workspace fails startup. `/promptattach enable`, `disable`,
+`up`, and `down` are refused for a forced name and do not write the file.
+Other names can still be changed. Listing stays available. A later workspace
+change that no longer contains a forced name skips it and prints a note.
 `--prompt-set` refuses `/promptset` switching for the process, including
 `default`, and does not write `prompt.json`. Listing and export stay
-available. Neither flag writes `prompt.json` or `config.json`.
+available. None of these flags write `prompt.json` or `config.json`.
 
 Enabled attachment text is added after the body is bound, and before an
 ordinary plugin prompt hook appends its own text.
@@ -1515,8 +1539,23 @@ terminal does not freeze. `/compact` (alias `/summarize`) runs
 immediately and does not wait for the threshold. When the retained tail
 already holds every turn, it still summarizes everything before the latest
 user turn. A session with nothing before that turn prints
-`Nothing earlier to compact`. It is refused while a turn is running. A
-successful compact is written to the session file. The screen keeps the
+`Nothing earlier to compact`. It is refused while a turn is running.
+`/compact model` shows `Compaction model  Off` or `On  <provider>  <model>`,
+turns that switch on or off, or selects `<model>` or `<provider> <model>`
+and turns it on. `/compact thinking` cycles or sets that model's gear.
+Both are refused during a turn or compaction. Any other argument is
+rejected and does not summarize. Tab completes `model` and `thinking`.
+When the switch is off, or `compactionModel` is omitted, summaries use
+the session model and the request omits reasoning. When it is on, summary
+requests use a separate client for that provider and model, including
+`/compact` and the summary a side question may take before it answers.
+The side answer still uses the session model. Changing the session model
+does not retarget an open compaction client. The trigger, retained tail,
+and CTX percent stay on the session window. The summary itself must fit
+the smaller of the session window and the compaction model's declared
+window; if it does not, the host keeps the existing "no summary" path.
+`/status` adds a Compaction model row only while the switch is on.
+A successful compact is written to the session file. The screen keeps the
 earlier lines. When `showCompactionSummary` is on (the default), the
 summary is printed under those lines in a rounded panel titled
 `Earlier context`. Automatic compaction does not print it. `/resume` restores that full conversation, while the model continues

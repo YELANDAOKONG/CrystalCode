@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Reasoning;
 
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
@@ -22,6 +23,7 @@ public sealed class ContextCompactor
         _prepareHead;
     private readonly Func<ChatResponse, CancellationToken, Task>? _reportResponse;
     private readonly Func<string, string, string?, string>? _userText;
+    private readonly ReasoningOptions? _reasoning;
 
     public ContextCompactor(
         IChatClient client,
@@ -31,7 +33,8 @@ public sealed class ContextCompactor
         Func<PluginCompactionPhase, string, string?>? finish = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareHead = null,
         Func<ChatResponse, CancellationToken, Task>? reportResponse = null,
-        Func<string, string, string?, string>? userText = null)
+        Func<string, string, string?, string>? userText = null,
+        ReasoningOptions? reasoning = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
@@ -41,6 +44,7 @@ public sealed class ContextCompactor
         _prepareHead = prepareHead;
         _reportResponse = reportResponse;
         _userText = userText;
+        _reasoning = reasoning;
         _systemText = systemText
             ?? (() => CompactionPrompt.ComposeSystem(
                 PromptContext.InstructionsOnly(string.Empty).WithMode("compaction")));
@@ -115,7 +119,8 @@ public sealed class ContextCompactor
                     [
                         new ChatMessage(ChatRole.System, systemText),
                         new ChatMessage(ChatRole.User, prompt)
-                    ]),
+                    ],
+                    reasoning: _reasoning),
                     token),
                 _retry,
                 _onRetry,

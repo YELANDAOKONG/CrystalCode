@@ -96,7 +96,8 @@ public sealed class SettingsStore
             imageModel: ReadImageModel(document.ImageModel),
             contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
             retry: ReadRetry(document.Retry),
-            approvalRetry: ReadRetry(document.ApprovalRetry));
+            approvalRetry: ReadRetry(document.ApprovalRetry),
+            compactionModel: ReadCompactionModel(document.CompactionModel));
     }
 
     public void Save(HarnessSettings settings)
@@ -155,6 +156,7 @@ public sealed class SettingsStore
                 WorkspaceLimits.BackgroundBashTimeoutSeconds),
             Providers = previous?.Providers,
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
+            CompactionModel = WriteCompactionModel(settings.CompactionModel),
             ImageModel = WriteImageModel(settings.ImageModel),
             Retry = WriteRetry(settings.Retry),
             ApprovalRetry = WriteRetry(settings.ApprovalRetry)
@@ -243,6 +245,55 @@ public sealed class SettingsStore
         }
 
         return new ApprovalModelDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
+                ? null
+                : settings.ThinkingEffort.Value
+        };
+    }
+
+    private static CompactionModelSettings ReadCompactionModel(CompactionModelDocument? document)
+    {
+        if (document is null)
+        {
+            return CompactionModelSettings.Off;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider)
+            ? null
+            : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model)
+            ? null
+            : document.Model.Trim();
+        if (document.Enabled == true && (provider is null || model is null))
+        {
+            throw new InvalidOperationException(
+                "compactionModel.enabled requires provider and model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new CompactionModelSettings(
+            document.Enabled ?? false,
+            provider,
+            model,
+            thinkingEffort);
+    }
+
+    private static CompactionModelDocument? WriteCompactionModel(CompactionModelSettings settings)
+    {
+        if (!settings.Enabled
+            && !settings.HasSelection
+            && settings.ThinkingEffort == ThinkingSelection.Default)
+        {
+            return null;
+        }
+
+        return new CompactionModelDocument
         {
             Enabled = settings.Enabled ? true : null,
             Provider = settings.Provider,
