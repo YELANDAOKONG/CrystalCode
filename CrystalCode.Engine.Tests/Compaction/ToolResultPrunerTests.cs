@@ -40,4 +40,33 @@ public sealed class ToolResultPrunerTests
             pruned,
             item => item is ToolResult { CallId: "2", Text: "recent" });
     }
+
+    [Fact]
+    public void Prune_ProtectTurnsKeepsThatManyLatestUserTurns()
+    {
+        var old = new string('x', 80);
+        var items = new List<ChatItem>
+        {
+            new ChatMessage(ChatRole.User, "first"),
+            new ToolResult("1", old),
+            new ChatMessage(ChatRole.User, "second"),
+            new ToolResult("2", old),
+            new ChatMessage(ChatRole.User, "third"),
+            new ToolResult("3", "recent")
+        };
+
+        var pruned = ToolResultPruner.Prune(
+            items,
+            ContextCompactor.OmittedResultText,
+            protectTokens: 1,
+            minimumPruneTokens: 1,
+            protectTurns: 1);
+
+        Assert.Contains(
+            pruned,
+            item => item is ToolResult result
+                && result.CallId == "2"
+                && result.Text == ContextCompactor.OmittedResultText);
+        Assert.Contains(pruned, item => item is ToolResult { CallId: "3", Text: "recent" });
+    }
 }

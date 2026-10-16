@@ -249,6 +249,26 @@ public sealed class ContextCompactorTests
     }
 
     [Fact]
+    public void ResolveTailBudget_CapsTheVerbatimTail()
+    {
+        var limits = new CompactionLimits(200_000);
+
+        Assert.Equal(CompactionLimits.MaxPreserveRecentTokens, limits.ResolveTailBudget());
+    }
+
+    [Fact]
+    public async Task CompactAsync_TreatsLengthAsNoSummary()
+    {
+        var compactor = new ContextCompactor(new LengthChatClient("## Objective\n- cut off"));
+
+        var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", TightLimits);
+
+        Assert.Equal(CompactionKind.Exhausted, outcome.Kind);
+        Assert.Null(outcome.Summary);
+        Assert.DoesNotContain(outcome.Transcript, item => item is ChatMessage message && message.Text.Contains("cut off", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task CompactAsync_TreatsEmptyCandidatesAsNoSummary()
     {
         var compactor = new ContextCompactor(new EmptyCandidatesChatClient());
@@ -269,7 +289,7 @@ public sealed class ContextCompactorTests
         var limits = new CompactionLimits(100_000, tailBudget: 8, summaryWindow: 50_000);
 
         Assert.Equal(4_000, narrow.ResolveTailBudget());
-        Assert.Equal(8_000 - CompactionLimits.SummaryOutputTokens, narrow.SummaryPromptBudget());
+        Assert.Equal(1, narrow.SummaryPromptBudget());
         Assert.Equal(
             50_000 - CompactionLimits.SummaryOutputTokens,
             limits.SummaryPromptBudget());
@@ -305,6 +325,27 @@ public sealed class ContextCompactorTests
             ChatRequest request,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new ChatResponse([]));
+    }
+
+    private sealed class LengthChatClient : IChatClient
+    {
+        private readonly string _text;
+
+        public LengthChatClient(string text)
+        {
+            _text = text;
+        }
+
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(
+                new ChatResponse(
+                [
+                    new ChatCandidate(
+                        [new ChatMessage(ChatRole.Assistant, _text)],
+                        FinishReason.Length)
+                ]));
     }
 
     private sealed class EmptyChatClient : IChatClient

@@ -189,7 +189,7 @@ public static class SlashMenu
             {
                 "model" => modelArguments,
                 "thinking" => thinkingArguments,
-                "summary" or "auto" => SummarySwitch,
+                "summary" or "auto" or "micro" => SummarySwitch,
                 _ => null
             };
             var help = argument switch
@@ -198,6 +198,7 @@ public static class SlashMenu
                 "thinking" => "Cycle or set the compaction thinking gear",
                 "summary" => "Toggle the summary printed after /compact",
                 "auto" => "Toggle the summary printed after automatic compaction",
+                "micro" => "Toggle removal of old tool results before each model call",
                 _ => argument
             };
             options.Add(nested is { Count: > 0 }

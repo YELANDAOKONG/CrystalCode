@@ -59,7 +59,10 @@ separate library with no terminal code. The product can:
   `showAutomaticCompactionSummary` is on, the same summary. That switch
   defaults off and is omitted from `config.json` until enabled. `/compact summary`
   and `/compact auto` (`automatic` is the same) toggle those two switches or
-  set `on` / `off`, and write `config.json`. They do not summarize;
+  set `on` / `off`, and write `config.json`. They do not summarize.
+  Optional microcompaction, off unless `microCompaction` is set, clears old
+  successful tool results before each model call. `/compact micro` toggles it
+  or sets `on` / `off` and writes `config.json`. It does not summarize;
 - ask before the first interactive session in a directory, when workspace
   trust is on (the default). Trust is the git root when the workspace is
   inside a repository, and the workspace itself otherwise. A yes is

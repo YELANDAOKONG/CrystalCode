@@ -60,6 +60,8 @@ internal sealed class SettingsDocument
 
     public CompactionModelDocument? CompactionModel { get; set; }
 
+    public MicroCompactionDocument? MicroCompaction { get; set; }
+
     public ImageModelDocument? ImageModel { get; set; }
 
     public RetryDocument? Retry { get; set; }

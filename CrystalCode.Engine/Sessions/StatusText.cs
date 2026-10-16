@@ -45,6 +45,11 @@ public static class StatusText
             modelRows.Add(("Compaction model", status.CompactionModel));
         }
 
+        if (!string.IsNullOrWhiteSpace(status.MicroCompaction))
+        {
+            modelRows.Add(("Microcompaction", status.MicroCompaction));
+        }
+
         if (full)
         {
             if (!string.IsNullOrWhiteSpace(status.Retry))

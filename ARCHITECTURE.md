@@ -879,17 +879,40 @@ headless front end denies any such operator prompt.
 
 ## Compaction
 
-Crystal does not reduce context. When estimated transcript size or the
-last model-round usage crosses the lesser of the configured fraction of
-the model context window and the usable window (context minus reserved
-output), the host:
+Crystal does not reduce context. Before each model round, and again
+before the post-turn compaction check, optional microcompaction may
+replace old successful tool results with `Tool result omitted after
+compaction.` It does not call a model. The last `protectTurns` user
+turns stay intact, then the newest `protectTokens` of older successful
+results stay intact. Older successful results are replaced only when
+that frees at least `minimumTokens`. User text, assistant text, and
+failed results stay. The walk stops at the previous summary. The
+archive, the screen, resume, fork, and export keep the original tool
+text. A rewrite is saved on the model transcript. The following compact
+decision then uses that transcript's estimate, because the previous
+provider usage still counts the removed text. Microcompaction is off
+when `microCompaction` is omitted. `/compact micro` toggles it, and
+`on` or `off` sets it, writes `config.json`, and does not summarize.
+It is refused during a turn or compaction. `/status` adds a
+Microcompaction row only while it is on. Defaults are 2 turns, 40000
+protected tokens, and 20000 minimum tokens. `protectTurns` must be at
+least 1. The token counts must be non-negative. Invalid values refuse
+startup. Full compaction's own prune does not follow this switch.
 
-1. Clears old tool results outside a protected recent band, when enough
-   tokens would be freed.
+When estimated transcript size or the last model-round usage crosses
+the lesser of the configured fraction of the model context window and
+the usable window (context minus reserved output), the host:
+
+1. Clears old tool results outside a protected recent band of 2 user
+   turns and 40000 tokens, when that frees more than 20000 tokens.
 2. Asks for one structured summary of older turns, folding any
-   previous summary, and keeps a recent tail verbatim. That summary
-   request follows the same `retry` policy as a model round. The
-   session model writes it unless `compactionModel` is enabled.
+   previous summary, and keeps a recent tail verbatim. The tail is 25%
+   of the usable window, at least 2000 tokens and at most 32000. That
+   summary request follows the same `retry` policy as a model round.
+   The session model writes it unless `compactionModel` is enabled.
+   The summary prompt reserves `min(session model maxTokens, 16384)`
+   tokens; a model without `maxTokens` reserves 16384. A summary whose
+   finish reason is `length` is not stored.
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.
@@ -908,8 +931,9 @@ before that turn prints `Nothing earlier to compact`. It is refused while
 a turn is running. `/compact model` and `/compact thinking` show or set
 the optional summarizer and its gear. `/compact summary` toggles
 `showCompactionSummary`, and `/compact auto` (alias `automatic`) toggles
-`showAutomaticCompactionSummary`. Either command accepts `on` or `off`,
-writes `config.json`, and does not summarize. Any other argument is rejected.
+`showAutomaticCompactionSummary`. `/compact micro` toggles microcompaction.
+Any of those commands accepts `on` or `off`, writes `config.json`, and does
+not summarize. Any other argument is rejected.
 `compactionModel` in `config.json` is `enabled`, `provider`, `model`,
 and optional `thinkingEffort`. An omitted object means off, and
 `enabled: false` keeps a stored provider, model, and gear unused.

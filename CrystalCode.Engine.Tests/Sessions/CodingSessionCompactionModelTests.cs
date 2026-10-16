@@ -64,7 +64,9 @@ public sealed class CodingSessionCompactionModelTests
 
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact later", CancellationToken.None);
-        Assert.Equal("Compact accepts no argument, or model, thinking, summary, and auto.", LastError(headless));
+        Assert.Equal(
+            "Compact accepts no argument, or model, thinking, summary, auto, and micro.",
+            LastError(headless));
     }
 
     [Fact]
@@ -96,6 +98,36 @@ public sealed class CodingSessionCompactionModelTests
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact summary later", CancellationToken.None);
         Assert.Equal("Compaction summary is on or off.", LastError(headless));
+    }
+
+    [Fact]
+    public async Task CompactMicro_TogglesAndShowsStatusOnlyWhileOn()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/status", CancellationToken.None);
+        Assert.Null(headless.Observer.Events.OfType<StatusReported>().Single().Status.MicroCompaction);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact micro", CancellationToken.None);
+        Assert.Equal("Microcompaction  On", LastNote(headless));
+        Assert.True(Read(headless).MicroCompaction!.Enabled);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/status", CancellationToken.None);
+        Assert.Equal(
+            "On  2 turns  40000  20000",
+            headless.Observer.Events.OfType<StatusReported>().Single().Status.MicroCompaction);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact micro off", CancellationToken.None);
+        Assert.Equal("Microcompaction  Off", LastNote(headless));
+        Assert.Null(Read(headless).MicroCompaction);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact micro later", CancellationToken.None);
+        Assert.Equal("Microcompaction is on or off.", LastError(headless));
     }
 
     [Fact]
@@ -168,7 +200,7 @@ public sealed class CodingSessionCompactionModelTests
     private static HarnessSettings Settings()
     {
         var work = new ModelSettings(200_000, thinking: true, thinkingEfforts: ["low", "high"]);
-        var summarizer = new ModelSettings(8_000, thinking: true, thinkingEfforts: ["low", "high"]);
+        var summarizer = new ModelSettings(64_000, thinking: true, thinkingEfforts: ["low", "high"]);
         var provider = new ProviderDefinition(
             new ProviderName("scripted"),
             ScriptedChatPlugin.Protocol,

@@ -1,3 +1,4 @@
+using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 
@@ -140,6 +141,11 @@ public sealed class ContextCompactor
             await _reportResponse(response, cancellationToken);
         }
 
+        if (IsTruncated(response))
+        {
+            return FinishWithoutSummary(pruned, prunedChanged);
+        }
+
         var summary = ReadAssistantText(response);
         if (string.IsNullOrWhiteSpace(summary))
         {
@@ -218,6 +224,10 @@ public sealed class ContextCompactor
 
         return _finish(phase, text) ?? text;
     }
+
+    private static bool IsTruncated(ChatResponse response) =>
+        response.Candidates.Count > 0
+        && response.Candidates[0].FinishReason == FinishReason.Length;
 
     private static string ReadAssistantText(ChatResponse response)
     {

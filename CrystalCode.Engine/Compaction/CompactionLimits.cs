@@ -9,9 +9,9 @@ public sealed record CompactionLimits
 {
     public const int MinPreserveRecentTokens = 2_000;
 
-    public const int MaxPreserveRecentTokens = 15_000;
+    public const int MaxPreserveRecentTokens = 32_000;
 
-    public const int SummaryOutputTokens = 4_096;
+    public const int SummaryOutputTokens = 16_384;
 
     public CompactionLimits(
         int contextWindow,

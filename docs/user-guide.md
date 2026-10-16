@@ -483,6 +483,7 @@ Top-level fields:
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). `/compact summary` toggles it; `on` or `off` sets it |
 | `showAutomaticCompactionSummary` | Print the same summary after automatic compaction (default `false`; omitted when off). `/compact auto` toggles it (`automatic` is the same); `on` or `off` sets it. Does not change `/compact` |
+| `microCompaction` | Optional removal of old successful tool results before each model call. Omitted means off. Object with `enabled` (default `false`), `protectTurns` (at least 1, default `2`), `protectTokens` (non-negative, default `40000`), and `minimumTokens` (non-negative, default `20000`). Invalid values stop startup. `/compact micro` toggles it; `on` or `off` sets it. Does not summarize |
 | `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
@@ -1066,7 +1067,7 @@ returns the transcript viewport to the latest output.
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
-| `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `model` shows or sets the compaction model; `thinking` cycles or sets its gear. `summary` toggles the manual summary; `auto` toggles the automatic one. `on` or `off` sets either switch |
+| `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `model` shows or sets the compaction model; `thinking` cycles or sets its gear. `summary` toggles the manual summary; `auto` toggles the automatic one. `micro` toggles removal of old tool results. `on` or `off` sets any of those switches |
 | `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
 | `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
@@ -1530,13 +1531,26 @@ complete ids so they can be copied into `/resume` or `/fork`.
 
 ## Compaction
 
-Crystal does not reduce context. When estimated transcript size or the
-last model-round usage crosses the lesser of `compactionThreshold` of
-the model context window and the usable window (context minus reserved
-output), the host:
+Crystal does not reduce context. Before each model call, microcompaction
+can replace old successful tool results with `Tool result omitted after
+compaction.` It is off unless `microCompaction` is set. The latest
+`protectTurns` user turns are kept, then the newest `protectTokens` of
+older successful results. Anything older is replaced only when that frees
+at least `minimumTokens`. It does not call a model, and it does not change
+the screen or the saved archive. `/compact micro` toggles it or sets `on`
+or `off`, writes `config.json`, and does not summarize. It is refused
+while a turn or compaction is running. `/status` shows a Microcompaction
+row only while it is on.
+
+When estimated transcript size or the last model-round usage crosses the
+lesser of `compactionThreshold` of the model context window and the usable
+window (context minus reserved output), the host:
 
 1. Clears old tool results outside a protected recent band, when that
-   frees enough tokens.
+   frees enough tokens. A summary that stops because it reached its output
+   limit is not stored. The summary request reserves 16384 tokens, or the
+   session model's `maxTokens` when that is smaller. The verbatim tail is
+   at most 32000 tokens.
 2. Asks the model for a structured summary of older turns (folding any
    previous summary) and keeps a recent tail verbatim.
 3. Stops if the summary cannot be produced and nothing else can be
@@ -1559,7 +1573,7 @@ Both are refused during a turn or compaction. `/compact summary` toggles
 `showAutomaticCompactionSummary` and prints `Automatic compaction summary`.
 `automatic` is the same command. These display commands write `config.json`
 and do not summarize. Any other argument is rejected and does not summarize.
-Tab completes `model`, `thinking`, `summary`, and `auto`, then `on` and `off`.
+Tab completes `model`, `thinking`, `summary`, `auto`, and `micro`, then `on` and `off`.
 When the compaction-model switch is off, or `compactionModel` is omitted, summaries use
 the session model and the request omits reasoning. When it is on, summary
 requests use a separate client for that provider and model, including

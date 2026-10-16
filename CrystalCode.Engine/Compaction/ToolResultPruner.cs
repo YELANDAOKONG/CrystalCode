@@ -12,11 +12,14 @@ public static class ToolResultPruner
 
     public const int MinimumPruneTokens = 20_000;
 
+    public const int DefaultProtectTurns = 2;
+
     public static IReadOnlyList<ChatItem> Prune(
         IReadOnlyList<ChatItem> transcript,
         string omittedText,
         int protectTokens = ProtectTokens,
-        int minimumPruneTokens = MinimumPruneTokens)
+        int minimumPruneTokens = MinimumPruneTokens,
+        int protectTurns = DefaultProtectTurns)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentException.ThrowIfNullOrWhiteSpace(omittedText);
@@ -33,6 +36,14 @@ public static class ToolResultPruner
                 "Minimum prune tokens cannot be negative.");
         }
 
+        if (protectTurns < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(protectTurns),
+                protectTurns,
+                "Protect turns must be at least 1.");
+        }
+
         var total = 0;
         var pruned = 0;
         var toPrune = new HashSet<int>();
@@ -45,7 +56,7 @@ public static class ToolResultPruner
                 userTurns++;
             }
 
-            if (userTurns < 2)
+            if (userTurns < protectTurns)
             {
                 continue;
             }

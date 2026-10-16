@@ -70,6 +70,11 @@ internal static class StatusWidget
             rows.Add(("Compaction model", status.CompactionModel));
         }
 
+        if (!string.IsNullOrWhiteSpace(status.MicroCompaction))
+        {
+            rows.Add(("Microcompaction", status.MicroCompaction));
+        }
+
         if (full)
         {
             if (!string.IsNullOrWhiteSpace(status.Retry))

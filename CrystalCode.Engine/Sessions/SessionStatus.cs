@@ -42,4 +42,5 @@ public sealed record SessionStatus(
     string? ApprovalThinking = null,
     string? Retry = null,
     string? ApprovalRetry = null,
-    string? CompactionModel = null);
+    string? CompactionModel = null,
+    string? MicroCompaction = null);

@@ -99,7 +99,8 @@ public sealed class SettingsStore
             contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
             retry: ReadRetry(document.Retry),
             approvalRetry: ReadRetry(document.ApprovalRetry),
-            compactionModel: ReadCompactionModel(document.CompactionModel));
+            compactionModel: ReadCompactionModel(document.CompactionModel),
+            microCompaction: ReadMicroCompaction(document.MicroCompaction));
     }
 
     public void Save(HarnessSettings settings)
@@ -160,6 +161,7 @@ public sealed class SettingsStore
             Providers = previous?.Providers,
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
+            MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             ImageModel = WriteImageModel(settings.ImageModel),
             Retry = WriteRetry(settings.Retry),
             ApprovalRetry = WriteRetry(settings.ApprovalRetry)
@@ -304,6 +306,42 @@ public sealed class SettingsStore
             ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
                 ? null
                 : settings.ThinkingEffort.Value
+        };
+    }
+
+    private static MicroCompactionSettings ReadMicroCompaction(MicroCompactionDocument? document)
+    {
+        if (document is null)
+        {
+            return MicroCompactionSettings.Default;
+        }
+
+        return new MicroCompactionSettings(
+            document.Enabled ?? false,
+            document.ProtectTurns ?? MicroCompactionSettings.DefaultProtectTurns,
+            document.ProtectTokens ?? MicroCompactionSettings.DefaultProtectTokens,
+            document.MinimumTokens ?? MicroCompactionSettings.DefaultMinimumTokens);
+    }
+
+    private static MicroCompactionDocument? WriteMicroCompaction(MicroCompactionSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new MicroCompactionDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            ProtectTurns = settings.ProtectTurns == MicroCompactionSettings.DefaultProtectTurns
+                ? null
+                : settings.ProtectTurns,
+            ProtectTokens = settings.ProtectTokens == MicroCompactionSettings.DefaultProtectTokens
+                ? null
+                : settings.ProtectTokens,
+            MinimumTokens = settings.MinimumTokens == MicroCompactionSettings.DefaultMinimumTokens
+                ? null
+                : settings.MinimumTokens
         };
     }
 

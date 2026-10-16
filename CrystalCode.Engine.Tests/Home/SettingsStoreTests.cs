@@ -1127,6 +1127,69 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsMicroCompactionAndOmitsTheDefault()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        Assert.DoesNotContain(
+            "microCompaction",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "microCompaction": {
+                "enabled": true,
+                "protectTurns": 3,
+                "protectTokens": 1000,
+                "minimumTokens": 0
+              }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.True(settings.MicroCompaction.Enabled);
+        Assert.Equal(3, settings.MicroCompaction.ProtectTurns);
+        Assert.Equal(1000, settings.MicroCompaction.ProtectTokens);
+        Assert.Equal(0, settings.MicroCompaction.MinimumTokens);
+        store.Save(settings);
+        var saved = File.ReadAllText(root.Home.ConfigPath);
+        Assert.Contains("\"enabled\": true", saved, StringComparison.Ordinal);
+        Assert.Contains("\"protectTurns\": 3", saved, StringComparison.Ordinal);
+        store.Save(settings.WithMicroCompaction(MicroCompactionSettings.Default));
+        Assert.DoesNotContain(
+            "microCompaction",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsInvalidMicroCompaction()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "microCompaction": { "protectTurns": 0 }
+            }
+            """);
+
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => store.Load());
+
+        Assert.Contains("at least 1", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Save_WritesProviderAndModelSelection()
     {
         using var root = new TemporaryHome();

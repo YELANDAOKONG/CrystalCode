@@ -578,9 +578,23 @@ public sealed class CodingSession : ITurnObserver
                         ChangeCompactionSummary(request);
                     }
                 }
+                else if (CompactionMicroArguments.IsMicroCommand(parsed.Argument))
+                {
+                    if (!CompactionMicroArguments.TryParse(
+                            parsed.Argument,
+                            out var enabled,
+                            out var parseError))
+                    {
+                        Error(parseError);
+                    }
+                    else
+                    {
+                        ChangeMicroCompaction(enabled);
+                    }
+                }
                 else
                 {
-                    Error("Compact accepts no argument, or model, thinking, summary, and auto.");
+                    Error("Compact accepts no argument, or model, thinking, summary, auto, and micro.");
                 }
 
                 PruneDraftImages(string.Empty);
@@ -2140,7 +2154,8 @@ public sealed class CodingSession : ITurnObserver
                     : null,
                 Retry: DescribeRetry(_settings.Retry),
                 ApprovalRetry: DescribeRetry(_settings.ApprovalRetry),
-                CompactionModel: CompactionModelStatus()),
+                CompactionModel: CompactionModelStatus(),
+                MicroCompaction: _settings.MicroCompaction.StatusText()),
             full));
     }
 
@@ -2777,7 +2792,9 @@ public sealed class CodingSession : ITurnObserver
 
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
     {
-        if (!NeedsCompaction(_transcript, result.Usage ?? _ledger.Usage))
+        var changed = TryMicrocompact(_transcript, out _);
+        var usage = changed ? null : result.Usage ?? _ledger.Usage;
+        if (!NeedsCompaction(_transcript, usage))
         {
             return;
         }
@@ -2793,13 +2810,17 @@ public sealed class CodingSession : ITurnObserver
         CancellationToken cancellationToken)
     {
         _reviewContext.Conversation = transcript;
-        if (!NeedsCompaction(transcript, ShownUsage()))
+        var changed = TryMicrocompact(transcript, out var current);
+        _reviewContext.Conversation = current;
+        if (!NeedsCompaction(current, changed ? null : ShownUsage()))
         {
-            return new CompactionOutcome(transcript, CompactionKind.Unchanged);
+            return changed
+                ? new CompactionOutcome(current, CompactionKind.Applied)
+                : new CompactionOutcome(transcript, CompactionKind.Unchanged);
         }
 
         var outcome = await RunCompactionAsync(
-            transcript,
+            current,
             silentSkip: true,
             cancellationToken);
         if (outcome.Kind == CompactionKind.Unchanged)
@@ -3981,6 +4002,61 @@ public sealed class CodingSession : ITurnObserver
             : "Compaction summary  " + (enabled ? "On" : "Off"));
     }
 
+    private void ChangeMicroCompaction(bool? enabled)
+    {
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing microcompaction.");
+            return;
+        }
+
+        var next = enabled ?? !_settings.MicroCompaction.Enabled;
+        SaveSettings(current => current.WithMicroCompaction(current.MicroCompaction.WithEnabled(next)));
+        Note("Microcompaction  " + (next ? "On" : "Off"));
+    }
+
+    /// <summary>
+    /// Replaces old successful tool results when microcompaction is on.
+    /// A rewritten session transcript is saved. A copy, such as a side
+    /// question, is pruned without writing it back. After a rewrite the
+    /// caller must judge the new estimate: the previous provider usage
+    /// still counts the removed text.
+    /// </summary>
+    private bool TryMicrocompact(IReadOnlyList<ChatItem> transcript, out IReadOnlyList<ChatItem> pruned)
+    {
+        pruned = transcript;
+        var settings = _settings.MicroCompaction;
+        if (!settings.Enabled)
+        {
+            return false;
+        }
+
+        var next = ToolResultPruner.Prune(
+            transcript,
+            ContextCompactor.OmittedResultText,
+            settings.ProtectTokens,
+            settings.MinimumTokens,
+            settings.ProtectTurns);
+        if (ReferenceEquals(next, transcript))
+        {
+            return false;
+        }
+
+        if (ReferenceEquals(transcript, _transcript))
+        {
+            _transcript.Clear();
+            _transcript.AddRange(next);
+            BindReviewConversation();
+            RememberCompactedUsage();
+            SaveSession();
+            pruned = _transcript;
+            return true;
+        }
+
+        pruned = next;
+        return true;
+    }
+
     private void ChangeCompactionThinking(CompactionThinkingArguments.Request request)
     {
         if (_turnActive || _compactSource is not null)
@@ -5159,6 +5235,7 @@ public sealed class CodingSession : ITurnObserver
         CancellationToken cancellationToken)
     {
         var conversation = SideConversation(ReconcilePendingToolCalls(sideBase));
+        _ = TryMicrocompact(conversation, out conversation);
         var composed = SideQuestion.Compose(conversation, prior, question);
         if (!NeedsCompaction(composed, null))
         {
