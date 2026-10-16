@@ -6,6 +6,8 @@ namespace CrystalCode.Engine.Plugins;
 /// <summary>
 /// Latest text for admitted plugin status fields. Plugins push changes.
 /// A retired board, and every sink it opened, ignores later updates.
+/// Snapshots leave in the order they were taken, including a clear from
+/// <see cref="Retire"/> or <see cref="Close"/>.
 /// </summary>
 public sealed class PluginStatusBoard
 {
@@ -14,8 +16,10 @@ public sealed class PluginStatusBoard
     private readonly Action<string> _note;
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private readonly HashSet<string> _rejected = new(StringComparer.Ordinal);
+    private readonly Queue<IReadOnlyList<StatusFieldValue>> _pending = new();
     private readonly List<StatusSink> _sinks = [];
     private bool _retired;
+    private bool _publishing;
 
     public PluginStatusBoard(
         Action<IReadOnlyList<StatusFieldValue>> publish,
@@ -47,7 +51,7 @@ public sealed class PluginStatusBoard
 
     public void Retire()
     {
-        var publish = false;
+        var drain = false;
         lock (_gate)
         {
             if (_retired)
@@ -56,25 +60,55 @@ public sealed class PluginStatusBoard
             }
 
             _retired = true;
-            publish = _values.Count > 0;
-            _values.Clear();
             foreach (var sink in _sinks)
             {
                 sink.Close();
             }
+
+            if (_values.Count > 0)
+            {
+                _values.Clear();
+                drain = Enqueue([]);
+            }
         }
 
-        if (publish)
+        if (drain)
         {
-            _publish([]);
+            Drain();
         }
     }
 
     public void Close(IPluginStatusUpdates updates)
     {
-        if (updates is StatusSink sink)
+        if (updates is not StatusSink sink || ReferenceEquals(sink, StatusSink.Closed))
         {
+            return;
+        }
+
+        var drain = false;
+        lock (_gate)
+        {
+            if (sink.IsClosed)
+            {
+                return;
+            }
+
             sink.Close();
+            var removed = false;
+            foreach (var name in sink.Names)
+            {
+                removed |= _values.Remove(name);
+            }
+
+            if (removed)
+            {
+                drain = Enqueue(Snapshot());
+            }
+        }
+
+        if (drain)
+        {
+            Drain();
         }
     }
 
@@ -95,7 +129,7 @@ public sealed class PluginStatusBoard
         }
 
         var normalized = PluginStatusText.Normalize(text, PluginStatusText.MaximumTextLength);
-        IReadOnlyList<StatusFieldValue>? snapshot = null;
+        var drain = false;
         lock (_gate)
         {
             if (_retired || sink.IsClosed)
@@ -120,11 +154,43 @@ public sealed class PluginStatusBoard
                 _values[key] = normalized;
             }
 
-            snapshot = Snapshot();
+            drain = Enqueue(Snapshot());
         }
 
-        if (snapshot is not null)
+        if (drain)
         {
+            Drain();
+        }
+    }
+
+    private bool Enqueue(IReadOnlyList<StatusFieldValue> snapshot)
+    {
+        _pending.Enqueue(snapshot);
+        if (_publishing)
+        {
+            return false;
+        }
+
+        _publishing = true;
+        return true;
+    }
+
+    private void Drain()
+    {
+        while (true)
+        {
+            IReadOnlyList<StatusFieldValue> snapshot;
+            lock (_gate)
+            {
+                if (_pending.Count == 0)
+                {
+                    _publishing = false;
+                    return;
+                }
+
+                snapshot = _pending.Dequeue();
+            }
+
             _publish(snapshot);
         }
     }
@@ -181,6 +247,8 @@ public sealed class PluginStatusBoard
         public static StatusSink Closed { get; } = new();
 
         public string DirectoryName { get; }
+
+        public IEnumerable<string> Names => _owned;
 
         public bool IsClosed => Volatile.Read(ref _closed) != 0;
 

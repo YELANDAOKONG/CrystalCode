@@ -71,6 +71,7 @@ public sealed class CodingSession : ITurnObserver
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
     private PluginPlaceholderTable _placeholders = PluginPlaceholderTable.Empty;
     private PluginStatusBoard _statusBoard = new(static _ => { }, static _ => { });
+    private bool _statusAttached;
     private readonly PluginModelView _modelView;
     private readonly PluginClientView _clientView;
     private PluginHookPipeline _hooks = PluginHookPipeline.Empty;
@@ -3488,6 +3489,7 @@ public sealed class CodingSession : ITurnObserver
         _placeholders = new PluginPlaceholderTable(_loadedPlugins.Placeholders, Note);
         _placeholders.SetModels(_modelView);
         _statusBoard = new PluginStatusBoard(PublishStatusFields, Note);
+        _statusAttached = false;
     }
 
     private void PublishStatusFields(IReadOnlyList<StatusFieldValue> fields)
@@ -3796,7 +3798,11 @@ public sealed class CodingSession : ITurnObserver
         _loadedPlugins.AttachSession(_modelView, Note);
         _loadedPlugins.AttachClients(_clientView, Note);
         _loadedPlugins.AttachDataDirectories(_home, _workspace.Root, Note);
-        _loadedPlugins.AttachStatus(_statusBoard, Note);
+        if (!_statusAttached)
+        {
+            _statusAttached = true;
+            _loadedPlugins.AttachStatus(_statusBoard, Note);
+        }
     }
 
     private void WriteExternalNotes()

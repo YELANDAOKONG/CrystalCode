@@ -187,13 +187,20 @@ loaded; the custom line omits it and `/statusline` marks it unavailable.
 
 After data directories, the host calls `AttachStatus` with
 `IPluginStatusUpdates` when at least one of this plugin's fields was
-accepted. `Set` replaces that field's text. `Clear`, or blank text, removes
-it. The host keeps one line: control characters and escapes are dropped,
+accepted. That call happens once for the loaded instance. Reloading tools
+or changing tool approval does not call it again. A later plugin reload
+retires the previous sink first.
+
+`Set` replaces that field's text. `Clear`, or blank text, removes it. The
+plugin pushes. The host does not poll and does not run a status timer. A
+plugin may call `Set` from any thread it already has, including a timer it
+owns. The host keeps one line: control characters and escapes are dropped,
 newlines and tabs become spaces, and text longer than 64 characters is cut.
 The description shown by `/statusline` is at most 80 characters. The same
 text is not published again. A name this plugin did not register is ignored,
 and that name is noted once. A sink from an older catalog ignores later
-calls. The plugin does not choose color, markup, or an extra row.
+calls. If `AttachStatus` throws, that sink is closed and any text it already
+published is removed. The plugin does not choose color, markup, or an extra row.
 
 ### Catalog snapshot
 

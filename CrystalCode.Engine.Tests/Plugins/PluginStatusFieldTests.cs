@@ -93,6 +93,95 @@ public sealed class PluginStatusFieldTests
     }
 
     [Fact]
+    public async Task Board_DeliversSnapshotsInTheOrderTheyWereTaken()
+    {
+        var published = new List<string>();
+        var entered = new ManualResetEventSlim(false);
+        var release = new ManualResetEventSlim(false);
+        var board = new PluginStatusBoard(
+            fields =>
+            {
+                var text = fields.Count == 0 ? string.Empty : fields[0].Text;
+                if (text == "one")
+                {
+                    entered.Set();
+                    Assert.True(release.Wait(TimeSpan.FromSeconds(5)));
+                }
+
+                lock (published)
+                {
+                    published.Add(text);
+                }
+            },
+            static _ => { });
+        var sink = board.Open("Acme", ["branch"]);
+        var first = Task.Run(() => sink.Set("branch", "one"));
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+
+        var second = Task.Run(() => sink.Set("branch", "two"));
+        await second.WaitAsync(TimeSpan.FromSeconds(5));
+        release.Set();
+        await first.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(["one", "two"], published);
+    }
+
+    [Fact]
+    public async Task Board_ClearFromRetireStaysAfterAnInFlightSnapshot()
+    {
+        var published = new List<string>();
+        var entered = new ManualResetEventSlim(false);
+        var release = new ManualResetEventSlim(false);
+        var board = new PluginStatusBoard(
+            fields =>
+            {
+                var text = fields.Count == 0 ? string.Empty : fields[0].Text;
+                if (text == "one")
+                {
+                    entered.Set();
+                    Assert.True(release.Wait(TimeSpan.FromSeconds(5)));
+                }
+
+                lock (published)
+                {
+                    published.Add(text);
+                }
+            },
+            static _ => { });
+        var sink = board.Open("Acme", ["branch"]);
+        var first = Task.Run(() => sink.Set("branch", "one"));
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+
+        board.Retire();
+        release.Set();
+        await first.WaitAsync(TimeSpan.FromSeconds(5));
+        sink.Set("branch", "later");
+
+        Assert.Equal(["one", string.Empty], published);
+    }
+
+    [Fact]
+    public void Close_DropsTextThatWasPublishedBeforeAttachFailed()
+    {
+        var published = new List<IReadOnlyList<StatusFieldValue>>();
+        var board = new PluginStatusBoard(
+            fields => published.Add(fields),
+            static _ => { });
+        var branch = board.Open("Acme", ["branch"]);
+        var ahead = board.Open("Other", ["ahead"]);
+        branch.Set("branch", "main");
+        ahead.Set("ahead", "1");
+
+        board.Close(branch);
+        branch.Set("branch", "later");
+
+        var last = published[^1];
+        var value = Assert.Single(last);
+        Assert.Equal("ahead", value.Name);
+        Assert.Equal("1", value.Text);
+    }
+
+    [Fact]
     public void Settings_KeepUnloadedNamesAndCommandsRejectThem()
     {
         var stored = new StatusLineSettings(true, ["model", "branch"]);
