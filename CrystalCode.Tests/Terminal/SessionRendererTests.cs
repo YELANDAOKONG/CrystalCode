@@ -220,7 +220,7 @@ public sealed class SessionRendererTests
 
         renderer.ShowLiveUsage(new TokenUsage(200, 50), new TokenUsage(13_200, 870));
 
-        Assert.Equal("CTX 25%  ·  13.2k IN / 870 OUT", renderer.ChromeUsage);
+        Assert.Equal("CTX 25.0%  ·  13.2k IN / 870 OUT", renderer.ChromeUsage);
         Assert.Equal("14.1k Total", renderer.ChromeUsageTotal);
     }
 
@@ -234,7 +234,7 @@ public sealed class SessionRendererTests
 
         renderer.ShowLiveUsage(new TokenUsage(200, 50), new TokenUsage(12_900, 800));
 
-        Assert.Equal("CTX 25%  ·  12.9k IN / 800 OUT", renderer.ChromeUsage);
+        Assert.Equal("CTX 25.0%  ·  12.9k IN / 800 OUT", renderer.ChromeUsage);
         Assert.Equal("13.7k Total", renderer.ChromeUsageTotal);
     }
 

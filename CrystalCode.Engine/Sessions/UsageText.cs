@@ -7,6 +7,10 @@ namespace CrystalCode.Engine.Sessions;
 /// </summary>
 public static class UsageText
 {
+    private const int PercentTenths = 10;
+
+    private const int FullPercentTenths = 100 * PercentTenths;
+
     public static string FormatWindow(int contextWindow) =>
         contextWindow <= 0 ? string.Empty : "Context " + Configuration.ContextWindowSelection.Format(contextWindow);
 
@@ -28,30 +32,40 @@ public static class UsageText
             + $"{FormatNumber(cumulativeUsage.OutputTokenCount)} OUT";
     }
 
-    private static string FormatContext(TokenUsage? usage, int contextWindow)
+    private static string FormatContext(TokenUsage? usage, int contextWindow) =>
+        FormatContextUsed(usage, contextWindow);
+
+    private static int ContextTenths(TokenUsage usage, int contextWindow)
     {
-        if (usage is null)
+        if (contextWindow <= 0 || usage.TotalTokenCount <= 0)
         {
-            return "CTX --";
+            return 0;
         }
 
-        var percent = ContextPercent(usage, contextWindow);
-        return $"CTX {percent}%";
+        var tenths = (double)usage.TotalTokenCount / contextWindow * FullPercentTenths;
+        return Math.Clamp(
+            (int)Math.Round(tenths, MidpointRounding.AwayFromZero),
+            0,
+            FullPercentTenths);
     }
 
-    private static int ContextPercent(TokenUsage usage, int contextWindow) =>
-        contextWindow <= 0
-            ? 0
-            : Math.Clamp((int)((double)usage.TotalTokenCount / contextWindow * 100), 0, 100);
+    private static string FormatPercent(int tenths)
+    {
+        var whole = tenths / PercentTenths;
+        var fraction = tenths % PercentTenths;
+        return $"{whole}.{fraction}";
+    }
 
     public static string FormatTotal(TokenUsage? usage) =>
         usage is null ? string.Empty : FormatNumber(usage.TotalTokenCount) + " Total";
 
     public static string FormatContextUsed(TokenUsage? usage, int contextWindow) =>
-        usage is null ? "CTX --" : $"CTX {ContextPercent(usage, contextWindow)}%";
+        usage is null ? "CTX --" : $"CTX {FormatPercent(ContextTenths(usage, contextWindow))}%";
 
     public static string FormatContextLeft(TokenUsage? usage, int contextWindow) =>
-        usage is null ? "CTX -- Left" : $"CTX {100 - ContextPercent(usage, contextWindow)}% Left";
+        usage is null
+            ? "CTX -- Left"
+            : $"CTX {FormatPercent(FullPercentTenths - ContextTenths(usage, contextWindow))}% Left";
 
     public static string FormatContextTokens(TokenUsage? usage, int contextWindow) =>
         usage is null

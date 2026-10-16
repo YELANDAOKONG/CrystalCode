@@ -19,7 +19,7 @@ public sealed class UsageTextTests
     {
         var text = UsageText.Format(new TokenUsage(100, 20), 1000);
 
-        Assert.Equal("CTX 12%  ·  100 IN / 20 OUT", text);
+        Assert.Equal("CTX 12.0%  ·  100 IN / 20 OUT", text);
         Assert.DoesNotContain("ctx", text, StringComparison.Ordinal);
         Assert.DoesNotContain(" in ", text, StringComparison.Ordinal);
         Assert.DoesNotContain(" out", text, StringComparison.Ordinal);
@@ -28,7 +28,7 @@ public sealed class UsageTextTests
     [Fact]
     public void Format_CapsPercentAtOneHundred()
     {
-        Assert.Equal("CTX 100%  ·  200 IN / 1 OUT", UsageText.Format(new TokenUsage(200, 1), 100));
+        Assert.Equal("CTX 100.0%  ·  200 IN / 1 OUT", UsageText.Format(new TokenUsage(200, 1), 100));
     }
 
     [Fact]
@@ -39,15 +39,26 @@ public sealed class UsageTextTests
             new TokenUsage(12_900, 800),
             1_000);
 
-        Assert.Equal("CTX 12%  ·  12.9k IN / 800 OUT", text);
+        Assert.Equal("CTX 12.0%  ·  12.9k IN / 800 OUT", text);
     }
 
     [Fact]
     public void Format_OmitsCountsWhenCumulativeUsageIsUnknown()
     {
         Assert.Equal(
-            "CTX 12%",
+            "CTX 12.0%",
             UsageText.Format(new TokenUsage(100, 20), null, 1_000));
+    }
+
+    [Fact]
+    public void FormatContext_ShowsOneDecimalAndComplementaryLeft()
+    {
+        var usage = new TokenUsage(123, 0);
+
+        Assert.Equal("CTX 12.3%", UsageText.FormatContextUsed(usage, 1_000));
+        Assert.Equal("CTX 87.7% Left", UsageText.FormatContextLeft(usage, 1_000));
+        Assert.Equal("CTX --", UsageText.FormatContextUsed(null, 1_000));
+        Assert.Equal("CTX -- Left", UsageText.FormatContextLeft(null, 1_000));
     }
 
     [Fact]
