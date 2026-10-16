@@ -249,6 +249,16 @@ public sealed class ContextCompactorTests
     }
 
     [Fact]
+    public void SummaryPromptBudget_KeepsTheSlotOnALargeWindowAndHalfOfASmallOne()
+    {
+        var wide = new CompactionLimits(200_000);
+        var small = new CompactionLimits(8_000);
+
+        Assert.Equal(200_000 - CompactionLimits.SummaryOutputTokens, wide.SummaryPromptBudget());
+        Assert.Equal(4_000, small.SummaryPromptBudget());
+    }
+
+    [Fact]
     public void ResolveTailBudget_CapsTheVerbatimTail()
     {
         var limits = new CompactionLimits(200_000);
@@ -289,7 +299,7 @@ public sealed class ContextCompactorTests
         var limits = new CompactionLimits(100_000, tailBudget: 8, summaryWindow: 50_000);
 
         Assert.Equal(4_000, narrow.ResolveTailBudget());
-        Assert.Equal(1, narrow.SummaryPromptBudget());
+        Assert.Equal(4_000, narrow.SummaryPromptBudget());
         Assert.Equal(
             50_000 - CompactionLimits.SummaryOutputTokens,
             limits.SummaryPromptBudget());

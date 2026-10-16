@@ -107,6 +107,9 @@ public sealed record CompactionLimits
             ? Math.Min(ContextWindow, declared)
             : ContextWindow;
         var output = Math.Min(MaxTokens ?? SummaryOutputTokens, SummaryOutputTokens);
+        // A window smaller than the summary slot cannot reserve the whole slot
+        // and still send the conversation. Leave at least half the window for the prompt.
+        output = Math.Min(output, Math.Max(1, window / 2));
         return Math.Max(1, window - output);
     }
 }

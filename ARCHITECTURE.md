@@ -885,7 +885,9 @@ replace old successful tool results with `Tool result omitted after
 compaction.` It does not call a model. The last `protectTurns` user
 turns stay intact, then the newest `protectTokens` of older successful
 results stay intact. Older successful results are replaced only when
-that frees at least `minimumTokens`. User text, assistant text, and
+the estimated size of the removed text is more than `minimumTokens`.
+The placeholder that replaces them is not subtracted from that estimate.
+User text, assistant text, and
 failed results stay. The walk stops at the previous summary. The
 archive, the screen, resume, fork, and export keep the original tool
 text. A rewrite is saved on the model transcript. The following compact
@@ -911,8 +913,10 @@ the usable window (context minus reserved output), the host:
    summary request follows the same `retry` policy as a model round.
    The session model writes it unless `compactionModel` is enabled.
    The summary prompt reserves `min(session model maxTokens, 16384)`
-   tokens; a model without `maxTokens` reserves 16384. A summary whose
-   finish reason is `length` is not stored.
+   tokens, and never more than half the effective summary window, so a
+   window smaller than 16384 can still be summarized. A model without
+   `maxTokens` reserves 16384 when the window is large enough. A summary
+   whose finish reason is `length` is not stored.
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.

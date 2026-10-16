@@ -68,12 +68,4 @@ public sealed record MicroCompactionSettings
 
     public MicroCompactionSettings WithEnabled(bool enabled) =>
         new(enabled, ProtectTurns, ProtectTokens, MinimumTokens);
-
-    /// <summary>
-    /// Status value while enabled. Null while off, so the row stays hidden.
-    /// </summary>
-    public string? StatusText() =>
-        Enabled
-            ? "On  " + ProtectTurns + " turns  " + ProtectTokens + "  " + MinimumTokens
-            : null;
 }

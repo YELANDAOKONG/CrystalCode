@@ -3,7 +3,9 @@ using System.Text.Json;
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Crystal.Tools;
 
+using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
@@ -117,7 +119,7 @@ public sealed class CodingSessionCompactionModelTests
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/status", CancellationToken.None);
         Assert.Equal(
-            "On  2 turns  40000  20000",
+            "On  2 turns, protect 40000, minimum 20000",
             headless.Observer.Events.OfType<StatusReported>().Single().Status.MicroCompaction);
 
         headless.Observer.Clear();
@@ -128,6 +130,48 @@ public sealed class CodingSessionCompactionModelTests
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact micro later", CancellationToken.None);
         Assert.Equal("Microcompaction is on or off.", LastError(headless));
+    }
+
+    [Fact]
+    public async Task Microcompaction_KeepsTheTurnTranscriptAfterPruning()
+    {
+        var client = new ScriptedStreamingClient(
+        [
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "kept going"),
+            new ChatCandidateCompleted(0, FinishReason.Stop)
+        ]);
+        var resume = new SessionDocument
+        {
+            Items =
+            [
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "old" },
+                new SessionItemDocument
+                {
+                    Kind = "tool_result",
+                    CallId = "1",
+                    Text = new string('x', 80)
+                },
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "KEEP-THIS" }
+            ]
+        };
+        var settings = HeadlessSession.ScriptedSettings().WithMicroCompaction(
+            new MicroCompactionSettings(true, protectTurns: 1, protectTokens: 0, minimumTokens: 0));
+        using var headless = new HeadlessSession(client, resume, settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("continue");
+
+        Assert.NotNull(client.LastRequest);
+        Assert.Contains(
+            client.LastRequest.Items.OfType<ChatMessage>(),
+            message => message.Text.Contains("KEEP-THIS", StringComparison.Ordinal));
+        Assert.Contains(
+            client.LastRequest.Items.OfType<ToolResult>(),
+            result => result.Text == ContextCompactor.OmittedResultText);
+        var saved = headless.ReadSaved();
+        Assert.Contains(saved.Items, item => item.Text == "KEEP-THIS");
+        Assert.Contains(saved.Items, item => item.Text == "kept going");
+        Assert.Contains(saved.Archive!, item => item.Text == new string('x', 80));
     }
 
     [Fact]
@@ -200,7 +244,7 @@ public sealed class CodingSessionCompactionModelTests
     private static HarnessSettings Settings()
     {
         var work = new ModelSettings(200_000, thinking: true, thinkingEfforts: ["low", "high"]);
-        var summarizer = new ModelSettings(64_000, thinking: true, thinkingEfforts: ["low", "high"]);
+        var summarizer = new ModelSettings(8_000, thinking: true, thinkingEfforts: ["low", "high"]);
         var provider = new ProviderDefinition(
             new ProviderName("scripted"),
             ScriptedChatPlugin.Protocol,

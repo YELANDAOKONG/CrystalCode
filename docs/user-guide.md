@@ -1535,8 +1535,9 @@ Crystal does not reduce context. Before each model call, microcompaction
 can replace old successful tool results with `Tool result omitted after
 compaction.` It is off unless `microCompaction` is set. The latest
 `protectTurns` user turns are kept, then the newest `protectTokens` of
-older successful results. Anything older is replaced only when that frees
-at least `minimumTokens`. It does not call a model, and it does not change
+older successful results. Anything older is replaced only when the
+estimated size of the removed text is more than `minimumTokens`. It does
+not call a model, and it does not change
 the screen or the saved archive. `/compact micro` toggles it or sets `on`
 or `off`, writes `config.json`, and does not summarize. It is refused
 while a turn or compaction is running. `/status` shows a Microcompaction
@@ -1549,8 +1550,8 @@ window (context minus reserved output), the host:
 1. Clears old tool results outside a protected recent band, when that
    frees enough tokens. A summary that stops because it reached its output
    limit is not stored. The summary request reserves 16384 tokens, or the
-   session model's `maxTokens` when that is smaller. The verbatim tail is
-   at most 32000 tokens.
+   session model's `maxTokens` when that is smaller, and never more than
+   half the summary window. The verbatim tail is at most 32000 tokens.
 2. Asks the model for a structured summary of older turns (folding any
    previous summary) and keeps a recent tail verbatim.
 3. Stops if the summary cannot be produced and nothing else can be

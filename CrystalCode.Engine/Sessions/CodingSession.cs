@@ -2155,7 +2155,7 @@ public sealed class CodingSession : ITurnObserver
                 Retry: DescribeRetry(_settings.Retry),
                 ApprovalRetry: DescribeRetry(_settings.ApprovalRetry),
                 CompactionModel: CompactionModelStatus(),
-                MicroCompaction: _settings.MicroCompaction.StatusText()),
+                MicroCompaction: DescribeMicroCompaction(_settings.MicroCompaction)),
             full));
     }
 
@@ -2172,6 +2172,24 @@ public sealed class CodingSession : ITurnObserver
         var jitter = (settings.JitterFactor * 100).ToString("0.###", CultureInfo.InvariantCulture);
         var cap = settings.MaximumDelaySeconds.ToString("0.###", CultureInfo.InvariantCulture);
         return $"{settings.MaximumRetries} {retries}, {initial}s base x{factor}, {jitter}% jitter, {cap}s cap";
+    }
+
+    private static string? DescribeMicroCompaction(MicroCompactionSettings settings)
+    {
+        if (!settings.Enabled)
+        {
+            return null;
+        }
+
+        var turns = settings.ProtectTurns == 1 ? "turn" : "turns";
+        return "On  "
+            + settings.ProtectTurns
+            + " "
+            + turns
+            + ", protect "
+            + settings.ProtectTokens
+            + ", minimum "
+            + settings.MinimumTokens;
     }
 
     private void ChangeStatusLine(string argument)
@@ -2809,13 +2827,15 @@ public sealed class CodingSession : ITurnObserver
         IReadOnlyList<ChatItem> transcript,
         CancellationToken cancellationToken)
     {
+        // Stay on the turn's list. A pruned copy would miss assistant and tool
+        // messages added later in this round, and returning that same list
+        // would let the turn clear the source it then copies from.
         _reviewContext.Conversation = transcript;
         var changed = TryMicrocompact(transcript, out var current);
-        _reviewContext.Conversation = current;
         if (!NeedsCompaction(current, changed ? null : ShownUsage()))
         {
             return changed
-                ? new CompactionOutcome(current, CompactionKind.Applied)
+                ? new CompactionOutcome([.. current], CompactionKind.Applied)
                 : new CompactionOutcome(transcript, CompactionKind.Unchanged);
         }
 
