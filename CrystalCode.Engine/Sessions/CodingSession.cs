@@ -3595,7 +3595,7 @@ public sealed class CodingSession : ITurnObserver
         {
             if (!HasConversation())
             {
-                Error("Session is empty");
+                Error("Nothing to fork.");
                 return;
             }
 
@@ -4947,6 +4947,8 @@ public sealed class CodingSession : ITurnObserver
             ? _queue.Snapshot()
             : [.. _deferredStops, .. _queue.Snapshot()];
 
+    // Follow-up text only. Leave _deferredStops so a later /clear, /resume,
+    // or /fork still runs in the order it was typed.
     private void DiscardQueue()
     {
         _queue.Clear();

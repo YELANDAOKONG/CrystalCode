@@ -328,17 +328,25 @@ public sealed class CodingSessionHeadlessTests
     }
 
     [Fact]
-    public async Task RunsWhileBusy_MatchesItsHandler()
+    public void RunsWhileBusy_IsTheReportingAllowList()
     {
-        using var headless = new HeadlessSession(new ScriptedStreamingClient());
-        await headless.Session.StartAsync(CancellationToken.None);
+        SessionVerb[] allowed =
+        [
+            SessionVerb.Help,
+            SessionVerb.Status,
+            SessionVerb.Stats,
+            SessionVerb.Todos,
+            SessionVerb.Sessions,
+            SessionVerb.Tokens,
+            SessionVerb.Verbose,
+            SessionVerb.StatusLine,
+            SessionVerb.Btw,
+            SessionVerb.Attach
+        ];
 
         foreach (SessionVerb verb in Enum.GetValues<SessionVerb>())
         {
-            var command = new SessionCommand(verb, string.Empty);
-            Assert.Equal(
-                CodingSession.RunsWhileBusy(verb),
-                headless.Session.TryRunWhileBusy(command));
+            Assert.Equal(allowed.Contains(verb), CodingSession.RunsWhileBusy(verb));
         }
     }
 
