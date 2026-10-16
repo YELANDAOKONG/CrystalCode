@@ -468,6 +468,112 @@ public sealed class ResponsesProviderTests
         Assert.Null(handler.Body);
     }
 
+    [Fact]
+    public async Task StreamAsync_ReportsTheProviderMessageForAFlatErrorEvent()
+    {
+        var exception = await ReadStreamFailure(
+            """
+            data: {"type":"error","code":"rate_limit_exceeded","message":"Rate limit reached.","param":null}
+
+            """);
+
+        Assert.Equal("Rate limit reached.", exception.Message);
+        Assert.Equal("rate_limit_exceeded", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsANestedErrorEvent()
+    {
+        var exception = await ReadStreamFailure(
+            """
+            data: {"type":"error","error":{"message":"nested boom","code":"invalid_request"}}
+
+            """);
+
+        Assert.Equal("nested boom", exception.Message);
+        Assert.Equal("invalid_request", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsTheProviderMessageWhenTheResponseFails()
+    {
+        var exception = await ReadStreamFailure(
+            """
+            data: {"type":"response.failed","response":{"status":"failed","error":{"code":"server_error","message":"The model failed."}}}
+
+            """);
+
+        Assert.Equal("The model failed.", exception.Message);
+        Assert.Equal("server_error", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamAsync_DoesNotHideAFailedResponseThatOmitsTheError()
+    {
+        var exception = await ReadStreamFailure(
+            """
+            data: {"type":"response.failed","response":{"status":"failed","error":null}}
+
+            """);
+
+        Assert.Equal("OpenAI Responses stream failed.", exception.Message);
+        Assert.Null(exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReadsChatCompletionTokenNames()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"response.output_text.delta","output_index":0,"delta":"hello"}
+
+            data: {"type":"response.completed","response":{"status":"completed","usage":{"prompt_tokens":9,"completion_tokens":4,"completion_tokens_details":{"reasoning_tokens":2}}}}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>()).Usage;
+        Assert.Equal(9, usage.InputTokenCount);
+        Assert.Equal(4, usage.OutputTokenCount);
+        Assert.Equal(2, usage.ReasoningTokenCount);
+        Assert.Equal(FinishReason.Stop, Assert.Single(events.OfType<ChatCandidateCompleted>()).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_CompletesWhenUsageOmitsTokenCounts()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"response.output_text.delta","delta":"hello"}
+
+            data: {"type":"response.completed","response":{"status":"completed","usage":{}}}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        Assert.Equal("hello", Assert.Single(events.OfType<ChatTextDelta>()).Text);
+        Assert.Empty(events.OfType<ChatUsageReceived>());
+        Assert.Equal(FinishReason.Stop, Assert.Single(events.OfType<ChatCandidateCompleted>()).FinishReason);
+    }
+
     private static async Task<FinishReason> ReadIncomplete(string json)
     {
         var handler = new RecordingHandler(JsonResponse.Create(json));
@@ -478,5 +584,22 @@ public sealed class ResponsesProviderTests
         var response = await provider.CompleteAsync(
             new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
         return response.Candidates[0].FinishReason;
+    }
+
+    private static async Task<ResponsesException> ReadStreamFailure(string sse)
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(sse));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+        return await Assert.ThrowsAsync<ResponsesException>(async () =>
+        {
+            await foreach (var streamEvent in provider.StreamAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+            {
+                _ = streamEvent;
+            }
+        });
     }
 }

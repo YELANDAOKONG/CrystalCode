@@ -278,7 +278,11 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
     private void ReadOutputItem(JsonElement item, List<ChatItem> items, ref bool refused)
     {
-        var type = item.GetProperty("type").GetString();
+        if (!TryReadString(item, "type", out var type))
+        {
+            return;
+        }
+
         switch (type)
         {
             case "reasoning":
@@ -291,9 +295,16 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 ReadMessage(item, items, ref refused);
                 break;
             case "function_call":
+                if (!TryReadString(item, "call_id", out var callId)
+                    || !TryReadString(item, "name", out var name))
+                {
+                    throw CreateException(
+                        $"{_vendorName} function call is missing an identifier or name.");
+                }
+
                 items.Add(new ToolCall(
-                    item.GetProperty("call_id").GetString()!,
-                    item.GetProperty("name").GetString()!,
+                    callId,
+                    name,
                     ReadArgumentText(item, "arguments")));
                 break;
         }
@@ -450,16 +461,119 @@ internal sealed class ResponsesCodec : IProtocolCodec
             return null;
         }
 
-        var input = usage.GetProperty("input_tokens").GetInt64();
-        var output = usage.GetProperty("output_tokens").GetInt64();
-        long? reasoning = null;
-        if (usage.TryGetProperty("output_tokens_details", out var details)
-            && details.TryGetProperty("reasoning_tokens", out var reasoningElement))
+        // Official Responses uses input_tokens and output_tokens. Some
+        // gateways reuse the Chat Completions names on the same object.
+        if (!TryReadCount(usage, "input_tokens", "prompt_tokens", out var input)
+            || !TryReadCount(usage, "output_tokens", "completion_tokens", out var output))
         {
-            reasoning = reasoningElement.GetInt64();
+            return null;
+        }
+
+        long? reasoning = null;
+        if (TryReadNestedCount(usage, "output_tokens_details", out var reportedReasoning)
+            || TryReadNestedCount(usage, "completion_tokens_details", out reportedReasoning))
+        {
+            reasoning = reportedReasoning;
         }
 
         return new TokenUsage(input, output, reasoning);
+    }
+
+    private Exception ReadStreamFailure(JsonElement root)
+    {
+        if (TryReadError(root, out var message, out var code))
+        {
+            return CreateException(message, errorCode: code);
+        }
+
+        if (root.TryGetProperty("response", out var response)
+            && response.ValueKind == JsonValueKind.Object
+            && TryReadError(response, out message, out code))
+        {
+            return CreateException(message, errorCode: code);
+        }
+
+        return CreateException($"{_vendorName} stream failed.");
+    }
+
+    // The stream error event puts message and code on the event itself.
+    // response.failed nests them under response.error, and some gateways
+    // nest them under error. A missing message must not surface as a
+    // dictionary lookup failure.
+    private bool TryReadError(JsonElement root, out string message, out string? code)
+    {
+        message = "";
+        code = null;
+        if (root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
+        {
+            message = ReadString(error, "message");
+            code = ReadOptionalCode(error);
+        }
+        else
+        {
+            message = ReadString(root, "message");
+            code = ReadOptionalCode(root);
+        }
+
+        if (message.Length == 0)
+        {
+            if (code is null)
+            {
+                return false;
+            }
+
+            message = $"{_vendorName} stream failed.";
+        }
+
+        return true;
+    }
+
+    private static bool TryReadCount(JsonElement usage, string primary, string alternate, out long value)
+    {
+        if (TryReadInt64(usage, primary, out value))
+        {
+            return true;
+        }
+
+        return TryReadInt64(usage, alternate, out value);
+    }
+
+    private static bool TryReadNestedCount(JsonElement usage, string detailsName, out long value)
+    {
+        value = 0;
+        return usage.TryGetProperty(detailsName, out var details)
+            && details.ValueKind == JsonValueKind.Object
+            && TryReadInt64(details, "reasoning_tokens", out value);
+    }
+
+    private static bool TryReadInt64(JsonElement element, string name, out long value)
+    {
+        value = 0;
+        return element.TryGetProperty(name, out var property)
+            && property.ValueKind == JsonValueKind.Number
+            && property.TryGetInt64(out value);
+    }
+
+    private static bool TryReadString(JsonElement element, string name, out string value)
+    {
+        value = "";
+        if (!element.TryGetProperty(name, out var property)
+            || property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString() ?? "";
+        return value.Length > 0;
+    }
+
+    private static string ReadString(JsonElement element, string name) =>
+        TryReadString(element, name, out var value) ? value : "";
+
+    private static string? ReadOptionalCode(JsonElement element)
+    {
+        var code = ReadString(element, "code");
+        return code.Length == 0 ? null : code;
     }
 
     private static string ReadArgumentText(JsonElement element, string name)
@@ -504,9 +618,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
             }
 
             var type = typeElement.GetString();
-            var outputIndex = root.TryGetProperty("output_index", out var indexElement)
-                ? indexElement.GetInt32()
-                : 0;
+            var outputIndex = ReadIndex(root, "output_index");
             switch (type)
             {
                 case "response.reasoning_summary_text.delta":
@@ -515,7 +627,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
                         ReasoningItemIndex(outputIndex),
                         ReadIndex(root, "summary_index"),
                         ReasoningTextKind.Summary,
-                        root.GetProperty("delta").GetString() ?? ""));
+                        ReadString(root, "delta")));
                     break;
                 case "response.reasoning_text.delta":
                     events.Add(new ChatReasoningTextDelta(
@@ -523,14 +635,14 @@ internal sealed class ResponsesCodec : IProtocolCodec
                         ReasoningItemIndex(outputIndex),
                         checked(ReadIndex(root, "content_index") + ReasoningTraceSegmentOffset),
                         ReasoningTextKind.Trace,
-                        root.GetProperty("delta").GetString() ?? ""));
+                        ReadString(root, "delta")));
                     break;
                 case "response.output_text.delta":
                     events.Add(new ChatTextDelta(
                         0,
                         ItemIndex(outputIndex, StreamItemKind.Message),
                         ChatRole.Assistant,
-                        root.GetProperty("delta").GetString() ?? ""));
+                        ReadString(root, "delta")));
                     break;
                 case "response.refusal.delta":
                     _refused = true;
@@ -539,7 +651,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
                         0,
                         ItemIndex(outputIndex, StreamItemKind.Message),
                         ChatRole.Assistant,
-                        root.GetProperty("delta").GetString() ?? ""));
+                        ReadString(root, "delta")));
                     break;
                 case "response.output_item.added":
                     ReadAddedItem(root, outputIndex, events);
@@ -556,34 +668,32 @@ internal sealed class ResponsesCodec : IProtocolCodec
                     break;
                 case "response.completed":
                 case "response.incomplete":
-                    var response = root.GetProperty("response");
-                    var usage = ReadUsage(response);
-                    if (usage is not null)
+                    FinishReason finish;
+                    if (root.TryGetProperty("response", out var response)
+                        && response.ValueKind == JsonValueKind.Object)
                     {
-                        events.Add(new ChatUsageReceived(usage));
-                    }
+                        var usage = ReadUsage(response);
+                        if (usage is not null)
+                        {
+                            events.Add(new ChatUsageReceived(usage));
+                        }
 
-                    var finish = type == "response.incomplete"
-                        ? ReadIncomplete(response)
-                        : _refused
-                            ? FinishReason.ContentFilter
-                            : _hasTools
-                                ? FinishReason.ToolCalls
-                                : FinishReason.Stop;
+                        finish = type == "response.incomplete"
+                            ? ReadIncomplete(response)
+                            : FinishFromStream();
+                    }
+                    else
+                    {
+                        finish = type == "response.incomplete"
+                            ? new FinishReason("incomplete")
+                            : FinishFromStream();
+                    }
                     events.Add(new ChatCandidateCompleted(0, finish));
                     IsComplete = true;
                     break;
                 case "response.failed":
-                    var failedResponse = root.GetProperty("response");
-                    var failure = failedResponse.GetProperty("error");
-                    throw _codec.CreateException(
-                        failure.GetProperty("message").GetString() ?? "Responses stream failed.",
-                        errorCode: failure.TryGetProperty("code", out var failureCode)
-                            ? failureCode.GetString()
-                            : null);
                 case "error":
-                    var error = root.GetProperty("error");
-                    throw _codec.CreateException(error.GetProperty("message").GetString() ?? "Responses stream failed.", errorCode: error.TryGetProperty("code", out var code) ? code.GetString() : null);
+                    throw _codec.ReadStreamFailure(root);
                 default:
                     break;
             }
@@ -593,8 +703,11 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
         private void ReadAddedItem(JsonElement root, int outputIndex, List<ChatStreamEvent> events)
         {
-            var item = root.GetProperty("item");
-            var type = item.GetProperty("type").GetString();
+            if (!TryReadItem(root, out var item, out var type))
+            {
+                return;
+            }
+
             if (type == "function_call")
             {
                 EnsureFunctionIdentity(outputIndex, item, events);
@@ -603,8 +716,11 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
         private void ReadDoneItem(JsonElement root, int outputIndex, List<ChatStreamEvent> events)
         {
-            var item = root.GetProperty("item");
-            var type = item.GetProperty("type").GetString();
+            if (!TryReadItem(root, out var item, out var type))
+            {
+                return;
+            }
+
             if (type == "function_call")
             {
                 EnsureFunctionIdentity(outputIndex, item, events);
@@ -772,6 +888,27 @@ internal sealed class ResponsesCodec : IProtocolCodec
             }
 
             return 0;
+        }
+
+        private FinishReason FinishFromStream() =>
+            _refused
+                ? FinishReason.ContentFilter
+                : _hasTools
+                    ? FinishReason.ToolCalls
+                    : FinishReason.Stop;
+
+        private static bool TryReadItem(JsonElement root, out JsonElement item, out string type)
+        {
+            type = "";
+            if (!root.TryGetProperty("item", out item)
+                || item.ValueKind != JsonValueKind.Object
+                || !TryReadString(item, "type", out type))
+            {
+                item = default;
+                return false;
+            }
+
+            return true;
         }
 
         private enum StreamItemKind
