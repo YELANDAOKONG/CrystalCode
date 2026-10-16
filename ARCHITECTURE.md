@@ -891,7 +891,10 @@ the threshold. When the retained tail already holds every turn, it still
 summarizes everything before the latest user turn. A session with nothing
 before that turn prints `Nothing earlier to compact`. It is refused while
 a turn is running. `/compact model` and `/compact thinking` show or set
-the optional summarizer and its gear; any other argument is rejected.
+the optional summarizer and its gear. `/compact summary` toggles
+`showCompactionSummary`, and `/compact auto` (alias `automatic`) toggles
+`showAutomaticCompactionSummary`. Either command accepts `on` or `off`,
+writes `config.json`, and does not summarize. Any other argument is rejected.
 `compactionModel` in `config.json` is `enabled`, `provider`, `model`,
 and optional `thinkingEffort`. An omitted object means off, and
 `enabled: false` keeps a stored provider, model, and gear unused.
@@ -921,7 +924,7 @@ stored summary under those lines in a rounded panel titled `Earlier context`.
 Automatic compaction prints `Compacted context` only, unless
 `showAutomaticCompactionSummary` is on. That switch defaults off, is omitted
 from `config.json` until enabled, and uses the same panel. It does not change
-`/compact`. A compaction with no summary text does not print one. A side
+`/compact` itself. A compaction with no summary text does not print one. A side
 question that summarizes a private copy does not print it.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each

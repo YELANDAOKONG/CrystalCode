@@ -64,7 +64,38 @@ public sealed class CodingSessionCompactionModelTests
 
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact later", CancellationToken.None);
-        Assert.Equal("Compact accepts no argument, or model and thinking.", LastError(headless));
+        Assert.Equal("Compact accepts no argument, or model, thinking, summary, and auto.", LastError(headless));
+    }
+
+    [Fact]
+    public async Task CompactSummary_TogglesManualAndAutomaticDisplay()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/compact summary off", CancellationToken.None);
+        Assert.Equal("Compaction summary  Off", LastNote(headless));
+        Assert.False(Read(headless).ShowCompactionSummary);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact summary", CancellationToken.None);
+        Assert.Equal("Compaction summary  On", LastNote(headless));
+        Assert.Null(Read(headless).ShowCompactionSummary);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/summarize auto", CancellationToken.None);
+        Assert.Equal("Automatic compaction summary  On", LastNote(headless));
+        Assert.True(Read(headless).ShowAutomaticCompactionSummary);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact automatic off", CancellationToken.None);
+        Assert.Equal("Automatic compaction summary  Off", LastNote(headless));
+        Assert.Null(Read(headless).ShowAutomaticCompactionSummary);
+        Assert.Null(Read(headless).ShowCompactionSummary);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact summary later", CancellationToken.None);
+        Assert.Equal("Compaction summary is on or off.", LastError(headless));
     }
 
     [Fact]

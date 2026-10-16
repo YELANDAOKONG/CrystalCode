@@ -481,8 +481,8 @@ Top-level fields:
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled |
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
-| `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on) |
-| `showAutomaticCompactionSummary` | Print the same summary after automatic compaction (default `false`; omitted when off). Does not change `/compact` |
+| `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). `/compact summary` toggles it; `on` or `off` sets it |
+| `showAutomaticCompactionSummary` | Print the same summary after automatic compaction (default `false`; omitted when off). `/compact auto` toggles it (`automatic` is the same); `on` or `off` sets it. Does not change `/compact` |
 | `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
@@ -1066,7 +1066,7 @@ returns the transcript viewport to the latest output.
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
-| `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `model` shows or sets the compaction model; `thinking` cycles or sets its gear |
+| `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `model` shows or sets the compaction model; `thinking` cycles or sets its gear. `summary` toggles the manual summary; `auto` toggles the automatic one. `on` or `off` sets either switch |
 | `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
 | `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
 | `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
@@ -1544,9 +1544,14 @@ user turn. A session with nothing before that turn prints
 `/compact model` shows `Compaction model  Off` or `On  <provider>  <model>`,
 turns that switch on or off, or selects `<model>` or `<provider> <model>`
 and turns it on. `/compact thinking` cycles or sets that model's gear.
-Both are refused during a turn or compaction. Any other argument is
-rejected and does not summarize. Tab completes `model` and `thinking`.
-When the switch is off, or `compactionModel` is omitted, summaries use
+Both are refused during a turn or compaction. `/compact summary` toggles
+`showCompactionSummary` and prints `Compaction summary  On` or `Off`.
+`/compact summary on` or `off` sets it. `/compact auto` does the same for
+`showAutomaticCompactionSummary` and prints `Automatic compaction summary`.
+`automatic` is the same command. These display commands write `config.json`
+and do not summarize. Any other argument is rejected and does not summarize.
+Tab completes `model`, `thinking`, `summary`, and `auto`, then `on` and `off`.
+When the compaction-model switch is off, or `compactionModel` is omitted, summaries use
 the session model and the request omits reasoning. When it is on, summary
 requests use a separate client for that provider and model, including
 `/compact` and the summary a side question may take before it answers.

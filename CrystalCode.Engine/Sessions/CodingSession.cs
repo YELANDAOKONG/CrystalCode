@@ -532,9 +532,26 @@ public sealed class CodingSession : ITurnObserver
                 {
                     ChangeCompactionThinking(CompactionThinkingArguments.Parse(parsed.Argument));
                 }
+                else if (CompactionSummaryArguments.IsSummaryCommand(parsed.Argument)
+                    || CompactionSummaryArguments.IsAutomaticCommand(parsed.Argument))
+                {
+                    var automatic = CompactionSummaryArguments.IsAutomaticCommand(parsed.Argument);
+                    if (!CompactionSummaryArguments.TryParse(
+                            parsed.Argument,
+                            automatic,
+                            out var request,
+                            out var parseError))
+                    {
+                        Error(parseError);
+                    }
+                    else
+                    {
+                        ChangeCompactionSummary(request);
+                    }
+                }
                 else
                 {
-                    Error("Compact accepts no argument, or model and thinking.");
+                    Error("Compact accepts no argument, or model, thinking, summary, and auto.");
                 }
 
                 PruneDraftImages(string.Empty);
@@ -3878,6 +3895,19 @@ public sealed class CodingSession : ITurnObserver
         ReplaceCompactionClient(next, client);
         RefreshSlashCommands();
         Note(next.Describe());
+    }
+
+    private void ChangeCompactionSummary(CompactionSummaryArguments.Request request)
+    {
+        var enabled = request.Enabled ?? !(request.Automatic
+            ? _settings.ShowAutomaticCompactionSummary
+            : _settings.ShowCompactionSummary);
+        SaveSettings(current => request.Automatic
+            ? current.WithShowAutomaticCompactionSummary(enabled)
+            : current.WithShowCompactionSummary(enabled));
+        Note(request.Automatic
+            ? "Automatic compaction summary  " + (enabled ? "On" : "Off")
+            : "Compaction summary  " + (enabled ? "On" : "Off"));
     }
 
     private void ChangeCompactionThinking(CompactionThinkingArguments.Request request)

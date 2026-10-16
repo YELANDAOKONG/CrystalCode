@@ -57,7 +57,9 @@ separate library with no terminal code. The product can:
   `showCompactionSummary` is off, and keeps the full conversation for resume,
   fork, and export. Automatic compaction prints `Compacted context` and, when
   `showAutomaticCompactionSummary` is on, the same summary. That switch
-  defaults off and is omitted from `config.json` until enabled;
+  defaults off and is omitted from `config.json` until enabled. `/compact summary`
+  and `/compact auto` (`automatic` is the same) toggle those two switches or
+  set `on` / `off`, and write `config.json`. They do not summarize;
 - ask before the first interactive session in a directory, when workspace
   trust is on (the default). Trust is the git root when the workspace is
   inside a repository, and the workspace itself otherwise. A yes is

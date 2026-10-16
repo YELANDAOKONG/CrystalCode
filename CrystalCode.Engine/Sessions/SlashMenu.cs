@@ -162,6 +162,12 @@ public static class SlashMenu
         return options;
     }
 
+    private static readonly SlashCompletion[] SummarySwitch =
+    [
+        new("on", "Turn it on", ["on"]),
+        new("off", "Turn it off", ["off"])
+    ];
+
     /// <summary>
     /// Nests model and thinking completions under <c>/compact</c>. A bare
     /// command still summarizes and has no required argument.
@@ -183,12 +189,15 @@ public static class SlashMenu
             {
                 "model" => modelArguments,
                 "thinking" => thinkingArguments,
+                "summary" or "auto" => SummarySwitch,
                 _ => null
             };
             var help = argument switch
             {
                 "model" => "Show or set the compaction model; on and off switch it",
                 "thinking" => "Cycle or set the compaction thinking gear",
+                "summary" => "Toggle the summary printed after /compact",
+                "auto" => "Toggle the summary printed after automatic compaction",
                 _ => argument
             };
             options.Add(nested is { Count: > 0 }

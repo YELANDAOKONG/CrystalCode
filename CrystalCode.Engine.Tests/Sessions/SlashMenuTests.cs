@@ -48,4 +48,18 @@ public sealed class SlashMenuTests
         Assert.Contains(approval.ArgumentOptions, item => item.Name == "thinking");
         Assert.All(approval.ArgumentOptions, item => Assert.Empty(item.ArgumentOptions));
     }
+
+    [Fact]
+    public void Create_NestsCompactionSummarySwitches()
+    {
+        var menu = SlashMenu.Create(extras: null);
+        var compact = menu.Single(item => item.Name == "compact");
+        var summary = compact.ArgumentOptions.Single(item => item.Name == "summary");
+        var auto = compact.ArgumentOptions.Single(item => item.Name == "auto");
+
+        Assert.Equal("Toggle the summary printed after /compact", summary.Help);
+        Assert.Equal("Toggle the summary printed after automatic compaction", auto.Help);
+        Assert.Equal(["on", "off"], summary.ArgumentOptions.Select(item => item.Name));
+        Assert.Equal(["on", "off"], auto.ArgumentOptions.Select(item => item.Name));
+    }
 }
