@@ -12,6 +12,10 @@ internal sealed class SettingsDocument
 
     public System.Text.Json.JsonElement? ContextSelections { get; set; }
 
+    public System.Text.Json.JsonElement? TierSelections { get; set; }
+
+    public System.Text.Json.JsonElement? SpeedSelections { get; set; }
+
     public bool? Skills { get; set; }
 
     public bool? ExternalTools { get; set; }

@@ -14,4 +14,6 @@ public sealed record SessionChrome(
     ApprovalMode Approval,
     string Thinking,
     string PromptSet,
-    int ContextWindow = 0);
+    int ContextWindow = 0,
+    string ServiceTier = "",
+    string Speed = "");

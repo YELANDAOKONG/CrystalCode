@@ -15,7 +15,9 @@ internal static class PluginModelFacts
         ProviderDefinition provider,
         string modelName,
         ModelSettings model,
-        string thinking)
+        string thinking,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(modelName);
@@ -32,12 +34,15 @@ internal static class PluginModelFacts
             model.ImageInput,
             thinking.Trim(),
             model.AudioInput,
-            model.VideoInput);
+            model.VideoInput,
+            serviceTier,
+            speed);
     }
 
     public static PluginReview DescribeReview(
         ApprovalModelSettings approval,
-        ProviderCatalog catalog)
+        ProviderCatalog catalog,
+        HarnessSettings? settings = null)
     {
         ArgumentNullException.ThrowIfNull(approval);
         ArgumentNullException.ThrowIfNull(catalog);
@@ -51,6 +56,12 @@ internal static class PluginModelFacts
         var model = catalog.GetModel(providerName, approval.Model);
         return new PluginReview(
             true,
-            Describe(provider, approval.Model, model, approval.ThinkingEffort.Value));
+            Describe(
+                provider,
+                approval.Model,
+                model,
+                approval.ThinkingEffort.Value,
+                settings?.TierFor(providerName, approval.Model),
+                settings?.SpeedFor(providerName, approval.Model)));
     }
 }

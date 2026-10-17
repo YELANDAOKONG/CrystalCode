@@ -11,7 +11,9 @@ internal sealed record CompatibleOptions
         int? maxTokens,
         TimeSpan requestTimeout,
         string? organization,
-        string? project)
+        string? project,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -31,6 +33,8 @@ internal sealed record CompatibleOptions
         RequestTimeout = requestTimeout;
         Organization = organization;
         Project = project;
+        ServiceTier = BlankToNull(serviceTier);
+        Speed = BlankToNull(speed);
     }
 
     public string ApiKey { get; }
@@ -50,4 +54,11 @@ internal sealed record CompatibleOptions
     public string? Organization { get; }
 
     public string? Project { get; }
+
+    public string? ServiceTier { get; }
+
+    public string? Speed { get; }
+
+    private static string? BlankToNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

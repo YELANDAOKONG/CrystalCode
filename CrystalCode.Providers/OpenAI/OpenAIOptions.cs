@@ -53,7 +53,9 @@ public sealed record OpenAIOptions
         bool replayReasoningContent = false,
         bool useMaxCompletionTokens = true,
         string? vendorName = null,
-        TimeSpan? requestTimeout = null)
+        TimeSpan? requestTimeout = null,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -108,6 +110,8 @@ public sealed record OpenAIOptions
         UseMaxCompletionTokens = useMaxCompletionTokens;
         VendorName = string.IsNullOrWhiteSpace(vendorName) ? "OpenAI" : vendorName.Trim();
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
+        ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
+        Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
 
     /// <inheritdoc />
@@ -173,6 +177,10 @@ public sealed record OpenAIOptions
     /// </summary>
     public TimeSpan RequestTimeout { get; }
 
+    public string? ServiceTier { get; }
+
+    public string? Speed { get; }
+
     internal CompatibleOptions ToCompatibleOptions() =>
         new(
             ApiKey,
@@ -183,5 +191,7 @@ public sealed record OpenAIOptions
             MaxTokens,
             RequestTimeout,
             Organization,
-            Project);
+            Project,
+            ServiceTier,
+            Speed);
 }

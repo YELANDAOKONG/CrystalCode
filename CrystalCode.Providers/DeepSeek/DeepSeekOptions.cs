@@ -30,7 +30,9 @@ public sealed record DeepSeekOptions
         double? temperature = null,
         double? topP = null,
         int? maxTokens = null,
-        TimeSpan? requestTimeout = null)
+        TimeSpan? requestTimeout = null,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -79,6 +81,8 @@ public sealed record DeepSeekOptions
         TopP = topP;
         MaxTokens = maxTokens;
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
+        ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
+        Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
 
     /// <inheritdoc />
@@ -119,6 +123,10 @@ public sealed record DeepSeekOptions
     /// </summary>
     public TimeSpan RequestTimeout { get; }
 
+    public string? ServiceTier { get; }
+
+    public string? Speed { get; }
+
     internal CompatibleOptions ToCompatibleOptions() =>
         new(
             ApiKey,
@@ -129,5 +137,7 @@ public sealed record DeepSeekOptions
             MaxTokens,
             RequestTimeout,
             organization: null,
-            project: null);
+            project: null,
+            serviceTier: ServiceTier,
+            speed: Speed);
 }

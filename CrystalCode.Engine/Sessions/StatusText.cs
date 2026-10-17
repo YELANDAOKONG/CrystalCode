@@ -30,6 +30,8 @@ public static class StatusText
             ("Model", status.Model),
             ("Thinking", ThinkingValue(status.Thinking))
         };
+        AddSlot(modelRows, "Tier", status.ServiceTier);
+        AddSlot(modelRows, "Speed", status.Speed);
         if (!string.IsNullOrWhiteSpace(status.ApprovalModel))
         {
             modelRows.Add(("Approval model", status.ApprovalModel));
@@ -154,6 +156,18 @@ public static class StatusText
         {
             lines.Add(string.Empty);
         }
+    }
+
+    private static void AddSlot(List<(string Label, string Value)> rows, string label, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        const string separator = " ";
+        var split = value.IndexOf(separator, StringComparison.Ordinal);
+        rows.Add((label, split < 0 ? value : value[(split + separator.Length)..]));
     }
 
     private static string ThinkingValue(string thinking)

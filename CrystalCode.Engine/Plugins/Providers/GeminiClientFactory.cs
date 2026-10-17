@@ -45,6 +45,8 @@ public sealed class GeminiClientFactory : IChatClientFactory
             model.Temperature,
             model.TopP,
             model.MaxTokens,
-            provider.Name.Value);
+            provider.Name.Value,
+            serviceTier: settings.ServiceTier,
+            speed: settings.Speed);
     }
 }

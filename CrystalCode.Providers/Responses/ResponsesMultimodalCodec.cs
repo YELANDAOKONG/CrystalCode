@@ -89,6 +89,8 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 writer.WriteNumber("top_p", topP);
             }
 
+            ProcessingSlots.WriteShared(writer, options.ServiceTier, options.Speed, options.VendorName);
+
             writer.WriteBoolean("store", false);
             writer.WritePropertyName("include");
             writer.WriteStartArray();

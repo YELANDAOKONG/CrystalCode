@@ -74,9 +74,8 @@ or `CrystalCode` on Windows.
 The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output,
-editing provider definitions in the TUI, automatically fetching
-model-list information from a provider. Service tier and request speed
-are not supported.
+editing provider definitions in the TUI, and automatically fetching
+model-list information from a provider.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.
@@ -171,6 +170,8 @@ CLI options:
 | `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context` (`272k`, `1m`, or an exact token count). A model with one budget, or a budget it does not declare, is rejected. Does not write `contextSelections` |
+| `--tier <token>` | Service-tier token the selected model lists. Does not write `tierSelections` |
+| `--speed <token>`, `--fast <token>` | Speed token the selected model lists. Does not write `speedSelections` |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. `/promptset` switching is refused and does not write the file. Listing and export stay available |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing and refuses enable, disable, up, and down. Listing stays available |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set for this process, even when its file says `enabled` false. Does not write the file. Rejected together with `--prompt-attachments off` |
@@ -314,6 +315,8 @@ checks the directory. `unlimited` removes that one cap.
 | `--plan` / `--work` | Start in Plan or Work. The default is Work |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context`. A model with one budget, or a budget it does not declare, exits 1. Does not write `contextSelections` |
+| `--tier <token>` | Service-tier token the selected model lists. A model that does not list it exits 1. Does not write `tierSelections` |
+| `--speed <token>`, `--fast <token>` | Speed token the selected model lists. A model that does not list it exits 1. Does not write `speedSelections` |
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set, even when `enabled` is false. A missing name exits 1. Cannot be combined with `--prompt-attachments off`. Does not write the file |
@@ -474,6 +477,8 @@ Top-level fields:
 | `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or an effort token the model lists. `max` and `maximum` are different tokens. Tokens are stored in lowercase and sent unchanged |
 | `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
+| `tierSelections` | Saved service-tier tokens as a nested map, for example `{"openai": {"my-model": "flex"}}`. `/tier` writes this map. An absent choice, or a token the model no longer lists, omits the field |
+| `speedSelections` | Saved speed tokens in the same shape as `tierSelections`. `/speed` writes this map |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `ruleFiles` | OpenCode-compatible rule files. `global` and `project` each default to `true` and are omitted until off. Does not affect `instructions.md` or `.crystal.md` |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
@@ -576,6 +581,8 @@ are not supported by the current adapter.
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
+| `serviceTiers` | Service-tier tokens this model accepts. A token starts with a letter and then uses only letters, digits, and hyphens. The host stores each token in lowercase and does not interpret it. `default` is sent when it is listed; it does not mean unset. An empty or omitted list means this model has no service tier |
+| `speeds` | Speed tokens this model accepts, using the same token rules. `fast` and `ultrafast` belong here when the endpoint accepts them. An empty or omitted list means this model has no speed |
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 | `audioInput` | Declared audio input (default `false`). Stored and visible to plugins. The host does not accept or send audio |
 | `videoInput` | Declared video input (default `false`). Stored and visible to plugins. The host does not accept or send video |
@@ -584,7 +591,12 @@ are not supported by the current adapter.
 them and shows them to plugins. It does not attach, paste, persist, or send
 audio or video, and those flags do not register multimodal tools.
 `imageInput` is still the only flag that allows image input.
-Service tier and request speed are not supported.
+Service tier and speed are sent only when the active model lists the
+selected token. The host does not choose the JSON field and does not
+compare the response with the request. Chat Completions and OpenAI
+Responses write one set slot to `service_tier` and reject both. Anthropic
+Messages writes `service_tier` and `speed` separately. DeepSeek, Gemini,
+and Ollama reject either slot. The endpoint address is not used to decide.
 
 Gemini and Ollama native adapters accept inline images in user messages.
 Tool images are sent on Gemini `functionResponse` parts and on the Ollama
@@ -641,8 +653,9 @@ it. Restart after editing `providers.json`. Select the model with
 `model` in `config.json`.
 CLI `--provider` and `--model` override that selection for one run;
 `/approval` (including `/approval model` and `/approval thinking`),
-`/thinking`, `/context`, and `/model` write their values to `config.json`.
+`/thinking`, `/context`, `/tier`, `/speed`, and `/model` write their values to `config.json`.
 `/context` stores each model's selected budget in `contextSelections`.
+`/tier` and `/speed` store each model's token in `tierSelections` and `speedSelections`.
 
 ### Example: add an Anthropic (Claude) provider
 
@@ -837,7 +850,7 @@ its own.
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/context`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
+| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/context`, `/tier`, `/speed`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
 | Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open. A recalled prompt that starts with `/` stays in history until you edit it |
@@ -1126,6 +1139,8 @@ Submitting returns the transcript viewport to the latest output.
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count; refused during a turn or compaction |
+| `/tier` | | Cycle the model's service-tier tokens, including not sending one, or select a listed token. `default` is sent when the model lists it. Refused during a turn or compaction |
+| `/speed` | `/fast` | Cycle the model's speed tokens, including not sending one, or select a listed token. Refused during a turn or compaction |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/verbose` | | Show or set tool, command, result, call, approval, review, or thinking detail: `tools`, `commands`, `results`, `calls`, `approvals`, `review`, `thinking`, then `on` or `off`. `results` is the parent of `tools` and `commands`. `calls` hides Tool cards and does not change results |
 | `/model` | | List catalog models, or set `model` / `provider model` |

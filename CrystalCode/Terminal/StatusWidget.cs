@@ -55,6 +55,8 @@ internal static class StatusWidget
             ("Model", status.Model),
             ("Thinking", ThinkingValue(status.Thinking))
         };
+        AddSlot(rows, "Tier", status.ServiceTier);
+        AddSlot(rows, "Speed", status.Speed);
         if (!string.IsNullOrWhiteSpace(status.ApprovalModel))
         {
             rows.Add(("Approval model", status.ApprovalModel));
@@ -225,6 +227,17 @@ internal static class StatusWidget
         }
 
         return grid;
+    }
+
+    private static void AddSlot(List<(string Field, string Value)> rows, string label, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        var split = value.IndexOf(' ');
+        rows.Add((label, split < 0 ? value : value[(split + 1)..]));
     }
 
     private static string ThinkingValue(string thinking)

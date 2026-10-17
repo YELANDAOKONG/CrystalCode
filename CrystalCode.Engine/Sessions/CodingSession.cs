@@ -760,6 +760,12 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Context:
                 ChangeContext(command.Argument);
                 return (true, false);
+            case SessionVerb.Tier:
+                ChangeCatalogSlot(command.Argument, serviceTier: true);
+                return (true, false);
+            case SessionVerb.Speed:
+                ChangeCatalogSlot(command.Argument, serviceTier: false);
+                return (true, false);
             case SessionVerb.Thinking:
                 ChangeThinking(command.Argument);
                 return (true, false);
@@ -1494,6 +1500,110 @@ public sealed class CodingSession : ITurnObserver
         RefreshChrome();
         ShowUsage(ShownUsage(), ShownCumulative());
         Note("Context  " + ContextWindowSelection.Format(selected));
+    }
+
+    private void ChangeCatalogSlot(string argument, bool serviceTier)
+    {
+        if (_turnActive || _compactSource is not null)
+        {
+            Error(
+                "Finish the current turn before switching "
+                + (serviceTier ? "service tier." : "speed."));
+            return;
+        }
+
+        var model = _settings.ActiveModel;
+        var tokens = serviceTier ? model.ServiceTiers : model.Speeds;
+        var label = serviceTier ? "Service tier" : "Speed";
+        if (tokens.Count == 0)
+        {
+            Error(label + " is not available for this model.");
+            return;
+        }
+
+        string? selected;
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            var current = serviceTier ? _settings.ServiceTier : _settings.Speed;
+            selected = CatalogSlots.Next(current, tokens);
+        }
+        else if (!CatalogToken.TryNormalize(argument, out var token) || !CatalogSlots.Contains(tokens, token))
+        {
+            Error(
+                label + " is not available for this model. Available: " + string.Join(", ", tokens));
+            return;
+        }
+        else
+        {
+            selected = token;
+        }
+
+        var provider = _settings.Provider;
+        var modelName = _settings.Model;
+        var next = serviceTier
+            ? _settings.WithTier(provider, modelName, selected)
+            : _settings.WithSpeed(provider, modelName, selected);
+        if (!TryReplaceWorkClient(next, out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        SaveSettings(current => serviceTier
+            ? current.WithTier(provider, modelName, selected)
+            : current.WithSpeed(provider, modelName, selected));
+        RefreshSlashCommands();
+        RefreshChrome();
+        Note(
+            (serviceTier ? "Tier  " : "Speed  ")
+            + (selected is null ? "not set" : DisplayCase.Token(selected)));
+    }
+
+    private bool TryReplaceWorkClient(HarnessSettings next, out string error)
+    {
+        IStreamingChatClient? nextClient = null;
+        IStreamingMultimodalChatClient? nextMultimodal;
+        try
+        {
+            nextClient = CreateClient(next);
+            nextMultimodal = CreateMultimodalClient(next);
+            if ((_pendingImages.Count > 0 || HasReferencedImages()) && nextMultimodal is null)
+            {
+                DisposeClient(nextClient);
+                error = "The selected model cannot continue a session containing images.";
+                return false;
+            }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            DisposeClient(nextClient);
+            error = exception.Message;
+            return false;
+        }
+
+        var previous = _client;
+        var previousMultimodal = _multimodalClient;
+        _client = nextClient;
+        _multimodalClient = nextMultimodal;
+        if (!next.CompactionModel.Enabled)
+        {
+            _compactor = CreateCompactor(nextClient);
+        }
+
+        if (!ReferenceEquals(previous, nextClient)
+            && !ReferenceEquals(previous, _approvalClient)
+            && !ReferenceEquals(previous, _compactionClient))
+        {
+            DisposeClient(previous);
+        }
+
+        if (!ReferenceEquals(previousMultimodal, nextMultimodal))
+        {
+            DisposeClient(previousMultimodal);
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     private void ChangeThinking(string argument)
@@ -2496,7 +2606,9 @@ public sealed class CodingSession : ITurnObserver
                 CompactionModel: CompactionModelStatus(),
                 MicroCompaction: DescribeMicroCompaction(_settings.MicroCompaction),
                 GlobalRulesEnabled: _settings.RuleFiles.Global,
-                ProjectRulesEnabled: _settings.RuleFiles.Project),
+                ProjectRulesEnabled: _settings.RuleFiles.Project,
+                ServiceTier: CatalogSlotStatus.For("Tier", _settings.ServiceTier),
+                Speed: CatalogSlotStatus.For("Speed", _settings.Speed)),
             full));
     }
 
@@ -2734,10 +2846,15 @@ public sealed class CodingSession : ITurnObserver
             _settings.ActiveProvider,
             _settings.Model,
             _settings.ActiveModel,
-            _thinkingEffort.Value);
+            _thinkingEffort.Value,
+            _settings.ServiceTier,
+            _settings.Speed);
 
     private PluginReview CurrentPluginReview() =>
-        PluginModelFacts.DescribeReview(_settings.ApprovalModel, _settings.Catalog);
+        PluginModelFacts.DescribeReview(
+            _settings.ApprovalModel,
+            _settings.Catalog,
+            _settings);
 
     /// <summary>
     /// A new client on the session model. Plugin calls stay off the instance
@@ -4342,8 +4459,14 @@ public sealed class CodingSession : ITurnObserver
         _approvalClientKey = null;
     }
 
-    private static string ApprovalClientKey(ApprovalModelSettings settings) =>
-        settings.Provider + "\n" + settings.Model;
+    private string ApprovalClientKey(ApprovalModelSettings settings)
+    {
+        var provider = new ProviderName(settings.Provider!);
+        return settings.Provider
+            + "\n" + settings.Model
+            + "\n" + _settings.TierFor(provider, settings.Model!)
+            + "\n" + _settings.SpeedFor(provider, settings.Model!);
+    }
 
     private void ChangeCompactionModel(CompactionModelArguments.Request request)
     {
@@ -4765,8 +4888,14 @@ public sealed class CodingSession : ITurnObserver
         return text;
     }
 
-    private static string CompactionClientKey(CompactionModelSettings settings) =>
-        settings.Provider + "\n" + settings.Model;
+    private string CompactionClientKey(CompactionModelSettings settings)
+    {
+        var provider = new ProviderName(settings.Provider!);
+        return settings.Provider
+            + "\n" + settings.Model
+            + "\n" + _settings.TierFor(provider, settings.Model!)
+            + "\n" + _settings.SpeedFor(provider, settings.Model!);
+    }
 
     private ReasoningOptions? CurrentReasoning() =>
         _thinkingEffort.ToReasoningOptions(_settings.ActiveModel);
@@ -4812,7 +4941,9 @@ public sealed class CodingSession : ITurnObserver
             ApprovalThinkingCompletions(),
             ContextWindowSelection.Completions(_settings.ActiveModel),
             CompactionModelCompletions(),
-            CompactionThinkingCompletions());
+            CompactionThinkingCompletions(),
+            CatalogSlotCompletions.For(_settings.ActiveModel.ServiceTiers),
+            CatalogSlotCompletions.For(_settings.ActiveModel.Speeds));
         Publish(new SlashCommandsChanged(menu));
     }
 
@@ -4918,7 +5049,9 @@ public sealed class CodingSession : ITurnObserver
             _approval,
             CurrentThinkingStatus(),
             CurrentPromptStatus(),
-            _settings.ContextWindow);
+            _settings.ContextWindow,
+            CatalogSlotStatus.For("Tier", _settings.ServiceTier),
+            CatalogSlotStatus.For("Speed", _settings.Speed));
 
     private void RefreshChrome()
     {

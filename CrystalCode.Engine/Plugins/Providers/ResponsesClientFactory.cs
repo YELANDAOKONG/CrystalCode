@@ -31,7 +31,9 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 model.Temperature,
                 model.TopP,
                 model.MaxTokens,
-                provider.Name.Value));
+                provider.Name.Value,
+                serviceTier: settings.ServiceTier,
+                speed: settings.Speed));
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -53,6 +55,8 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 model.Temperature,
                 model.TopP,
                 model.MaxTokens,
-                provider.Name.Value));
+                provider.Name.Value,
+                serviceTier: settings.ServiceTier,
+                speed: settings.Speed));
     }
 }

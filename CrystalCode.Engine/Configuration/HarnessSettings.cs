@@ -84,7 +84,9 @@ public sealed record HarnessSettings
         bool showAutomaticCompactionSummary = DefaultShowAutomaticCompactionSummary,
         MicroCompactionSettings? microCompaction = null,
         RuleFileSettings? ruleFiles = null,
-        IReadOnlyList<string>? disabledBuiltInTools = null)
+        IReadOnlyList<string>? disabledBuiltInTools = null,
+        IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
+        IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -128,6 +130,8 @@ public sealed record HarnessSettings
             contextSelections is null
                 ? new Dictionary<ContextSelectionKey, int>()
                 : contextSelections.ToDictionary(pair => pair.Key, pair => pair.Value));
+        TierSelections = CopyTokens(tierSelections);
+        SpeedSelections = CopyTokens(speedSelections);
         Retry = retry ?? RetrySettings.Default;
         ApprovalRetry = approvalRetry ?? RetrySettings.Default;
         Skills = skills;
@@ -207,6 +211,20 @@ public sealed record HarnessSettings
 
     public IReadOnlyDictionary<ContextSelectionKey, int> ContextSelections { get; }
 
+    public IReadOnlyDictionary<ContextSelectionKey, string> TierSelections { get; }
+
+    public IReadOnlyDictionary<ContextSelectionKey, string> SpeedSelections { get; }
+
+    /// <summary>
+    /// Service-tier token for the active model, or null when unset or no longer listed.
+    /// </summary>
+    public string? ServiceTier => ResolveSlot(Provider, Model, ActiveModel.ServiceTiers, TierSelections);
+
+    /// <summary>
+    /// Speed token for the active model, or null when unset or no longer listed.
+    /// </summary>
+    public string? Speed => ResolveSlot(Provider, Model, ActiveModel.Speeds, SpeedSelections);
+
     public RetrySettings Retry { get; }
 
     public RetrySettings ApprovalRetry { get; }
@@ -253,6 +271,18 @@ public sealed record HarnessSettings
 
         return WithContextWindow(Provider, Model, selected);
     }
+
+    public HarnessSettings WithTier(ProviderName provider, string model, string? token) =>
+        WithSlot(provider, model, token, serviceTier: true);
+
+    public HarnessSettings WithSpeed(ProviderName provider, string model, string? token) =>
+        WithSlot(provider, model, token, serviceTier: false);
+
+    public string? TierFor(ProviderName provider, string model) =>
+        ResolveSlot(provider, model, Catalog.GetModel(provider, model).ServiceTiers, TierSelections);
+
+    public string? SpeedFor(ProviderName provider, string model) =>
+        ResolveSlot(provider, model, Catalog.GetModel(provider, model).Speeds, SpeedSelections);
 
     public bool Skills { get; }
 
@@ -571,7 +601,9 @@ public sealed record HarnessSettings
         MicroCompactionSettings? microCompaction = null,
         bool setMicroCompaction = false,
         RuleFileSettings? ruleFiles = null,
-        IReadOnlyList<string>? disabledBuiltInTools = null) =>
+        IReadOnlyList<string>? disabledBuiltInTools = null,
+        IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
+        IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -611,7 +643,9 @@ public sealed record HarnessSettings
             showAutomaticCompactionSummary ?? ShowAutomaticCompactionSummary,
             setMicroCompaction ? microCompaction : MicroCompaction,
             ruleFiles ?? RuleFiles,
-            disabledBuiltInTools ?? DisabledBuiltInTools);
+            disabledBuiltInTools ?? DisabledBuiltInTools,
+            tierSelections ?? TierSelections,
+            speedSelections ?? SpeedSelections);
 
     public override string ToString() => nameof(HarnessSettings);
 
@@ -636,6 +670,76 @@ public sealed record HarnessSettings
         throw new InvalidOperationException(
             $"Provider '{provider.Value}' has more than one model. Pass --model.");
     }
+
+    private HarnessSettings WithSlot(
+        ProviderName provider,
+        string model,
+        string? token,
+        bool serviceTier)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        var settings = Catalog.GetModel(provider, model);
+        var listed = serviceTier ? settings.ServiceTiers : settings.Speeds;
+        var label = serviceTier ? "Service tier" : "Speed";
+        string? normalized = null;
+        if (token is not null)
+        {
+            if (listed.Count == 0 || !CatalogSlots.Contains(listed, token))
+            {
+                throw new ArgumentException(Unavailable(label, listed));
+            }
+
+            normalized = new CatalogToken(token).Value;
+        }
+
+        var source = serviceTier ? TierSelections : SpeedSelections;
+        var selections = source.ToDictionary(pair => pair.Key, pair => pair.Value);
+        var key = new ContextSelectionKey(provider, model);
+        if (normalized is null)
+        {
+            selections.Remove(key);
+        }
+        else
+        {
+            selections[key] = normalized;
+        }
+
+        return serviceTier
+            ? Copy(tierSelections: selections)
+            : Copy(speedSelections: selections);
+    }
+
+    private static string? ResolveSlot(
+        ProviderName provider,
+        string model,
+        IReadOnlyList<string> tokens,
+        IReadOnlyDictionary<ContextSelectionKey, string> selections)
+    {
+        if (!selections.TryGetValue(new ContextSelectionKey(provider, model), out var stored))
+        {
+            return null;
+        }
+
+        return CatalogSlots.Contains(tokens, stored) ? stored : null;
+    }
+
+    private static string Unavailable(string label, IReadOnlyList<string> tokens)
+    {
+        if (tokens.Count == 0)
+        {
+            return label + " is not available for this model.";
+        }
+
+        return label + " is not available for this model. Available: " + string.Join(", ", tokens);
+    }
+
+    private static IReadOnlyDictionary<ContextSelectionKey, string> CopyTokens(
+        IReadOnlyDictionary<ContextSelectionKey, string>? selections) =>
+        new ReadOnlyDictionary<ContextSelectionKey, string>(
+            selections is null
+                ? new Dictionary<ContextSelectionKey, string>()
+                : selections.ToDictionary(pair => pair.Key, pair => pair.Value));
 
     private static void RequireImageModel(ProviderCatalog catalog, ImageModelSettings imageModel)
     {

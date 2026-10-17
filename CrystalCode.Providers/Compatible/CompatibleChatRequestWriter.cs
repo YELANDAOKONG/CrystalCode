@@ -3,6 +3,7 @@ using System.Text.Json;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.Compatible;
 
@@ -44,6 +45,19 @@ internal static class CompatibleChatRequestWriter
             if (options.TopP is { } topP)
             {
                 writer.WriteNumber("top_p", topP);
+            }
+
+            if (profile.Processing == CompatibleProcessing.SharedServiceTier)
+            {
+                ProcessingSlots.WriteShared(
+                    writer,
+                    options.ServiceTier,
+                    options.Speed,
+                    profile.VendorName);
+            }
+            else
+            {
+                ProcessingSlots.Reject(options.ServiceTier, options.Speed, profile.VendorName);
             }
 
             writer.WriteBoolean("stream", stream);

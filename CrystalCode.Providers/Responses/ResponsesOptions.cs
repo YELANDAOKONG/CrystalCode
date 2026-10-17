@@ -15,7 +15,9 @@ public sealed record ResponsesOptions
         double? topP = null,
         int? maxTokens = null,
         string? vendorName = null,
-        TimeSpan? requestTimeout = null)
+        TimeSpan? requestTimeout = null,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -53,6 +55,8 @@ public sealed record ResponsesOptions
         MaxTokens = maxTokens;
         VendorName = string.IsNullOrWhiteSpace(vendorName) ? "OpenAI Responses" : vendorName.Trim();
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
+        ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
+        Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
 
     public string ApiKey { get; }
@@ -64,6 +68,20 @@ public sealed record ResponsesOptions
     public string VendorName { get; }
     public TimeSpan RequestTimeout { get; }
 
+    public string? ServiceTier { get; }
+
+    public string? Speed { get; }
+
     internal ProtocolOptions ToProtocolOptions() =>
-        new(ApiKey, Model, BaseUri, Temperature, TopP, MaxTokens, RequestTimeout, VendorName);
+        new(
+            ApiKey,
+            Model,
+            BaseUri,
+            Temperature,
+            TopP,
+            MaxTokens,
+            RequestTimeout,
+            VendorName,
+            ServiceTier,
+            Speed);
 }

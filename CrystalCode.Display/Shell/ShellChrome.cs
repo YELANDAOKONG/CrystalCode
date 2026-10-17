@@ -25,6 +25,10 @@ public sealed class ShellChrome
 
     public string Thinking { get; set; } = string.Empty;
 
+    public string ServiceTier { get; set; } = string.Empty;
+
+    public string Speed { get; set; } = string.Empty;
+
     public string ContextWindow { get; set; } = string.Empty;
 
     public string PromptSet { get; set; } = string.Empty;
@@ -120,6 +124,16 @@ public sealed class ShellChrome
             items.Add((Thinking, $"[{Theme.Chrome}]{MarkupText.Escape(Thinking)}[/]", "keep"));
         }
 
+        if (!string.IsNullOrWhiteSpace(ServiceTier))
+        {
+            items.Add((ServiceTier, $"[{Theme.Chrome}]{MarkupText.Escape(ServiceTier)}[/]", "keep"));
+        }
+
+        if (!string.IsNullOrWhiteSpace(Speed))
+        {
+            items.Add((Speed, $"[{Theme.Chrome}]{MarkupText.Escape(Speed)}[/]", "keep"));
+        }
+
         if (!string.IsNullOrWhiteSpace(ContextWindow))
         {
             items.Add((ContextWindow, $"[{Theme.Chrome}]{MarkupText.Escape(ContextWindow)}[/]", "keep"));
@@ -200,6 +214,8 @@ public sealed class ShellChrome
             {
                 "approval" => Approval,
                 "thinking" => Thinking,
+                "tier" => ServiceTier,
+                "speed" => Speed,
                 "context-window" => ContextWindow,
                 "prompt-set" => string.IsNullOrWhiteSpace(PromptSet)
                     ? string.Empty

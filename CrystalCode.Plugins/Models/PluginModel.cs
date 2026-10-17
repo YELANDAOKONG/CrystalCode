@@ -23,7 +23,9 @@ public sealed record PluginModel
         bool imageInput,
         string thinking,
         bool audioInput = false,
-        bool videoInput = false)
+        bool videoInput = false,
+        string? serviceTier = null,
+        string? speed = null)
         : this(
             provider,
             protocol,
@@ -36,7 +38,9 @@ public sealed record PluginModel
             thinking,
             unavailable: false,
             audioInput,
-            videoInput)
+            videoInput,
+            serviceTier,
+            speed)
     {
     }
 
@@ -53,7 +57,9 @@ public sealed record PluginModel
             string.Empty,
             unavailable,
             audioInput: false,
-            videoInput: false)
+            videoInput: false,
+            serviceTier: null,
+            speed: null)
     {
     }
 
@@ -69,7 +75,9 @@ public sealed record PluginModel
         string thinking,
         bool unavailable,
         bool audioInput,
-        bool videoInput)
+        bool videoInput,
+        string? serviceTier,
+        string? speed)
     {
         if (!unavailable)
         {
@@ -126,6 +134,8 @@ public sealed record PluginModel
         AudioInput = audioInput;
         VideoInput = videoInput;
         Thinking = thinking;
+        ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
+        Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
 
     public string Provider { get; }
@@ -161,6 +171,18 @@ public sealed record PluginModel
     /// Other values are effort names such as <c>low</c> or <c>high</c>.
     /// </summary>
     public string Thinking { get; }
+
+    /// <summary>
+    /// Selected service-tier token, or null when the slot is unset.
+    /// The host does not interpret the token.
+    /// </summary>
+    public string? ServiceTier { get; }
+
+    /// <summary>
+    /// Selected speed token, or null when the slot is unset.
+    /// The host does not interpret the token.
+    /// </summary>
+    public string? Speed { get; }
 
     public override string ToString() =>
         Name.Length == 0 ? nameof(PluginModel) : Provider + " / " + Name;

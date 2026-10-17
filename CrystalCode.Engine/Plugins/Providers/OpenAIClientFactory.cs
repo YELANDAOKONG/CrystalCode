@@ -38,7 +38,9 @@ public sealed class OpenAIClientFactory : IChatClientFactory
                 model.MaxTokens,
                 provider.ReplayReasoningContent,
                 useMaxCompletionTokens: provider.TokenLimit == TokenLimitStyle.MaxCompletionTokens,
-                vendorName: provider.Name.Value));
+                vendorName: provider.Name.Value,
+                serviceTier: settings.ServiceTier,
+                speed: settings.Speed));
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -64,6 +66,8 @@ public sealed class OpenAIClientFactory : IChatClientFactory
                 model.MaxTokens,
                 provider.ReplayReasoningContent,
                 useMaxCompletionTokens: provider.TokenLimit == TokenLimitStyle.MaxCompletionTokens,
-                vendorName: provider.Name.Value));
+                vendorName: provider.Name.Value,
+                serviceTier: settings.ServiceTier,
+                speed: settings.Speed));
     }
 }

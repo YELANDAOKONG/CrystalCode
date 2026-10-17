@@ -100,6 +100,8 @@ public sealed class SettingsStore
                 ?? defaults.ShowAutomaticCompactionSummary,
             imageModel: ReadImageModel(document.ImageModel),
             contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
+            tierSelections: SettingsMapper.ReadTokenSelections(document.TierSelections, "tierSelections"),
+            speedSelections: SettingsMapper.ReadTokenSelections(document.SpeedSelections, "speedSelections"),
             retry: ReadRetry(document.Retry),
             approvalRetry: ReadRetry(document.ApprovalRetry),
             compactionModel: ReadCompactionModel(document.CompactionModel),
@@ -133,6 +135,12 @@ public sealed class SettingsStore
             ContextSelections = settings.ContextSelections.Count == 0
                 ? null
                 : SettingsMapper.WriteContextSelections(settings.ContextSelections),
+            TierSelections = settings.TierSelections.Count == 0
+                ? null
+                : SettingsMapper.WriteTokenSelections(settings.TierSelections),
+            SpeedSelections = settings.SpeedSelections.Count == 0
+                ? null
+                : SettingsMapper.WriteTokenSelections(settings.SpeedSelections),
             Skills = settings.Skills ? null : false,
             ExternalTools = settings.ExternalTools ? null : false,
             Plugins = settings.Plugins ? null : false,

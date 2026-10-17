@@ -133,6 +133,67 @@ internal static class SettingsMapper
         return JsonSerializer.SerializeToElement(document, HomeJson.Options);
     }
 
+    /// <summary>
+    /// Reads saved service-tier or speed tokens. The stored form is
+    /// <c>{"provider": {"model": "token"}}</c>. The older flat
+    /// <c>{"provider/model": "token"}</c> form is still accepted.
+    /// </summary>
+    public static IReadOnlyDictionary<ContextSelectionKey, string> ReadTokenSelections(
+        JsonElement? document,
+        string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var selections = new Dictionary<ContextSelectionKey, string>();
+        if (document is null
+            || document.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return selections;
+        }
+
+        if (document.Value.ValueKind != JsonValueKind.Object)
+        {
+            throw new JsonException($"{name} must be an object.");
+        }
+
+        foreach (var entry in document.Value.EnumerateObject())
+        {
+            if (entry.Value.ValueKind == JsonValueKind.Object)
+            {
+                ReadNestedTokens(entry, selections, name);
+            }
+            else
+            {
+                ReadFlatToken(entry, selections, name);
+            }
+        }
+
+        return selections;
+    }
+
+    /// <summary>
+    /// Writes saved tokens in the nested form, sorted by provider and model.
+    /// </summary>
+    public static JsonElement WriteTokenSelections(
+        IReadOnlyDictionary<ContextSelectionKey, string> selections)
+    {
+        ArgumentNullException.ThrowIfNull(selections);
+        var document = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var (key, token) in selections
+            .OrderBy(pair => pair.Key.Provider.Value, StringComparer.Ordinal)
+            .ThenBy(pair => pair.Key.Model, StringComparer.Ordinal))
+        {
+            if (!document.TryGetValue(key.Provider.Value, out var models))
+            {
+                models = new Dictionary<string, string>(StringComparer.Ordinal);
+                document[key.Provider.Value] = models;
+            }
+
+            models[key.Model] = token;
+        }
+
+        return JsonSerializer.SerializeToElement(document, HomeJson.Options);
+    }
+
     private static ProviderDocument ReadDocument(string name, JsonElement entry)
     {
         if (entry.ValueKind != JsonValueKind.Object)
@@ -204,7 +265,9 @@ internal static class SettingsMapper
                     modelEntry.ThinkingCanDisable ?? true,
                     modelEntry.AudioInput ?? false,
                     modelEntry.VideoInput ?? false,
-                    modelEntry.ContextWindows);
+                    modelEntry.ContextWindows,
+                    modelEntry.ServiceTiers,
+                    modelEntry.Speeds);
             }
         }
 
@@ -247,7 +310,13 @@ internal static class SettingsMapper
                 ImageInput = settings.ImageInput ? true : null,
                 ThinkingCanDisable = settings.ThinkingCanDisable ? null : false,
                 AudioInput = settings.AudioInput ? true : null,
-                VideoInput = settings.VideoInput ? true : null
+                VideoInput = settings.VideoInput ? true : null,
+                ServiceTiers = settings.ServiceTiers.Count == 0
+                    ? null
+                    : [.. settings.ServiceTiers],
+                Speeds = settings.Speeds.Count == 0
+                    ? null
+                    : [.. settings.Speeds]
             };
         }
 
@@ -346,6 +415,90 @@ internal static class SettingsMapper
 
     private static bool IsExactModelId(string model) =>
         model.Length > 0 && string.Equals(model, model.Trim(), StringComparison.Ordinal);
+
+    private static void ReadNestedTokens(
+        JsonProperty providerEntry,
+        Dictionary<ContextSelectionKey, string> selections,
+        string name)
+    {
+        if (!ProviderName.TryParse(providerEntry.Name, out var provider) || provider is null)
+        {
+            throw new JsonException(
+                $"{name} provider '{providerEntry.Name}' is not a valid provider name.");
+        }
+
+        foreach (var modelEntry in providerEntry.Value.EnumerateObject())
+        {
+            var model = modelEntry.Name;
+            if (!IsExactModelId(model))
+            {
+                throw new JsonException(
+                    $"{name} model '{model}' under '{provider.Value}' "
+                    + "must not be blank or padded with whitespace.");
+            }
+
+            if (!TryReadToken(modelEntry.Value, out var token))
+            {
+                throw new JsonException(
+                    $"{name} value for '{provider.Value}/{model}' must be a token that "
+                    + "starts with a letter and then uses only letters, digits, and hyphens.");
+            }
+
+            AddToken(selections, new ContextSelectionKey(provider, model), token, name);
+        }
+    }
+
+    private static void ReadFlatToken(
+        JsonProperty entry,
+        Dictionary<ContextSelectionKey, string> selections,
+        string name)
+    {
+        var separator = entry.Name.IndexOf('/');
+        if (separator <= 0
+            || separator == entry.Name.Length - 1
+            || !ProviderName.TryParse(entry.Name[..separator], out var provider)
+            || provider is null)
+        {
+            throw new JsonException(
+                $"{name} key '{entry.Name}' must be provider/model with a valid provider name.");
+        }
+
+        var model = entry.Name[(separator + 1)..];
+        if (!IsExactModelId(model))
+        {
+            throw new JsonException(
+                $"{name} model '{model}' under '{provider.Value}' "
+                + "must not be blank or padded with whitespace.");
+        }
+
+        if (!TryReadToken(entry.Value, out var token))
+        {
+            throw new JsonException(
+                $"{name} value for '{entry.Name}' must be a token that "
+                + "starts with a letter and then uses only letters, digits, and hyphens.");
+        }
+
+        AddToken(selections, new ContextSelectionKey(provider, model), token, name);
+    }
+
+    private static void AddToken(
+        Dictionary<ContextSelectionKey, string> selections,
+        ContextSelectionKey key,
+        string token,
+        string name)
+    {
+        if (!selections.TryAdd(key, token))
+        {
+            throw new JsonException($"{name} lists '{key}' more than once.");
+        }
+    }
+
+    private static bool TryReadToken(JsonElement value, out string token)
+    {
+        token = string.Empty;
+        return value.ValueKind == JsonValueKind.String
+            && CatalogToken.TryNormalize(value.GetString() ?? string.Empty, out token);
+    }
 
     private static bool TryReadWindow(JsonElement value, out int window)
     {

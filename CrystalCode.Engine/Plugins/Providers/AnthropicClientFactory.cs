@@ -32,7 +32,9 @@ public sealed class AnthropicClientFactory : IChatClientFactory
                 model.TopP,
                 model.MaxTokens,
                 provider.Name.Value,
-                summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted));
+                summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
+                serviceTier: settings.ServiceTier,
+                speed: settings.Speed));
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -55,6 +57,8 @@ public sealed class AnthropicClientFactory : IChatClientFactory
                 model.TopP,
                 model.MaxTokens,
                 provider.Name.Value,
-                summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted));
+                summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
+                serviceTier: settings.ServiceTier,
+                speed: settings.Speed));
     }
 }

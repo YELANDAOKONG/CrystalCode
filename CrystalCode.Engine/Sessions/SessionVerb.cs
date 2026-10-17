@@ -11,6 +11,8 @@ public enum SessionVerb
     Approval,
     Thinking,
     Context,
+    Tier,
+    Speed,
     Tokens,
     Model,
     PromptSet,

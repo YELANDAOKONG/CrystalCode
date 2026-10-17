@@ -63,6 +63,12 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--context <BUDGET>")]
     public string? Context { get; init; }
 
+    [CommandOption("--tier <TOKEN>")]
+    public string? Tier { get; init; }
+
+    [CommandOption("--speed|--fast <TOKEN>")]
+    public string? Speed { get; init; }
+
     [CommandOption("--prompt-set <NAME>")]
     public string? PromptSet { get; init; }
 

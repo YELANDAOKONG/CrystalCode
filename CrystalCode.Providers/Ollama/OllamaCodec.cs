@@ -26,6 +26,7 @@ internal sealed class OllamaCodec : IProtocolCodec
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {
+        ProcessingSlots.Reject(options.ServiceTier, options.Speed, options.VendorName);
         JsonOutputGuard.Reject(request.JsonOutput, "Ollama");
         if (request.Items.Count == 0)
         {

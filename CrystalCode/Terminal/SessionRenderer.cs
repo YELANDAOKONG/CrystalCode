@@ -393,7 +393,9 @@ public sealed class SessionRenderer : IDisposable
         ApprovalMode approval,
         string thinking = "",
         string promptSet = "",
-        int contextWindow = 0)
+        int contextWindow = 0,
+        string serviceTier = "",
+        string speed = "")
     {
         lock (_gate)
         {
@@ -403,6 +405,8 @@ public sealed class SessionRenderer : IDisposable
             _chrome.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            _chrome.ServiceTier = serviceTier;
+            _chrome.Speed = speed;
             _chrome.ContextWindow = UsageText.FormatWindow(contextWindow);
             ContextWindow = contextWindow;
             _chrome.PromptSet = promptSet;
@@ -438,7 +442,9 @@ public sealed class SessionRenderer : IDisposable
         string? model = null,
         string? workspaceRoot = null,
         string? promptSet = null,
-        int? contextWindow = null)
+        int? contextWindow = null,
+        string? serviceTier = null,
+        string? speed = null)
     {
         lock (_gate)
         {
@@ -446,6 +452,16 @@ public sealed class SessionRenderer : IDisposable
             _composer.PlanMode = planMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
+            if (serviceTier is not null)
+            {
+                _chrome.ServiceTier = serviceTier;
+            }
+
+            if (speed is not null)
+            {
+                _chrome.Speed = speed;
+            }
+
             if (contextWindow is int window)
             {
                 _chrome.ContextWindow = UsageText.FormatWindow(window);

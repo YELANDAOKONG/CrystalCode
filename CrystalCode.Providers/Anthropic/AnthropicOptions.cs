@@ -16,7 +16,9 @@ public sealed record AnthropicOptions
         int? maxTokens = null,
         string? vendorName = null,
         TimeSpan? requestTimeout = null,
-        bool summarizeThinking = true)
+        bool summarizeThinking = true,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -55,6 +57,8 @@ public sealed record AnthropicOptions
         VendorName = string.IsNullOrWhiteSpace(vendorName) ? "Anthropic" : vendorName.Trim();
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
         SummarizeThinking = summarizeThinking;
+        ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
+        Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
 
     public string ApiKey { get; }
@@ -72,6 +76,20 @@ public sealed record AnthropicOptions
     /// </summary>
     public bool SummarizeThinking { get; }
 
+    public string? ServiceTier { get; }
+
+    public string? Speed { get; }
+
     internal ProtocolOptions ToProtocolOptions() =>
-        new(ApiKey, Model, BaseUri, Temperature, TopP, MaxTokens, RequestTimeout, VendorName);
+        new(
+            ApiKey,
+            Model,
+            BaseUri,
+            Temperature,
+            TopP,
+            MaxTokens,
+            RequestTimeout,
+            VendorName,
+            ServiceTier,
+            Speed);
 }

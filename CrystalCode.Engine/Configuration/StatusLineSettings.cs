@@ -26,6 +26,8 @@ public sealed record StatusLineSettings
         {
             "approval",
             "thinking",
+            "tier",
+            "speed",
             "context-window",
             "prompt-set",
             "activity",

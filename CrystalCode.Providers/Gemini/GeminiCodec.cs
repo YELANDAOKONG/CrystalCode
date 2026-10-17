@@ -36,6 +36,7 @@ internal sealed class GeminiCodec : IProtocolCodec
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {
+        ProcessingSlots.Reject(options.ServiceTier, options.Speed, options.VendorName);
         JsonOutputGuard.Reject(request.JsonOutput, "Gemini");
         if (request.Items.Count == 0)
         {

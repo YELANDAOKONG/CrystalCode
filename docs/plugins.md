@@ -221,22 +221,27 @@ until that plugin loads. Built-in tools are not listed.
 
 `AttachSession` runs with `Attach`, after `Contribute`, and again when
 that plugin instance is loaded again. The object stays live. `/model`,
-`/approval model`, `/approval thinking`, and `/thinking` show up on the
-next read. The host does
+`/approval model`, `/approval thinking`, `/thinking`, `/tier`, and
+`/speed` show up on the next read. The host does
 not call `AttachSession` again for those changes.
 
 `Session` carries the provider, protocol, model name, context window,
 maximum tokens, temperature, top-p, image input, declared audio input,
-declared video input, and the current thinking gear. Audio and video
+declared video input, the current thinking gear, and the selected
+service tier and speed. Audio and video
 flags copy the model entry. They do not make a turn, a tool result, or
 `CreateMultimodal` accept audio or video.
-`default` and `off` are host sentinels. Other values are effort
+`default` and `off` are host sentinels for thinking. Other thinking values are effort
 tokens the model lists. Tokens are stored in lowercase and forwarded
 unchanged. `max` and `maximum` are different tokens.
+`ServiceTier` and `Speed` are null when that slot is unset. A listed
+`default` is a service-tier token, not the thinking sentinel. The plugin
+sees the token, not the JSON field name.
 
 `Review.Independent` is true only when review uses its own model. That
 model's thinking gear is its stored `thinkingEffort`, `default` when
-unset. While the switch is off, review uses
+unset. Its service tier and speed are the tokens saved for that model.
+While the switch is off, review uses
 the session model, `Model` is null, and a saved provider or model name is
 omitted. The facts include no API key, endpoint, organization, or project.
 

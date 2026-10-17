@@ -235,7 +235,6 @@ implemented in the current build:
   once its field scope, precedence, write policy, and trust semantics are
   defined;
 - automatically fetching model-list information from a provider;
-- service tier and request speed;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
 - saved, session, and plugin ways to disable a built-in tool, and supplying

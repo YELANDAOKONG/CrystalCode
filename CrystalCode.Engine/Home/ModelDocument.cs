@@ -23,4 +23,8 @@ internal sealed class ModelDocument
     public bool? AudioInput { get; set; }
 
     public bool? VideoInput { get; set; }
+
+    public List<string>? ServiceTiers { get; set; }
+
+    public List<string>? Speeds { get; set; }
 }

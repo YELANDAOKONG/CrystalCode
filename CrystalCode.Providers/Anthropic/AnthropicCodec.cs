@@ -62,6 +62,8 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 writer.WriteNumber("top_p", topP);
             }
 
+            ProcessingSlots.WriteSeparate(writer, options.ServiceTier, options.Speed);
+
             writer.WriteBoolean("stream", stream);
             writer.WriteEndObject();
         }

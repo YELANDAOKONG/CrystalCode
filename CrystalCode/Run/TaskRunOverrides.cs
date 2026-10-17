@@ -81,6 +81,22 @@ internal static class TaskRunOverrides
                 next = next.WithContextBudget(Required(request.Context, "Context budget"));
             }
 
+            if (request.Tier is not null)
+            {
+                next = next.WithTier(
+                    next.Provider,
+                    next.Model,
+                    Required(request.Tier, "Service tier"));
+            }
+
+            if (request.Speed is not null)
+            {
+                next = next.WithSpeed(
+                    next.Provider,
+                    next.Model,
+                    Required(request.Speed, "Speed"));
+            }
+
             if (request.Skills is not null)
             {
                 next = next.WithSkills(ParseSwitch(request.Skills, "--skills"));

@@ -48,4 +48,6 @@ public sealed record SessionStatus(
     string? CompactionModel = null,
     string? MicroCompaction = null,
     bool GlobalRulesEnabled = true,
-    bool ProjectRulesEnabled = true);
+    bool ProjectRulesEnabled = true,
+    string ServiceTier = "",
+    string Speed = "");

@@ -15,6 +15,8 @@ public static class SlashCatalog
         new(SessionVerb.Thinking, "thinking", ["think", "effort"], "off | none | default | an effort token the model lists",
             ["off", "none", "default"]),
         new(SessionVerb.Context, "context", [], "Cycle or set the model context window"),
+        new(SessionVerb.Tier, "tier", [], "Cycle or set the model service tier"),
+        new(SessionVerb.Speed, "speed", ["fast"], "Cycle or set the model speed"),
         new(SessionVerb.Tokens, "tokens", [], "Toggle estimated progress tokens",
             ["on", "off"]),
         new(SessionVerb.Verbose, "verbose", [], "Tool, command, result, call, approval, review, or thinking detail",

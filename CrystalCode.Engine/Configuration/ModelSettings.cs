@@ -19,7 +19,9 @@ public sealed record ModelSettings
         bool thinkingCanDisable = true,
         bool audioInput = false,
         bool videoInput = false,
-        IReadOnlyList<int>? contextWindows = null)
+        IReadOnlyList<int>? contextWindows = null,
+        IReadOnlyList<string>? serviceTiers = null,
+        IReadOnlyList<string>? speeds = null)
     {
         if (contextWindow <= 0)
         {
@@ -74,6 +76,8 @@ public sealed record ModelSettings
         ThinkingCanDisable = thinkingCanDisable;
         AudioInput = audioInput;
         VideoInput = videoInput;
+        ServiceTiers = CatalogSlots.Normalize(serviceTiers, "Service tier");
+        Speeds = CatalogSlots.Normalize(speeds, "Speed");
     }
 
     public int ContextWindow { get; }
@@ -110,6 +114,16 @@ public sealed record ModelSettings
     /// declaration and does not accept or send video.
     /// </summary>
     public bool VideoInput { get; }
+
+    /// <summary>
+    /// Service-tier tokens this model accepts. Empty means the slot is unsupported.
+    /// </summary>
+    public IReadOnlyList<string> ServiceTiers { get; }
+
+    /// <summary>
+    /// Speed tokens this model accepts. Empty means the slot is unsupported.
+    /// </summary>
+    public IReadOnlyList<string> Speeds { get; }
 
     public bool AllowsEffort(string effort)
     {

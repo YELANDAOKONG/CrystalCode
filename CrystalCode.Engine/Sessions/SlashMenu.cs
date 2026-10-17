@@ -20,7 +20,9 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? approvalThinkingArguments = null,
         IReadOnlyList<SlashCompletion>? contextArguments = null,
         IReadOnlyList<SlashCompletion>? compactionModelArguments = null,
-        IReadOnlyList<SlashCompletion>? compactionThinkingArguments = null)
+        IReadOnlyList<SlashCompletion>? compactionThinkingArguments = null,
+        IReadOnlyList<SlashCompletion>? tierArguments = null,
+        IReadOnlyList<SlashCompletion>? speedArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -39,7 +41,9 @@ public static class SlashMenu
                 approvalThinkingArguments,
                 contextArguments,
                 compactionModelArguments,
-                compactionThinkingArguments);
+                compactionThinkingArguments,
+                tierArguments,
+                speedArguments);
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
         }
 
@@ -68,11 +72,23 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? approvalThinkingArguments,
         IReadOnlyList<SlashCompletion>? contextArguments,
         IReadOnlyList<SlashCompletion>? compactionModelArguments,
-        IReadOnlyList<SlashCompletion>? compactionThinkingArguments)
+        IReadOnlyList<SlashCompletion>? compactionThinkingArguments,
+        IReadOnlyList<SlashCompletion>? tierArguments,
+        IReadOnlyList<SlashCompletion>? speedArguments)
     {
         if (spec.Verb == SessionVerb.Context && contextArguments is not null)
         {
             return contextArguments;
+        }
+
+        if (spec.Verb == SessionVerb.Tier && tierArguments is not null)
+        {
+            return tierArguments;
+        }
+
+        if (spec.Verb == SessionVerb.Speed && speedArguments is not null)
+        {
+            return speedArguments;
         }
 
         if (spec.Verb == SessionVerb.Approval)

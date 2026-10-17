@@ -13,7 +13,9 @@ public sealed record OllamaOptions
         double? topP = null,
         int? maxTokens = null,
         string? vendorName = null,
-        TimeSpan? requestTimeout = null)
+        TimeSpan? requestTimeout = null,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         if (temperature is < 0 or > 2)
@@ -44,6 +46,8 @@ public sealed record OllamaOptions
         MaxTokens = maxTokens;
         VendorName = string.IsNullOrWhiteSpace(vendorName) ? "Ollama" : vendorName.Trim();
         RequestTimeout = requestTimeout ?? TimeSpan.FromMinutes(10);
+        ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
+        Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
 
     public string Model { get; }
@@ -55,8 +59,22 @@ public sealed record OllamaOptions
     public string VendorName { get; }
     public TimeSpan RequestTimeout { get; }
 
+    public string? ServiceTier { get; }
+
+    public string? Speed { get; }
+
     internal ProtocolOptions ToProtocolOptions() =>
-        new(ApiKey, Model, BaseUri, Temperature, TopP, MaxTokens, RequestTimeout, VendorName);
+        new(
+            ApiKey,
+            Model,
+            BaseUri,
+            Temperature,
+            TopP,
+            MaxTokens,
+            RequestTimeout,
+            VendorName,
+            ServiceTier,
+            Speed);
 
     public override string ToString() => nameof(OllamaOptions);
 }

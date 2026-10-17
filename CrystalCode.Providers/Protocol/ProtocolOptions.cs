@@ -8,4 +8,6 @@ internal sealed record ProtocolOptions(
     double? TopP,
     int? MaxTokens,
     TimeSpan RequestTimeout,
-    string VendorName);
+    string VendorName,
+    string? ServiceTier = null,
+    string? Speed = null);

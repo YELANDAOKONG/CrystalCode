@@ -1395,7 +1395,23 @@ Gemini 3 models do. `/thinking` then omits Off. A stored Off gear falls
 back to the provider default and the status bar shows `Think Default`.
 An explicit `/thinking off` is refused.
 
-Service tier and request speed are not supported.
+`serviceTiers` and `speeds` declare the tokens a model accepts for service
+tier and speed. A token starts with a letter and then uses only letters,
+digits, and hyphens. The host stores every token in lowercase and does not
+interpret it. `default` is an ordinary token when the model lists it. An
+unset slot is omitted from the request. `/tier` and `/speed` (alias
+`/fast`) cycle the current model's list, including the unset slot, or
+select a listed token. Each choice is stored per model in
+`tierSelections` and `speedSelections`. Switching is refused during a turn
+or compaction. An empty list means that slot is not offered.
+
+Chat Completions writes whichever one slot is set to `service_tier` and
+rejects a request that sets both, because that protocol has one field.
+OpenAI Responses does the same. Anthropic Messages writes the service tier
+to `service_tier` and the speed to `speed`. DeepSeek, Gemini, and Ollama
+reject a request that sets either slot. The host does not read the
+response back to see which value was applied, and it does not infer a
+vendor from the endpoint address.
 
 `contextWindow` remains the model's maximum context size. An optional
 `contextWindows` array declares selectable local context budgets, for example
