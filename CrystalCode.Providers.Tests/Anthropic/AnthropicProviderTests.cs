@@ -218,7 +218,7 @@ public sealed class AnthropicProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_MapsMaximumToMaxAndForwardsOtherEfforts()
+    public async Task CompleteAsync_ForwardsMaximumAndOtherEfforts()
     {
         var maximumHandler = new RecordingHandler(JsonResponse.Create(
             """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
@@ -229,7 +229,18 @@ public sealed class AnthropicProviderTests
         await maximumProvider.CompleteAsync(new ChatRequest(
             [new ChatMessage(ChatRole.User, "Hi")],
             reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.Maximum)));
-        Assert.Contains("\"effort\":\"max\"", maximumHandler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"effort\":\"maximum\"", maximumHandler.Body, StringComparison.Ordinal);
+
+        var maxHandler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var maxHttp = new HttpClient(maxHandler);
+        using var maxProvider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            maxHttp);
+        await maxProvider.CompleteAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "Hi")],
+            reasoning: new ReasoningOptions(ReasoningMode.Enabled, new ReasoningEffort("max"))));
+        Assert.Contains("\"effort\":\"max\"", maxHandler.Body, StringComparison.Ordinal);
 
         var customHandler = new RecordingHandler(JsonResponse.Create(
             """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));

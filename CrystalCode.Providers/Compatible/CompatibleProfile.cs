@@ -8,13 +8,11 @@ internal sealed record CompatibleProfile
         string? reasoningStateFormat,
         bool writeReasoningContent,
         bool writeThinkingObject,
-        string maximumEffortValue,
         CompatibleTokenLimit tokenLimit,
         CompatibleFaults faults)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
         ArgumentException.ThrowIfNullOrWhiteSpace(chatCompletionsPath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(maximumEffortValue);
         ArgumentNullException.ThrowIfNull(faults);
 
         if (writeReasoningContent && string.IsNullOrWhiteSpace(reasoningStateFormat))
@@ -29,7 +27,6 @@ internal sealed record CompatibleProfile
         ReasoningStateFormat = reasoningStateFormat;
         WriteReasoningContent = writeReasoningContent;
         WriteThinkingObject = writeThinkingObject;
-        MaximumEffortValue = maximumEffortValue;
         TokenLimit = tokenLimit;
         Faults = faults;
     }
@@ -43,8 +40,6 @@ internal sealed record CompatibleProfile
     public bool WriteReasoningContent { get; }
 
     public bool WriteThinkingObject { get; }
-
-    public string MaximumEffortValue { get; }
 
     public CompatibleTokenLimit TokenLimit { get; }
 

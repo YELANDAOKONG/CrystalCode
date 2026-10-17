@@ -74,10 +74,10 @@ public sealed class OpenAIProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_MapsMaximumToXhighAndForwardsOtherEfforts()
+    public async Task CompleteAsync_ForwardsMaximumAndOtherEfforts()
     {
         var maximum = await SendEffort(ReasoningEffort.Maximum);
-        Assert.Contains("\"reasoning_effort\":\"xhigh\"", maximum, StringComparison.Ordinal);
+        Assert.Contains("\"reasoning_effort\":\"maximum\"", maximum, StringComparison.Ordinal);
 
         var custom = await SendEffort(new ReasoningEffort("ultra"));
         Assert.Contains("\"reasoning_effort\":\"ultra\"", custom, StringComparison.Ordinal);

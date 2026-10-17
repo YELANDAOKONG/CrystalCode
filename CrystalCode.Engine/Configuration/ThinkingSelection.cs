@@ -5,9 +5,9 @@ namespace CrystalCode.Engine.Configuration;
 /// <summary>
 /// Host-selected thinking gear. Not a model capability and not a wire value.
 /// <c>default</c> and <c>off</c> are host sentinels. Other values are the
-/// portable Crystal names (<c>minimal</c>, <c>low</c>, <c>medium</c>,
-/// <c>high</c>, <c>maximum</c>) or another effort token the endpoint accepts.
-/// The host does not interpret that token; the adapter forwards it.
+/// effort tokens the endpoint accepts. The host stores them in lowercase and
+/// does not interpret them. <c>max</c> and <c>maximum</c> stay distinct.
+/// Adapters forward the stored token unchanged.
 /// </summary>
 public sealed record ThinkingSelection
 {
@@ -42,7 +42,7 @@ public sealed record ThinkingSelection
         }
 
         throw new ArgumentException(
-            "Thinking effort must be default, off, none, minimal, low, medium, high, maximum, max, "
+            "Thinking effort must be default, off, none, "
             + "or an effort token that starts with a letter and then uses only letters, digits, and hyphens.",
             nameof(value));
     }
@@ -58,18 +58,6 @@ public sealed record ThinkingSelection
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         var normalized = value.Trim().ToLowerInvariant();
-        if (normalized is "minimal" or "low" or "medium" or "high" or "maximum")
-        {
-            effort = normalized;
-            return true;
-        }
-
-        if (normalized == "max")
-        {
-            effort = "maximum";
-            return true;
-        }
-
         if (IsEffortToken(normalized))
         {
             effort = normalized;
@@ -81,8 +69,7 @@ public sealed record ThinkingSelection
     }
 
     /// <summary>
-    /// An endpoint token, not a host sentinel and not the <c>max</c> alias.
-    /// Adapters decide how to spell it on the wire.
+    /// An endpoint token, not a host sentinel. Adapters forward it unchanged.
     /// </summary>
     private static bool IsEffortToken(string value)
     {

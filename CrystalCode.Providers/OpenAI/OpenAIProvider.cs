@@ -36,7 +36,6 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
             reasoningStateFormat: ReasoningStateFormat,
             writeReasoningContent: options.ReplayReasoningContent,
             writeThinkingObject: false,
-            maximumEffortValue: "xhigh",
             tokenLimit: options.UseMaxCompletionTokens
                 ? CompatibleTokenLimit.MaxCompletionTokens
                 : CompatibleTokenLimit.MaxTokens,

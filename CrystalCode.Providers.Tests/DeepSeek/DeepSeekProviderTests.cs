@@ -67,10 +67,13 @@ public sealed class DeepSeekProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_MapsMaximumToMaxAndForwardsOtherEfforts()
+    public async Task CompleteAsync_ForwardsMaximumAndOtherEfforts()
     {
         var maximum = await SendEffort(ReasoningEffort.Maximum);
-        Assert.Contains("\"reasoning_effort\":\"max\"", maximum, StringComparison.Ordinal);
+        Assert.Contains("\"reasoning_effort\":\"maximum\"", maximum, StringComparison.Ordinal);
+
+        var max = await SendEffort(new ReasoningEffort("max"));
+        Assert.Contains("\"reasoning_effort\":\"max\"", max, StringComparison.Ordinal);
 
         var custom = await SendEffort(new ReasoningEffort("xhigh"));
         Assert.Contains("\"reasoning_effort\":\"xhigh\"", custom, StringComparison.Ordinal);

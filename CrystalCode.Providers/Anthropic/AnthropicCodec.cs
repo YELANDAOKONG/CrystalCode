@@ -377,7 +377,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
         {
             writer.WritePropertyName("output_config");
             writer.WriteStartObject();
-            writer.WriteString("effort", ResolveEffort(effort));
+            writer.WriteString("effort", effort.Value);
             writer.WriteEndObject();
         }
     }
@@ -424,9 +424,6 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 "Anthropic requires a reasoning token budget of at least 1024 tokens.");
         }
     }
-
-    private static string ResolveEffort(ReasoningEffort effort) =>
-        effort == ReasoningEffort.Maximum ? "max" : effort.Value;
 
     private static void ReadBlock(JsonElement block, List<ChatItem> items)
     {

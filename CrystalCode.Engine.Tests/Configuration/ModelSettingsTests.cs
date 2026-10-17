@@ -49,16 +49,16 @@ public sealed class ModelSettingsTests
     }
 
     [Fact]
-    public void Constructor_AcceptsMaxAsMaximum()
+    public void Constructor_KeepsMaxDistinctFromMaximum()
     {
         var model = new ModelSettings(
             1000,
             thinking: true,
             thinkingEfforts: ["none", "low", "high", "max"]);
 
-        Assert.Equal(["low", "high", "maximum"], model.ThinkingEfforts);
+        Assert.Equal(["low", "high", "max"], model.ThinkingEfforts);
         Assert.True(model.AllowsEffort("max"));
-        Assert.True(model.AllowsEffort("maximum"));
+        Assert.False(model.AllowsEffort("maximum"));
     }
 
     [Fact]

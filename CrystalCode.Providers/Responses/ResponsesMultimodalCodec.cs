@@ -324,9 +324,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         }
         else if (reasoning.Effort is { } effort)
         {
-            writer.WriteString(
-                "effort",
-                effort == ReasoningEffort.Maximum ? "xhigh" : effort.Value);
+            writer.WriteString("effort", effort.Value);
         }
 
         if (!disabled)

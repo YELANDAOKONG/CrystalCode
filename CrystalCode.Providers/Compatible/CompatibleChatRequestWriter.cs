@@ -436,11 +436,9 @@ internal static class CompatibleChatRequestWriter
                 $"{profile.VendorName} does not apply reasoning effort when thinking is disabled.");
         }
 
-        // Only the portable maximum name changes spelling per profile.
-        // Every other Crystal or caller-defined value is the wire token.
-        return effort == ReasoningEffort.Maximum
-            ? profile.MaximumEffortValue
-            : effort.Value;
+        // The catalog token is the wire token. Chat Completions gateways,
+        // including third-party ones, do not share one spelling of the top effort.
+        return effort.Value;
     }
 
     private sealed class AssistantBuffer

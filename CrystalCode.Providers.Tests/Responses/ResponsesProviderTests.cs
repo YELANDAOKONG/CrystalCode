@@ -252,10 +252,10 @@ public sealed class ResponsesProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_MapsMaximumToXhighAndForwardsOtherEfforts()
+    public async Task CompleteAsync_ForwardsMaximumAndOtherEfforts()
     {
         var maximum = await SendEffort(ReasoningEffort.Maximum);
-        Assert.Contains("\"effort\":\"xhigh\"", maximum, StringComparison.Ordinal);
+        Assert.Contains("\"effort\":\"maximum\"", maximum, StringComparison.Ordinal);
 
         var custom = await SendEffort(new ReasoningEffort("ultra"));
         Assert.Contains("\"effort\":\"ultra\"", custom, StringComparison.Ordinal);

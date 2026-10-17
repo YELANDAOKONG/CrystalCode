@@ -249,7 +249,7 @@ public sealed class SettingsStoreTests
         Assert.Equal("deepseek-flash", settings.Model);
         Assert.Equal(1_000_000, settings.ActiveModel.ContextWindow);
         Assert.True(settings.ActiveModel.Thinking);
-        Assert.Equal(["low", "high", "maximum"], settings.ActiveModel.ThinkingEfforts);
+        Assert.Equal(["low", "high", "max"], settings.ActiveModel.ThinkingEfforts);
         Assert.Equal(ThinkingSelection.Default, settings.ThinkingEffort);
         Assert.True(settings.Skills);
         Assert.True(settings.ExternalTools);

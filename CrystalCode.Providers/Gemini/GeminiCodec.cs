@@ -481,13 +481,12 @@ internal sealed class GeminiCodec : IProtocolCodec
 
         if (reasoning.Effort is { } effort)
         {
-            // Neither Gemini generation has a maximum level. The top portable name is high.
-            var level = effort == ReasoningEffort.Maximum ? "high" : effort.Value;
+            // The catalog token is the wire token. Gemini 3 only changes case.
             if (IsGemini3)
             {
                 generation["thinkingConfig"] = new JsonObject
                 {
-                    ["thinkingLevel"] = level.ToUpperInvariant()
+                    ["thinkingLevel"] = effort.Value.ToUpperInvariant()
                 };
                 return;
             }
@@ -499,7 +498,7 @@ internal sealed class GeminiCodec : IProtocolCodec
             }
 
             // Gemini 2.5 has no effort string. Unmapped tokens cannot be forwarded.
-            var thinkingBudget = level switch
+            var thinkingBudget = effort.Value switch
             {
                 "minimal" or "low" => Gemini25LowThinkingBudget,
                 "medium" => Gemini25MediumThinkingBudget,

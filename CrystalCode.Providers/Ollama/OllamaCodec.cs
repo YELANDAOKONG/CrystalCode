@@ -321,7 +321,7 @@ internal sealed class OllamaCodec : IProtocolCodec
         }
         else if (reasoning.Effort is { } effort)
         {
-            root["think"] = effort == ReasoningEffort.Maximum ? "high" : effort.Value;
+            root["think"] = effort.Value;
         }
         else if (reasoning.Mode == ReasoningMode.Enabled)
         {

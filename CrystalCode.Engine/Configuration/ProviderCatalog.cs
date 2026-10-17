@@ -35,17 +35,17 @@ public sealed class ProviderCatalog
                 ["deepseek-flash"] = new(
                     1_000_000,
                     thinking: true,
-                    thinkingEfforts: ["low", "high", "maximum"],
+                    thinkingEfforts: ["low", "high", "max"],
                     imageInput: true),
                 ["deepseek-v4-flash"] = new(
                     1_000_000,
                     thinking: true,
-                    thinkingEfforts: ["low", "high", "maximum"],
+                    thinkingEfforts: ["low", "high", "max"],
                     imageInput: true),
                 ["deepseek-v4-pro"] = new(
                     1_000_000,
                     thinking: true,
-                    thinkingEfforts: ["low", "high", "maximum"])
+                    thinkingEfforts: ["low", "high", "max"])
             }),
         new ProviderDefinition(
             ProviderName.OpenAI,

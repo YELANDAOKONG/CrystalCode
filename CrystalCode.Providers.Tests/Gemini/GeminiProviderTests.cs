@@ -339,7 +339,7 @@ public sealed class GeminiProviderTests
     public async Task CompleteAsync_ForwardsGemini3EffortAsThinkingLevel()
     {
         var maximum = await SendEffort(ReasoningEffort.Maximum);
-        Assert.Contains("\"thinkingLevel\":\"HIGH\"", maximum, StringComparison.Ordinal);
+        Assert.Contains("\"thinkingLevel\":\"MAXIMUM\"", maximum, StringComparison.Ordinal);
 
         var custom = await SendEffort(new ReasoningEffort("xhigh"));
         Assert.Contains("\"thinkingLevel\":\"XHIGH\"", custom, StringComparison.Ordinal);
@@ -394,6 +394,12 @@ public sealed class GeminiProviderTests
                 [new ChatMessage(ChatRole.User, "hi")],
                 reasoning: new ReasoningOptions(ReasoningMode.Enabled, new ReasoningEffort("xhigh")))));
         Assert.Contains("xhigh", rejected.Message, StringComparison.Ordinal);
+
+        var maximum = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "hi")],
+                reasoning: new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.Maximum))));
+        Assert.Contains("maximum", maximum.Message, StringComparison.Ordinal);
     }
 
     [Fact]

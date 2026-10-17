@@ -75,7 +75,8 @@ The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output,
 editing provider definitions in the TUI, automatically fetching
-model-list information from a provider.
+model-list information from a provider. Service tier and request speed
+are not supported.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.
@@ -471,7 +472,7 @@ Top-level fields:
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
 | `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists). Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, and gear unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
 | `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
-| `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), a portable name (`minimal`, `low`, `medium`, `high`, `maximum`; `max` is stored as `maximum`), or another effort token. Tokens are stored in lowercase |
+| `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or an effort token the model lists. `max` and `maximum` are different tokens. Tokens are stored in lowercase and sent unchanged |
 | `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
 | `skills` | Enable the `skill` tool and available-skill guidance (default `true`) |
 | `ruleFiles` | OpenCode-compatible rule files. `global` and `project` each default to `true` and are omitted until off. Does not affect `instructions.md` or `.crystal.md` |
@@ -517,7 +518,7 @@ Starter catalog (merged with `providers.json`):
 | `ollama` | `ollama` | `http://localhost:11434/` | `qwen3:8b` (pull this model before selecting it) |
 
 Built-in DeepSeek V4 models enable thinking with efforts `low`,
-`high`, and `maximum`. Each has a 1,000,000-token context window.
+`high`, and `max`. Each has a 1,000,000-token context window.
 Starter OpenAI models use a 400,000-token window and do not enable
 thinking unless you add it.
 The Ollama starter assumes a 4,096-token local context. If the local model
@@ -573,7 +574,7 @@ are not supported by the current adapter.
 | `topP` | Optional, 0 to 1 |
 | `maxTokens` | Optional positive output-token cap |
 | `thinking` | Whether the model accepts reasoning hints |
-| `thinkingEfforts` | Portable names `minimal`, `low`, `medium`, `high`, and `maximum` (`max` is stored as `maximum`), or another effort token this endpoint accepts. A token starts with a letter and then uses only letters, digits, and hyphens |
+| `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 | `audioInput` | Declared audio input (default `false`). Stored and visible to plugins. The host does not accept or send audio |
@@ -583,6 +584,7 @@ are not supported by the current adapter.
 them and shows them to plugins. It does not attach, paste, persist, or send
 audio or video, and those flags do not register multimodal tools.
 `imageInput` is still the only flag that allows image input.
+Service tier and request speed are not supported.
 
 Gemini and Ollama native adapters accept inline images in user messages.
 Tool images are sent on Gemini `functionResponse` parts and on the Ollama
@@ -594,11 +596,13 @@ models never fails: if the model does not support thinking, requests
 omit reasoning hints; if the stored gear is not in that model's list,
 the request uses the provider default and the stored choice is
 unchanged. The host stores a listed token in lowercase and forwards
-that text. Adapters send the portable names as themselves, except
-`maximum`: `max` on Anthropic and DeepSeek, `xhigh` on Responses and
-OpenAI, and `high` on Ollama and Gemini 3 (sent as `HIGH`). Gemini 3
-uppercases any other token. Gemini 2.5 maps the portable names to
-thinking budgets and rejects any other token.
+that text. Adapters send the token unchanged. `max` and `maximum` are
+different tokens. `openai` and `responses` are also used for
+third-party gateways such as OpenRouter, so a catalog value is not
+renamed to `xhigh`. List `xhigh`, `max`, or `maximum` only when that
+endpoint accepts that spelling. Gemini 3 uppercases the token as
+`thinkingLevel`. Gemini 2.5 maps `minimal`, `low`, `medium`, and
+`high` to thinking budgets and rejects any other token.
 Anthropic requests summarized thinking text when thinking is on, unless
 that endpoint sets `options.thinkingDisplay` to `omitted`.
 An empty `thinkingEfforts` list is on/off only. When
@@ -669,10 +673,9 @@ Anthropic entry, so Claude models are reached by adding one to
 editing `providers.json`, then select the model with
 `/model anthropic claude-sonnet-4`, or set `provider` and `model` in
 `config.json`. The same entry reaches any Anthropic Messages gateway:
-change `baseUri` and the model id to match it. List an endpoint token
-such as `xhigh` in `thinkingEfforts` when that model accepts it. The
-adapter sends `maximum` as `max` and any other token unchanged, and it
-asks for summarized thinking text whenever thinking is on. Set
+change `baseUri` and the model id to match it. List the endpoint token
+in `thinkingEfforts`, such as `max` or `xhigh`. The adapter sends that
+token unchanged, and it asks for summarized thinking text whenever thinking is on. Set
 `options.thinkingDisplay` to `omitted` on this endpoint to leave the
 Anthropic `display` field off. `summarized` is the default and is not
 written back. The name is valid only for the `anthropic` protocol. Omit
@@ -720,7 +723,8 @@ endpoints belongs in `credentials.json` under `opencode-zen`.
 ```
 
 Add a `protocol: "openai"` object to the same array for Chat Completions
-models. Each model id must be unique within a provider.
+models. Each model id must be unique within a provider. Listed efforts
+are sent as written. `maximum` is not rewritten to `xhigh` or `max`.
 
 ## Interactive session
 
@@ -1016,9 +1020,8 @@ may deny those calls or escalate them to you. Writes under `.ssh`,
 ## Thinking
 
 `/thinking` (alias `/think`) cycles the host gear, or sets one by
-name: `off`, `none`, `default`, the portable names `minimal`, `low`,
-`medium`, `high`, and `maximum` (`max` is the same as `maximum`), or
-another effort token the selected model lists. Tab completes the
+name: `off`, `none`, `default`, or an effort token the selected model
+lists. `max` and `maximum` are different tokens. Tab completes the
 argument from those efforts. The choice is written to `config.json`.
 
 The approval model has its own gear. `/approval thinking` cycles it, or

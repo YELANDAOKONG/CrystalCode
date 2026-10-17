@@ -36,7 +36,6 @@ public sealed class DeepSeekProvider : IStreamingChatClient, IDisposable
             reasoningStateFormat: ReasoningStateFormat,
             writeReasoningContent: true,
             writeThinkingObject: true,
-            maximumEffortValue: "max",
             tokenLimit: CompatibleTokenLimit.MaxTokens,
             faults: new CompatibleFaults(
                 typeof(DeepSeekException),

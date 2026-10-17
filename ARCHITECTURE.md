@@ -1384,19 +1384,18 @@ For a mixed-protocol gateway, `providers.openrouter` may instead be an array:
 ```
 
 `thinking` and `thinkingEfforts` declare whether the model supports
-thinking and which effort names it accepts. The portable Crystal names
-are `minimal`, `low`, `medium`, `high`, and `maximum`. `max` is stored
-as `maximum`. A model may also list another effort token. That token
-starts with a letter and then uses only letters, digits, and hyphens.
-The host stores every token in lowercase and does not interpret it.
-`max` remains an alias of `maximum`, not a separate token, so a
-case-sensitive wire value cannot be spelled here. An empty `thinkingEfforts`
-list is on/off only. Built-in
-DeepSeek V4 models enable thinking with `low`, `high`, and `maximum`. `thinkingCanDisable` defaults to true. Set it to
+thinking and which effort tokens it accepts. A token starts with a
+letter and then uses only letters, digits, and hyphens. The host
+stores every token in lowercase and does not interpret it. `max` and
+`maximum` are different tokens. A case-sensitive wire value cannot be
+spelled here. An empty `thinkingEfforts` list is on/off only. Built-in
+DeepSeek V4 models enable thinking with `low`, `high`, and `max`. `thinkingCanDisable` defaults to true. Set it to
 false when the model rejects a request to turn thinking off. Built-in
 Gemini 3 models do. `/thinking` then omits Off. A stored Off gear falls
 back to the provider default and the status bar shows `Think Default`.
 An explicit `/thinking off` is refused.
+
+Service tier and request speed are not supported.
 
 `contextWindow` remains the model's maximum context size. An optional
 `contextWindows` array declares selectable local context budgets, for example
@@ -1430,25 +1429,27 @@ and do not guarantee a billing threshold against token estimation errors or
 large tool results.
 
 `thinkingEffort` is the operator choice: `default`, `off` (`none` is
-the same), a portable Crystal name, or another effort token. It is not stored on the model. `/thinking` (alias
+the same), or an effort token listed for that model. It is not stored on the model. `/thinking` (alias
 `/think`) cycles the gear or sets one by name. `/model` never
 fails because of thinking: if the model does not support thinking, requests omit reasoning
 hints; if the stored gear is not in that model's list, the request
 uses the provider default and the stored choice is unchanged.
 `crystal run` prints that fallback on its error stream and continues.
 
-Each adapter forwards an effort token unchanged. It rewrites only the
-portable name `maximum`, whose wire spelling differs:
+Each adapter forwards an effort token unchanged. `openai` and
+`responses` are also the Chat Completions and Responses paths for
+third-party gateways, so they do not rename `maximum` to `xhigh`.
+List the spelling that endpoint accepts.
 
-| Protocol | `maximum` | Any other effort |
-| :--- | :--- | :--- |
-| `anthropic` | `max` | unchanged. Adaptive or budgeted thinking also sets `display` to `summarized`, unless the endpoint sets `options.thinkingDisplay` to `omitted` |
-| `responses` | `xhigh` | unchanged |
-| `openai` | `xhigh` | unchanged |
-| `deepseek` | `max` | unchanged |
-| `ollama` | `high` | unchanged |
-| Gemini 3 | `HIGH` | uppercased `thinkingLevel`. There is no maximum level |
-| Gemini 2.5 | the high thinking budget | portable `minimal`, `low`, `medium`, and `high` map to fixed budgets. Any other token is rejected because the field is an integer |
+| Protocol | Effort token |
+| :--- | :--- |
+| `anthropic` | unchanged. Adaptive or budgeted thinking also sets `display` to `summarized`, unless the endpoint sets `options.thinkingDisplay` to `omitted` |
+| `responses` | unchanged |
+| `openai` | unchanged |
+| `deepseek` | unchanged |
+| `ollama` | unchanged |
+| Gemini 3 | uppercased `thinkingLevel` |
+| Gemini 2.5 | `minimal`, `low`, `medium`, and `high` map to fixed budgets. Any other token, including `maximum`, is rejected because the field is an integer |
 
 `skills` enables the `skill` tool and available-skill guidance
 (default `true`). Set it to `false` to disable skill discovery.

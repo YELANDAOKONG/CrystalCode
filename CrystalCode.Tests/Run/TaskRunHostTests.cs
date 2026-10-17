@@ -597,7 +597,7 @@ public sealed class TaskRunHostTests
         Assert.Null(applied.BashTimeoutSeconds);
         Assert.False(applied.Skills);
         Assert.False(applied.ExternalTools);
-        Assert.Equal("maximum", applied.ThinkingEffort.Value);
+        Assert.Equal("max", applied.ThinkingEffort.Value);
         Assert.Equal(ApprovalMode.Audit, applied.Approval);
         Assert.Equal("concise", applied.PromptSetOverride);
         Assert.Equal(HarnessSettings.DefaultPromptSet, applied.PromptSet);

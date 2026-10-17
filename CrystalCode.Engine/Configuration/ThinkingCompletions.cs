@@ -26,10 +26,7 @@ public static class ThinkingCompletions
 
         foreach (var effort in model.ThinkingEfforts)
         {
-            var keys = effort == "maximum"
-                ? new[] { "maximum", "max" }
-                : new[] { effort };
-            options.Add(new(effort, ThinkingLabel.For(new ThinkingSelection(effort)), keys));
+            options.Add(new(effort, ThinkingLabel.For(new ThinkingSelection(effort)), [effort]));
         }
 
         return options;

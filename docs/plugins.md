@@ -230,9 +230,9 @@ maximum tokens, temperature, top-p, image input, declared audio input,
 declared video input, and the current thinking gear. Audio and video
 flags copy the model entry. They do not make a turn, a tool result, or
 `CreateMultimodal` accept audio or video.
-`default` and `off` are host sentinels. Other values are the
-portable names `minimal`, `low`, `medium`, `high`, and `maximum`, or
-another effort token. Tokens are stored in lowercase.
+`default` and `off` are host sentinels. Other values are effort
+tokens the model lists. Tokens are stored in lowercase and forwarded
+unchanged. `max` and `maximum` are different tokens.
 
 `Review.Independent` is true only when review uses its own model. That
 model's thinking gear is its stored `thinkingEffort`, `default` when

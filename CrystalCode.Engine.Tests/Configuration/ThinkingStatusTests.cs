@@ -33,10 +33,14 @@ public sealed class ThinkingStatusTests
     [Fact]
     public void For_ShowsEffortWhenThinkingIsOn()
     {
-        var model = new ModelSettings(1000, thinking: true, thinkingEfforts: ["low", "high", "maximum"]);
+        var model = new ModelSettings(
+            1000,
+            thinking: true,
+            thinkingEfforts: ["low", "high", "maximum", "max"]);
 
         Assert.Equal("Think High", ThinkingStatus.For(model, ThinkingSelection.Parse("high")));
-        Assert.Equal("Think Maximum", ThinkingStatus.For(model, ThinkingSelection.Parse("max")));
+        Assert.Equal("Think Maximum", ThinkingStatus.For(model, ThinkingSelection.Parse("maximum")));
+        Assert.Equal("Think Max", ThinkingStatus.For(model, ThinkingSelection.Parse("max")));
     }
 
     [Fact]

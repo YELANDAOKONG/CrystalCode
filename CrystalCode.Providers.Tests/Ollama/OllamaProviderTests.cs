@@ -284,10 +284,10 @@ public sealed class OllamaProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_MapsMaximumToHighAndForwardsOtherEfforts()
+    public async Task CompleteAsync_ForwardsMaximumAndOtherEfforts()
     {
         var maximum = await SendEffort(ReasoningEffort.Maximum);
-        Assert.Contains("\"think\":\"high\"", maximum, StringComparison.Ordinal);
+        Assert.Contains("\"think\":\"maximum\"", maximum, StringComparison.Ordinal);
 
         var custom = await SendEffort(new ReasoningEffort("xhigh"));
         Assert.Contains("\"think\":\"xhigh\"", custom, StringComparison.Ordinal);

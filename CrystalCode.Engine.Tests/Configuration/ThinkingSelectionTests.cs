@@ -54,9 +54,10 @@ public sealed class ThinkingSelectionTests
     }
 
     [Fact]
-    public void Parse_TreatsMaxAsMaximum()
+    public void Parse_KeepsMaxDistinctFromMaximum()
     {
-        Assert.Equal(new ThinkingSelection("maximum"), ThinkingSelection.Parse("max"));
+        Assert.Equal(new ThinkingSelection("max"), ThinkingSelection.Parse("max"));
+        Assert.Equal(new ThinkingSelection("maximum"), ThinkingSelection.Parse("maximum"));
     }
 
     [Fact]
