@@ -1,9 +1,10 @@
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Interfaces;
 
 using Xunit;
 
-namespace CrystalCode.Engine.Tests.Home;
+namespace CrystalCode.Engine.Tests.Home.Interfaces;
 
 public sealed class ISettingsStoreTests
 {

@@ -2,6 +2,7 @@ using CrystalCode.Display.Composer;
 using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Interfaces;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;

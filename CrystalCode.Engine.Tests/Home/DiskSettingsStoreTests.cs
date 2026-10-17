@@ -4,7 +4,6 @@ using Crystal.Reasoning;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
-using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -46,7 +45,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsJsoncProvidersFile()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         const string jsonc = """
             {
@@ -101,7 +100,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsRepeatedProviderKeyInJsoncProvidersFile()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ProvidersPath,
@@ -130,7 +129,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsCommentsInConfigFile()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -344,7 +343,7 @@ public sealed class DiskSettingsStoreTests
     public void LoadOrCreate_UsesStarterCatalogWithoutWritingProviderDefinitions()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
 
         var settings = store.LoadOrCreate();
 
@@ -380,7 +379,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsConfiguredRetryPolicies()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, """
             {
@@ -415,7 +414,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsCustomRetryPolicyAndOmitsTheDefault()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithRetry(new RetrySettings(maximumRetries: 1));
         store.Save(settings.WithVerboseTools(false));
 
@@ -434,7 +433,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsInvalidRetryPolicy()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, """{ "retry": { "maximumRetries": -1 } }""");
 
@@ -445,7 +444,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ExecutionBudgetSupportsPartialOverridesAndUnlimitedDimensions()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, """
             {
@@ -476,7 +475,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ExecutionBudgetUnlimitedRoundTrips()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, """
             { "executionBudget": "unlimited" }
@@ -499,7 +498,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsInvalidExecutionBudget(string budget)
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, "{ \"executionBudget\": " + budget + " }");
 
@@ -513,7 +512,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_BashTimeoutUnlimitedRoundTrips(string value)
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -534,7 +533,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_BashTimeoutCustomSecondsRoundTrips()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, "{ \"bashTimeoutSeconds\": 30 }");
 
@@ -554,7 +553,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsInvalidBashTimeout(string value)
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -569,7 +568,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_BackgroundBashTimeoutUnlimitedRoundTrips(string value)
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -590,7 +589,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_BackgroundBashTimeoutCustomSecondsRoundTrips()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, "{ \"backgroundBashTimeoutSeconds\": 1800 }");
 
@@ -606,7 +605,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_KeepsBashAndBackgroundBashTimeoutsIndependent()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -627,7 +626,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsInvalidBackgroundBashTimeout(string value)
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -640,7 +639,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_PrefersProvidersFileOverLegacyDefinitions()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         root.Home.EnsureCreated();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -681,7 +680,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_CopiesLegacyProvidersAndPreservesOriginalDefinitions()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         root.Home.EnsureCreated();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -720,7 +719,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_DoesNotRewriteExistingProvidersFile()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate();
         const string providers = """
             {
@@ -743,7 +742,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_OverlaysCompatibleProviderAndModelParameters()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -786,7 +785,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_GroupsProtocolsUnderOneProviderAndRoundTrips()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -839,7 +838,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsDuplicateModelAcrossProtocols()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -871,7 +870,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsRepeatedProviderKeyInsteadOfDroppingAnEndpoint()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -900,7 +899,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsRepeatedModelKeyInOneEndpoint()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -927,7 +926,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsHostThinkingEffortAndModelCapability()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -964,7 +963,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsSkillsDisabled()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -987,7 +986,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsExternalToolsDisabled()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1013,7 +1012,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_OmitsWorkspaceTrustWhenEnabled()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
 
         var settings = store.LoadOrCreate();
 
@@ -1028,7 +1027,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsWorkspaceTrustDisabled()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1054,7 +1053,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_OmitsRuleFilesWhenBothAreOn()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
 
         var settings = store.LoadOrCreate();
 
@@ -1070,7 +1069,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsProjectRuleFilesDisabledAndOmitsTheOnSide()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1096,7 +1095,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsPluginsDisabled()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1122,7 +1121,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RoundTripsExternalToolApprovalPolicies()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1151,7 +1150,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsEstimatedTokensEnabled()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1177,7 +1176,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsVerboseDisplayFlags()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1223,7 +1222,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_VerboseReviewStaysOnWhenApprovalsAreOff()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1245,7 +1244,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_VerboseResultsStaysOnWhenTheFieldIsAbsent()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1269,7 +1268,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsShowCompactionSummary()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1301,7 +1300,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsShowAutomaticCompactionSummary()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1333,7 +1332,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_ReadsMicroCompactionAndOmitsTheDefault()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         Assert.DoesNotContain(
             "microCompaction",
@@ -1375,7 +1374,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsInvalidMicroCompaction()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(
             root.Home.ConfigPath,
@@ -1396,7 +1395,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_WritesProviderAndModelSelection()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithSelection(
             new ProviderName("openai"),
             "gpt-5.6-sol");
@@ -1421,7 +1420,7 @@ public sealed class DiskSettingsStoreTests
               "promptAttachments": [ "beta", "alpha" ]
             }
             """);
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var loaded = store.Load();
 
         Assert.Equal(HarnessSettings.DefaultPromptSet, loaded.PromptSet);
@@ -1449,7 +1448,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_OmitsDisabledBuiltInTools()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithDisabledBuiltInTools(["describe_image", "bash"]);
 
         store.Save(settings);
@@ -1465,7 +1464,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsExportDirectory()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithExportDirectory("workspace");
 
         store.Save(settings);
@@ -1478,7 +1477,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsHomeExportDirectory()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithExportDirectory("home");
 
         store.Save(settings);
@@ -1491,7 +1490,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_ClearsExportDirectoryWhenUnset()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.Save(store.LoadOrCreate().WithExportDirectory("workspace"));
         store.Save(store.Load().WithExportDirectory(null));
 
@@ -1508,7 +1507,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsCustomStatusLine()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithStatusLine(
             new StatusLineSettings(true, ["context-left", "session-total"]));
 
@@ -1523,7 +1522,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsAnUnloadedPluginStatusField()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithStatusLine(
             new StatusLineSettings(true, ["model", "branch"]));
 
@@ -1537,7 +1536,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsAnEnabledApprovalModel()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithApprovalModel(
             new ApprovalModelSettings(true, "openai", "gpt-5.6-sol"));
 
@@ -1555,7 +1554,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsAndOmitsTheApprovalThinkingGear()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithApprovalModel(
             new ApprovalModelSettings(
                 true,
@@ -1587,7 +1586,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_KeepsADisabledApprovalModelWithoutEnablingIt()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithApprovalModel(
             new ApprovalModelSettings(false, "openai", "not-a-model"));
 
@@ -1607,7 +1606,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_OmitsAnUnsetApprovalModel()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
 
         store.Save(HarnessSettings.CreateDefault());
         var loaded = store.Load();
@@ -1628,7 +1627,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsACompactionModelAndOmitsTheDefaultGear()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithCompactionModel(
             new CompactionModelSettings(true, "openai", "gpt-5.6-sol"));
 
@@ -1661,7 +1660,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsAnEnabledApprovalModelThatIsIncompleteOrUnknown()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
 
         File.WriteAllText(
@@ -1687,7 +1686,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_RoundTripsImageModelAndOmitsTheDefaultThinkingGear()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithImageModel(
             new ImageModelSettings(
                 "openai",
@@ -1718,7 +1717,7 @@ public sealed class DiskSettingsStoreTests
     public void Save_OmitsAnUnsetImageModel()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
 
         store.Save(HarnessSettings.CreateDefault());
         var loaded = store.Load();
@@ -1734,7 +1733,7 @@ public sealed class DiskSettingsStoreTests
     public void Load_RejectsAnImageModelThatIsIncompleteUnknownOrTextOnly()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
 
         File.WriteAllText(

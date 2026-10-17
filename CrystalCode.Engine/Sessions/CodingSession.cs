@@ -12,6 +12,7 @@ using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Interfaces;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;

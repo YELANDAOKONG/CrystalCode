@@ -5,7 +5,6 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
-using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;

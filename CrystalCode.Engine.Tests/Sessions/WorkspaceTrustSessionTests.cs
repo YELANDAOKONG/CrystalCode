@@ -3,7 +3,6 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Tests.Approvals;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
-using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Home;

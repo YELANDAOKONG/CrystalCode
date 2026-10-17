@@ -8,7 +8,6 @@ using CrystalCode.Commands;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
-using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
@@ -1251,7 +1250,7 @@ public sealed class TaskRunHostTests
             _home = Directory.CreateTempSubdirectory("crystal-run-home-").FullName;
             Workspace = Directory.CreateTempSubdirectory("crystal-run-workspace-").FullName;
             var crystalHome = new CrystalHome(_home);
-            new SettingsStore(crystalHome).LoadOrCreate();
+            new DiskSettingsStore(crystalHome).LoadOrCreate();
             new WorkspaceTrustStore(crystalHome).Remember(Workspace);
             _configBefore = File.ReadAllBytes(Path.Combine(_home, "config.json"));
         }
@@ -1302,7 +1301,7 @@ public sealed class TaskRunHostTests
             return (code, output.ToString(), error.ToString());
         }
 
-        public HarnessSettings Reload() => new SettingsStore(new CrystalHome(_home)).Load();
+        public HarnessSettings Reload() => new DiskSettingsStore(new CrystalHome(_home)).Load();
 
         public void AssertSettingsUnchanged()
         {

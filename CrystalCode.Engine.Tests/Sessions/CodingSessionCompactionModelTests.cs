@@ -9,7 +9,6 @@ using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
-using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;

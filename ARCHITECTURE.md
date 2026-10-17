@@ -196,7 +196,8 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | :--- | :--- |
 | `Configuration` | Loaded options, defaults, thinking and mode labels, display-case helpers |
 | `Events` | Immutable session events, observer interface, chrome and preference snapshots |
-| `Home` | `~/.crystal` paths and file I/O; `ISettingsStore` defines configuration persistence, and `DiskSettingsStore` is the default `config.json` and `providers.json` implementation |
+| `Home` | `~/.crystal` paths and file I/O; `DiskSettingsStore` is the default `config.json` and `providers.json` implementation |
+| `Home/Interfaces` | Configuration persistence contracts such as `ISettingsStore` |
 | `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
 | `Approvals` | Risk, authority, grants, policy, review transcript |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
