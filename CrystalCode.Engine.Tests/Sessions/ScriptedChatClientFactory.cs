@@ -15,8 +15,14 @@ internal sealed class ScriptedChatClientFactory : IChatClientFactory
         _client = client;
     }
 
+    public int Creates { get; private set; }
+
     public bool CanCreate(ProviderProtocol protocol) =>
         protocol == ScriptedChatPlugin.Protocol;
 
-    public IStreamingChatClient Create(HarnessSettings settings, string apiKey) => _client;
+    public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
+    {
+        Creates++;
+        return _client;
+    }
 }

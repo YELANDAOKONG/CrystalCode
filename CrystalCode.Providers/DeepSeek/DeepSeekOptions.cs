@@ -1,4 +1,5 @@
 using CrystalCode.Providers.Compatible;
+using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.DeepSeek;
 
@@ -83,6 +84,7 @@ public sealed record DeepSeekOptions
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
+        ProcessingSlots.RequireAbsent(ServiceTier, Speed, "DeepSeek");
     }
 
     /// <inheritdoc />

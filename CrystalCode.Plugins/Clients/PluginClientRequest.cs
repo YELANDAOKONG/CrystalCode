@@ -22,7 +22,9 @@ public sealed record PluginClientRequest
         bool imageInput,
         bool requiresApiKey,
         bool audioInput = false,
-        bool videoInput = false)
+        bool videoInput = false,
+        string? serviceTier = null,
+        string? speed = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -50,6 +52,8 @@ public sealed record PluginClientRequest
         AudioInput = audioInput;
         VideoInput = videoInput;
         RequiresApiKey = requiresApiKey;
+        ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
+        Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
 
     public string Protocol { get; }
@@ -91,6 +95,18 @@ public sealed record PluginClientRequest
     public bool VideoInput { get; }
 
     public bool RequiresApiKey { get; }
+
+    /// <summary>
+    /// Selected service-tier token, or null when the slot is unset.
+    /// A factory that cannot send a non-null slot must throw.
+    /// </summary>
+    public string? ServiceTier { get; }
+
+    /// <summary>
+    /// Selected speed token, or null when the slot is unset.
+    /// A factory that cannot send a non-null slot must throw.
+    /// </summary>
+    public string? Speed { get; }
 
     public override string ToString() => nameof(PluginClientRequest);
 }

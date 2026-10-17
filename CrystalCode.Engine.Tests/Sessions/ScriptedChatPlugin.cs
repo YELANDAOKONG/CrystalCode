@@ -17,16 +17,18 @@ internal sealed class ScriptedChatPlugin : IPlugin
     /// </summary>
     public static ProviderProtocol Protocol { get; } = ProviderProtocol.Ollama;
 
-    private readonly IStreamingChatClient _client;
+    private readonly ScriptedChatClientFactory _factory;
 
     public ScriptedChatPlugin(IStreamingChatClient client)
     {
         ArgumentNullException.ThrowIfNull(client);
-        _client = client;
+        _factory = new ScriptedChatClientFactory(client);
     }
+
+    public int Creates => _factory.Creates;
 
     public string Name => "scripted";
 
     public PluginContribution Contribute() =>
-        new(clients: [new ScriptedChatClientFactory(_client)]);
+        new(clients: [_factory]);
 }

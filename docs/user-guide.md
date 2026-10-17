@@ -594,9 +594,11 @@ audio or video, and those flags do not register multimodal tools.
 Service tier and speed are sent only when the active model lists the
 selected token. The host does not choose the JSON field and does not
 compare the response with the request. Chat Completions and OpenAI
-Responses write one set slot to `service_tier` and reject both. Anthropic
-Messages writes `service_tier` and `speed` separately. DeepSeek, Gemini,
-and Ollama reject either slot. The endpoint address is not used to decide.
+Responses write one set slot to `service_tier` and reject both when the
+client is created, before the choice is saved. Anthropic Messages writes
+`service_tier` and `speed` separately. DeepSeek, Gemini, and Ollama reject
+either slot when the client is created. A saved combination the protocol
+cannot send fails at startup. The endpoint address is not used to decide.
 
 Gemini and Ollama native adapters accept inline images in user messages.
 Tool images are sent on Gemini `functionResponse` parts and on the Ollama
@@ -771,7 +773,8 @@ optional progress row, status bar, and a multiline composer. Redirected
 output stays sequential.
 
 The status bar shows approval, thinking (when the selected model
-supports it), selected context budget (`Context 272K`), model, workspace,
+supports it), `Tier <token>` and `Speed <token>` when those slots are
+set, selected context budget (`Context 272K`), model, workspace,
 context percent (`CTX`), token counts
 (`IN` / `OUT`), a Title Case total when the bar has room, tool count,
 and elapsed time. Named chrome labels are
@@ -1182,7 +1185,7 @@ It is not provider-billed usage. The choice is written to `config.json`.
 
 `/statusline` does not replace `/status`. The status line is a configurable
 live summary, while `/status` remains a stable diagnostic report. Supported
-custom fields are `approval`, `thinking`, `context-window`, `prompt-set`, `activity`, `model`,
+custom fields are `approval`, `thinking`, `tier`, `speed`, `context-window`, `prompt-set`, `activity`, `model`,
 `workspace`, `context-used`, `context-left`, `context-tokens`,
 `request-input`, `request-output`, `request-total`, `session-input`,
 `session-output`, `session-total`, `tools`, `elapsed`, and `queued`.

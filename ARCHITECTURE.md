@@ -1406,10 +1406,12 @@ select a listed token. Each choice is stored per model in
 or compaction. An empty list means that slot is not offered.
 
 Chat Completions writes whichever one slot is set to `service_tier` and
-rejects a request that sets both, because that protocol has one field.
-OpenAI Responses does the same. Anthropic Messages writes the service tier
-to `service_tier` and the speed to `speed`. DeepSeek, Gemini, and Ollama
-reject a request that sets either slot. The host does not read the
+rejects both when the client is created, because that protocol has one
+field. The choice is not saved. OpenAI Responses does the same. Anthropic
+Messages writes the service tier to `service_tier` and the speed to
+`speed`. DeepSeek, Gemini, and Ollama reject either slot when the client
+is created. A saved combination the protocol cannot send fails at startup.
+The host does not read the
 response back to see which value was applied, and it does not infer a
 vendor from the endpoint address.
 
@@ -1591,7 +1593,7 @@ assembly. It reads one task from an argument or from stdin, applies
 process-only overrides, starts one user turn, and exits. The interactive
 `crystal` and `crystal space` commands apply the same session overrides:
 approval, the approval model and its thinking gear, Plan or Work, thinking,
-the selected model's context budget, prompt set, prompt attachments, skills,
+the selected model's context budget, service tier, speed, prompt set, prompt attachments, skills,
 external tools, plugins, and turn quotas. Overrides are not written to
 `config.json`. That includes the
 approval-model switch
@@ -1733,7 +1735,8 @@ same value and is included in its default field list.
 
 The status bar shows approval, thinking (when the selected model
 supports it: `Think Off`, or `Think` plus the resolved gear when
-thinking is on), the non-default prompt set as `Prompt <name>`, model,
+thinking is on), `Tier <token>` and `Speed <token>` when those slots
+are set, the non-default prompt set as `Prompt <name>`, model,
 workspace, the latest request's context percent (`CTX`), cumulative
 token counts (`IN` / `OUT`), and, when the bar has room, a cumulative
 Title Case total (`783k Total`). During a turn the status bar updates `CTX`, `IN`, and `OUT` after each
@@ -1968,7 +1971,8 @@ plugins or tools. The host then calls `IPlugin.AttachSession` with a live
 view of the session model and the review model. Each read returns the
 current provider, protocol, model name, context window, maximum tokens,
 temperature, top-p, image input, declared audio input, declared video
-input, and thinking gear. The plugin model's `ContextWindow` describes the
+input, thinking gear, and the selected service tier and speed when set.
+The plugin model's `ContextWindow` describes the
 configured maximum model capability, not the selected local session budget.
 `/context` does not change that capability value; chrome and usage events
 carry the selected budget used by compaction and `/status`.

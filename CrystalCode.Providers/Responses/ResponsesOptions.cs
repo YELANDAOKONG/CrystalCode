@@ -57,6 +57,7 @@ public sealed record ResponsesOptions
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
+        ProcessingSlots.RequireSharedOrEmpty(ServiceTier, Speed, VendorName);
     }
 
     public string ApiKey { get; }

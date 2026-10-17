@@ -102,12 +102,20 @@ internal sealed class PluginClientView : IPluginClients
         }
     }
 
-    public void ReleaseSession()
+    public void ReleaseSession(object? keepChat = null, object? keepImages = null)
     {
         lock (_gate)
         {
-            DisposeClient(_session);
-            DisposeClient(_images);
+            if (!ReferenceEquals(_session, keepChat))
+            {
+                DisposeClient(_session);
+            }
+
+            if (!ReferenceEquals(_images, keepImages))
+            {
+                DisposeClient(_images);
+            }
+
             _session = null;
             _images = null;
             _imagesReady = false;

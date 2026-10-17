@@ -64,6 +64,23 @@ public sealed class CodingSessionSlotTests
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Tier_RebuildsTheCompactionClientWhenItUsesTheSameModel()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
+        await headless.Session.StartAsync(CancellationToken.None);
+        var started = headless.ChatPlugin.Creates;
+
+        await headless.Session.SubmitAsync("/compact model model", CancellationToken.None);
+        var withCompaction = headless.ChatPlugin.Creates;
+        Assert.True(withCompaction > started);
+
+        await headless.Session.SubmitAsync("/tier flex", CancellationToken.None);
+
+        Assert.Equal(withCompaction + 2, headless.ChatPlugin.Creates);
+        Assert.Equal("Tier Flex", headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.ServiceTier);
+    }
+
     private static HarnessSettings Settings()
     {
         var provider = new ProviderName("scripted");

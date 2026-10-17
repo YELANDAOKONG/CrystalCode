@@ -96,6 +96,26 @@ public sealed class PluginModelFactsTests
         Assert.False(request.ImageInput);
         Assert.True(request.AudioInput);
         Assert.True(request.VideoInput);
+        Assert.Null(request.ServiceTier);
+        Assert.Null(request.Speed);
+
+        var listed = new ModelSettings(8192, serviceTiers: ["flex"], speeds: ["fast"]);
+        var listedProvider = new ProviderDefinition(
+            providerName,
+            ProviderProtocol.OpenAI,
+            new Uri("https://example.test/v1/"),
+            new Dictionary<string, ModelSettings> { ["heard"] = listed });
+        var listedSettings = new HarnessSettings(
+            providerName,
+            "heard",
+            ApprovalMode.Default,
+            HarnessSettings.DefaultCompactionThreshold,
+            new ProviderCatalog([listedProvider]))
+            .WithTier(providerName, "heard", "flex")
+            .WithSpeed(providerName, "heard", "fast");
+        var slotted = PluginClientRequests.From(listedSettings, "not-a-key");
+        Assert.Equal("flex", slotted.ServiceTier);
+        Assert.Equal("fast", slotted.Speed);
         Assert.False(PluginModel.Empty.AudioInput);
         Assert.False(PluginModel.Empty.VideoInput);
     }

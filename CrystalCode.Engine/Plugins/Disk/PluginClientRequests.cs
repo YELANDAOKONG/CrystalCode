@@ -27,6 +27,8 @@ internal static class PluginClientRequests
             model.ImageInput,
             provider.RequiresApiKey,
             model.AudioInput,
-            model.VideoInput);
+            model.VideoInput,
+            settings.ServiceTier,
+            settings.Speed);
     }
 }

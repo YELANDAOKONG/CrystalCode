@@ -22,9 +22,14 @@ public sealed record CatalogToken
 
     public string Value { get; }
 
-    public static bool TryNormalize(string value, out string token)
+    public static bool TryNormalize(string? value, out string token)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            token = string.Empty;
+            return false;
+        }
+
         var normalized = value.Trim().ToLowerInvariant();
         if (IsToken(normalized))
         {

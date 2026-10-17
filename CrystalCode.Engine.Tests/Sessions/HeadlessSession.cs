@@ -42,7 +42,8 @@ internal sealed class HeadlessSession : IDisposable
 
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());
-        plugins.Add(new ScriptedChatPlugin(client));
+        ChatPlugin = new ScriptedChatPlugin(client);
+        plugins.Add(ChatPlugin);
 
         if (resume is not null)
         {
@@ -103,6 +104,8 @@ internal sealed class HeadlessSession : IDisposable
     }
 
     public CodingSession Session { get; }
+
+    public ScriptedChatPlugin ChatPlugin { get; }
 
     public CrystalHome Home => _home.Home;
 

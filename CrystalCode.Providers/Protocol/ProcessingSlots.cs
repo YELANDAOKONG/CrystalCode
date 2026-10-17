@@ -8,6 +8,26 @@ namespace CrystalCode.Providers.Protocol;
 /// </summary>
 internal static class ProcessingSlots
 {
+    public static void RequireSharedOrEmpty(string? serviceTier, string? speed, string vendorName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
+        if (serviceTier is not null && speed is not null)
+        {
+            throw new NotSupportedException(
+                $"{vendorName} accepts only one of service tier and speed.");
+        }
+    }
+
+    public static void RequireAbsent(string? serviceTier, string? speed, string vendorName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
+        if (serviceTier is not null || speed is not null)
+        {
+            throw new NotSupportedException(
+                $"{vendorName} does not support service tier or speed.");
+        }
+    }
+
     public static void WriteShared(
         Utf8JsonWriter writer,
         string? serviceTier,

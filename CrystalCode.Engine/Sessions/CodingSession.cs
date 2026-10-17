@@ -1552,6 +1552,7 @@ public sealed class CodingSession : ITurnObserver
         SaveSettings(current => serviceTier
             ? current.WithTier(provider, modelName, selected)
             : current.WithSpeed(provider, modelName, selected));
+        RefreshSideClients(provider, modelName);
         RefreshSlashCommands();
         RefreshChrome();
         Note(
@@ -1605,6 +1606,62 @@ public sealed class CodingSession : ITurnObserver
         error = string.Empty;
         return true;
     }
+
+    private void RefreshSideClients(ProviderName provider, string model)
+    {
+        _clientView.ReleaseSession(_client, _multimodalClient);
+        if (UsesModel(_settings.ImageModel.Provider, _settings.ImageModel.Model, provider, model))
+        {
+            ReleaseImageDescriptionClient();
+        }
+
+        if (_settings.ApprovalModel.Enabled
+            && UsesModel(_settings.ApprovalModel.Provider, _settings.ApprovalModel.Model, provider, model))
+        {
+            ReleaseApprovalClient();
+            _clientView.ReleaseReview();
+        }
+
+        if (!_settings.CompactionModel.Enabled
+            || !UsesModel(_settings.CompactionModel.Provider, _settings.CompactionModel.Model, provider, model))
+        {
+            return;
+        }
+
+        if (!TryPrepareCompactionClient(_settings.CompactionModel, out var client, out _) || client is null)
+        {
+            ReleaseCompactionClient();
+            _compactor = CreateCompactor(_client);
+            return;
+        }
+
+        ReplaceCompactionClient(_settings.CompactionModel, client);
+    }
+
+    private void ReleaseImageDescriptionClient()
+    {
+        if (_imageDescriptionClient is null)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_imageDescriptionClient, _multimodalClient))
+        {
+            DisposeClient(_imageDescriptionClient);
+        }
+
+        _imageDescriptionClient = null;
+    }
+
+    private static bool UsesModel(
+        string? provider,
+        string? model,
+        ProviderName changedProvider,
+        string changedModel) =>
+        provider is not null
+        && model is not null
+        && string.Equals(provider, changedProvider.Value, StringComparison.Ordinal)
+        && string.Equals(model, changedModel, StringComparison.Ordinal);
 
     private void ChangeThinking(string argument)
     {
@@ -1851,7 +1908,7 @@ public sealed class CodingSession : ITurnObserver
         _settings = nextSettings;
         _persisted = _persisted.WithSelection(selection.Provider, selection.Model);
         _settingsStore.Save(_persisted);
-        _clientView.ReleaseSession();
+        _clientView.ReleaseSession(_client, _multimodalClient);
         if (!ReferenceEquals(previous, _approvalClient)
             && !ReferenceEquals(previous, _compactionClient))
         {
@@ -3371,6 +3428,7 @@ public sealed class CodingSession : ITurnObserver
         Note("Compacting context...");
         SetActivity(SessionActivity.Compacting);
         _compacting = true;
+        EnsureCompactionClient();
         CompactionOutcome outcome;
         var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _compactSource = compactSource;
@@ -4784,6 +4842,31 @@ public sealed class CodingSession : ITurnObserver
         _compactionClient = client;
         _compactionClientKey = CompactionClientKey(_settings.CompactionModel);
         _compactor = CreateCompactor(client, CompactionReasoning());
+    }
+
+    private void EnsureCompactionClient()
+    {
+        if (!_settings.CompactionModel.Enabled)
+        {
+            return;
+        }
+
+        var key = CompactionClientKey(_settings.CompactionModel);
+        if (_compactionClient is not null && _compactionClientKey == key)
+        {
+            return;
+        }
+
+        if (!TryPrepareCompactionClient(_settings.CompactionModel, out var client, out var error)
+            || client is null)
+        {
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(error)
+                    ? "The compaction model could not be created."
+                    : error);
+        }
+
+        ReplaceCompactionClient(_settings.CompactionModel, client);
     }
 
     private void ReleaseCompactionClient()

@@ -50,6 +50,7 @@ public sealed record GeminiOptions
         RequestTimeout = requestTimeout ?? TimeSpan.FromMinutes(10);
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
+        ProcessingSlots.RequireAbsent(ServiceTier, Speed, VendorName);
     }
 
     public string ApiKey { get; }

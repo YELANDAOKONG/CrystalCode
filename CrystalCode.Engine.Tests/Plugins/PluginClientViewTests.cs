@@ -89,6 +89,23 @@ public sealed class PluginClientViewTests
     }
 
     [Fact]
+    public void ReleaseSession_KeepsAClientTheHostStillUses()
+    {
+        var shared = new LaneClient();
+        var view = new PluginClientView(
+            () => false,
+            () => shared,
+            () => null,
+            () => throw new InvalidOperationException("Review is using the session model."));
+
+        Assert.Same(shared, view.Session);
+        view.ReleaseSession(shared);
+
+        Assert.False(shared.Disposed);
+        Assert.Same(shared, view.Session);
+    }
+
+    [Fact]
     public void Review_WhenTheSwitchTurnsOff_DropsTheReviewClient()
     {
         var independent = true;

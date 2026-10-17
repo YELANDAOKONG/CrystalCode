@@ -1,4 +1,5 @@
 using CrystalCode.Providers.Compatible;
+using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.OpenAI;
 
@@ -112,6 +113,7 @@ public sealed record OpenAIOptions
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
+        ProcessingSlots.RequireSharedOrEmpty(ServiceTier, Speed, VendorName);
     }
 
     /// <inheritdoc />

@@ -1,4 +1,7 @@
+using System.Text.Json;
+
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Home;
 
 using Xunit;
 
@@ -69,5 +72,15 @@ public sealed class CatalogSlotTests
         Assert.Null(stale.ServiceTier);
         Assert.Equal("fast", stale.Speed);
         Assert.Throws<ArgumentException>(() => settings.WithSpeed(provider, "narrow", "fast"));
+    }
+
+    [Fact]
+    public void ReadTokenSelections_NamesTheFieldWhenTheTokenIsBlank()
+    {
+        using var document = JsonDocument.Parse("""{"openai":{"model":""}}""");
+        var exception = Assert.Throws<JsonException>(
+            () => SettingsMapper.ReadTokenSelections(document.RootElement, "tierSelections"));
+        Assert.Contains("tierSelections", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Parameter", exception.Message, StringComparison.Ordinal);
     }
 }

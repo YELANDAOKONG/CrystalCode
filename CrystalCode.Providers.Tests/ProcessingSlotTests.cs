@@ -25,12 +25,8 @@ public sealed class ProcessingSlotTests
         var omitted = await SendOpenAI();
         Assert.DoesNotContain("service_tier", omitted, StringComparison.Ordinal);
 
-        var handler = new RecordingHandler(JsonResponse.Create(Done()));
-        using var http = new HttpClient(handler);
-        using var provider = new OpenAIProvider(
-            new OpenAIOptions("test-key", "gpt-test", serviceTier: "flex", speed: "fast"),
-            http);
-        var rejected = await Assert.ThrowsAsync<NotSupportedException>(() => provider.CompleteAsync(Request()));
+        var rejected = Assert.Throws<NotSupportedException>(
+            () => new OpenAIOptions("test-key", "gpt-test", serviceTier: "flex", speed: "fast"));
         Assert.Contains("only one of service tier and speed", rejected.Message, StringComparison.Ordinal);
     }
 
@@ -77,29 +73,18 @@ public sealed class ProcessingSlotTests
     [Theory]
     [InlineData("flex", null)]
     [InlineData(null, "fast")]
-    public async Task DeepSeek_RejectsASetSlot(string? serviceTier, string? speed)
+    public void DeepSeek_RejectsASetSlotWhenTheClientIsCreated(string? serviceTier, string? speed)
     {
-        var handler = new RecordingHandler(JsonResponse.Create(Done()));
-        using var http = new HttpClient(handler);
-        using var provider = new DeepSeekProvider(
-            new DeepSeekOptions("test-key", "deepseek-flash", serviceTier: serviceTier, speed: speed),
-            http);
-
-        var rejected = await Assert.ThrowsAsync<NotSupportedException>(() => provider.CompleteAsync(Request()));
+        var rejected = Assert.Throws<NotSupportedException>(
+            () => new DeepSeekOptions("test-key", "deepseek-flash", serviceTier: serviceTier, speed: speed));
         Assert.Contains("does not support service tier or speed", rejected.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Gemini_RejectsASetSlot()
+    public void Gemini_RejectsASetSlotWhenTheClientIsCreated()
     {
-        var handler = new RecordingHandler(JsonResponse.Create(
-            """{"candidates":[{"content":{"role":"model","parts":[{"text":"done"}]},"finishReason":"STOP"}]}"""));
-        using var http = new HttpClient(handler);
-        using var provider = new GeminiProvider(
-            new GeminiOptions("test-key", "gemini-test", speed: "fast"),
-            http);
-
-        var rejected = await Assert.ThrowsAsync<NotSupportedException>(() => provider.CompleteAsync(Request()));
+        var rejected = Assert.Throws<NotSupportedException>(
+            () => new GeminiOptions("test-key", "gemini-test", speed: "fast"));
         Assert.Contains("does not support service tier or speed", rejected.Message, StringComparison.Ordinal);
     }
 
