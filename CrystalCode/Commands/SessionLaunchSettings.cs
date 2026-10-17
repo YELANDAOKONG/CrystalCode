@@ -95,4 +95,7 @@ public class SessionLaunchSettings : CommandSettings
 
     [CommandOption("--bash-timeout <SECONDS>")]
     public string? BashTimeout { get; init; }
+
+    [CommandOption("--disable-tool <NAME>")]
+    public string[] DisableTool { get; init; } = [];
 }

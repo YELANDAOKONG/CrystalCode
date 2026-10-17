@@ -179,6 +179,7 @@ CLI options:
 | `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
 | `--duration <seconds>` | Wall-clock cap for each turn. `unlimited` removes that cap |
 | `--bash-timeout <seconds>` | Foreground per-command bash cap. `unlimited` disables that timer |
+| `--disable-tool <name>` | Repeatable. Omits that built-in tool for this process. An unknown name refuses to start. Does not write the file, and does not free the name |
 
 These flags shape this process only. They are not written to `config.json`
 or `prompt.json` at startup. A later slash command that saves a preference
@@ -322,6 +323,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--tool-calls <count>` | Tool calls for this turn. Default 8192. `0` allows none |
 | `--duration <seconds>` | Wall-clock cap for this turn. Default 7 days. Pass a short value in CI |
 | `--bash-timeout <seconds>` | Foreground per-command bash cap. Default 600. `unlimited` disables that timer |
+| `--disable-tool <name>` | Repeatable. Omits that built-in tool for this process. An unknown name refuses to start. Does not write the file, and does not free the name |
 | `--show-thinking` | Print reasoning text for this run, and label each reply `[Assistant]`. Independent of `verboseThinking` |
 | `--format` | `default` for plain text, or `json` for one JSON object per line |
 

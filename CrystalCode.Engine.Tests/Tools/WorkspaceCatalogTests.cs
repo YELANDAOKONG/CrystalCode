@@ -141,4 +141,47 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(plan.Find(DescribeImageTool.ToolName));
         Assert.NotNull(work.Find(DescribeImageTool.ToolName));
     }
+
+    [Fact]
+    public void CreatePlanAndWork_OmitNamedBuiltInTools()
+    {
+        using var root = new TemporaryWorkspace();
+        var workspace = new Workspace(root.Path);
+        var todos = new TodoList();
+        var prompt = new FixedUserPrompt("ok");
+        var describer = new ImageDescriber(
+            () => throw new InvalidOperationException("The image client is not used by catalog construction."),
+            ImageDescriptionPrompt.SystemText,
+            reasoning: null);
+        var disabled = new[] { " read ", "bash", "bash_start", "describe_image", "skill", "read" };
+        var plan = WorkspaceCatalog.CreatePlan(
+            workspace,
+            todos,
+            prompt,
+            skills: SkillCatalog.Empty,
+            imageDescriber: describer,
+            disabledBuiltInTools: disabled);
+        var work = WorkspaceCatalog.CreateWork(
+            workspace,
+            todos,
+            prompt,
+            skills: SkillCatalog.Empty,
+            imageDescriber: describer,
+            backgroundTasks: new BackgroundTaskRegistry(workspace),
+            disabledBuiltInTools: disabled);
+
+        Assert.Null(plan.Find(ReadTool.ToolName));
+        Assert.Null(plan.Find(SkillTool.ToolName));
+        Assert.Null(plan.Find(DescribeImageTool.ToolName));
+        Assert.NotNull(plan.Find(QuestionTool.ToolName));
+        Assert.Null(work.Find(ReadTool.ToolName));
+        Assert.Null(work.Find(BashTool.ToolName));
+        Assert.Null(work.Find(BackgroundBashStartTool.ToolName));
+        Assert.Null(work.Find(SkillTool.ToolName));
+        Assert.Null(work.Find(DescribeImageTool.ToolName));
+        Assert.NotNull(work.Find(EditTool.ToolName));
+        Assert.NotNull(work.Find(BackgroundBashStatusTool.ToolName));
+        Assert.NotNull(work.Find(BackgroundBashLogsTool.ToolName));
+        Assert.NotNull(work.Find(BackgroundBashStopTool.ToolName));
+    }
 }

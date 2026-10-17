@@ -1343,6 +1343,22 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Save_OmitsDisabledBuiltInTools()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithDisabledBuiltInTools(["describe_image", "bash"]);
+
+        store.Save(settings);
+        var json = File.ReadAllText(root.Home.ConfigPath);
+        var loaded = store.Load();
+
+        Assert.DoesNotContain("describe_image", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("disabledBuiltInTools", json, StringComparison.Ordinal);
+        Assert.Empty(loaded.DisabledBuiltInTools);
+    }
+
+    [Fact]
     public void Save_RoundTripsExportDirectory()
     {
         using var root = new TemporaryHome();

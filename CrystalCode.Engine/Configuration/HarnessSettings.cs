@@ -83,7 +83,8 @@ public sealed record HarnessSettings
         CompactionModelSettings? compactionModel = null,
         bool showAutomaticCompactionSummary = DefaultShowAutomaticCompactionSummary,
         MicroCompactionSettings? microCompaction = null,
-        RuleFileSettings? ruleFiles = null)
+        RuleFileSettings? ruleFiles = null,
+        IReadOnlyList<string>? disabledBuiltInTools = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -150,6 +151,7 @@ public sealed record HarnessSettings
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
+        DisabledBuiltInTools = BuiltInToolSelection.Normalize(disabledBuiltInTools);
         ImageModel = imageModel ?? ImageModelSettings.None;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
@@ -305,6 +307,12 @@ public sealed record HarnessSettings
     /// </summary>
     public bool UsePromptAttachments { get; }
 
+    /// <summary>
+    /// Built-in tool names omitted for this process. Empty keeps the full
+    /// catalog. This value is not written to <c>config.json</c>.
+    /// </summary>
+    public IReadOnlyList<string> DisabledBuiltInTools { get; }
+
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
     public string? ExportDirectory { get; }
@@ -441,6 +449,12 @@ public sealed record HarnessSettings
     public HarnessSettings WithUsePromptAttachments(bool usePromptAttachments) =>
         Copy(usePromptAttachments: usePromptAttachments, setUsePromptAttachments: true);
 
+    public HarnessSettings WithDisabledBuiltInTools(IReadOnlyList<string> disabledBuiltInTools)
+    {
+        ArgumentNullException.ThrowIfNull(disabledBuiltInTools);
+        return Copy(disabledBuiltInTools: disabledBuiltInTools);
+    }
+
     public HarnessSettings WithExternalToolApproval(ExternalToolApprovalSettings approval)
     {
         ArgumentNullException.ThrowIfNull(approval);
@@ -556,7 +570,8 @@ public sealed record HarnessSettings
         bool? showAutomaticCompactionSummary = null,
         MicroCompactionSettings? microCompaction = null,
         bool setMicroCompaction = false,
-        RuleFileSettings? ruleFiles = null) =>
+        RuleFileSettings? ruleFiles = null,
+        IReadOnlyList<string>? disabledBuiltInTools = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -595,7 +610,8 @@ public sealed record HarnessSettings
             setCompactionModel ? compactionModel : CompactionModel,
             showAutomaticCompactionSummary ?? ShowAutomaticCompactionSummary,
             setMicroCompaction ? microCompaction : MicroCompaction,
-            ruleFiles ?? RuleFiles);
+            ruleFiles ?? RuleFiles,
+            disabledBuiltInTools ?? DisabledBuiltInTools);
 
     public override string ToString() => nameof(HarnessSettings);
 

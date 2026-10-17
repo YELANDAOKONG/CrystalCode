@@ -494,6 +494,13 @@ These are product modes, not Crystal types.
   session-local `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`
   tools, then external tools whose `catalogs` include `work`.
 
+`--disable-tool` repeats on `crystal`, `crystal space`, and `crystal run`.
+Each value is one built-in tool name. The process omits that tool from Plan
+and Work, including `describe_image`, `view_image`, `skill`, and a named
+background shell tool. An unknown name refuses to start. The choice is not
+saved. The system text lists the omitted names and tells the model not to
+call them. The name stays reserved for plugins and external tools.
+
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
 and custom input enabled by default. A single single-select question submits

@@ -168,6 +168,36 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task DisableTool_OmitsTheBuiltInAndDoesNotSave()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(AllowReview, TextRound("Hello there."));
+        var settings = fixture.Settings("Say hello");
+        settings = new TaskRunSettings
+        {
+            TaskText = settings.TaskText,
+            Home = settings.Home,
+            Workspace = settings.Workspace,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            Skills = settings.Skills,
+            ExternalTools = settings.ExternalTools,
+            Duration = settings.Duration,
+            DisableTool = ["read", "bash"]
+        };
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        Assert.Contains("Disabled built-in tools  read, bash", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Do not call them.", client.SystemText, StringComparison.Ordinal);
+        Assert.DoesNotContain(client.ToolNames, name => name == "read");
+        Assert.DoesNotContain(client.ToolNames, name => name == "bash");
+        Assert.Contains(client.ToolNames, name => name == "edit");
+        fixture.AssertSettingsUnchanged();
+    }
+
+    [Fact]
     public async Task SpaceFlag_CreatesTheOperatorSpaceAndRunsThere()
     {
         using var fixture = new RunFixture();
@@ -872,6 +902,25 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public void Overrides_AppliesDisabledBuiltInToolsWithoutSavingThem()
+    {
+        var current = HarnessSettings.CreateDefault();
+        var applied = AssertApplied(
+            current,
+            new TaskRunSettings { DisableTool = [" read ", "bash", "read"] });
+
+        Assert.Equal(["read", "bash"], applied.DisabledBuiltInTools);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { DisableTool = ["deploy"] },
+            out _,
+            out _,
+            out var error));
+        Assert.Contains("Unknown built-in tool", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Overrides_RejectsAnUnknownProviderOrModel()
     {
         var current = HarnessSettings.CreateDefault();
@@ -1287,12 +1336,20 @@ public sealed class TaskRunHostTests
 
         public int RequestCount { get; private set; }
 
+        public IReadOnlyList<string> ToolNames { get; private set; } = [];
+
+        public string SystemText { get; private set; } = string.Empty;
+
         public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
             ChatRequest request,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             RequestCount++;
+            ToolNames = [.. request.Tools.Select(tool => tool.Name)];
+            SystemText = request.Items.Count > 0 && request.Items[0] is ChatMessage system
+                ? system.Text
+                : string.Empty;
             var events = _rounds.Count == 0
                 ? Array.Empty<ChatStreamEvent>()
                 : _rounds.Dequeue();

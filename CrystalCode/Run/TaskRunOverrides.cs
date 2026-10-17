@@ -140,6 +140,11 @@ internal static class TaskRunOverrides
                     minimum: 1));
             }
 
+            if (request.DisableTool.Length > 0)
+            {
+                next = next.WithDisabledBuiltInTools(request.DisableTool);
+            }
+
             applied = next;
             planMode = request.Plan;
             return true;

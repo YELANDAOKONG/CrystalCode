@@ -302,4 +302,26 @@ public sealed class HarnessSettingsTests
         Assert.Contains("does not accept image input", textOnly.Message, StringComparison.Ordinal);
         Assert.False(settings.ImageModel.IsConfigured);
     }
+
+    [Fact]
+    public void WithDisabledBuiltInTools_KeepsTheListAcrossCopy()
+    {
+        var settings = HarnessSettings.CreateDefault()
+            .WithDisabledBuiltInTools([" bash ", "read", "bash"]);
+
+        var copied = settings.WithSkills(false);
+
+        Assert.Equal(["bash", "read"], settings.DisabledBuiltInTools);
+        Assert.Equal(["bash", "read"], copied.DisabledBuiltInTools);
+        Assert.Empty(HarnessSettings.CreateDefault().DisabledBuiltInTools);
+    }
+
+    [Fact]
+    public void WithDisabledBuiltInTools_RejectsAnUnknownName()
+    {
+        var error = Assert.Throws<ArgumentException>(() =>
+            HarnessSettings.CreateDefault().WithDisabledBuiltInTools(["Read"]));
+
+        Assert.Contains("Unknown built-in tool", error.Message, StringComparison.Ordinal);
+    }
 }

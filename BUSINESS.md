@@ -47,6 +47,10 @@ separate library with no terminal code. The product can:
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
   write, shell, and session-local background shell tasks); operator tool sets
   may add extra catalog entries to either;
+- omit named built-in tools for one process with `--disable-tool` on
+  `crystal`, `crystal space`, and `crystal run`. An unknown name refuses to
+  start. The choice is not written to `config.json`, and the name stays
+  reserved;
 - approve side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
 - ask one or more operator questions in one request, with described choices,
@@ -233,6 +237,8 @@ implemented in the current build:
 - automatically fetching model-list information from a provider;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
+- saved, session, and plugin ways to disable a built-in tool, and supplying
+  another tool in its place;
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored

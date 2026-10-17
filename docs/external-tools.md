@@ -60,7 +60,8 @@ Each **tool** has a model-facing name: exec `tools[].name`, or dotnet
 is not `<directory>/<tool>`. A slash is not a legal OpenAI-compatible
 function name. The host does not compose a qualified id. Tool names
 match `^[A-Za-z][A-Za-z0-9_-]*$` (1–64 characters) and must not be a
-built-in name.
+built-in name. `--disable-tool` can omit a built-in for one process.
+The name stays reserved, so a plugin or external tool still cannot take it.
 
 One-tool exec shorthand (no `tools` array): the tool name defaults to
 the directory name. A different model-facing name requires a

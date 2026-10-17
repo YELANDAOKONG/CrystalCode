@@ -19,7 +19,8 @@ public static class WorkspaceCatalog
         SkillCatalog? skills = null,
         ExternalCatalog? external = null,
         PluginCatalog? disk = null,
-        ImageDescriber? imageDescriber = null)
+        ImageDescriber? imageDescriber = null,
+        IReadOnlyList<string>? disabledBuiltInTools = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -34,7 +35,8 @@ public static class WorkspaceCatalog
                 external,
                 HostToolCatalog.Plan,
                 disk: disk,
-                imageDescriber: imageDescriber));
+                imageDescriber: imageDescriber,
+                disabledBuiltInTools: disabledBuiltInTools));
     }
 
     public static ToolCatalog CreateWork(
@@ -47,7 +49,8 @@ public static class WorkspaceCatalog
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
         PluginCatalog? disk = null,
         ImageDescriber? imageDescriber = null,
-        BackgroundTaskRegistry? backgroundTasks = null)
+        BackgroundTaskRegistry? backgroundTasks = null,
+        IReadOnlyList<string>? disabledBuiltInTools = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -72,7 +75,8 @@ public static class WorkspaceCatalog
                 bashTimeoutSeconds,
                 disk,
                 imageDescriber,
-                backgroundTasks));
+                backgroundTasks,
+                disabledBuiltInTools));
     }
 
     private static IReadOnlyList<ITool> CreateTools(
@@ -86,7 +90,8 @@ public static class WorkspaceCatalog
         int? bashTimeoutSeconds = WorkspaceLimits.BashTimeoutSeconds,
         PluginCatalog? disk = null,
         ImageDescriber? imageDescriber = null,
-        BackgroundTaskRegistry? backgroundTasks = null)
+        BackgroundTaskRegistry? backgroundTasks = null,
+        IReadOnlyList<string>? disabledBuiltInTools = null)
     {
         var tools = new List<ITool>(
             (registry ?? PluginRegistry.CreateBuiltIn())
@@ -121,6 +126,12 @@ public static class WorkspaceCatalog
         if (imageDescriber is not null)
         {
             tools.Add(new DescribeImageTool(workspace, imageDescriber));
+        }
+
+        if (disabledBuiltInTools is { Count: > 0 })
+        {
+            tools.RemoveAll(tool =>
+                BuiltInToolSelection.Includes(disabledBuiltInTools, tool.Definition.Name));
         }
 
         return tools;

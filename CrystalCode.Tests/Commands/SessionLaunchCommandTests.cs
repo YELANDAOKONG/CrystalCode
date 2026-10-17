@@ -20,6 +20,7 @@ public sealed class SessionLaunchCommandTests
         Assert.Contains("--thinking", interactive, StringComparison.Ordinal);
         Assert.Contains("--context", interactive, StringComparison.Ordinal);
         Assert.Contains("--bash-timeout", interactive, StringComparison.Ordinal);
+        Assert.Contains("--disable-tool", interactive, StringComparison.Ordinal);
         Assert.Contains("--allow-read", interactive, StringComparison.Ordinal);
         Assert.Contains("--allow-write", interactive, StringComparison.Ordinal);
         Assert.DoesNotContain("--format", interactive, StringComparison.Ordinal);
@@ -29,6 +30,7 @@ public sealed class SessionLaunchCommandTests
 
         var space = Help(["space", "--help"]);
         Assert.Contains("--prompt-set", space, StringComparison.Ordinal);
+        Assert.Contains("--disable-tool", space, StringComparison.Ordinal);
         Assert.DoesNotContain("--workspace", space, StringComparison.Ordinal);
         Assert.DoesNotContain("--format", space, StringComparison.Ordinal);
 
@@ -38,6 +40,7 @@ public sealed class SessionLaunchCommandTests
         Assert.Contains("--format", run, StringComparison.Ordinal);
         Assert.Contains("--show-thinking", run, StringComparison.Ordinal);
         Assert.Contains("--workspace-trust", run, StringComparison.Ordinal);
+        Assert.Contains("--disable-tool", run, StringComparison.Ordinal);
     }
 
     [Fact]

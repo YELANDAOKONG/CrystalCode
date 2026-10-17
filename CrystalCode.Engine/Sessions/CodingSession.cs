@@ -274,6 +274,12 @@ public sealed class CodingSession : ITurnObserver
             Note("Prompt attachments  " + attachmentStatus);
         }
 
+        var disabledTools = BuiltInToolSelection.OperatorNote(_settings.DisabledBuiltInTools);
+        if (disabledTools.Length > 0)
+        {
+            Note(disabledTools);
+        }
+
         ReloadExternalToolsWithProgress();
         PublishPluginEnvironment();
         RebuildExecutors();
@@ -3106,12 +3112,21 @@ public sealed class CodingSession : ITurnObserver
             directories: directories);
     }
 
-    private string CurrentSystemText() =>
-        ApplyPluginPrompt(
+    private string CurrentSystemText()
+    {
+        var text = ApplyPluginPrompt(
             _planMode
                 ? _prompts.ComposePlan(CurrentPromptContext(), _placeholders)
                 : _prompts.ComposeWork(CurrentPromptContext(), _placeholders),
             _planMode ? "plan" : "work");
+        var disabled = BuiltInToolSelection.ModelText(_settings.DisabledBuiltInTools);
+        if (disabled.Length == 0)
+        {
+            return text;
+        }
+
+        return text.Length == 0 ? disabled : text + "\n\n" + disabled;
+    }
 
     private string CurrentReviewSystemText() =>
         ApplyPluginPrompt(
@@ -3830,7 +3845,8 @@ public sealed class CodingSession : ITurnObserver
                 _settings.BashTimeoutSeconds,
                 _loadedPlugins,
                 imageDescriber,
-                _backgroundTasks),
+                _backgroundTasks,
+                _settings.DisabledBuiltInTools),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -3843,7 +3859,8 @@ public sealed class CodingSession : ITurnObserver
                 _skills,
                 _external,
                 _loadedPlugins,
-                imageDescriber),
+                imageDescriber,
+                _settings.DisabledBuiltInTools),
             options,
             policy.DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -3894,6 +3911,14 @@ public sealed class CodingSession : ITurnObserver
 
         // Text-only turns return before this, so view_image stays off that catalog.
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
+        if (_settings.DisabledBuiltInTools.Count > 0)
+        {
+            tools.RemoveAll(tool =>
+                BuiltInToolSelection.Includes(
+                    _settings.DisabledBuiltInTools,
+                    tool.Definition.Name));
+        }
+
         return tools;
     }
 
