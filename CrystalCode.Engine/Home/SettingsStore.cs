@@ -193,7 +193,9 @@ public sealed class SettingsStore
             return SettingsMapper.ReadProviders(document.Providers);
         }
 
-        using var providers = JsonDocument.Parse(File.ReadAllText(_home.ProvidersPath));
+        using var providers = JsonDocument.Parse(
+            File.ReadAllText(_home.ProvidersPath),
+            HomeJson.ProviderCatalogReadOptions);
         return SettingsMapper.ReadProviders(providers.RootElement);
     }
 

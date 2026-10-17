@@ -42,6 +42,108 @@ public sealed class SettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsJsoncProvidersFile()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        const string jsonc = """
+            {
+              // A mixed-protocol gateway.
+              "openrouter": [
+                {
+                  "protocol": "anthropic",
+                  "baseUri": "https://example.test/anthropic/",
+                  "options": {
+                    // Hide the reasoning display.
+                    "thinkingDisplay": "omitted",
+                  },
+                  "models": {
+                    // Keep the old model disabled for now.
+                    // "legacy": { "contextWindow": 1000 },
+                    "claude": { "contextWindow": 200000, },
+                  },
+                },
+                {
+                  "protocol": "openai",
+                  "baseUri": "https://example.test/openai/",
+                  /* The second protocol. */
+                  "models": { "gpt": { "contextWindow": 128000, }, },
+                },
+              ],
+            }
+            """;
+        File.WriteAllText(root.Home.ProvidersPath, jsonc);
+
+        var settings = store.Load();
+
+        Assert.Equal(
+            200000,
+            settings.Catalog.GetModel(new ProviderName("openrouter"), "claude").ContextWindow);
+        Assert.Equal(
+            ThinkingDisplay.Omitted,
+            settings.Catalog.Get(new ProviderName("openrouter"))[0].ThinkingDisplay);
+        Assert.Equal(
+            128000,
+            settings.Catalog.GetModel(new ProviderName("openrouter"), "gpt").ContextWindow);
+        Assert.DoesNotContain(
+            "legacy",
+            settings.Catalog.GetModelNames(new ProviderName("openrouter")));
+        var before = File.ReadAllText(root.Home.ProvidersPath);
+
+        store.Save(settings);
+
+        Assert.Equal(before, File.ReadAllText(root.Home.ProvidersPath));
+    }
+
+    [Fact]
+    public void Load_RejectsRepeatedProviderKeyInJsoncProvidersFile()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ProvidersPath,
+            """
+            {
+              // Duplicate provider names must still fail.
+              "gateway": {
+                "protocol": "openai",
+                "baseUri": "https://one.example.test/",
+                "models": { "one": { "contextWindow": 1024 } }
+              },
+              "gateway": {
+                "protocol": "openai",
+                "baseUri": "https://two.example.test/",
+                "models": { "two": { "contextWindow": 1024 } }
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(() => store.Load());
+
+        Assert.Contains("Use an array", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsCommentsInConfigFile()
+    {
+        using var root = new TemporaryHome();
+        var store = new SettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              // config.json stays strict JSON.
+              "provider": "deepseek"
+            }
+            """);
+
+        Assert.ThrowsAny<JsonException>(() => store.Load());
+    }
+
+    [Fact]
     public void ProviderDocument_PreservesExplicitOllamaKeyRequirement()
     {
         var catalog = new ProviderCatalog([

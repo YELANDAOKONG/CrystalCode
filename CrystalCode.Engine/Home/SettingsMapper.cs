@@ -222,7 +222,7 @@ internal static class SettingsMapper
             }
         }
 
-        return entry.Deserialize<ProviderDocument>(HomeJson.Options)
+        return entry.Deserialize<ProviderDocument>(HomeJson.ProviderCatalogSerializerOptions)
             ?? throw new InvalidOperationException($"Provider '{name}' is invalid.");
     }
 

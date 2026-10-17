@@ -1146,9 +1146,12 @@ precedence over legacy `config.json.providers`; otherwise the legacy field is
 read. Saving preferences copies legacy provider definitions to `providers.json`
 if needed, then preserves the legacy field in `config.json` so an older running
 version can continue reading it. Preference saves do not rewrite an existing
-`providers.json`. Duplicate model ids across protocols under one provider are
-rejected. Editing provider definitions in the TUI is deferred product work.
-The catalog changes by editing this file, then restarting.
+`providers.json`. An existing `providers.json` accepts `//` and `/* */`
+comments and trailing commas (JSONC); the host never rewrites it, so comments
+survive. `config.json`, including its legacy `providers` field, and every other
+JSON file remain strict JSON. Duplicate model ids across protocols under one
+provider are rejected. Editing provider definitions in the TUI is deferred
+product work. The catalog changes by editing this file, then restarting.
 
 Project overlay (wins over home for named prompts, prompt attachments,
 Crystal skills, and tool sets of the same directory name):
