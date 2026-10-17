@@ -44,6 +44,9 @@ separate library with no terminal code. The product can:
   selected budget in the default or custom status bar. The selected budget
   drives local compaction and context accounting; it does not change provider
   pricing or enable provider-specific long-context features;
+- declare per-model service tiers and speeds in `providers.json`, switch them
+  through `/tier` and `/speed`, remember each model's choice, and show the
+  selected values in the default or custom status bar;
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
   write, shell, and session-local background shell tasks); operator tool sets
   may add extra catalog entries to either;

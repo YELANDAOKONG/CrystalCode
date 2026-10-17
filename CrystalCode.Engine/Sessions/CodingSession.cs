@@ -1552,7 +1552,11 @@ public sealed class CodingSession : ITurnObserver
         SaveSettings(current => serviceTier
             ? current.WithTier(provider, modelName, selected)
             : current.WithSpeed(provider, modelName, selected));
-        RefreshSideClients(provider, modelName);
+        if (!RefreshSideClients(provider, modelName, out var sideError))
+        {
+            Error(sideError);
+        }
+
         RefreshSlashCommands();
         RefreshChrome();
         Note(
@@ -1607,8 +1611,9 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
-    private void RefreshSideClients(ProviderName provider, string model)
+    private bool RefreshSideClients(ProviderName provider, string model, out string error)
     {
+        error = string.Empty;
         _clientView.ReleaseSession(_client, _multimodalClient);
         if (UsesModel(_settings.ImageModel.Provider, _settings.ImageModel.Model, provider, model))
         {
@@ -1625,17 +1630,20 @@ public sealed class CodingSession : ITurnObserver
         if (!_settings.CompactionModel.Enabled
             || !UsesModel(_settings.CompactionModel.Provider, _settings.CompactionModel.Model, provider, model))
         {
-            return;
+            return true;
         }
 
-        if (!TryPrepareCompactionClient(_settings.CompactionModel, out var client, out _) || client is null)
+        if (!TryPrepareCompactionClient(_settings.CompactionModel, out var client, out var prepareError)
+            || client is null)
         {
-            ReleaseCompactionClient();
-            _compactor = CreateCompactor(_client);
-            return;
+            error = string.IsNullOrWhiteSpace(prepareError)
+                ? "The compaction model could not be refreshed."
+                : "The compaction model could not be refreshed: " + prepareError;
+            return false;
         }
 
         ReplaceCompactionClient(_settings.CompactionModel, client);
+        return true;
     }
 
     private void ReleaseImageDescriptionClient()
@@ -1657,11 +1665,18 @@ public sealed class CodingSession : ITurnObserver
         string? provider,
         string? model,
         ProviderName changedProvider,
-        string changedModel) =>
-        provider is not null
-        && model is not null
-        && string.Equals(provider, changedProvider.Value, StringComparison.Ordinal)
-        && string.Equals(model, changedModel, StringComparison.Ordinal);
+        string changedModel)
+    {
+        if (provider is null || model is null)
+        {
+            return false;
+        }
+
+        return ProviderName.TryParse(provider, out var selectedProvider)
+            && selectedProvider is not null
+            && selectedProvider == changedProvider
+            && string.Equals(model, changedModel, StringComparison.Ordinal);
+    }
 
     private void ChangeThinking(string argument)
     {
@@ -3425,15 +3440,15 @@ public sealed class CodingSession : ITurnObserver
         CancellationToken cancellationToken,
         bool force = false)
     {
-        Note("Compacting context...");
-        SetActivity(SessionActivity.Compacting);
-        _compacting = true;
-        EnsureCompactionClient();
         CompactionOutcome outcome;
         var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _compactSource = compactSource;
+        _compacting = true;
         try
         {
+            Note("Compacting context...");
+            SetActivity(SessionActivity.Compacting);
+            EnsureCompactionClient();
             outcome = await _compactor.CompactAsync(
                 transcript,
                 _todos.Format(),

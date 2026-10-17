@@ -241,7 +241,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                 launchPlan,
                 launchAccess);
         }
-        catch (ArgumentException exception)
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
         {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(exception.Message)}[/]");
             return 1;

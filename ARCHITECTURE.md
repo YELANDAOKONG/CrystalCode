@@ -354,9 +354,11 @@ opt in with `imageInput: true`; unsupported combinations are rejected before
 sending a request. `audioInput` and `videoInput` are stored declarations.
 They are published on plugin model facts and on `PluginClientRequest`, and
 they do not change adapter capabilities, tool registration, attachment,
-persistence, or the outbound request. Built-in adapters still accept only
-text and image input. Accepting audio or video, and non-text model output,
-remain TODO. MCP
+persistence, or the outbound request. Selected service tiers and speeds are
+also published on both contracts; a custom protocol factory must apply a
+non-null slot or reject it when the client is created. Built-in adapters
+still accept only text and image input. Accepting audio or video, and
+non-text model output, remain TODO. MCP
 media transport is TODO.
 
 CrystalCode does not capture screenshots, control browsers, phones, virtual
