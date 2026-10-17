@@ -128,6 +128,9 @@ internal static class CompatibleChatRequestWriter
                     AppendReasoning(writer, profile, ref assistant, reasoning, pendingToolCallIds);
                     break;
                 case ToolCall toolCall:
+                    ToolInputJson.RequireJsonCall(
+                        toolCall,
+                        profile.VendorName);
                     assistant ??= new AssistantBuffer();
                     assistant.ToolCalls.Add(toolCall);
                     pendingToolCallIds.Add(toolCall.CallId);

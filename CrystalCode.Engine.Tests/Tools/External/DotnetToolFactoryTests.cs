@@ -51,6 +51,61 @@ public sealed class DotnetToolFactoryTests
     }
 
     [Fact]
+    public void Load_DotnetTextInputTool_SkipsSetWithNote()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var output = Path.Combine(
+            workspace.Path,
+            ".crystal",
+            "tools",
+            "TextTools");
+        PublishFixture(
+            output,
+            """
+            using Crystal.Tools;
+
+            namespace FixtureTools;
+
+            public sealed class TextTool : ITool
+            {
+                public TextTool()
+                {
+                    Definition = ToolDefinition.Text(
+                        "capture",
+                        "Captures text input.");
+                }
+
+                public ToolDefinition Definition { get; }
+
+                public ValueTask<ToolOutput> InvokeAsync(
+                    ToolCall call,
+                    CancellationToken cancellationToken = default) =>
+                    ValueTask.FromResult(new ToolOutput("captured"));
+            }
+            """);
+        File.WriteAllText(
+            Path.Combine(output, ExternalFiles.FileName),
+            """
+            {
+              "runner": "dotnet",
+              "assembly": "FixtureTools.dll",
+              "types": ["TextTool"]
+            }
+            """);
+
+        var catalog = ExternalCatalog.Load(
+            home.Home,
+            new Workspace(workspace.Path),
+            enabled: true);
+
+        Assert.Empty(catalog.WorkTools);
+        Assert.Contains(
+            catalog.Notes,
+            note => note.Contains("text input", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Load_DotnetTimeoutAndUnlimited_ApplyToCalls()
     {
         using var home = new TemporaryHome();

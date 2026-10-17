@@ -122,7 +122,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             errorCode,
             retryAfter);
 
-    private static void WriteItem(Utf8JsonWriter writer, MultimodalChatItem item)
+    private void WriteItem(Utf8JsonWriter writer, MultimodalChatItem item)
     {
         switch (item)
         {
@@ -209,8 +209,9 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         document.RootElement.WriteTo(writer);
     }
 
-    private static void WriteToolCall(Utf8JsonWriter writer, MultimodalToolCall call)
+    private void WriteToolCall(Utf8JsonWriter writer, MultimodalToolCall call)
     {
+        ToolInputJson.RequireJsonCall(call.InputKind, _vendorName);
         if (call.Contents.Count != 0)
         {
             throw new NotSupportedException(

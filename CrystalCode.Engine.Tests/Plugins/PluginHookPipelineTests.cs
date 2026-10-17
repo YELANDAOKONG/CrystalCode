@@ -294,6 +294,7 @@ public sealed class PluginHookPipelineTests
         var call = Assert.IsType<ToolCall>(sent[2]);
         Assert.Equal("c9", call.CallId);
         Assert.Equal("read", call.Name);
+        Assert.Equal(ToolInputKind.Text, call.InputKind);
         var result = Assert.IsType<ToolResult>(sent[3]);
         Assert.Equal("c9", result.CallId);
         Assert.Equal(ToolResultStatus.Failure, result.Status);
@@ -632,7 +633,10 @@ public sealed class PluginHookPipelineTests
             [
                 .. request.Items,
                 new PluginModelMessage("note", ChatRole.User, "note"),
-                new PluginModelToolCall("call", "c9", "read", "{}"),
+                new PluginModelToolCall("call", "c9", "read", "{}")
+                {
+                    InputKind = ToolInputKind.Text
+                },
                 new PluginModelToolResult("result", "c9", "read", "failed", success: false),
                 new PluginModelReasoning("think", "thought")
             ];

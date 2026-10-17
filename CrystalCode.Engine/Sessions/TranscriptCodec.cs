@@ -35,7 +35,8 @@ public static class TranscriptCodec
                             Kind = "tool_call",
                             CallId = call.CallId,
                             Name = call.Name,
-                            Arguments = call.Arguments
+                            Arguments = call.Arguments,
+                            InputKind = call.InputKind.Value
                         });
                     break;
                 case ToolResult result:
@@ -118,11 +119,16 @@ public static class TranscriptCodec
                         return false;
                     }
 
+                    if (!TryReadInputKind(document.InputKind, out var inputKind))
+                    {
+                        return false;
+                    }
+
                     item = new ToolCall(
                         document.CallId,
                         document.Name,
                         document.Arguments,
-                        ToolInputKind.Json);
+                        inputKind);
                     return true;
                 case "tool_result":
                     if (string.IsNullOrWhiteSpace(document.CallId)
@@ -168,6 +174,33 @@ public static class TranscriptCodec
             StateFormat = state?.Format,
             StateData = state is null ? null : Convert.ToBase64String(state.Data.Span)
         };
+    }
+
+    private static bool TryReadInputKind(
+        string? value,
+        out ToolInputKind inputKind)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || string.Equals(
+                value,
+                ToolInputKind.Json.Value,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            inputKind = ToolInputKind.Json;
+            return true;
+        }
+
+        if (string.Equals(
+                value,
+                ToolInputKind.Text.Value,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            inputKind = ToolInputKind.Text;
+            return true;
+        }
+
+        inputKind = null!;
+        return false;
     }
 
     private static bool TryReadReasoning(SessionItemDocument document, out ChatItem item)

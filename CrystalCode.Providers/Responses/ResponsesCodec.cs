@@ -118,7 +118,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
     public Exception CreateException(string message, int? statusCode = null, Exception? innerException = null, string? errorCode = null, TimeSpan? retryAfter = null) =>
         new ResponsesException(message, statusCode, innerException, errorCode, retryAfter);
 
-    private static void WriteItem(Utf8JsonWriter writer, ChatItem item)
+    private void WriteItem(Utf8JsonWriter writer, ChatItem item)
     {
         switch (item)
         {
@@ -133,6 +133,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 WriteReasoningItem(writer, reasoning.Content);
                 break;
             case ToolCall toolCall:
+                ToolInputJson.RequireJsonCall(toolCall, _vendorName);
                 writer.WriteStartObject();
                 writer.WriteString("type", "function_call");
                 writer.WriteString("call_id", toolCall.CallId);

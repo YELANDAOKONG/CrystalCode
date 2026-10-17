@@ -73,6 +73,7 @@ internal sealed class OllamaCodec : IProtocolCodec
                     break;
                 }
                 case ToolCall call:
+                    ToolInputJson.RequireJsonCall(call, options.VendorName);
                     var args = JsonNode.Parse(call.Arguments) as JsonObject
                         ?? throw new JsonException("Ollama tool arguments must be a JSON object.");
                     var assistant = Assistant(messages);
@@ -136,7 +137,7 @@ internal sealed class OllamaCodec : IProtocolCodec
                         ["name"] = tool.Name,
                         ["description"] = tool.Description ?? string.Empty,
                         ["parameters"] = JsonNode.Parse(
-                            ToolInputJson.RequireSchema(tool, "Ollama").GetRawText())
+                            ToolInputJson.RequireSchema(tool, options.VendorName).GetRawText())
                     }
                 });
             }

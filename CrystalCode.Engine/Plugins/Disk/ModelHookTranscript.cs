@@ -154,7 +154,8 @@ internal static class ModelHookTranscript
                 case PluginModelToolCall call when source is PluginModelToolCall original:
                     if (!string.Equals(call.CallId, original.CallId, StringComparison.Ordinal)
                         || !string.Equals(call.Name, original.Name, StringComparison.Ordinal)
-                        || !string.Equals(call.Arguments, original.Arguments, StringComparison.Ordinal))
+                        || !string.Equals(call.Arguments, original.Arguments, StringComparison.Ordinal)
+                        || call.InputKind != original.InputKind)
                     {
                         reason = "it changed a tool call.";
                         return false;
@@ -229,7 +230,10 @@ internal static class ModelHookTranscript
             message.Role,
             ImageMarkerText.Display(message.Text),
             ReadImages(message.Text, mediaTypes)),
-        ToolCall call => new PluginModelToolCall(id, call.CallId, call.Name, call.Arguments),
+        ToolCall call => new PluginModelToolCall(id, call.CallId, call.Name, call.Arguments)
+        {
+            InputKind = call.InputKind
+        },
         ToolResult result => new PluginModelToolResult(
             id,
             result.CallId,
@@ -266,7 +270,7 @@ internal static class ModelHookTranscript
             call.CallId,
             call.Name,
             call.Arguments,
-            ToolInputKind.Json),
+            call.InputKind),
         PluginModelToolResult result => new ToolResult(
             result.CallId,
             Compose(result.Text, [], result.Images),
@@ -291,12 +295,13 @@ internal static class ModelHookTranscript
         string.Equals(final.CallId, origin.CallId, StringComparison.Ordinal)
         && string.Equals(final.Name, origin.Name, StringComparison.Ordinal)
         && string.Equals(final.Arguments, origin.Arguments, StringComparison.Ordinal)
+        && final.InputKind == origin.InputKind
             ? origin
             : new ToolCall(
                 final.CallId,
                 final.Name,
                 final.Arguments,
-                origin.InputKind);
+                final.InputKind);
 
     private static ChatItem ApplyResult(
         ToolResult origin,

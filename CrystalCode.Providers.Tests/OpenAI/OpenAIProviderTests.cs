@@ -196,6 +196,55 @@ public sealed class OpenAIProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_RejectsTextToolInput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(
+            new OpenAIOptions("test-key", "gpt-test"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+                [new ChatMessage(ChatRole.User, "capture")],
+                [ToolDefinition.Text("capture", "Captures text input.")])));
+
+        Assert.Contains(
+            "does not support text tool input",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.Null(handler.Body);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_RejectsTextToolCallInHistory()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create("{}"));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(
+            new OpenAIOptions("test-key", "gpt-test"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<NotSupportedException>(
+            () => provider.CompleteAsync(new ChatRequest(
+            [
+                new ChatMessage(ChatRole.User, "capture"),
+                new ToolCall(
+                    "call_1",
+                    "capture",
+                    "raw text",
+                    ToolInputKind.Text),
+                new ToolResult("call_1", "ok")
+            ])));
+
+        Assert.Contains(
+            "does not support text tool input",
+            exception.Message,
+            StringComparison.Ordinal);
+        Assert.Null(handler.Body);
+    }
+
+    [Fact]
     public async Task StreamAsync_CoalescesRepeatedUsage()
     {
         var handler = new RecordingHandler(JsonResponse.CreateStream(

@@ -43,6 +43,7 @@ internal static class SessionFork
             CallId = item.CallId,
             Name = item.Name,
             Arguments = item.Arguments,
+            InputKind = item.InputKind,
             Status = item.Status,
             Segments = CloneSegments(item.Segments),
             StateFormat = item.StateFormat,

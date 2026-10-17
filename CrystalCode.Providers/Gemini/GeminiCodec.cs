@@ -62,6 +62,7 @@ internal sealed class GeminiCodec : IProtocolCodec
                     AddPart(contents, message.Role == ChatRole.Assistant ? "model" : "user", lastPart);
                     break;
                 case ToolCall call:
+                    ToolInputJson.RequireJsonCall(call, options.VendorName);
                     var arguments = JsonNode.Parse(call.Arguments) as JsonObject
                         ?? throw new JsonException("Gemini tool arguments must be a JSON object.");
                     lastPart = new JsonObject
@@ -133,7 +134,7 @@ internal sealed class GeminiCodec : IProtocolCodec
                     ["name"] = tool.Name,
                     ["description"] = tool.Description ?? string.Empty,
                     ["parametersJsonSchema"] = JsonNode.Parse(
-                        ToolInputJson.RequireSchema(tool, "Gemini").GetRawText())
+                        ToolInputJson.RequireSchema(tool, options.VendorName).GetRawText())
                 });
             }
 

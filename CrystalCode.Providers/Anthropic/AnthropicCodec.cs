@@ -49,7 +49,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
             writer.WriteString("model", options.Model);
             WriteSystem(writer, request.Items);
             writer.WriteNumber("max_tokens", options.MaxTokens ?? DefaultMaxTokens);
-            WriteMessages(writer, request.Items);
+            WriteMessages(writer, request.Items, _vendorName);
             WriteTools(writer, request.Tools);
             WriteReasoning(writer, request.Reasoning, _summarizeThinking);
             if (options.Temperature is { } temperature)
@@ -126,7 +126,10 @@ internal sealed class AnthropicCodec : IProtocolCodec
         writer.WriteEndArray();
     }
 
-    private static void WriteMessages(Utf8JsonWriter writer, IReadOnlyList<ChatItem> items)
+    private static void WriteMessages(
+        Utf8JsonWriter writer,
+        IReadOnlyList<ChatItem> items,
+        string vendorName)
     {
         writer.WritePropertyName("messages");
         writer.WriteStartArray();
@@ -148,7 +151,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
             writer.WriteStartArray();
             foreach (var block in blocks)
             {
-                WriteBlock(writer, block, ReferenceEquals(block, lastBlockItem));
+                WriteBlock(writer, block, ReferenceEquals(block, lastBlockItem), vendorName);
             }
 
             writer.WriteEndArray();
@@ -215,7 +218,11 @@ internal sealed class AnthropicCodec : IProtocolCodec
         return null;
     }
 
-    private static void WriteBlock(Utf8JsonWriter writer, ChatItem item, bool markCache)
+    private static void WriteBlock(
+        Utf8JsonWriter writer,
+        ChatItem item,
+        bool markCache,
+        string vendorName)
     {
         switch (item)
         {
@@ -234,6 +241,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 WriteReasoningBlock(writer, reasoning.Content, markCache);
                 break;
             case ToolCall call:
+                ToolInputJson.RequireJsonCall(call, vendorName);
                 writer.WriteStartObject();
                 writer.WriteString("type", "tool_use");
                 writer.WriteString("id", call.CallId);

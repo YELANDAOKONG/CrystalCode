@@ -1,6 +1,7 @@
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Crystal.Tools;
 
 using CrystalCode.Engine.Sessions;
 
@@ -47,5 +48,56 @@ public sealed class ChatStreamAssemblerTests
         Assert.Equal("sum", reasoning.Content.TextSegments[0].Text);
         Assert.Equal(ReasoningTextKind.Trace, reasoning.Content.TextSegments[1].Kind);
         Assert.Equal("raw", reasoning.Content.TextSegments[1].Text);
+    }
+
+    [Fact]
+    public void ToResponse_PreservesTextToolInput()
+    {
+        var assembler = new ChatStreamAssembler();
+        assembler.Apply(new ChatToolCallDelta(
+            0,
+            0,
+            "call",
+            "capture",
+            "first line\n",
+            ToolInputKind.Text));
+        assembler.Apply(new ChatToolCallDelta(
+            0,
+            0,
+            "",
+            "",
+            "second line",
+            ToolInputKind.Text));
+        assembler.Apply(new ChatCandidateCompleted(0, FinishReason.ToolCalls));
+
+        var response = assembler.ToResponse();
+
+        var call = Assert.IsType<ToolCall>(response.Candidates[0].Items[0]);
+        Assert.Equal(ToolInputKind.Text, call.InputKind);
+        Assert.Equal("first line\nsecond line", call.Arguments);
+    }
+
+    [Fact]
+    public void ToResponse_RejectsChangedToolInputKind()
+    {
+        var assembler = new ChatStreamAssembler();
+        assembler.Apply(new ChatToolCallDelta(
+            0,
+            0,
+            "call",
+            "capture",
+            "{}",
+            ToolInputKind.Text));
+
+        var failure = Assert.Throws<InvalidOperationException>(
+            () => assembler.Apply(new ChatToolCallDelta(
+                0,
+                0,
+                "",
+                "",
+                "{}",
+                ToolInputKind.Json)));
+
+        Assert.Contains("changed its input kind", failure.Message);
     }
 }

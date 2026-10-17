@@ -6,6 +6,28 @@ namespace CrystalCode.Providers;
 
 internal static class ToolInputJson
 {
+    public static void RequireJsonCall(
+        ToolCall call,
+        string vendorName)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        RequireJsonCall(call.InputKind, vendorName);
+    }
+
+    public static void RequireJsonCall(
+        ToolInputKind inputKind,
+        string vendorName)
+    {
+        ArgumentNullException.ThrowIfNull(inputKind);
+        ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
+
+        if (inputKind == ToolInputKind.Text)
+        {
+            throw new NotSupportedException(
+                $"{vendorName} does not support text tool input.");
+        }
+    }
+
     public static JsonElement RequireSchema(
         ToolDefinition tool,
         string vendorName)

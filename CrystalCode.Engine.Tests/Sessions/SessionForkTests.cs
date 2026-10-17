@@ -20,7 +20,18 @@ public sealed class SessionForkTests
             PlanMode = true,
             CreatedUtc = DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
             UpdatedUtc = DateTimeOffset.Parse("2026-01-02T00:00:00Z"),
-            Items = [new SessionItemDocument { Kind = "message", Role = "user", Text = "hello" }],
+            Items =
+            [
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "hello" },
+                new SessionItemDocument
+                {
+                    Kind = "tool_call",
+                    CallId = "1",
+                    Name = "capture",
+                    Arguments = "raw",
+                    InputKind = "text"
+                }
+            ],
             Todos = [new SessionTodoDocument { Id = "1", Content = "work", Status = "pending" }],
             UserTurns = 3,
             ModelCalls = 4,
@@ -41,6 +52,8 @@ public sealed class SessionForkTests
         Assert.Equal(4, fork.ModelCalls);
         Assert.Equal(5, fork.ToolCalls);
         Assert.Equal("hello", fork.Items[0].Text);
+        Assert.Equal("text", fork.Items[1].InputKind);
+        Assert.NotSame(source.Items[1], fork.Items[1]);
         Assert.Null(fork.Archive);
         Assert.Equal("work", fork.Todos[0].Content);
         Assert.Equal(10, fork.Usage?.InputTokenCount);

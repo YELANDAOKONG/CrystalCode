@@ -109,7 +109,9 @@ public static class TranscriptExport
             case ToolCall call:
                 lines.Add("### Tool: " + call.Name);
                 lines.Add(string.Empty);
-                lines.Add("```json");
+                lines.Add(call.InputKind == ToolInputKind.Text
+                    ? "```text"
+                    : "```json");
                 lines.Add(call.Arguments.Trim());
                 lines.Add("```");
                 lines.Add(string.Empty);

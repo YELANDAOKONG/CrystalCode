@@ -77,4 +77,31 @@ public sealed class TranscriptExportTests
         Assert.Contains("## System", markdown, StringComparison.Ordinal);
         Assert.Contains("system body", markdown, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void RenderMarkdown_UsesTextFenceForTextToolInput()
+    {
+        var metadata = new SessionExportMetadata(
+            "abc123",
+            "/tmp/demo",
+            "deepseek",
+            "deepseek-v4-flash",
+            "default",
+            false,
+            new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
+        var items = new List<ChatItem>
+        {
+            new ChatMessage(ChatRole.User, "capture"),
+            new ToolCall(
+                "1",
+                "capture",
+                "first line\nsecond line",
+                ToolInputKind.Text)
+        };
+
+        var markdown = TranscriptExport.RenderMarkdown(metadata, items, [], null);
+
+        Assert.Contains("```text", markdown, StringComparison.Ordinal);
+        Assert.DoesNotContain("```json", markdown, StringComparison.Ordinal);
+    }
 }

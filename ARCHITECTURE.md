@@ -496,6 +496,13 @@ These are product modes, not Crystal types.
   session-local `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`
   tools, then external tools whose `catalogs` include `work`.
 
+CrystalCode currently maps only JSON tool input. Built-in and external dotnet
+tools publish `ToolDefinition.Json`; a dotnet tool set that publishes
+`ToolDefinition.Text` is skipped with a visible note. Provider adapters reject
+a text-input tool or a text tool call in history with `NotSupportedException`
+instead of wrapping it. Session documents and the plugin model transcript
+preserve `ToolInputKind`, but no current provider maps `ToolInputKind.Text`.
+
 `--disable-tool` repeats on `crystal`, `crystal space`, and `crystal run`.
 Each value is one built-in tool name. The process omits that tool from Plan
 and Work, including `describe_image`, `view_image`, `skill`, and a named
