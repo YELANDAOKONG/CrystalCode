@@ -9,6 +9,7 @@ using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
@@ -280,7 +281,7 @@ public sealed class CodingSessionCompactionModelTests
         plugins.Add(new RoutingPlugin(clients));
         return CodingSession.Create(
             settings,
-            new SettingsStore(home.Home),
+            new DiskSettingsStore(home.Home),
             new CredentialStore(home.Home),
             home.Home,
             workspace.Path,

@@ -8,6 +8,7 @@ using CrystalCode.Commands;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
@@ -1059,13 +1060,13 @@ public sealed class TaskRunHostTests
     {
         using var fixture = new RunFixture();
         var home = new CrystalHome(fixture.Home);
-        var loaded = new SettingsStore(home).Load();
+        var loaded = new DiskSettingsStore(home).Load();
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());
         plugins.Add(new ScriptedRunPlugin(new ScriptedRunClient(AllowReview)));
         var session = CodingSession.Create(
             loaded.WithOverrides("ollama", "qwen3:8b"),
-            new SettingsStore(home),
+            new DiskSettingsStore(home),
             new CredentialStore(home),
             home,
             fixture.Workspace,

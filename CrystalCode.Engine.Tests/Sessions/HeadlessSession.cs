@@ -3,6 +3,7 @@ using Crystal.Chat;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Approvals;
@@ -58,7 +59,7 @@ internal sealed class HeadlessSession : IDisposable
 
         Session = CodingSession.Create(
             sessionSettings,
-            new SettingsStore(_home.Home),
+            new DiskSettingsStore(_home.Home),
             new CredentialStore(_home.Home),
             _home.Home,
             _workspace.Path,

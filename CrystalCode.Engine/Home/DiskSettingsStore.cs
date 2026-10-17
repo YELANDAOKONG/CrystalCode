@@ -10,11 +10,11 @@ namespace CrystalCode.Engine.Home;
 /// Reads user preferences from <c>config.json</c> and provider definitions
 /// from <c>providers.json</c> under a Crystal home directory.
 /// </summary>
-public sealed class SettingsStore
+public sealed class DiskSettingsStore : ISettingsStore
 {
     private readonly CrystalHome _home;
 
-    public SettingsStore(CrystalHome home)
+    public DiskSettingsStore(CrystalHome home)
     {
         ArgumentNullException.ThrowIfNull(home);
         _home = home;

@@ -5,6 +5,7 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -41,11 +42,11 @@ public sealed class CodingSessionContextTests
         var usage = headless.Observer.Events.OfType<UsageChanged>().Last();
         Assert.Equal(272000, usage.ContextWindow);
         Assert.Equal(100, usage.Usage?.InputTokenCount);
-        Assert.Equal(272000, new SettingsStore(headless.Home).Load().ContextWindow);
+        Assert.Equal(272000, new DiskSettingsStore(headless.Home).Load().ContextWindow);
 
         await headless.Session.SubmitAsync("/context 128k", CancellationToken.None);
         Assert.Contains(headless.Observer.Events.OfType<ErrorWritten>(), error => error.Text.Contains("not available", StringComparison.Ordinal));
-        Assert.Equal(272000, new SettingsStore(headless.Home).Load().ContextWindow);
+        Assert.Equal(272000, new DiskSettingsStore(headless.Home).Load().ContextWindow);
 
         await headless.Session.SubmitAsync("/model small", CancellationToken.None);
         Assert.Equal(128000, headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.ContextWindow);

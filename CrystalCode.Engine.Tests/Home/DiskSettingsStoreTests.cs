@@ -4,19 +4,20 @@ using Crystal.Reasoning;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
 
 namespace CrystalCode.Engine.Tests.Home;
 
-public sealed class SettingsStoreTests
+public sealed class DiskSettingsStoreTests
 {
     [Fact]
     public void Load_AllowsKeylessCompatibleEndpointAndPreservesOllamaDefault()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ProvidersPath,
             """

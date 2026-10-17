@@ -2,6 +2,7 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Approvals;
@@ -233,7 +234,7 @@ public sealed class ResumeWorkspaceTests
         var observer = new RecordingSessionObserver();
         var session = CodingSession.Create(
             settings,
-            new SettingsStore(home.Home),
+            new DiskSettingsStore(home.Home),
             new CredentialStore(home.Home),
             home.Home,
             workspace,

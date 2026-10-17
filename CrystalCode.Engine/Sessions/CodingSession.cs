@@ -45,7 +45,7 @@ public sealed class CodingSession : ITurnObserver
     // unless the operator changes that field. Provider and model from the
     // command line are already on this copy.
     private HarnessSettings _persisted;
-    private readonly SettingsStore _settingsStore;
+    private readonly ISettingsStore _settingsStore;
     private readonly CredentialStore _credentials;
     private readonly PromptStore _promptStore;
     private readonly SessionStore _sessionStore;
@@ -123,7 +123,7 @@ public sealed class CodingSession : ITurnObserver
 
     private CodingSession(
         HarnessSettings settings,
-        SettingsStore settingsStore,
+        ISettingsStore settingsStore,
         CredentialStore credentials,
         CrystalHome home,
         Workspace workspace,
@@ -200,7 +200,7 @@ public sealed class CodingSession : ITurnObserver
 
     public static CodingSession Create(
         HarnessSettings settings,
-        SettingsStore settingsStore,
+        ISettingsStore settingsStore,
         CredentialStore credentials,
         CrystalHome home,
         string workspaceRoot,

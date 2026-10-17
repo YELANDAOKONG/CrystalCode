@@ -42,7 +42,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         cancellationToken.ThrowIfCancellationRequested();
 
         var home = CrystalHome.Resolve(settings.Home);
-        var settingsStore = new SettingsStore(home);
+        var settingsStore = new DiskSettingsStore(home);
         var loaded = settingsStore.LoadOrCreate();
         if (!TaskRunOverrides.TryApply(loaded, settings, out var harnessSettings, out _, out var applyError))
         {

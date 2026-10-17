@@ -3,6 +3,7 @@ using Spectre.Console.Cli;
 
 using CrystalCode.Commands;
 using CrystalCode.Engine.Home;
+using SettingsStore = CrystalCode.Engine.Home.DiskSettingsStore;
 using CrystalCode.Engine.Tools;
 
 using Xunit;
@@ -51,7 +52,7 @@ public sealed class SessionLaunchCommandTests
         try
         {
             var crystalHome = new CrystalHome(home);
-            new SettingsStore(crystalHome).LoadOrCreate();
+            new DiskSettingsStore(crystalHome).LoadOrCreate();
             var before = File.ReadAllBytes(crystalHome.ConfigPath);
 
             var code = await RunCommand.RunAsync(

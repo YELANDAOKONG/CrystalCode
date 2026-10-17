@@ -29,7 +29,7 @@ internal sealed class TerminalHost
 
     public static TerminalHost Create(
         HarnessSettings settings,
-        SettingsStore settingsStore,
+        ISettingsStore settingsStore,
         CredentialStore credentials,
         CrystalHome home,
         string workspaceRoot,

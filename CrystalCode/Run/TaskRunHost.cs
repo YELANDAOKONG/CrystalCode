@@ -85,7 +85,7 @@ internal static class TaskRunHost
                 }
             }
 
-            loaded = new SettingsStore(home).LoadOrCreate();
+            loaded = new DiskSettingsStore(home).LoadOrCreate();
             if (!TaskRunOverrides.TryApply(loaded, settings, out applied, out planMode, out var applyError))
             {
                 await error.WriteLineAsync(applyError);
@@ -161,7 +161,7 @@ internal static class TaskRunHost
             // process's launch overrides, including provider and model.
             session = CodingSession.Create(
                 applied,
-                new SettingsStore(home),
+                new DiskSettingsStore(home),
                 credentials,
                 home,
                 workspace,

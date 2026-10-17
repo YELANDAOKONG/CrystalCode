@@ -14,7 +14,7 @@ public sealed class ContextSettingsTests
     public void LoadAndSave_PreservesPerModelChoicesAndProviderDefinitions()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         const string providers = """
             {
@@ -49,7 +49,7 @@ public sealed class ContextSettingsTests
     public void Load_RemovedSavedWindowFallsBackToLowestAvailable()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, """
             {
@@ -65,7 +65,7 @@ public sealed class ContextSettingsTests
     public void Save_WritesNestedSelectionsAndKeepsModelIdsWithSlash()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ProvidersPath, """
             {
@@ -103,7 +103,7 @@ public sealed class ContextSettingsTests
     public void Load_ReadsFlatSelectionsAndSavesThemNested()
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, """
             {
@@ -145,7 +145,7 @@ public sealed class ContextSettingsTests
     public void Load_RefusesMalformedSelections(string json)
     {
         using var root = new TemporaryHome();
-        var store = new SettingsStore(root.Home);
+        var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, json);
 

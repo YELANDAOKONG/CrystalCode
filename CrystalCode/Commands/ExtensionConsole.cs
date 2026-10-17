@@ -398,7 +398,7 @@ public static class ExtensionConsole
             return true;
         }
 
-        var settings = new SettingsStore(home).Load();
+        var settings = new DiskSettingsStore(home).Load();
         return plugins ? settings.Plugins : settings.ExternalTools;
     }
 
