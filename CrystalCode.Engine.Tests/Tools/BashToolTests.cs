@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 using Crystal.Tools;
 
 using CrystalCode.Engine.Tools;
@@ -81,42 +79,20 @@ public sealed class BashToolTests
     public async Task InvokeAsync_CancelStopsTheProcess()
     {
         using var root = new TemporaryWorkspace();
-        var pidFile = Path.Combine(root.Path, "pid.txt");
         var tool = new BashTool(new Workspace(root.Path), timeoutSeconds: null);
         using var cancellation = new CancellationTokenSource();
         var running = tool.InvokeAsync(
             new ToolCall(
                 "1",
                 BashTool.ToolName,
-                """{"command":"echo $$ > pid.txt; sleep 30"}"""),
+                """{"command":"while true; do printf x >> beat.txt; done"}"""),
             cancellation.Token).AsTask();
 
-        var started = DateTimeOffset.UtcNow;
-        while (!File.Exists(pidFile) && DateTimeOffset.UtcNow - started < TimeSpan.FromSeconds(5))
-        {
-            await Task.Delay(50);
-        }
-
-        Assert.True(File.Exists(pidFile));
-        var pid = int.Parse(File.ReadAllText(pidFile).Trim());
+        var beat = Path.Combine(root.Path, "beat.txt");
+        await ShellHeartbeat.WaitUntilWritingAsync(beat);
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running);
-        await Task.Delay(300);
-
-        Assert.False(IsAlive(pid));
-    }
-
-    private static bool IsAlive(int pid)
-    {
-        try
-        {
-            using var process = Process.GetProcessById(pid);
-            return !process.HasExited;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
+        await ShellHeartbeat.AssertStoppedAsync(beat);
     }
 }

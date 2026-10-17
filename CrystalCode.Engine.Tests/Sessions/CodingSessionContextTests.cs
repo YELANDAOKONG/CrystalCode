@@ -208,10 +208,14 @@ public sealed class CodingSessionContextTests
         var sessionId = headless.Session.SessionId;
         var started = headless.Session.SubmitAsync("continue", CancellationToken.None);
         await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        // The summary client is signaled inside ExecuteTurnAsync, before
+        // StartTurnAsync stores TurnTask. Another core can observe Started first.
+        var turn = await WaitForTurnAsync(headless.Session);
 
         var refused = await headless.Session.SubmitAsync("/fork", CancellationToken.None);
         Assert.False(refused);
-        Assert.False(headless.Session.TurnTask!.IsCompleted);
+        Assert.Same(turn, headless.Session.TurnTask);
+        Assert.False(turn.IsCompleted);
         Assert.Equal(sessionId, headless.Session.SessionId);
         Assert.Contains(
             headless.Observer.Events.OfType<ErrorWritten>(),
@@ -277,6 +281,22 @@ public sealed class CodingSessionContextTests
         var completed = await Task.WhenAny(work, Task.Delay(TimeSpan.FromSeconds(10)));
         Assert.Same(work, completed);
         return await work;
+    }
+
+    private static async Task<Task> WaitForTurnAsync(CodingSession session)
+    {
+        var started = DateTimeOffset.UtcNow;
+        while (DateTimeOffset.UtcNow - started < TimeSpan.FromSeconds(5))
+        {
+            if (session.TurnTask is { } turn)
+            {
+                return turn;
+            }
+
+            await Task.Delay(1);
+        }
+
+        throw new Xunit.Sdk.XunitException("The turn was not published.");
     }
 
     private static async Task<string[]> CompactAutomatically(bool showSummary)

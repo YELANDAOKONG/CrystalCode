@@ -44,22 +44,14 @@ public sealed class BackgroundBashToolTests
         var registry = new BackgroundTaskRegistry(new Workspace(root.Path), timeoutSeconds: null);
         var start = new BackgroundBashStartTool(registry);
         var stop = new BackgroundBashStopTool(registry);
-        var pidFile = Path.Combine(root.Path, "pid.txt");
-
         var started = await start.InvokeAsync(
             new ToolCall(
                 "1",
                 BackgroundBashStartTool.ToolName,
-                """{"command":"echo $$ > pid.txt; sleep 30"}"""));
+                """{"command":"while true; do printf x >> beat.txt; done"}"""));
         var taskId = ReadValue(started.Text, "task_id");
-        var startedAt = DateTimeOffset.UtcNow;
-        while (!File.Exists(pidFile) && DateTimeOffset.UtcNow - startedAt < TimeSpan.FromSeconds(5))
-        {
-            await Task.Delay(50);
-        }
-
-        Assert.True(File.Exists(pidFile));
-        var pid = int.Parse(File.ReadAllText(pidFile).Trim());
+        var beat = Path.Combine(root.Path, "beat.txt");
+        await ShellHeartbeat.WaitUntilWritingAsync(beat);
         var stopped = await stop.InvokeAsync(
             new ToolCall(
                 "2",
@@ -68,7 +60,7 @@ public sealed class BackgroundBashToolTests
 
         Assert.Equal(ToolResultStatus.Success, stopped.Status);
         Assert.Contains("status: Stopped", stopped.Text, StringComparison.Ordinal);
-        Assert.False(IsAlive(pid));
+        await ShellHeartbeat.AssertStoppedAsync(beat);
     }
 
     [Fact]
@@ -76,30 +68,20 @@ public sealed class BackgroundBashToolTests
     {
         using var root = new TemporaryWorkspace();
         var registry = new BackgroundTaskRegistry(new Workspace(root.Path), timeoutSeconds: null);
-        var pidFile = Path.Combine(root.Path, "pid.txt");
-
         Assert.True(
             registry.TryStart(
-                "echo $$ > pid.txt; sleep 30",
+                ShellHeartbeat.Command,
                 out var started,
                 out var error),
             error);
-        var startedAt = DateTimeOffset.UtcNow;
-        while (!File.Exists(pidFile) && DateTimeOffset.UtcNow - startedAt < TimeSpan.FromSeconds(5))
-        {
-            await Task.Delay(50);
-        }
-
-        Assert.True(File.Exists(pidFile));
-        var pid = int.Parse(File.ReadAllText(pidFile).Trim());
+        var beat = Path.Combine(root.Path, "beat.txt");
+        await ShellHeartbeat.WaitUntilWritingAsync(beat);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => registry.StopAsync(started.TaskId, cancellation.Token));
-        await Task.Delay(300);
-
-        Assert.False(IsAlive(pid));
+        await ShellHeartbeat.AssertStoppedAsync(beat);
     }
 
     [Fact]
@@ -212,18 +194,5 @@ public sealed class BackgroundBashToolTests
         var prefix = name + ": ";
         var line = text.Split('\n').Single(item => item.StartsWith(prefix, StringComparison.Ordinal));
         return line[prefix.Length..];
-    }
-
-    private static bool IsAlive(int pid)
-    {
-        try
-        {
-            using var process = System.Diagnostics.Process.GetProcessById(pid);
-            return !process.HasExited;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
     }
 }
