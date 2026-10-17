@@ -43,7 +43,7 @@ public sealed record ThinkingSelection
 
         throw new ArgumentException(
             "Thinking effort must be default, off, none, "
-            + "or an effort token that starts with a letter and then uses only letters, digits, and hyphens.",
+            + "or an effort token that starts with a letter and then uses only letters, digits, underscores, and hyphens.",
             nameof(value));
     }
 
@@ -81,7 +81,7 @@ public sealed record ThinkingSelection
         for (var index = 1; index < value.Length; index++)
         {
             var character = value[index];
-            if (character is not ((>= 'a' and <= 'z') or (>= '0' and <= '9') or '-'))
+            if (character is not ((>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_'))
             {
                 return false;
             }

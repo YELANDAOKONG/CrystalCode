@@ -175,7 +175,7 @@ public sealed record ModelSettings
             {
                 throw new ArgumentException(
                     "Thinking effort must be an effort token that starts with a letter "
-                    + "and then uses only letters, digits, and hyphens.",
+                    + "and then uses only letters, digits, underscores, and hyphens.",
                     nameof(thinkingEfforts));
             }
 
@@ -190,7 +190,7 @@ public sealed record ModelSettings
             {
                 throw new ArgumentException(
                     "Thinking effort must be an effort token that starts with a letter "
-                    + "and then uses only letters, digits, and hyphens. "
+                    + "and then uses only letters, digits, underscores, and hyphens. "
                     + "Use none or off to disable thinking.",
                     nameof(thinkingEfforts));
             }

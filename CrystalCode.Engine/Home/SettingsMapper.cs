@@ -441,7 +441,7 @@ internal static class SettingsMapper
             {
                 throw new JsonException(
                     $"{name} value for '{provider.Value}/{model}' must be a token that "
-                    + "starts with a letter and then uses only letters, digits, and hyphens.");
+                    + "starts with a letter and then uses only letters, digits, underscores, and hyphens.");
             }
 
             AddToken(selections, new ContextSelectionKey(provider, model), token, name);
@@ -475,7 +475,7 @@ internal static class SettingsMapper
         {
             throw new JsonException(
                 $"{name} value for '{entry.Name}' must be a token that "
-                + "starts with a letter and then uses only letters, digits, and hyphens.");
+                + "starts with a letter and then uses only letters, digits, underscores, and hyphens.");
         }
 
         AddToken(selections, new ContextSelectionKey(provider, model), token, name);

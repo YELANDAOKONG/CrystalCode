@@ -75,6 +75,18 @@ public sealed class ModelSettingsTests
     }
 
     [Fact]
+    public void Constructor_AcceptsAnEndpointEffortTokenWithAnUnderscore()
+    {
+        var model = new ModelSettings(
+            1000,
+            thinking: true,
+            thinkingEfforts: ["xhigh_ultra"]);
+
+        Assert.Equal(["xhigh_ultra"], model.ThinkingEfforts);
+        Assert.True(model.AllowsEffort("XHigh_Ultra"));
+    }
+
+    [Fact]
     public void Constructor_RejectsAnEffortTokenWithASpace()
     {
         var exception = Assert.Throws<ArgumentException>(

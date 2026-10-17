@@ -1397,10 +1397,10 @@ For a mixed-protocol gateway, `providers.openrouter` may instead be an array:
 
 `thinking` and `thinkingEfforts` declare whether the model supports
 thinking and which effort tokens it accepts. A token starts with a
-letter and then uses only letters, digits, and hyphens. The host
-stores every token in lowercase and does not interpret it. `max` and
-`maximum` are different tokens. A case-sensitive wire value cannot be
-spelled here. An empty `thinkingEfforts` list is on/off only. Built-in
+letter and then uses only letters, digits, underscores, and hyphens.
+The host stores every token in lowercase and does not interpret it.
+`max` and `maximum` are different tokens. A case-sensitive wire value
+cannot be spelled here. An empty `thinkingEfforts` list is on/off only. Built-in
 DeepSeek V4 models enable thinking with `low`, `high`, and `max`. `thinkingCanDisable` defaults to true. Set it to
 false when the model rejects a request to turn thinking off. Built-in
 Gemini 3 models do. `/thinking` then omits Off. A stored Off gear falls
@@ -1409,8 +1409,9 @@ An explicit `/thinking off` is refused.
 
 `serviceTiers` and `speeds` declare the tokens a model accepts for service
 tier and speed. A token starts with a letter and then uses only letters,
-digits, and hyphens. The host stores every token in lowercase and does not
-interpret it. `default` is an ordinary token when the model lists it. An
+digits, underscores, and hyphens. The host stores every token in
+lowercase and does not interpret it. `default` is an ordinary token when
+the model lists it. An
 unset slot is omitted from the request. `/tier` and `/speed` (alias
 `/fast`) cycle the current model's list, including the unset slot, or
 select a listed token. Each choice is stored per model in

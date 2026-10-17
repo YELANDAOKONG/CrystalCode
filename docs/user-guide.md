@@ -579,9 +579,9 @@ are not supported by the current adapter.
 | `topP` | Optional, 0 to 1 |
 | `maxTokens` | Optional positive output-token cap |
 | `thinking` | Whether the model accepts reasoning hints |
-| `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
+| `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
-| `serviceTiers` | Service-tier tokens this model accepts. A token starts with a letter and then uses only letters, digits, and hyphens. The host stores each token in lowercase and does not interpret it. `default` is sent when it is listed; it does not mean unset. An empty or omitted list means this model has no service tier |
+| `serviceTiers` | Service-tier tokens this model accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. The host stores each token in lowercase and does not interpret it. `default` is sent when it is listed; it does not mean unset. An empty or omitted list means this model has no service tier |
 | `speeds` | Speed tokens this model accepts, using the same token rules. `fast` and `ultrafast` belong here when the endpoint accepts them. An empty or omitted list means this model has no speed |
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 | `audioInput` | Declared audio input (default `false`). Stored and visible to plugins. The host does not accept or send audio |

@@ -65,6 +65,7 @@ public sealed class ThinkingSelectionTests
     {
         Assert.Equal(new ThinkingSelection("xhigh"), ThinkingSelection.Parse("XHigh"));
         Assert.Equal(new ThinkingSelection("very-high"), ThinkingSelection.Parse("very-high"));
+        Assert.Equal(new ThinkingSelection("very_high"), ThinkingSelection.Parse("Very_High"));
     }
 
     [Fact]

@@ -26,6 +26,42 @@ public sealed class CatalogSlotTests
     }
 
     [Fact]
+    public void Normalize_AcceptsUnderscoreInTokens()
+    {
+        var model = new ModelSettings(
+            1000,
+            serviceTiers: ["auto", "Standard_Only"],
+            speeds: ["very_fast"]);
+
+        Assert.Equal(["auto", "standard_only"], model.ServiceTiers);
+        Assert.Equal(["very_fast"], model.Speeds);
+    }
+
+    [Fact]
+    public void ReadProviders_AcceptsAnUnderscoreServiceTier()
+    {
+        using var document = JsonDocument.Parse(
+            """
+            {
+              "anthropic": {
+                "protocol": "anthropic",
+                "baseUri": "https://example.test/",
+                "models": {
+                  "claude-test": {
+                    "contextWindow": 1000,
+                    "serviceTiers": ["auto", "standard_only"]
+                  }
+                }
+              }
+            }
+            """);
+
+        var provider = Assert.Single(SettingsMapper.ReadProviders(document.RootElement));
+
+        Assert.Equal(["auto", "standard_only"], provider.Models["claude-test"].ServiceTiers);
+    }
+
+    [Fact]
     public void Next_CyclesThroughTokensAndBackToUnset()
     {
         IReadOnlyList<string> tokens = ["flex", "default"];

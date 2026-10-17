@@ -21,7 +21,7 @@ public static class CatalogSlots
             if (string.IsNullOrWhiteSpace(token) || !CatalogToken.TryNormalize(token, out var value))
             {
                 throw new ArgumentException(
-                    $"{name} must start with a letter and then use only letters, digits, and hyphens.",
+                    $"{name} must start with a letter and then use only letters, digits, underscores, and hyphens.",
                     nameof(tokens));
             }
 

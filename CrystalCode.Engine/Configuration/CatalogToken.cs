@@ -13,7 +13,7 @@ public sealed record CatalogToken
         if (!TryNormalize(value, out var normalized))
         {
             throw new ArgumentException(
-                "The token must start with a letter and then use only letters, digits, and hyphens.",
+                "The token must start with a letter and then use only letters, digits, underscores, and hyphens.",
                 nameof(value));
         }
 
@@ -53,7 +53,7 @@ public sealed record CatalogToken
         for (var index = 1; index < value.Length; index++)
         {
             var character = value[index];
-            if (character is not ((>= 'a' and <= 'z') or (>= '0' and <= '9') or '-'))
+            if (character is not ((>= 'a' and <= 'z') or (>= '0' and <= '9') or '-' or '_'))
             {
                 return false;
             }
