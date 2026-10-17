@@ -262,7 +262,11 @@ internal static class ModelHookTranscript
         PluginModelMessage message => new ChatMessage(
             message.Role,
             Compose(message.Text, [], message.Images)),
-        PluginModelToolCall call => new ToolCall(call.CallId, call.Name, call.Arguments),
+        PluginModelToolCall call => new ToolCall(
+            call.CallId,
+            call.Name,
+            call.Arguments,
+            ToolInputKind.Json),
         PluginModelToolResult result => new ToolResult(
             result.CallId,
             Compose(result.Text, [], result.Images),
@@ -288,7 +292,11 @@ internal static class ModelHookTranscript
         && string.Equals(final.Name, origin.Name, StringComparison.Ordinal)
         && string.Equals(final.Arguments, origin.Arguments, StringComparison.Ordinal)
             ? origin
-            : new ToolCall(final.CallId, final.Name, final.Arguments);
+            : new ToolCall(
+                final.CallId,
+                final.Name,
+                final.Arguments,
+                origin.InputKind);
 
     private static ChatItem ApplyResult(
         ToolResult origin,

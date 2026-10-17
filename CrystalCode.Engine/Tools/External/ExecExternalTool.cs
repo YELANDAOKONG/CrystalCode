@@ -35,7 +35,7 @@ internal sealed class ExecExternalTool : ITool, IMultimodalTool
         _set = set;
         _spec = spec;
         _host = host;
-        Definition = new ToolDefinition(spec.Name, spec.Schema, spec.Description);
+        Definition = ToolDefinition.Json(spec.Name, spec.Schema, spec.Description);
     }
 
     public ToolDefinition Definition { get; }

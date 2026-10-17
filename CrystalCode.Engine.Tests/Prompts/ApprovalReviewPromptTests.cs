@@ -15,7 +15,7 @@ public sealed class ApprovalReviewPromptTests
     public void UserText_RequiresAndLeadsWithConversation()
     {
         using var root = new TemporaryWorkspace();
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"src/App.cs","contents":"x"}""");
@@ -37,7 +37,7 @@ public sealed class ApprovalReviewPromptTests
     public void UserText_ThrowsWhenConversationIsMissing()
     {
         using var root = new TemporaryWorkspace();
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"src/App.cs","contents":"x"}""");

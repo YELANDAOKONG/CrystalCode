@@ -68,6 +68,7 @@ internal sealed class FencedExternalMultimodalTool : IMultimodalTool
                 call.CallId,
                 call.Name,
                 rewritten,
+                call.InputKind,
                 call.Contents);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         if (_timeoutSeconds is int seconds)

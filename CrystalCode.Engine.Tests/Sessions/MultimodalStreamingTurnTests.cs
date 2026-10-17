@@ -138,7 +138,7 @@ public sealed class MultimodalStreamingTurnTests
             cancellationToken.ThrowIfCancellationRequested();
             yield return new MultimodalMessageStarted(0, 0, MultimodalChatRole.Assistant);
             yield return new MultimodalMessageTextDelta(0, 0, 0, "partial");
-            yield return new MultimodalToolCallDelta(0, 1, "call_1", "render", "{}");
+            yield return JsonMultimodalToolCallDelta(0, 1, "call_1", "render", "{}");
             yield return new MultimodalChatCandidateCompleted(0, FinishReason.ToolCalls);
         }
     }
@@ -172,7 +172,7 @@ public sealed class MultimodalStreamingTurnTests
             cancellationToken.ThrowIfCancellationRequested();
             if (Requests.Count == 1)
             {
-                yield return new MultimodalToolCallDelta(
+                yield return JsonMultimodalToolCallDelta(
                     0,
                     0,
                     "call_1",
@@ -197,7 +197,7 @@ public sealed class MultimodalStreamingTurnTests
     {
         public IReadOnlyList<ToolDefinition> Definitions { get; } =
         [
-            new ToolDefinition(
+            ToolDefinition.Json(
                 "render",
                 JsonDocument.Parse("{\"type\":\"object\"}").RootElement,
                 "Render an image")

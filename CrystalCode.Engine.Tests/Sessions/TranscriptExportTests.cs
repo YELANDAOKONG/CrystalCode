@@ -19,7 +19,7 @@ public sealed class TranscriptExportTests
             new ChatMessage(ChatRole.System, "live system"),
             new ChatMessage(ChatRole.System, CompactionPrompt.Marker + "\nPrior work."),
             new ChatMessage(ChatRole.User, "hello"),
-            new ToolCall("1", "read", """{"path":"a.txt"}"""),
+            JsonToolCall("1", "read", """{"path":"a.txt"}"""),
             new ToolResult("1", "contents")
         };
 

@@ -59,7 +59,7 @@ public sealed class HybridMultimodalToolExecutorTests
     private static ToolDefinition CreateDefinition(string name)
     {
         using var document = JsonDocument.Parse("""{"type":"object","properties":{}}""");
-        return new ToolDefinition(name, document.RootElement.Clone(), name);
+        return ToolDefinition.Json(name, document.RootElement.Clone(), name);
     }
 
     private sealed class StubTextExecutor : IToolExecutor

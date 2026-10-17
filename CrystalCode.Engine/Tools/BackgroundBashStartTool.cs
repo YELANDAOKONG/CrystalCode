@@ -12,7 +12,7 @@ public sealed class BackgroundBashStartTool : ITool
     {
         ArgumentNullException.ThrowIfNull(tasks);
         _tasks = tasks;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

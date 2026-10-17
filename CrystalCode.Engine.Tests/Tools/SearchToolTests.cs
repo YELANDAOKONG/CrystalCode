@@ -22,7 +22,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"feature"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"feature"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         var nameIndex = output.Text.IndexOf("feature/Readme.md", StringComparison.Ordinal);
@@ -47,7 +47,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"mixedcase"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"mixedcase"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("App.cs", output.Text);
@@ -61,7 +61,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var miss = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 SearchTool.ToolName,
                 """{"query":"mixedcase","caseSensitive":true}"""));
@@ -70,7 +70,7 @@ public sealed class SearchToolTests
         Assert.Equal("No matches.", miss.Text);
 
         var hit = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "2",
                 SearchTool.ToolName,
                 """{"query":"MixedCase","caseSensitive":true}"""));
@@ -88,7 +88,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"alpha","glob":"*.cs"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"alpha","glob":"*.cs"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("App.cs", output.Text);
@@ -104,7 +104,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"alpha","path":"App.cs"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"alpha","path":"App.cs"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("App.cs", output.Text);
@@ -121,7 +121,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"alpha","path":"sub"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"alpha","path":"sub"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("sub/Inner.cs", output.Text);
@@ -138,7 +138,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var first = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"alpha","limit":1}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"alpha","limit":1}"""));
         Assert.Equal(ToolResultStatus.Success, first.Status);
         Assert.Contains("A.cs", first.Text);
         Assert.Contains(
@@ -147,7 +147,7 @@ public sealed class SearchToolTests
             StringComparison.Ordinal);
 
         var second = await tool.InvokeAsync(
-            new ToolCall("2", SearchTool.ToolName, """{"query":"alpha","offset":2,"limit":1}"""));
+            JsonToolCall("2", SearchTool.ToolName, """{"query":"alpha","offset":2,"limit":1}"""));
         Assert.Equal(ToolResultStatus.Success, second.Status);
         Assert.Contains("B.cs", second.Text);
         Assert.DoesNotContain("A.cs", second.Text);
@@ -157,7 +157,7 @@ public sealed class SearchToolTests
             StringComparison.Ordinal);
 
         var past = await tool.InvokeAsync(
-            new ToolCall("3", SearchTool.ToolName, """{"query":"alpha","offset":9}"""));
+            JsonToolCall("3", SearchTool.ToolName, """{"query":"alpha","offset":9}"""));
         Assert.Equal(ToolResultStatus.Failure, past.Status);
         Assert.Contains("offset 9 is past the end.", past.Text, StringComparison.Ordinal);
     }
@@ -177,7 +177,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("hot.txt", output.Text);
@@ -202,7 +202,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("200 matches", output.Text);
@@ -225,7 +225,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("App.cs", output.Text);
@@ -244,13 +244,13 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var byName = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"data"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"data"}"""));
 
         Assert.Equal(ToolResultStatus.Success, byName.Status);
         Assert.Contains("data.bin  (name)", byName.Text, StringComparison.Ordinal);
 
         var byContent = await tool.InvokeAsync(
-            new ToolCall("2", SearchTool.ToolName, """{"query":"needle"}"""));
+            JsonToolCall("2", SearchTool.ToolName, """{"query":"needle"}"""));
 
         Assert.Equal(ToolResultStatus.Success, byContent.Status);
         Assert.Equal("No matches.", byContent.Text);
@@ -266,7 +266,7 @@ public sealed class SearchToolTests
         var json = "{\"query\":\"alpha\",\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, json));
+            JsonToolCall("1", SearchTool.ToolName, json));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("note.txt", output.Text);
@@ -283,7 +283,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"alpha"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"alpha"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("a.txt", output.Text);
@@ -300,7 +300,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"needle"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("...", output.Text, StringComparison.Ordinal);
@@ -321,7 +321,7 @@ public sealed class SearchToolTests
         var tool = new SearchTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SearchTool.ToolName, json));
+            JsonToolCall("1", SearchTool.ToolName, json));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Contains(expected, output.Text, StringComparison.Ordinal);

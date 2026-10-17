@@ -73,7 +73,11 @@ public sealed class HybridMultimodalToolExecutor : IMultimodalToolExecutor
                 continue;
             }
 
-            var textCall = new ToolCall(call.CallId, call.Name, call.Arguments);
+            var textCall = new ToolCall(
+                call.CallId,
+                call.Name,
+                call.Arguments,
+                call.InputKind);
             var textResults = await _textExecutor.ExecuteAsync(
                 [textCall],
                 cancellationToken);
@@ -99,7 +103,11 @@ public sealed class HybridMultimodalToolExecutor : IMultimodalToolExecutor
             return Failed(call, "Model-generated tool content is not supported yet.");
         }
 
-        var textCall = new ToolCall(call.CallId, call.Name, call.Arguments);
+        var textCall = new ToolCall(
+            call.CallId,
+            call.Name,
+            call.Arguments,
+            call.InputKind);
         var decision = await _approval.DecideAsync(textCall, cancellationToken);
         if (decision.Action == ToolInvocationAction.Reject)
         {

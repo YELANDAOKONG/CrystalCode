@@ -36,7 +36,8 @@ public sealed class ChatStreamAssembler
                     .AppendToolCall(
                         toolCall.CallIdDelta,
                         toolCall.NameDelta,
-                        toolCall.ArgumentsDelta);
+                        toolCall.ArgumentsDelta,
+                        toolCall.InputKind);
                 break;
             case ChatReasoningStateReceived state:
                 GetCandidate(state.CandidateIndex)
@@ -139,6 +140,7 @@ public sealed class ChatStreamAssembler
         private readonly StringBuilder _callId = new();
         private readonly StringBuilder _name = new();
         private readonly StringBuilder _arguments = new();
+        private ToolInputKind? _inputKind;
         private ItemKind _kind;
         private ChatRole? _role;
         private OpaqueReasoningState? _state;
@@ -179,9 +181,20 @@ public sealed class ChatStreamAssembler
             _text.Append(text);
         }
 
-        public void AppendToolCall(string callIdDelta, string nameDelta, string argumentsDelta)
+        public void AppendToolCall(
+            string callIdDelta,
+            string nameDelta,
+            string argumentsDelta,
+            ToolInputKind inputKind)
         {
             SetKind(ItemKind.ToolCall);
+            if (_inputKind is not null && _inputKind != inputKind)
+            {
+                throw new InvalidOperationException(
+                    "A streamed tool call changed its input kind.");
+            }
+
+            _inputKind = inputKind;
             _callId.Append(callIdDelta);
             _name.Append(nameDelta);
             _arguments.Append(argumentsDelta);
@@ -209,7 +222,9 @@ public sealed class ChatStreamAssembler
                 ItemKind.ToolCall => new ToolCall(
                     _callId.ToString(),
                     _name.ToString(),
-                    _arguments.ToString()),
+                    _arguments.ToString(),
+                    _inputKind ?? throw new InvalidOperationException(
+                        "A streamed tool call ended without an input kind.")),
                 _ => throw new InvalidOperationException(
                     "A streamed item received no content.")
             };

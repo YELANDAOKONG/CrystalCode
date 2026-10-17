@@ -1236,7 +1236,7 @@ public sealed class TaskRunHostTests
 
     private static ChatStreamEvent[] ToolRound(string callId, string name, string arguments) =>
     [
-        new ChatToolCallDelta(0, 0, callId, name, arguments),
+        JsonChatToolCallDelta(0, 0, callId, name, arguments),
         new ChatCandidateCompleted(0, FinishReason.ToolCalls)
     ];
 

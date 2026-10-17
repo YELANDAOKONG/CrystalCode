@@ -60,7 +60,11 @@ internal sealed class FencedExternalTool : ITool
 
         var next = rewritten == call.Arguments
             ? call
-            : new ToolCall(call.CallId, call.Name, rewritten);
+            : new ToolCall(
+                call.CallId,
+                call.Name,
+                rewritten,
+                call.InputKind);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         if (_timeoutSeconds is int seconds)
         {

@@ -104,7 +104,11 @@ internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
                 reasoning.Content.Parts.Select(ConvertReasoningPart),
                 reasoning.Content.State)),
         MultimodalToolCall call when call.Contents.Count == 0 =>
-            new ToolCall(call.CallId, call.Name, call.Arguments),
+            new ToolCall(
+                call.CallId,
+                call.Name,
+                call.Arguments,
+                call.InputKind),
         MultimodalToolCall => throw new NotSupportedException(
             "Anthropic does not support multimodal tool-call content."),
         MultimodalToolResult result => new ToolResult(

@@ -138,13 +138,16 @@ public sealed class PluginCatalogTests
         Assert.Single(catalog.RawHooks);
         Assert.Equal("sample", catalog.WorkTools[0].Definition.Name);
         Assert.Empty(catalog.PlanTools);
-        var output = await catalog.WorkTools[0].InvokeAsync(new Crystal.Tools.ToolCall("1", "sample", "{}"));
+        var output = await catalog.WorkTools[0].InvokeAsync(
+            JsonToolCall("1", "sample", "{}"));
         Assert.Equal("sample-ok", output.Text);
         var hosted = catalog.WorkTools.Single(tool => tool.Definition.Name == "hosted");
-        var first = await hosted.InvokeAsync(new Crystal.Tools.ToolCall("2", "hosted", "{}"));
+        var first = await hosted.InvokeAsync(
+            JsonToolCall("2", "hosted", "{}"));
         Assert.Equal(root.Root + "\nsess-1\naudit", first.Text);
         approval = "full";
-        var second = await hosted.InvokeAsync(new Crystal.Tools.ToolCall("3", "hosted", "{}"));
+        var second = await hosted.InvokeAsync(
+            JsonToolCall("3", "hosted", "{}"));
         Assert.Equal(root.Root + "\nsess-1\nfull", second.Text);
         var pipeline = new PluginHookPipeline(catalog.Hooks, rawHooks: catalog.RawHooks);
         Assert.Equal("hook-line", pipeline.OnPrompt("work", string.Empty));
@@ -197,12 +200,14 @@ public sealed class PluginCatalogTests
             ExtensionDataKind.Plugins,
             "Fixture");
         var dataTool = catalog.WorkTools.Single(tool => tool.Definition.Name == "datadirs");
-        var dataLine = await dataTool.InvokeAsync(new Crystal.Tools.ToolCall("5", "datadirs", "{}"));
+        var dataLine = await dataTool.InvokeAsync(
+            JsonToolCall("5", "datadirs", "{}"));
         Assert.Equal(dataPaths.GlobalDirectory + "\n" + dataPaths.ProjectDirectory, dataLine.Text);
         Assert.True(Directory.Exists(dataPaths.GlobalDirectory));
         Assert.True(Directory.Exists(dataPaths.ProjectDirectory));
         var peers = catalog.WorkTools.Single(tool => tool.Definition.Name == "peers");
-        var listed = await peers.InvokeAsync(new Crystal.Tools.ToolCall("4", "peers", "{}"));
+        var listed = await peers.InvokeAsync(
+            JsonToolCall("4", "peers", "{}"));
         Assert.Equal("1\n1\n1\n1\nsession\nyes", listed.Text);
         var table = new PluginPlaceholderTable(catalog.Placeholders, _ => { });
         table.SetEnvironment(environment);
@@ -362,7 +367,7 @@ public sealed class PluginCatalogTests
                     {
                         _plugin = plugin;
                         using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                        Definition = new ToolDefinition("peers", document.RootElement.Clone(), "Peers.");
+                        Definition = ToolDefinition.Json("peers", document.RootElement.Clone(), "Peers.");
                     }
 
                     public ToolDefinition Definition { get; }
@@ -396,7 +401,7 @@ public sealed class PluginCatalogTests
                     public Inner()
                     {
                         using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                        Definition = new ToolDefinition("sample", document.RootElement.Clone(), "Sample.");
+                        Definition = ToolDefinition.Json("sample", document.RootElement.Clone(), "Sample.");
                     }
 
                     public ToolDefinition Definition { get; }
@@ -419,7 +424,7 @@ public sealed class PluginCatalogTests
                     public Inner()
                     {
                         using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                        Definition = new ToolDefinition("hosted", document.RootElement.Clone(), "Hosted.");
+                        Definition = ToolDefinition.Json("hosted", document.RootElement.Clone(), "Hosted.");
                     }
 
                     public ToolDefinition Definition { get; }
@@ -453,7 +458,7 @@ public sealed class PluginCatalogTests
                     {
                         _plugin = plugin;
                         using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                        Definition = new ToolDefinition(
+                        Definition = ToolDefinition.Json(
                             "datadirs",
                             document.RootElement.Clone(),
                             "Data directories.");

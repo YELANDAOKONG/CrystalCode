@@ -141,6 +141,6 @@ internal static class CompatibleChatResponseReader
                 $"{profile.VendorName} tool call is missing argument text.");
         }
 
-        return new ToolCall(callId, name, arguments);
+        return new ToolCall(callId, name, arguments, ToolInputKind.Json);
     }
 }

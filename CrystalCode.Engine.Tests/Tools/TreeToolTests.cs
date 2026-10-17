@@ -18,7 +18,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, "{}"));
+            JsonToolCall("1", TreeTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("src/\nsrc/inner/", output.Text);
@@ -35,7 +35,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"files":true}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"files":true}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("src/\nsrc/app.cs\nalpha.txt\nzeta.txt", output.Text);
@@ -49,7 +49,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"depth":99}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"depth":99}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("a/\na/b/\na/b/c/\na/b/c/d/", output.Text);
@@ -62,7 +62,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"depth":0}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"depth":0}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Contains("depth must be positive", output.Text, StringComparison.Ordinal);
@@ -75,7 +75,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"files":"yes"}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"files":"yes"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Contains(
@@ -96,7 +96,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, "{}"));
+            JsonToolCall("1", TreeTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("src/", output.Text);
@@ -114,7 +114,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"files":true}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"files":true}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal(".crystal/\n.crystal/notes.md", output.Text);
@@ -127,7 +127,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"path":"~/.ssh"}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"path":"~/.ssh"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("Listing credential paths is not allowed.", output.Text);
@@ -149,7 +149,7 @@ public sealed class TreeToolTests
 
         var tool = new TreeTool(new Workspace(root.Path));
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"files":true}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"files":true}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("[+5 more files in big]", output.Text, StringComparison.Ordinal);
@@ -171,7 +171,7 @@ public sealed class TreeToolTests
 
         var tool = new TreeTool(new Workspace(root.Path));
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"files":true}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"files":true}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains(
@@ -191,7 +191,7 @@ public sealed class TreeToolTests
 
         var tool = new TreeTool(new Workspace(root.Path));
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, "{}"));
+            JsonToolCall("1", TreeTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains(
@@ -212,7 +212,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"files":true}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"files":true}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("real/\nreal/note.txt", output.Text);
@@ -228,7 +228,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, "{}"));
+            JsonToolCall("1", TreeTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("(no directories)", output.Text);
@@ -242,7 +242,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"path":"note.txt"}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"path":"note.txt"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("note.txt", output.Text);
@@ -256,7 +256,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"path":"empty"}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"path":"empty"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("(no directories)", output.Text);
@@ -269,7 +269,7 @@ public sealed class TreeToolTests
         var tool = new TreeTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, """{"path":"missing"}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"path":"missing"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Contains("Path not found", output.Text, StringComparison.Ordinal);
@@ -285,7 +285,7 @@ public sealed class TreeToolTests
         var json = "{\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", TreeTool.ToolName, json));
+            JsonToolCall("1", TreeTool.ToolName, json));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.EndsWith("data/", output.Text, StringComparison.Ordinal);

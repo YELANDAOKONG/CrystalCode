@@ -17,7 +17,7 @@ public sealed class GlobToolTests
         var tool = new GlobTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.cs"}"""));
+            JsonToolCall("1", GlobTool.ToolName, """{"pattern":"*.cs"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("App.cs", output.Text);
@@ -31,7 +31,7 @@ public sealed class GlobToolTests
         var tool = new GlobTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 GlobTool.ToolName,
                 """{"pattern":"*.cs","path":"","offset":null,"limit":null}"""));
@@ -52,7 +52,7 @@ public sealed class GlobToolTests
         var tool = new GlobTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt","offset":2,"limit":2}"""));
+            JsonToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt","offset":2,"limit":2}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal(
@@ -68,7 +68,7 @@ public sealed class GlobToolTests
         var tool = new GlobTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt","offset":2}"""));
+            JsonToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt","offset":2}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("Glob matched 1 file; offset 2 is past the end.", output.Text);
@@ -82,7 +82,7 @@ public sealed class GlobToolTests
         var tool = new GlobTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.cs","path":"App.cs"}"""));
+            JsonToolCall("1", GlobTool.ToolName, """{"pattern":"*.cs","path":"App.cs"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("App.cs", output.Text);
@@ -99,7 +99,7 @@ public sealed class GlobToolTests
         var tool = new GlobTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt"}"""));
+            JsonToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("a.txt\nlink.txt", output.Text);
@@ -117,9 +117,9 @@ public sealed class GlobToolTests
         var tool = new GlobTool(new Workspace(root.Path));
 
         var firstPage = await tool.InvokeAsync(
-            new ToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt","limit":2}"""));
+            JsonToolCall("1", GlobTool.ToolName, """{"pattern":"*.txt","limit":2}"""));
         var lastPage = await tool.InvokeAsync(
-            new ToolCall("2", GlobTool.ToolName, """{"pattern":"*.txt","offset":1001,"limit":1}"""));
+            JsonToolCall("2", GlobTool.ToolName, """{"pattern":"*.txt","offset":1001,"limit":1}"""));
 
         Assert.Equal(ToolResultStatus.Success, firstPage.Status);
         Assert.Equal(

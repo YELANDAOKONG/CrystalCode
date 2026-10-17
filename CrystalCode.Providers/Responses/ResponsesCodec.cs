@@ -179,7 +179,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
         writer.WriteEndObject();
     }
 
-    private static void WriteTools(Utf8JsonWriter writer, IReadOnlyList<ToolDefinition> tools)
+    private void WriteTools(Utf8JsonWriter writer, IReadOnlyList<ToolDefinition> tools)
     {
         if (tools.Count == 0)
         {
@@ -199,7 +199,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
             }
 
             writer.WritePropertyName("parameters");
-            tool.InputSchema.WriteTo(writer);
+            ToolInputJson.RequireSchema(tool, _vendorName).WriteTo(writer);
             writer.WriteEndObject();
         }
 
@@ -307,7 +307,8 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 items.Add(new ToolCall(
                     callId,
                     name,
-                    ReadArgumentText(item, "arguments")));
+                    ReadArgumentText(item, "arguments"),
+                    ToolInputKind.Json));
                 break;
         }
     }
@@ -782,7 +783,8 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 ItemIndex(outputIndex, StreamItemKind.ToolCall),
                 callId,
                 name,
-                ""));
+                "",
+                ToolInputKind.Json));
         }
 
         private void AppendArgumentFragment(int outputIndex, string delta, List<ChatStreamEvent> events)
@@ -802,7 +804,8 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 ItemIndex(outputIndex, StreamItemKind.ToolCall),
                 "",
                 "",
-                delta));
+                delta,
+                ToolInputKind.Json));
         }
 
         private void AcceptCompleteArguments(int outputIndex, string arguments, List<ChatStreamEvent> events)
@@ -820,7 +823,8 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 ItemIndex(outputIndex, StreamItemKind.ToolCall),
                 "",
                 "",
-                arguments));
+                arguments,
+                ToolInputKind.Json));
         }
 
         // output_index is not a Crystal item. GPT streams reuse one index for

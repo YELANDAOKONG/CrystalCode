@@ -188,7 +188,7 @@ public sealed class OpenAIProviderTests
             () => provider.CompleteAsync(new ChatRequest(
             [
                 new ChatMessage(ChatRole.User, "read"),
-                new ToolCall("call_1", "read", "{}")
+                JsonToolCall("call_1", "read", "{}")
             ])));
 
         Assert.Contains("missing a tool result for 'call_1'", exception.Message, StringComparison.Ordinal);

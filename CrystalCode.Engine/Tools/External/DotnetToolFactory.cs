@@ -134,17 +134,24 @@ internal static class DotnetToolFactory
                 return false;
             }
 
+            if (!TryRequireJsonSchema(definition, out var schema))
+            {
+                notes.Add(
+                    $"External tool set '{set.DirectoryName}' was skipped: tool '{name}' uses text input, which is not supported yet.");
+                return false;
+            }
+
             ExternalToolSpec spec;
             if (overlays.Remove(name, out var overlay))
             {
-                spec = WithDefinition(definition, overlay);
+                spec = WithDefinition(definition, overlay, schema);
             }
             else
             {
                 spec = new ExternalToolSpec(
                     name,
                     definition.Description ?? name,
-                    definition.InputSchema,
+                    schema,
                     set.Catalogs,
                     approval: set.Approval);
             }
@@ -281,11 +288,12 @@ internal static class DotnetToolFactory
 
     private static ExternalToolSpec WithDefinition(
         ToolDefinition definition,
-        ExternalToolSpec overlay) =>
+        ExternalToolSpec overlay,
+        JsonElement schema) =>
         new(
             definition.Name,
             definition.Description ?? overlay.Description,
-            definition.InputSchema,
+            schema,
             overlay.Catalogs,
             overlay.CommandSuffix,
             overlay.Argv,
@@ -368,7 +376,30 @@ internal static class DotnetToolFactory
     private static bool DefinitionsMatch(ToolDefinition left, ToolDefinition right) =>
         string.Equals(left.Name, right.Name, StringComparison.Ordinal)
         && string.Equals(left.Description, right.Description, StringComparison.Ordinal)
-        && JsonElement.DeepEquals(left.InputSchema, right.InputSchema);
+        && InputsMatch(left.Input, right.Input);
+
+    private static bool TryRequireJsonSchema(
+        ToolDefinition definition,
+        out JsonElement schema)
+    {
+        if (definition.Input is JsonToolInput json)
+        {
+            schema = json.Schema;
+            return true;
+        }
+
+        schema = default;
+        return false;
+    }
+
+    private static bool InputsMatch(ToolInput left, ToolInput right) =>
+        (left, right) switch
+        {
+            (JsonToolInput leftJson, JsonToolInput rightJson) =>
+                JsonElement.DeepEquals(leftJson.Schema, rightJson.Schema),
+            (TextToolInput, TextToolInput) => true,
+            _ => false
+        };
 
     private static void AddText(
         ExternalToolSpec spec,

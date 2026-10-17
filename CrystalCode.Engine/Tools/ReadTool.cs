@@ -24,7 +24,7 @@ public sealed class ReadTool : ITool
     {
         ArgumentNullException.ThrowIfNull(workspace);
         _workspace = workspace;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

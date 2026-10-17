@@ -17,7 +17,7 @@ public sealed class WriteToolTests
         var tool = new WriteTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 WriteTool.ToolName,
                 """{"path":"src/App.cs","contents":"class App {}"}"""));
@@ -34,7 +34,7 @@ public sealed class WriteToolTests
         var tool = new WriteTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", WriteTool.ToolName, """{"path":"empty.txt","contents":""}"""));
+            JsonToolCall("1", WriteTool.ToolName, """{"path":"empty.txt","contents":""}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal(string.Empty, File.ReadAllText(Path.Combine(root.Path, "empty.txt")));
@@ -49,7 +49,7 @@ public sealed class WriteToolTests
         var tool = new WriteTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 WriteTool.ToolName,
                 PathArguments(target, "hello")));
@@ -69,7 +69,7 @@ public sealed class WriteToolTests
         var tool = new WriteTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 WriteTool.ToolName,
                 """{"path":".ssh/id_rsa","contents":"OVERWRITTEN"}"""));
@@ -90,7 +90,7 @@ public sealed class WriteToolTests
         var tool = new WriteTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 WriteTool.ToolName,
                 """{"path":"link.txt","contents":"PWN"}"""));
@@ -111,7 +111,7 @@ public sealed class WriteToolTests
         var tool = new WriteTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 WriteTool.ToolName,
                 PathArguments(key, "OVERWRITTEN")));

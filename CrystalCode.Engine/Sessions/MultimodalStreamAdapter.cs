@@ -55,7 +55,8 @@ public static class MultimodalStreamAdapter
                 tool.ItemIndex,
                 tool.CallIdDelta,
                 tool.NameDelta,
-                tool.ArgumentsDelta),
+                tool.ArgumentsDelta,
+                tool.InputKind),
             MultimodalToolCallContentReceived tool => throw UnsupportedOutput(
                 tool.Content.Modality),
             MultimodalChatCandidateCompleted completed => new ChatCandidateCompleted(

@@ -19,7 +19,7 @@ public sealed class TodoReadToolTests
         ]);
         var tool = new TodoReadTool(todos);
 
-        var output = await tool.InvokeAsync(new ToolCall("1", TodoReadTool.ToolName, "{}"));
+        var output = await tool.InvokeAsync(JsonToolCall("1", TodoReadTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("- [ ] wait", output.Text, StringComparison.Ordinal);
@@ -32,7 +32,7 @@ public sealed class TodoReadToolTests
     {
         var tool = new TodoReadTool(new TodoList());
 
-        var output = await tool.InvokeAsync(new ToolCall("1", TodoReadTool.ToolName, "{}"));
+        var output = await tool.InvokeAsync(JsonToolCall("1", TodoReadTool.ToolName, "{}"));
 
         Assert.Equal("No todos.", output.Text);
     }

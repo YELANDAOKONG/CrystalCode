@@ -34,7 +34,7 @@ public sealed class SearchTool : ITool
     {
         ArgumentNullException.ThrowIfNull(workspace);
         _workspace = workspace;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 $$"""

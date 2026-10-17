@@ -439,7 +439,7 @@ public sealed class CodingSessionHeadlessTests
     {
         return
         [
-            new ChatToolCallDelta(0, 0, callId, name, arguments),
+            JsonChatToolCallDelta(0, 0, callId, name, arguments),
             new ChatCandidateCompleted(0, FinishReason.ToolCalls)
         ];
     }

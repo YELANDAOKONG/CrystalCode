@@ -46,7 +46,7 @@ public sealed class DotnetToolFactoryTests
         Assert.NotNull(catalog.WorkTools.FirstOrDefault(tool => tool.Definition.Name == "beta"));
         Assert.True(catalog.WorkTools[0] is ITool);
         var alpha = catalog.WorkTools.First(tool => tool.Definition.Name == "alpha");
-        var outputText = await alpha.InvokeAsync(new ToolCall("1", "alpha", "{}"));
+        var outputText = await alpha.InvokeAsync(JsonToolCall("1", "alpha", "{}"));
         Assert.Equal("alpha-ok", outputText.Text);
     }
 
@@ -69,7 +69,7 @@ public sealed class DotnetToolFactoryTests
                 public SlowTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("slow", document.RootElement.Clone(), "Slow.");
+                    Definition = ToolDefinition.Json("slow", document.RootElement.Clone(), "Slow.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -100,7 +100,7 @@ public sealed class DotnetToolFactoryTests
             enabled: true);
         var tool = Assert.Single(catalog.WorkTools);
 
-        var timedOut = await tool.InvokeAsync(new ToolCall("1", "slow", "{}"));
+        var timedOut = await tool.InvokeAsync(JsonToolCall("1", "slow", "{}"));
 
         Assert.Equal(ToolResultStatus.Failure, timedOut.Status);
         Assert.Contains("timed out after 1 second", timedOut.Text, StringComparison.Ordinal);
@@ -123,7 +123,7 @@ public sealed class DotnetToolFactoryTests
         using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => tool.InvokeAsync(new ToolCall("2", "slow", "{}"), cancellation.Token).AsTask());
+            () => tool.InvokeAsync(JsonToolCall("2", "slow", "{}"), cancellation.Token).AsTask());
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public sealed class DotnetToolFactoryTests
                 private static ToolDefinition CreateDefinition()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    return new ToolDefinition("boom", document.RootElement.Clone(), "Boom.");
+                    return ToolDefinition.Json("boom", document.RootElement.Clone(), "Boom.");
                 }
             }
             """);
@@ -243,7 +243,7 @@ public sealed class DotnetToolFactoryTests
                 public ImageTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{\"path\":{\"type\":\"string\"}}}");
-                    Definition = new ToolDefinition("image", document.RootElement.Clone(), "Image.");
+                    Definition = ToolDefinition.Json("image", document.RootElement.Clone(), "Image.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -289,7 +289,7 @@ public sealed class DotnetToolFactoryTests
             catalog.WorkMultimodalTools,
             tool => tool.Definition.Name == "image");
         var result = await tool.InvokeAsync(
-            new MultimodalToolCall("1", "image", """{"path":"capture.png"}"""));
+            JsonMultimodalToolCall("1", "image", """{"path":"capture.png"}"""));
 
         var text = Assert.IsType<TextContent>(result.Contents[0]);
         using var arguments = JsonDocument.Parse(text.Text);
@@ -320,7 +320,7 @@ public sealed class DotnetToolFactoryTests
                 public SlowImageTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("slow_image", document.RootElement.Clone(), "Slow image.");
+                    Definition = ToolDefinition.Json("slow_image", document.RootElement.Clone(), "Slow image.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -350,7 +350,7 @@ public sealed class DotnetToolFactoryTests
             enabled: true);
         var tool = Assert.Single(catalog.WorkMultimodalTools);
 
-        var result = await tool.InvokeAsync(new MultimodalToolCall("1", "slow_image", "{}"));
+        var result = await tool.InvokeAsync(JsonMultimodalToolCall("1", "slow_image", "{}"));
 
         Assert.Equal(MultimodalToolResultStatus.Failure, result.Status);
         var text = Assert.IsType<TextContent>(Assert.Single(result.Contents));
@@ -381,7 +381,7 @@ public sealed class DotnetToolFactoryTests
                 public HostTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("where", document.RootElement.Clone(), "Where.");
+                    Definition = ToolDefinition.Json("where", document.RootElement.Clone(), "Where.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -399,7 +399,7 @@ public sealed class DotnetToolFactoryTests
                 public HostImageTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("where_image", document.RootElement.Clone(), "Where image.");
+                    Definition = ToolDefinition.Json("where_image", document.RootElement.Clone(), "Where image.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -435,10 +435,10 @@ public sealed class DotnetToolFactoryTests
         Assert.Empty(catalog.Notes);
         Assert.True(File.Exists(Path.Combine(output, "CrystalCode.Tools.dll")));
         var expected = root.Root + "\nsess-9\naudit";
-        var text = await Assert.Single(catalog.WorkTools).InvokeAsync(new ToolCall("1", "where", "{}"));
+        var text = await Assert.Single(catalog.WorkTools).InvokeAsync(JsonToolCall("1", "where", "{}"));
         Assert.Equal(expected, text.Text);
         var pictured = await Assert.Single(catalog.WorkMultimodalTools)
-            .InvokeAsync(new MultimodalToolCall("2", "where_image", "{}"));
+            .InvokeAsync(JsonMultimodalToolCall("2", "where_image", "{}"));
         var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
         Assert.Equal(expected, content.Text);
     }
@@ -465,7 +465,7 @@ public sealed class DotnetToolFactoryTests
                 public PatchTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("patch", document.RootElement.Clone(), "Patch.");
+                    Definition = ToolDefinition.Json("patch", document.RootElement.Clone(), "Patch.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -506,7 +506,7 @@ public sealed class DotnetToolFactoryTests
         Assert.Empty(catalog.Notes);
         Assert.True(Assert.Single(catalog.Tools).HasApprovalClassifier);
         var classification = await catalog.Classifier.ClassifyAsync(
-            new ToolCall("1", "patch", "{}"), root);
+            JsonToolCall("1", "patch", "{}"), root);
         Assert.NotNull(classification);
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -545,7 +545,7 @@ public sealed class DotnetToolFactoryTests
                 public PatchImage()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("patch_image", document.RootElement.Clone(), "Patch image.");
+                    Definition = ToolDefinition.Json("patch_image", document.RootElement.Clone(), "Patch image.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -579,7 +579,7 @@ public sealed class DotnetToolFactoryTests
         Assert.Single(catalog.WorkMultimodalTools);
         Assert.True(Assert.Single(catalog.Tools).HasApprovalClassifier);
         var classification = await catalog.Classifier.ClassifyAsync(
-            new ToolCall("1", "patch_image", "{}"), root);
+            JsonToolCall("1", "patch_image", "{}"), root);
         Assert.NotNull(classification);
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -667,7 +667,7 @@ public sealed class DotnetToolFactoryTests
                 public AlphaTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("alpha", document.RootElement.Clone(), "Alpha.");
+                    Definition = ToolDefinition.Json("alpha", document.RootElement.Clone(), "Alpha.");
                 }
 
                 public ToolDefinition Definition { get; }
@@ -691,7 +691,7 @@ public sealed class DotnetToolFactoryTests
                 public BetaTool()
                 {
                     using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-                    Definition = new ToolDefinition("beta", document.RootElement.Clone(), "Beta.");
+                    Definition = ToolDefinition.Json("beta", document.RootElement.Clone(), "Beta.");
                 }
 
                 public ToolDefinition Definition { get; }

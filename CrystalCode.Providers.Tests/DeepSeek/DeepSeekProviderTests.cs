@@ -47,7 +47,7 @@ public sealed class DeepSeekProviderTests
                     new ChatMessage(ChatRole.System, "Be brief."),
                     new ChatMessage(ChatRole.User, "Hello.")
                 ],
-                [new ToolDefinition("read", schema.RootElement, "Read a file.")],
+                [ToolDefinition.Json("read", schema.RootElement, "Read a file.")],
                 new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.High)));
 
         Assert.NotNull(handler.Request);
@@ -119,7 +119,7 @@ public sealed class DeepSeekProviderTests
             () => provider.CompleteAsync(new ChatRequest(
             [
                 new ChatMessage(ChatRole.System, "system"),
-                new ToolCall("call_dangling", "bash", "{\"command\":\"ls\"}"),
+                JsonToolCall("call_dangling", "bash", "{\"command\":\"ls\"}"),
                 new ChatMessage(ChatRole.User, "next user message")
             ])));
 

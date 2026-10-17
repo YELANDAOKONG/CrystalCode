@@ -73,7 +73,8 @@ internal static class CompatibleMultimodalRequestWriter
         MultimodalToolCall call when call.Contents.Count == 0 => new ToolCall(
             call.CallId,
             call.Name,
-            call.Arguments),
+            call.Arguments,
+            call.InputKind),
         MultimodalToolCall => throw new NotSupportedException(
             "Compatible Chat Completions does not support multimodal tool-call content."),
         MultimodalToolResult result => new ToolResult(

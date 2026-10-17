@@ -16,7 +16,7 @@ public sealed class BackgroundBashToolTests
         var start = new BackgroundBashStartTool(registry);
 
         var started = await start.InvokeAsync(
-            new ToolCall("1", BackgroundBashStartTool.ToolName, """{"command":"printf ready"}"""));
+            JsonToolCall("1", BackgroundBashStartTool.ToolName, """{"command":"printf ready"}"""));
 
         Assert.Equal(ToolResultStatus.Success, started.Status);
         var taskId = ReadValue(started.Text, "task_id");
@@ -27,7 +27,7 @@ public sealed class BackgroundBashToolTests
         Assert.Contains("exit_code: 0", statusOutput.Text, StringComparison.Ordinal);
 
         var logsOutput = await logs.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "2",
                 BackgroundBashLogsTool.ToolName,
                 $$"""{"taskId":"{{taskId}}","limit":100}"""));
@@ -45,7 +45,7 @@ public sealed class BackgroundBashToolTests
         var start = new BackgroundBashStartTool(registry);
         var stop = new BackgroundBashStopTool(registry);
         var started = await start.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 BackgroundBashStartTool.ToolName,
                 """{"command":"while true; do printf x >> beat.txt; done"}"""));
@@ -53,7 +53,7 @@ public sealed class BackgroundBashToolTests
         var beat = Path.Combine(root.Path, "beat.txt");
         await ShellHeartbeat.WaitUntilWritingAsync(beat);
         var stopped = await stop.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "2",
                 BackgroundBashStopTool.ToolName,
                 $$"""{"taskId":"{{taskId}}"}"""));
@@ -152,7 +152,7 @@ public sealed class BackgroundBashToolTests
         while (DateTimeOffset.UtcNow - startedAt < TimeSpan.FromSeconds(5))
         {
             var output = await status.InvokeAsync(
-                new ToolCall(
+                JsonToolCall(
                     "2",
                     BackgroundBashStatusTool.ToolName,
                     $$"""{"taskId":"{{taskId}}"}"""));

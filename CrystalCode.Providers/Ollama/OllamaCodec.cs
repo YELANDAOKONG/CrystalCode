@@ -135,7 +135,8 @@ internal sealed class OllamaCodec : IProtocolCodec
                     {
                         ["name"] = tool.Name,
                         ["description"] = tool.Description ?? string.Empty,
-                        ["parameters"] = JsonNode.Parse(tool.InputSchema.GetRawText())
+                        ["parameters"] = JsonNode.Parse(
+                            ToolInputJson.RequireSchema(tool, "Ollama").GetRawText())
                     }
                 });
             }
@@ -235,7 +236,11 @@ internal sealed class OllamaCodec : IProtocolCodec
         var arguments = function.TryGetProperty("arguments", out var args)
             ? args.GetRawText()
             : "{}";
-        return new ToolCall($"ollama_{Guid.NewGuid():N}", name, arguments);
+        return new ToolCall(
+            $"ollama_{Guid.NewGuid():N}",
+            name,
+            arguments,
+            ToolInputKind.Json);
     }
 
     internal static FinishReason ReadFinish(JsonElement root, bool hasTools)

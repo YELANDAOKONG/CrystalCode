@@ -18,7 +18,7 @@ public sealed class EditToolTests
         var tool = new EditTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 EditTool.ToolName,
                 """{"path":"App.cs","old_string":"old","new_string":"new"}"""));
@@ -36,7 +36,7 @@ public sealed class EditToolTests
         var tool = new EditTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 EditTool.ToolName,
                 """{"path":"App.cs","old_string":"old","new_string":"new"}"""));
@@ -58,7 +58,7 @@ public sealed class EditToolTests
             + ",\"old_string\":\"old\",\"new_string\":\"new\"}";
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", EditTool.ToolName, arguments));
+            JsonToolCall("1", EditTool.ToolName, arguments));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains(target, output.Text, StringComparison.Ordinal);

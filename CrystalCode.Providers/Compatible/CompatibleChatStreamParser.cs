@@ -4,6 +4,7 @@ using System.Text.Json;
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Crystal.Tools;
 
 namespace CrystalCode.Providers.Compatible;
 
@@ -183,7 +184,8 @@ internal sealed class CompatibleChatStreamParser
                 itemIndex,
                 callIdDelta,
                 nameDelta,
-                argumentsDelta));
+                argumentsDelta,
+                ToolInputKind.Json));
     }
 
     private static string ReadDeltaString(JsonElement element, string name)

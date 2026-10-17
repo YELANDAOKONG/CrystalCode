@@ -27,7 +27,7 @@ public sealed class QuestionTool : ITool
     {
         ArgumentNullException.ThrowIfNull(prompt);
         _prompt = prompt;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

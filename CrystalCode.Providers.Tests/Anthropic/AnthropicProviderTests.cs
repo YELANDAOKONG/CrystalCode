@@ -30,7 +30,7 @@ public sealed class AnthropicProviderTests
 
         var response = await provider.CompleteAsync(new ChatRequest(
             [new ChatMessage(ChatRole.System, "system"), new ChatMessage(ChatRole.User, "Hi")],
-            [new ToolDefinition("read", JsonDocument.Parse("{\"type\":\"object\"}").RootElement, "Read a file")]));
+            [ToolDefinition.Json("read", JsonDocument.Parse("{\"type\":\"object\"}").RootElement, "Read a file")]));
 
         Assert.Equal(new Uri("https://example.test/v1/messages"), handler.Request!.RequestUri);
         Assert.Equal("test-key", handler.Request.Headers.GetValues("x-api-key").Single());

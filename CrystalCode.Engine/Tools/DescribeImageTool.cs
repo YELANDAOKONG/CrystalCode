@@ -29,7 +29,7 @@ public sealed class DescribeImageTool : ITool
         ArgumentNullException.ThrowIfNull(describer);
         _workspace = workspace;
         _describer = describer;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

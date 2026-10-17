@@ -34,7 +34,7 @@ public sealed class DescribeImageToolTests
             new ImageDescriber(() => client, system, reasoning));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", DescribeImageTool.ToolName, """{"path":"shot.png","question":"what color"}"""));
+            JsonToolCall("1", DescribeImageTool.ToolName, """{"path":"shot.png","question":"what color"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("a red square", output.Text);
@@ -68,7 +68,7 @@ public sealed class DescribeImageToolTests
                 reasoning: null));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", DescribeImageTool.ToolName, """{"path":"shot.png"}"""));
+            JsonToolCall("1", DescribeImageTool.ToolName, """{"path":"shot.png"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("The image model returned no description.", output.Text);
@@ -87,7 +87,7 @@ public sealed class DescribeImageToolTests
                 reasoning: null));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", DescribeImageTool.ToolName, """{"path":"shot.png"}"""));
+            JsonToolCall("1", DescribeImageTool.ToolName, """{"path":"shot.png"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("The image model failed: missing credential", output.Text);

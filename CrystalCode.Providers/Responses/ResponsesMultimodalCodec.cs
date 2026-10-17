@@ -271,7 +271,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             $"Responses does not support image source {image.Source.Kind.Value}.")
     };
 
-    private static void WriteTools(
+    private void WriteTools(
         Utf8JsonWriter writer,
         IReadOnlyList<ToolDefinition> tools)
     {
@@ -293,7 +293,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             }
 
             writer.WritePropertyName("parameters");
-            tool.InputSchema.WriteTo(writer);
+            ToolInputJson.RequireSchema(tool, _vendorName).WriteTo(writer);
             writer.WriteEndObject();
         }
 
@@ -404,7 +404,8 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         ToolCall call => new MultimodalToolCall(
             call.CallId,
             call.Name,
-            call.Arguments),
+            call.Arguments,
+            call.InputKind),
         ToolResult result => new MultimodalToolResult(
             result.CallId,
             [new TextContent(result.Text)],
@@ -470,7 +471,8 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 tool.ItemIndex,
                 tool.CallIdDelta,
                 tool.NameDelta,
-                tool.ArgumentsDelta),
+                tool.ArgumentsDelta,
+                tool.InputKind),
             ChatCandidateCompleted completed => new MultimodalChatCandidateCompleted(
                 completed.CandidateIndex,
                 completed.FinishReason),

@@ -59,7 +59,7 @@ public sealed class ResponsesMultimodalProviderTests
             new MultimodalMessage(
                 MultimodalChatRole.User,
                 [new TextContent("Inspect the tool output")]),
-            new MultimodalToolCall("call_1", "render", "{}"),
+            JsonMultimodalToolCall("call_1", "render", "{}"),
             new MultimodalToolResult(
                 "call_1",
                 [new TextContent("rendered"), Image([4, 5, 6], "image/png")])

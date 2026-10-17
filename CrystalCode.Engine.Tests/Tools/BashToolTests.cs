@@ -16,7 +16,7 @@ public sealed class BashToolTests
         var tool = new BashTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"cat note.txt"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"cat note.txt"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.StartsWith("exit 0", output.Text);
@@ -30,7 +30,7 @@ public sealed class BashToolTests
         var tool = new BashTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":""}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":""}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("Arguments must include a command string.", output.Text);
@@ -43,7 +43,7 @@ public sealed class BashToolTests
         var tool = new BashTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"exit 7"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"exit 7"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.StartsWith("exit 7", output.Text);
@@ -56,7 +56,7 @@ public sealed class BashToolTests
         var tool = new BashTool(new Workspace(root.Path), timeoutSeconds: 1);
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"sleep 30"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"sleep 30"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Contains("timed out after 1 second", output.Text, StringComparison.Ordinal);
@@ -69,7 +69,7 @@ public sealed class BashToolTests
         var tool = new BashTool(new Workspace(root.Path), timeoutSeconds: null);
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"sleep 0.2"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"sleep 0.2"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("no per-command timeout", tool.Definition.Description, StringComparison.Ordinal);
@@ -82,7 +82,7 @@ public sealed class BashToolTests
         var tool = new BashTool(new Workspace(root.Path), timeoutSeconds: null);
         using var cancellation = new CancellationTokenSource();
         var running = tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 BashTool.ToolName,
                 """{"command":"while true; do printf x >> beat.txt; done"}"""),

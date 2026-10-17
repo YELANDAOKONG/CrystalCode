@@ -47,7 +47,7 @@ public sealed class OllamaMultimodalProviderTests
         await provider.CompleteAsync(new MultimodalChatRequest(
         [
             new MultimodalMessage(MultimodalChatRole.User, [new TextContent("inspect")]),
-            new MultimodalToolCall("call_1", "render", "{}"),
+            JsonMultimodalToolCall("call_1", "render", "{}"),
             new MultimodalToolResult(
                 "call_1",
                 [

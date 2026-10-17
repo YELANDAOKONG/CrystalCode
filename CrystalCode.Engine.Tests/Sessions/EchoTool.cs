@@ -8,7 +8,7 @@ internal sealed class EchoTool : ITool
 {
     public EchoTool()
     {
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             "echo",
             ToolSchema.Parse("""{"type":"object","properties":{}}"""),
             "Returns the call arguments.");

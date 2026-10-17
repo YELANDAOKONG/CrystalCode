@@ -23,7 +23,7 @@ public sealed class ApprovalPolicyTests
         var policy = context.CreatePolicy(prompt);
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
@@ -43,7 +43,7 @@ public sealed class ApprovalPolicyTests
             advise: static (_, classification) => classification with { RequirePrompt = true });
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
@@ -62,7 +62,7 @@ public sealed class ApprovalPolicyTests
         var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
@@ -85,7 +85,7 @@ public sealed class ApprovalPolicyTests
         var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
@@ -108,7 +108,7 @@ public sealed class ApprovalPolicyTests
         var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
@@ -127,7 +127,7 @@ public sealed class ApprovalPolicyTests
         var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
@@ -149,7 +149,7 @@ public sealed class ApprovalPolicyTests
         var json = "{\"path\":\"" + loose.Replace("\\", "/") + "\"}";
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
@@ -177,7 +177,7 @@ public sealed class ApprovalPolicyTests
         var json = "{\"path\":\"" + nested.Replace("\\", "/") + "\"}";
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
@@ -231,7 +231,7 @@ public sealed class ApprovalPolicyTests
             automaticTools: new HashSet<string>(StringComparer.Ordinal) { "websearch" });
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", "websearch", """{"query":"Crystal"}"""));
+            JsonToolCall("1", "websearch", """{"query":"Crystal"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
@@ -248,7 +248,7 @@ public sealed class ApprovalPolicyTests
         var policy = context.CreatePolicy(prompt);
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.PassCount);
@@ -353,7 +353,7 @@ public sealed class ApprovalPolicyTests
             new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("matches the request")));
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(0, prompt.Count);
@@ -484,7 +484,7 @@ public sealed class ApprovalPolicyTests
             new FixedApprovalReviewer(ApprovalReviewVerdict.Allow("looks fine")));
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"sudo ls"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"sudo ls"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
@@ -499,7 +499,7 @@ public sealed class ApprovalPolicyTests
         var policy = context.CreatePolicy(prompt);
 
         var decision = await policy.DecideAsync(
-            new ToolCall("1", BashTool.ToolName, """{"command":"sudo ls"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"sudo ls"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
         Assert.Equal(1, prompt.Count);
@@ -528,7 +528,7 @@ public sealed class ApprovalPolicyTests
         using var context = new ApprovalContext(ApprovalMode.Plan);
         var policy = context.CreatePolicy(new ThrowingApprovalPrompt());
 
-        var decision = await policy.DecideAsync(new ToolCall("1", toolName, arguments));
+        var decision = await policy.DecideAsync(JsonToolCall("1", toolName, arguments));
 
         Assert.Equal(ToolInvocationAction.Reject, decision.Action);
         Assert.Equal($"Plan mode does not allow {toolName}.", decision.RejectionOutput?.Text);
@@ -582,7 +582,7 @@ public sealed class ApprovalPolicyTests
         using var home = new TemporaryHome();
         var workspace = new Workspace(root.Path);
         var grants = new GrantStore(home.Home);
-        var firstCall = new ToolCall("1", "apply_patch", "{\"patch\":\"inside\"}");
+        var firstCall = JsonToolCall("1", "apply_patch", "{\"patch\":\"inside\"}");
         var first = new ApprovalPolicy(
             ApprovalMode.Default, workspace, grants,
             new RecordingApprovalPrompt(persistent ? ApprovalChoice.AllowPersistent : ApprovalChoice.AllowSession),
@@ -595,7 +595,7 @@ public sealed class ApprovalPolicyTests
             ApprovalMode.Full, workspace, persistent ? new GrantStore(home.Home) : grants, prompt,
             classifiers: [new FixedApprovalClassifier("apply_patch",
                 new ToolClassification(new Risk(risk), new Authority(authority), "Raised patch", requirePrompt))]);
-        var result = await second.DecideAsync(new ToolCall("2", "apply_patch", "{\"patch\":\"outside\"}"));
+        var result = await second.DecideAsync(JsonToolCall("2", "apply_patch", "{\"patch\":\"outside\"}"));
 
         Assert.Equal(ToolInvocationAction.Reject, result.Action);
         Assert.Equal(1, prompt.Count);
@@ -636,7 +636,7 @@ public sealed class ApprovalPolicyTests
                 new ToolClassification(Risk.Write, Authority.Workspace, "Patch", RequirePrompt: true))],
             automaticTools: new HashSet<string> { "apply_patch" });
 
-        var result = await policy.DecideAsync(new ToolCall("1", "apply_patch", "{}"));
+        var result = await policy.DecideAsync(JsonToolCall("1", "apply_patch", "{}"));
 
         Assert.Equal(ToolInvocationAction.Reject, result.Action);
         Assert.Equal(1, prompt.Count);
@@ -654,7 +654,7 @@ public sealed class ApprovalPolicyTests
         using var home = new TemporaryHome();
         using var root = new TemporaryWorkspace();
         var grants = new GrantStore(home.Home);
-        var call = new ToolCall("1", "apply_patch", "{}");
+        var call = JsonToolCall("1", "apply_patch", "{}");
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowPersistent);
         var policy = new ApprovalPolicy(ApprovalMode.Default, new Workspace(root.Path), grants, prompt,
             classifiers: [new FixedApprovalClassifier("apply_patch",
@@ -673,7 +673,7 @@ public sealed class ApprovalPolicyTests
         using var home = new TemporaryHome();
         using var root = new TemporaryWorkspace();
         var workspace = new Workspace(root.Path);
-        var call = new ToolCall("1", "apply_patch", "{}");
+        var call = JsonToolCall("1", "apply_patch", "{}");
         IApprovalClassifier[] classifiers = [new FixedApprovalClassifier("apply_patch",
             new ToolClassification(Risk.Write, Authority.Workspace, "Patch"))];
         var first = new ApprovalPolicy(ApprovalMode.Default, workspace, new GrantStore(home.Home),
@@ -689,10 +689,16 @@ public sealed class ApprovalPolicyTests
     }
 
     private static ToolCall WriteCall() =>
-        new("1", WriteTool.ToolName, """{"path":"src/App.cs","contents":"x"}""");
+        JsonToolCall(
+            "1",
+            WriteTool.ToolName,
+            """{"path":"src/App.cs","contents":"x"}""");
 
     private static ToolCall OutsideWriteCall() =>
-        new("1", WriteTool.ToolName, """{"path":"../escape.txt","contents":"x"}""");
+        JsonToolCall(
+            "1",
+            WriteTool.ToolName,
+            """{"path":"../escape.txt","contents":"x"}""");
 
     private sealed class FixedApprovalClassifier : IApprovalClassifier
     {

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Crystal.Tools;
 using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.Gemini;
@@ -114,7 +115,13 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
             var args = function.TryGetProperty("args", out var arguments)
                 ? arguments.GetRawText()
                 : "{}";
-            state.HeldToolEvents.Add(new ChatToolCallDelta(candidateIndex, itemIndex, id, name, args));
+            state.HeldToolEvents.Add(new ChatToolCallDelta(
+                candidateIndex,
+                itemIndex,
+                id,
+                name,
+                args,
+                ToolInputKind.Json));
             if (opaque is not null)
             {
                 state.HeldToolEvents.Add(new ChatReasoningStateReceived(

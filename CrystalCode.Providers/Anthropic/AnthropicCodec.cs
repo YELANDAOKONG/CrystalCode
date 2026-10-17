@@ -303,7 +303,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
         document.RootElement.WriteTo(writer);
     }
 
-    private static void WriteTools(Utf8JsonWriter writer, IReadOnlyList<ToolDefinition> tools)
+    private void WriteTools(Utf8JsonWriter writer, IReadOnlyList<ToolDefinition> tools)
     {
         if (tools.Count == 0)
         {
@@ -322,7 +322,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
             }
 
             writer.WritePropertyName("input_schema");
-            tool.InputSchema.WriteTo(writer);
+            ToolInputJson.RequireSchema(tool, _vendorName).WriteTo(writer);
             writer.WriteEndObject();
         }
 
@@ -447,7 +447,8 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 items.Add(new ToolCall(
                     block.GetProperty("id").GetString()!,
                     block.GetProperty("name").GetString()!,
-                    block.GetProperty("input").GetRawText()));
+                    block.GetProperty("input").GetRawText(),
+                    ToolInputKind.Json));
                 break;
         }
     }
@@ -539,7 +540,13 @@ internal sealed class AnthropicCodec : IProtocolCodec
             _blocks[index] = assembly;
             if (type == "tool_use")
             {
-                events.Add(new ChatToolCallDelta(0, index, block.GetProperty("id").GetString() ?? "", block.GetProperty("name").GetString() ?? "", ""));
+                events.Add(new ChatToolCallDelta(
+                    0,
+                    index,
+                    block.GetProperty("id").GetString() ?? "",
+                    block.GetProperty("name").GetString() ?? "",
+                    "",
+                    ToolInputKind.Json));
             }
             else if (type == "redacted_thinking")
             {
@@ -568,7 +575,13 @@ internal sealed class AnthropicCodec : IProtocolCodec
                     break;
                 case "input_json_delta":
                     var partial = delta.GetProperty("partial_json").GetString() ?? "";
-                    events.Add(new ChatToolCallDelta(0, index, "", "", partial));
+                    events.Add(new ChatToolCallDelta(
+                        0,
+                        index,
+                        "",
+                        "",
+                        partial,
+                        ToolInputKind.Json));
                     break;
             }
         }

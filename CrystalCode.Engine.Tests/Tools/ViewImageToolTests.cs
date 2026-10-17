@@ -35,7 +35,7 @@ public sealed class ViewImageToolTests
         var tool = new ViewImageTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new MultimodalToolCall("1", ViewImageTool.ToolName, """{"path":"shot.png"}"""));
+            JsonMultimodalToolCall("1", ViewImageTool.ToolName, """{"path":"shot.png"}"""));
 
         Assert.Equal(MultimodalToolResultStatus.Success, output.Status);
         Assert.Equal("Image loaded.", Assert.IsType<TextContent>(output.Contents[0]).Text);
@@ -52,7 +52,7 @@ public sealed class ViewImageToolTests
         var tool = new ViewImageTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new MultimodalToolCall("1", ViewImageTool.ToolName, """{"path":"notes.txt"}"""));
+            JsonMultimodalToolCall("1", ViewImageTool.ToolName, """{"path":"notes.txt"}"""));
 
         Assert.Equal(MultimodalToolResultStatus.Failure, output.Status);
         Assert.Contains(

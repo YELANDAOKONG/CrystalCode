@@ -20,7 +20,7 @@ public sealed class TranscriptReplayTests
             new ChatMessage(ChatRole.System, "work system"),
             new ChatMessage(ChatRole.User, "read the file"),
             new ChatMessage(ChatRole.Assistant, "I will read it."),
-            new ToolCall("1", "read", """{"path":"a.txt"}"""),
+            JsonToolCall("1", "read", """{"path":"a.txt"}"""),
             new ToolResult("1", "hello", ToolResultStatus.Success)
         };
 
@@ -43,8 +43,8 @@ public sealed class TranscriptReplayTests
     {
         var items = new List<ChatItem>
         {
-            new ToolCall("1", "read", """{"path":"a.txt"}"""),
-            new ToolCall("2", "bash", """{"command":"echo hi"}"""),
+            JsonToolCall("1", "read", """{"path":"a.txt"}"""),
+            JsonToolCall("2", "bash", """{"command":"echo hi"}"""),
             new ToolResult("1", "file contents", ToolResultStatus.Success),
             new ToolResult("2", "exit 0\nhi\n", ToolResultStatus.Success)
         };

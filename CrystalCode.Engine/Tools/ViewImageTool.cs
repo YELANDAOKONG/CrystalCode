@@ -25,7 +25,7 @@ public sealed class ViewImageTool : IMultimodalTool
     {
         ArgumentNullException.ThrowIfNull(workspace);
         _workspace = workspace;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

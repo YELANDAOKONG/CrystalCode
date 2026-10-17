@@ -224,7 +224,8 @@ public sealed class MultimodalStreamingTurn
                     new MultimodalToolCall(
                         call.CallId,
                         call.Name,
-                        call.Arguments));
+                        call.Arguments,
+                        call.InputKind));
                 var multimodalResults = await _executor.ExecuteAsync(
                     multimodalCalls,
                     linked.Token);

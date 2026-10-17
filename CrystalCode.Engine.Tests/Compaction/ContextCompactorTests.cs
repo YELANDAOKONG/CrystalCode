@@ -318,10 +318,10 @@ public sealed class ContextCompactorTests
         new ChatMessage(ChatRole.System, "work"),
         new ChatMessage(ChatRole.User, "first"),
         new ChatMessage(ChatRole.Assistant, "ok"),
-        new ToolCall("1", "read", """{"path":"a.txt"}"""),
+        JsonToolCall("1", "read", """{"path":"a.txt"}"""),
         new ToolResult("1", "file contents"),
         new ChatMessage(ChatRole.User, "second"),
-        new ToolCall("2", "write", """{"path":"App.cs","contents":"x"}"""),
+        JsonToolCall("2", "write", """{"path":"App.cs","contents":"x"}"""),
         new ToolResult("2", "wrote"),
         new ChatMessage(ChatRole.User, "third"),
         new ChatMessage(ChatRole.Assistant, "done")

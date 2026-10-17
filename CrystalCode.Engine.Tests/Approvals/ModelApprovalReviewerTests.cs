@@ -188,5 +188,8 @@ public sealed class ModelApprovalReviewerTests
             () => 0);
 
     private static ToolCall WriteCall() =>
-        new("1", WriteTool.ToolName, """{"path":"src/App.cs","contents":"x"}""");
+        JsonToolCall(
+            "1",
+            WriteTool.ToolName,
+            """{"path":"src/App.cs","contents":"x"}""");
 }

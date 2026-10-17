@@ -36,7 +36,7 @@ public sealed class PluginHookPipelineTests
             new RewriteHook("{\"a\":1}", changeId: true),
             new RewriteHook("{\"a\":2}", changeId: false)
         ]);
-        var call = new ToolCall("call-1", "read", "{}");
+        var call = JsonToolCall("call-1", "read", "{}");
 
         var next = await pipeline.OnToolCallAsync(call, CancellationToken.None);
 
@@ -51,7 +51,7 @@ public sealed class PluginHookPipelineTests
         var pipeline = new PluginHookPipeline(
             [new AdviceHook(PluginRisk.Read, requirePrompt: false), new AdviceHook(PluginRisk.Privileged, requirePrompt: true)],
             notes.Add);
-        var call = new ToolCall("1", "read", "{}");
+        var call = JsonToolCall("1", "read", "{}");
         var classification = new ToolClassification(Risk.Write, Authority.Workspace, "Write file");
 
         var advised = pipeline.OnApproval(call, classification);
@@ -159,7 +159,7 @@ public sealed class PluginHookPipelineTests
                     string.Empty,
                     prompt: true)
             ]);
-        var call = new ToolCall("1", "bash", "{}");
+        var call = JsonToolCall("1", "bash", "{}");
         var classification = new ToolClassification(Risk.Write, Authority.OutsideWorkspace, "Run command");
 
         var advised = pipeline.OnApproval(call, classification);
@@ -181,7 +181,7 @@ public sealed class PluginHookPipelineTests
         var executor = new PluginToolExecutor(inner, pipeline);
 
         var results = await executor.ExecuteAsync(
-            [new ToolCall("1", "read", "{\"path\":\"a.txt\"}")]);
+            [JsonToolCall("1", "read", "{\"path\":\"a.txt\"}")]);
 
         Assert.Equal("{\"path\":\"b.txt\"}", inner.Seen[0].Arguments);
         Assert.Equal("seen", results[0].Text);
@@ -207,7 +207,7 @@ public sealed class PluginHookPipelineTests
         IReadOnlyList<ChatItem> items =
         [
             new ChatMessage(ChatRole.System, "work"),
-            new ToolCall("c1", "screen", "{}"),
+            JsonToolCall("c1", "screen", "{}"),
             new ToolResult("c1", stored)
         ];
         var pipeline = new PluginHookPipeline([new DropImageHook(1)]);
@@ -232,7 +232,7 @@ public sealed class PluginHookPipelineTests
         IReadOnlyList<ChatItem> items =
         [
             new ChatMessage(ChatRole.System, "work"),
-            new ToolCall("c1", "screen", "{}"),
+            JsonToolCall("c1", "screen", "{}"),
             new ToolResult("c1", "shot")
         ];
         var pipeline = new PluginHookPipeline([], notes.Add, [new DropCallsHook()]);
@@ -411,7 +411,7 @@ public sealed class PluginHookPipelineTests
         IReadOnlyList<ChatItem> items =
         [
             new ChatMessage(ChatRole.System, "work"),
-            new ToolCall("c1", "screen", "{}"),
+            JsonToolCall("c1", "screen", "{}"),
             new ToolResult("c1", "shot")
         ];
         var pipeline = new PluginHookPipeline([], rawHooks: [new DropCallsHook()]);
@@ -515,7 +515,7 @@ public sealed class PluginHookPipelineTests
         public ValueTask<ToolCall?> OnToolCallAsync(ToolCall call, CancellationToken cancellationToken = default)
         {
             var id = changeId ? call.CallId + "-other" : call.CallId;
-            return ValueTask.FromResult<ToolCall?>(new ToolCall(id, call.Name, arguments));
+            return ValueTask.FromResult<ToolCall?>(JsonToolCall(id, call.Name, arguments));
         }
     }
 

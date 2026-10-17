@@ -3,6 +3,7 @@ using System.Text.Json;
 using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
+using Crystal.Tools;
 using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.Ollama;
@@ -63,7 +64,8 @@ internal sealed class OllamaStreamParser : IProtocolStreamParser
                         _nextItemIndex++,
                         tool.CallId,
                         tool.Name,
-                        tool.Arguments));
+                        tool.Arguments,
+                        ToolInputKind.Json));
                     _hasTools = true;
                 }
             }

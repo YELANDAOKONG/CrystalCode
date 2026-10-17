@@ -43,7 +43,8 @@ public static class MultimodalTranscript
         ToolCall call => new MultimodalToolCall(
             call.CallId,
             call.Name,
-            call.Arguments),
+            call.Arguments,
+            call.InputKind),
         ToolResult result => new MultimodalToolResult(
             result.CallId,
             ConvertMessage(result.Text, images),

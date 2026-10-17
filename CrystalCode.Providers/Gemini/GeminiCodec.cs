@@ -132,7 +132,8 @@ internal sealed class GeminiCodec : IProtocolCodec
                 {
                     ["name"] = tool.Name,
                     ["description"] = tool.Description ?? string.Empty,
-                    ["parametersJsonSchema"] = JsonNode.Parse(tool.InputSchema.GetRawText())
+                    ["parametersJsonSchema"] = JsonNode.Parse(
+                        ToolInputJson.RequireSchema(tool, "Gemini").GetRawText())
                 });
             }
 
@@ -315,7 +316,7 @@ internal sealed class GeminiCodec : IProtocolCodec
             var args = function.TryGetProperty("args", out var arguments)
                 ? arguments.GetRawText()
                 : "{}";
-            items.Add(new ToolCall(id, name, args));
+            items.Add(new ToolCall(id, name, args, ToolInputKind.Json));
             if (callState is not null)
             {
                 items.Add(new ChatReasoningItem(new ReasoningContent([], callState)));

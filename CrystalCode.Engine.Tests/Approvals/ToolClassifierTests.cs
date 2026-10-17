@@ -22,7 +22,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"a.txt"}"""));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -39,7 +39,7 @@ public sealed class ToolClassifierTests
         var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
 
         var classification = classifier.Classify(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -61,7 +61,7 @@ public sealed class ToolClassifierTests
         var json = "{\"path\":\"" + loose.Replace("\\", "/") + "\"}";
 
         var classification = classifier.Classify(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -69,7 +69,7 @@ public sealed class ToolClassifierTests
 
         var nestedJson = "{\"path\":\"" + nested.Replace("\\", "/") + "\"}";
         var nestedClassification = classifier.Classify(
-            new ToolCall("2", ReadTool.ToolName, nestedJson));
+            JsonToolCall("2", ReadTool.ToolName, nestedJson));
         Assert.Equal(Authority.Workspace, nestedClassification.Authority);
     }
 
@@ -86,7 +86,7 @@ public sealed class ToolClassifierTests
         var json = "{\"path\":\"" + loose.Replace("\\", "/") + "\"}";
 
         var classification = classifier.Classify(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -99,7 +99,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"~/.ssh/id_rsa"}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"~/.ssh/id_rsa"}"""));
 
         Assert.Equal(Risk.Forbidden, classification.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
@@ -112,7 +112,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", ListTool.ToolName, "{}"));
+            JsonToolCall("1", ListTool.ToolName, "{}"));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -128,7 +128,7 @@ public sealed class ToolClassifierTests
         var json = "{\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
 
         var classification = classifier.Classify(
-            new ToolCall("1", ListTool.ToolName, json));
+            JsonToolCall("1", ListTool.ToolName, json));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -142,7 +142,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", ListTool.ToolName, """{"path":"~/.ssh"}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"path":"~/.ssh"}"""));
 
         Assert.Equal(Risk.Forbidden, classification.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
@@ -161,7 +161,7 @@ public sealed class ToolClassifierTests
         var json = "{\"path\":\"" + skillPath.Replace("\\", "/") + "\"}";
 
         var classification = classifier.Classify(
-            new ToolCall("1", ListTool.ToolName, json));
+            JsonToolCall("1", ListTool.ToolName, json));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -175,7 +175,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", SkillTool.ToolName, """{"name":"git-release"}"""));
+            JsonToolCall("1", SkillTool.ToolName, """{"name":"git-release"}"""));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -190,25 +190,25 @@ public sealed class ToolClassifierTests
         var outsideJson = "{\"query\":\"alpha\",\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
 
         var inside = classifier.Classify(
-            new ToolCall("1", SearchTool.ToolName, """{"query":"alpha"}"""));
+            JsonToolCall("1", SearchTool.ToolName, """{"query":"alpha"}"""));
         Assert.Equal(Risk.Read, inside.Risk);
         Assert.Equal(Authority.Workspace, inside.Authority);
         Assert.Equal("Search workspace", inside.Summary);
 
         var outsideClassification = classifier.Classify(
-            new ToolCall("2", SearchTool.ToolName, outsideJson));
+            JsonToolCall("2", SearchTool.ToolName, outsideJson));
         Assert.Equal(Risk.Read, outsideClassification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, outsideClassification.Authority);
 
         var credential = classifier.Classify(
-            new ToolCall("3", SearchTool.ToolName, """{"query":"x","path":".ssh/id_rsa"}"""));
+            JsonToolCall("3", SearchTool.ToolName, """{"query":"x","path":".ssh/id_rsa"}"""));
         Assert.Equal(Risk.Forbidden, credential.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, credential.Authority);
 
         Assert.Equal(
             "src/lib",
             GrantFingerprint.Create(
-                new ToolCall("4", SearchTool.ToolName, """{"query":"x","path":"src/lib"}""")));
+                JsonToolCall("4", SearchTool.ToolName, """{"query":"x","path":"src/lib"}""")));
     }
 
     [Fact]
@@ -220,25 +220,25 @@ public sealed class ToolClassifierTests
         var outsideJson = "{\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
 
         var inside = classifier.Classify(
-            new ToolCall("1", TreeTool.ToolName, """{"depth":2}"""));
+            JsonToolCall("1", TreeTool.ToolName, """{"depth":2}"""));
         Assert.Equal(Risk.Read, inside.Risk);
         Assert.Equal(Authority.Workspace, inside.Authority);
         Assert.Equal("Tree workspace", inside.Summary);
 
         var outsideClassification = classifier.Classify(
-            new ToolCall("2", TreeTool.ToolName, outsideJson));
+            JsonToolCall("2", TreeTool.ToolName, outsideJson));
         Assert.Equal(Risk.Read, outsideClassification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, outsideClassification.Authority);
 
         var credential = classifier.Classify(
-            new ToolCall("3", TreeTool.ToolName, """{"path":".ssh"}"""));
+            JsonToolCall("3", TreeTool.ToolName, """{"path":".ssh"}"""));
         Assert.Equal(Risk.Forbidden, credential.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, credential.Authority);
 
         Assert.Equal(
             "src/lib",
             GrantFingerprint.Create(
-                new ToolCall("4", TreeTool.ToolName, """{"path":"src/lib"}""")));
+                JsonToolCall("4", TreeTool.ToolName, """{"path":"src/lib"}""")));
     }
 
     [Fact]
@@ -248,7 +248,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", WriteTool.ToolName, """{"path":"src/App.cs","contents":"x"}"""));
+            JsonToolCall("1", WriteTool.ToolName, """{"path":"src/App.cs","contents":"x"}"""));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -261,7 +261,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", WriteTool.ToolName, """{"path":"../escape.txt","contents":"x"}"""));
+            JsonToolCall("1", WriteTool.ToolName, """{"path":"../escape.txt","contents":"x"}"""));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -278,7 +278,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", WriteTool.ToolName, """{"path":"link.txt","contents":"x"}"""));
+            JsonToolCall("1", WriteTool.ToolName, """{"path":"link.txt","contents":"x"}"""));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -291,7 +291,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 WriteTool.ToolName,
                 """{"path":"~/.ssh/authorized_keys","contents":"x"}"""));
@@ -307,7 +307,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 WriteTool.ToolName,
                 """{"path":".ssh/id_rsa","contents":"x"}"""));
@@ -335,7 +335,7 @@ public sealed class ToolClassifierTests
         var json = "{\"command\":\"" + command + "\"}";
 
         var classification = classifier.Classify(
-            new ToolCall("1", BashTool.ToolName, json));
+            JsonToolCall("1", BashTool.ToolName, json));
 
         Assert.Equal(forbidden, classification.Risk == Risk.Forbidden);
     }
@@ -347,7 +347,7 @@ public sealed class ToolClassifierTests
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
         var classification = classifier.Classify(
-            new ToolCall("1", BashTool.ToolName, """{"command":"curl https://example.com"}"""));
+            JsonToolCall("1", BashTool.ToolName, """{"command":"curl https://example.com"}"""));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.Network, classification.Authority);
@@ -366,7 +366,7 @@ public sealed class ToolClassifierTests
         using var root = new TemporaryWorkspace();
         var classifier = new ToolClassifier(new Workspace(root.Path));
 
-        var classification = classifier.Classify(new ToolCall("1", toolName, arguments));
+        var classification = classifier.Classify(JsonToolCall("1", toolName, arguments));
 
         Assert.Equal(isRead ? Risk.Read : Risk.Write, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -380,7 +380,7 @@ public sealed class ToolClassifierTests
             new Workspace(root.Path),
             [new EchoClassifier()]);
 
-        var classification = classifier.Classify(new ToolCall("1", "echo", "{}"));
+        var classification = classifier.Classify(JsonToolCall("1", "echo", "{}"));
 
         Assert.Equal(Risk.Read, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -401,7 +401,7 @@ public sealed class ToolClassifierTests
             [new ExternalApprovalClassifier(
                 new Dictionary<string, ExternalToolSpec> { [spec.Name] = spec })]);
 
-        var classification = classifier.Classify(new ToolCall("1", "echojson", "{}"));
+        var classification = classifier.Classify(JsonToolCall("1", "echojson", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -420,7 +420,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            new ToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "apply_patch", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -436,7 +436,7 @@ public sealed class ToolClassifierTests
             new HostToolApprovalClassification("read", "workspace", "Inspect workspace"));
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
-        var classification = await classifier.ClassifyAsync(new ToolCall("1", "inspect", "{}"));
+        var classification = await classifier.ClassifyAsync(JsonToolCall("1", "inspect", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -453,7 +453,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            new ToolCall("1", "preview", """{"path":".ssh/id_rsa"}"""));
+            JsonToolCall("1", "preview", """{"path":".ssh/id_rsa"}"""));
 
         Assert.Equal(Risk.Forbidden, classification.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
@@ -473,7 +473,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            new ToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "apply_patch", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -493,7 +493,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            new ToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "apply_patch", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -510,7 +510,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            new ToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "apply_patch", "{}"));
 
         Assert.Equal(Risk.Privileged, classification.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
@@ -527,7 +527,7 @@ public sealed class ToolClassifierTests
             new ThrowingHostApprovalClassifier());
 
         var classification = await classifier.ClassifyAsync(
-            new ToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "apply_patch", "{}"));
 
         Assert.Equal(Risk.Privileged, classification.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
@@ -548,7 +548,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            new ToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "apply_patch", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);
@@ -566,7 +566,7 @@ public sealed class ToolClassifierTests
         var host = new SessionToolHost(workspace, home.Home, () => "sess-7", () => "audit");
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier, host);
 
-        _ = await classifier.ClassifyAsync(new ToolCall("1", "where", "{}"));
+        _ = await classifier.ClassifyAsync(JsonToolCall("1", "where", "{}"));
 
         var captured = approvalClassifier.Context;
         Assert.NotNull(captured);
@@ -589,21 +589,21 @@ public sealed class ToolClassifierTests
 
         foreach (var name in new[] { DescribeImageTool.ToolName, ViewImageTool.ToolName })
         {
-            var inside = classifier.Classify(new ToolCall("1", name, """{"path":"shot.png"}"""));
+            var inside = classifier.Classify(JsonToolCall("1", name, """{"path":"shot.png"}"""));
             Assert.Equal(Risk.Read, inside.Risk);
             Assert.Equal(Authority.Workspace, inside.Authority);
 
-            var outsideClassification = classifier.Classify(new ToolCall("2", name, outsideJson));
+            var outsideClassification = classifier.Classify(JsonToolCall("2", name, outsideJson));
             Assert.Equal(Risk.Read, outsideClassification.Risk);
             Assert.Equal(Authority.OutsideWorkspace, outsideClassification.Authority);
 
             var credential = classifier.Classify(
-                new ToolCall("3", name, """{"path":".ssh/id_rsa"}"""));
+                JsonToolCall("3", name, """{"path":".ssh/id_rsa"}"""));
             Assert.Equal(Risk.Forbidden, credential.Risk);
 
             Assert.Equal(
                 "shot.png",
-                GrantFingerprint.Create(new ToolCall("4", name, """{"path":"shot.png"}""")));
+                GrantFingerprint.Create(JsonToolCall("4", name, """{"path":"shot.png"}""")));
         }
     }
 

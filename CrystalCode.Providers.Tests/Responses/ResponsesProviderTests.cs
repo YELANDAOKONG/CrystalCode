@@ -30,7 +30,7 @@ public sealed class ResponsesProviderTests
 
         var response = await provider.CompleteAsync(new ChatRequest(
             [new ChatMessage(ChatRole.User, "Hi")],
-            [new ToolDefinition("read", JsonDocument.Parse("{\"type\":\"object\"}").RootElement, null)]));
+            [ToolDefinition.Json("read", JsonDocument.Parse("{\"type\":\"object\"}").RootElement, null)]));
 
         Assert.Equal(new Uri("https://example.test/v1/responses"), handler.Request!.RequestUri);
         Assert.Equal("Bearer", handler.Request.Headers.Authorization!.Scheme);

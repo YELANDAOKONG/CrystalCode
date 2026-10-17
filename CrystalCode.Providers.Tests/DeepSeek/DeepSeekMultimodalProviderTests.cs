@@ -28,7 +28,7 @@ public sealed class DeepSeekMultimodalProviderTests
                     new TextContent("inspect "),
                     InlineImage([1, 2, 3])
                 ]),
-            new MultimodalToolCall("call_1", "render", "{}"),
+            JsonMultimodalToolCall("call_1", "render", "{}"),
             new MultimodalToolResult(
                 "call_1",
                 [

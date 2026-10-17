@@ -42,7 +42,7 @@ public sealed class ExternalCatalogTests
         var tool = Assert.Single(catalog.WorkTools);
         Assert.Contains(catalog.PlanTools, item => item.Definition.Name == "echojson");
         var output = await tool.InvokeAsync(
-            new ToolCall("1", "echojson", """{"tag":"ok"}"""));
+            JsonToolCall("1", "echojson", """{"tag":"ok"}"""));
 
         Assert.True(output.Status == ToolResultStatus.Success, output.Text);
         Assert.Contains("ok", output.Text, StringComparison.Ordinal);
@@ -72,7 +72,7 @@ public sealed class ExternalCatalogTests
             enabled: true);
 
         var output = await catalog.WorkTools[0].InvokeAsync(
-            new ToolCall("1", "echojson", """{"tag":"ok"}"""));
+            JsonToolCall("1", "echojson", """{"tag":"ok"}"""));
 
         Assert.True(output.Status == ToolResultStatus.Success, output.Text);
         var probe = Path.Combine(workspace.Path, "stdin.bin");
@@ -109,7 +109,7 @@ public sealed class ExternalCatalogTests
         var arguments = "{\"payload\":\"" + new string('x', WorkspaceLimits.MaximumToolOutputCharacters + 10_000) + "\"}";
 
         var output = await catalog.WorkTools[0].InvokeAsync(
-            new ToolCall("1", "echojson", arguments));
+            JsonToolCall("1", "echojson", arguments));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("[truncated to", output.Text, StringComparison.Ordinal);
@@ -142,7 +142,7 @@ public sealed class ExternalCatalogTests
             enabled: true);
         using var cancellation = new CancellationTokenSource();
         var invocation = catalog.WorkTools[0].InvokeAsync(
-            new ToolCall("1", "sleeping", "{}"),
+            JsonToolCall("1", "sleeping", "{}"),
             cancellation.Token).AsTask();
         var started = Path.Combine(workspace.Path, "started.txt");
         Assert.True(SpinWait.SpinUntil(() => File.Exists(started), TimeSpan.FromSeconds(5)));
@@ -181,7 +181,7 @@ public sealed class ExternalCatalogTests
 
         Assert.Empty(catalog.Notes);
         var output = await catalog.WorkTools[0].InvokeAsync(
-            new ToolCall("1", "echoargv", """{"environment":"prod"}"""));
+            JsonToolCall("1", "echoargv", """{"environment":"prod"}"""));
 
         Assert.True(output.Status == ToolResultStatus.Success, output.Text);
         Assert.Contains("prod", output.Text, StringComparison.Ordinal);
@@ -330,7 +330,7 @@ public sealed class ExternalCatalogTests
             host: new SessionToolHost(root, home.Home, () => "sess-9", () => "audit"));
 
         var output = await catalog.WorkTools[0].InvokeAsync(
-            new ToolCall("1", "showenv", "{}"));
+            JsonToolCall("1", "showenv", "{}"));
 
         Assert.True(output.Status == ToolResultStatus.Success, output.Text);
         Assert.Contains(root.Root, output.Text, StringComparison.Ordinal);
@@ -379,12 +379,12 @@ public sealed class ExternalCatalogTests
             enabled: true);
 
         var text = await catalog.WorkTools[0].InvokeAsync(
-            new ToolCall("1", "render", "{}"));
+            JsonToolCall("1", "render", "{}"));
         Assert.Equal(ToolResultStatus.Failure, text.Status);
         Assert.Contains("cannot accept tool images", text.Text, StringComparison.Ordinal);
 
         var imageTool = Assert.Single(catalog.WorkMultimodalTools);
-        var image = await imageTool.InvokeAsync(new MultimodalToolCall("2", "render", "{}"));
+        var image = await imageTool.InvokeAsync(JsonMultimodalToolCall("2", "render", "{}"));
         Assert.Equal(MultimodalToolResultStatus.Success, image.Status);
         Assert.Equal("rendered", Assert.IsType<TextContent>(image.Contents[0]).Text);
         Assert.Equal("image/png", Assert.IsType<ImageContent>(image.Contents[1]).Image.MimeType.Value);

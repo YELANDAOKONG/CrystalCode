@@ -91,7 +91,7 @@ public sealed class SideQuestionTests
         var client = new ScriptedStreamingClient(
         [
             new ChatTextDelta(0, 0, ChatRole.Assistant, "Because."),
-            new ChatToolCallDelta(0, 1, "c1", "read", "{}"),
+            JsonChatToolCallDelta(0, 1, "c1", "read", "{}"),
             new ChatCandidateCompleted(0, FinishReason.ToolCalls)
         ]);
         using var headless = new HeadlessSession(client);
@@ -273,7 +273,7 @@ public sealed class SideQuestionTests
 
     private static ChatStreamEvent[] ToolRound(string callId, string name, string arguments) =>
     [
-        new ChatToolCallDelta(0, 0, callId, name, arguments),
+        JsonChatToolCallDelta(0, 0, callId, name, arguments),
         new ChatCandidateCompleted(0, FinishReason.ToolCalls)
     ];
 

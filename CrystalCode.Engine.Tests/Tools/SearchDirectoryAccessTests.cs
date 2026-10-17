@@ -33,7 +33,7 @@ public sealed class SearchDirectoryAccessTests
             "search" => new SearchTool(workspace),
             _ => throw new ArgumentOutOfRangeException(nameof(name))
         };
-        var call = new ToolCall("1", name, JsonSerializer.Serialize(new
+        var call = JsonToolCall("1", name, JsonSerializer.Serialize(new
         {
             path = requested.Path, pattern = name == "glob" ? "*.txt" : "needle", query = "needle"
         }));

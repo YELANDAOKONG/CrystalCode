@@ -39,7 +39,11 @@ internal sealed class NativeMultimodalRequest
                             : ReasoningTextKind.Summary)),
                 reasoning.Content.State)),
         MultimodalToolCall call when call.Contents.Count == 0 =>
-            new ToolCall(call.CallId, call.Name, call.Arguments),
+            new ToolCall(
+                call.CallId,
+                call.Name,
+                call.Arguments,
+                call.InputKind),
         MultimodalToolCall => throw new NotSupportedException(
             "Multimodal tool-call content is unsupported."),
         MultimodalToolResult result => new ToolResult(

@@ -52,7 +52,8 @@ internal sealed class CompatibleMultimodalOutput
         ToolCall call => new MultimodalToolCall(
             call.CallId,
             call.Name,
-            call.Arguments),
+            call.Arguments,
+            call.InputKind),
         ToolResult result => new MultimodalToolResult(
             result.CallId,
             [new TextContent(result.Text)],
@@ -89,7 +90,8 @@ internal sealed class CompatibleMultimodalOutput
             tool.ItemIndex,
             tool.CallIdDelta,
             tool.NameDelta,
-            tool.ArgumentsDelta),
+            tool.ArgumentsDelta,
+            tool.InputKind),
         ChatCandidateCompleted completed => new MultimodalChatCandidateCompleted(
             completed.CandidateIndex,
             completed.FinishReason),

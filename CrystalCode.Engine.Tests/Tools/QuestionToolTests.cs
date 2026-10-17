@@ -18,7 +18,7 @@ public sealed class QuestionToolTests
         var tool = new QuestionTool(prompt);
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 QuestionTool.ToolName,
                 """
@@ -81,7 +81,7 @@ public sealed class QuestionToolTests
         var tool = new QuestionTool(prompt);
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 QuestionTool.ToolName,
                 """
@@ -108,7 +108,7 @@ public sealed class QuestionToolTests
         var tool = new QuestionTool(new FixedUserPrompt("unused"));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", QuestionTool.ToolName, arguments));
+            JsonToolCall("1", QuestionTool.ToolName, arguments));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
     }

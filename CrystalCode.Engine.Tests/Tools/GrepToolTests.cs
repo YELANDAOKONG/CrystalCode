@@ -18,7 +18,7 @@ public sealed class GrepToolTests
         var tool = new GrepTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GrepTool.ToolName, """{"pattern":"class"}"""));
+            JsonToolCall("1", GrepTool.ToolName, """{"pattern":"class"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("App.cs:1:class App {}", output.Text);
@@ -33,7 +33,7 @@ public sealed class GrepToolTests
         var tool = new GrepTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 GrepTool.ToolName,
                 """{"pattern":"class","path":"","glob":""}"""));
@@ -52,7 +52,7 @@ public sealed class GrepToolTests
         var json = "{\"pattern\":\"alpha\",\"path\":\"" + outside.Path.Replace("\\", "/") + "\"}";
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GrepTool.ToolName, json));
+            JsonToolCall("1", GrepTool.ToolName, json));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("alpha", output.Text);
@@ -72,7 +72,7 @@ public sealed class GrepToolTests
         var tool = new GrepTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GrepTool.ToolName, """{"pattern":"SECRET|visible"}"""));
+            JsonToolCall("1", GrepTool.ToolName, """{"pattern":"SECRET|visible"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("visible", output.Text);
@@ -90,7 +90,7 @@ public sealed class GrepToolTests
         var tool = new GrepTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", GrepTool.ToolName, """{"pattern":"alpha"}"""));
+            JsonToolCall("1", GrepTool.ToolName, """{"pattern":"alpha"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("a.txt:1:alpha", output.Text);

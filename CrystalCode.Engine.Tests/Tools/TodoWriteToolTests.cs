@@ -15,12 +15,12 @@ public sealed class TodoWriteToolTests
         var tool = new TodoWriteTool(todos);
 
         var replaced = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 TodoWriteTool.ToolName,
                 """{"todos":[{"id":"a","content":"first","status":"pending"}]}"""));
         var merged = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "2",
                 TodoWriteTool.ToolName,
                 """{"merge":true,"todos":[{"id":"a","content":"first","status":"completed"},{"id":"b","content":"second","status":"in_progress"}]}"""));

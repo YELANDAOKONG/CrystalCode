@@ -22,8 +22,8 @@ public sealed class RunLogTests
             new ChatTextDelta(0, 0, ChatRole.Assistant, "Looking.")));
         log.OnEvent(new ToolCallsIssued(
         [
-            new ToolCall("1", "read", """{"path":"a.cs"}"""),
-            new ToolCall("2", "read", """{"path":"b.cs"}""")
+            JsonToolCall("1", "read", """{"path":"a.cs"}"""),
+            JsonToolCall("2", "read", """{"path":"b.cs"}""")
         ]));
         log.OnEvent(new ToolResultsReceived(
         [
@@ -123,7 +123,7 @@ public sealed class RunLogTests
 
         log.OnEvent(new ToolCallsIssued(
         [
-            new ToolCall("1", "read", """{"path":"notes.txt"}""")
+            JsonToolCall("1", "read", """{"path":"notes.txt"}""")
         ]));
         log.OnEvent(new ToolResultsReceived(
         [

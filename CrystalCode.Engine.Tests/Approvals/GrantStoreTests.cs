@@ -16,7 +16,7 @@ public sealed class GrantStoreTests
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"src/App.cs","contents":"x"}""");

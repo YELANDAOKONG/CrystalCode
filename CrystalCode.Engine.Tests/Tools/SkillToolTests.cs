@@ -35,7 +35,7 @@ public sealed class SkillToolTests
         var tool = new SkillTool(catalog);
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SkillTool.ToolName, """{"name":"git-release"}"""));
+            JsonToolCall("1", SkillTool.ToolName, """{"name":"git-release"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("<skill_content name=\"git-release\">", output.Text, StringComparison.Ordinal);
@@ -51,7 +51,7 @@ public sealed class SkillToolTests
         var tool = new SkillTool(SkillCatalog.Empty);
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", SkillTool.ToolName, """{"name":"missing"}"""));
+            JsonToolCall("1", SkillTool.ToolName, """{"name":"missing"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Contains("was not found", output.Text, StringComparison.Ordinal);

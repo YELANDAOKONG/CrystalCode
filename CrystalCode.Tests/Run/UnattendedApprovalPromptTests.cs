@@ -22,7 +22,7 @@ public sealed class UnattendedApprovalPromptTests
         {
             var workspace = new Workspace(directory.FullName);
             var grants = new GrantStore(new CrystalHome(Path.Combine(directory.FullName, "home")));
-            var call = new ToolCall("1", "write", """{"path":"file.txt","contents":"Patch"}""");
+            var call = JsonToolCall("1", "write", """{"path":"file.txt","contents":"Patch"}""");
             grants.Remember(workspace.Root, call, GrantScope.Persistent);
             var prompt = new UnattendedApprovalPrompt();
             var policy = new ApprovalPolicy(new ApprovalMode(mode), workspace, grants, prompt,

@@ -22,7 +22,7 @@ public sealed class ApprovalCardTests
     [Fact]
     public void ActionLine_UsesPathNotRawJson()
     {
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"src/App.cs","contents":"x"}""");
@@ -45,7 +45,7 @@ public sealed class ApprovalCardTests
             ReviewAuthorization.High,
             "Adds the requested test.");
 
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"src/App.cs","contents":"x"}""");
@@ -76,7 +76,7 @@ public sealed class ApprovalCardTests
             ReviewRiskLevel.Low,
             ReviewAuthorization.High,
             "Adds the requested test.");
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"src/App.cs","contents":"x"}""");
@@ -104,7 +104,7 @@ public sealed class ApprovalCardTests
             Risk.Write,
             Authority.Workspace,
             "Edit workspace file");
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             EditTool.ToolName,
             """{"path":"src/App.cs","old_string":"a","new_string":"b"}""");
@@ -127,7 +127,7 @@ public sealed class ApprovalCardTests
     {
         var classification = new ToolClassification(new Risk(risk), new Authority(authority), "Patch", requirePrompt);
         var text = string.Join('\n', WidgetPaint.Plain(
-            ApprovalCard.AskWidget(new ToolCall("1", "apply_patch", "{}"), classification), 100));
+            ApprovalCard.AskWidget(JsonToolCall("1", "apply_patch", "{}"), classification), 100));
 
         Assert.Contains("Y Once", text, StringComparison.Ordinal);
         Assert.Contains("N Deny", text, StringComparison.Ordinal);
@@ -147,7 +147,7 @@ public sealed class ApprovalCardTests
             ReviewRiskLevel.High,
             ReviewAuthorization.Low,
             "Needs a look\u001b]0;x\u0007");
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             BashTool.ToolName,
             """{"command":"echo safe\u001b[1G\u001b[2Kls"}""");

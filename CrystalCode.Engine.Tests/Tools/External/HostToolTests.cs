@@ -45,12 +45,12 @@ public sealed class HostToolTests
     {
         ITool text = new EchoHostTool();
         var textError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            text.InvokeAsync(new ToolCall("1", "echo", "{}")).AsTask());
+            text.InvokeAsync(JsonToolCall("1", "echo", "{}")).AsTask());
         Assert.Equal("This tool requires host context.", textError.Message);
 
         IMultimodalTool image = new EchoHostImageTool();
         var imageError = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            image.InvokeAsync(new MultimodalToolCall("2", "echo_image", "{}")).AsTask());
+            image.InvokeAsync(JsonMultimodalToolCall("2", "echo_image", "{}")).AsTask());
         Assert.Equal("This tool requires host context.", imageError.Message);
     }
 
@@ -69,7 +69,7 @@ public sealed class HostToolTests
             [],
             timeoutSeconds: null);
 
-        var output = await fenced.InvokeAsync(new ToolCall("1", "plain", "{}"));
+        var output = await fenced.InvokeAsync(JsonToolCall("1", "plain", "{}"));
 
         Assert.Equal("plain", output.Text);
         Assert.Equal(ToolResultStatus.Success, output.Status);
@@ -99,7 +99,7 @@ public sealed class HostToolTests
             timeoutSeconds: null);
         var paths = ExtensionDataPaths.Resolve(home, root.Root, ExtensionDataKind.Tools, TextSet);
 
-        var first = await text.InvokeAsync(new ToolCall("1", "echo", "{}"));
+        var first = await text.InvokeAsync(JsonToolCall("1", "echo", "{}"));
         Assert.Equal(
             Facts(root.Root, "sess-9", "audit", paths.GlobalDirectory, paths.ProjectDirectory),
             first.Text);
@@ -107,7 +107,7 @@ public sealed class HostToolTests
         Assert.True(Directory.Exists(paths.ProjectDirectory));
 
         approval = "full";
-        var second = await text.InvokeAsync(new ToolCall("2", "echo", "{}"));
+        var second = await text.InvokeAsync(JsonToolCall("2", "echo", "{}"));
         Assert.Equal(
             Facts(root.Root, "sess-9", "full", paths.GlobalDirectory, paths.ProjectDirectory),
             second.Text);
@@ -116,12 +116,12 @@ public sealed class HostToolTests
         Directory.CreateDirectory(nested);
         Assert.True(root.TrySetRoot(nested, out var error), error);
         var movedPaths = ExtensionDataPaths.Resolve(home, root.Root, ExtensionDataKind.Tools, TextSet);
-        var moved = await text.InvokeAsync(new ToolCall("3", "echo", "{}"));
+        var moved = await text.InvokeAsync(JsonToolCall("3", "echo", "{}"));
         Assert.Equal(
             Facts(root.Root, "sess-9", "full", movedPaths.GlobalDirectory, movedPaths.ProjectDirectory),
             moved.Text);
 
-        var pictured = await image.InvokeAsync(new MultimodalToolCall("4", "echo_image", "{}"));
+        var pictured = await image.InvokeAsync(JsonMultimodalToolCall("4", "echo_image", "{}"));
         var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
         Assert.Equal(
             Facts(root.Root, "sess-9", "full", movedPaths.GlobalDirectory, movedPaths.ProjectDirectory),
@@ -141,7 +141,7 @@ public sealed class HostToolTests
             new PluginHostMultimodalTool(new EchoHostImageTool(), host, PluginDirectory);
         var paths = ExtensionDataPaths.Resolve(home, root.Root, ExtensionDataKind.Plugins, PluginDirectory);
 
-        var first = await text.InvokeAsync(new ToolCall("1", "echo", "{}"));
+        var first = await text.InvokeAsync(JsonToolCall("1", "echo", "{}"));
         Assert.Equal(
             Facts(root.Root, "sess-1", "audit", paths.GlobalDirectory, paths.ProjectDirectory),
             first.Text);
@@ -149,12 +149,12 @@ public sealed class HostToolTests
         Assert.True(Directory.Exists(paths.ProjectDirectory));
 
         approval = "full";
-        var second = await text.InvokeAsync(new ToolCall("2", "echo", "{}"));
+        var second = await text.InvokeAsync(JsonToolCall("2", "echo", "{}"));
         Assert.Equal(
             Facts(root.Root, "sess-1", "full", paths.GlobalDirectory, paths.ProjectDirectory),
             second.Text);
 
-        var pictured = await image.InvokeAsync(new MultimodalToolCall("3", "echo_image", "{}"));
+        var pictured = await image.InvokeAsync(JsonMultimodalToolCall("3", "echo_image", "{}"));
         var content = Assert.IsType<TextContent>(Assert.Single(pictured.Contents));
         Assert.Equal(
             Facts(root.Root, "sess-1", "full", paths.GlobalDirectory, paths.ProjectDirectory),
@@ -188,7 +188,7 @@ public sealed class HostToolTests
     private static ToolDefinition Define(string name)
     {
         using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
-        return new ToolDefinition(name, document.RootElement.Clone(), name);
+        return ToolDefinition.Json(name, document.RootElement.Clone(), name);
     }
 
     private sealed class PlainTool : ITool

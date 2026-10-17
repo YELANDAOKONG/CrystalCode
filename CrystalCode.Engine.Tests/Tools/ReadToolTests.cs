@@ -16,7 +16,7 @@ public sealed class ReadToolTests
         var tool = new ReadTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"note.txt"}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"note.txt"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("1|alpha", output.Text);
@@ -32,7 +32,7 @@ public sealed class ReadToolTests
         var tool = new ReadTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"note.txt","offset":null,"limit":null}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"note.txt","offset":null,"limit":null}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("1|alpha", output.Text);
@@ -49,7 +49,7 @@ public sealed class ReadToolTests
         var json = "{\"path\":\"" + file.Replace("\\", "/") + "\"}";
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ReadTool.ToolName, json));
+            JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Contains("1|hello", output.Text);
@@ -62,7 +62,7 @@ public sealed class ReadToolTests
         var tool = new ReadTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"~/.ssh/id_rsa"}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"~/.ssh/id_rsa"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("Reading credential paths is not allowed.", output.Text);
@@ -76,7 +76,7 @@ public sealed class ReadToolTests
         var tool = new ReadTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ReadTool.ToolName, """{"path":"blob.bin"}"""));
+            JsonToolCall("1", ReadTool.ToolName, """{"path":"blob.bin"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("File looks binary and will not be read.", output.Text);

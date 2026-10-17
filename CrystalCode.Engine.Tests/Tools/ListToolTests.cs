@@ -18,7 +18,7 @@ public sealed class ListToolTests
         File.WriteAllText(Path.Combine(root.Path, "Beta.txt"), "b\n");
         var tool = new ListTool(new Workspace(root.Path));
 
-        var output = await tool.InvokeAsync(new ToolCall("1", ListTool.ToolName, "{}"));
+        var output = await tool.InvokeAsync(JsonToolCall("1", ListTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("Alpha.txt\nBeta.txt\nsrc/", output.Text);
@@ -33,7 +33,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"path":"src"}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"path":"src"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("src/App.cs", output.Text);
@@ -51,7 +51,7 @@ public sealed class ListToolTests
         File.WriteAllText(Path.Combine(root.Path, "keep.txt"), "keep\n");
         var tool = new ListTool(new Workspace(root.Path));
 
-        var output = await tool.InvokeAsync(new ToolCall("1", ListTool.ToolName, "{}"));
+        var output = await tool.InvokeAsync(JsonToolCall("1", ListTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("keep.txt", output.Text);
@@ -69,7 +69,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"offset":2,"limit":2}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"offset":2,"limit":2}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal(
@@ -85,7 +85,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"path":"only.txt","offset":2}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"path":"only.txt","offset":2}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("File has 1 entry; offset 2 is past the end.", output.Text);
@@ -100,7 +100,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"offset":3}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"offset":3}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("Directory has 2 entries; offset 3 is past the end.", output.Text);
@@ -112,8 +112,8 @@ public sealed class ListToolTests
         using var root = new TemporaryWorkspace();
         var tool = new ListTool(new Workspace(root.Path));
 
-        var text = await tool.InvokeAsync(new ToolCall("1", ListTool.ToolName, "not json"));
-        var array = await tool.InvokeAsync(new ToolCall("2", ListTool.ToolName, "[]"));
+        var text = await tool.InvokeAsync(JsonToolCall("1", ListTool.ToolName, "not json"));
+        var array = await tool.InvokeAsync(JsonToolCall("2", ListTool.ToolName, "[]"));
 
         Assert.Equal(ToolResultStatus.Failure, text.Status);
         Assert.Equal(ToolResultStatus.Failure, array.Status);
@@ -126,7 +126,7 @@ public sealed class ListToolTests
         File.WriteAllText(Path.Combine(root.Path, "keep.txt"), "k\n");
         var tool = new ListTool(new Workspace(root.Path));
 
-        var output = await tool.InvokeAsync(new ToolCall("1", ListTool.ToolName, string.Empty));
+        var output = await tool.InvokeAsync(JsonToolCall("1", ListTool.ToolName, string.Empty));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("keep.txt", output.Text);
@@ -140,7 +140,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall(
+            JsonToolCall(
                 "1",
                 ListTool.ToolName,
                 """{"path":"","offset":null,"limit":null}"""));
@@ -161,7 +161,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"path":"empty"}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"path":"empty"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("(empty directory)", output.Text);
@@ -175,7 +175,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"path":"note.txt"}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"path":"note.txt"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("note.txt", output.Text);
@@ -189,7 +189,7 @@ public sealed class ListToolTests
         File.WriteAllText(Path.Combine(root.Path, "visible.txt"), "v\n");
         var tool = new ListTool(new Workspace(root.Path));
 
-        var output = await tool.InvokeAsync(new ToolCall("1", ListTool.ToolName, "{}"));
+        var output = await tool.InvokeAsync(JsonToolCall("1", ListTool.ToolName, "{}"));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
         Assert.Equal("visible.txt", output.Text);
@@ -202,7 +202,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"path":"~/.ssh"}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"path":"~/.ssh"}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
         Assert.Equal("Listing credential paths is not allowed.", output.Text);
@@ -215,7 +215,7 @@ public sealed class ListToolTests
         var tool = new ListTool(new Workspace(root.Path));
 
         var output = await tool.InvokeAsync(
-            new ToolCall("1", ListTool.ToolName, """{"offset":0}"""));
+            JsonToolCall("1", ListTool.ToolName, """{"offset":0}"""));
 
         Assert.Equal(ToolResultStatus.Failure, output.Status);
     }

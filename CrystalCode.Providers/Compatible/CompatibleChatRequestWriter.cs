@@ -33,7 +33,7 @@ internal static class CompatibleChatRequestWriter
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
             WriteMessages(writer, profile, request.Items);
-            WriteTools(writer, request.Tools);
+            WriteTools(writer, profile, request.Tools);
             WriteReasoning(writer, profile, request.Reasoning);
             WriteTokenLimit(writer, profile, options);
 
@@ -316,6 +316,7 @@ internal static class CompatibleChatRequestWriter
 
     private static void WriteTools(
         Utf8JsonWriter writer,
+        CompatibleProfile profile,
         IReadOnlyList<ToolDefinition> tools)
     {
         if (tools.Count == 0)
@@ -338,7 +339,7 @@ internal static class CompatibleChatRequestWriter
             }
 
             writer.WritePropertyName("parameters");
-            tool.InputSchema.WriteTo(writer);
+            ToolInputJson.RequireSchema(tool, profile.VendorName).WriteTo(writer);
             writer.WriteEndObject();
             writer.WriteEndObject();
         }

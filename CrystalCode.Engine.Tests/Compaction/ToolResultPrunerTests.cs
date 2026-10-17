@@ -17,11 +17,11 @@ public sealed class ToolResultPrunerTests
         {
             new ChatMessage(ChatRole.System, "work"),
             new ChatMessage(ChatRole.User, "first"),
-            new ToolCall("1", "read", "{}"),
+            JsonToolCall("1", "read", "{}"),
             new ToolResult("1", old),
             new ChatMessage(ChatRole.User, "second"),
             new ChatMessage(ChatRole.User, "third"),
-            new ToolCall("2", "read", "{}"),
+            JsonToolCall("2", "read", "{}"),
             new ToolResult("2", "recent")
         };
 

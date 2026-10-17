@@ -153,7 +153,7 @@ public sealed class OllamaProviderTests
             new ChatMessage(ChatRole.User, "hi"),
             new ChatReasoningItem(new ReasoningContent(
                 [new ReasoningText("thought", ReasoningTextKind.Trace)])),
-            new ToolCall("call_1", "read", "{}"),
+            JsonToolCall("call_1", "read", "{}"),
             new ChatReasoningItem(new ReasoningContent(
                 state: new OpaqueReasoningState(
                     "gemini.part",
@@ -271,7 +271,7 @@ public sealed class OllamaProviderTests
             () => provider.CompleteAsync(new ChatRequest(
             [
                 new ChatMessage(ChatRole.User, "read"),
-                new ToolCall("call_1", "read", "{}")
+                JsonToolCall("call_1", "read", "{}")
             ])));
         Assert.Contains("missing a tool result for 'read'", missing.Message, StringComparison.Ordinal);
 

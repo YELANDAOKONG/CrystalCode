@@ -12,7 +12,7 @@ public sealed class HarnessExceptionMapperTests
     public async Task MapAsync_ReturnsFailureForIoException()
     {
         var output = await HarnessExceptionMapper.MapAsync(
-            new ToolCall("1", ReadTool.ToolName, "{}"),
+            JsonToolCall("1", ReadTool.ToolName, "{}"),
             new IOException("disk full"));
 
         Assert.NotNull(output);

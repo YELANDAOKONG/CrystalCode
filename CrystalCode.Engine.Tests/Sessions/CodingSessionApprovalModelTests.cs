@@ -460,7 +460,7 @@ public sealed class CodingSessionApprovalModelTests
         var arguments = JsonSerializer.Serialize(new Dictionary<string, string> { ["path"] = path });
         return
         [
-            new ChatToolCallDelta(0, 0, "c1", "read", arguments),
+            JsonChatToolCallDelta(0, 0, "c1", "read", arguments),
             new ChatCandidateCompleted(0, FinishReason.ToolCalls)
         ];
     }

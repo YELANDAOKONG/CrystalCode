@@ -166,7 +166,7 @@ public sealed class SessionAccessTests
         using var outside = new TemporaryWorkspace();
         await File.WriteAllTextAsync(Path.Combine(outside.Path, "a.txt"), "reference text");
         var client = new ScriptedStreamingClient(
-            [new ChatToolCallDelta(0, 0, "c1", "read", JsonSerializer.Serialize(new { path = Path.Combine(outside.Path, "a.txt") })),
+            [JsonChatToolCallDelta(0, 0, "c1", "read", JsonSerializer.Serialize(new { path = Path.Combine(outside.Path, "a.txt") })),
                 new ChatCandidateCompleted(0, FinishReason.ToolCalls)],
             TextRound("done"));
         var saved = new SessionDocument

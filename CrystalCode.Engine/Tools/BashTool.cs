@@ -27,7 +27,7 @@ public sealed class BashTool : ITool
 
         _workspace = workspace;
         _timeoutSeconds = timeoutSeconds;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

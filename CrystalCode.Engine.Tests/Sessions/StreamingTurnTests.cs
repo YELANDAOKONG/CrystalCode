@@ -101,7 +101,7 @@ public sealed class StreamingTurnTests
         var client = new ScriptedStreamingClient(
         [
             new ChatTextDelta(0, 0, ChatRole.Assistant, "partial"),
-            new ChatToolCallDelta(0, 1, "c1", "echo", "{}"),
+            JsonChatToolCallDelta(0, 1, "c1", "echo", "{}"),
             new ChatCandidateCompleted(0, FinishReason.ToolCalls)
         ]);
         var turn = CreateTurn(client, new TurnLimits(2, 0, TimeSpan.FromSeconds(5)));
@@ -351,7 +351,7 @@ public sealed class StreamingTurnTests
         var client = new ScriptedStreamingClient(
         [
             new ChatTextDelta(0, 0, ChatRole.Assistant, "cut"),
-            new ChatToolCallDelta(0, 1, "c1", "echo", "{}"),
+            JsonChatToolCallDelta(0, 1, "c1", "echo", "{}"),
             new ChatCandidateCompleted(0, FinishReason.Length)
         ]);
         var turn = CreateTurn(client);
@@ -370,7 +370,7 @@ public sealed class StreamingTurnTests
         var client = new ScriptedStreamingClient(
         [
             new ChatTextDelta(0, 0, ChatRole.Assistant, "blocked"),
-            new ChatToolCallDelta(0, 1, "c1", "echo", "{}"),
+            JsonChatToolCallDelta(0, 1, "c1", "echo", "{}"),
             new ChatCandidateCompleted(0, FinishReason.ContentFilter)
         ]);
         var turn = CreateTurn(client);
@@ -446,7 +446,7 @@ public sealed class StreamingTurnTests
     {
         var events = new List<ChatStreamEvent>
         {
-            new ChatToolCallDelta(0, 0, callId, name, arguments),
+            JsonChatToolCallDelta(0, 0, callId, name, arguments),
             new ChatCandidateCompleted(0, FinishReason.ToolCalls)
         };
         if (usage is not null)
@@ -477,7 +477,7 @@ public sealed class StreamingTurnTests
         public CancellingTool(Action onExecute)
         {
             _onExecute = onExecute;
-            Definition = new ToolDefinition(
+            Definition = ToolDefinition.Json(
                 "cancel_tool",
                 ToolSchema.Parse("""{"type":"object","properties":{}}"""),
                 "Cancels execution.");

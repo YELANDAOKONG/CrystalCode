@@ -68,7 +68,7 @@ public sealed class CompactionSelectionTests
         new ChatMessage(ChatRole.System, "work"),
         new ChatMessage(ChatRole.User, "first"),
         new ChatMessage(ChatRole.Assistant, "ok"),
-        new ToolCall("1", "read", """{"path":"a.txt"}"""),
+        JsonToolCall("1", "read", """{"path":"a.txt"}"""),
         new ToolResult("1", "file contents"),
         new ChatMessage(ChatRole.User, "second"),
         new ChatMessage(ChatRole.User, "third"),

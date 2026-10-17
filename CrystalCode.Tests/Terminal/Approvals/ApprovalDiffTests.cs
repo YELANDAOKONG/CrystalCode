@@ -14,7 +14,7 @@ public sealed class ApprovalDiffTests
     [Fact]
     public void Lines_EditShowsRemovedAndAdded()
     {
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             EditTool.ToolName,
             """{"path":"src/App.cs","old_string":"foo","new_string":"bar"}""");
@@ -32,7 +32,7 @@ public sealed class ApprovalDiffTests
     [Fact]
     public void Lines_WriteShowsAddedContents()
     {
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"src/App.cs","contents":"hello"}""");
@@ -47,7 +47,7 @@ public sealed class ApprovalDiffTests
     {
         var body = string.Join('\n', Enumerable.Range(1, ApprovalDiff.MaximumLines + 1)
             .Select(index => "line" + index));
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             "{\"path\":\"src/App.cs\",\"contents\":\"" + body.Replace("\n", "\\n", StringComparison.Ordinal) + "\"}");
@@ -64,7 +64,7 @@ public sealed class ApprovalDiffTests
     [Fact]
     public void Lines_OtherToolsEmpty()
     {
-        var call = new ToolCall("1", "bash", """{"command":"ls"}""");
+        var call = JsonToolCall("1", "bash", """{"command":"ls"}""");
 
         Assert.Empty(ApprovalDiff.Lines(call));
     }
@@ -72,7 +72,7 @@ public sealed class ApprovalDiffTests
     [Fact]
     public void Lines_SpellOutControlCharactersInPreviewText()
     {
-        var call = new ToolCall(
+        var call = JsonToolCall(
             "1",
             WriteTool.ToolName,
             """{"path":"x","contents":"safe\u001b[2Kline"}""");

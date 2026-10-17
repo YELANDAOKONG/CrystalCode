@@ -25,7 +25,7 @@ public sealed class TodoWriteTool : ITool
     {
         ArgumentNullException.ThrowIfNull(todos);
         _todos = todos;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

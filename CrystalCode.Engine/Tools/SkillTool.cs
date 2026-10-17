@@ -23,7 +23,7 @@ public sealed class SkillTool : ITool
     {
         ArgumentNullException.ThrowIfNull(catalog);
         _catalog = catalog;
-        Definition = new ToolDefinition(
+        Definition = ToolDefinition.Json(
             ToolName,
             ToolSchema.Parse(
                 """

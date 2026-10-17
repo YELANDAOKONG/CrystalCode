@@ -19,7 +19,7 @@ public sealed class ReviewTranscriptTests
             new ChatMessage(ChatRole.System, "You are Crystal Code."),
             new ChatMessage(ChatRole.User, "Run the tests and fix failures."),
             new ChatMessage(ChatRole.Assistant, "I will start with the failing suite."),
-            new ToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""),
+            JsonToolCall("1", BashTool.ToolName, """{"command":"dotnet test"}"""),
             new ToolResult("1", "Failed: 1", ToolResultStatus.Failure),
             new ChatMessage(ChatRole.User, "how's it going?")
         ]);
@@ -99,7 +99,7 @@ public sealed class ReviewTranscriptTests
         [
             new ChatMessage(ChatRole.System, "work"),
             new ChatMessage(ChatRole.User, "Fix the failing tests."),
-            new ToolCall("1", QuestionTool.ToolName, """{"questions":[]}"""),
+            JsonToolCall("1", QuestionTool.ToolName, """{"questions":[]}"""),
             new ToolResult(
                 "1",
                 QuestionTool.AnswersPrefix + """{"answers":[["Yes, delete the file"]]}""",
@@ -118,7 +118,7 @@ public sealed class ReviewTranscriptTests
         [
             new ChatMessage(ChatRole.System, "work"),
             new ChatMessage(ChatRole.User, "Fix the failing tests."),
-            new ToolCall("1", QuestionTool.ToolName, """{"questions":[]}"""),
+            JsonToolCall("1", QuestionTool.ToolName, """{"questions":[]}"""),
             new ToolResult("1", "The user dismissed the question.", ToolResultStatus.Failure)
         ]);
 

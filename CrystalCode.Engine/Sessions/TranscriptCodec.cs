@@ -118,7 +118,11 @@ public static class TranscriptCodec
                         return false;
                     }
 
-                    item = new ToolCall(document.CallId, document.Name, document.Arguments);
+                    item = new ToolCall(
+                        document.CallId,
+                        document.Name,
+                        document.Arguments,
+                        ToolInputKind.Json);
                     return true;
                 case "tool_result":
                     if (string.IsNullOrWhiteSpace(document.CallId)

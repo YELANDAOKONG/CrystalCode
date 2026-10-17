@@ -44,7 +44,7 @@ public sealed class DirectoryAccessPolicyTests
         var workspace = new Workspace(root.Path);
         var file = Path.Combine(workspace.Root, "new", "a.txt");
         workspace.Access.Set(workspace.Root, "read");
-        var call = new ToolCall("1", "write", JsonSerializer.Serialize(new { path = file, contents = "new" }));
+        var call = JsonToolCall("1", "write", JsonSerializer.Serialize(new { path = file, contents = "new" }));
         var grants = new GrantStore(home.Home);
         grants.Remember(workspace.Root, call, GrantScope.Session);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
@@ -79,7 +79,7 @@ public sealed class DirectoryAccessPolicyTests
         workspace.Access.Set(new Workspace(other.Path).Root, access);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = new ApprovalPolicy(ApprovalMode.Parse(mode), workspace, new GrantStore(home.Home), prompt);
-        var call = new ToolCall("1", tool, JsonSerializer.Serialize(new
+        var call = JsonToolCall("1", tool, JsonSerializer.Serialize(new
         {
             path = Path.Combine(other.Path, "a.txt"), contents = "new"
         }));
@@ -97,7 +97,7 @@ public sealed class DirectoryAccessPolicyTests
         workspace.Access.Set(workspace.Root, "read");
         var file = Path.Combine(root.Path, "a.txt");
         await File.WriteAllTextAsync(file, "before");
-        var call = new ToolCall("1", "edit", JsonSerializer.Serialize(new
+        var call = JsonToolCall("1", "edit", JsonSerializer.Serialize(new
         {
             path = file, old_string = "before", new_string = "after"
         }));

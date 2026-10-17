@@ -31,7 +31,7 @@ public sealed class AnthropicMultimodalProviderTests
             new MultimodalMessage(
                 MultimodalChatRole.User,
                 [new TextContent("inspect "), InlineImage([1, 2, 3])]),
-            new MultimodalToolCall("toolu_1", "render", "{}"),
+            JsonMultimodalToolCall("toolu_1", "render", "{}"),
             new MultimodalToolResult(
                 "toolu_1",
                 [

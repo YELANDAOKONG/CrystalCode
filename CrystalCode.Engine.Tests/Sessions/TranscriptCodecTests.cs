@@ -19,7 +19,7 @@ public sealed class TranscriptCodecTests
         {
             new ChatMessage(ChatRole.System, "work"),
             new ChatMessage(ChatRole.User, "hi"),
-            new ToolCall("1", "read", """{"path":"a.txt"}"""),
+            JsonToolCall("1", "read", """{"path":"a.txt"}"""),
             new ToolResult("1", "ok", ToolResultStatus.Success)
         };
 
@@ -39,7 +39,7 @@ public sealed class TranscriptCodecTests
         {
             new ChatMessage(ChatRole.System, "work"),
             new ChatMessage(ChatRole.System, summary),
-            new ToolCall("1", "read", "{}"),
+            JsonToolCall("1", "read", "{}"),
             new ToolResult("1", ContextCompactor.OmittedResultText),
             new ChatMessage(ChatRole.User, "continue")
         };
