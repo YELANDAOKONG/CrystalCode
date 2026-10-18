@@ -497,7 +497,9 @@ public sealed class DeepSeekProviderTests
                 "Error while copying content to a stream.",
                 new IOException(
                     "Unable to write data to the transport connection: Broken pipe.",
-                    new SocketException((int)SocketError.Shutdown)));
+                    // Windows formats SocketError.Shutdown as a distinct WSAESHUTDOWN
+                    // sentence. Pin the text so the reported cause is stable.
+                    new SocketException((int)SocketError.Shutdown, "Broken pipe.")));
         }
     }
 }
