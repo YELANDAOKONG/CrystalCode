@@ -1,8 +1,12 @@
+using System.Text;
+using System.Text.Json;
+
 using Crystal;
 using Crystal.Media;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
+using Crystal.Reasoning;
 using CrystalCode.Providers.DeepSeek;
 
 using Xunit;
@@ -159,6 +163,60 @@ public sealed class DeepSeekMultimodalProviderTests
         Assert.Equal("invalid_request_error", exception.ErrorCode);
         Assert.Null(exception.StatusCode);
         Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReplaysReasoningOnTheToolCallMessage()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"four"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = CreateProvider(http);
+
+        await provider.CompleteAsync(new MultimodalChatRequest(
+        [
+            new MultimodalMessage(
+                MultimodalChatRole.User,
+                [new TextContent("Inspect the screenshots.")]),
+            new MultimodalReasoningItem(new MultimodalReasoningContent(
+                [new MultimodalReasoningPart(
+                    new TextContent("look at all four"),
+                    MultimodalReasoningKind.Trace)],
+                new OpaqueReasoningState(
+                    DeepSeekProvider.ReasoningStateFormat,
+                    Encoding.UTF8.GetBytes("look at all four")))),
+            JsonMultimodalToolCall("call_1", "view_image", """{"path":"1.png"}"""),
+            JsonMultimodalToolCall("call_2", "view_image", """{"path":"2.png"}"""),
+            JsonMultimodalToolCall("call_3", "view_image", """{"path":"3.png"}"""),
+            JsonMultimodalToolCall("call_4", "view_image", """{"path":"4.png"}"""),
+            new MultimodalToolResult("call_1", [new TextContent("Image loaded."), InlineImage([1, 2, 3])]),
+            new MultimodalToolResult("call_2", [new TextContent("Image loaded."), InlineImage([1, 2, 3])]),
+            new MultimodalToolResult("call_3", [new TextContent("Image loaded."), InlineImage([1, 2, 3])]),
+            new MultimodalToolResult("call_4", [new TextContent("Image loaded."), InlineImage([1, 2, 3])]),
+            new MultimodalMessage(
+                MultimodalChatRole.User,
+                [new TextContent("What did you see?")])
+        ]));
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        var assistant = sent.RootElement.GetProperty("messages").EnumerateArray()
+            .Single(message => message.GetProperty("role").GetString() == "assistant");
+        Assert.Equal("look at all four", assistant.GetProperty("reasoning_content").GetString());
+        Assert.Equal(4, assistant.GetProperty("tool_calls").GetArrayLength());
+        Assert.Equal(4, Count(handler.Body!, "\"type\":\"image_url\""));
+    }
+
+    private static int Count(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 
     private static async Task CollectAsync(DeepSeekMultimodalProvider provider)

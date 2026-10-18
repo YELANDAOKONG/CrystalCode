@@ -430,4 +430,41 @@ public sealed class DeepSeekProviderTests
         Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
         Assert.Null(handler.Body);
     }
+
+    [Fact]
+    public async Task CompleteAsync_ReplaysReasoningOnTheToolCallMessage()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"four"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-flash"),
+            http);
+        var reasoning = new ChatReasoningItem(new ReasoningContent(
+            [new ReasoningText("look at all four", ReasoningTextKind.Trace)],
+            new OpaqueReasoningState(
+                DeepSeekProvider.ReasoningStateFormat,
+                Encoding.UTF8.GetBytes("look at all four"))));
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Inspect the screenshots."),
+            reasoning,
+            JsonToolCall("call_1", "view_image", """{"path":"1.png"}"""),
+            JsonToolCall("call_2", "view_image", """{"path":"2.png"}"""),
+            JsonToolCall("call_3", "view_image", """{"path":"3.png"}"""),
+            JsonToolCall("call_4", "view_image", """{"path":"4.png"}"""),
+            new ToolResult("call_1", "Image loaded."),
+            new ToolResult("call_2", "Image loaded."),
+            new ToolResult("call_3", "Image loaded."),
+            new ToolResult("call_4", "Image loaded."),
+            new ChatMessage(ChatRole.User, "What did you see?")
+        ]));
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        var assistant = sent.RootElement.GetProperty("messages").EnumerateArray()
+            .Single(message => message.GetProperty("role").GetString() == "assistant");
+        Assert.Equal("look at all four", assistant.GetProperty("reasoning_content").GetString());
+        Assert.Equal(4, assistant.GetProperty("tool_calls").GetArrayLength());
+    }
 }
