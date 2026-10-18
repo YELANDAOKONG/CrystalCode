@@ -289,6 +289,17 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_WindowsControlCharacterWithoutMetadata_RecognizesCtrlV()
+    {
+        var key = Assert.IsType<InputKey>(
+            Assert.Single(new InputDecoder().Push(
+                [new ConsoleKeyInfo('\u0016', ConsoleKey.None, false, false, false)])));
+
+        Assert.Equal(ConsoleKey.V, key.Key);
+        Assert.True(key.Modifiers.HasFlag(ConsoleModifiers.Control));
+    }
+
+    [Fact]
     public void Push_HoldsPasteUntilEndMarker()
     {
         var windows = new InputDecoder();

@@ -410,6 +410,15 @@ public sealed class InputDecoder
             return new InputKey(ConsoleKey.J, key.KeyChar, key.Modifiers);
         }
 
+        if (key.KeyChar == '\u0016'
+            && !key.Modifiers.HasFlag(ConsoleModifiers.Control))
+        {
+            return new InputKey(
+                ConsoleKey.V,
+                key.KeyChar,
+                key.Modifiers | ConsoleModifiers.Control);
+        }
+
         return InputKey.From(key);
     }
 

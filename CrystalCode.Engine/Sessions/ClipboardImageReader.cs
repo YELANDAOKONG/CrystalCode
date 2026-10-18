@@ -84,7 +84,14 @@ public static class ClipboardImageReader
                 $ErrorActionPreference='Stop'
                 Add-Type -AssemblyName System.Windows.Forms
                 Add-Type -AssemblyName System.Drawing
-                $dataObject=[Windows.Forms.Clipboard]::GetDataObject()
+                $dataObject=$null
+                for ($attempt=0; $attempt -lt 5 -and $null -eq $dataObject; $attempt++) {
+                    try { $dataObject=[Windows.Forms.Clipboard]::GetDataObject() }
+                    catch [Runtime.InteropServices.ExternalException] {
+                        if ($attempt -eq 4) { throw }
+                        Start-Sleep -Milliseconds 50
+                    }
+                }
                 if ($null -eq $dataObject) { [Console]::Write('NO_IMAGE'); exit 0 }
                 $bytes=$null
                 if ($dataObject.GetDataPresent('PNG')) {
