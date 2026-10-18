@@ -1739,13 +1739,12 @@ width characters assume a narrow terminal.
 (`?2026h` and `?2026l`), which terminals that lack the mode ignore.
 Autowrap is disabled while rows are written. Before it is enabled again
 the cursor is parked at the origin, so a full-width row cannot leave the
-pending-wrap flag set and shift ASCII onto the composer. Composer rows
-are erased on every paint even when their text did not change, because
-that is where the cursor sits and where an echoed report would remain
-until the next key. On Windows the console echo flag is off for the same
-reason: the host would otherwise print mouse and mode reports into the
-input line. A report whose escape was already consumed is dropped, not
-pasted.
+pending-wrap flag set and shift ASCII onto the composer. Unchanged rows,
+including the composer, stay in place. On Windows the console echo flag
+is off so the host does not print mouse and mode reports into the input
+line. A finished report whose escape was already consumed is dropped, not
+pasted. An unfinished tail is still text, so a paste such as `[12;40` is
+kept.
 `WidgetPaint` keeps foreground, background, bold, dim, italic, underline,
 strikethrough, and invert when it rasterizes Spectre widgets. Links and
 blinking are dropped on purpose.

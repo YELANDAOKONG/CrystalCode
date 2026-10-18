@@ -552,57 +552,11 @@ public sealed class InputDecoder
         {
             if (!TrySkipReport(text, ref index))
             {
-                return index == 0 && IsIncompleteReport(text);
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsIncompleteReport(string text)
-    {
-        var rest = text.AsSpan(1);
-        if (rest.Length == 0)
-        {
-            return false;
-        }
-
-        if (rest[0] is '<' or '?')
-        {
-            rest = rest[1..];
-            foreach (var ch in rest)
-            {
-                if (ch is not (>= '0' and <= '9' or ';'))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        if (rest.StartsWith("20")
-            && ("200~".AsSpan().StartsWith(rest) || "201~".AsSpan().StartsWith(rest)))
-        {
-            return true;
-        }
-
-        var sawSeparator = false;
-        foreach (var ch in rest)
-        {
-            if (ch == ';')
-            {
-                sawSeparator = true;
-                continue;
-            }
-
-            if (ch is < '0' or > '9')
-            {
                 return false;
             }
         }
 
-        return sawSeparator;
+        return true;
     }
 
     private static bool TrySkipReport(string text, ref int index)

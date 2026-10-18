@@ -50,15 +50,7 @@ public sealed class ScreenPainter
         AnsiConsole.Write(new ControlCode(BeginSynchronizedUpdate));
         try
         {
-            // The composer is where the cursor sits. Mouse reports, mode
-            // sequences, and a wrapped tail from the row above land there as
-            // ASCII and stay until that row is erased. Rewrite it every frame.
-            WriteFrame(
-                frame,
-                regions.Width,
-                regions.Height,
-                resetFrame,
-                regions.ComposerTop);
+            WriteFrame(frame, regions.Width, regions.Height, resetFrame);
             if (showCursor)
             {
                 var cursorLine = Math.Clamp(
@@ -99,15 +91,10 @@ public sealed class ScreenPainter
         _previous = [.. frame];
     }
 
-    private void WriteFrame(
-        IReadOnlyList<PaintLine> frame,
-        int width,
-        int height,
-        bool resetFrame,
-        int stickyFrom = -1)
+    private void WriteFrame(IReadOnlyList<PaintLine> frame, int width, int height, bool resetFrame)
     {
         var rewriteAll = resetFrame || _previous is null || _previous.Length != frame.Count;
-        var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame, stickyFrom);
+        var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame);
         AnsiConsole.Cursor.Hide();
         if (rewriteAll)
         {

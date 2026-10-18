@@ -236,7 +236,8 @@ public sealed class InputDecoderTests
         Assert.Empty(new InputDecoder().Push(WindowsVt("[<64;12;8M")));
         Assert.Empty(new InputDecoder().Push(WindowsVt("[?2004h[?1000h")));
         Assert.Empty(new InputDecoder().Push(WindowsVt("[24;8R")));
-        Assert.Empty(new InputDecoder().Push(WindowsVt("[<64;12")));
+        AssertPaste(new InputDecoder().Push(WindowsVt("[<64;12")), "[<64;12");
+        AssertPaste(new InputDecoder().Push(WindowsVt("[12;40")), "[12;40");
         AssertPaste(new InputDecoder().Push(WindowsVt("[link](url)")), "[link](url)");
     }
 
