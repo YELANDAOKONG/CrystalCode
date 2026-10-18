@@ -23,6 +23,34 @@ public sealed class TranscriptLogTests
     }
 
     [Fact]
+    public void RemoveUserBeforeNotes_DropsTheUserLineAndKeepsTheNote()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.User, "oops");
+        log.Add(TranscriptKind.Note, "status");
+
+        Assert.True(log.RemoveUserBeforeNotes("oops"));
+
+        var lines = log.BuildLines(40);
+        Assert.Contains(lines, line => line.Plain.Contains("status", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.Plain.Contains("oops", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RemoveUserBeforeNotes_LeavesTheUserLineWhenAssistantTextFollows()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.User, "oops");
+        log.Add(TranscriptKind.Assistant, "answer");
+
+        Assert.False(log.RemoveUserBeforeNotes("oops"));
+
+        var lines = log.BuildLines(40);
+        Assert.Contains(lines, line => line.Plain.Contains("oops", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("answer", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void RemoveLast_KeepsTheUserEntryWhenLiveOutputFollowsIt()
     {
         var log = new TranscriptLog();

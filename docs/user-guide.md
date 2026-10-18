@@ -866,7 +866,10 @@ its own.
 
 `crystal run` does not put a message back. A trusted image marker that the
 session no longer holds is left in the transcript, and that Ctrl+C only
-cancels. A queued follow-up also keeps the message.
+cancels. A queued follow-up also keeps the message. So does a note, an
+error, or a slash command that runs during the turn, such as `/status` or
+`/help`. Text typed while that turn is stopping is kept after the returned
+message.
 
 The alternate screen enables bracketed paste and mouse reporting (1000
 with SGR encoding 1006), turns alternate scroll off, and repeats those

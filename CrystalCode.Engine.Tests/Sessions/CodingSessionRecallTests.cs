@@ -110,6 +110,27 @@ public sealed class CodingSessionRecallTests
     }
 
     [Fact]
+    public async Task TryRecall_AfterStatusDuringTheTurn_LeavesTheMessage()
+    {
+        var client = new HeldStreamingClient();
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        var running = headless.Session.SubmitAsync("stay", CancellationToken.None);
+        await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
+        await headless.Session.SubmitAsync("/status", CancellationToken.None);
+
+        Assert.False(headless.Session.TryRecall());
+        Assert.True(headless.Session.TryInterrupt());
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+        Assert.False(await running);
+
+        Assert.Empty(headless.Observer.Events.OfType<UserMessageRecalled>());
+        var saved = headless.ReadSaved();
+        Assert.Contains(saved.Archive!, item => item.Text == "stay");
+    }
+
+    [Fact]
     public async Task TryRecall_WhenIdle_ReturnsFalse()
     {
         var client = new HeldStreamingClient();

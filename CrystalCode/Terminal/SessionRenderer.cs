@@ -1162,23 +1162,21 @@ public sealed class SessionRenderer : IDisposable
     }
 
     /// <summary>
-    /// Removes the user line just painted for a recalled message and, when the
-    /// composer is still empty, puts that submitted text back.
+    /// Removes the recalled user line, including when notes or errors follow
+    /// it, and puts that submitted text back. Text typed into the composer
+    /// while the turn was stopping is kept after the recalled message.
     /// </summary>
     public void RestoreRecalledMessage(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         lock (_gate)
         {
-            _log.RemoveLast(TranscriptKind.User);
+            _log.RemoveUserBeforeNotes(ImageMarkerText.Display(text));
             _suppressInterruptedNote = true;
-            if (_composer.IsEmpty)
-            {
-                _composer.ReplaceSubmitted(text);
-                OnComposerEdited?.Invoke(_composer.SubmissionText);
-                RefreshPickerUnlocked();
-            }
-
+            var draft = _composer.SubmissionText;
+            _composer.ReplaceSubmitted(draft.Length == 0 ? text : text + "\n\n" + draft);
+            OnComposerEdited?.Invoke(_composer.SubmissionText);
+            RefreshPickerUnlocked();
             PaintUnlocked(force: true);
         }
     }

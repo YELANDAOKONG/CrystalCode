@@ -136,12 +136,14 @@ separate library with no terminal code. The product can:
   recent text-only entries across runs for the same workspace;
 - return a just-submitted message to an empty composer with Ctrl+C while that
   turn has not shown model text, reasoning, a tool call, or a retry, and the
-  follow-up queue is empty. The message leaves the transcript and the turn
-  stops as interrupted. The next Ctrl+C still clears the composer, and the
-  press after that on an empty composer exits. After any of that output, or
-  when a follow-up is queued, Ctrl+C only cancels and the message stays. A
-  message whose trusted image markers are no longer held is not returned.
-  `crystal run` does not return a message this way;
+  follow-up queue is empty. A note, an error, or a slash command that runs
+  during the turn, such as `/status` or `/help`, also ends that window. The
+  message leaves the transcript and the turn stops as interrupted. Text typed
+  before the turn finishes is kept after the returned message. The next Ctrl+C
+  still clears the composer, and the press after that on an empty composer
+  exits. After the window ends, or when a follow-up is queued, Ctrl+C only
+  cancels and the message stays. A message whose trusted image markers are no
+  longer held is not returned. `crystal run` does not return a message this way;
 - open quick prompts with F6 from user-level `~/.crystal/shortcuts/` (or the
   selected Home). Each open reloads direct UTF-8 `.md` files; the filename is
   the name and the full body is the prompt. Search matches names and bodies,

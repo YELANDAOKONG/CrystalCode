@@ -495,6 +495,7 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public bool TryRecall()
     {
+        CancellationTokenSource? source;
         lock (_recallGate)
         {
             if (!_recallOpen
@@ -507,11 +508,25 @@ public sealed class CodingSession : ITurnObserver
                 return false;
             }
 
+            source = _turnSource;
             _recallOpen = false;
             _recallPending = true;
         }
 
-        _turnSource?.Cancel();
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            lock (_recallGate)
+            {
+                _recallPending = false;
+            }
+
+            return false;
+        }
+
         return true;
     }
 
@@ -556,15 +571,10 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private void PublishRecallIfStripped(TurnStopReason? stop)
+    private void PublishRecallIfStripped()
     {
         var recalled = AcceptedRecall();
-        if (recalled is null || (stop is not null && stop != TurnStopReason.Interrupted))
-        {
-            return;
-        }
-
-        if (!TryStripRecalledMessage(recalled))
+        if (recalled is null || !TryStripRecalledMessage(recalled))
         {
             return;
         }
@@ -5555,6 +5565,7 @@ public sealed class CodingSession : ITurnObserver
 
     internal bool TryRunWhileBusy(SessionCommand command)
     {
+        CloseRecallWindow();
         switch (command.Verb)
         {
             case SessionVerb.Help:
@@ -6063,10 +6074,16 @@ public sealed class CodingSession : ITurnObserver
         }
         finally
         {
-            _turnActive = false;
-            _turnTask = null;
-            _turnSource?.Dispose();
-            _turnSource = null;
+            CancellationTokenSource? source;
+            lock (_recallGate)
+            {
+                _turnActive = false;
+                _turnTask = null;
+                source = _turnSource;
+                _turnSource = null;
+            }
+
+            source?.Dispose();
         }
 
         var stop = result?.StopReason ?? TurnStopReason.Failed;
@@ -6084,12 +6101,12 @@ public sealed class CodingSession : ITurnObserver
 
         if (result is null)
         {
-            PublishRecallIfStripped(stop: null);
+            PublishRecallIfStripped();
             return;
         }
 
         _transcript = [.. result.Transcript];
-        PublishRecallIfStripped(result.StopReason);
+        PublishRecallIfStripped();
         lock (_imagesGate)
         {
             _nextImageNumber = Math.Max(_nextImageNumber, NextImageNumber());
@@ -6126,16 +6143,28 @@ public sealed class CodingSession : ITurnObserver
 
     private void Publish(SessionEvent sessionEvent)
     {
+        if (sessionEvent is NoteWritten
+            or ErrorWritten
+            or HelpRequested
+            or StatusReported
+            or StatsReported
+            or ToolsListed)
+        {
+            CloseRecallWindow();
+        }
+
         _frontEnd.Observer.OnEvent(sessionEvent);
     }
 
     private void Note(string text)
     {
+        CloseRecallWindow();
         Publish(new NoteWritten(text));
     }
 
     private void Error(string text)
     {
+        CloseRecallWindow();
         Publish(new ErrorWritten(text));
     }
 

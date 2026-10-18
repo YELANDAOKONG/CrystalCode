@@ -227,6 +227,37 @@ public sealed class TranscriptLog
         return true;
     }
 
+    /// <summary>
+    /// Drops the latest user entry with this text when only notes or errors
+    /// were written after it. Model output blocks the removal.
+    /// </summary>
+    public bool RemoveUserBeforeNotes(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        CommitLive();
+        text = TerminalText.Sanitize(text);
+        for (var index = _entries.Count - 1; index >= 0; index--)
+        {
+            var entry = _entries[index];
+            if (entry.Kind is TranscriptKind.Note or TranscriptKind.Error)
+            {
+                continue;
+            }
+
+            if (entry.Kind != TranscriptKind.User
+                || !string.Equals(entry.Text, text, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            _entries.RemoveAt(index);
+            InvalidateCache();
+            return true;
+        }
+
+        return false;
+    }
+
     public string AppendLive(TranscriptKind kind, string text)
     {
         ArgumentNullException.ThrowIfNull(text);

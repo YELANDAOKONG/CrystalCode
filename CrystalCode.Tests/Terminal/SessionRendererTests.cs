@@ -53,13 +53,15 @@ public sealed class SessionRendererTests
 
         renderer.SeedComposer("draft");
         Assert.False(renderer.CanRecallIntoComposer);
+        renderer.WriteUser("other");
+        renderer.WriteNote("status");
         renderer.RestoreRecalledMessage("other");
         var draft = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
             static () => false,
             CancellationToken.None,
             checkSize: false);
-        Assert.Equal("draft", draft);
+        Assert.Equal("other\n\ndraft", draft);
     }
 
     [Fact]
