@@ -521,6 +521,48 @@ public sealed class ResponsesProviderTests
     }
 
     [Fact]
+    public async Task StreamAsync_ThrowsJsonErrorBody()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":{"message":"too many images","code":"invalid_request_error"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<ResponsesException>(async () =>
+        {
+            await foreach (var streamEvent in provider.StreamAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+            {
+                _ = streamEvent;
+            }
+        });
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ended before", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsErrorBodyWithoutFailedStatus()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":{"message":"too many images","code":"invalid_request_error"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<ResponsesException>(
+            () => provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])));
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("response failed", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StreamAsync_ReadsChatCompletionTokenNames()
     {
         var handler = new RecordingHandler(JsonResponse.CreateStream(

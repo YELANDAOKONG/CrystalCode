@@ -598,4 +598,77 @@ public sealed class GeminiProviderTests
         Assert.Contains("does not support a JSON output schema", json.Message, StringComparison.Ordinal);
         Assert.Null(handler.Body);
     }
+
+    [Fact]
+    public async Task StreamAsync_ThrowsJsonErrorBody()
+    {
+        var exception = await ReadStream(
+            """{"error":{"code":400,"message":"too many images","status":"INVALID_ARGUMENT"}}""");
+
+        Assert.Equal("INVALID_ARGUMENT", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ended before", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsErrorObject()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"error":{"code":429,"message":"Resource exhausted.","status":"RESOURCE_EXHAUSTED"}}
+
+            """);
+
+        Assert.Equal("Resource exhausted.", exception.Message);
+        Assert.Equal("RESOURCE_EXHAUSTED", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsStringError()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"error":"model not found"}
+
+            """);
+
+        Assert.Equal("model not found", exception.Message);
+        Assert.Null(exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsErrorBodyWithOkStatus()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":{"code":400,"message":"too many images","status":"INVALID_ARGUMENT"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), http);
+
+        var exception = await Assert.ThrowsAsync<GeminiException>(
+            () => provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])));
+
+        Assert.Equal("INVALID_ARGUMENT", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("response failed", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static Task<GeminiException> ReadStream(string json) =>
+        Read(new RecordingHandler(JsonResponse.Create(json)));
+
+    private static Task<GeminiException> ReadStreamEvents(string events) =>
+        Read(new RecordingHandler(JsonResponse.CreateStream(events)));
+
+    private static async Task<GeminiException> Read(RecordingHandler handler)
+    {
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("key", "gemini-test"), http);
+        return await Assert.ThrowsAsync<GeminiException>(async () =>
+        {
+            await foreach (var item in provider.StreamAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+            {
+                _ = item;
+            }
+        });
+    }
 }

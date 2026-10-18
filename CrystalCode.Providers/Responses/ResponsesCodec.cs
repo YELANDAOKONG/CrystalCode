@@ -92,6 +92,16 @@ internal sealed class ResponsesCodec : IProtocolCodec
             throw ReadFailure(root);
         }
 
+        if (ProtocolFaults.TryCreate(
+            root,
+            _vendorName,
+            "response",
+            (message, code, inner) => CreateException(message, innerException: inner, errorCode: code),
+            out var fault))
+        {
+            throw fault;
+        }
+
         if (!root.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array)
         {
             throw CreateException($"{_vendorName} response is missing output items.");

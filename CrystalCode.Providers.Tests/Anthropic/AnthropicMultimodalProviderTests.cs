@@ -124,6 +124,32 @@ public sealed class AnthropicMultimodalProviderTests
         Assert.Null(handler.Body);
     }
 
+    [Fact]
+    public async Task StreamAsync_ThrowsJsonErrorBody()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"type":"error","error":{"type":"invalid_request_error","message":"too many images"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicMultimodalProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<AnthropicException>(async () =>
+        {
+            await foreach (var item in provider.StreamAsync(new MultimodalChatRequest(
+            [
+                new MultimodalMessage(MultimodalChatRole.User, [new TextContent("Hi")])
+            ])))
+            {
+                _ = item;
+            }
+        });
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ended before", exception.Message, StringComparison.Ordinal);
+    }
+
     private static ImageContent InlineImage(byte[] data) =>
         new(new ImageMedia(
             new InlineMediaSource(data),

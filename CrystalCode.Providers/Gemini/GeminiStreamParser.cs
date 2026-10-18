@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.Gemini;
@@ -21,11 +22,12 @@ internal sealed class GeminiStreamParser : IProtocolStreamParser
     {
         var events = new List<ChatStreamEvent>();
         var completeBefore = IsComplete;
-        if (root.TryGetProperty("error", out var error))
+        if (root.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
         {
-            throw new GeminiException(error.TryGetProperty("message", out var message)
-                ? message.GetString() ?? "Gemini stream failed."
-                : "Gemini stream failed.");
+            CompatibleWire.TryReadError(root, out var code, out var providerMessage);
+            throw new GeminiException(
+                string.IsNullOrWhiteSpace(providerMessage) ? "Gemini stream failed." : providerMessage!,
+                errorCode: code);
         }
 
         if (root.TryGetProperty("candidates", out var candidates)

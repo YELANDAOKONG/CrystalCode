@@ -171,6 +171,16 @@ internal sealed class GeminiCodec : IProtocolCodec
 
     public ChatResponse ReadResponse(JsonElement root)
     {
+        if (ProtocolFaults.TryCreate(
+            root,
+            "Gemini",
+            "response",
+            (message, code, inner) => CreateException(message, innerException: inner, errorCode: code),
+            out var fault))
+        {
+            throw fault;
+        }
+
         if (!root.TryGetProperty("candidates", out var candidates)
             || candidates.ValueKind != JsonValueKind.Array
             || candidates.GetArrayLength() == 0)

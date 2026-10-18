@@ -349,4 +349,121 @@ public sealed class AnthropicProviderTests
         Assert.Contains("does not support a JSON output schema", exception.Message, StringComparison.Ordinal);
         Assert.Null(handler.Body);
     }
+
+    [Fact]
+    public async Task StreamAsync_ThrowsJsonErrorBody()
+    {
+        var exception = await ReadStream(
+            """{"type":"error","error":{"type":"invalid_request_error","message":"too many images"}}""");
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ended before", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ThrowsPrettyJsonErrorBody()
+    {
+        var exception = await ReadStream(
+            """
+            {
+              "type": "error",
+              "error": {"type": "invalid_request_error", "message": "too many images"}
+            }
+            """);
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ended before", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsBodyWithoutEventStream()
+    {
+        var exception = await ReadStream(
+            """{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn"}""");
+
+        Assert.Contains("did not contain an event stream", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ended before", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsOfficialErrorEvent()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            event: error
+            data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}
+
+            """);
+
+        Assert.Equal("Overloaded", exception.Message);
+        Assert.Equal("overloaded_error", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsErrorEventWithoutMessage()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"type":"error","error":{"type":"api_error"}}
+
+            """);
+
+        Assert.Equal("api_error", exception.ErrorCode);
+        Assert.Equal("Anthropic stream failed.", exception.Message);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsFlatErrorEvent()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"type":"error","message":"flat boom","code":"server_error"}
+
+            """);
+
+        Assert.Equal("flat boom", exception.Message);
+        Assert.Equal("server_error", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsErrorBodyWithOkStatus()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"type":"error","error":{"type":"invalid_request_error","message":"too many images"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<AnthropicException>(
+            () => provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])));
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("response failed", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static Task<AnthropicException> ReadStream(string json) =>
+        Read(new RecordingHandler(JsonResponse.Create(json)));
+
+    private static Task<AnthropicException> ReadStreamEvents(string events) =>
+        Read(new RecordingHandler(JsonResponse.CreateStream(events)));
+
+    private static async Task<AnthropicException> Read(RecordingHandler handler)
+    {
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+        return await Assert.ThrowsAsync<AnthropicException>(async () =>
+        {
+            await foreach (var item in provider.StreamAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+            {
+                _ = item;
+            }
+        });
+    }
 }

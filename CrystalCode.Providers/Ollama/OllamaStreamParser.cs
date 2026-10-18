@@ -4,6 +4,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.Ollama;
@@ -20,9 +21,12 @@ internal sealed class OllamaStreamParser : IProtocolStreamParser
 
     public IReadOnlyList<ChatStreamEvent> Parse(JsonElement root)
     {
-        if (root.TryGetProperty("error", out var error))
+        if (root.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
         {
-            throw new OllamaException(error.GetString() ?? "Ollama stream failed.");
+            CompatibleWire.TryReadError(root, out var code, out var providerMessage);
+            throw new OllamaException(
+                string.IsNullOrWhiteSpace(providerMessage) ? "Ollama stream failed." : providerMessage!,
+                errorCode: code);
         }
 
         var events = new List<ChatStreamEvent>();

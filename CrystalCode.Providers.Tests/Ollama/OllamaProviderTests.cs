@@ -304,4 +304,69 @@ public sealed class OllamaProviderTests
             return handler.Body;
         }
     }
+
+    [Fact]
+    public async Task StreamAsync_ReportsStringError()
+    {
+        var exception = await ReadStream("""{"error":"model 'qwen' not found"}""");
+
+        Assert.Equal("model 'qwen' not found", exception.Message);
+        Assert.Null(exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsPrettyErrorBody()
+    {
+        var exception = await ReadStream(
+            """
+            {
+              "error": "model 'qwen' not found"
+            }
+            """);
+
+        Assert.Contains("model 'qwen' not found", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("stream failed", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("invalid JSON", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsObjectError()
+    {
+        var exception = await ReadStream(
+            """{"error":{"message":"too many images","code":"invalid_request_error"}}""");
+
+        Assert.Equal("too many images", exception.Message);
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsStringErrorWithOkStatus()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":"model 'qwen' not found"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        var exception = await Assert.ThrowsAsync<OllamaException>(
+            () => provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "hi")])));
+
+        Assert.Null(exception.StatusCode);
+        Assert.Contains("model 'qwen' not found", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("response failed", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static async Task<OllamaException> ReadStream(string json)
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(json));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+        return await Assert.ThrowsAsync<OllamaException>(async () =>
+        {
+            await foreach (var item in provider.StreamAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "hi")])))
+            {
+                _ = item;
+            }
+        });
+    }
 }

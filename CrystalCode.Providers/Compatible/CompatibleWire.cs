@@ -148,7 +148,9 @@ internal static class CompatibleWire
             && eventType.ValueKind == JsonValueKind.String
             && string.Equals(eventType.GetString(), "error", StringComparison.OrdinalIgnoreCase))
         {
-            code = ReadStringProperty(root, "code");
+            code = ReadStringProperty(root, "code")
+                ?? ReadStringProperty(root, "status")
+                ?? ReadNumberProperty(root, "code");
             message = ReadStringProperty(root, "message");
             return true;
         }
@@ -174,10 +176,21 @@ internal static class CompatibleWire
             return false;
         }
 
+        // Gemini sends error.code as a number and the stable name in status.
         code = ReadStringProperty(error, "code")
-            ?? ReadStringProperty(error, "type");
+            ?? ReadStringProperty(error, "type")
+            ?? ReadStringProperty(error, "status")
+            ?? ReadNumberProperty(error, "code");
         message = ReadStringProperty(error, "message");
         return true;
+    }
+
+    private static string? ReadNumberProperty(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var property)
+            && property.ValueKind == JsonValueKind.Number
+                ? property.GetRawText()
+                : null;
     }
 
     private static string? ReadStringProperty(JsonElement element, string name)

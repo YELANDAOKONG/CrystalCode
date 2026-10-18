@@ -172,6 +172,19 @@ internal sealed class OllamaCodec : IProtocolCodec
 
     public ChatResponse ReadResponse(JsonElement root)
     {
+        if (ProtocolFaults.TryCreate(
+            root,
+            "Ollama",
+            "response",
+            (faultMessage, code, inner) => CreateException(
+                faultMessage,
+                innerException: inner,
+                errorCode: code),
+            out var fault))
+        {
+            throw fault;
+        }
+
         if (!root.TryGetProperty("message", out var message))
         {
             throw CreateException("Ollama response is missing a message.");

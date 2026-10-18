@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 
 namespace CrystalCode.Providers.Anthropic;
@@ -73,6 +74,16 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     public ChatResponse ReadResponse(JsonElement root)
     {
+        if (ProtocolFaults.TryCreate(
+            root,
+            _vendorName,
+            "response",
+            (message, code, inner) => CreateException(message, innerException: inner, errorCode: code),
+            out var fault))
+        {
+            throw fault;
+        }
+
         if (!root.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
         {
             throw CreateException($"{_vendorName} response is missing content blocks.");
@@ -94,6 +105,17 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     public Exception CreateException(string message, int? statusCode = null, Exception? innerException = null, string? errorCode = null, TimeSpan? retryAfter = null) =>
         new AnthropicException(message, statusCode, innerException, errorCode, retryAfter);
+
+    private Exception ReadStreamError(JsonElement root)
+    {
+        if (!CompatibleWire.TryReadError(root, out var code, out var providerMessage)
+            || string.IsNullOrWhiteSpace(providerMessage))
+        {
+            return CreateException($"{_vendorName} stream failed.", errorCode: code);
+        }
+
+        return CreateException(providerMessage, errorCode: code);
+    }
 
     private static void WriteSystem(Utf8JsonWriter writer, IReadOnlyList<ChatItem> items)
     {
@@ -525,8 +547,9 @@ internal sealed class AnthropicCodec : IProtocolCodec
                     IsComplete = true;
                     break;
                 case "error":
-                    var error = root.GetProperty("error");
-                    throw _codec.CreateException(error.GetProperty("message").GetString() ?? "Anthropic stream failed.", errorCode: error.GetProperty("type").GetString());
+                    throw _codec.ReadStreamError(root);
+                default:
+                    break;
             }
 
             return events;

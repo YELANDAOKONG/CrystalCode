@@ -70,20 +70,16 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
             .ConfigureAwait(false);
         using var reader = new StreamReader(content, Encoding.UTF8);
         var parser = _codec.CreateStreamParser();
-        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        await foreach (var data in ProtocolStream.ReadDataAsync(
+            reader,
+            _codec.UsesJsonLines,
+            _options.VendorName,
+            (message, code, inner) => _codec.CreateException(
+                message,
+                innerException: inner,
+                errorCode: code),
+            cancellationToken).ConfigureAwait(false))
         {
-            if (!_codec.UsesJsonLines
-                && !line.StartsWith("data:", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var data = _codec.UsesJsonLines ? line : line[5..].TrimStart();
-            if (data.Length == 0 || data == "[DONE]")
-            {
-                continue;
-            }
-
             IReadOnlyList<ChatStreamEvent> events;
             try
             {
