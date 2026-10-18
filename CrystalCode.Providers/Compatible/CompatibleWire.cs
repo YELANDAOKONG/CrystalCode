@@ -100,32 +100,46 @@ internal static class CompatibleWire
 
     public static (string? Code, string? Message) ReadError(string body)
     {
+        return TryReadError(body, out var code, out var message)
+            ? (code, message)
+            : (null, null);
+    }
+
+    public static bool TryReadError(string body, out string? code, out string? message)
+    {
+        code = null;
+        message = null;
         if (string.IsNullOrWhiteSpace(body))
         {
-            return (null, null);
+            return false;
         }
 
         try
         {
             using var document = JsonDocument.Parse(body);
-            return ReadError(document.RootElement);
+            return TryReadError(document.RootElement, out code, out message);
         }
         catch (JsonException)
         {
-            return (null, null);
+            return false;
         }
     }
 
-    public static (string? Code, string? Message) ReadError(JsonElement root)
+    public static bool TryReadError(
+        JsonElement root,
+        out string? code,
+        out string? message)
     {
+        code = null;
+        message = null;
         if (root.ValueKind != JsonValueKind.Object)
         {
-            return (null, null);
+            return false;
         }
 
         if (root.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
         {
-            return ReadErrorElement(error);
+            return TryReadErrorElement(error, out code, out message);
         }
 
         // Some gateways put the stream failure on the event itself instead of
@@ -134,46 +148,36 @@ internal static class CompatibleWire
             && eventType.ValueKind == JsonValueKind.String
             && string.Equals(eventType.GetString(), "error", StringComparison.OrdinalIgnoreCase))
         {
-            return (
-                ReadStringProperty(root, "code"),
-                ReadStringProperty(root, "message"));
-        }
-
-        return (null, null);
-    }
-
-    public static bool HasError(JsonElement root)
-    {
-        if (root.ValueKind != JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        if (root.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
-        {
+            code = ReadStringProperty(root, "code");
+            message = ReadStringProperty(root, "message");
             return true;
         }
 
-        return root.TryGetProperty("type", out var eventType)
-            && eventType.ValueKind == JsonValueKind.String
-            && string.Equals(eventType.GetString(), "error", StringComparison.OrdinalIgnoreCase);
+        return false;
     }
 
-    private static (string? Code, string? Message) ReadErrorElement(JsonElement error)
+    private static bool TryReadErrorElement(
+        JsonElement error,
+        out string? code,
+        out string? message)
     {
+        code = null;
+        message = null;
         if (error.ValueKind == JsonValueKind.String)
         {
-            return (null, error.GetString());
+            message = error.GetString();
+            return true;
         }
 
         if (error.ValueKind != JsonValueKind.Object)
         {
-            return (null, null);
+            return false;
         }
 
-        var code = ReadStringProperty(error, "code")
+        code = ReadStringProperty(error, "code")
             ?? ReadStringProperty(error, "type");
-        return (code, ReadStringProperty(error, "message"));
+        message = ReadStringProperty(error, "message");
+        return true;
     }
 
     private static string? ReadStringProperty(JsonElement element, string name)
@@ -230,13 +234,5 @@ internal static class CompatibleWire
         }
 
         return new Uri(text + "/");
-    }
-
-    public static bool IsJsonResponse(HttpResponseMessage response)
-    {
-        ArgumentNullException.ThrowIfNull(response);
-        var mediaType = response.Content.Headers.ContentType?.MediaType;
-        return mediaType is not null
-            && mediaType.EndsWith("json", StringComparison.OrdinalIgnoreCase);
     }
 }

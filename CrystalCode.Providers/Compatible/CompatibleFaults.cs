@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Headers;
-using System.Text.Json;
 
 namespace CrystalCode.Providers.Compatible;
 
@@ -45,7 +44,7 @@ internal sealed class CompatibleFaults
     {
         ArgumentNullException.ThrowIfNull(headers);
         var status = (int)statusCode;
-        var (code, providerMessage) = CompatibleWire.ReadError(body);
+        CompatibleWire.TryReadError(body, out var code, out var providerMessage);
         var message = code is null
             ? $"Chat request failed (HTTP {status})."
             : $"Chat request failed (HTTP {status}, code: {code}).";
@@ -61,37 +60,50 @@ internal sealed class CompatibleFaults
             retryAfter: CompatibleRetryAfter.Read(headers));
     }
 
-    public Exception FromStreamError(string vendorName, JsonElement root)
+    public Exception FromResponseError(
+        string vendorName,
+        string? code,
+        string? providerMessage)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
-        var (code, providerMessage) = CompatibleWire.ReadError(root);
-        var message = code is null
-            ? $"{vendorName} chat stream failed."
-            : $"{vendorName} chat stream failed (code: {code}).";
-        if (!string.IsNullOrWhiteSpace(providerMessage))
-        {
-            message = $"{message} {providerMessage}";
-        }
-
-        return Create(message, errorCode: code);
+        return Create(
+            BuildMessage(vendorName, "response", code, providerMessage),
+            errorCode: code);
     }
 
-    public Exception FromNonStreamingBody(string vendorName, string body)
+    public Exception FromStreamError(
+        string vendorName,
+        string? code,
+        string? providerMessage)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
-        try
+        return Create(
+            BuildMessage(vendorName, "chat stream", code, providerMessage),
+            errorCode: code);
+    }
+
+    public Exception InvalidStreamBody(string vendorName, string body)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
+        if (CompatibleWire.TryReadError(body, out var code, out var providerMessage))
         {
-            using var document = JsonDocument.Parse(body);
-            if (CompatibleWire.HasError(document.RootElement))
-            {
-                return FromStreamError(vendorName, document.RootElement);
-            }
-        }
-        catch (JsonException)
-        {
+            return FromStreamError(vendorName, code, providerMessage);
         }
 
-        return Create(
-            $"{vendorName} chat stream returned JSON instead of an event stream.");
+        return Create($"{vendorName} chat stream did not contain an event stream.");
+    }
+
+    private static string BuildMessage(
+        string vendorName,
+        string phase,
+        string? code,
+        string? providerMessage)
+    {
+        var message = code is null
+            ? $"{vendorName} {phase} failed."
+            : $"{vendorName} {phase} failed (code: {code}).";
+        return string.IsNullOrWhiteSpace(providerMessage)
+            ? message
+            : $"{message} {providerMessage}";
     }
 }

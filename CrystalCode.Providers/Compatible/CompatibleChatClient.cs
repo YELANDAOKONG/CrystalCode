@@ -50,6 +50,13 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
         var payload = await response.Content
             .ReadAsStringAsync(cancellationToken)
             .ConfigureAwait(false);
+        if (CompatibleWire.TryReadError(payload, out var code, out var providerMessage))
+        {
+            throw _profile.Faults.FromResponseError(
+                _profile.VendorName,
+                code,
+                providerMessage);
+        }
 
         try
         {
@@ -73,58 +80,19 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
         var body = CompatibleChatRequestWriter.Write(_profile, _options, request, stream: true);
         using var response = await SendAsync(body, stream: true, cancellationToken)
             .ConfigureAwait(false);
-        if (CompatibleWire.IsJsonResponse(response))
-        {
-            var payload = await response.Content
-                .ReadAsStringAsync(cancellationToken)
-                .ConfigureAwait(false);
-            throw _profile.Faults.FromNonStreamingBody(_profile.VendorName, payload);
-        }
-
         await using var content = await response.Content
             .ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
         using var reader = new StreamReader(content, Encoding.UTF8);
         var parser = new CompatibleChatStreamParser(_profile);
 
-        while (true)
+        await foreach (var data in CompatibleSse.ReadDataAsync(
+            reader,
+            _profile.Faults,
+            _profile.VendorName,
+            cancellationToken))
         {
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            if (line is null)
-            {
-                break;
-            }
-
-            if (line.Length == 0 || line[0] == ':')
-            {
-                continue;
-            }
-
-            if (!line.StartsWith("data:", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var data = line[5..].TrimStart();
-            if (data == "[DONE]")
-            {
-                break;
-            }
-
-            IReadOnlyList<ChatStreamEvent> events;
-            try
-            {
-                using var document = JsonDocument.Parse(data);
-                events = parser.Parse(document.RootElement);
-            }
-            catch (JsonException exception)
-            {
-                throw _profile.Faults.Create(
-                    $"{_profile.VendorName} chat stream contained a chunk that was not valid JSON.",
-                    innerException: exception);
-            }
-
-            foreach (var streamEvent in events)
+            foreach (var streamEvent in parser.Parse(data))
             {
                 yield return streamEvent;
             }

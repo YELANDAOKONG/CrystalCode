@@ -145,11 +145,21 @@ public sealed class SessionRetryTests
     }
 
     [Fact]
-    public void TryDescribe_DoesNotRetryProviderStreamError()
+    public void TryDescribe_DoesNotRetryInvalidRequestStreamError()
     {
         var exception = new DeepSeekException(
-            "DeepSeek chat stream failed (code: invalid_request_error). too many images");
+            "DeepSeek chat stream failed (code: invalid_request_error). too many images",
+            errorCode: "invalid_request_error");
         Assert.False(SessionRetry.TryDescribe(exception, out _));
+    }
+
+    [Fact]
+    public void TryDescribe_RetriesTransientStreamError()
+    {
+        var exception = new DeepSeekException(
+            "DeepSeek chat stream failed (code: rate_limit_exceeded). rate limit exceeded",
+            errorCode: "rate_limit_exceeded");
+        Assert.True(SessionRetry.TryDescribe(exception, out _));
     }
 
     [Fact]

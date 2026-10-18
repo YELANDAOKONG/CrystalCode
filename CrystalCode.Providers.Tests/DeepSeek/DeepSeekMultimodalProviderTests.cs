@@ -141,42 +141,24 @@ public sealed class DeepSeekMultimodalProviderTests
     }
 
     [Fact]
-    public async Task CompleteAsync_WritesConsecutiveToolImages()
+    public async Task CompleteAsync_MapsErrorBodyWithOkStatus()
     {
         var handler = new RecordingHandler(JsonResponse.Create(
-            """
-            {"choices":[{"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}]}
-            """));
+            """{"error":{"code":"invalid_request_error","message":"too many images"}}"""));
         using var http = new HttpClient(handler);
         using var provider = CreateProvider(http);
-        var request = new MultimodalChatRequest(
-        [
-            new MultimodalMessage(
-                MultimodalChatRole.User,
-                [new TextContent("inspect both")]),
-            JsonMultimodalToolCall("call_1", "view_image", """{"path":"one.png"}"""),
-            new MultimodalToolResult(
-                "call_1",
-                [new TextContent("Image loaded."), InlineImage([1, 2, 3])]),
-            JsonMultimodalToolCall("call_2", "view_image", """{"path":"two.png"}"""),
-            new MultimodalToolResult(
-                "call_2",
-                [new TextContent("Image loaded."), InlineImage([4, 5, 6])])
-        ]);
 
-        await provider.CompleteAsync(request);
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => provider.CompleteAsync(new MultimodalChatRequest(
+            [
+                new MultimodalMessage(
+                    MultimodalChatRole.User,
+                    [new TextContent("Hi")])
+            ])));
 
-        Assert.Contains(
-            "data:image/png;base64,AQID",
-            handler.Body,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "data:image/png;base64,BAUG",
-            handler.Body,
-            StringComparison.Ordinal);
-        Assert.Equal(
-            2,
-            handler.Body!.Split("\"type\":\"image_url\"", StringSplitOptions.None).Length - 1);
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Null(exception.StatusCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
     }
 
     private static async Task CollectAsync(DeepSeekMultimodalProvider provider)

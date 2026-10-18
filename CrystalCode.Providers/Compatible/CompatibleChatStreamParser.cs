@@ -24,11 +24,34 @@ internal sealed class CompatibleChatStreamParser
         _candidates.Count > 0
         && _candidates.Values.All(static candidate => candidate.Completed);
 
+    public IReadOnlyList<ChatStreamEvent> Parse(string data)
+    {
+        JsonDocument document;
+        try
+        {
+            document = JsonDocument.Parse(data);
+        }
+        catch (JsonException exception)
+        {
+            throw _profile.Faults.Create(
+                $"{_profile.VendorName} chat stream contained a chunk that was not valid JSON.",
+                innerException: exception);
+        }
+
+        using (document)
+        {
+            return Parse(document.RootElement);
+        }
+    }
+
     public IReadOnlyList<ChatStreamEvent> Parse(JsonElement root)
     {
-        if (CompatibleWire.HasError(root))
+        if (CompatibleWire.TryReadError(root, out var code, out var providerMessage))
         {
-            throw _profile.Faults.FromStreamError(_profile.VendorName, root);
+            throw _profile.Faults.FromStreamError(
+                _profile.VendorName,
+                code,
+                providerMessage);
         }
 
         var events = new List<ChatStreamEvent>();

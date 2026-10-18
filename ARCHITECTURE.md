@@ -252,10 +252,11 @@ the previous round are read from the provider's prompt cache; the multimodal
 codec keeps the message breakpoint when image expansion splits a marked text
 block. Other adapters rely on their providers' automatic prefix caching and
 send no cache directives. Chat Completions stream error events (`error`
-payloads, or events whose `type` is `error`) and a JSON error body returned to
-a streaming request become provider faults carrying the provider code and
-message, so session retry reports the cause instead of treating the truncated
-stream as retryable. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
+payloads, or events whose `type` is `error`) and a JSON body returned where an
+event stream was expected become provider faults carrying the provider code
+and message. A non-streaming JSON response with an `error` payload maps the
+same way even when the HTTP status is 200. Session retry then reports the cause
+instead of treating the truncated stream as retryable. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
 with no version. Provider SDKs are not used.
 
 ## Crystal consumption

@@ -293,16 +293,124 @@ public sealed class DeepSeekProviderTests
             http);
 
         var exception = await Assert.ThrowsAsync<DeepSeekException>(
-            async () =>
-            {
-                await foreach (var _ in provider.StreamAsync(new ChatRequest(
-                    [new ChatMessage(ChatRole.User, "Hello.")])))
-                {
-                }
-            });
+            () => CollectAsync(provider));
 
         Assert.Equal("insufficient_quota", exception.ErrorCode);
         Assert.Contains("quota exhausted", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ThrowsJsonErrorBody()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":{"code":"invalid_request_error","message":"too many images"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => CollectAsync(provider));
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsBodyWithoutEventStream()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => CollectAsync(provider));
+
+        Assert.Contains(
+            "did not contain an event stream",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ParsesSseBodyMislabeledAsJson()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            data: {"choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}]}
+
+            data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var events = await CollectAsync(provider);
+
+        Assert.Contains(
+            events,
+            item => item is ChatTextDelta { Text: "hello" });
+        Assert.Contains(events, item => item is ChatCandidateCompleted);
+    }
+
+    [Fact]
+    public async Task StreamAsync_IgnoresNullError()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}],"error":null}
+
+            data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var events = await CollectAsync(provider);
+
+        Assert.Contains(
+            events,
+            item => item is ChatTextDelta { Text: "hello" });
+    }
+
+    [Fact]
+    public async Task CompleteAsync_MapsErrorBodyWithOkStatus()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":{"code":"invalid_request_error","message":"too many images"}}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => provider.CompleteAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hello.")])));
+
+        Assert.Equal("invalid_request_error", exception.ErrorCode);
+        Assert.Null(exception.StatusCode);
+        Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static async Task<List<ChatStreamEvent>> CollectAsync(DeepSeekProvider provider)
+    {
+        var events = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(new ChatRequest(
+            [new ChatMessage(ChatRole.User, "Hello.")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        return events;
     }
 
     [Fact]
