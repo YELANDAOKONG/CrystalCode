@@ -519,12 +519,18 @@ public sealed class CodingSession : ITurnObserver
         }
         catch (ObjectDisposedException)
         {
+            // FinishTurn already took the source. Leave a pending recall for
+            // it to collect. Returning false here would clear the composer
+            // or count as an exit press.
             lock (_recallGate)
             {
-                _recallPending = false;
+                if (_recallText is null)
+                {
+                    _recallPending = false;
+                }
             }
 
-            return false;
+            return true;
         }
 
         return true;
