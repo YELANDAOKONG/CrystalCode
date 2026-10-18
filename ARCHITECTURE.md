@@ -251,7 +251,11 @@ tool definitions, the system prompt, and the conversation prefix written by
 the previous round are read from the provider's prompt cache; the multimodal
 codec keeps the message breakpoint when image expansion splits a marked text
 block. Other adapters rely on their providers' automatic prefix caching and
-send no cache directives. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
+send no cache directives. Chat Completions stream error events (`error`
+payloads, or events whose `type` is `error`) and a JSON error body returned to
+a streaming request become provider faults carrying the provider code and
+message, so session retry reports the cause instead of treating the truncated
+stream as retryable. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
 with no version. Provider SDKs are not used.
 
 ## Crystal consumption

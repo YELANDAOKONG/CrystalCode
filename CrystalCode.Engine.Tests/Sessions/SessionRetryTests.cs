@@ -145,6 +145,14 @@ public sealed class SessionRetryTests
     }
 
     [Fact]
+    public void TryDescribe_DoesNotRetryProviderStreamError()
+    {
+        var exception = new DeepSeekException(
+            "DeepSeek chat stream failed (code: invalid_request_error). too many images");
+        Assert.False(SessionRetry.TryDescribe(exception, out _));
+    }
+
+    [Fact]
     public void TryDescribe_RetriesWrappedNetworkFailure()
     {
         var exception = new DeepSeekException(

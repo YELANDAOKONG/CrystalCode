@@ -89,6 +89,14 @@ internal sealed class CompatibleMultimodalChatClient
             stream: true);
         using var response = await SendAsync(body, stream: true, cancellationToken)
             .ConfigureAwait(false);
+        if (CompatibleWire.IsJsonResponse(response))
+        {
+            var payload = await response.Content
+                .ReadAsStringAsync(cancellationToken)
+                .ConfigureAwait(false);
+            throw _profile.Faults.FromNonStreamingBody(_profile.VendorName, payload);
+        }
+
         await using var content = await response.Content.ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
         using var reader = new StreamReader(content, Encoding.UTF8);

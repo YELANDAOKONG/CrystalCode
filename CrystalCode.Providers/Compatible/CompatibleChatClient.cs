@@ -73,6 +73,14 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
         var body = CompatibleChatRequestWriter.Write(_profile, _options, request, stream: true);
         using var response = await SendAsync(body, stream: true, cancellationToken)
             .ConfigureAwait(false);
+        if (CompatibleWire.IsJsonResponse(response))
+        {
+            var payload = await response.Content
+                .ReadAsStringAsync(cancellationToken)
+                .ConfigureAwait(false);
+            throw _profile.Faults.FromNonStreamingBody(_profile.VendorName, payload);
+        }
+
         await using var content = await response.Content
             .ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);

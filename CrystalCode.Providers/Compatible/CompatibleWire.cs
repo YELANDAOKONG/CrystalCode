@@ -108,46 +108,80 @@ internal static class CompatibleWire
         try
         {
             using var document = JsonDocument.Parse(body);
-            if (!document.RootElement.TryGetProperty("error", out var error))
-            {
-                return (null, null);
-            }
-
-            if (error.ValueKind == JsonValueKind.String)
-            {
-                return (null, error.GetString());
-            }
-
-            if (error.ValueKind != JsonValueKind.Object)
-            {
-                return (null, null);
-            }
-
-            string? code = null;
-            if (error.TryGetProperty("code", out var codeElement)
-                && codeElement.ValueKind == JsonValueKind.String)
-            {
-                code = codeElement.GetString();
-            }
-            else if (error.TryGetProperty("type", out var typeElement)
-                && typeElement.ValueKind == JsonValueKind.String)
-            {
-                code = typeElement.GetString();
-            }
-
-            string? message = null;
-            if (error.TryGetProperty("message", out var messageElement)
-                && messageElement.ValueKind == JsonValueKind.String)
-            {
-                message = messageElement.GetString();
-            }
-
-            return (code, message);
+            return ReadError(document.RootElement);
         }
         catch (JsonException)
         {
             return (null, null);
         }
+    }
+
+    public static (string? Code, string? Message) ReadError(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return (null, null);
+        }
+
+        if (root.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
+        {
+            return ReadErrorElement(error);
+        }
+
+        // Some gateways put the stream failure on the event itself instead of
+        // nesting it under error.
+        if (root.TryGetProperty("type", out var eventType)
+            && eventType.ValueKind == JsonValueKind.String
+            && string.Equals(eventType.GetString(), "error", StringComparison.OrdinalIgnoreCase))
+        {
+            return (
+                ReadStringProperty(root, "code"),
+                ReadStringProperty(root, "message"));
+        }
+
+        return (null, null);
+    }
+
+    public static bool HasError(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (root.TryGetProperty("error", out var error) && error.ValueKind != JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        return root.TryGetProperty("type", out var eventType)
+            && eventType.ValueKind == JsonValueKind.String
+            && string.Equals(eventType.GetString(), "error", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static (string? Code, string? Message) ReadErrorElement(JsonElement error)
+    {
+        if (error.ValueKind == JsonValueKind.String)
+        {
+            return (null, error.GetString());
+        }
+
+        if (error.ValueKind != JsonValueKind.Object)
+        {
+            return (null, null);
+        }
+
+        var code = ReadStringProperty(error, "code")
+            ?? ReadStringProperty(error, "type");
+        return (code, ReadStringProperty(error, "message"));
+    }
+
+    private static string? ReadStringProperty(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var property)
+            && property.ValueKind == JsonValueKind.String
+                ? property.GetString()
+                : null;
     }
 
     public static bool TryReadInt64(JsonElement element, string name, out long value)
@@ -196,5 +230,13 @@ internal static class CompatibleWire
         }
 
         return new Uri(text + "/");
+    }
+
+    public static bool IsJsonResponse(HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        var mediaType = response.Content.Headers.ContentType?.MediaType;
+        return mediaType is not null
+            && mediaType.EndsWith("json", StringComparison.OrdinalIgnoreCase);
     }
 }

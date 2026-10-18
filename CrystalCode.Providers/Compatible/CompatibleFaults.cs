@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace CrystalCode.Providers.Compatible;
 
@@ -58,5 +59,39 @@ internal sealed class CompatibleFaults
             status,
             errorCode: code,
             retryAfter: CompatibleRetryAfter.Read(headers));
+    }
+
+    public Exception FromStreamError(string vendorName, JsonElement root)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
+        var (code, providerMessage) = CompatibleWire.ReadError(root);
+        var message = code is null
+            ? $"{vendorName} chat stream failed."
+            : $"{vendorName} chat stream failed (code: {code}).";
+        if (!string.IsNullOrWhiteSpace(providerMessage))
+        {
+            message = $"{message} {providerMessage}";
+        }
+
+        return Create(message, errorCode: code);
+    }
+
+    public Exception FromNonStreamingBody(string vendorName, string body)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            if (CompatibleWire.HasError(document.RootElement))
+            {
+                return FromStreamError(vendorName, document.RootElement);
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return Create(
+            $"{vendorName} chat stream returned JSON instead of an event stream.");
     }
 }

@@ -26,6 +26,11 @@ internal sealed class CompatibleChatStreamParser
 
     public IReadOnlyList<ChatStreamEvent> Parse(JsonElement root)
     {
+        if (CompatibleWire.HasError(root))
+        {
+            throw _profile.Faults.FromStreamError(_profile.VendorName, root);
+        }
+
         var events = new List<ChatStreamEvent>();
 
         if (root.TryGetProperty("choices", out var choices)

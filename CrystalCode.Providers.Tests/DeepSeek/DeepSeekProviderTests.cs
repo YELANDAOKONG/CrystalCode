@@ -280,6 +280,32 @@ public sealed class DeepSeekProviderTests
     }
 
     [Fact]
+    public async Task StreamAsync_ThrowsErrorEventChunk()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"error","code":"insufficient_quota","message":"quota exhausted"}
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-v4-flash"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            async () =>
+            {
+                await foreach (var _ in provider.StreamAsync(new ChatRequest(
+                    [new ChatMessage(ChatRole.User, "Hello.")])))
+                {
+                }
+            });
+
+        Assert.Equal("insufficient_quota", exception.ErrorCode);
+        Assert.Contains("quota exhausted", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteAsync_RejectsJsonOutput()
     {
         var handler = new RecordingHandler(JsonResponse.Create("{}"));
