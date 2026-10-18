@@ -62,6 +62,7 @@ public sealed class SessionRenderer : IDisposable
     private int _paintedHeight;
     private DateTimeOffset _inputModesAt;
     private bool _composerPaused;
+    private bool _suppressInterruptedNote;
     private bool _showEstimatedTokens;
     private int _streamedCharacters;
     private TokenUsage? _lastUsage;
@@ -603,7 +604,7 @@ public sealed class SessionRenderer : IDisposable
                 AddHelpUnlocked($"{names,-28}{spec.Help}");
             }
 
-            AddHelpUnlocked("ctrl+c      Stop turn; at idle clears input, twice on empty exits");
+            AddHelpUnlocked("ctrl+c      Return the message before output; otherwise stop. Idle clears, twice exits");
             if (extras is not null)
             {
                 foreach (var command in extras)
@@ -746,7 +747,10 @@ public sealed class SessionRenderer : IDisposable
                 : UsageText.FormatElapsed(_turnClock.Elapsed);
             _chrome.Activity = string.Empty;
             _chrome.Progress = string.Empty;
-            if (result.StopReason != TurnStopReason.Completed)
+            var suppressInterrupted = _suppressInterruptedNote
+                && result.StopReason == TurnStopReason.Interrupted;
+            _suppressInterruptedNote = false;
+            if (result.StopReason != TurnStopReason.Completed && !suppressInterrupted)
             {
                 var stopReason = DisplayCase.Token(result.StopReason.Value);
                 _log.Add(TranscriptKind.Note, stopReason);
@@ -1133,6 +1137,48 @@ public sealed class SessionRenderer : IDisposable
         {
             _todoItems.Clear();
             _todoItems.AddRange(items);
+            PaintUnlocked(force: true);
+        }
+    }
+
+    /// <summary>
+    /// True when Ctrl+C can put a recalled message into the composer without
+    /// covering a draft, picker, or dialog.
+    /// </summary>
+    public bool CanRecallIntoComposer
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _composer.IsEmpty
+                    && _quickPicker is null
+                    && !_fullPageOverlay
+                    && _overlayWidget is null
+                    && _modalOverlay.Count == 0
+                    && !_sideOpen;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes the user line just painted for a recalled message and, when the
+    /// composer is still empty, puts that submitted text back.
+    /// </summary>
+    public void RestoreRecalledMessage(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        lock (_gate)
+        {
+            _log.RemoveLast(TranscriptKind.User);
+            _suppressInterruptedNote = true;
+            if (_composer.IsEmpty)
+            {
+                _composer.ReplaceSubmitted(text);
+                OnComposerEdited?.Invoke(_composer.SubmissionText);
+                RefreshPickerUnlocked();
+            }
+
             PaintUnlocked(force: true);
         }
     }
@@ -1763,7 +1809,7 @@ public sealed class SessionRenderer : IDisposable
             AddHelpUnlocked($"{names,-28}{option.Help}");
         }
 
-        AddHelpUnlocked("ctrl+c      Stop turn; at idle clears input, twice on empty exits");
+        AddHelpUnlocked("ctrl+c      Return the message before output; otherwise stop. Idle clears, twice exits");
         PaintUnlocked(force: true);
     }
 

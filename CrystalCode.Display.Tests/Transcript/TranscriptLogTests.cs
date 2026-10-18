@@ -8,6 +8,35 @@ namespace CrystalCode.Display.Tests.Transcript;
 public sealed class TranscriptLogTests
 {
     [Fact]
+    public void RemoveLast_DropsOnlyATrailingUserEntry()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.Note, "older");
+        log.Add(TranscriptKind.User, "oops");
+
+        Assert.True(log.RemoveLast(TranscriptKind.User));
+        Assert.False(log.RemoveLast(TranscriptKind.User));
+
+        var lines = log.BuildLines(40);
+        Assert.Contains(lines, line => line.Plain.Contains("older", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, line => line.Plain.Contains("oops", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RemoveLast_KeepsTheUserEntryWhenLiveOutputFollowsIt()
+    {
+        var log = new TranscriptLog();
+        log.Add(TranscriptKind.User, "oops");
+        log.AppendLive(TranscriptKind.Assistant, "hi");
+
+        Assert.False(log.RemoveLast(TranscriptKind.User));
+
+        var lines = log.BuildLines(40);
+        Assert.Contains(lines, line => line.Plain.Contains("oops", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("hi", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Viewport_KeepsLatestRows()
     {
         var log = new TranscriptLog();

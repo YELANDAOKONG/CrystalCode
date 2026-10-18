@@ -137,6 +137,24 @@ public sealed class ComposerBufferTests
     }
 
     [Fact]
+    public void ReplaceSubmitted_RestoresTextAndAtomicImageMarkers()
+    {
+        var buffer = new ComposerBuffer();
+        var submitted = "see " + ComposerBuffer.ImageMarkerPrefix + "[Image #2]";
+
+        buffer.ReplaceSubmitted(submitted);
+
+        Assert.Equal("see [Image #2]", buffer.Text);
+        Assert.Equal(submitted, buffer.SubmissionText);
+        Assert.Equal(buffer.Text.Length, buffer.Cursor);
+
+        buffer.Handle(new ConsoleKeyInfo('\b', ConsoleKey.Backspace, false, false, false));
+
+        Assert.Equal("see ", buffer.Text);
+        Assert.Equal("see ", buffer.SubmissionText);
+    }
+
+    [Fact]
     public void Handle_BackspaceRemovesAtomicImageMarker()
     {
         var buffer = new ComposerBuffer();

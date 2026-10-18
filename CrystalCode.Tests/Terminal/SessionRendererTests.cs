@@ -36,6 +36,33 @@ public sealed class SessionRendererTests
     }
 
     [Fact]
+    public async Task RestoreRecalledMessage_FillsAnEmptyComposerAndKeepsADraft()
+    {
+        var renderer = new SessionRenderer();
+        Assert.True(renderer.CanRecallIntoComposer);
+
+        renderer.WriteUser("oops");
+        var submittedText = "see " + ComposerBuffer.ImageMarkerPrefix + "[Image #2]";
+        renderer.RestoreRecalledMessage(submittedText);
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        Assert.Equal(submittedText, submitted);
+
+        renderer.SeedComposer("draft");
+        Assert.False(renderer.CanRecallIntoComposer);
+        renderer.RestoreRecalledMessage("other");
+        var draft = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false,
+            CancellationToken.None,
+            checkSize: false);
+        Assert.Equal("draft", draft);
+    }
+
+    [Fact]
     public void SetChrome_UpdatesContextWindowOnlyWhenProvided()
     {
         var renderer = new SessionRenderer();

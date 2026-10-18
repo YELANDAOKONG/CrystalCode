@@ -72,6 +72,9 @@ internal sealed class SessionProjection : ISessionObserver
             case UserMessageSent user:
                 _renderer.WriteUser(user.Text);
                 break;
+            case UserMessageRecalled recalled:
+                _renderer.RestoreRecalledMessage(recalled.Text);
+                break;
             case ConversationCleared:
                 _renderer.ClearConversation();
                 break;

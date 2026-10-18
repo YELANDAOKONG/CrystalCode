@@ -859,9 +859,14 @@ its own.
 | Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open. A recalled prompt that starts with `/` stays in history until you edit it |
 | Escape | Clear the composer |
 | Mouse wheel, PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |
-| Ctrl+C during a turn | Cancel the turn |
+| Ctrl+C before the model shows text, reasoning, a tool call, or a retry, with an empty composer and an empty follow-up queue | Cancel the turn and put that message back in the composer |
+| Ctrl+C during a turn after that | Cancel the turn. The message stays |
 | Ctrl+C at idle | Clear the composer |
 | Ctrl+C twice on an empty composer | Exit |
+
+`crystal run` does not put a message back. A trusted image marker that the
+session no longer holds is left in the transcript, and that Ctrl+C only
+cancels. A queued follow-up also keeps the message.
 
 The alternate screen enables bracketed paste and mouse reporting (1000
 with SGR encoding 1006), turns alternate scroll off, and repeats those

@@ -210,6 +210,23 @@ public sealed class TranscriptLog
         }
     }
 
+    /// <summary>
+    /// Drops the last committed entry when it has this kind. Live text is
+    /// committed first, so a streaming block is not removed by mistake.
+    /// </summary>
+    public bool RemoveLast(TranscriptKind kind)
+    {
+        CommitLive();
+        if (_entries.Count == 0 || _entries[^1].Kind != kind)
+        {
+            return false;
+        }
+
+        _entries.RemoveAt(_entries.Count - 1);
+        InvalidateCache();
+        return true;
+    }
+
     public string AppendLive(TranscriptKind kind, string text)
     {
         ArgumentNullException.ThrowIfNull(text);

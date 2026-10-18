@@ -178,6 +178,64 @@ public sealed class ComposerBuffer
         _atomicSpans.Clear();
     }
 
+    /// <summary>
+    /// Replaces the composer with a submitted message. Trusted image markers
+    /// keep their prefix out of the visible text and become atomic spans.
+    /// </summary>
+    public void ReplaceSubmitted(string submitted)
+    {
+        ArgumentNullException.ThrowIfNull(submitted);
+        DetachHistoryNavigation();
+        _text.Clear();
+        _atomicSpans.Clear();
+        for (var index = 0; index < submitted.Length;)
+        {
+            if (submitted[index] == ImageMarkerPrefix
+                && TryReadImageMarker(submitted, index + 1, out var markerLength))
+            {
+                var start = _text.Length;
+                _text.Append(submitted, index + 1, markerLength);
+                _atomicSpans.Add(new AtomicSpan(start, markerLength));
+                index += 1 + markerLength;
+                continue;
+            }
+
+            _text.Append(submitted[index]);
+            index++;
+        }
+
+        _cursor = _text.Length;
+    }
+
+    private static bool TryReadImageMarker(string text, int start, out int length)
+    {
+        length = 0;
+        const string Prefix = "[Image #";
+        if ((uint)start >= (uint)text.Length || !text.AsSpan(start).StartsWith(Prefix))
+        {
+            return false;
+        }
+
+        var cursor = start + Prefix.Length;
+        if (cursor >= text.Length || !char.IsAsciiDigit(text[cursor]))
+        {
+            return false;
+        }
+
+        while (cursor < text.Length && char.IsAsciiDigit(text[cursor]))
+        {
+            cursor++;
+        }
+
+        if (cursor >= text.Length || text[cursor] != ']')
+        {
+            return false;
+        }
+
+        length = cursor - start + 1;
+        return true;
+    }
+
     public void Insert(string text)
     {
         ArgumentNullException.ThrowIfNull(text);

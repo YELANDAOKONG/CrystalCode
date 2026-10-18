@@ -107,6 +107,12 @@ public sealed class CodingSession : ITurnObserver
     private bool _turnActive;
     private string? _turnUserText;
     private string? _turnFault;
+    private readonly object _recallGate = new();
+    private bool _recallOpen;
+    private bool _recallPending;
+    private bool _recallSpoiled;
+    private string? _recallText;
+    private int _recallBaseline;
     private readonly object _sideGate = new();
     private readonly List<SideExchange> _sideExchanges = [];
     private CancellationTokenSource? _sideSource;
@@ -465,6 +471,177 @@ public sealed class CodingSession : ITurnObserver
 
         return false;
     }
+
+    /// <summary>
+    /// True after <see cref="TryRecall"/> accepts a message and before that
+    /// turn has been collected. A second Ctrl+C in that gap must not exit.
+    /// </summary>
+    public bool RecallPending
+    {
+        get
+        {
+            lock (_recallGate)
+            {
+                return _recallPending;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cancels a turn that has not shown model output and, when the turn is
+    /// collected, removes that user message. Returns false when the message
+    /// must stay: the model has already produced output, a follow-up is
+    /// queued, or a trusted image marker can no longer be held.
+    /// </summary>
+    public bool TryRecall()
+    {
+        lock (_recallGate)
+        {
+            if (!_recallOpen
+                || _recallText is null
+                || !_turnActive
+                || _turnSource is null
+                || _queue.Count > 0
+                || !HeldImagesCover(_recallText))
+            {
+                return false;
+            }
+
+            _recallOpen = false;
+            _recallPending = true;
+        }
+
+        _turnSource?.Cancel();
+        return true;
+    }
+
+    private void OpenRecallWindow(string message)
+    {
+        lock (_recallGate)
+        {
+            _recallText = message;
+            _recallBaseline = _transcript.Count;
+            _recallOpen = true;
+            _recallPending = false;
+            _recallSpoiled = false;
+        }
+    }
+
+    /// <summary>
+    /// Closes the recall window. A recall already accepted is dropped when
+    /// output arrives before the turn is collected.
+    /// </summary>
+    private void CloseRecallWindow()
+    {
+        lock (_recallGate)
+        {
+            _recallOpen = false;
+            if (_recallPending)
+            {
+                _recallSpoiled = true;
+            }
+        }
+    }
+
+    private string? AcceptedRecall()
+    {
+        lock (_recallGate)
+        {
+            var text = _recallPending && !_recallSpoiled ? _recallText : null;
+            _recallPending = false;
+            _recallOpen = false;
+            _recallSpoiled = false;
+            _recallText = null;
+            return text;
+        }
+    }
+
+    private void PublishRecallIfStripped(TurnStopReason? stop)
+    {
+        var recalled = AcceptedRecall();
+        if (recalled is null || (stop is not null && stop != TurnStopReason.Interrupted))
+        {
+            return;
+        }
+
+        if (!TryStripRecalledMessage(recalled))
+        {
+            return;
+        }
+
+        Publish(new UserMessageRecalled(recalled));
+    }
+
+    private bool TryStripRecalledMessage(string text)
+    {
+        if (_transcript.Count != _recallBaseline
+            || _transcript.Count == 0
+            || _transcript[^1] is not ChatMessage message
+            || message.Role != ChatRole.User
+            || !string.Equals(message.Text, text, StringComparison.Ordinal)
+            || !TryImageNumbers(text, out var numbers))
+        {
+            return false;
+        }
+
+        lock (_archiveGate)
+        {
+            if (_archive.Count == 0
+                || _archive[^1] is not ChatMessage archived
+                || archived.Role != ChatRole.User
+                || !string.Equals(archived.Text, text, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            _archive.RemoveAt(_archive.Count - 1);
+        }
+
+        _transcript.RemoveAt(_transcript.Count - 1);
+        foreach (var number in numbers)
+        {
+            _draftImages.Add(number);
+        }
+
+        return true;
+    }
+
+    private bool HeldImagesCover(string text) =>
+        TryImageNumbers(text, out _);
+
+    private bool TryImageNumbers(string text, out List<int> numbers)
+    {
+        numbers = [];
+        var images = ImageSnapshot();
+        foreach (Match match in ImageMarkerText.Matches(text))
+        {
+            if (!int.TryParse(
+                    match.Groups[1].Value,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var number)
+                || !images.ContainsKey(number))
+            {
+                return false;
+            }
+
+            if (!numbers.Contains(number))
+            {
+                numbers.Add(number);
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsVisibleModelOutput(ChatStreamEvent streamEvent) =>
+        streamEvent switch
+        {
+            ChatTextDelta text => text.Text.Length > 0,
+            ChatReasoningTextDelta reasoning => reasoning.Text.Length > 0,
+            ChatToolCallDelta => true,
+            _ => false
+        };
 
     /// <summary>
     /// Switches between Plan and Work, replaces the live system message, and
@@ -3404,6 +3581,11 @@ public sealed class CodingSession : ITurnObserver
         // would let the turn clear the source it then copies from.
         _reviewContext.Conversation = transcript;
         var changed = TryMicrocompact(transcript, out var current);
+        if (changed)
+        {
+            CloseRecallWindow();
+        }
+
         if (!NeedsCompaction(current, changed ? null : ShownUsage()))
         {
             return changed
@@ -3445,6 +3627,7 @@ public sealed class CodingSession : ITurnObserver
         var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _compactSource = compactSource;
         _compacting = true;
+        CloseRecallWindow();
         try
         {
             Note("Compacting context...");
@@ -5517,6 +5700,7 @@ public sealed class CodingSession : ITurnObserver
             throw;
         }
 
+        OpenRecallWindow(message);
         Publish(new TurnStarted());
         _turnTask = ExecuteTurnAsync(turnSource.Token);
     }
@@ -5900,10 +6084,12 @@ public sealed class CodingSession : ITurnObserver
 
         if (result is null)
         {
+            PublishRecallIfStripped(stop: null);
             return;
         }
 
         _transcript = [.. result.Transcript];
+        PublishRecallIfStripped(result.StopReason);
         lock (_imagesGate)
         {
             _nextImageNumber = Math.Max(_nextImageNumber, NextImageNumber());
@@ -5991,11 +6177,17 @@ public sealed class CodingSession : ITurnObserver
 
     void ITurnObserver.OnStreamEvent(ChatStreamEvent streamEvent)
     {
+        if (IsVisibleModelOutput(streamEvent))
+        {
+            CloseRecallWindow();
+        }
+
         Publish(new StreamReceived(streamEvent));
     }
 
     void ITurnObserver.OnRetry(SessionRetryAttempt attempt)
     {
+        CloseRecallWindow();
         Publish(new RetryScheduled(attempt));
     }
 
@@ -6006,6 +6198,11 @@ public sealed class CodingSession : ITurnObserver
 
     void ITurnObserver.OnToolCalls(IReadOnlyList<ToolCall> calls)
     {
+        if (calls.Count > 0)
+        {
+            CloseRecallWindow();
+        }
+
         Publish(new ToolCallsIssued(calls));
     }
 
@@ -6017,6 +6214,7 @@ public sealed class CodingSession : ITurnObserver
 
     void ITurnObserver.OnFault(string message)
     {
+        CloseRecallWindow();
         _turnFault = message;
         Error(message);
         var rawNote = _hooks.TakeRawNote();
