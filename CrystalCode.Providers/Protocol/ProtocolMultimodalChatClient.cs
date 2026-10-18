@@ -186,7 +186,9 @@ internal sealed class ProtocolMultimodalChatClient
         {
             response?.Dispose();
             throw _codec.CreateException(
-                $"{_options.VendorName} request failed.",
+                TransportFailure.Describe(
+                    $"{_options.VendorName} request failed.",
+                    exception),
                 innerException: exception);
         }
     }

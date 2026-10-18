@@ -10,6 +10,7 @@ namespace CrystalCode.Display.Shell;
 internal static class WindowsConsole
 {
     private const int StandardInputHandle = -10;
+    private const uint EnableEchoInput = 0x0004;
     private const uint EnableMouseInput = 0x0010;
     private const uint EnableQuickEditMode = 0x0040;
     private const uint EnableExtendedFlags = 0x0080;
@@ -24,6 +25,9 @@ internal static class WindowsConsole
         var desired = mode | EnableVirtualTerminalInput | EnableExtendedFlags;
         desired &= ~EnableQuickEditMode;
         desired &= ~EnableMouseInput;
+        // Echo would paint mouse and mode reports into the composer as ASCII.
+        // ReadKey(intercept) does not stop the console host from doing that.
+        desired &= ~EnableEchoInput;
         return desired;
     }
 

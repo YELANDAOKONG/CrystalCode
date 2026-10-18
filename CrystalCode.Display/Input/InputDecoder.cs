@@ -41,6 +41,14 @@ public sealed class InputDecoder
         if (!_pasteOpen && _held.Length == 0 && burst.Count >= 2)
         {
             var flat = InputChars.From(burst);
+            // The ESC of a mouse, mode, or cursor report can be consumed on
+            // its own. The printable tail is ASCII and must not be pasted
+            // into the composer.
+            if (IsOrphanReport(flat))
+            {
+                return [];
+            }
+
             if (flat.Length >= 2
                 && burst.All(static key => key.KeyChar != '\0')
                 && !flat.Contains(EscapeChar, StringComparison.Ordinal)
@@ -530,6 +538,142 @@ public sealed class InputDecoder
         }
 
         return modifiers;
+    }
+
+    private static bool IsOrphanReport(string text)
+    {
+        if (text.Length < 2 || text[0] != '[')
+        {
+            return false;
+        }
+
+        var index = 0;
+        while (index < text.Length)
+        {
+            if (!TrySkipReport(text, ref index))
+            {
+                return index == 0 && IsIncompleteReport(text);
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsIncompleteReport(string text)
+    {
+        var rest = text.AsSpan(1);
+        if (rest.Length == 0)
+        {
+            return false;
+        }
+
+        if (rest[0] is '<' or '?')
+        {
+            rest = rest[1..];
+            foreach (var ch in rest)
+            {
+                if (ch is not (>= '0' and <= '9' or ';'))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (rest.StartsWith("20")
+            && ("200~".AsSpan().StartsWith(rest) || "201~".AsSpan().StartsWith(rest)))
+        {
+            return true;
+        }
+
+        var sawSeparator = false;
+        foreach (var ch in rest)
+        {
+            if (ch == ';')
+            {
+                sawSeparator = true;
+                continue;
+            }
+
+            if (ch is < '0' or > '9')
+            {
+                return false;
+            }
+        }
+
+        return sawSeparator;
+    }
+
+    private static bool TrySkipReport(string text, ref int index)
+    {
+        if (index >= text.Length || text[index] != '[')
+        {
+            return false;
+        }
+
+        if (text.AsSpan(index).StartsWith("[200~".AsSpan())
+            || text.AsSpan(index).StartsWith("[201~".AsSpan()))
+        {
+            index += "[200~".Length;
+            return true;
+        }
+
+        var cursor = index + 1;
+        if (cursor >= text.Length)
+        {
+            return false;
+        }
+
+        if (text[cursor] == '<')
+        {
+            return TrySkipDelimited(text, cursor + 1, "Mm", requireSeparator: true, ref index);
+        }
+
+        if (text[cursor] == '?')
+        {
+            return TrySkipDelimited(text, cursor + 1, "hl", requireSeparator: false, ref index);
+        }
+
+        if (text[cursor] is >= '0' and <= '9')
+        {
+            return TrySkipDelimited(text, cursor, "R", requireSeparator: true, ref index);
+        }
+
+        return false;
+    }
+
+    private static bool TrySkipDelimited(
+        string text,
+        int bodyStart,
+        string finals,
+        bool requireSeparator,
+        ref int index)
+    {
+        var cursor = bodyStart;
+        var sawSeparator = false;
+        while (cursor < text.Length && text[cursor] is >= '0' and <= '9' or ';')
+        {
+            if (text[cursor] == ';')
+            {
+                sawSeparator = true;
+            }
+
+            cursor++;
+        }
+
+        if (cursor == bodyStart || cursor >= text.Length || finals.IndexOf(text[cursor]) < 0)
+        {
+            return false;
+        }
+
+        if (requireSeparator && !sawSeparator)
+        {
+            return false;
+        }
+
+        index = cursor + 1;
+        return true;
     }
 
     private static bool IsCsiFinal(char value) =>

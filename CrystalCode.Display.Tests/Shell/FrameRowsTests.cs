@@ -154,4 +154,13 @@ public sealed class FrameRowsTests
 
         Assert.Equal([1], FrameRows.Dirty(previous, current));
     }
+
+    [Fact]
+    public void Dirty_RewritesStickyRowsEvenWhenUnchanged()
+    {
+        var line = PaintLine.Colored("grey50", "keep");
+        var frame = new[] { line, PaintLine.Blank, line };
+
+        Assert.Equal([1, 2], FrameRows.Dirty(frame, frame, stickyFrom: 1));
+    }
 }

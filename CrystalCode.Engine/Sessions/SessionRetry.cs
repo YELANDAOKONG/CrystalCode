@@ -14,6 +14,13 @@ public static class SessionRetry
 {
     public static readonly TimeSpan MaximumDelay = TimeSpan.FromMilliseconds(int.MaxValue);
 
+    /// <summary>
+    /// A peer that has already closed the socket fails again on the same
+    /// upload. One retry replaces a stale pooled connection; further
+    /// attempts spend the budget without a different result.
+    /// </summary>
+    private const int ClosedUploadRetries = 1;
+
     private static readonly HashSet<string> NonRetryableCodes = new(StringComparer.OrdinalIgnoreCase)
     {
         "insufficient_quota",
@@ -127,7 +134,8 @@ public static class SessionRetry
             catch (Exception exception)
             {
                 attempt++;
-                if (attempt > options.MaximumRetries || !TryDescribe(exception, out var retryable))
+                if (attempt > AttemptLimit(options, exception)
+                    || !TryDescribe(exception, out var retryable))
                 {
                     throw;
                 }
@@ -190,6 +198,44 @@ public static class SessionRetry
         foreach (var pattern in RetryablePatterns)
         {
             if (pattern.IsMatch(text))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int AttemptLimit(SessionRetryOptions options, Exception exception)
+    {
+        if (!IsClosedUpload(exception))
+        {
+            return options.MaximumRetries;
+        }
+
+        return Math.Min(ClosedUploadRetries, options.MaximumRetries);
+    }
+
+    /// <summary>
+    /// .NET reports a socket that closes while the request body is copied
+    /// with these messages. <see cref="SocketError.Shutdown"/> is Unix
+    /// EPIPE, including when the runtime text is localized.
+    /// </summary>
+    private static bool IsClosedUpload(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SocketException { SocketErrorCode: SocketError.Shutdown })
+            {
+                return true;
+            }
+
+            if (current.Message.Contains(
+                    "Error while copying content to a stream",
+                    StringComparison.Ordinal)
+                || current.Message.Contains(
+                    "Unable to write data to the transport connection",
+                    StringComparison.Ordinal))
             {
                 return true;
             }

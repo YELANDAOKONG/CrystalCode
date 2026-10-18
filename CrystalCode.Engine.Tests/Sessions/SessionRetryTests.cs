@@ -1,3 +1,6 @@
+using System.Net.Http;
+using System.Net.Sockets;
+
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Providers.DeepSeek;
 
@@ -261,5 +264,94 @@ public sealed class SessionRetryTests
                 cts.Token));
 
         Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task RunAsync_RetriesClosedUploadOnce()
+    {
+        var calls = 0;
+        var messages = new List<string>();
+        var options = new SessionRetryOptions(
+            5,
+            (_, _) => Task.CompletedTask,
+            () => 0);
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => SessionRetry.RunAsync<int>(
+                _ =>
+                {
+                    calls++;
+                    throw ClosedUpload();
+                },
+                options,
+                attempt => messages.Add(attempt.Message),
+                CancellationToken.None));
+
+        Assert.Equal(2, calls);
+        Assert.Equal(
+            [
+                "DeepSeek chat request failed. Error while copying content to a stream. Unable to write data to the transport connection: Broken pipe."
+            ],
+            messages);
+        Assert.Contains(
+            "Unable to write data to the transport connection: Broken pipe.",
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_RetriesOtherTransportFailuresUpToTheLimit()
+    {
+        var calls = 0;
+        var options = new SessionRetryOptions(
+            2,
+            (_, _) => Task.CompletedTask,
+            () => 0);
+
+        await Assert.ThrowsAsync<DeepSeekException>(
+            () => SessionRetry.RunAsync<int>(
+                _ =>
+                {
+                    calls++;
+                    throw new DeepSeekException(
+                        "DeepSeek chat request failed.",
+                        innerException: new HttpRequestException("Connection refused"));
+                },
+                options,
+                onRetry: null,
+                CancellationToken.None));
+
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task RunAsync_DoesNotRetryClosedUploadWhenRetriesAreDisabled()
+    {
+        var calls = 0;
+
+        await Assert.ThrowsAsync<DeepSeekException>(
+            () => SessionRetry.RunAsync<int>(
+                _ =>
+                {
+                    calls++;
+                    throw ClosedUpload();
+                },
+                SessionRetryOptions.None,
+                onRetry: null,
+                CancellationToken.None));
+
+        Assert.Equal(1, calls);
+    }
+
+    private static DeepSeekException ClosedUpload()
+    {
+        var copy = new HttpRequestException(
+            "Error while copying content to a stream.",
+            new IOException(
+                "Unable to write data to the transport connection: Broken pipe.",
+                new SocketException((int)SocketError.Shutdown)));
+        return new DeepSeekException(
+            "DeepSeek chat request failed. Error while copying content to a stream. Unable to write data to the transport connection: Broken pipe.",
+            innerException: copy);
     }
 }

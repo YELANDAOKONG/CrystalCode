@@ -2490,6 +2490,9 @@ public sealed class SessionRenderer : IDisposable
                 {
                     _inputModesAt = now;
                     _screen.MaintainInputModes();
+                    // Mode bytes are written at the cursor. Repaint so a
+                    // terminal that shows them does not leave ASCII there.
+                    PaintUnlocked(force: true);
                 }
             }
 

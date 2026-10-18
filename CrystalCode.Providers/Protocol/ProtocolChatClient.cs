@@ -181,7 +181,9 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
         {
             response?.Dispose();
             throw _codec.CreateException(
-                $"{_options.VendorName} request failed.",
+                TransportFailure.Describe(
+                    $"{_options.VendorName} request failed.",
+                    exception),
                 innerException: exception);
         }
     }

@@ -71,7 +71,8 @@ public static class FrameRows
 
     public static IReadOnlyList<int> Dirty(
         IReadOnlyList<PaintLine>? previous,
-        IReadOnlyList<PaintLine> current)
+        IReadOnlyList<PaintLine> current,
+        int stickyFrom = -1)
     {
         ArgumentNullException.ThrowIfNull(current);
         if (previous is null || previous.Count != current.Count)
@@ -88,7 +89,7 @@ public static class FrameRows
         var dirty = new List<int>();
         for (var i = 0; i < current.Count; i++)
         {
-            if (previous[i] != current[i])
+            if (previous[i] != current[i] || (stickyFrom >= 0 && i >= stickyFrom))
             {
                 dirty.Add(i);
             }

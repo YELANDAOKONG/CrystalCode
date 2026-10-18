@@ -392,7 +392,10 @@ One user message is one turn:
    the transcript prints `retrying model request` plus the operator
    message. Live stream text from the failed attempt is
    discarded. HTTP 401, 403, quota, `invalid_prompt`, and context
-   overflow are not retried. User cancel still interrupts immediately.
+   overflow are not retried. A connection that closes while the request
+   body is still being written is retried once, so a stale connection can
+   be replaced, and then reported with the transport cause instead of
+   using the rest of the budget. User cancel still interrupts immediately.
 3. Select candidate zero.
 4. Stop before tools when the finish reason is not a normal stop or a tool
    request. `length` keeps the assistant text, drops tool calls, and stops
@@ -1734,6 +1737,15 @@ width characters assume a narrow terminal.
 
 `ScreenPainter` wraps every paint in DEC 2026 synchronized output
 (`?2026h` and `?2026l`), which terminals that lack the mode ignore.
+Autowrap is disabled while rows are written. Before it is enabled again
+the cursor is parked at the origin, so a full-width row cannot leave the
+pending-wrap flag set and shift ASCII onto the composer. Composer rows
+are erased on every paint even when their text did not change, because
+that is where the cursor sits and where an echoed report would remain
+until the next key. On Windows the console echo flag is off for the same
+reason: the host would otherwise print mouse and mode reports into the
+input line. A report whose escape was already consumed is dropped, not
+pasted.
 `WidgetPaint` keeps foreground, background, bold, dim, italic, underline,
 strikethrough, and invert when it rasterizes Spectre widgets. Links and
 blinking are dropped on purpose.

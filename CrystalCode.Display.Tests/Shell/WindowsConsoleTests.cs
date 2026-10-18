@@ -7,6 +7,7 @@ namespace CrystalCode.Display.Tests.Shell;
 public sealed class WindowsConsoleTests
 {
     private const uint EnableProcessedInput = 0x0001;
+    private const uint EnableEchoInput = 0x0004;
     private const uint EnableMouseInput = 0x0010;
     private const uint EnableQuickEditMode = 0x0040;
     private const uint EnableExtendedFlags = 0x0080;
@@ -28,5 +29,15 @@ public sealed class WindowsConsoleTests
     {
         var current = EnableProcessedInput | EnableExtendedFlags | EnableVirtualTerminalInput;
         Assert.Equal(current, WindowsConsole.ModeForReporting(current));
+    }
+
+    [Fact]
+    public void ModeForReporting_TurnsEchoOff()
+    {
+        var current = EnableProcessedInput | EnableEchoInput | EnableExtendedFlags | EnableVirtualTerminalInput;
+
+        var desired = WindowsConsole.ModeForReporting(current);
+
+        Assert.Equal(EnableProcessedInput | EnableExtendedFlags | EnableVirtualTerminalInput, desired);
     }
 }

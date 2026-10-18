@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 
@@ -466,5 +467,37 @@ public sealed class DeepSeekProviderTests
             .Single(message => message.GetProperty("role").GetString() == "assistant");
         Assert.Equal("look at all four", assistant.GetProperty("reasoning_content").GetString());
         Assert.Equal(4, assistant.GetProperty("tool_calls").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ReportsClosedConnectionCause()
+    {
+        using var http = new HttpClient(new ClosedUploadHandler());
+        using var provider = new DeepSeekProvider(
+            new DeepSeekOptions("test-key", "deepseek-flash"),
+            http);
+
+        var exception = await Assert.ThrowsAsync<DeepSeekException>(
+            () => provider.CompleteAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hello.")])));
+
+        Assert.Equal(
+            "DeepSeek chat request failed. Error while copying content to a stream. Unable to write data to the transport connection: Broken pipe.",
+            exception.Message);
+        Assert.Null(exception.StatusCode);
+    }
+
+    private sealed class ClosedUploadHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException(
+                "Error while copying content to a stream.",
+                new IOException(
+                    "Unable to write data to the transport connection: Broken pipe.",
+                    new SocketException((int)SocketError.Shutdown)));
+        }
     }
 }

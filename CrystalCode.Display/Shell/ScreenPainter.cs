@@ -50,7 +50,15 @@ public sealed class ScreenPainter
         AnsiConsole.Write(new ControlCode(BeginSynchronizedUpdate));
         try
         {
-            WriteFrame(frame, regions.Width, regions.Height, resetFrame);
+            // The composer is where the cursor sits. Mouse reports, mode
+            // sequences, and a wrapped tail from the row above land there as
+            // ASCII and stay until that row is erased. Rewrite it every frame.
+            WriteFrame(
+                frame,
+                regions.Width,
+                regions.Height,
+                resetFrame,
+                regions.ComposerTop);
             if (showCursor)
             {
                 var cursorLine = Math.Clamp(
@@ -91,10 +99,15 @@ public sealed class ScreenPainter
         _previous = [.. frame];
     }
 
-    private void WriteFrame(IReadOnlyList<PaintLine> frame, int width, int height, bool resetFrame)
+    private void WriteFrame(
+        IReadOnlyList<PaintLine> frame,
+        int width,
+        int height,
+        bool resetFrame,
+        int stickyFrom = -1)
     {
         var rewriteAll = resetFrame || _previous is null || _previous.Length != frame.Count;
-        var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame);
+        var dirty = rewriteAll ? null : FrameRows.Dirty(_previous, frame, stickyFrom);
         AnsiConsole.Cursor.Hide();
         if (rewriteAll)
         {
@@ -122,7 +135,11 @@ public sealed class ScreenPainter
         }
         finally
         {
-            AnsiConsole.Write(new ControlCode("\u001b[?7h"));
+            // A row that fills the width leaves the pending-wrap flag set.
+            // Turning autowrap back on in that state inserts a line and
+            // shifts ASCII onto the rows below, which are not redrawn until
+            // their text changes. Park the cursor while autowrap is still off.
+            AnsiConsole.Write(new ControlCode("\u001b[1;1H\u001b[?7h"));
         }
     }
 

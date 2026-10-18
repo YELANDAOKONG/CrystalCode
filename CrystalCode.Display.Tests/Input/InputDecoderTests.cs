@@ -231,6 +231,16 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_OrphanMouseAndModeReports_AreNotComposerText()
+    {
+        Assert.Empty(new InputDecoder().Push(WindowsVt("[<64;12;8M")));
+        Assert.Empty(new InputDecoder().Push(WindowsVt("[?2004h[?1000h")));
+        Assert.Empty(new InputDecoder().Push(WindowsVt("[24;8R")));
+        Assert.Empty(new InputDecoder().Push(WindowsVt("[<64;12")));
+        AssertPaste(new InputDecoder().Push(WindowsVt("[link](url)")), "[link](url)");
+    }
+
+    [Fact]
     public void Push_BackspaceInBurst_StaysKeys()
     {
         var burst = Linux(

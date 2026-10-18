@@ -200,7 +200,9 @@ internal sealed class CompatibleMultimodalChatClient
             }
 
             throw _profile.Faults.Create(
-                $"{_profile.VendorName} chat request failed.",
+                TransportFailure.Describe(
+                    $"{_profile.VendorName} chat request failed.",
+                    exception),
                 innerException: exception);
         }
     }
