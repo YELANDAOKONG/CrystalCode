@@ -220,6 +220,36 @@ separate library with no terminal code. The product can:
   whose attached markers were deleted;
 - register built-in tools and providers through an in-process plugin table.
 
+## Desktop requirements
+
+The Avalonia desktop front end is a first-party operator surface alongside
+the terminal and headless entry points. Its user-facing text is English only,
+including window chrome, menus, settings, dialogs, notifications, errors, and
+accessibility labels.
+
+The desktop surface provides three theme modes:
+
+- `Automatic`, which follows the operating system appearance;
+- `Light`, which forces the light theme;
+- `Dark`, which forces the dark theme.
+
+The desktop surface also provides two window background modes:
+
+- `Normal`, an opaque background;
+- `Transparent`, a translucent acrylic-style background with blur.
+
+Transparency has an operator-adjustable opacity value. `Transparent` mode and
+its opacity control are required on Windows, macOS, and Linux. The platform
+implementation may use native composition APIs or an Avalonia-supported
+equivalent, but platform differences must not remove the setting. When the
+host compositor cannot provide blur, the desktop front end must retain the
+requested opacity and use the closest supported translucent presentation
+without becoming unusable or silently switching the saved preference to
+`Normal`.
+
+These settings belong to the desktop front end. They must not enter
+`CrystalCode.Engine`, the terminal display library, or session transcripts.
+
 ## Deferred product work
 
 The following capabilities are part of the product direction but are not yet

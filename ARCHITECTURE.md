@@ -38,6 +38,27 @@ Do not add XAML or AXAML files.
 `EngineAssemblyTests` and `DisplayAssemblyTests` fail the build when either
 direction above is crossed.
 
+The desktop front end is a first-party operator surface and must support
+Windows, macOS, and Linux (WML). All desktop-facing text is authored in
+English only: window chrome, menus, settings, dialogs, notifications, errors,
+and accessibility labels.
+
+Desktop appearance is front-end state, not engine state. It has three theme
+modes: `Automatic` follows the operating system, `Light` forces the light
+theme, and `Dark` forces the dark theme. It also has two background modes:
+`Normal` is opaque and `Transparent` is translucent with an acrylic-style blur.
+Transparent mode has an operator-adjustable opacity. The setting and control
+must exist on Windows, macOS, and Linux. Native composition differences may
+change the implementation, but not the public behavior or persisted choice.
+If a platform compositor cannot provide blur, the desktop front end uses its
+closest supported translucent fallback, preserves the selected opacity, and
+does not silently change the saved mode to `Normal`.
+
+Theme, background, opacity, native window composition, and desktop resource
+loading belong to `CrystalCode.Desktop`. They must not be implemented in
+`CrystalCode.Engine` or `CrystalCode.Display`, and must not be persisted in
+session archives or sent to providers.
+
 CrystalCode.Tests references CrystalCode.
 CrystalCode.Engine.Tests references CrystalCode.Engine.
 CrystalCode.Display.Tests references CrystalCode.Display.
