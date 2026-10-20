@@ -8,14 +8,6 @@ using CrystalCode.Engine.Sessions;
 namespace CrystalCode.Terminal;
 
 /// <summary>
-/// One replay row for the transcript viewport.
-/// </summary>
-public sealed record TranscriptLine(
-    TranscriptKind Kind,
-    string Text,
-    string? ToolName = null);
-
-/// <summary>
 /// Maps a persisted transcript into viewport rows. Skips the live system prompt.
 /// </summary>
 public static class TranscriptReplay
