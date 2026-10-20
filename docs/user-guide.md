@@ -71,7 +71,8 @@ or `CrystalCode` on Windows.
 
 ## Not yet implemented
 
-The following planned capabilities are not yet implemented in the current
+The full list is in [TODO.md](../TODO.md). The following planned capabilities
+are not yet implemented in the current
 build: MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output,
 editing provider definitions in the TUI, automatically fetching

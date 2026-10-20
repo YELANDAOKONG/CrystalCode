@@ -167,13 +167,14 @@ Branch roles: `master` is the main development branch. `release` is the release 
 - 🧰 [External tools](docs/external-tools.md): tool-set format and runners
 - 🧩 [Plugins](docs/plugins.md): plugin contract, tools, and hooks
 - 📄 [Product definition](BUSINESS.md): scope and terminology
+- 📋 [Deferred work](TODO.md): deferred, priority, and undecided buckets
 - 🏗️ [Architecture](ARCHITECTURE.md): components and runtime behavior
 - 📏 [Engineering standards](STANDARDS.md): source and verification rules
 - 🤖 [Agent instructions](AGENTS.md): repository guidance for coding agents
 
 ## 🗺️ Roadmap
 
-MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox, parent/child agents, audio and video input, non-text model output, editing provider definitions in the TUI, automatically fetching model-list information from a provider, and switchable thinking-chain compression are planned but not yet implemented. ACP would be an editor-facing front end on stdio, not an engine protocol. The terminal remains the only operator surface until it exists. Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog.
+The full deferred list is in [TODO.md](TODO.md). Parent/child agents are high priority and are not implemented. Items still under evaluation are separate and are not scheduled. MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox, parent/child agents, audio and video input, non-text model output, editing provider definitions in the TUI, automatically fetching model-list information from a provider, and switchable thinking-chain compression are planned but not yet implemented. ACP would be an editor-facing front end on stdio, not an engine protocol. The terminal remains the only operator surface until it exists. Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog.
 
 ## 📄 License
 

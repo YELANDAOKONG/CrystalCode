@@ -285,7 +285,8 @@ not use `Crystal.Agents.Agent` for the live UI: that Agent completes model
 turns without token streaming.
 
 The live session does not yet use `Crystal.Harness.AgentHarness`. Parent/child
-Agent composition is deferred product work; when that topology is implemented,
+Agent composition is high-priority work in `TODO.md` and is not in the current
+build. When that topology is implemented,
 the host consumes `AgentHarness` for named invocation ancestry and shared
 budgets while retaining ownership of prompts, tools, approval, persistence, and
 the terminal projection.

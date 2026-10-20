@@ -232,6 +232,11 @@ separate library with no terminal code. The product can:
 
 ## Deferred product work
 
+The same items are bucketed in [TODO.md](TODO.md). That file does not add
+scope and does not authorize implementation. When an item moves between
+buckets, update `TODO.md` in the same change. The constraints below remain
+authoritative.
+
 The following capabilities are part of the product direction but are not yet
 implemented in the current build:
 
@@ -300,6 +305,9 @@ They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
 Implement each capability only when its behavior and ownership are defined, and
 do not reserve empty public types in advance.
+
+[TODO.md](TODO.md) lists the items below under Pending evaluation. They are
+not a priority. Parent/child Agents do not decide them.
 
 Deferred on a much longer horizon than the list above, with no schedule:
 
