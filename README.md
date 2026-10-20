@@ -23,6 +23,7 @@ Crystal Code works in a local repository through a streaming terminal UI. Ask it
 - **🧵 Keep a conversation going.** Resume or fork saved sessions, switch models with `/model`, and compact older context automatically or with `/compact`.
 - **🔌 Use the model endpoints you prefer.** Built-in DeepSeek, OpenAI, Gemini, and Ollama providers are available, and you can configure OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages (Claude) endpoints.
 - **🧩 Extend the workflow.** Load skills and operator tool sets from your home directory or workspace. Image-capable models can receive workspace or clipboard images.
+- **👥 Delegate inside the session.** When child Agents are enabled, the model can hand a bounded task to `general`, read-only `explore`, or Work-only `work`. They are off by default. `/agents` configures them; `/child` or F7 inspects one.
 
 Crystal Code is the coding product built on the sibling [Crystal](https://github.com/YELANDAOKONG/Crystal) library. The terminal is its operator surface.
 
@@ -90,6 +91,8 @@ Type these inside a running session; `/help` lists them all.
 | `/resume` | Choose a saved session for this workspace, another directory, or every workspace |
 | `/fork` | Branch the current conversation into a new session |
 | `/compact` | Summarize older context now |
+| `/agents` | List child Agents, or turn them on, set concurrency, or choose a model |
+| `/child` | Inspect one child session, or return to the parent |
 | `/help` | Show all commands and shortcuts |
 
 See the [complete command reference](docs/user-guide.md#slash-commands).
@@ -174,7 +177,7 @@ Branch roles: `master` is the main development branch. `release` is the release 
 
 ## 🗺️ Roadmap
 
-The full deferred list is in [TODO.md](TODO.md). Parent/child agents are high priority and are not implemented. Items still under evaluation are separate and are not scheduled. MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox, parent/child agents, audio and video input, non-text model output, editing provider definitions in the TUI, automatically fetching model-list information from a provider, and switchable thinking-chain compression are planned but not yet implemented. ACP would be an editor-facing front end on stdio, not an engine protocol. The terminal remains the only operator surface until it exists. Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog.
+The full deferred list is in [TODO.md](TODO.md). Items still under evaluation are separate and are not scheduled. MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox, audio and video input, non-text model output, editing provider definitions in the TUI, automatically fetching model-list information from a provider, and switchable thinking-chain compression are planned but not yet implemented. ACP would be an editor-facing front end on stdio, not an engine protocol. The terminal remains the only operator surface until it exists. Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog.
 
 ## 📄 License
 

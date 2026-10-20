@@ -27,6 +27,8 @@ From a workspace you want the agent to inspect or change, CrystalCode:
   pass-through according to risk and authority;
 - compacts conversation context when usage approaches the selected
   model's window;
+- delegates a bounded task to a child session when child Agents are
+  enabled (off by default);
 - persists configuration, permissions, and sessions under `~/.crystal`;
 - talks to DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
   and Anthropic Messages endpoints, including operator-added gateways.
@@ -74,7 +76,7 @@ or `CrystalCode` on Windows.
 The full list is in [TODO.md](../TODO.md). The following planned capabilities
 are not yet implemented in the current
 build: MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox,
-parent/child Agents, audio and video input, non-text model output,
+audio and video input, non-text model output,
 editing provider definitions in the TUI, automatically fetching
 model-list information from a provider, and switchable thinking-chain
 compression. That last one would, after each thinking pass, ask a model
@@ -183,6 +185,8 @@ CLI options:
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing and refuses enable, disable, up, and down. Listing stays available |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set for this process, even when its file says `enabled` false. Does not write the file. Rejected together with `--prompt-attachments off` |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--agents <on\|off>` | Enable or disable child Agents for this process. Does not write `config.json` |
+| `--agents-concurrency <count>` | Active child invocations for this process, from 1 to 8. Does not write the file |
 | `--rules <value>` | `on` or `off` for both rule-file sides, or `global=on\|off` and `project=on\|off`. Does not affect `instructions.md` or `.crystal.md` |
 | `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
 | `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
@@ -328,6 +332,8 @@ checks the directory. `unlimited` removes that one cap.
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set, even when `enabled` is false. A missing name exits 1. Cannot be combined with `--prompt-attachments off`. Does not write the file |
 | `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--agents <on\|off>` | Enable or disable child Agents for this process. Does not write `config.json` |
+| `--agents-concurrency <count>` | Active child invocations for this process, from 1 to 8. Does not write the file |
 | `--rules <value>` | `on` or `off` for both rule-file sides, or comma-separated `global=on\|off` and `project=on\|off`. An assignment leaves the other side as saved. Does not write the file, and does not affect `instructions.md` or `.crystal.md` |
 | `--workspace-trust <on\|off>` | Directory trust for this process only. Omitted and `on` refuse an untrusted directory. `off` skips the check and does not record trust. This does not follow `workspaceTrust` |
 | `--model-calls <count>` | Model rounds for this turn. Default 1024 |
@@ -490,6 +496,7 @@ Top-level fields:
 | `ruleFiles` | OpenCode-compatible rule files. `global` and `project` each default to `true` and are omitted until off. Does not affect `instructions.md` or `.crystal.md` |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `plugins` | Enable operator plugin discovery (default `true`) |
+| `agents` | Child Agents. Omitted means off, concurrency 4, and the built-in Agents inherit the parent model. `enabled`, `maxConcurrent` (1–8), and `general`, `explore`, and `work` model choices (`provider`, `model`, `thinking`, `context`, `tier`, `speed`). `/agents` writes built-in choices here. Custom Agents are stored in their own `agent.json`, not in this object |
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
@@ -861,11 +868,12 @@ its own.
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/context`, `/tier`, `/speed`, `/approval`, `/model`, `/tokens`, or `/verbose`) |
+| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/context`, `/tier`, `/speed`, `/approval`, `/model`, `/tokens`, `/verbose`, `/agents`, or `/child`) |
 | Shift+Tab | Toggle Plan/Work |
 | `?` on an empty composer | Show shortcuts and commands |
+| F7 | Open the child picker when child Agents are enabled. F7 in the picker dismisses it |
 | Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open. A recalled prompt that starts with `/` stays in history until you edit it |
-| Escape | Clear the composer |
+| Escape | Clear the composer. While inspecting a child, and no modal owns the key, return to the parent at any draft state. Esc in the child picker dismisses the picker |
 | Mouse wheel, PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |
 | Ctrl+C before the model shows text, reasoning, a tool call, or a retry, with an empty composer and an empty follow-up queue | Cancel the turn and put that message back in the composer |
 | Ctrl+C during a turn after that | Cancel the turn. The message stays |
@@ -929,8 +937,9 @@ text still waiting in the panel; the panel updates and does not keep it.
 During compaction, `/clear`, `/resume`, and `/fork` are refused
 instead, with the same kind of message as `/cd` while a turn is running.
 Other commands that change the session, workspace, or model are refused for
-that same reason. `/status`, `/help`, `/todos`, and other commands that only
-report state or adjust the display run immediately. `/quit` still exits.
+that same reason. `/status`, `/help`, `/todos`, `/child`, and other commands that only
+report state or adjust the display run immediately. `/agents` with no
+arguments lists; its other forms are refused during a turn. `/quit` still exits.
 
 ### One turn
 
@@ -962,7 +971,101 @@ otherwise the same conversation.
 | **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
 | **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
-Tab, Shift+Tab, or `/plan` toggles Plan and Work.
+Tab, Shift+Tab, or `/plan` toggles Plan and Work. When child Agents are
+enabled, Plan and Work also offer `task`. See [Child Agents](#child-agents).
+
+## Child Agents
+
+Child Agents are delegated conversations inside the current session.
+They are not a third mode. They are available in Plan and Work when
+`agents.enabled` is true. The default is false, and an omitted
+`agents` object means off. `--agents on|off` and
+`--agents-concurrency <n>` change only this process.
+
+The model uses one `task` tool. Arguments are `agent`, a short
+`label`, `prompt`, and an optional `sessionId`. A call without
+`sessionId` creates a new child even when the Agent name matches
+another child. A call with `sessionId` continues only that child, and
+only with the same Agent. The tool cannot select a model or gear.
+
+Built-ins are `general`, strictly read-only `explore`, and Work-only
+`work`. `work` is not offered during a Plan turn. A custom Agent whose
+tools exceed Plan is omitted in Plan. Children cannot call `question`,
+`task`, or the background shell tools. They inherit the parent's
+approval and directory boundaries. A custom tool list can only narrow
+the parent catalog. Children share the workspace; parallel writers
+need non-overlapping files. Separate working copies, background
+completion notifications, and sending text to a child are not
+implemented.
+
+A child starts from its role prompt, applicable workspace
+instructions, and the delegated task. It does not receive parent
+history or pasted images. Its model, thinking, context window, service
+tier, and speed are resolved when it is created and kept when it is
+continued. Without a configured model it inherits the parent's current
+choices. An explicit model must exist and have credentials; an
+unavailable Agent is omitted with an English note. Model-specific
+options without an explicit model are ignored. An invalid gear or slot
+is diagnosed and falls back; the Agent stays available.
+
+`agents.maxConcurrent` defaults to 4 and accepts 1 through 8. It
+limits active child invocations, including several instances of the
+same Agent. Adjacent `task` calls may overlap. Other tools stay
+serial. Cancelling the parent stops running and queued children.
+Approval prompts are queued and name the source child. A headless call
+that would ask the operator is denied by the same parent policy.
+`crystal run` has no `/child`; the child summary stays with the
+`task` result.
+
+`/agents` lists definitions and settings. While idle it accepts `on`,
+`off`, `concurrency <1-8>`, `model <name> [provider model]`, and
+`thinking`, `context`, `tier`, or `speed` with `<name> [value]`.
+Omitting the value clears that choice. Completions for those choices
+use the Agent's model. Built-in settings are saved to `config.json`.
+Custom settings are saved to that Agent's `agent.json`. Changes are
+refused during a turn or compaction.
+
+Custom definitions live in `~/.crystal/agents/<name>/` and
+`<workspace>/.crystal/agents/<name>/`, with `agent.json` and
+`prompt.md`. `description` is required. `enabled` defaults to false.
+A workspace entry replaces the entire Home entry, including when it is
+disabled or invalid. `general`, `explore`, and `work` are reserved.
+The directory name starts with a letter and then uses letters, digits,
+`.`, `_`, or `-`. Symbolic links are skipped. Each file must be at
+most 64 KiB.
+
+Built-in prompts are separate from the parent Work and Plan prompts.
+`general` uses `agents/general`, and `agents/plan` when the parent
+turn is Plan. `work` uses `agents/work`. `explore` always uses
+`agents/plan`. Precedence is the built-in text, the selected prompt
+set, Home `prompts/agents/`, then the project `prompts/agents/`. An
+attachment appends only the matching `agents/` file. A custom Agent
+keeps `prompt.md`, then the built-in child safety rules and bound
+placeholders. Overlays, sets, and attachments do not replace that
+file.
+
+`/child` opens a filterable picker. `/child <unique-id-prefix>`
+inspects one child. `/child parent` returns. F7 opens the picker from
+either view. F7 and Esc in the picker dismiss it. Inspection works
+during a turn and is read-only: text, paste, and submit aimed at the child are ignored, and
+the parent's composer draft stays. Esc returns to the parent at any
+draft state when no modal owns the key. Identity and navigation stay
+in the view chrome. F7 and `/child` are unavailable after Agents are
+disabled. The child view shows that child's model and usage.
+Saved-session lists show only parents.
+
+Children keep their archive, compacted context, model choices, usage,
+todos, and image references inside the parent session file. Resume and
+fork carry those records and do not add the usage again. Clear drops
+them. An interrupted process does not restart a child task.
+Continuing a child rechecks the current mode and directory boundaries
+and cannot widen the tool ceiling of the parent turn that started it.
+Token totals include child model and compaction calls, using
+provider-reported usage only. Context estimates stay separate and use
+`~`. A text child has no `view_image`. An image-capable child's tool
+images stay in that child. `describe_image` remains a tool-free side
+request. Child images use the existing media store, and JSON export
+inlines available bytes.
 
 ## Approval
 
@@ -1182,6 +1285,8 @@ Submitting returns the transcript viewport to the latest output.
 | `/rules` | | Show global and project rule files, set both with `on` / `off`, or set one side with `global` or `project` and `on` / `off`. Writes `config.json`. Does not change `instructions.md` or `.crystal.md`. Refused during a turn or compaction |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
+| `/agents` | | List child Agents and settings. While idle: `on`, `off`, `concurrency <1-8>`, `model <name> [provider model]`, and `thinking`, `context`, `tier`, or `speed` with `<name> [value]`. Omitting the value clears that choice. Built-in choices go to `config.json`; custom choices go to that Agent's `agent.json`. Changes are refused during a turn or compaction |
+| `/child` | | Open a filterable child picker, inspect `/child <unique-id-prefix>`, or `/child parent` to return. Read-only. Unavailable after Agents are disabled. `crystal run` has no `/child` |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `model` shows or sets the compaction model; `thinking` cycles or sets its gear. `summary` toggles the manual summary; `auto` toggles the automatic one. `micro` toggles removal of old tool results. `on` or `off` sets any of those switches |
 | `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
@@ -1254,6 +1359,7 @@ is the workspace root.
 | `todoread` | Plan, Work | Read the current session todo list |
 | `question` | Plan, Work | Ask one or more questions with single/multiple choices and custom answers |
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
+| `task` | Plan, Work | Delegate to a child Agent (`agent`, `label`, `prompt`, optional `sessionId`). Present only while child Agents are enabled and at least one Agent is available. `work` is omitted in Plan. A call without `sessionId` creates a child; a call with it continues that child |
 | `edit` | Work | Replace one unique `old_string` in a file |
 | `write` | Work | Create or overwrite a UTF-8 text file |
 | `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 600 seconds) |
@@ -1380,7 +1486,8 @@ Details are in [Plugins](plugins.md).
 
 Crystal is prompt-neutral. Every model-bound string this product
 sends is authored here. Operators may replace Work, Plan, Review, the Review
-user turn, topic naming, compaction, and image description
+user turn, topic naming, compaction, image description, and the
+built-in child Agent prompts
 by placing files under `~/.crystal/prompts` and
 `<workspace>/.crystal/prompts`.
 
@@ -1393,6 +1500,9 @@ Named files (`work.md`, `plan.md`, `review.md`, `review.user.md`, `topic.md`,
 - A project file replaces the home file for that name.
 - Empty files are treated as missing.
 - The host never writes prompt files.
+
+The `agents/` files are built-in child Agent prompts, not a reserved
+future name. See [Child Agents](#child-agents).
 
 Prompt set selection is separate from direct prompt overrides. Reusable sets
 live only under `~/.crystal/promptsets/<name>/`; the workspace is never scanned
@@ -1798,12 +1908,16 @@ Override with `CRYSTAL_HOME` or `--home`.
   data/tools/<directory>/
   plugins/<directory>/plugin.json
   data/plugins/<directory>/
+  agents/<name>/
+    agent.json
+    prompt.md
   sessions/<id>.json
   logs/
 ```
 
-Project overlay (named prompts, prompt attachments, Crystal skills, tool
-sets, and plugins of the same directory name win over home):
+Project overlay (named prompts, prompt attachments, child Agent
+definitions, Crystal skills, tool sets, and plugins of the same
+directory name win over home):
 
 ```text
 <workspace>/.crystal/
@@ -1836,6 +1950,9 @@ sets, and plugins of the same directory name win over home):
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
   plugins/<directory>/plugin.json
+  agents/<name>/
+    agent.json
+    prompt.md
   data/tools/<directory>/
   data/plugins/<directory>/
 <workspace>/.crystal.md
