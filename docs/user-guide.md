@@ -1677,7 +1677,8 @@ ceiling and the reply cap only when it is already tighter than the
 threshold. A request asks for at most
 `min(maxTokens, budget - ceiling)`, so the prompt and the reply fit the
 budget together; a model without `maxTokens` sends no cap. `/context`
-rebuilds the client, because that cap is fixed when the client is opened.
+rebuilds the session client and drops cached plugin, review, and
+image-description clients whose output cap depends on that budget.
 
 When estimated transcript size or the last model-round usage crosses the
 compact ceiling, the host:

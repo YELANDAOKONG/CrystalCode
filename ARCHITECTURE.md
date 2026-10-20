@@ -983,8 +983,11 @@ gap, a bigger reservation changes neither. A model request asks for
 at most `min(maxTokens, window - ceiling)`, so the prompt and the reply
 fit the window together. A model without `maxTokens` sends no cap and
 keeps the provider default. Switching the selected context budget
-rebuilds the session client, because the output cap is fixed when the
-client is opened.
+rebuilds the session client and drops the cached plugin session client,
+plugin image client, and image-description client, because each output
+cap is fixed when that client is opened. The review client is dropped
+when its own budget or output cap changes, including when review uses
+the session model.
 
 When estimated transcript size or the last model-round usage crosses
 the lesser of the configured fraction of the model context window and

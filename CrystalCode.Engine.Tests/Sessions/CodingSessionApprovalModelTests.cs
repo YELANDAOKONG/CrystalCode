@@ -5,6 +5,7 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
@@ -272,6 +273,54 @@ public sealed class CodingSessionApprovalModelTests
     }
 
     [Fact]
+    public async Task Context_RebuildsTheApprovalClientWhenItsBudgetChanges()
+    {
+        var outside = Path.Combine(Path.GetTempPath(), "crystal-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        await File.WriteAllTextAsync(outside, "outside-text");
+        var client = new CountingClient(ToolRound(outside), TextRound("Read it."));
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var observer = new RecordingSessionObserver();
+        var plugins = new PluginRegistry();
+        plugins.Add(new WorkspaceToolsPlugin());
+        var routing = new RoutingPlugin(new Dictionary<string, IStreamingChatClient> { ["work"] = client });
+        plugins.Add(routing);
+        var session = CodingSession.Create(
+            BudgetSettings(),
+            new DiskSettingsStore(home.Home),
+            new CredentialStore(home.Home),
+            home.Home,
+            workspace.Path,
+            new SessionFrontEnd(
+                observer,
+                new RecordingApprovalPrompt(ApprovalChoice.Deny),
+                new FixedUserPrompt("unused"),
+                new DecliningSessionChooser(),
+                new ScriptedTrustPrompt(accept: false)),
+            plugins);
+        try
+        {
+            await session.StartAsync(CancellationToken.None);
+            await RunTurnAsync(session, "Read the outside file.");
+            Assert.Contains(Fitted(272_000), routing.OutputCaps);
+            var beforeContext = routing.OutputCaps.Count;
+
+            await session.SubmitAsync("/context", CancellationToken.None);
+
+            Assert.True(routing.OutputCaps.Count >= beforeContext + 2);
+            Assert.Equal(Fitted(1_000_000), routing.OutputCaps[^1]);
+            Assert.Equal(Fitted(1_000_000), routing.OutputCaps[^2]);
+        }
+        finally
+        {
+            session.Close();
+            File.Delete(outside);
+        }
+
+        static int Fitted(int window) => ContextAccountant.OutputTokens(window, 0.8, 128_000);
+    }
+
+    [Fact]
     public async Task Review_UsesTheConfiguredApprovalThinkingGear()
     {
         var outside = Path.Combine(Path.GetTempPath(), "crystal-approval-" + Guid.NewGuid().ToString("N") + ".txt");
@@ -372,6 +421,33 @@ public sealed class CodingSessionApprovalModelTests
             skills: false,
             externalTools: false,
             approvalModel: selection);
+    }
+
+    private static HarnessSettings BudgetSettings()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ProviderProtocol.Ollama,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>
+            {
+                ["work"] = new(
+                    1_000_000,
+                    maxTokens: 128_000,
+                    contextWindows: [272_000, 1_000_000],
+                    thinking: true,
+                    thinkingEfforts: ["low", "high"])
+            });
+        return new HarnessSettings(
+            provider.Name,
+            "work",
+            ApprovalMode.Review,
+            0.8,
+            new ProviderCatalog([provider]),
+            thinkingEffort: ThinkingSelection.Parse("high"),
+            skills: false,
+            externalTools: false,
+            approvalModel: new ApprovalModelSettings(true, "scripted", "work"));
     }
 
     private static ProviderDefinition ScriptedProvider() =>
@@ -527,17 +603,19 @@ public sealed class CodingSessionApprovalModelTests
 
     private sealed class RoutingPlugin : IPlugin
     {
-        private readonly IReadOnlyDictionary<string, IStreamingChatClient> _clients;
+        private readonly RoutingFactory _factory;
 
         public RoutingPlugin(IReadOnlyDictionary<string, IStreamingChatClient> clients)
         {
-            _clients = clients;
+            _factory = new RoutingFactory(clients);
         }
+
+        public IReadOnlyList<int?> OutputCaps => _factory.OutputCaps;
 
         public string Name => "routing";
 
         public PluginContribution Contribute() =>
-            new(clients: [new RoutingFactory(_clients)]);
+            new(clients: [_factory]);
     }
 
     private sealed class RoutingFactory : IChatClientFactory
@@ -549,12 +627,15 @@ public sealed class CodingSessionApprovalModelTests
             _clients = clients;
         }
 
+        public List<int?> OutputCaps { get; } = [];
+
         public bool CanCreate(ProviderProtocol protocol) =>
             protocol == ProviderProtocol.Ollama;
 
         public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
         {
             ArgumentNullException.ThrowIfNull(settings);
+            OutputCaps.Add(settings.MaxOutputTokens);
             return _clients[settings.Model];
         }
     }

@@ -1698,10 +1698,16 @@ public sealed class CodingSession : ITurnObserver
         }
 
         SaveSettings(current => current.WithContextWindow(provider, model, selected));
+        _clientView.ReleaseSession(_client, _multimodalClient);
+        ReleaseImageDescriptionClient();
+        ReleaseFittedApprovalClient();
         if (!RefreshSummaryClient(out var summaryError))
         {
             Error(summaryError);
         }
+
+        // Review captured the previous client. Rebind it after the cap changes.
+        RebuildExecutors();
 
         RefreshChrome();
         ShowUsage(ShownUsage(), ShownCumulative());
@@ -4781,10 +4787,30 @@ public sealed class CodingSession : ITurnObserver
     private string ApprovalClientKey(ApprovalModelSettings settings)
     {
         var provider = new ProviderName(settings.Provider!);
+        var selected = _settings.WithSelection(provider, settings.Model!);
         return settings.Provider
             + "\n" + settings.Model
-            + "\n" + _settings.TierFor(provider, settings.Model!)
-            + "\n" + _settings.SpeedFor(provider, settings.Model!);
+            + "\n" + selected.ServiceTier
+            + "\n" + selected.Speed
+            + "\n" + selected.ContextWindow
+            + "\n" + selected.MaxOutputTokens;
+    }
+
+    private void ReleaseFittedApprovalClient()
+    {
+        if (!_settings.ApprovalModel.Enabled)
+        {
+            return;
+        }
+
+        var key = ApprovalClientKey(_settings.ApprovalModel);
+        if (_approvalClient is not null && _approvalClientKey == key)
+        {
+            return;
+        }
+
+        ReleaseApprovalClient();
+        _clientView.ReleaseReview();
     }
 
     private void ChangeCompactionModel(CompactionModelArguments.Request request)
