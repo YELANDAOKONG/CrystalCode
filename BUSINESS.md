@@ -261,6 +261,13 @@ implemented in the current build:
   field, or command for it. Context compaction, microcompaction, hiding
   Thinking panels, and a provider's summarized thinking display are not
   this path;
+- configurable serial or concurrent execution of one tool-call batch. Today
+  Work and Plan both run every batch serially, including image-capable turns.
+  The setting, its default, its scope, which calls may overlap, and how
+  approval prompts, the single progress row, grants, and side-effect tools
+  stay ordered are not defined. Do not reserve a configuration field or
+  command for it. Crystal's concurrent tool mode is not that setting by
+  itself;
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
@@ -275,6 +282,11 @@ TODO: add switchable thinking-chain compression only after its switch,
 requirement, model choice, and the fate of the original thinking are defined.
 It runs after a thinking pass and summarizes that thinking. It is not context
 compaction, microcompaction, `verboseThinking`, or `thinkingDisplay`.
+
+TODO: add configurable serial or concurrent tool execution only after the
+setting, its default, its scope, and the ordering of approval, progress,
+grants, and side-effect tools are defined. The current serial batch stands
+until then.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.

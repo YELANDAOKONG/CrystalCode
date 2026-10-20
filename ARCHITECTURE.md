@@ -294,6 +294,11 @@ Approval is a `ToolInvocationPolicy` supplied to `ToolExecutor`. Rejection
 returns Harness-authored `ToolOutput`. Tool exceptions become model-visible
 only through a Harness `ToolExceptionMapper`.
 
+Tool-call batches run serially. Work and Plan both construct `ToolExecutor`
+with serial mode and a concurrency of one. The multimodal bridge also runs
+its batch one call at a time. Configurable concurrent execution is deferred
+product work; do not reserve a configuration field for it.
+
 ### Image input boundary
 
 CrystalCode.Engine owns image attachment, MIME signature validation,
