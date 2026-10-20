@@ -74,8 +74,12 @@ or `CrystalCode` on Windows.
 The following planned capabilities are not yet implemented in the current
 build: MCP servers, an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output,
-editing provider definitions in the TUI, and automatically fetching
-model-list information from a provider.
+editing provider definitions in the TUI, automatically fetching
+model-list information from a provider, and switchable thinking-chain
+compression. That last one would, after each thinking pass, ask a model
+to compress and summarize that thinking according to a requirement.
+Context compaction, microcompaction, `/verbose thinking`, and a
+provider's summarized thinking display are not that path.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.
@@ -1071,6 +1075,11 @@ transcript. It stays on unless `verboseThinking` is `false` in
 from a saved session, follow the switch. The gear, the progress row,
 and `/export` stay. `crystal run --show-thinking` does not use this
 setting.
+
+Switchable thinking-chain compression is not available. It would, after
+each thinking pass, ask a model to compress and summarize that thinking
+according to a requirement. `/compact`, microcompaction, and
+`/verbose thinking` do not do that.
 
 ## Context budgets
 

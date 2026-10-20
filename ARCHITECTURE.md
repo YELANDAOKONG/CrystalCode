@@ -1041,6 +1041,12 @@ when the transcript has a user message or a compaction summary. The
 file stores the compacted model transcript (live system prompt, one
 summary, recent tail, and reasoning items with their readable text and
 opaque provider state), the last usage snapshot, and cumulative provider usage.
+Switchable thinking-chain compression is deferred product work. The host
+does not, after a thinking pass, ask a model to compress and summarize
+that thinking according to a requirement. Context compaction,
+microcompaction, `verboseThinking`, and Anthropic `thinkingDisplay`
+`summarized` are not that path. No prompt file, configuration field, or
+command is reserved for it.
 `crystal --resume` (`-r`) opens a terminal selector for this workspace.
 `crystal --resume <id>` loads that file and stays in the process workspace.
 `crystal --resume <path>` lists that directory, asks for trust before the

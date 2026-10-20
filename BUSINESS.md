@@ -253,6 +253,14 @@ implemented in the current build:
   or another mechanism, once its behavior and ownership are defined;
 - saved, session, and plugin ways to disable a built-in tool, and supplying
   another tool in its place;
+- switchable thinking-chain compression. After each thinking pass, a model
+  compresses and summarizes that thinking according to a requirement. The
+  switch, the requirement, which model writes the summary, and whether the
+  original thinking remains in the transcript, the archive, and later
+  requests are not defined. Do not reserve a prompt file, configuration
+  field, or command for it. Context compaction, microcompaction, hiding
+  Thinking panels, and a provider's summarized thinking display are not
+  this path;
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
@@ -262,6 +270,11 @@ MCP without bypassing the existing plugin, approval, and media boundaries.
 TODO: add workspace-level configuration only after its field scope, precedence,
 write policy, and trust semantics are defined; a repository-controlled file
 must not weaken approval or trust.
+
+TODO: add switchable thinking-chain compression only after its switch,
+requirement, model choice, and the fate of the original thinking are defined.
+It runs after a thinking pass and summarizes that thinking. It is not context
+compaction, microcompaction, `verboseThinking`, or `thinkingDisplay`.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
