@@ -38,6 +38,18 @@ Do not add XAML or AXAML files.
 `EngineAssemblyTests` and `DisplayAssemblyTests` fail the build when either
 direction above is crossed.
 
+`CrystalCode.Platform` is deferred. The project does not exist, it is not
+in the graph above, and it is not a Crystal project. Do not add it, reference
+it, or reserve empty public types until a new decision defines its behavior
+and ownership. Its intended job is a platform abstraction so
+`CrystalCode.Engine` does not own operating-system-specific process and
+clipboard details. Whether `CrystalCode.Display` would reference that
+abstraction is not decided. Until then, each assembly keeps the platform
+branches it already has: clipboard reading, path comparison, file modes, and
+process launch stay in `CrystalCode.Engine`; console and composer key
+differences stay in `CrystalCode.Display`; version text and launch path
+comparison stay in `CrystalCode`.
+
 CrystalCode.Tests references CrystalCode.
 CrystalCode.Engine.Tests references CrystalCode.Engine.
 CrystalCode.Display.Tests references CrystalCode.Display.

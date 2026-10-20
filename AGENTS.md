@@ -59,7 +59,8 @@ semantics. Do not copy its Demo UI into this product.
 ## Change rules
 
 - Ask before adding a project, a public architectural boundary, or a new
-  provider family. Extra first-party tools and protocols go through
+  provider family. `CrystalCode.Platform` is deferred; do not add that
+  project. Extra first-party tools and protocols go through
   `IPlugin` / `PluginRegistry`. Operator plugins load from `plugins/`
   through `CrystalCode.Plugins` (`PluginCatalog`), one load context per
   plugin. Do not load `CrystalCode.Engine` into that context. Operator
