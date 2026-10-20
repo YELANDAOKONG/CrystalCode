@@ -18,7 +18,8 @@ public sealed record CompactionLimits
         int? maxTokens = null,
         double threshold = HarnessSettings.DefaultCompactionThreshold,
         int? tailBudget = null,
-        int? summaryWindow = null)
+        int? summaryWindow = null,
+        int? reservedOutputTokens = null)
     {
         if (contextWindow <= 0)
         {
@@ -60,11 +61,20 @@ public sealed record CompactionLimits
                 "Summary window must be positive.");
         }
 
+        if (reservedOutputTokens is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reservedOutputTokens),
+                reservedOutputTokens,
+                "Reserved output tokens must be positive.");
+        }
+
         ContextWindow = contextWindow;
         MaxTokens = maxTokens;
         Threshold = threshold;
         TailBudget = tailBudget;
         SummaryWindow = summaryWindow;
+        ReservedOutputTokens = reservedOutputTokens;
     }
 
     public int ContextWindow { get; }
@@ -82,6 +92,8 @@ public sealed record CompactionLimits
     /// </summary>
     public int? SummaryWindow { get; }
 
+    public int? ReservedOutputTokens { get; }
+
     public int ResolveTailBudget()
     {
         if (TailBudget is int specified)
@@ -89,7 +101,7 @@ public sealed record CompactionLimits
             return specified;
         }
 
-        var usable = ContextAccountant.UsableTokens(ContextWindow, MaxTokens);
+        var usable = ContextAccountant.UsableTokens(ContextWindow, MaxTokens, ReservedOutputTokens);
         if (usable <= 0)
         {
             usable = ContextWindow;
@@ -110,6 +122,14 @@ public sealed record CompactionLimits
         // A window smaller than the summary slot cannot reserve the whole slot
         // and still send the conversation. Leave at least half the window for the prompt.
         output = Math.Min(output, Math.Max(1, window / 2));
+        // The summary must land below the compact ceiling, or the next round
+        // compacts what the last round just produced.
+        var ceiling = ContextAccountant.CompactLimit(
+            window,
+            Threshold,
+            MaxTokens,
+            ReservedOutputTokens);
+        output = Math.Min(output, Math.Max(1, ceiling / 4));
         return Math.Max(1, window - output);
     }
 }

@@ -30,7 +30,7 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 provider.BaseUri,
                 model.Temperature,
                 model.TopP,
-                model.MaxTokens,
+                settings.MaxOutputTokens,
                 provider.Name.Value,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed));
@@ -54,7 +54,7 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 provider.BaseUri,
                 model.Temperature,
                 model.TopP,
-                model.MaxTokens,
+                settings.MaxOutputTokens,
                 provider.Name.Value,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed));

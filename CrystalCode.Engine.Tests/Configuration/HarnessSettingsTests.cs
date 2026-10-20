@@ -10,6 +10,55 @@ namespace CrystalCode.Engine.Tests.Configuration;
 public sealed class HarnessSettingsTests
 {
     [Fact]
+    public void MaxOutputTokens_FitsTheWindowLeftByTheCompactionCeiling()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("local"),
+            ProviderProtocol.OpenAI,
+            new Uri("https://example.test/v1/"),
+            new Dictionary<string, ModelSettings>
+            {
+                ["cramped"] = new(32_768, maxTokens: 32_768),
+                ["roomy"] = new(200_000, maxTokens: 128_000),
+                ["plain"] = new(200_000)
+            });
+        var catalog = new ProviderCatalog([provider]);
+        HarnessSettings Make(string model, double threshold = 0.8, int? reserved = null) =>
+            new(
+                new ProviderName("local"),
+                model,
+                ApprovalMode.Default,
+                threshold,
+                catalog,
+                reservedOutputTokens: reserved);
+
+        Assert.Equal(8_192, Make("cramped").MaxOutputTokens);
+        Assert.Equal(40_000, Make("roomy").MaxOutputTokens);
+        Assert.Null(Make("plain").MaxOutputTokens);
+        // A full-window threshold leaves exactly the reservation for the reply.
+        Assert.Equal(3_200, Make("roomy", threshold: 1.0, reserved: 3_200).MaxOutputTokens);
+    }
+
+    [Fact]
+    public void ReservedOutputTokens_RejectsNonPositiveValuesAndCanBeCleared()
+    {
+        var settings = HarnessSettings.CreateDefault();
+        Assert.Null(settings.ReservedOutputTokens);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HarnessSettings(
+            settings.Provider,
+            settings.Model,
+            settings.Approval,
+            settings.CompactionThreshold,
+            settings.Catalog,
+            reservedOutputTokens: 0));
+
+        var declared = settings.WithReservedOutputTokens(4096);
+        Assert.Equal(4096, declared.ReservedOutputTokens);
+        Assert.Null(declared.WithReservedOutputTokens(null).ReservedOutputTokens);
+    }
+
+    [Fact]
     public void WithSelection_SwitchesProviderAndModel()
     {
         var catalog = ModelSelectionTests.Catalog();

@@ -97,6 +97,22 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Save_RoundTripsReservedOutputTokens()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        var settings = store.LoadOrCreate();
+
+        store.Save(settings.WithReservedOutputTokens(4096));
+
+        Assert.Equal(4096, store.Load().ReservedOutputTokens);
+        Assert.Contains(
+            "reservedOutputTokens",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_RejectsRepeatedProviderKeyInJsoncProvidersFile()
     {
         using var root = new TemporaryHome();

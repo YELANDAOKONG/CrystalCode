@@ -501,6 +501,7 @@ Top-level fields:
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled. Built-in names are checked on load. An extra name is kept when it matches a plugin field name, even if that plugin is not loaded yet |
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
+| `reservedOutputTokens` | Optional positive tokens held back for the reply. Omitted derives the reservation from the window and the model `maxTokens`: the smallest of 20000, `maxTokens`, and a quarter of the window. It sets the compact ceiling and the request output cap together, so a larger value means earlier compaction and longer replies |
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). `/compact summary` toggles it; `on` or `off` sets it |
 | `showAutomaticCompactionSummary` | Print the same summary after automatic compaction (default `false`; omitted when off). `/compact auto` toggles it (`automatic` is the same); `on` or `off` sets it. Does not change `/compact` |
 | `microCompaction` | Optional removal of old successful tool results before each model call. Omitted means off. Object with `enabled` (default `false`), `protectTurns` (at least 1, default `2`), `protectTokens` (non-negative, default `40000`), and `minimumTokens` (non-negative, default `20000`). Invalid values stop startup. `/compact micro` toggles it; `on` or `off` sets it. Does not summarize |
@@ -581,7 +582,7 @@ are not supported by the current adapter.
 | `contextWindows` | Optional distinct positive token budgets no greater than `contextWindow`, for example `[272000, 1000000]`. `/context` cycles these values; the lowest is the initial budget. Compaction and the status bar use the selected budget |
 | `temperature` | Optional, 0 to 2 |
 | `topP` | Optional, 0 to 1 |
-| `maxTokens` | Optional positive output-token cap |
+| `maxTokens` | Optional positive output-token cap. The host lowers the cap a request asks for so the prompt and the reply fit the selected context budget; it never raises it |
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
@@ -1667,15 +1668,23 @@ or `off`, writes `config.json`, and does not summarize. It is refused
 while a turn or compaction is running. `/status` shows a Microcompaction
 row only while it is on.
 
+Reserved output is `reservedOutputTokens` when set. Otherwise it is the
+smallest of 20000, the model `maxTokens`, and a quarter of the context
+budget, so a small budget keeps most of itself for input. The compact
+ceiling is the lesser of `compactionThreshold` of the budget and the
+budget minus that reservation. A request asks for at most
+`min(maxTokens, budget - ceiling)`, so the prompt and the reply fit the
+budget together; a model without `maxTokens` sends no cap.
+
 When estimated transcript size or the last model-round usage crosses the
-lesser of `compactionThreshold` of the model context window and the usable
-window (context minus reserved output), the host:
+compact ceiling, the host:
 
 1. Clears old tool results outside a protected recent band, when that
    frees enough tokens. A summary that stops because it reached its output
-   limit is not stored. The summary request reserves 16384 tokens, or the
-   session model's `maxTokens` when that is smaller, and never more than
-   half the summary window. The verbatim tail is at most 32000 tokens.
+   limit is not stored. The summary reply is capped at a quarter of the
+   ceiling, at most 16384 tokens or the session model's `maxTokens` when
+   that is smaller, and never more than half the summary window. The
+   verbatim tail is at most 32000 tokens.
 2. Asks the model for a structured summary of older turns (folding any
    previous summary) and keeps a recent tail verbatim.
 3. Stops if the summary cannot be produced and nothing else can be

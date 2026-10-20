@@ -21,7 +21,7 @@ internal static class PluginClientRequests
             provider.Project,
             model.Temperature,
             model.TopP,
-            model.MaxTokens,
+            settings.MaxOutputTokens,
             provider.ReplayReasoningContent,
             provider.TokenLimit.Value,
             model.ImageInput,

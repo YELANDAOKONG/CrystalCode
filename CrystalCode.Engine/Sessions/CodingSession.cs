@@ -3556,7 +3556,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.ContextWindow,
             _settings.ActiveModel.MaxTokens,
             _settings.CompactionThreshold,
-            summaryWindow: CompactionSummaryWindow());
+            summaryWindow: CompactionSummaryWindow(),
+            reservedOutputTokens: _settings.ReservedOutputTokens);
 
     private async Task CompactForcedAsync(CancellationToken cancellationToken)
     {
@@ -3630,7 +3631,8 @@ public sealed class CodingSession : ITurnObserver
             reportedUsage,
             limits.ContextWindow,
             limits.Threshold,
-            limits.MaxTokens);
+            limits.MaxTokens,
+            limits.ReservedOutputTokens);
     }
 
     private async Task<CompactionOutcome> RunCompactionAsync(

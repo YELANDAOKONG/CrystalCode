@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using Crystal.Reasoning;
 
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 
@@ -86,7 +87,8 @@ public sealed record HarnessSettings
         RuleFileSettings? ruleFiles = null,
         IReadOnlyList<string>? disabledBuiltInTools = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
-        IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null)
+        IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
+        int? reservedOutputTokens = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -100,6 +102,14 @@ public sealed record HarnessSettings
                 nameof(compactionThreshold),
                 compactionThreshold,
                 "Compaction threshold must be greater than 0 and at most 1.");
+        }
+
+        if (reservedOutputTokens is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reservedOutputTokens),
+                reservedOutputTokens,
+                "Reserved output tokens must be positive.");
         }
 
         if (!BashTool.IsSupported(bashTimeoutSeconds))
@@ -124,6 +134,7 @@ public sealed record HarnessSettings
         Model = model.Trim();
         Approval = approval;
         CompactionThreshold = compactionThreshold;
+        ReservedOutputTokens = reservedOutputTokens;
         Catalog = catalog;
         ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
         ContextSelections = new ReadOnlyDictionary<ContextSelectionKey, int>(
@@ -205,6 +216,12 @@ public sealed record HarnessSettings
 
     public double CompactionThreshold { get; }
 
+    /// <summary>
+    /// Declared tokens to hold back for the reply, or null to derive them from
+    /// the window and the model output cap.
+    /// </summary>
+    public int? ReservedOutputTokens { get; }
+
     public ProviderCatalog Catalog { get; }
 
     public ThinkingSelection ThinkingEffort { get; }
@@ -234,6 +251,24 @@ public sealed record HarnessSettings
         && ActiveModel.ContextWindows.Contains(selected)
             ? selected
             : ActiveModel.ContextWindows[0];
+
+    /// <summary>
+    /// Output cap for one request, fitted to the room the window leaves after
+    /// the compaction ceiling. Null when the model declares no cap, which
+    /// leaves the provider default in place.
+    /// </summary>
+    public int? MaxOutputTokens
+    {
+        get
+        {
+            var tokens = ContextAccountant.OutputTokens(
+                ContextWindow,
+                CompactionThreshold,
+                ActiveModel.MaxTokens,
+                ReservedOutputTokens);
+            return tokens > 0 ? tokens : null;
+        }
+    }
 
     public HarnessSettings WithContextWindow(ProviderName provider, string model, int window)
     {
@@ -431,6 +466,13 @@ public sealed record HarnessSettings
     public HarnessSettings WithShowCompactionSummary(bool showCompactionSummary) =>
         Copy(showCompactionSummary: showCompactionSummary);
 
+    /// <summary>
+    /// Sets the tokens held back for the reply, or clears them so the window
+    /// and the model output cap decide.
+    /// </summary>
+    public HarnessSettings WithReservedOutputTokens(int? reservedOutputTokens) =>
+        Copy(reservedOutputTokens: reservedOutputTokens, setReservedOutputTokens: true);
+
     public HarnessSettings WithShowAutomaticCompactionSummary(bool showAutomaticCompactionSummary) =>
         Copy(showAutomaticCompactionSummary: showAutomaticCompactionSummary);
 
@@ -603,7 +645,9 @@ public sealed record HarnessSettings
         RuleFileSettings? ruleFiles = null,
         IReadOnlyList<string>? disabledBuiltInTools = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
-        IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null) =>
+        IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
+        int? reservedOutputTokens = null,
+        bool setReservedOutputTokens = false) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -645,7 +689,8 @@ public sealed record HarnessSettings
             ruleFiles ?? RuleFiles,
             disabledBuiltInTools ?? DisabledBuiltInTools,
             tierSelections ?? TierSelections,
-            speedSelections ?? SpeedSelections);
+            speedSelections ?? SpeedSelections,
+            setReservedOutputTokens ? reservedOutputTokens : ReservedOutputTokens);
 
     public override string ToString() => nameof(HarnessSettings);
 

@@ -263,7 +263,7 @@ public sealed class CodingSessionContextTests
 
     private static HeadlessSession OpenLargeSession(IStreamingChatClient client)
     {
-        var head = "EARLIER-CONTENT" + new string('x', 50_000);
+        var head = "EARLIER-CONTENT" + new string('x', 98_000);
         var resume = new SessionDocument
         {
             Items =
@@ -301,7 +301,7 @@ public sealed class CodingSessionContextTests
 
     private static async Task<string[]> CompactAutomatically(bool showSummary)
     {
-        var head = "EARLIER-CONTENT" + new string('x', 50_000);
+        var head = "EARLIER-CONTENT" + new string('x', 98_000);
         var resume = new SessionDocument
         {
             Items =

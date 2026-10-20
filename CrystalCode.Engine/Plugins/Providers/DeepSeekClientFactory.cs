@@ -33,7 +33,7 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
                 provider.BaseUri,
                 model.Temperature,
                 model.TopP,
-                model.MaxTokens,
+                settings.MaxOutputTokens,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed));
     }
@@ -56,7 +56,7 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
                 provider.BaseUri,
                 model.Temperature,
                 model.TopP,
-                model.MaxTokens,
+                settings.MaxOutputTokens,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed));
     }

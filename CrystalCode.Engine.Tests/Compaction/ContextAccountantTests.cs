@@ -66,9 +66,32 @@ public sealed class ContextAccountantTests
     }
 
     [Fact]
-    public void CompactLimit_UsesReservedOutputOnLargeWindows()
+    public void CompactLimit_AppliesTheThresholdAndTheReservation()
     {
-        Assert.Equal(80, ContextAccountant.CompactLimit(100, 0.8));
-        Assert.Equal(12_000, ContextAccountant.CompactLimit(32_000, 0.8, maxTokens: 20_000));
+        Assert.Equal(160_000, ContextAccountant.CompactLimit(200_000, 0.8));
+        Assert.Equal(24_000, ContextAccountant.CompactLimit(32_000, 0.8, maxTokens: 32_000));
+        // A tiny window keeps three quarters for input instead of reserving all of it.
+        Assert.Equal(75, ContextAccountant.CompactLimit(100, 0.8));
+        Assert.Equal(25_600, ContextAccountant.CompactLimit(32_000, 0.8, reserved: 4_000));
+        Assert.Equal(2_000, ContextAccountant.CompactLimit(32_000, 0.8, reserved: 30_000));
+    }
+
+    [Fact]
+    public void ShouldCompact_HonorsADeclaredReservation()
+    {
+        Assert.True(ContextAccountant.ShouldCompact(25_000, 32_000, 0.8));
+        Assert.False(ContextAccountant.ShouldCompact(25_000, 32_000, 0.8, reserved: 4_000));
+    }
+
+    [Fact]
+    public void OutputTokens_LeavesTheRestOfTheWindowForTheReply()
+    {
+        // A model whose output cap equals its window can still be asked for a
+        // reply that fits once the prompt is capped at the compact limit.
+        Assert.Equal(8_192, ContextAccountant.OutputTokens(32_768, 0.8, 32_768));
+        Assert.Equal(200_000, ContextAccountant.OutputTokens(1_000_000, 0.8, 1_000_000));
+        Assert.Equal(32_000, ContextAccountant.OutputTokens(200_000, 0.8, 32_000));
+        Assert.Equal(40_000, ContextAccountant.OutputTokens(200_000, 0.8, 128_000));
+        Assert.Equal(0, ContextAccountant.OutputTokens(200_000, 0.8, maxTokens: null));
     }
 }

@@ -107,7 +107,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             approvalRetry: ReadRetry(document.ApprovalRetry),
             compactionModel: ReadCompactionModel(document.CompactionModel),
             microCompaction: ReadMicroCompaction(document.MicroCompaction),
-            ruleFiles: ReadRuleFiles(document.RuleFiles));
+            ruleFiles: ReadRuleFiles(document.RuleFiles),
+            reservedOutputTokens: document.ReservedOutputTokens);
     }
 
     public void Save(HarnessSettings settings)
@@ -165,6 +166,7 @@ public sealed class DiskSettingsStore : ISettingsStore
                     ? null
                     : [.. settings.StatusLine.Fields],
             CompactionThreshold = settings.CompactionThreshold,
+            ReservedOutputTokens = settings.ReservedOutputTokens,
             ShowCompactionSummary = settings.ShowCompactionSummary ? null : false,
             ShowAutomaticCompactionSummary = settings.ShowAutomaticCompactionSummary ? true : null,
             ExecutionBudget = ExecutionBudgetMapper.Write(settings.ExecutionBudget),

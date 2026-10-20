@@ -36,7 +36,7 @@ public sealed class OllamaClientFactory : IChatClientFactory
             apiKey,
             model.Temperature,
             model.TopP,
-            model.MaxTokens,
+            settings.MaxOutputTokens,
             provider.Name.Value,
             serviceTier: settings.ServiceTier,
             speed: settings.Speed);

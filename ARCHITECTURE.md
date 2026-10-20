@@ -971,6 +971,15 @@ protected tokens, and 20000 minimum tokens. `protectTurns` must be at
 least 1. The token counts must be non-negative. Invalid values refuse
 startup. Full compaction's own prune does not follow this switch.
 
+Reserved output is `reservedOutputTokens` when set. Otherwise it is
+the smallest of 20000, the model `maxTokens`, and a quarter of the
+window, so a small window keeps most of itself for input. The
+compaction ceiling is the lesser of the configured fraction of the
+window and the window minus the reservation. A model request asks for
+at most `min(maxTokens, window - ceiling)`, so the prompt and the reply
+fit the window together. A model without `maxTokens` sends no cap and
+keeps the provider default.
+
 When estimated transcript size or the last model-round usage crosses
 the lesser of the configured fraction of the model context window and
 the usable window (context minus reserved output), the host:
@@ -982,11 +991,12 @@ the usable window (context minus reserved output), the host:
    of the usable window, at least 2000 tokens and at most 32000. That
    summary request follows the same `retry` policy as a model round.
    The session model writes it unless `compactionModel` is enabled.
-   The summary prompt reserves `min(session model maxTokens, 16384)`
-   tokens, and never more than half the effective summary window, so a
-   window smaller than 16384 can still be summarized. A model without
-   `maxTokens` reserves 16384 when the window is large enough. A summary
-   whose finish reason is `length` is not stored.
+   The summary prompt caps its reply at one quarter of the compact
+   ceiling, at most `min(session model maxTokens, 16384)`, and never
+   more than half the effective summary window, so the result lands
+   below the ceiling that would trigger the next compaction. A model
+   without `maxTokens` may use 16384 when the window allows it. A
+   summary whose finish reason is `length` is not stored.
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.

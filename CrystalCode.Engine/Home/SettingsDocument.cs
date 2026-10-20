@@ -56,6 +56,8 @@ internal sealed class SettingsDocument
 
     public double? CompactionThreshold { get; set; }
 
+    public int? ReservedOutputTokens { get; set; }
+
     public bool? ShowCompactionSummary { get; set; }
 
     public bool? ShowAutomaticCompactionSummary { get; set; }

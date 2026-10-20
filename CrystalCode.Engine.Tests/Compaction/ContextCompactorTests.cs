@@ -249,13 +249,15 @@ public sealed class ContextCompactorTests
     }
 
     [Fact]
-    public void SummaryPromptBudget_KeepsTheSlotOnALargeWindowAndHalfOfASmallOne()
+    public void SummaryPromptBudget_KeepsTheSlotOnALargeWindowAndFitsASmallOne()
     {
         var wide = new CompactionLimits(200_000);
         var small = new CompactionLimits(8_000);
 
         Assert.Equal(200_000 - CompactionLimits.SummaryOutputTokens, wide.SummaryPromptBudget());
-        Assert.Equal(4_000, small.SummaryPromptBudget());
+        // A small window caps the summary below half the window so the result
+        // still fits under the compact limit.
+        Assert.Equal(6_500, small.SummaryPromptBudget());
     }
 
     [Fact]
@@ -299,10 +301,8 @@ public sealed class ContextCompactorTests
         var limits = new CompactionLimits(100_000, tailBudget: 8, summaryWindow: 50_000);
 
         Assert.Equal(4_000, narrow.ResolveTailBudget());
-        Assert.Equal(4_000, narrow.SummaryPromptBudget());
-        Assert.Equal(
-            50_000 - CompactionLimits.SummaryOutputTokens,
-            limits.SummaryPromptBudget());
+        Assert.Equal(6_500, narrow.SummaryPromptBudget());
+        Assert.Equal(40_625, limits.SummaryPromptBudget());
 
         var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", limits);
 
