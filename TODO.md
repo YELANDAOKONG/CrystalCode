@@ -51,8 +51,10 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 
 ## High priority
 
-None. Parent/child Agents are current behavior, defined in `BUSINESS.md`
-and `ARCHITECTURE.md`.
+- Complete code review of the current product. It does not change product
+  scope, reserve a public type, command, or configuration field, or
+  authorize new behavior. Findings stay inside the boundaries in
+  `BUSINESS.md` and `ARCHITECTURE.md`.
 
 ## Medium priority
 
