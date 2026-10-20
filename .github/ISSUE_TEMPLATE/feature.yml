@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest a change to Crystal Code.
+title: "Feature: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Crystal Code is the terminal product. Protocol types and tool dispatch belong to [Crystal](https://github.com/YELANDAOKONG/Crystal/issues). Open those issues there, not here.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: What should Crystal Code do instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Select every area this would touch.
+      multiple: true
+      options:
+        - Terminal
+        - crystal run
+        - Approval
+        - Session
+        - Provider
+        - Plugins or tools
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Optional. Other approaches you considered, including doing nothing.
+    validations:
+      required: false

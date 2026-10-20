@@ -1,0 +1,126 @@
+name: Bug report
+description: Report something Crystal Code does that it should not.
+title: "Bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste `credentials.json`, API keys, tokens, or other secrets from `~/.crystal`. Provider and model names are enough.
+
+        On Windows the command is `CrystalCode`, not `crystal`.
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: Paste the full output of `crystal version` (or `CrystalCode version` on Windows).
+      placeholder: |
+        Crystal Code   ...
+        Crystal        ...
+        SDK            ...
+        Configuration  ...
+
+        Runtime        ...
+        OS             ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - linux-x64
+        - linux-arm64
+        - macos-arm64
+        - windows-x64
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - Install script
+        - Built from source
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: entry
+    attributes:
+      label: Entry
+      options:
+        - Interactive terminal
+        - crystal run
+        - crystal space
+        - crystal plugins, tools, promptsets, or prompt-attachments
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Plan
+        - Work
+        - Not applicable
+    validations:
+      required: true
+  - type: dropdown
+    id: approval
+    attributes:
+      label: Approval mode
+      options:
+        - Default
+        - Edit
+        - Review
+        - Audit
+        - Full
+        - Not applicable
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and model
+      description: Names only, for example `deepseek` / `deepseek-flash`. Leave blank if the bug happens before a model is selected. Do not include API keys or credential file contents.
+      placeholder: deepseek / deepseek-flash
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you ran and what you typed, in order.
+      placeholder: |
+        1. Start crystal in a repository
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Session excerpt or log
+      description: Optional. Remove keys, tokens, and credential file contents before pasting.
+    validations:
+      required: false
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Secrets
+      options:
+        - label: I did not include `credentials.json`, API keys, or other secrets from `~/.crystal`.
+          required: true

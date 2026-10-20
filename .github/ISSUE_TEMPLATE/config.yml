@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: User guide
+    url: https://github.com/YELANDAOKONG/CrystalCode/blob/master/docs/user-guide.md
+    about: Setup, commands, approval, sessions, and configuration.
