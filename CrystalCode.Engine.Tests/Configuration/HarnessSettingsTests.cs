@@ -59,6 +59,19 @@ public sealed class HarnessSettingsTests
     }
 
     [Fact]
+    public void OutputTokenCap_ReplacesTheFittedCapAndStaysOnCopies()
+    {
+        var settings = HarnessSettings.CreateDefault();
+        Assert.Null(settings.OutputTokenCap);
+
+        var capped = settings.WithOutputTokenCap(1500);
+        Assert.Equal(1500, capped.MaxOutputTokens);
+        Assert.Equal(1500, capped.WithShowCompactionSummary(false).OutputTokenCap);
+        Assert.Null(settings.OutputTokenCap);
+        Assert.Throws<ArgumentOutOfRangeException>(() => settings.WithOutputTokenCap(0));
+    }
+
+    [Fact]
     public void WithSelection_SwitchesProviderAndModel()
     {
         var catalog = ModelSelectionTests.Catalog();

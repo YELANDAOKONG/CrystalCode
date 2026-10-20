@@ -15,7 +15,7 @@ public sealed class ContextCompactor
 {
     public const string OmittedResultText = "Tool result omitted after compaction.";
 
-    private readonly IChatClient _client;
+    private readonly Func<IChatClient> _client;
     private readonly Func<string> _systemText;
     private readonly SessionRetryOptions _retry;
     private readonly Action<SessionRetryAttempt>? _onRetry;
@@ -28,6 +28,35 @@ public sealed class ContextCompactor
 
     public ContextCompactor(
         IChatClient client,
+        SessionRetryOptions? retry = null,
+        Action<SessionRetryAttempt>? onRetry = null,
+        Func<string>? systemText = null,
+        Func<PluginCompactionPhase, string, string?>? finish = null,
+        Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareHead = null,
+        Func<ChatResponse, CancellationToken, Task>? reportResponse = null,
+        Func<string, string, string?, string>? userText = null,
+        ReasoningOptions? reasoning = null)
+        : this(
+            Client(client),
+            retry,
+            onRetry,
+            systemText,
+            finish,
+            prepareHead,
+            reportResponse,
+            userText,
+            reasoning)
+    {
+    }
+
+    private static Func<IChatClient> Client(IChatClient client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        return () => client;
+    }
+
+    public ContextCompactor(
+        Func<IChatClient> client,
         SessionRetryOptions? retry = null,
         Action<SessionRetryAttempt>? onRetry = null,
         Func<string>? systemText = null,
@@ -114,8 +143,10 @@ public sealed class ContextCompactor
         ChatResponse response;
         try
         {
+            var client = _client();
+            ArgumentNullException.ThrowIfNull(client);
             response = await SessionRetry.RunAsync(
-                token => _client.CompleteAsync(
+                token => client.CompleteAsync(
                     new ChatRequest(
                     [
                         new ChatMessage(ChatRole.System, systemText),

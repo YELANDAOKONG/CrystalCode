@@ -1786,7 +1786,8 @@ public sealed class CodingSession : ITurnObserver
         _multimodalClient = nextMultimodal;
         if (!next.CompactionModel.Enabled)
         {
-            _compactor = CreateCompactor(nextClient);
+            ReleaseCompactionClient();
+            _compactor = CreateCompactor();
         }
 
         if (!ReferenceEquals(previous, nextClient)
@@ -2112,7 +2113,8 @@ public sealed class CodingSession : ITurnObserver
         _multimodalClient = nextMultimodalClient;
         if (!_settings.CompactionModel.Enabled)
         {
-            _compactor = CreateCompactor(nextClient);
+            ReleaseCompactionClient();
+            _compactor = CreateCompactor();
         }
         _settings = nextSettings;
         _persisted = _persisted.WithSelection(selection.Provider, selection.Model);
@@ -4951,7 +4953,7 @@ public sealed class CodingSession : ITurnObserver
 
         SaveSettings(current => current.WithCompactionModel(
             current.CompactionModel.WithThinkingEffort(selection)));
-        _compactor = CreateCompactor(CompactionClient(), CompactionReasoning());
+        _compactor = CreateCompactor(CompactionReasoning());
         RefreshSlashCommands();
         Note("Compaction thinking  " + ThinkingLabel.For(selection));
     }
@@ -5021,21 +5023,24 @@ public sealed class CodingSession : ITurnObserver
         var selected = _settings.WithSelection(
             new ProviderName(settings.Provider!),
             settings.Model!);
-        return CreateClient(selected);
+        return CreateSummaryClient(selected);
     }
+
+    private IStreamingChatClient CreateSummaryClient(HarnessSettings selected) =>
+        CreateClient(selected.WithOutputTokenCap(CurrentLimits().SummaryOutputCap()));
 
     private void ReplaceCompactionClient(CompactionModelSettings settings, IStreamingChatClient? client)
     {
         ReleaseCompactionClient();
         if (client is null)
         {
-            _compactor = CreateCompactor(_client);
+            _compactor = CreateCompactor();
             return;
         }
 
         _compactionClient = client;
         _compactionClientKey = CompactionClientKey(settings);
-        _compactor = CreateCompactor(client, CompactionReasoning());
+        _compactor = CreateCompactor(CompactionReasoning());
     }
 
     private void BindCompactor()
@@ -5043,7 +5048,7 @@ public sealed class CodingSession : ITurnObserver
         ReleaseCompactionClient();
         if (!_settings.CompactionModel.Enabled)
         {
-            _compactor = CreateCompactor(_client);
+            _compactor = CreateCompactor();
             return;
         }
 
@@ -5058,13 +5063,14 @@ public sealed class CodingSession : ITurnObserver
 
         _compactionClient = client;
         _compactionClientKey = CompactionClientKey(_settings.CompactionModel);
-        _compactor = CreateCompactor(client, CompactionReasoning());
+        _compactor = CreateCompactor(CompactionReasoning());
     }
 
     private void EnsureCompactionClient()
     {
         if (!_settings.CompactionModel.Enabled)
         {
+            EnsureSessionSummaryClient();
             return;
         }
 
@@ -5086,6 +5092,29 @@ public sealed class CodingSession : ITurnObserver
         ReplaceCompactionClient(_settings.CompactionModel, client);
     }
 
+    private void EnsureSessionSummaryClient()
+    {
+        var key = SessionSummaryClientKey();
+        if (_compactionClient is not null && _compactionClientKey == key)
+        {
+            return;
+        }
+
+        var client = CreateSummaryClient(_settings);
+        ReleaseCompactionClient();
+        _compactionClient = client;
+        _compactionClientKey = key;
+        _compactor = CreateCompactor();
+    }
+
+    private string SessionSummaryClientKey() =>
+        "session\n"
+        + _settings.Provider.Value
+        + "\n" + _settings.Model
+        + "\n" + _settings.ServiceTier
+        + "\n" + _settings.Speed
+        + "\n" + CurrentLimits().SummaryOutputCap();
+
     private void ReleaseCompactionClient()
     {
         if (_compactionClient is null)
@@ -5102,22 +5131,20 @@ public sealed class CodingSession : ITurnObserver
         _compactionClientKey = null;
     }
 
-    private IChatClient CompactionClient() =>
-        _settings.CompactionModel.Enabled && _compactionClient is not null
-            ? _compactionClient
-            : _client;
+    private IChatClient ResolveSummaryClient()
+    {
+        EnsureCompactionClient();
+        return _compactionClient
+            ?? throw new InvalidOperationException("The summary client could not be created.");
+    }
 
     private IStreamingChatClient OpenSideCompactionClient(
         IStreamingChatClient answerClient,
         out bool owned)
     {
-        if (!_settings.CompactionModel.Enabled)
-        {
-            owned = false;
-            return answerClient;
-        }
-
-        var client = CreateCompactionClient(_settings.CompactionModel);
+        var client = _settings.CompactionModel.Enabled
+            ? CreateCompactionClient(_settings.CompactionModel)
+            : CreateSummaryClient(_settings);
         owned = !ReferenceEquals(client, _client)
             && !ReferenceEquals(client, _compactionClient)
             && !ReferenceEquals(client, answerClient);
@@ -5194,7 +5221,8 @@ public sealed class CodingSession : ITurnObserver
         return settings.Provider
             + "\n" + settings.Model
             + "\n" + _settings.TierFor(provider, settings.Model!)
-            + "\n" + _settings.SpeedFor(provider, settings.Model!);
+            + "\n" + _settings.SpeedFor(provider, settings.Model!)
+            + "\n" + CurrentLimits().SummaryOutputCap();
     }
 
     private ReasoningOptions? CurrentReasoning() =>
@@ -6028,7 +6056,10 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private ContextCompactor CreateCompactor(IChatClient client, ReasoningOptions? reasoning = null) =>
+    private ContextCompactor CreateCompactor(ReasoningOptions? reasoning = null) =>
+        CreateCompactor(() => ResolveSummaryClient(), reasoning);
+
+    private ContextCompactor CreateCompactor(Func<IChatClient> client, ReasoningOptions? reasoning = null) =>
         new(
             client,
             _settings.Retry.ToOptions(),
@@ -6372,8 +6403,19 @@ public sealed class CodingSession : ITurnObserver
         {
             client = CreateClient(_settings);
             owned = !ReferenceEquals(client, _client);
-            summaryClient = OpenSideCompactionClient(client, out ownedSummary);
-            var compactor = CreateCompactor(summaryClient, CompactionReasoning());
+            var compactor = CreateCompactor(
+                () =>
+                {
+                    if (summaryClient is null)
+                    {
+                        summaryClient = OpenSideCompactionClient(client, out ownedSummary);
+                    }
+
+                    return summaryClient
+                        ?? throw new InvalidOperationException(
+                            "The summary client could not be created.");
+                },
+                CompactionReasoning());
             var conversation = await PrepareSideConversationAsync(
                 sideBase,
                 prior,

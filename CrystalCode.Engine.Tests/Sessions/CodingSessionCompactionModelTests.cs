@@ -41,6 +41,13 @@ public sealed class CodingSessionCompactionModelTests
         await headless.Session.SubmitAsync("/compact model model", CancellationToken.None);
         Assert.Contains("On", LastNote(headless), StringComparison.Ordinal);
         Assert.Contains("scripted", LastNote(headless), StringComparison.Ordinal);
+        Assert.Contains(
+            new CompactionLimits(200_000).SummaryOutputCap(),
+            headless.ChatPlugin.OutputCaps);
+        Assert.DoesNotContain(
+            "outputTokenCap",
+            File.ReadAllText(headless.Home.ConfigPath),
+            StringComparison.Ordinal);
 
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact thinking off", CancellationToken.None);

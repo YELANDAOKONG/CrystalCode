@@ -88,7 +88,8 @@ public sealed record HarnessSettings
         IReadOnlyList<string>? disabledBuiltInTools = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
-        int? reservedOutputTokens = null)
+        int? reservedOutputTokens = null,
+        int? outputTokenCap = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -110,6 +111,14 @@ public sealed record HarnessSettings
                 nameof(reservedOutputTokens),
                 reservedOutputTokens,
                 "Reserved output tokens must be positive.");
+        }
+
+        if (outputTokenCap is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(outputTokenCap),
+                outputTokenCap,
+                "Output token cap must be positive.");
         }
 
         if (!BashTool.IsSupported(bashTimeoutSeconds))
@@ -135,6 +144,7 @@ public sealed record HarnessSettings
         Approval = approval;
         CompactionThreshold = compactionThreshold;
         ReservedOutputTokens = reservedOutputTokens;
+        OutputTokenCap = outputTokenCap;
         Catalog = catalog;
         ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
         ContextSelections = new ReadOnlyDictionary<ContextSelectionKey, int>(
@@ -222,6 +232,12 @@ public sealed record HarnessSettings
     /// </summary>
     public int? ReservedOutputTokens { get; }
 
+    /// <summary>
+    /// Output tokens a client built from these settings asks for, when set.
+    /// Null keeps the fitted turn cap. This is not saved.
+    /// </summary>
+    public int? OutputTokenCap { get; }
+
     public ProviderCatalog Catalog { get; }
 
     public ThinkingSelection ThinkingEffort { get; }
@@ -261,6 +277,11 @@ public sealed record HarnessSettings
     {
         get
         {
+            if (OutputTokenCap is int cap)
+            {
+                return cap;
+            }
+
             var tokens = ContextAccountant.OutputTokens(
                 ContextWindow,
                 CompactionThreshold,
@@ -473,6 +494,13 @@ public sealed record HarnessSettings
     public HarnessSettings WithReservedOutputTokens(int? reservedOutputTokens) =>
         Copy(reservedOutputTokens: reservedOutputTokens, setReservedOutputTokens: true);
 
+    /// <summary>
+    /// Forces the output cap on a client built from the copy. The summary
+    /// client uses this because a chat request cannot carry its own cap.
+    /// </summary>
+    public HarnessSettings WithOutputTokenCap(int outputTokenCap) =>
+        Copy(outputTokenCap: outputTokenCap);
+
     public HarnessSettings WithShowAutomaticCompactionSummary(bool showAutomaticCompactionSummary) =>
         Copy(showAutomaticCompactionSummary: showAutomaticCompactionSummary);
 
@@ -647,7 +675,8 @@ public sealed record HarnessSettings
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
         int? reservedOutputTokens = null,
-        bool setReservedOutputTokens = false) =>
+        bool setReservedOutputTokens = false,
+        int? outputTokenCap = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -690,7 +719,8 @@ public sealed record HarnessSettings
             disabledBuiltInTools ?? DisabledBuiltInTools,
             tierSelections ?? TierSelections,
             speedSelections ?? SpeedSelections,
-            setReservedOutputTokens ? reservedOutputTokens : ReservedOutputTokens);
+            setReservedOutputTokens ? reservedOutputTokens : ReservedOutputTokens,
+            outputTokenCap ?? OutputTokenCap);
 
     public override string ToString() => nameof(HarnessSettings);
 

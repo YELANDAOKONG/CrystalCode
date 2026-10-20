@@ -731,7 +731,8 @@ saved. There is no migration tool.
 turn. Crystal `ChatRequest` has no model field; adapters bake the name
 and sampling into client options, so the session rebuilds
 `IStreamingChatClient`. A compaction model that is on keeps its own
-client; otherwise the summarizer uses the new session client. An
+client; otherwise the next summary opens a client for the new session
+model and puts the summary reply cap on it. An
 approval model that is on keeps its own Review client. The transcript
 stays the same conversation.
 
@@ -995,8 +996,10 @@ the usable window (context minus reserved output), the host:
    ceiling, at most `min(session model maxTokens, 16384)`, and never
    more than half the effective summary window, so the result lands
    below the ceiling that would trigger the next compaction. A model
-   without `maxTokens` may use 16384 when the window allows it. A
-   summary whose finish reason is `length` is not stored.
+   without `maxTokens` still sends that cap. The cap is fixed on the
+   summary client. Crystal's `ChatRequest` cannot lower one call, and
+   the session client keeps the turn cap. A summary whose finish reason
+   is `length` is not stored.
 3. Stops if the summary request itself cannot fit or the summarizer
    returns nothing and prune did not help. The turn does not retry
    compaction in a loop.
@@ -1021,14 +1024,17 @@ not summarize. Any other argument is rejected.
 `compactionModel` in `config.json` is `enabled`, `provider`, `model`,
 and optional `thinkingEffort`. An omitted object means off, and
 `enabled: false` keeps a stored provider, model, and gear unused.
-While off, the summary request uses the session client and omits
-reasoning. While on, the host opens a separate client and maps that
+While off, the summary request uses the session model and omits
+reasoning. It does not reuse the session client, because that client
+keeps the turn output cap. The host opens a summary client with the
+summary reply cap, and opens it again when the model, tier, speed, or
+cap changes. While on, the host opens a separate client and maps that
 model's gear the same way as the approval model: no thinking omits
 reasoning, `off` disables it when the model allows that, and `default`
 or an unsupported gear uses the provider default without changing the
 saved gear. Changing the session model does not replace that client.
-A side question that must summarize first opens its own compaction
-client and releases it; the answer still uses the session model.
+A side question that must summarize first opens its own summary client
+and releases it; the answer still uses the session model.
 The trigger, retained tail, and CTX percent stay on the session
 window. The summary prompt budget is the smaller of that window and
 the compaction model's declared window. A summary that cannot fit

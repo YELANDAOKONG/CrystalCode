@@ -17,12 +17,15 @@ internal sealed class ScriptedChatClientFactory : IChatClientFactory
 
     public int Creates { get; private set; }
 
+    public List<int?> OutputCaps { get; } = [];
+
     public bool CanCreate(ProviderProtocol protocol) =>
         protocol == ScriptedChatPlugin.Protocol;
 
     public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
     {
         Creates++;
+        OutputCaps.Add(settings.MaxOutputTokens);
         return _client;
     }
 }

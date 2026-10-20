@@ -27,6 +27,8 @@ internal sealed class ScriptedChatPlugin : IPlugin
 
     public int Creates => _factory.Creates;
 
+    public IReadOnlyList<int?> OutputCaps => _factory.OutputCaps;
+
     public string Name => "scripted";
 
     public PluginContribution Contribute() =>

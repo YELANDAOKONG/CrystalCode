@@ -1681,10 +1681,11 @@ compact ceiling, the host:
 
 1. Clears old tool results outside a protected recent band, when that
    frees enough tokens. A summary that stops because it reached its output
-   limit is not stored. The summary reply is capped at a quarter of the
-   ceiling, at most 16384 tokens or the session model's `maxTokens` when
-   that is smaller, and never more than half the summary window. The
-   verbatim tail is at most 32000 tokens.
+   limit is not stored. The summary call sends a reply cap of a quarter
+   of the ceiling, at most 16384 tokens or the session model's
+   `maxTokens` when that is smaller, and never more than half the
+   summary window. A model without `maxTokens` still sends that cap.
+   The verbatim tail is at most 32000 tokens.
 2. Asks the model for a structured summary of older turns (folding any
    previous summary) and keeps a recent tail verbatim.
 3. Stops if the summary cannot be produced and nothing else can be

@@ -113,11 +113,14 @@ public sealed record CompactionLimits
             MaxPreserveRecentTokens);
     }
 
-    public int SummaryPromptBudget()
+    /// <summary>
+    /// Output cap for the summary request. The prompt budget reserves the same
+    /// number, so the summary call fits its window and the stored summary stays
+    /// under the compact ceiling.
+    /// </summary>
+    public int SummaryOutputCap()
     {
-        var window = SummaryWindow is int declared
-            ? Math.Min(ContextWindow, declared)
-            : ContextWindow;
+        var window = EffectiveSummaryWindow();
         var output = Math.Min(MaxTokens ?? SummaryOutputTokens, SummaryOutputTokens);
         // A window smaller than the summary slot cannot reserve the whole slot
         // and still send the conversation. Leave at least half the window for the prompt.
@@ -129,7 +132,14 @@ public sealed record CompactionLimits
             Threshold,
             MaxTokens,
             ReservedOutputTokens);
-        output = Math.Min(output, Math.Max(1, ceiling / 4));
-        return Math.Max(1, window - output);
+        return Math.Min(output, Math.Max(1, ceiling / 4));
     }
+
+    public int SummaryPromptBudget() =>
+        Math.Max(1, EffectiveSummaryWindow() - SummaryOutputCap());
+
+    private int EffectiveSummaryWindow() =>
+        SummaryWindow is int declared
+            ? Math.Min(ContextWindow, declared)
+            : ContextWindow;
 }

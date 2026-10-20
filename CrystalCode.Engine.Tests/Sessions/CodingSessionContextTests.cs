@@ -2,6 +2,7 @@ using Crystal;
 using Crystal.Chat;
 
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
@@ -320,6 +321,9 @@ public sealed class CodingSessionContextTests
         using var headless = new HeadlessSession(new CompactingClient(), resume, settings: settings);
         await headless.Session.StartAsync(CancellationToken.None);
         await headless.RunTurnAsync("continue");
+        Assert.Equal(
+            new CompactionLimits(32_000).SummaryOutputCap(),
+            Assert.Single(headless.ChatPlugin.OutputCaps, cap => cap is not null));
         Assert.Equal(
             TurnStopReason.Completed,
             headless.Observer.Events.OfType<TurnFinished>().Single().Result.StopReason);

@@ -110,6 +110,13 @@ public sealed class DiskSettingsStoreTests
             "reservedOutputTokens",
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
+
+        store.Save(settings.WithOutputTokenCap(1500));
+        Assert.Null(store.Load().OutputTokenCap);
+        Assert.DoesNotContain(
+            "outputTokenCap",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
     }
 
     [Fact]
