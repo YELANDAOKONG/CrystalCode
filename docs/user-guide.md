@@ -1537,10 +1537,12 @@ replacements. They never replace Work, Plan, or Review.
   `~/.crystal/CLAUDE.md`, `~/.config/opencode/AGENTS.md`, and
   `~/.claude/CLAUDE.md` (`XDG_CONFIG_HOME` is honored for the
   OpenCode path).
-- Project: walk from the workspace up to the git root. The first
-  matching name wins (`AGENTS.md`, then `CLAUDE.md`, then
-  `CONTEXT.md`). Every file of that name on the walk is appended.
-  `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
+- Project: walk from the git root down to the workspace. Each
+  directory contributes at most one file, the first readable of
+  `AGENTS.md`, `CLAUDE.md`, then `CONTEXT.md`. Files are appended from
+  the outermost directory inward, so a later file is more specific.
+  The combined rule files stop at 32768 characters; a file that does
+  not fit is cut at a line break and a note says so.
 
 `ruleFiles` in `config.json` turns those compatible files on or off.
 `global` and `project` each default to on and are omitted until off.

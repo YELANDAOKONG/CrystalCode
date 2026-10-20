@@ -112,6 +112,84 @@ public sealed class InstructionDiscoveryTests
     }
 
     [Fact]
+    public void Collect_AppendsOutermostFileFirstSoTheClosestFileWins()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        Directory.CreateDirectory(Path.Combine(workspace.Path, ".git"));
+        var nested = Path.Combine(workspace.Path, "src");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "root rules");
+        File.WriteAllText(Path.Combine(nested, InstructionNames.Agents), "nested rules");
+        var discovery = InstructionDiscovery.Isolated(home.Home);
+
+        var text = string.Join("\n\n", discovery.Collect(nested));
+
+        var rootIndex = text.IndexOf("root rules", StringComparison.Ordinal);
+        var nestedIndex = text.IndexOf("nested rules", StringComparison.Ordinal);
+        Assert.True(rootIndex >= 0, "The root rule file was not collected.");
+        Assert.True(
+            nestedIndex > rootIndex,
+            "The closest rule file must come last so it is the most specific.");
+    }
+
+    [Fact]
+    public void Collect_TakesOneFilePerDirectory()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "root agents");
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Claude), "root claude");
+        var discovery = InstructionDiscovery.Isolated(home.Home);
+
+        var text = string.Join("\n\n", discovery.Collect(workspace.Path));
+
+        Assert.Contains("root agents", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("root claude", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Collect_UsesNestedClaudeWhenThatDirectoryHasNoAgents()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        Directory.CreateDirectory(Path.Combine(workspace.Path, ".git"));
+        var nested = Path.Combine(workspace.Path, "services");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), "root agents");
+        File.WriteAllText(Path.Combine(nested, InstructionNames.Claude), "nested claude");
+        var discovery = InstructionDiscovery.Isolated(home.Home);
+
+        var text = string.Join("\n\n", discovery.Collect(nested));
+
+        Assert.Contains("root agents", text, StringComparison.Ordinal);
+        Assert.Contains("nested claude", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Collect_StopsAtTheCharacterBudget()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        home.Home.EnsureCreated();
+        var line = new string('x', 99) + "\n";
+        var content = string.Concat(Enumerable.Repeat(line, InstructionDiscovery.MaxInstructionCharacters / 100 + 100));
+        File.WriteAllText(Path.Combine(workspace.Path, InstructionNames.Agents), content);
+        var discovery = InstructionDiscovery.Isolated(home.Home);
+
+        var parts = discovery.Collect(workspace.Path);
+        var text = string.Join("\n\n", parts);
+
+        Assert.Contains(InstructionDiscovery.TruncationNote, text, StringComparison.Ordinal);
+        Assert.True(
+            text.Length < InstructionDiscovery.MaxInstructionCharacters + 512,
+            "Rule files must stay inside the character budget.");
+    }
+
+    [Fact]
     public void Collect_SkipsUnreadableAgentsAndUsesClaude()
     {
         if (OperatingSystem.IsWindows())

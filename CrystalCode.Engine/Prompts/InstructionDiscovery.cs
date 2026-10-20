@@ -6,10 +6,22 @@ namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
 /// Finds OpenCode-style rule files and returns them as extra instructions.
-/// Files are combined. They never replace Work, Plan, or Review prompts.
+/// Files are combined from the outermost directory inward, one per directory,
+/// so the closest file is the most specific. They never replace Work, Plan,
+/// or Review prompts.
 /// </summary>
 public sealed class InstructionDiscovery
 {
+    /// <summary>
+    /// Budget for the combined rule files. Past this, later files are trimmed
+    /// or dropped and a note is appended, so one large file cannot crowd out
+    /// the conversation.
+    /// </summary>
+    public const int MaxInstructionCharacters = 32 * 1024;
+
+    public const string TruncationNote =
+        "Only the first 32768 characters of rule files were included; the rest was not sent to the model.";
+
     private static readonly string[] ProjectFileNames =
     [
         InstructionNames.Agents,
@@ -56,14 +68,21 @@ public sealed class InstructionDiscovery
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var rules = ruleFiles ?? RuleFileSettings.Default;
         var parts = new List<string>();
+        var remaining = MaxInstructionCharacters;
+        var truncated = false;
         if (rules.Global)
         {
-            AddFirstExisting(parts, GlobalCandidates());
+            AddFirstExisting(parts, GlobalCandidates(), ref remaining, ref truncated);
         }
 
         if (rules.Project)
         {
-            AddProjectFamily(parts, Path.GetFullPath(workspaceRoot));
+            AddProjectFamily(parts, Path.GetFullPath(workspaceRoot), ref remaining, ref truncated);
+        }
+
+        if (truncated)
+        {
+            parts.Add(TruncationNote);
         }
 
         return parts;
@@ -84,39 +103,52 @@ public sealed class InstructionDiscovery
         }
     }
 
-    private static void AddFirstExisting(List<string> parts, IEnumerable<string> candidates)
+    private static void AddFirstExisting(
+        List<string> parts,
+        IEnumerable<string> candidates,
+        ref int remaining,
+        ref bool truncated)
     {
         foreach (var path in candidates)
         {
-            if (TryAdd(parts, path))
+            if (remaining <= 0)
+            {
+                truncated = true;
+                return;
+            }
+
+            if (TryAdd(parts, path, ref remaining, ref truncated))
             {
                 return;
             }
         }
     }
 
-    private static void AddProjectFamily(List<string> parts, string workspaceRoot)
+    private static void AddProjectFamily(
+        List<string> parts,
+        string workspaceRoot,
+        ref int remaining,
+        ref bool truncated)
     {
-        var directories = EnumerateToGitRoot(workspaceRoot);
-        foreach (var fileName in ProjectFileNames)
+        foreach (var directory in EnumerateFromGitRoot(workspaceRoot))
         {
-            var added = false;
-            foreach (var directory in directories)
+            if (remaining <= 0)
             {
-                if (TryAdd(parts, Path.Combine(directory, fileName)))
+                truncated = true;
+                return;
+            }
+
+            foreach (var fileName in ProjectFileNames)
+            {
+                if (TryAdd(parts, Path.Combine(directory, fileName), ref remaining, ref truncated))
                 {
-                    added = true;
+                    break;
                 }
             }
-
-            if (added)
-            {
-                return;
-            }
         }
     }
 
-    private static IReadOnlyList<string> EnumerateToGitRoot(string start)
+    private static IReadOnlyList<string> EnumerateFromGitRoot(string start)
     {
         var directories = new List<string>();
         var gitRoot = GitRoot.Find(start);
@@ -138,26 +170,31 @@ public sealed class InstructionDiscovery
             current = parent.FullName;
         }
 
+        directories.Reverse();
         return directories;
     }
 
-    private static bool TryAdd(List<string> parts, string path)
+    private static bool TryAdd(
+        List<string> parts,
+        string path,
+        ref int remaining,
+        ref bool truncated)
     {
+        if (remaining <= 0)
+        {
+            truncated = true;
+            return false;
+        }
+
         if (!File.Exists(path))
         {
             return false;
         }
 
+        string text;
         try
         {
-            var text = File.ReadAllText(path).Trim();
-            if (text.Length == 0)
-            {
-                return false;
-            }
-
-            parts.Add("Instructions from: " + Path.GetFullPath(path) + "\n" + text);
-            return true;
+            text = File.ReadAllText(path).Trim();
         }
         catch (IOException)
         {
@@ -167,6 +204,26 @@ public sealed class InstructionDiscovery
         {
             return false;
         }
+
+        if (text.Length == 0)
+        {
+            return false;
+        }
+
+        if (text.Length > remaining)
+        {
+            var cut = text.LastIndexOf('\n', remaining - 1);
+            text = text[..(cut > 0 ? cut : remaining)];
+            remaining = 0;
+            truncated = true;
+        }
+        else
+        {
+            remaining -= text.Length;
+        }
+
+        parts.Add("Instructions from: " + Path.GetFullPath(path) + "\n" + text);
+        return true;
     }
 
     private static bool PathsEqual(string left, string right) =>

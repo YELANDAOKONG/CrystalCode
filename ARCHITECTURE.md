@@ -1298,10 +1298,12 @@ and never replace Work, Plan, or Review.
 - Global: first existing file among `~/.crystal/AGENTS.md`,
   `~/.crystal/CLAUDE.md`, `~/.config/opencode/AGENTS.md`, and
   `~/.claude/CLAUDE.md`.
-- Project: walk from the workspace up to the git root. The first
-  matching name wins (`AGENTS.md`, then `CLAUDE.md`, then
-  `CONTEXT.md`). Every file of that name on the walk is appended.
-  `CLAUDE.md` is used only when no `AGENTS.md` exists on the walk.
+- Project: walk from the git root down to the workspace. Each directory
+  contributes at most one file, the first readable of `AGENTS.md`,
+  `CLAUDE.md`, then `CONTEXT.md`. Files are appended from the outermost
+  directory inward, so the closest file is the most specific and comes
+  last. The combined rule files stop at 32768 characters; a file that
+  does not fit is cut at a line break and a note is appended.
 
 `config.json` field `ruleFiles` is an object with `global` and `project`.
 Each defaults to on. A missing object or member means on. The object is
