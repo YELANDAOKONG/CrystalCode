@@ -43,6 +43,8 @@ semantics. Do not copy its Demo UI into this product.
   `~/.crystal/prompts`, a selected prompt set, and `<workspace>/.crystal/prompts`.
   The file stems are `work`, `plan`, `review`, `review.user`, `topic`,
   `compaction.system`, `compaction.user`, `image.system`, and `image.user`.
+  Built-in child Agents add `agents/general`, `agents/work`, and `agents/plan`
+  under those same prompt, prompt-set, and prompt-attachment directories.
   `AGENTS.md` and
   `CLAUDE.md` are OpenCode-compatible instructions that append; they do
   not replace those prompts. Do not invent prompt file names beyond that list.

@@ -699,6 +699,42 @@ public sealed class PromptStoreTests
         Assert.Equal(WorkPrompt.Text, prompts.Work);
     }
 
+    [Fact]
+    public void Resolve_AgentPromptsAreIndependentOfWorkAndPlan()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var set = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(Path.Combine(set, "agents"), "general.md", "set general");
+        WritePrompt(Path.Combine(set, "agents"), "plan.md", "set plan");
+        WriteManifest(set, enabled: true);
+        WritePrompt(Path.Combine(home.Home.PromptsDirectory, "agents"), "general.md", "home general");
+        WritePrompt(home.Home.PromptsDirectory, "work.md", "home work");
+        WritePrompt(
+            Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "prompts", "agents"),
+            "work.md",
+            "project work agent");
+        var attachment = AttachmentDirectory(home.Home, "rules");
+        WritePrompt(Path.Combine(attachment, "agents"), "general.md", "attached general");
+        WritePrompt(attachment, "work.md", "attached work");
+        WriteManifest(attachment, enabled: true, order: 0);
+        var store = CreateStore(home);
+
+        var prompts = store.Resolve(workspace.Path).Prompts;
+        var context = PromptContext.InstructionsOnly(string.Empty);
+
+        Assert.Equal("home general", prompts.AgentGeneral);
+        Assert.Equal("project work agent", prompts.AgentWork);
+        Assert.Equal("set plan", prompts.AgentPlan);
+        Assert.Equal("home work", prompts.Work);
+        Assert.Equal(["attached general"], prompts.AgentGeneralAttachments);
+        Assert.Empty(prompts.AgentWorkAttachments);
+        Assert.Contains("attached general", prompts.ComposeAgentGeneral(context), StringComparison.Ordinal);
+        Assert.DoesNotContain("attached work", prompts.ComposeAgentGeneral(context), StringComparison.Ordinal);
+        Assert.DoesNotContain("home general", prompts.ComposeWork(context), StringComparison.Ordinal);
+        Assert.Contains("attached work", prompts.ComposeWork(context), StringComparison.Ordinal);
+    }
+
     private static void WritePrompt(string directory, string fileName, string text)
     {
         Directory.CreateDirectory(directory);

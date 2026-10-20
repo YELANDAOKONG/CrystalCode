@@ -371,10 +371,15 @@ submits text to a child. Headless JSON labels child events and media provenance;
 text output keeps the returned summary with the task result and reports child
 usage separately.
 
-Built-in child role prompts compose the resolved parent Work or Plan prompt,
-including active attachments and placeholder binding, before appending the
-built-in Agent safety/role rules. Custom Agent prompts remain independently
-configured and receive the common child safety rules and bound placeholders.
+Built-in child prompts are `agents/general`, `agents/work`, and `agents/plan`.
+They do not reuse the parent Work or Plan body or those attachments. `general`
+uses `agents/general`, and `agents/plan` when the parent turn is Plan. `work`
+uses `agents/work` and is not offered during a parent Plan turn. `explore`
+always uses `agents/plan`. Resolution
+follows the named-prompt order, then appends only that agent's attachments,
+then the built-in child safety and role lines. Custom Agent `prompt.md` files
+are not replaced or extended by prompt overlays, prompt sets, or prompt
+attachments. They still receive the child safety rules and bound placeholders.
 
 Approval is a `ToolInvocationPolicy` supplied to `ToolExecutor`. Rejection
 returns Harness-authored `ToolOutput`. Tool exceptions become model-visible
@@ -719,8 +724,9 @@ Prompt set selection and direct prompt overrides are separate features. A
 prompt set is a Home-only directory under `~/.crystal/promptsets/<name>` with
 `prompt.json` and any subset of the named prompt files (`work.md`,
 `plan.md`, `review.md`, `review.user.md`, `topic.md`,
-`compaction.system.md`, `compaction.user.md`, `image.system.md`, and
-`image.user.md`; `.txt` is also accepted). The host never scans a workspace for prompt sets.
+`compaction.system.md`, `compaction.user.md`, `image.system.md`,
+`image.user.md`, and `agents/general.md`, `agents/work.md`, and
+`agents/plan.md`; `.txt` is also accepted). The host never scans a workspace for prompt sets.
 `default` is a virtual, reserved selection backed by the built-in prompts. A
 missing or empty file in a selected set falls back to the built-in prompt for
 that name. Direct `prompts/work.md` overrides do not use `prompt.json`.
@@ -758,11 +764,12 @@ list|show|enable|disable` edits the same Home manifests outside a session.
 
 Prompt attachments append after the resolved Work, Plan, or Review text has
 been bound. The resolved text stays in place. Attachments are not prompt-set
-members. An attachment only appends Work, Plan, or Review. Topic, Review
+members. An attachment only appends Work, Plan, Review, or one built-in child prompt
+(`agents/general`, `agents/work`, `agents/plan`). Topic, Review
 user, compaction, and image description are replaced by named prompt files,
 not by attachments. Each attachment is a
-directory of `prompt.json` plus `work.md`, `plan.md`, and `review.md`
-files (`.txt` is also accepted). A missing file contributes nothing for that
+directory of `prompt.json` plus `work.md`, `plan.md`, `review.md`, and the
+`agents/` files (`.txt` is also accepted). A missing file contributes nothing for that
 mode. Empty files are missing. A trailing newline at the end of an
 attachment file is kept. Directory names use the same 1-64 character
 hyphenated form as prompt sets. `default` is a valid attachment name.
@@ -1230,6 +1237,9 @@ contents of `binaries/code/`.
   prompts/compaction.user.md
   prompts/image.system.md
   prompts/image.user.md
+  prompts/agents/general.md
+  prompts/agents/work.md
+  prompts/agents/plan.md
   promptsets/<name>/prompt.json
   promptsets/<name>/work.md
   promptsets/<name>/plan.md
@@ -1240,10 +1250,16 @@ contents of `binaries/code/`.
   promptsets/<name>/compaction.user.md
   promptsets/<name>/image.system.md
   promptsets/<name>/image.user.md
+  promptsets/<name>/agents/general.md
+  promptsets/<name>/agents/work.md
+  promptsets/<name>/agents/plan.md
   prompt-attachments/<name>/prompt.json
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
   prompt-attachments/<name>/review.md
+  prompt-attachments/<name>/agents/general.md
+  prompt-attachments/<name>/agents/work.md
+  prompt-attachments/<name>/agents/plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
@@ -1323,10 +1339,16 @@ Crystal skills, and tool sets of the same directory name):
   prompts/compaction.user.md
   prompts/image.system.md
   prompts/image.user.md
+  prompts/agents/general.md
+  prompts/agents/work.md
+  prompts/agents/plan.md
   prompt-attachments/<name>/prompt.json
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
   prompt-attachments/<name>/review.md
+  prompt-attachments/<name>/agents/general.md
+  prompt-attachments/<name>/agents/work.md
+  prompt-attachments/<name>/agents/plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json

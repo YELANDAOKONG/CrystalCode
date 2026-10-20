@@ -274,11 +274,16 @@ Custom definitions live in `~/.crystal/agents/<name>/` and
 `<workspace>/.crystal/agents/<name>/`, containing `agent.json` and `prompt.md`.
 `description` is required; `enabled` defaults false. A workspace entry replaces
 the entire Home entry, including when disabled or invalid. Built-in names are
-reserved. Built-in role prompts do not add prompt-overlay filenames. They start with the
-resolved Work prompt (`general` and `work`) or Plan prompt (`explore`, and any
-child created during a parent Plan turn), then append the built-in child role
-and safety rules. Prompt overrides, bindings, and the selected Work/Plan
-attachments therefore apply to built-ins as well as custom Agents.
+reserved. Built-in `general`, `work`, and `plan` prompts are separate from the
+parent Work and Plan prompts. Their files are `agents/general`, `agents/work`,
+and `agents/plan` under `prompts/`, a selected prompt set, and prompt
+attachments. `general` uses `agents/general`, and `agents/plan` when the parent turn is
+Plan. `work` uses `agents/work`; it is not offered during a parent Plan turn.
+`explore` always uses `agents/plan`. The same precedence applies: built-in text, the selected prompt
+set, Home `prompts/agents/`, then the project `prompts/agents/`. Attachments
+append only the matching `agents/` file. Custom Agent prompts are not affected
+by those overlays, sets, or attachments. They keep `prompt.md`, then the
+built-in child safety rules and bound placeholders.
 
 `/child` opens a filterable child picker, `/child <unique-id-prefix>` inspects
 one child, and `/child parent` returns. F7 opens the picker from either view;

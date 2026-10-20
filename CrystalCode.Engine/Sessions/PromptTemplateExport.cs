@@ -23,13 +23,17 @@ public static class PromptTemplateExport
             ("compaction.user.md", CompactionPrompt.UserTemplate),
             ("image.system.md", ImageDescriptionPrompt.SystemText),
             ("image.user.md", ImageDescriptionPrompt.UserTemplate),
-            ("placeholders.md", RenderPlaceholderGuide())
+            ("placeholders.md", RenderPlaceholderGuide()),
+            (Path.Combine(PromptNames.AgentsDirectory, "general.md"), AgentGeneralPrompt.Text),
+            (Path.Combine(PromptNames.AgentsDirectory, "work.md"), AgentWorkPrompt.Text),
+            (Path.Combine(PromptNames.AgentsDirectory, "plan.md"), AgentPlanPrompt.Text)
         };
 
         var written = new List<string>();
         foreach (var (name, text) in files)
         {
             var path = Path.Combine(directory, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, text, Encoding.UTF8);
             written.Add(path);
         }

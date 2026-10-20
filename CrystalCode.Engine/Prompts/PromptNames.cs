@@ -23,6 +23,21 @@ public static class PromptNames
 
     public const string ImageUser = "image.user";
 
+    public const string AgentsDirectory = "agents";
+
+    public const string AgentGeneral = "general";
+
+    public const string AgentWork = "work";
+
+    public const string AgentPlan = "plan";
+
+    public static IReadOnlyList<string> Agents { get; } =
+    [
+        AgentGeneral,
+        AgentWork,
+        AgentPlan
+    ];
+
     public static IReadOnlyList<string> Overlay { get; } =
     [
         Work,

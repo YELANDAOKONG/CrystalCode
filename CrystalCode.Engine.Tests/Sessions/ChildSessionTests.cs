@@ -7,6 +7,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -26,12 +27,12 @@ public sealed partial class ChildSessionTests
         new ChatCandidateCompleted(0, FinishReason.ToolCalls)];
 
     [Theory]
-    [InlineData("general", false, "work")]
+    [InlineData("general", false, "general")]
     [InlineData("explore", false, "plan")]
     [InlineData("work", false, "work")]
     [InlineData("general", true, "plan")]
     [InlineData("explore", true, "plan")]
-    public async Task BuiltInAgent_UsesResolvedOverridesAttachmentsAndChildPlaceholders(string agent, bool plan, string promptMode)
+    public async Task BuiltInAgent_UsesResolvedOverridesAttachmentsAndChildPlaceholders(string agent, bool plan, string promptName)
     {
         var arguments = JsonSerializer.Serialize(new { agent, label = "prompt test", prompt = "inspect" });
         using var session = new HeadlessSession(new ScriptedStreamingClient(
@@ -39,17 +40,32 @@ public sealed partial class ChildSessionTests
             prepare: (home, workspace) =>
             {
                 var projectPrompts = Path.Combine(workspace, ".crystal", "prompts");
-                Directory.CreateDirectory(home.PromptsDirectory);
-                Directory.CreateDirectory(projectPrompts);
+                var homeAgents = Path.Combine(home.PromptsDirectory, "agents");
+                var projectAgents = Path.Combine(projectPrompts, "agents");
+                Directory.CreateDirectory(homeAgents);
+                Directory.CreateDirectory(projectAgents);
                 var attachment = Path.Combine(home.PromptAttachmentsDirectory, "rules");
-                Directory.CreateDirectory(attachment);
+                var attachmentAgents = Path.Combine(attachment, "agents");
+                Directory.CreateDirectory(attachmentAgents);
                 File.WriteAllText(Path.Combine(attachment, "prompt.json"), "{\"enabled\":true}");
+                foreach (var name in new[] { "general", "work", "plan" })
+                {
+                    File.WriteAllText(Path.Combine(homeAgents, name + ".md"), "HOME AGENT " + name);
+                    File.WriteAllText(
+                        Path.Combine(projectAgents, name + ".md"),
+                        "PROJECT AGENT " + name + " {{session_id}} {{mode}}");
+                    File.WriteAllText(
+                        Path.Combine(attachmentAgents, name + ".md"),
+                        "ATTACHMENT AGENT " + name + " {{session_id}}");
+                }
+
                 foreach (var mode in new[] { "work", "plan" })
                 {
-                    File.WriteAllText(Path.Combine(home.PromptsDirectory, mode + ".md"), "HOME OVERRIDE " + mode);
-                    File.WriteAllText(Path.Combine(projectPrompts, mode + ".md"), "PROJECT OVERRIDE " + mode + " {{session_id}} {{mode}}");
-                    File.WriteAllText(Path.Combine(attachment, mode + ".md"), "ATTACHMENT " + mode + " {{session_id}}");
+                    File.WriteAllText(Path.Combine(home.PromptsDirectory, mode + ".md"), "PARENT OVERRIDE " + mode);
+                    File.WriteAllText(Path.Combine(projectPrompts, mode + ".md"), "PARENT PROJECT " + mode);
+                    File.WriteAllText(Path.Combine(attachment, mode + ".md"), "PARENT ATTACHMENT " + mode);
                 }
+
                 File.WriteAllText(Path.Combine(workspace, "AGENTS.md"), "WORKSPACE RULE");
             });
         await session.Session.StartAsync(CancellationToken.None);
@@ -60,13 +76,52 @@ public sealed partial class ChildSessionTests
         await session.RunTurnAsync("delegate");
         var child = Assert.Single(session.ReadSaved().Children);
         var system = Assert.Single(child.Items, item => item.Role == "system").Text!;
-        Assert.Contains("PROJECT OVERRIDE " + promptMode, system, StringComparison.Ordinal);
-        Assert.Contains("ATTACHMENT " + promptMode + " " + child.Id, system, StringComparison.Ordinal);
+        Assert.Contains("PROJECT AGENT " + promptName, system, StringComparison.Ordinal);
+        Assert.Contains("ATTACHMENT AGENT " + promptName + " " + child.Id, system, StringComparison.Ordinal);
         Assert.Contains("WORKSPACE RULE", system, StringComparison.Ordinal);
         Assert.Contains("You are a child Agent", system, StringComparison.Ordinal);
-        Assert.DoesNotContain("HOME OVERRIDE", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("HOME AGENT", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("PARENT OVERRIDE", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("PARENT PROJECT", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("PARENT ATTACHMENT", system, StringComparison.Ordinal);
         Assert.DoesNotContain("{{session_id}}", system, StringComparison.Ordinal);
         Assert.DoesNotContain("{{mode}}", system, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CustomAgent_IgnoresPromptOverlaysSetsAndAttachments()
+    {
+        var arguments = JsonSerializer.Serialize(new { agent = "reviewer", label = "custom", prompt = "inspect" });
+        using var session = new HeadlessSession(new ScriptedStreamingClient(
+            Tool("task", arguments), Text("child"), Text("parent")), settings: Settings(),
+            prepare: (home, workspace) =>
+            {
+                var agentDirectory = Path.Combine(home.Root, "agents", "reviewer");
+                Directory.CreateDirectory(agentDirectory);
+                File.WriteAllText(
+                    Path.Combine(agentDirectory, "agent.json"),
+                    "{\"description\":\"Custom reviewer.\",\"enabled\":true}");
+                File.WriteAllText(Path.Combine(agentDirectory, "prompt.md"), "CUSTOM ROLE {{session_id}}");
+                var projectAgents = Path.Combine(workspace, ".crystal", "prompts", "agents");
+                Directory.CreateDirectory(projectAgents);
+                File.WriteAllText(Path.Combine(projectAgents, "general.md"), "PROJECT AGENT general");
+                Directory.CreateDirectory(home.PromptsDirectory);
+                File.WriteAllText(Path.Combine(home.PromptsDirectory, "work.md"), "PARENT WORK");
+                var attachment = Path.Combine(home.PromptAttachmentsDirectory, "rules");
+                Directory.CreateDirectory(Path.Combine(attachment, "agents"));
+                File.WriteAllText(Path.Combine(attachment, "prompt.json"), "{\"enabled\":true}");
+                File.WriteAllText(Path.Combine(attachment, "agents", "general.md"), "ATTACHMENT AGENT general");
+            });
+        await session.Session.StartAsync(CancellationToken.None);
+        await session.RunTurnAsync("delegate");
+        var child = Assert.Single(session.ReadSaved().Children);
+        var system = Assert.Single(child.Items, item => item.Role == "system").Text!;
+        Assert.Contains("CUSTOM ROLE " + child.Id, system, StringComparison.Ordinal);
+        Assert.Contains("You are a child Agent", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("PROJECT AGENT", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("ATTACHMENT AGENT", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("PARENT WORK", system, StringComparison.Ordinal);
+        Assert.DoesNotContain(AgentGeneralPrompt.Text, system, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -20,7 +20,13 @@ public sealed record PromptSet
         string? compactionSystem = null,
         string? compactionUser = null,
         string? imageSystem = null,
-        string? imageUser = null)
+        string? imageUser = null,
+        string? agentGeneral = null,
+        string? agentWork = null,
+        string? agentPlan = null,
+        IReadOnlyList<string>? agentGeneralAttachments = null,
+        IReadOnlyList<string>? agentWorkAttachments = null,
+        IReadOnlyList<string>? agentPlanAttachments = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(work);
         ArgumentException.ThrowIfNullOrWhiteSpace(plan);
@@ -40,6 +46,12 @@ public sealed record PromptSet
         CompactionUser = TextOrBuiltIn(compactionUser, CompactionPrompt.UserTemplate);
         ImageSystem = TextOrBuiltIn(imageSystem, ImageDescriptionPrompt.SystemText);
         ImageUser = TextOrBuiltIn(imageUser, ImageDescriptionPrompt.UserTemplate);
+        AgentGeneral = TextOrBuiltIn(agentGeneral, AgentGeneralPrompt.Text);
+        AgentWork = TextOrBuiltIn(agentWork, AgentWorkPrompt.Text);
+        AgentPlan = TextOrBuiltIn(agentPlan, AgentPlanPrompt.Text);
+        AgentGeneralAttachments = CopyAttachments(agentGeneralAttachments);
+        AgentWorkAttachments = CopyAttachments(agentWorkAttachments);
+        AgentPlanAttachments = CopyAttachments(agentPlanAttachments);
     }
 
     public string Work { get; }
@@ -68,6 +80,18 @@ public sealed record PromptSet
 
     public string ImageUser { get; }
 
+    public string AgentGeneral { get; }
+
+    public string AgentWork { get; }
+
+    public string AgentPlan { get; }
+
+    public IReadOnlyList<string> AgentGeneralAttachments { get; }
+
+    public IReadOnlyList<string> AgentWorkAttachments { get; }
+
+    public IReadOnlyList<string> AgentPlanAttachments { get; }
+
     public string WorkSystem =>
         ComposeWork(PromptContext.InstructionsOnly(Instructions));
 
@@ -85,6 +109,27 @@ public sealed record PromptSet
 
     public string ComposeReview(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
         AppendAttachments(PromptBinder.Apply(Review, context, placeholders), ReviewAttachments, context, placeholders);
+
+    public string ComposeAgentGeneral(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        AppendAttachments(
+            PromptBinder.Apply(AgentGeneral, context, placeholders),
+            AgentGeneralAttachments,
+            context,
+            placeholders);
+
+    public string ComposeAgentWork(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        AppendAttachments(
+            PromptBinder.Apply(AgentWork, context, placeholders),
+            AgentWorkAttachments,
+            context,
+            placeholders);
+
+    public string ComposeAgentPlan(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        AppendAttachments(
+            PromptBinder.Apply(AgentPlan, context, placeholders),
+            AgentPlanAttachments,
+            context,
+            placeholders);
 
     public override string ToString() => nameof(PromptSet);
 

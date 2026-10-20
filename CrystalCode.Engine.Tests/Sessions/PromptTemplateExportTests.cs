@@ -16,7 +16,7 @@ public sealed class PromptTemplateExportTests
 
         var written = PromptTemplateExport.Write(directory);
 
-        Assert.Equal(10, written.Count);
+        Assert.Equal(13, written.Count);
         var work = File.ReadAllText(Path.Combine(directory, "work.md"));
         Assert.Contains("{{env}}", work, StringComparison.Ordinal);
         Assert.Equal(WorkPrompt.Text, work);
@@ -28,5 +28,14 @@ public sealed class PromptTemplateExportTests
             Assert.Contains("{{" + name + "}}", guide, StringComparison.Ordinal);
         }
         Assert.Contains("New conversation", File.ReadAllText(Path.Combine(directory, "topic.md")), StringComparison.Ordinal);
+        Assert.Equal(
+            AgentGeneralPrompt.Text,
+            File.ReadAllText(Path.Combine(directory, "agents", "general.md")));
+        Assert.Equal(
+            AgentWorkPrompt.Text,
+            File.ReadAllText(Path.Combine(directory, "agents", "work.md")));
+        Assert.Equal(
+            AgentPlanPrompt.Text,
+            File.ReadAllText(Path.Combine(directory, "agents", "plan.md")));
     }
 }

@@ -133,6 +133,21 @@ public sealed class PromptStore
             ImageDescriptionPrompt.UserTemplate,
             selection.Selected,
             project);
+        var agentGeneral = ResolveAgent(
+            PromptNames.AgentGeneral,
+            AgentGeneralPrompt.Text,
+            selection.Selected,
+            project);
+        var agentWork = ResolveAgent(
+            PromptNames.AgentWork,
+            AgentWorkPrompt.Text,
+            selection.Selected,
+            project);
+        var agentPlan = ResolveAgent(
+            PromptNames.AgentPlan,
+            AgentPlanPrompt.Text,
+            selection.Selected,
+            project);
         var attachments = new PromptAttachmentDiscovery().Collect(_home, project, notes);
         var enabled = ResolveAttachments(
             attachments,
@@ -153,7 +168,13 @@ public sealed class PromptStore
                 compactionSystem.Text,
                 compactionUser.Text,
                 imageSystem.Text,
-                imageUser.Text),
+                imageUser.Text,
+                agentGeneral.Text,
+                agentWork.Text,
+                agentPlan.Text,
+                enabled.AgentGeneral,
+                enabled.AgentWork,
+                enabled.AgentPlan),
             selection.Effective,
             catalog.Names,
             work.Source,
@@ -187,6 +208,38 @@ public sealed class PromptStore
         }
 
         var fromProject = PromptFiles.ReadNamed(project.PromptsDirectory, name);
+        if (fromProject is not null)
+        {
+            text = fromProject;
+            source = PromptSource.ProjectOverride;
+        }
+
+        return (text, source);
+    }
+
+    private (string Text, PromptSource Source) ResolveAgent(
+        string name,
+        string builtIn,
+        PromptSetDefinition? selected,
+        CrystalHome project)
+    {
+        var text = builtIn;
+        var source = PromptSource.BuiltIn;
+        var fromSet = selected is null ? null : PromptFiles.ReadAgent(selected.Directory, name);
+        if (fromSet is not null)
+        {
+            text = fromSet;
+            source = PromptSource.PromptSet;
+        }
+
+        var fromHome = PromptFiles.ReadAgent(_home.PromptsDirectory, name);
+        if (fromHome is not null)
+        {
+            text = fromHome;
+            source = PromptSource.HomeOverride;
+        }
+
+        var fromProject = PromptFiles.ReadAgent(project.PromptsDirectory, name);
         if (fromProject is not null)
         {
             text = fromProject;
@@ -320,11 +373,17 @@ public sealed class PromptStore
         var work = new List<string>();
         var plan = new List<string>();
         var review = new List<string>();
+        var agentGeneral = new List<string>();
+        var agentWork = new List<string>();
+        var agentPlan = new List<string>();
         foreach (var definition in active)
         {
             AddNamed(work, definition.Directory, PromptNames.Work);
             AddNamed(plan, definition.Directory, PromptNames.Plan);
             AddNamed(review, definition.Directory, PromptNames.Review);
+            AddAgent(agentGeneral, definition.Directory, PromptNames.AgentGeneral);
+            AddAgent(agentWork, definition.Directory, PromptNames.AgentWork);
+            AddAgent(agentPlan, definition.Directory, PromptNames.AgentPlan);
         }
 
         var activeNames = new HashSet<string>(active.Select(item => item.Name), StringComparer.Ordinal);
@@ -344,7 +403,7 @@ public sealed class PromptStore
             entries.Add(Entry(definition, effective: false));
         }
 
-        return new AttachmentSelection(work, plan, review, entries);
+        return new AttachmentSelection(work, plan, review, agentGeneral, agentWork, agentPlan, entries);
     }
 
     private static PromptAttachmentEntry Entry(PromptAttachmentDefinition definition, bool effective) =>
@@ -360,6 +419,15 @@ public sealed class PromptStore
     private static void AddNamed(List<string> parts, string directory, string name)
     {
         var text = PromptFiles.ReadAttachment(directory, name);
+        if (text is not null)
+        {
+            parts.Add(text);
+        }
+    }
+
+    private static void AddAgent(List<string> parts, string directory, string name)
+    {
+        var text = PromptFiles.ReadAgentAttachment(directory, name);
         if (text is not null)
         {
             parts.Add(text);
@@ -446,5 +514,8 @@ public sealed class PromptStore
         IReadOnlyList<string> Work,
         IReadOnlyList<string> Plan,
         IReadOnlyList<string> Review,
+        IReadOnlyList<string> AgentGeneral,
+        IReadOnlyList<string> AgentWork,
+        IReadOnlyList<string> AgentPlan,
         IReadOnlyList<PromptAttachmentEntry> Entries);
 }

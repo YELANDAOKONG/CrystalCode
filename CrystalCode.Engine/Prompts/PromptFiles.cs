@@ -10,6 +10,12 @@ internal static class PromptFiles
     public static string? ReadAttachment(string directory, string name) =>
         ReadNamed(directory, name, keepTrailingNewlines: true);
 
+    public static string? ReadAgent(string directory, string name) =>
+        ReadNamed(Path.Combine(directory, PromptNames.AgentsDirectory), name);
+
+    public static string? ReadAgentAttachment(string directory, string name) =>
+        ReadAttachment(Path.Combine(directory, PromptNames.AgentsDirectory), name);
+
     public static bool TryRead(string path, out string text) =>
         TryRead(path, keepTrailingNewlines: false, out text);
 

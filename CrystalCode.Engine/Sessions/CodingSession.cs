@@ -351,9 +351,13 @@ public sealed class CodingSession : ITurnObserver
             var facts = PromptContext.Create(_workspace.Root, selectedModel.Provider.Value, selectedModel.Model,
                 childPlan ? "plan" : "work", skills, _prompts.Instructions,
                 sessionId: child.Id, approval: _approval.Value, directories: directories);
-            var system = definition.ManifestPath is null
-                ? childPlan ? _prompts.ComposePlan(facts, _placeholders) : _prompts.ComposeWork(facts, _placeholders)
-                : string.Empty;
+            var system = definition.ManifestPath is not null
+                ? string.Empty
+                : childPlan
+                    ? _prompts.ComposeAgentPlan(facts, _placeholders)
+                    : agent == "work"
+                        ? _prompts.ComposeAgentWork(facts, _placeholders)
+                        : _prompts.ComposeAgentGeneral(facts, _placeholders);
             system += "\n\n" + AgentPrompt.Rules + "\n\n" + PromptBinder.Apply(child.SystemPrompt, facts, _placeholders)
                 + "\n\n" + facts.EnvironmentBlock
                 + "\n\nParent mode: " + (EffectiveChildPlanMode ? "Plan. Inspect and report only." : "Work.")

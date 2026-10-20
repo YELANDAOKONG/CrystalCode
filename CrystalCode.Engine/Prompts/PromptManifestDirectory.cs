@@ -29,13 +29,27 @@ internal static class PromptManifestDirectory
     public static bool HasPrompt(string directory) =>
         PromptFiles.ReadNamed(directory, PromptNames.Work) is not null
         || PromptFiles.ReadNamed(directory, PromptNames.Plan) is not null
-        || PromptFiles.ReadNamed(directory, PromptNames.Review) is not null;
+        || PromptFiles.ReadNamed(directory, PromptNames.Review) is not null
+        || HasAgentPrompt(directory);
 
     public static bool HasNamedPrompt(string directory)
     {
         foreach (var name in PromptNames.Overlay)
         {
             if (PromptFiles.ReadNamed(directory, name) is not null)
+            {
+                return true;
+            }
+        }
+
+        return HasAgentPrompt(directory);
+    }
+
+    public static bool HasAgentPrompt(string directory)
+    {
+        foreach (var name in PromptNames.Agents)
+        {
+            if (PromptFiles.ReadAgent(directory, name) is not null)
             {
                 return true;
             }

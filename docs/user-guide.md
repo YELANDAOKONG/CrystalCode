@@ -1385,8 +1385,9 @@ by placing files under `~/.crystal/prompts` and
 `<workspace>/.crystal/prompts`.
 
 Named files (`work.md`, `plan.md`, `review.md`, `review.user.md`, `topic.md`,
-`compaction.system.md`, `compaction.user.md`, `image.system.md`, and
-`image.user.md`; `.txt` is also accepted):
+`compaction.system.md`, `compaction.user.md`, `image.system.md`,
+`image.user.md`, and `agents/general.md`, `agents/work.md`, and
+`agents/plan.md`; `.txt` is also accepted):
 
 - Within direct overrides, the Home file is applied before the project file.
 - A project file replaces the home file for that name.
@@ -1429,11 +1430,12 @@ Older `promptSet` and `promptAttachments` values in `config.json` are ignored.
 The next preference save omits them. There is no migration tool. Add
 `prompt.json` to each directory you still want.
 
-Prompt attachments append after the resolved Work, Plan, or Review text.
+Prompt attachments append after the resolved Work, Plan, Review, or built-in
+child prompt (`agents/general`, `agents/work`, `agents/plan`).
 An attachment does not replace topic, Review user, compaction, or image
 description. Each attachment is a directory
-with `prompt.json` and any of `work.md`, `plan.md`, and `review.md` (`.txt`
-is also accepted). A mode with no file gets nothing from that attachment.
+with `prompt.json` and any of `work.md`, `plan.md`, `review.md`, and the
+`agents/` files (`.txt` is also accepted). A mode with no file gets nothing from that attachment.
 Empty files are treated as missing. A trailing newline at the end of an
 attachment file is kept. Directory names are 1-64 lowercase
 alphanumeric words joined by single hyphens. `default` is allowed.
@@ -1760,6 +1762,10 @@ Override with `CRYSTAL_HOME` or `--home`.
     compaction.user.md
     image.system.md
     image.user.md
+    agents/
+      general.md
+      work.md
+      plan.md
   promptsets/
     concise/
       prompt.json
@@ -1772,12 +1778,20 @@ Override with `CRYSTAL_HOME` or `--home`.
       compaction.user.md
       image.system.md
       image.user.md
+      agents/
+        general.md
+        work.md
+        plan.md
   prompt-attachments/
     <name>/
       prompt.json
       work.md
       plan.md
       review.md
+      agents/
+        general.md
+        work.md
+        plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
@@ -1804,12 +1818,20 @@ sets, and plugins of the same directory name win over home):
     compaction.user.md
     image.system.md
     image.user.md
+    agents/
+      general.md
+      work.md
+      plan.md
   prompt-attachments/
     <name>/
       prompt.json
       work.md
       plan.md
       review.md
+      agents/
+        general.md
+        work.md
+        plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
