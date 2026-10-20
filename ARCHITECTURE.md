@@ -2084,7 +2084,10 @@ those modes about once a second. On Windows it also puts VT input back and
 turns quick edit and native mouse input off, then restores the console
 input mode captured at entry when the screen closes. The next refresh puts
 the wheel back if the console host cleared it. A wheel report scrolls the transcript and is
-drained without waiting; other mouse reports are swallowed. The wheel is
+drained without waiting; other mouse reports are swallowed. Unix ReadKey
+reports an X10 click (`ESC [ M` plus three bytes) as F1 followed by those
+bytes; that burst is still a mouse report and is not composer text. A lone
+F1 is held briefly so a split payload stays with the prefix. The wheel is
 never converted to Up/Down, so plain Up/Down stay with the composer, prompt
 history, or the active selection. Terminal text selection needs Shift
 (Option or Fn on some macOS terminals) while mouse reporting is on, and the

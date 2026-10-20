@@ -48,6 +48,21 @@ public sealed class KeyBurstTests
     }
 
     [Fact]
+    public void NeedsEscapeHold_LoneF1WaitsForX10Payload()
+    {
+        var lone = new List<ConsoleKeyInfo>
+        {
+            new('\0', ConsoleKey.F1, false, false, false)
+        };
+
+        Assert.True(KeyBurst.NeedsEscapeHold(lone, moreAvailable: false));
+        Assert.False(KeyBurst.NeedsEscapeHold(lone, moreAvailable: true));
+
+        lone.Add(new(' ', ConsoleKey.Spacebar, false, false, false));
+        Assert.False(KeyBurst.NeedsEscapeHold(lone, moreAvailable: false));
+    }
+
+    [Fact]
     public async Task ReadAsync_CompleteSgrDoesNotHold()
     {
         var keys = new Queue<ConsoleKeyInfo>(Csi("\u001b[<64;12;8M"));

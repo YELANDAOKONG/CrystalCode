@@ -93,6 +93,61 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_DotNetX10LeftAndRightClicks_AreNotComposerText()
+    {
+        var decoder = new InputDecoder();
+        Assert.Empty(decoder.Push(DotNetX10(' ', ConsoleKey.Spacebar, '!', '!')));
+        Assert.Empty(decoder.Push(DotNetX10(
+            '"',
+            default,
+            'A',
+            ConsoleKey.A,
+            'B',
+            ConsoleKey.B)));
+        Assert.Empty(decoder.Push(DotNetX10('#', '!', '!')));
+
+        var pressAndRelease = DotNetX10(' ', ConsoleKey.Spacebar, '!', '!');
+        pressAndRelease.AddRange(DotNetX10('"', '!', '!'));
+        Assert.Empty(decoder.Push(pressAndRelease));
+    }
+
+    [Fact]
+    public void Push_DotNetX10Wheel_StillScrolls()
+    {
+        AssertWheel(new InputDecoder().Push(DotNetX10('`', '!', '!')), InputWheel.LineStep);
+        AssertWheel(
+            new InputDecoder().Push(DotNetX10('a', ConsoleKey.A, '!', '!')),
+            -InputWheel.LineStep);
+    }
+
+    [Fact]
+    public void Push_F1ThatIsNotX10_StaysAKey()
+    {
+        var lone = new InputDecoder().Push(
+            [new ConsoleKeyInfo('\0', ConsoleKey.F1, false, false, false)]);
+        Assert.Equal(ConsoleKey.F1, Assert.IsType<InputKey>(Assert.Single(lone)).Key);
+
+        var typed = new InputDecoder().Push(
+        [
+            new ConsoleKeyInfo('\0', ConsoleKey.F1, false, false, false),
+            new ConsoleKeyInfo('A', ConsoleKey.A, true, false, false),
+            new ConsoleKeyInfo('B', ConsoleKey.B, true, false, false),
+            new ConsoleKeyInfo('C', ConsoleKey.C, true, false, false)
+        ]);
+        Assert.Equal(4, typed.Count);
+        Assert.Equal(ConsoleKey.F1, Assert.IsType<InputKey>(typed[0]).Key);
+        Assert.Equal('A', Assert.IsType<InputKey>(typed[1]).KeyChar);
+    }
+
+    [Fact]
+    public void Push_OrphanX10Click_IsNotComposerText()
+    {
+        Assert.Empty(new InputDecoder().Push(WindowsVt("[M !!")));
+        Assert.Empty(new InputDecoder().Push(WindowsVt("[M\"!!")));
+        AssertPaste(new InputDecoder().Push(WindowsVt("[More]")), "[More]");
+    }
+
+    [Fact]
     public void Push_RepeatedArrowsRemainKeysOnEveryPlatform()
     {
         var payload = "\u001b[A\u001b[A\u001b[A";
@@ -388,6 +443,30 @@ public sealed class InputDecoderTests
             Assert.Equal(ConsoleKey.UpArrow, Assert.IsType<InputKey>(item).Key);
         }
     }
+
+    private static List<ConsoleKeyInfo> DotNetX10(char button, char x, char y) =>
+        DotNetX10(button, default, x, default, y, default);
+
+    private static List<ConsoleKeyInfo> DotNetX10(
+        char button,
+        ConsoleKey buttonKey,
+        char x,
+        char y) =>
+        DotNetX10(button, buttonKey, x, default, y, default);
+
+    private static List<ConsoleKeyInfo> DotNetX10(
+        char button,
+        ConsoleKey buttonKey,
+        char x,
+        ConsoleKey xKey,
+        char y,
+        ConsoleKey yKey) =>
+    [
+        new('\0', ConsoleKey.F1, false, false, false),
+        new(button, buttonKey, false, false, false),
+        new(x, xKey, x is >= 'A' and <= 'Z', false, false),
+        new(y, yKey, y is >= 'A' and <= 'Z', false, false)
+    ];
 
     private static List<ConsoleKeyInfo> Linux(params ConsoleKeyInfo[] keys) => [.. keys];
 

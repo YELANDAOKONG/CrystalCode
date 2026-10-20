@@ -16,6 +16,11 @@ public sealed class InputDecoder
     private const int WheelButtonBit = 64;
     private const int HorizontalWheelBit = 2;
     private const int WheelDownBit = 1;
+    private const int X10Offset = 32;
+    private const int X10MotionBit = 32;
+    private const int X10PayloadLength = 3;
+    private const int X10SequenceLength = 6;
+    private const char X10CoordMin = ' ';
 
     private readonly StringBuilder _held = new();
     private readonly StringBuilder _paste = new();
@@ -36,6 +41,13 @@ public sealed class InputDecoder
         if (burst.Count == 0 && _held.Length == 0 && !_pasteOpen)
         {
             return [];
+        }
+
+        var source = OmitDotNetX10(burst, out var leading);
+        if (leading is not null)
+        {
+            leading.AddRange(Push(source));
+            return leading;
         }
 
         if (!_pasteOpen && _held.Length == 0 && burst.Count >= 2)
@@ -288,33 +300,126 @@ public sealed class InputDecoder
             return true;
         }
 
-        if (!pressed || (button & (WheelButtonBit | HorizontalWheelBit)) != WheelButtonBit)
+        if (pressed)
         {
-            return true;
+            AppendVerticalWheel(button, events);
         }
 
-        var delta = (button & WheelDownBit) == 0 ? InputWheel.LineStep : -InputWheel.LineStep;
-        events.Add(new InputWheel(delta));
         return true;
     }
 
     private static bool TryConsumeX10(string text, ref int index, List<IInputEvent> events)
     {
-        if (index + 5 >= text.Length)
+        if (index + X10SequenceLength > text.Length)
         {
             return false;
         }
 
-        var button = text[index + 3] - 32;
-        index += 6;
+        var button = text[index + 3] - X10Offset;
+        index += X10SequenceLength;
+        AppendVerticalWheel(button, events);
+        return true;
+    }
+
+    /// <summary>
+    /// Unix ReadKey maps the X10 prefix ESC [ M to F1 and leaves the three
+    /// payload bytes. Terminals that ignore SGR (1006) send clicks that way,
+    /// and those bytes would otherwise land in the composer as ASCII.
+    /// </summary>
+    private static IReadOnlyList<ConsoleKeyInfo> OmitDotNetX10(
+        IReadOnlyList<ConsoleKeyInfo> burst,
+        out List<IInputEvent>? wheels)
+    {
+        wheels = null;
+        for (var i = 0; i < burst.Count; i++)
+        {
+            if (IsDotNetX10Intro(burst[i]) && TryX10Button(burst, i + 1, out _))
+            {
+                wheels = [];
+                break;
+            }
+        }
+
+        if (wheels is null)
+        {
+            return burst;
+        }
+
+        var kept = new List<ConsoleKeyInfo>(burst.Count);
+        for (var i = 0; i < burst.Count; i++)
+        {
+            if (IsDotNetX10Intro(burst[i]) && TryX10Button(burst, i + 1, out var button))
+            {
+                AppendVerticalWheel(button, wheels);
+                i += X10PayloadLength;
+                continue;
+            }
+
+            kept.Add(burst[i]);
+        }
+
+        return kept;
+    }
+
+    private static bool IsDotNetX10Intro(ConsoleKeyInfo key) =>
+        key.Key == ConsoleKey.F1
+        && key.KeyChar == '\0'
+        && key.Modifiers == ConsoleModifiers.None;
+
+    private static bool TryX10Button(
+        IReadOnlyList<ConsoleKeyInfo> burst,
+        int index,
+        out int button)
+    {
+        button = 0;
+        if (index < 0 || index + X10PayloadLength > burst.Count)
+        {
+            return false;
+        }
+
+        var cb = burst[index].KeyChar;
+        var cx = burst[index + 1].KeyChar;
+        var cy = burst[index + 2].KeyChar;
+        if (!IsX10Payload(cb, cx, cy))
+        {
+            return false;
+        }
+
+        button = cb - X10Offset;
+        return true;
+    }
+
+    private static bool IsX10Payload(char cb, char cx, char cy)
+    {
+        if (cb < X10CoordMin || cx < X10CoordMin || cy < X10CoordMin)
+        {
+            return false;
+        }
+
+        var button = cb - X10Offset;
+        if ((button & ~127) != 0 || (button & X10MotionBit) != 0)
+        {
+            return false;
+        }
+
+        var low = button & 3;
+        if ((button & WheelButtonBit) != 0)
+        {
+            return low <= HorizontalWheelBit;
+        }
+
+        return button < X10MotionBit;
+    }
+
+    private static void AppendVerticalWheel(int button, List<IInputEvent> events)
+    {
         if ((button & (WheelButtonBit | HorizontalWheelBit)) != WheelButtonBit)
         {
-            return true;
+            return;
         }
 
         var delta = (button & WheelDownBit) == 0 ? InputWheel.LineStep : -InputWheel.LineStep;
         events.Add(new InputWheel(delta));
-        return true;
     }
 
     private static bool TryMapCsi(string body, char final, out IInputEvent mapped)
@@ -582,6 +687,21 @@ public sealed class InputDecoder
         if (text[cursor] == '<')
         {
             return TrySkipDelimited(text, cursor + 1, "Mm", requireSeparator: true, ref index);
+        }
+
+        if (text[cursor] == 'M')
+        {
+            if (cursor + X10PayloadLength >= text.Length
+                || !IsX10Payload(
+                    text[cursor + 1],
+                    text[cursor + 2],
+                    text[cursor + 3]))
+            {
+                return false;
+            }
+
+            index = cursor + 1 + X10PayloadLength;
+            return true;
         }
 
         if (text[cursor] == '?')
