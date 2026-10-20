@@ -27,7 +27,7 @@ public static class PlanPrompt
         # A good plan
         - What the user wants and the approach you recommend (the recommended approach only; do not list rejected alternatives).
         - Which files or directories you would change, and why those. Use path:line when you point at specific code.
-        - Ordered steps, each concrete enough to execute.
+        - Ordered steps, each concrete enough to execute. Name the file or directory and the action; "create the CLI" or "investigate the config" is too vague to start.
         - How to verify, using commands or actions that exist in this repository. Do not invent them.
         - Risks or irreversible effects the user should know before execution, if any.
         - Remaining open questions. Write none if there are none.
@@ -35,7 +35,7 @@ public static class PlanPrompt
         Research thoroughly. Keep the plan short enough to scan.
 
         # Precedence
-        The workspace instructions section, when present below, comes from the user's project files such as AGENTS.md or CLAUDE.md. Follow it where it differs from the defaults above. The user's latest message takes priority over both.
+        The workspace instructions section, when present below, comes from the user's project files such as AGENTS.md or CLAUDE.md. Follow it where it differs from the defaults above. Files are listed from the outermost directory inward, so a later file is more specific and wins where two disagree. The user's latest message takes priority over both.
 
         {{env}}
 
