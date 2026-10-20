@@ -61,6 +61,37 @@ public sealed class CodingSessionContextTests
     }
 
     [Fact]
+    public async Task Context_RebuildsTheClientWithTheFittedOutputCap()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>
+            {
+                ["model"] = new(1_000_000, maxTokens: 128_000, contextWindows: [272_000, 1_000_000])
+            },
+            requiresApiKey: false);
+        var settings = new HarnessSettings(
+            provider.Name,
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([provider]));
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+        Assert.Equal(FittedOutput(272_000), headless.ChatPlugin.OutputCaps[^1]);
+
+        await headless.Session.SubmitAsync("/context", CancellationToken.None);
+        Assert.Equal(FittedOutput(1_000_000), headless.ChatPlugin.OutputCaps[^1]);
+
+        await headless.Session.SubmitAsync("/context 272k", CancellationToken.None);
+        Assert.Equal(FittedOutput(272_000), headless.ChatPlugin.OutputCaps[^1]);
+
+        static int FittedOutput(int window) => ContextAccountant.OutputTokens(window, 0.8, 128_000);
+    }
+
+    [Fact]
     public async Task Context_RefusesChangesDuringAnActiveTurn()
     {
         var client = new BlockingStreamingClient();

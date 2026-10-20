@@ -74,6 +74,10 @@ public sealed class ContextAccountantTests
         Assert.Equal(75, ContextAccountant.CompactLimit(100, 0.8));
         Assert.Equal(25_600, ContextAccountant.CompactLimit(32_000, 0.8, reserved: 4_000));
         Assert.Equal(2_000, ContextAccountant.CompactLimit(32_000, 0.8, reserved: 30_000));
+        // The 0.8 fraction is tighter than either reservation, so both leave the same ceiling.
+        Assert.Equal(
+            ContextAccountant.CompactLimit(200_000, 0.8, reserved: 20_000),
+            ContextAccountant.CompactLimit(200_000, 0.8, reserved: 30_000));
     }
 
     [Fact]

@@ -19,7 +19,9 @@ public sealed record CompactionLimits
         double threshold = HarnessSettings.DefaultCompactionThreshold,
         int? tailBudget = null,
         int? summaryWindow = null,
-        int? reservedOutputTokens = null)
+        int? reservedOutputTokens = null,
+        int? summaryMaxTokens = null,
+        bool useSummaryMaxTokens = false)
     {
         if (contextWindow <= 0)
         {
@@ -69,12 +71,22 @@ public sealed record CompactionLimits
                 "Reserved output tokens must be positive.");
         }
 
+        if (useSummaryMaxTokens && summaryMaxTokens is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(summaryMaxTokens),
+                summaryMaxTokens,
+                "Summary maximum token count must be positive.");
+        }
+
         ContextWindow = contextWindow;
         MaxTokens = maxTokens;
         Threshold = threshold;
         TailBudget = tailBudget;
         SummaryWindow = summaryWindow;
         ReservedOutputTokens = reservedOutputTokens;
+        SummaryMaxTokens = summaryMaxTokens;
+        UseSummaryMaxTokens = useSummaryMaxTokens;
     }
 
     public int ContextWindow { get; }
@@ -93,6 +105,15 @@ public sealed record CompactionLimits
     public int? SummaryWindow { get; }
 
     public int? ReservedOutputTokens { get; }
+
+    /// <summary>
+    /// Output cap of the model that writes the summary, when
+    /// <see cref="UseSummaryMaxTokens"/> is set. Null means that model declares
+    /// no cap. Ignored when the session model writes the summary.
+    /// </summary>
+    public int? SummaryMaxTokens { get; }
+
+    public bool UseSummaryMaxTokens { get; }
 
     public int ResolveTailBudget()
     {
@@ -121,7 +142,8 @@ public sealed record CompactionLimits
     public int SummaryOutputCap()
     {
         var window = EffectiveSummaryWindow();
-        var output = Math.Min(MaxTokens ?? SummaryOutputTokens, SummaryOutputTokens);
+        var writerCap = UseSummaryMaxTokens ? SummaryMaxTokens : MaxTokens;
+        var output = Math.Min(writerCap ?? SummaryOutputTokens, SummaryOutputTokens);
         // A window smaller than the summary slot cannot reserve the whole slot
         // and still send the conversation. Leave at least half the window for the prompt.
         output = Math.Min(output, Math.Max(1, window / 2));

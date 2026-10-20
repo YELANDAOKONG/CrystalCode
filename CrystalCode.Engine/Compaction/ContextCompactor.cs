@@ -140,11 +140,11 @@ public sealed class ContextCompactor
             return FinishWithoutSummary(pruned, prunedChanged);
         }
 
+        var client = _client();
+        ArgumentNullException.ThrowIfNull(client);
         ChatResponse response;
         try
         {
-            var client = _client();
-            ArgumentNullException.ThrowIfNull(client);
             response = await SessionRetry.RunAsync(
                 token => client.CompleteAsync(
                     new ChatRequest(

@@ -976,10 +976,15 @@ Reserved output is `reservedOutputTokens` when set. Otherwise it is
 the smallest of 20000, the model `maxTokens`, and a quarter of the
 window, so a small window keeps most of itself for input. The
 compaction ceiling is the lesser of the configured fraction of the
-window and the window minus the reservation. A model request asks for
+window and the window minus the reservation. Raising the reservation
+lowers that ceiling, and lengthens the reply, only when the reservation
+is already the tighter of the two. While the fraction leaves a larger
+gap, a bigger reservation changes neither. A model request asks for
 at most `min(maxTokens, window - ceiling)`, so the prompt and the reply
 fit the window together. A model without `maxTokens` sends no cap and
-keeps the provider default.
+keeps the provider default. Switching the selected context budget
+rebuilds the session client, because the output cap is fixed when the
+client is opened.
 
 When estimated transcript size or the last model-round usage crosses
 the lesser of the configured fraction of the model context window and
@@ -993,9 +998,10 @@ the usable window (context minus reserved output), the host:
    summary request follows the same `retry` policy as a model round.
    The session model writes it unless `compactionModel` is enabled.
    The summary prompt caps its reply at one quarter of the compact
-   ceiling, at most `min(session model maxTokens, 16384)`, and never
-   more than half the effective summary window, so the result lands
-   below the ceiling that would trigger the next compaction. A model
+   ceiling, at most `min(writer maxTokens, 16384)`, and never more than
+   half the effective summary window, so the result lands below the
+   ceiling that would trigger the next compaction. The writer is the
+   session model, or the compaction model when that is on. A writer
    without `maxTokens` still sends that cap. The cap is fixed on the
    summary client. Crystal's `ChatRequest` cannot lower one call, and
    the session client keeps the turn cap. A summary whose finish reason

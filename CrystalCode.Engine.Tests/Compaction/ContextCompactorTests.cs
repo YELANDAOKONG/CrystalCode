@@ -236,6 +236,18 @@ public sealed class ContextCompactorTests
     }
 
     [Fact]
+    public async Task CompactAsync_PropagatesSummaryClientCreationFailure()
+    {
+        var compactor = new ContextCompactor(
+            () => throw new InvalidOperationException("missing credential"));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            compactor.CompactAsync(LongTranscript(), "No todos.", new CompactionLimits(1_000_000, tailBudget: 8)));
+
+        Assert.Equal("missing credential", error.Message);
+    }
+
+    [Fact]
     public async Task CompactAsync_PropagatesReportingFailure()
     {
         var compactor = new ContextCompactor(
@@ -307,6 +319,20 @@ public sealed class ContextCompactorTests
         Assert.Equal(6_500, narrow.SummaryPromptBudget());
         Assert.Equal(9_375, limits.SummaryOutputCap());
         Assert.Equal(40_625, limits.SummaryPromptBudget());
+        var summarizer = new CompactionLimits(
+            200_000,
+            maxTokens: 128_000,
+            summaryWindow: 32_000,
+            summaryMaxTokens: 4_096,
+            useSummaryMaxTokens: true);
+        var wideWriter = new CompactionLimits(
+            200_000,
+            maxTokens: 1_024,
+            summaryWindow: 200_000,
+            summaryMaxTokens: 128_000,
+            useSummaryMaxTokens: true);
+        Assert.Equal(4_096, summarizer.SummaryOutputCap());
+        Assert.Equal(CompactionLimits.SummaryOutputTokens, wideWriter.SummaryOutputCap());
 
         var outcome = await compactor.CompactAsync(LongTranscript(), "No todos.", limits);
 

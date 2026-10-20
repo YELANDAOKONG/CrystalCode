@@ -5,6 +5,7 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
@@ -76,6 +77,45 @@ public sealed class CodingSessionCompactionModelTests
         Assert.Equal(
             "Compact accepts no argument, or model, thinking, summary, auto, and micro.",
             LastError(headless));
+    }
+
+    [Fact]
+    public async Task CompactModel_CapsTheSummaryClientForTheSelectedModel()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("scripted"),
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>
+            {
+                ["model"] = new(200_000, maxTokens: 128_000),
+                ["brief"] = new(32_000, maxTokens: 4_096)
+            },
+            requiresApiKey: false);
+        var settings = new HarnessSettings(
+            provider.Name,
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([provider]));
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+        var started = headless.ChatPlugin.OutputCaps.Count;
+
+        await headless.Session.SubmitAsync("/compact model brief", CancellationToken.None);
+
+        var expected = new CompactionLimits(
+            200_000,
+            maxTokens: 128_000,
+            summaryWindow: 32_000,
+            summaryMaxTokens: 4_096,
+            useSummaryMaxTokens: true).SummaryOutputCap();
+        Assert.Equal(expected, headless.ChatPlugin.OutputCaps[^1]);
+        var created = headless.ChatPlugin.OutputCaps.Count;
+        Assert.True(created > started);
+
+        await headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        Assert.Equal(created, headless.ChatPlugin.OutputCaps.Count);
     }
 
     [Fact]

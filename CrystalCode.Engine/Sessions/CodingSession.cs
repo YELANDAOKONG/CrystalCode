@@ -1690,7 +1690,19 @@ public sealed class CodingSession : ITurnObserver
 
         var provider = _settings.Provider;
         var model = _settings.Model;
+        var next = _settings.WithContextWindow(provider, model, selected);
+        if (!TryReplaceWorkClient(next, out var error))
+        {
+            Error(error);
+            return;
+        }
+
         SaveSettings(current => current.WithContextWindow(provider, model, selected));
+        if (!RefreshSummaryClient(out var summaryError))
+        {
+            Error(summaryError);
+        }
+
         RefreshChrome();
         ShowUsage(ShownUsage(), ShownCumulative());
         Note("Context  " + ContextWindowSelection.Format(selected));
@@ -1825,6 +1837,29 @@ public sealed class CodingSession : ITurnObserver
         if (!_settings.CompactionModel.Enabled
             || !UsesModel(_settings.CompactionModel.Provider, _settings.CompactionModel.Model, provider, model))
         {
+            return true;
+        }
+
+        if (!TryPrepareCompactionClient(_settings.CompactionModel, out var client, out var prepareError)
+            || client is null)
+        {
+            error = string.IsNullOrWhiteSpace(prepareError)
+                ? "The compaction model could not be refreshed."
+                : "The compaction model could not be refreshed: " + prepareError;
+            return false;
+        }
+
+        ReplaceCompactionClient(_settings.CompactionModel, client);
+        return true;
+    }
+
+    private bool RefreshSummaryClient(out string error)
+    {
+        error = string.Empty;
+        if (!_settings.CompactionModel.Enabled)
+        {
+            ReleaseCompactionClient();
+            _compactor = CreateCompactor();
             return true;
         }
 
@@ -3553,13 +3588,20 @@ public sealed class CodingSession : ITurnObserver
         return false;
     }
 
-    private CompactionLimits CurrentLimits() =>
-        new(
-            _settings.ContextWindow,
-            _settings.ActiveModel.MaxTokens,
-            _settings.CompactionThreshold,
-            summaryWindow: CompactionSummaryWindow(),
-            reservedOutputTokens: _settings.ReservedOutputTokens);
+    private CompactionLimits CurrentLimits() => LimitsFor(_settings);
+
+    private CompactionLimits LimitsFor(HarnessSettings settings)
+    {
+        var writer = SummaryWriter(settings);
+        return new CompactionLimits(
+            settings.ContextWindow,
+            settings.ActiveModel.MaxTokens,
+            settings.CompactionThreshold,
+            summaryWindow: writer.Window,
+            reservedOutputTokens: settings.ReservedOutputTokens,
+            summaryMaxTokens: writer.MaxTokens,
+            useSummaryMaxTokens: writer.UseMaxTokens);
+    }
 
     private async Task CompactForcedAsync(CancellationToken cancellationToken)
     {
@@ -5023,11 +5065,15 @@ public sealed class CodingSession : ITurnObserver
         var selected = _settings.WithSelection(
             new ProviderName(settings.Provider!),
             settings.Model!);
-        return CreateSummaryClient(selected);
+        // The caller may still be on the previous compaction model. The cap
+        // follows the model this client will serve. The key is stored only
+        // after that choice is committed.
+        var host = _settings.WithCompactionModel(settings);
+        return CreateClient(selected.WithOutputTokenCap(LimitsFor(host).SummaryOutputCap()));
     }
 
     private IStreamingChatClient CreateSummaryClient(HarnessSettings selected) =>
-        CreateClient(selected.WithOutputTokenCap(CurrentLimits().SummaryOutputCap()));
+        CreateClient(selected.WithOutputTokenCap(LimitsFor(selected).SummaryOutputCap()));
 
     private void ReplaceCompactionClient(CompactionModelSettings settings, IStreamingChatClient? client)
     {
@@ -5166,24 +5212,24 @@ public sealed class CodingSession : ITurnObserver
         return _settings.CompactionModel.ThinkingEffort.ToReasoningOptions(model);
     }
 
-    private int? CompactionSummaryWindow()
+    private (int? Window, int? MaxTokens, bool UseMaxTokens) SummaryWriter(HarnessSettings settings)
     {
-        var compaction = _settings.CompactionModel;
+        var compaction = settings.CompactionModel;
         if (!compaction.Enabled || compaction.Provider is null || compaction.Model is null)
         {
-            return null;
+            return (null, null, false);
         }
 
         try
         {
-            var declared = _settings.Catalog.GetModel(
+            var model = settings.Catalog.GetModel(
                 new ProviderName(compaction.Provider),
-                compaction.Model).ContextWindow;
-            return Math.Min(declared, _settings.ContextWindow);
+                compaction.Model);
+            return (Math.Min(model.ContextWindow, settings.ContextWindow), model.MaxTokens, true);
         }
         catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
         {
-            return null;
+            return (null, null, false);
         }
     }
 
