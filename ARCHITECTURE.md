@@ -2238,6 +2238,13 @@ table. `--format text` prints aligned plain text. They write `enabled` on
 that manifest and do not write `config.json` or start a session. The
 global discovery switches stay separate.
 
+Further plugin capabilities are deferred. They include extending the process
+command line and custom tool execution modes. The set is not closed. This
+build does not reserve a command, flag, configuration field, or public type
+for them. An in-session slash command is not a process command. A custom
+execution mode is not a host concurrency setting. A plugin still cannot
+bypass approval, trust, the workspace fence, or `ToolInvocationPolicy`.
+
 Operator tool sets are not plugins. They are discovered from `tools/` and
 wrapped by `ExternalCatalog`. An exec child starts in the workspace root
 and receives `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION`, `CRYSTAL_APPROVAL`,

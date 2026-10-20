@@ -40,6 +40,14 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Automatically fetching model-list information from a provider.
 - A module system below plugins and raw hooks, once its behavior and
   ownership are defined.
+- More plugin capabilities beyond the current contribution surface.
+  Examples include extending the process command line and custom tool
+  execution modes. The set is not closed. Do not reserve a command, flag,
+  configuration field, or public type. An in-session slash command,
+  `crystal plugins`, and `crystal tools` are not this path. A custom
+  execution mode is not the deferred host setting for serial or concurrent
+  ordinary tool batches. Pending hook methods and plugin dependencies stay
+  undecided.
 - Saved, session, and plugin ways to disable a built-in tool, and supplying
   another tool in its place.
 - Switchable thinking-chain compression. After a thinking pass, a model

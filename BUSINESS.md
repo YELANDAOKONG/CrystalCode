@@ -332,6 +332,13 @@ implemented in the current build:
 - automatically fetching model-list information from a provider;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
+- more plugin capabilities beyond tools, protocol clients, classifiers,
+  slash commands, hooks, raw hooks, prompt placeholders, status fields,
+  catalog snapshots, model facts, model clients, and data directories.
+  Examples include extending the process command line and custom tool
+  execution modes. The set is not closed. Behavior and ownership are not
+  defined. Do not reserve a command, flag, configuration field, or public
+  type;
 - saved, session, and plugin ways to disable a built-in tool, and supplying
   another tool in its place;
 - switchable thinking-chain compression. After each thinking pass, a model
@@ -361,6 +368,18 @@ when that front end exists, use the same MCP client as local servers.
 TODO: add workspace-level configuration only after its field scope, precedence,
 write policy, and trust semantics are defined; a repository-controlled file
 must not weaken approval or trust.
+
+TODO: add further plugin capabilities only after each capability's behavior
+and ownership are defined. Extending the process command line is not an
+in-session slash command and not `crystal plugins` or `crystal tools`. A
+plugin command must not put secrets on the command line, must not persist
+its flags to `config.json`, and must not make `crystal run` ask the
+operator. A custom tool execution mode is not the deferred host setting for
+serial or concurrent ordinary tool batches. Ordinary Work and Plan tools
+remain serial. A plugin must not bypass approval, trust, the workspace
+fence, or `ToolInvocationPolicy`. This item is not the deferred module
+system, not the deferred way to disable and replace a built-in tool, and
+not the undecided extra hook methods or plugin dependencies.
 
 TODO: add switchable thinking-chain compression only after its switch,
 requirement, model choice, and the fate of the original thinking are defined.

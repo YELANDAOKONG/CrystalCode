@@ -442,3 +442,9 @@ or marketplace.
 - A module system below plugins and raw hooks. A later one may reach the
   host through reflection or another mechanism. Its behavior and ownership
   are not defined, and this build does not reserve types for it.
+- Further plugin capabilities, including process command-line contributions
+  and custom tool execution modes. They are deferred. The set is not closed.
+  This build does not reserve a command, flag, configuration field, or
+  public type. An in-session slash command is not a process command. A
+  custom execution mode cannot bypass approval or `ToolInvocationPolicy`,
+  and it does not change the serial execution of ordinary tools.
