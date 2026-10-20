@@ -1662,6 +1662,9 @@ contracts above, and projecting events onto its own surface. The terminal host
 in CrystalCode is the reference implementation. The headless test in
 CrystalCode.Engine.Tests is the smallest correct driver. A later Avalonia
 desktop front end uses C# markup and does not add XAML or AXAML files.
+The Agent Client Protocol (ACP) is deferred. It would be another front end
+on this contract, not an engine protocol. Do not reserve a command, project,
+or public type for it.
 
 `crystal run` is the headless front end in this executable, not a second
 assembly. It reads one task from an argument or from stdin, applies

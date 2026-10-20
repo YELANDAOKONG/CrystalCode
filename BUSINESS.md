@@ -237,6 +237,10 @@ implemented in the current build:
 
 - parent/child Agents through `Crystal.Harness.AgentHarness`;
 - MCP servers;
+- the Agent Client Protocol (ACP). An editor would drive a session over
+  stdio. That is another front end, not an engine protocol. The terminal
+  remains the only operator surface until it exists. Do not reserve a
+  command, project, or public type for it;
 - an operating-system sandbox;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
@@ -273,6 +277,10 @@ TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
 `audioInput` or `videoInput` declaration is not that path. TODO: add
 MCP without bypassing the existing plugin, approval, and media boundaries.
+TODO: add ACP only as a front end that implements `SessionFrontEnd`. Do not
+put that protocol in the engine, and do not bypass approval, trust, or the
+tool boundary. ACP does not speak MCP itself. Editor-supplied MCP servers,
+when that front end exists, use the same MCP client as local servers.
 
 TODO: add workspace-level configuration only after its field scope, precedence,
 write policy, and trust semantics are defined; a repository-controlled file

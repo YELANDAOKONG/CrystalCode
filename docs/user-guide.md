@@ -72,7 +72,7 @@ or `CrystalCode` on Windows.
 ## Not yet implemented
 
 The following planned capabilities are not yet implemented in the current
-build: MCP servers, an operating-system sandbox,
+build: MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox,
 parent/child Agents, audio and video input, non-text model output,
 editing provider definitions in the TUI, automatically fetching
 model-list information from a provider, and switchable thinking-chain
@@ -80,6 +80,8 @@ compression. That last one would, after each thinking pass, ask a model
 to compress and summarize that thinking according to a requirement.
 Context compaction, microcompaction, `/verbose thinking`, and a
 provider's summarized thinking display are not that path.
+ACP would be an editor-facing front end, not an engine or provider protocol.
+The terminal remains the only operator surface until it exists.
 Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
 OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and providers.

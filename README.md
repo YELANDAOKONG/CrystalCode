@@ -173,7 +173,7 @@ Branch roles: `master` is the main development branch. `release` is the release 
 
 ## 🗺️ Roadmap
 
-MCP servers, an operating-system sandbox, parent/child agents, audio and video input, non-text model output, editing provider definitions in the TUI, automatically fetching model-list information from a provider, and switchable thinking-chain compression are planned but not yet implemented. Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog.
+MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox, parent/child agents, audio and video input, non-text model output, editing provider definitions in the TUI, automatically fetching model-list information from a provider, and switchable thinking-chain compression are planned but not yet implemented. ACP would be an editor-facing front end on stdio, not an engine protocol. The terminal remains the only operator surface until it exists. Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog.
 
 ## 📄 License
 

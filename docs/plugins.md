@@ -22,6 +22,7 @@ truncation, and timeouts. Plugin code does not bypass
 | External tool sets | Model-callable tools under `tools/`. They do not implement this contract and have no hooks. See [external-tools.md](external-tools.md). |
 | Skills | Markdown instructions loaded through the `skill` tool. |
 | MCP | Deferred. It is not a plugin runner. |
+| ACP | Deferred. It is an editor-facing front end, not a plugin runner. |
 
 ## Identity
 
@@ -434,6 +435,7 @@ or marketplace.
 ## Not included
 
 - MCP.
+- ACP. The Agent Client Protocol is a deferred front end, not a plugin.
 - Collectible unload and hot reload.
 - Replacing a built-in protocol, built-in tool, or built-in slash verb.
 - Hooks on external tool sets.
