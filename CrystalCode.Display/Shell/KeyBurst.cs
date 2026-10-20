@@ -29,7 +29,9 @@ public static class KeyBurst
 
         // Unix ReadKey turns X10 ESC [ M into F1 before the three payload
         // bytes are available. Hold a lone F1 so a click does not split.
-        if (burst.Count == 1
+        // Windows VT delivers that sequence as characters, so F1 stays immediate.
+        if (!OperatingSystem.IsWindows()
+            && burst.Count == 1
             && burst[0].Key == ConsoleKey.F1
             && burst[0].KeyChar == '\0'
             && burst[0].Modifiers == ConsoleModifiers.None)

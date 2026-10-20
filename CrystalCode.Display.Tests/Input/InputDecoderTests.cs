@@ -93,17 +93,31 @@ public sealed class InputDecoderTests
     }
 
     [Fact]
+    public void Push_RawX10LeftAndRightClicks_AreDroppedOnEveryPlatform()
+    {
+        var left = "\u001b[M !!";
+        var right = "\u001b[M\"!!";
+        Assert.Empty(new InputDecoder().Push(WindowsVt(left)));
+        Assert.Empty(new InputDecoder().Push(UnixCsi(left)));
+        Assert.Empty(new InputDecoder().Push(WindowsVt(right)));
+        Assert.Empty(new InputDecoder().Push(UnixCsi(right)));
+    }
+
+    [Fact]
     public void Push_DotNetX10LeftAndRightClicks_AreNotComposerText()
     {
         var decoder = new InputDecoder();
-        Assert.Empty(decoder.Push(DotNetX10(' ', ConsoleKey.Spacebar, '!', '!')));
-        Assert.Empty(decoder.Push(DotNetX10(
-            '"',
-            default,
-            'A',
-            ConsoleKey.A,
-            'B',
-            ConsoleKey.B)));
+        var left = DotNetX10(' ', ConsoleKey.Spacebar, '!', '!');
+        var right = DotNetX10('"', default, 'A', ConsoleKey.A, 'B', ConsoleKey.B);
+        if (OperatingSystem.IsWindows())
+        {
+            AssertKeepsF1(decoder.Push(left));
+            AssertKeepsF1(decoder.Push(right));
+            return;
+        }
+
+        Assert.Empty(decoder.Push(left));
+        Assert.Empty(decoder.Push(right));
         Assert.Empty(decoder.Push(DotNetX10('#', '!', '!')));
 
         var pressAndRelease = DotNetX10(' ', ConsoleKey.Spacebar, '!', '!');
@@ -114,10 +128,17 @@ public sealed class InputDecoderTests
     [Fact]
     public void Push_DotNetX10Wheel_StillScrolls()
     {
-        AssertWheel(new InputDecoder().Push(DotNetX10('`', '!', '!')), InputWheel.LineStep);
-        AssertWheel(
-            new InputDecoder().Push(DotNetX10('a', ConsoleKey.A, '!', '!')),
-            -InputWheel.LineStep);
+        var up = DotNetX10('`', '!', '!');
+        var down = DotNetX10('a', ConsoleKey.A, '!', '!');
+        if (OperatingSystem.IsWindows())
+        {
+            AssertKeepsF1(new InputDecoder().Push(up));
+            AssertKeepsF1(new InputDecoder().Push(down));
+            return;
+        }
+
+        AssertWheel(new InputDecoder().Push(up), InputWheel.LineStep);
+        AssertWheel(new InputDecoder().Push(down), -InputWheel.LineStep);
     }
 
     [Fact]
@@ -395,6 +416,13 @@ public sealed class InputDecoderTests
         var decoder = new InputDecoder();
         Assert.Empty(decoder.Push(WindowsVt("\u001b[")));
         AssertKey(decoder.Push(WindowsVt("A")), ConsoleKey.UpArrow, '\0');
+    }
+
+    private static void AssertKeepsF1(IReadOnlyList<IInputEvent> events)
+    {
+        Assert.Equal(4, events.Count);
+        Assert.Equal(ConsoleKey.F1, Assert.IsType<InputKey>(events[0]).Key);
+        Assert.DoesNotContain(events, static item => item is InputWheel);
     }
 
     private static void AssertAltB(IReadOnlyList<IInputEvent> events)

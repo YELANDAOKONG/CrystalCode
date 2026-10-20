@@ -55,7 +55,9 @@ public sealed class KeyBurstTests
             new('\0', ConsoleKey.F1, false, false, false)
         };
 
-        Assert.True(KeyBurst.NeedsEscapeHold(lone, moreAvailable: false));
+        Assert.Equal(
+            !OperatingSystem.IsWindows(),
+            KeyBurst.NeedsEscapeHold(lone, moreAvailable: false));
         Assert.False(KeyBurst.NeedsEscapeHold(lone, moreAvailable: true));
 
         lone.Add(new(' ', ConsoleKey.Spacebar, false, false, false));

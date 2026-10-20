@@ -2087,7 +2087,9 @@ the wheel back if the console host cleared it. A wheel report scrolls the transc
 drained without waiting; other mouse reports are swallowed. Unix ReadKey
 reports an X10 click (`ESC [ M` plus three bytes) as F1 followed by those
 bytes; that burst is still a mouse report and is not composer text. A lone
-F1 is held briefly so a split payload stays with the prefix. The wheel is
+F1 is held briefly on Unix so a split payload stays with the prefix.
+Windows VT delivers the same report as characters, so F1 is not delayed
+and is not treated as a mouse prefix. The wheel is
 never converted to Up/Down, so plain Up/Down stay with the composer, prompt
 history, or the active selection. Terminal text selection needs Shift
 (Option or Fn on some macOS terminals) while mouse reporting is on, and the

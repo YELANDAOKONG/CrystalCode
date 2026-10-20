@@ -331,6 +331,13 @@ public sealed class InputDecoder
         out List<IInputEvent>? wheels)
     {
         wheels = null;
+        // Windows reports X10 as ESC [ M plus three chars, already handled
+        // below. Treating F1 as that prefix there would drop a real F1.
+        if (OperatingSystem.IsWindows())
+        {
+            return burst;
+        }
+
         for (var i = 0; i < burst.Count; i++)
         {
             if (IsDotNetX10Intro(burst[i]) && TryX10Button(burst, i + 1, out _))
