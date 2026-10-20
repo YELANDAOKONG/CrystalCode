@@ -43,4 +43,28 @@ public sealed class CommandArgumentsTests
     {
         Assert.Throws<ArgumentException>(() => CommandArguments.Split("markdown \"./open.md"));
     }
+
+    [Fact]
+    public void Split_PreservesWindowsSeparatorsInsideDoubleQuotes()
+    {
+        var tokens = CommandArguments.Split("""json "C:\Users\runner\My Exports\child-export.json" --system""");
+
+        Assert.Equal(["json", @"C:\Users\runner\My Exports\child-export.json", "--system"], tokens);
+    }
+
+    [Fact]
+    public void Split_PreservesWindowsSeparatorsOutsideQuotes()
+    {
+        var tokens = CommandArguments.Split(@"json C:\Users\runner\child-export.json");
+
+        Assert.Equal(["json", @"C:\Users\runner\child-export.json"], tokens);
+    }
+
+    [Fact]
+    public void Split_PreservesUncPrefix()
+    {
+        var tokens = CommandArguments.Split(@"json \\server\share\child-export.json");
+
+        Assert.Equal(["json", @"\\server\share\child-export.json"], tokens);
+    }
 }

@@ -4,6 +4,8 @@ namespace CrystalCode.Engine.Sessions;
 
 /// <summary>
 /// Splits slash-command argument text into tokens with quote and escape support.
+/// A backslash escapes a double quote, or an unquoted single quote or whitespace.
+/// Other backslashes are literal so Windows paths keep their separators.
 /// </summary>
 public static class CommandArguments
 {
@@ -21,13 +23,7 @@ public static class CommandArguments
         for (var i = 0; i < argument.Length; i++)
         {
             var ch = argument[i];
-            if (inDoubleQuotes && ch == '\\' && i + 1 < argument.Length)
-            {
-                current.Append(argument[++i]);
-                continue;
-            }
-
-            if (!inSingleQuotes && !inDoubleQuotes && ch == '\\' && i + 1 < argument.Length)
+            if (!inSingleQuotes && ch == '\\' && i + 1 < argument.Length && Escapes(argument[i + 1], inDoubleQuotes))
             {
                 current.Append(argument[++i]);
                 continue;
@@ -62,6 +58,9 @@ public static class CommandArguments
         Flush(current, tokens);
         return tokens;
     }
+
+    private static bool Escapes(char next, bool inDoubleQuotes) =>
+        next == '"' || (!inDoubleQuotes && (next == '\'' || char.IsWhiteSpace(next)));
 
     private static void Flush(StringBuilder current, List<string> tokens)
     {
