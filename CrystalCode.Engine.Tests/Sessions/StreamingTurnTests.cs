@@ -207,11 +207,10 @@ public sealed class StreamingTurnTests
 
         await turn.RunAsync([new ChatMessage(ChatRole.User, "hi")]);
 
-        var afterTools = observer.UsageUpdates
-            .Last(update => update.Context?.OutputTokenCount == 0
-                && update.Context.InputTokenCount > 10);
-        Assert.Equal(10, afterTools.TurnCumulative?.InputTokenCount);
-        Assert.Equal(5, afterTools.TurnCumulative?.OutputTokenCount);
+        Assert.True(Assert.Single(observer.ContextEstimates) > 10);
+        Assert.DoesNotContain(observer.UsageUpdates, update => update.Context?.OutputTokenCount == 0);
+        Assert.Contains(observer.UsageUpdates, update => update.TurnCumulative?.InputTokenCount == 10
+            && update.TurnCumulative.OutputTokenCount == 5);
     }
 
     [Fact]
@@ -497,6 +496,10 @@ public sealed class StreamingTurnTests
 
     private sealed class TestObserver : ITurnObserver
     {
+        public List<int> ContextEstimates { get; } = [];
+
+        public void OnContextEstimated(int tokens) => ContextEstimates.Add(tokens);
+
         public List<(TokenUsage? Context, TokenUsage? TurnCumulative)> UsageUpdates { get; } = [];
 
         public List<IReadOnlyList<ToolCall>> ToolCallBatches { get; } = [];

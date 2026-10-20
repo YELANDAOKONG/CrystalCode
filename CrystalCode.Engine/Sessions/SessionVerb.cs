@@ -29,6 +29,8 @@ public enum SessionVerb
     Access,
     Resume,
     Fork,
+    Agents,
+    Child,
     Sessions,
     Compact,
     Todos,

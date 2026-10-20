@@ -97,6 +97,15 @@ internal static class TaskRunOverrides
                     Required(request.Speed, "Speed"));
             }
 
+            if (request.Agents is not null || request.AgentsConcurrency is not null)
+            {
+                next = next.WithAgents(next.Agents with
+                {
+                    Enabled = request.Agents is null ? next.Agents.Enabled : ParseSwitch(request.Agents, "--agents"),
+                    MaxConcurrent = request.AgentsConcurrency ?? next.Agents.MaxConcurrent
+                });
+            }
+
             if (request.Skills is not null)
             {
                 next = next.WithSkills(ParseSwitch(request.Skills, "--skills"));

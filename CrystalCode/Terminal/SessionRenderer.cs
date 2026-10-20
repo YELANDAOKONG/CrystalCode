@@ -38,6 +38,7 @@ public sealed class SessionRenderer : IDisposable
     private readonly ShellChrome _chrome = new();
     private readonly List<string> _modalOverlay = [];
     private readonly List<string> _queueItems = [];
+    private string[] _childRows = [];
     private readonly List<TodoBarItem> _todoItems = [];
     private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
@@ -96,6 +97,8 @@ public sealed class SessionRenderer : IDisposable
     public Action<string>? OnComposerEdited { get; set; }
 
     public Action? OnSideCleared { get; set; }
+
+    public bool ChildViewActive { get; set; }
 
     public Action? OnSideCancelled { get; set; }
 
@@ -948,6 +951,43 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    internal void SetChildSessions(IReadOnlyList<CrystalCode.Engine.Home.ChildSessionDocument> children, string? focus)
+    {
+        lock (_gate)
+        {
+            ChildViewActive = focus is not null;
+            var rows = new List<string>();
+            if (focus is not null && children.FirstOrDefault(child => child.Id == focus) is { } current)
+            {
+                rows.Add($"Child · {current.Agent} · {current.Label} · {current.Id[..Math.Min(8, current.Id.Length)]}  /child parent returns");
+                rows.Add("Send to parent; child transcript is read-only.");
+            }
+            else if (children.Count > 0)
+            {
+                rows.Add($"Child sessions: {children.Count}  /child inspects");
+                rows.AddRange(children.Where(child => child.Status is "running" or "queued").Take(8)
+                    .Select(child => $"  {child.Label} · {child.Agent} · {child.Status} · {child.Id[..Math.Min(8, child.Id.Length)]}"));
+            }
+            _childRows = rows.ToArray();
+            PaintUnlocked(force: true);
+        }
+    }
+
+    internal void ShowContextEstimate(int tokens)
+    {
+        lock (_gate)
+        {
+            var percent = ContextWindow > 0 ? Math.Clamp((double)tokens / ContextWindow * 100, 0, 100) : 0;
+            var suffix = _chrome.Usage.IndexOf("  ·  ", StringComparison.Ordinal);
+            var totals = suffix < 0 ? string.Empty : _chrome.Usage[suffix..];
+            _chrome.ContextUsed = FormattableString.Invariant($"CTX ~{percent:0.0}%");
+            _chrome.ContextLeft = FormattableString.Invariant($"CTX ~{100 - percent:0.0}% Left");
+            _chrome.ContextTokens = $"~{tokens} / {ContextWindow} CTX";
+            _chrome.Usage = _chrome.ContextUsed + totals;
+            PaintUnlocked(force: false);
+        }
+    }
+
     public void ShowUsage(TokenUsage? usage, TokenUsage? cumulativeUsage)
     {
         lock (_gate)
@@ -1705,6 +1745,10 @@ public sealed class SessionRenderer : IDisposable
 
     private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> togglePlan)
     {
+        if (key.Key == ConsoleKey.Escape && _picker is null && ChildViewActive)
+        {
+            return _composer.IsEmpty ? "/child parent" : null;
+        }
         if (_picker is not null
             && key.Key == ConsoleKey.Tab
             && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
@@ -2369,7 +2413,8 @@ public sealed class SessionRenderer : IDisposable
     }
 
     private IReadOnlyList<PaintLine> TodoLines(int width) =>
-        TodoBar.Lines(_todoItems, width);
+        _childRows.Select(row => PaintLine.Colored(Theme.Chrome, row).Fit(width))
+            .Concat(TodoBar.Lines(_todoItems, width)).ToArray();
 
     private ShellRegions CurrentRegions()
     {

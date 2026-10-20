@@ -32,6 +32,25 @@ public sealed class SessionLedger
         }
     }
 
+    public void RecordChildUsage(int modelCalls, int toolCalls, TokenUsage? usage)
+    {
+        if (modelCalls < 0 || toolCalls < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(modelCalls));
+        }
+        ModelCalls = checked(ModelCalls + modelCalls);
+        ToolCalls = checked(ToolCalls + toolCalls);
+        if (usage is not null)
+        {
+            CumulativeUsage = _cumulativeUsageComplete ? Add(CumulativeUsage, usage) : null;
+        }
+        else if (modelCalls > 0)
+        {
+            CumulativeUsage = null;
+            _cumulativeUsageComplete = false;
+        }
+    }
+
     public void ReplaceUsage(TokenUsage usage)
     {
         ArgumentNullException.ThrowIfNull(usage);

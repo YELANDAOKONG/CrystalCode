@@ -89,7 +89,8 @@ public sealed record HarnessSettings
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
         int? reservedOutputTokens = null,
-        int? outputTokenCap = null)
+        int? outputTokenCap = null,
+        AgentSettings? agents = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -145,6 +146,7 @@ public sealed record HarnessSettings
         CompactionThreshold = compactionThreshold;
         ReservedOutputTokens = reservedOutputTokens;
         OutputTokenCap = outputTokenCap;
+        Agents = agents ?? new AgentSettings();
         Catalog = catalog;
         ThinkingEffort = thinkingEffort ?? ThinkingSelection.Default;
         ContextSelections = new ReadOnlyDictionary<ContextSelectionKey, int>(
@@ -261,6 +263,8 @@ public sealed record HarnessSettings
     public RetrySettings Retry { get; }
 
     public RetrySettings ApprovalRetry { get; }
+
+    public AgentSettings Agents { get; }
 
     public int ContextWindow =>
         ContextSelections.TryGetValue(new ContextSelectionKey(Provider, Model), out var selected)
@@ -466,6 +470,12 @@ public sealed record HarnessSettings
     {
         ArgumentNullException.ThrowIfNull(thinkingEffort);
         return Copy(thinkingEffort: thinkingEffort);
+    }
+
+    public HarnessSettings WithAgents(AgentSettings agents)
+    {
+        ArgumentNullException.ThrowIfNull(agents);
+        return Copy(agents: agents);
     }
 
     public HarnessSettings WithSkills(bool skills) => Copy(skills: skills);
@@ -676,7 +686,8 @@ public sealed record HarnessSettings
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
         int? reservedOutputTokens = null,
         bool setReservedOutputTokens = false,
-        int? outputTokenCap = null) =>
+        int? outputTokenCap = null,
+        AgentSettings? agents = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -720,7 +731,8 @@ public sealed record HarnessSettings
             tierSelections ?? TierSelections,
             speedSelections ?? SpeedSelections,
             setReservedOutputTokens ? reservedOutputTokens : ReservedOutputTokens,
-            outputTokenCap ?? OutputTokenCap);
+            outputTokenCap ?? OutputTokenCap,
+            agents ?? Agents);
 
     public override string ToString() => nameof(HarnessSettings);
 

@@ -37,7 +37,8 @@ public static class ExternalToolNames
         BackgroundBashStatusTool.ToolName,
         BackgroundBashLogsTool.ToolName,
         BackgroundBashStopTool.ToolName,
-        SkillTool.ToolName
+        SkillTool.ToolName,
+        TaskTool.ToolName
     };
 
     public static StringComparer OverlayComparer =>

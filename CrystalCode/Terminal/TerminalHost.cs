@@ -17,12 +17,14 @@ namespace CrystalCode.Terminal;
 internal sealed class TerminalHost
 {
     private readonly SessionRenderer _renderer;
+    private readonly SessionProjection _projection;
     private readonly CodingSession _session;
     private readonly bool? _launchPlan;
     private int _idleCancels;
 
-    private TerminalHost(SessionRenderer renderer, CodingSession session, bool? launchPlan)
+    private TerminalHost(SessionRenderer renderer, CodingSession session, bool? launchPlan, SessionProjection projection)
     {
+        _projection = projection;
         _renderer = renderer;
         _session = session;
         _launchPlan = launchPlan;
@@ -41,12 +43,16 @@ internal sealed class TerminalHost
         IReadOnlyList<DirectoryAccess>? launchAccess = null)
     {
         var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
         var frontEnd = new SessionFrontEnd(
-            new SessionProjection(renderer),
+            projection,
             new ApprovalPrompt(renderer),
             new QuestionPrompt(renderer),
             new SessionPicker(renderer),
-            new TrustPrompt(renderer));
+            new TrustPrompt(renderer))
+        {
+            ChooseChildAsync = new ChildPicker(renderer).ChooseAsync
+        };
         var session = CodingSession.Create(
             settings,
             settingsStore,
@@ -60,7 +66,7 @@ internal sealed class TerminalHost
             launchAccess);
         renderer.LoadQuickPromptsAsync = new QuickPromptStore(home).LoadAsync;
         renderer.QueueQuickPromptAsync = (text, token) => session.SubmitQuickPromptAsync(text, true, token);
-        return new TerminalHost(renderer, session, launchPlan);
+        return new TerminalHost(renderer, session, launchPlan, projection);
     }
 
     /// <summary>
@@ -193,6 +199,10 @@ internal sealed class TerminalHost
                 continue;
             }
 
+            if (read.IsQuickPrompt || !string.IsNullOrWhiteSpace(read.Text) && !read.Text.TrimStart().StartsWith('/'))
+            {
+                _projection.ReturnToParent();
+            }
             if (read.IsQuickPrompt)
             {
                 await PumpAsync(_session.SubmitQuickPromptAsync(read.Text, false, promptSource.Token), promptSource.Token);

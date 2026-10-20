@@ -66,6 +66,27 @@ internal sealed class RunJsonLog : IRunLog
         {
             switch (sessionEvent)
             {
+                case ChildSessionChanged child:
+                    Emit("child_status", writer =>
+                    {
+                        writer.WriteString("childSessionID", child.Child.Id);
+                        writer.WriteString("invocationID", child.InvocationId);
+                        writer.WriteString("agent", child.Child.Agent);
+                        writer.WriteString("label", child.Child.Label);
+                        writer.WriteString("status", child.Child.Status);
+                        writer.WritePropertyName("images");
+                        JsonSerializer.Serialize(writer, child.Child.Images.Select(image => new
+                        {
+                            number = image.Number, mimeType = image.MimeType, contentHash = image.ContentHash,
+                            source = "child_tool"
+                        }));
+                        writer.WritePropertyName("usage");
+                        JsonSerializer.Serialize(writer, child.Child.CumulativeUsage);
+                    });
+                    break;
+                case ChildEventReceived child:
+                    EmitChild(child);
+                    break;
                 case StreamReceived received:
                     Apply(received.StreamEvent);
                     break;
@@ -126,6 +147,51 @@ internal sealed class RunJsonLog : IRunLog
                     break;
             }
         }
+    }
+
+    private void EmitChild(ChildEventReceived child)
+    {
+        string? type = null;
+        string? text = null;
+        switch (child.Event)
+        {
+            case StreamReceived { StreamEvent: ChatTextDelta delta }:
+                type = "child_text";
+                text = delta.Text;
+                break;
+            case StreamReceived { StreamEvent: ChatReasoningTextDelta delta } when _showThinking:
+                type = "child_reasoning";
+                text = delta.Text;
+                break;
+            case ErrorWritten error:
+                type = "child_error";
+                text = error.Text;
+                break;
+            case RetryScheduled retry:
+                type = "child_retry";
+                text = $"Attempt {retry.Attempt.Attempt}: {retry.Attempt.Message}";
+                break;
+            case ToolCallsIssued calls:
+                type = "child_tools";
+                text = string.Join(", ", calls.Calls.Select(call => call.Name));
+                break;
+            case ToolResultsReceived results:
+                type = "child_results";
+                text = string.Join("\n", results.Results.Select(result => result.Text));
+                break;
+            default:
+                break;
+        }
+        if (type is null)
+        {
+            return;
+        }
+        Emit(type, writer =>
+        {
+            writer.WriteString("childSessionID", child.ChildSessionId);
+            writer.WriteString("invocationID", child.InvocationId);
+            writer.WriteString("text", ImageMarkerText.Display(text ?? string.Empty));
+        });
     }
 
     private void Apply(ChatStreamEvent streamEvent)

@@ -93,6 +93,7 @@ public sealed class ToolClassifier
             GlobTool.ToolName => ClassifyRead(call.Arguments, "Glob", pathRequired: false),
             GrepTool.ToolName => ClassifyRead(call.Arguments, "Grep", pathRequired: false),
             SearchTool.ToolName => ClassifyRead(call.Arguments, "Search", pathRequired: false),
+            TaskTool.ToolName => new ToolClassification(Risk.Read, Authority.Workspace, "Delegate child task"),
             TodoWriteTool.ToolName or TodoReadTool.ToolName or QuestionTool.ToolName or SkillTool.ToolName =>
                 new ToolClassification(Risk.Read, Authority.Workspace, "Read-only tool"),
             WriteTool.ToolName => ClassifyWrite(call.Arguments),

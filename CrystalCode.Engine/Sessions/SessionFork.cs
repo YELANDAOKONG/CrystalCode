@@ -30,9 +30,22 @@ internal static class SessionFork
             ModelCalls = Math.Max(0, source.ModelCalls),
             ToolCalls = Math.Max(0, source.ToolCalls),
             Usage = CloneUsage(source.Usage),
-            CumulativeUsage = CloneUsage(source.CumulativeUsage)
+            CumulativeUsage = CloneUsage(source.CumulativeUsage),
+            Children = source.Children.Select(CloneChild).ToList()
         };
     }
+
+    private static ChildSessionDocument CloneChild(ChildSessionDocument child) => child with
+    {
+        Items = child.Items.Select(CloneItem).ToArray(),
+        Archive = child.Archive.Select(CloneItem).ToArray(),
+        Images = child.Images.Select(CloneImage).ToArray(),
+        Notes = child.Notes.ToArray(),
+        Tools = child.Tools.ToArray(),
+        Todos = child.Todos.Select(CloneTodo).ToArray(),
+        Usage = CloneUsage(child.Usage),
+        CumulativeUsage = CloneUsage(child.CumulativeUsage)
+    };
 
     private static SessionItemDocument CloneItem(SessionItemDocument item) =>
         new()

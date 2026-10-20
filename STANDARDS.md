@@ -142,6 +142,13 @@
   file before its session reference. Missing or damaged media must not make
   the remaining session unreadable.
 - Keep text and image-capable turn budgets on the same configured limits.
+  Parent and child calls reserve one shared budget atomically; retries do not
+  acquire another logical model-call reservation. Only adjacent child task
+  groups overlap. Preserve ordinary-tool barriers and result order. Child
+  execution must use approved executors, with a filtered catalog beneath hooks.
+  Child ledger updates and parent snapshots must be serialized, and restore
+  must never sum saved child usage into an already-inclusive parent total.
+  Context estimates must not be persisted as provider token usage.
   A null limit is unlimited; omitted budget fields retain the finite defaults.
 - Built-in bash uses the same rule for `bashTimeoutSeconds`: omit it to keep
   600 seconds; `null` or `"unlimited"` removes the per-command timer.

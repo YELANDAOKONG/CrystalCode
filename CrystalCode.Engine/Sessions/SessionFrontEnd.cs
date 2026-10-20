@@ -13,4 +13,8 @@ public sealed record SessionFrontEnd(
     IApprovalPrompt Approvals,
     IUserPrompt Questions,
     ISessionChooser Sessions,
-    IWorkspaceTrustPrompt Trust);
+    IWorkspaceTrustPrompt Trust)
+{
+    public Func<IReadOnlyList<CrystalCode.Engine.Home.ChildSessionDocument>, CancellationToken, Task<string?>>?
+        ChooseChildAsync { get; init; }
+}

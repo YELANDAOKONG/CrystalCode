@@ -78,6 +78,12 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--prompt-attachment <NAME>")]
     public string[] PromptAttachment { get; init; } = [];
 
+    [CommandOption("--agents <on|off>")]
+    public string? Agents { get; init; }
+
+    [CommandOption("--agents-concurrency <COUNT>")]
+    public int? AgentsConcurrency { get; init; }
+
     [CommandOption("--skills <on|off>")]
     public string? Skills { get; init; }
 

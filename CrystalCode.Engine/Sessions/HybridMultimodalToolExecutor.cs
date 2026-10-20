@@ -14,18 +14,26 @@ public sealed class HybridMultimodalToolExecutor : IMultimodalToolExecutor
 {
     private readonly IToolExecutor _textExecutor;
     private readonly IReadOnlyDictionary<string, IMultimodalTool> _tools;
-    private readonly ApprovalPolicy _approval;
+    private readonly ToolInvocationPolicy _policy;
 
     public HybridMultimodalToolExecutor(
         IToolExecutor textExecutor,
         IEnumerable<IMultimodalTool> tools,
         ApprovalPolicy approval)
+        : this(textExecutor, tools, approval.DecideAsync)
+    {
+    }
+
+    internal HybridMultimodalToolExecutor(
+        IToolExecutor textExecutor,
+        IEnumerable<IMultimodalTool> tools,
+        ToolInvocationPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(textExecutor);
         ArgumentNullException.ThrowIfNull(tools);
-        ArgumentNullException.ThrowIfNull(approval);
+        ArgumentNullException.ThrowIfNull(policy);
         _textExecutor = textExecutor;
-        _approval = approval;
+        _policy = policy;
         var registered = new Dictionary<string, IMultimodalTool>(StringComparer.Ordinal);
         foreach (var tool in tools)
         {
@@ -62,32 +70,26 @@ public sealed class HybridMultimodalToolExecutor : IMultimodalToolExecutor
     {
         ArgumentNullException.ThrowIfNull(calls);
         var results = new List<MultimodalToolResult>();
-        foreach (var call in calls)
+        var batch = calls.ToArray();
+        for (var index = 0; index < batch.Length;)
         {
+            var call = batch[index];
             if (_tools.TryGetValue(call.Name, out var tool))
             {
-                results.Add(await ExecuteMultimodalAsync(
-                    call,
-                    tool,
-                    cancellationToken));
+                results.Add(await ExecuteMultimodalAsync(call, tool, cancellationToken));
+                index++;
                 continue;
             }
-
-            var textCall = new ToolCall(
-                call.CallId,
-                call.Name,
-                call.Arguments,
-                call.InputKind);
-            var textResults = await _textExecutor.ExecuteAsync(
-                [textCall],
-                cancellationToken);
-            var result = textResults[0];
-            results.Add(new MultimodalToolResult(
-                result.CallId,
-                [new TextContent(result.Text)],
-                result.Status == ToolResultStatus.Success
-                    ? MultimodalToolResultStatus.Success
-                    : MultimodalToolResultStatus.Failure));
+            var textCalls = new List<ToolCall>();
+            while (index < batch.Length && !_tools.ContainsKey(batch[index].Name))
+            {
+                var text = batch[index++];
+                textCalls.Add(new ToolCall(text.CallId, text.Name, text.Arguments, text.InputKind));
+            }
+            var textResults = await _textExecutor.ExecuteAsync(textCalls, cancellationToken);
+            results.AddRange(textResults.Select(result => new MultimodalToolResult(
+                result.CallId, [new TextContent(result.Text)], result.Status == ToolResultStatus.Success
+                    ? MultimodalToolResultStatus.Success : MultimodalToolResultStatus.Failure)));
         }
 
         return results;
@@ -108,7 +110,7 @@ public sealed class HybridMultimodalToolExecutor : IMultimodalToolExecutor
             call.Name,
             call.Arguments,
             call.InputKind);
-        var decision = await _approval.DecideAsync(textCall, cancellationToken);
+        var decision = await _policy(textCall, cancellationToken);
         if (decision.Action == ToolInvocationAction.Reject)
         {
             var text = decision.RejectionOutput?.Text

@@ -42,6 +42,8 @@ public static class SlashCatalog
             ["on", "off", "global", "project"]),
         new(SessionVerb.Resume, "resume", ["continue"], "Choose a session, workspace, or all", ["all"]),
         new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
+        new(SessionVerb.Agents, "agents", [], "List or configure child Agents", ["on", "off", "concurrency", "model", "thinking", "context", "tier", "speed"]),
+        new(SessionVerb.Child, "child", [], "Inspect a child session or return to parent", ["parent"]),
         new(SessionVerb.Sessions, "sessions", [], "List workspace sessions or all", ["all"]),
         new(SessionVerb.Compact, "compact", ["summarize"],
             "Summarize earlier context, or set the model, thinking gear, summary display, and microcompaction",

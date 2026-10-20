@@ -284,21 +284,95 @@ same approval policy. The session owns those clients and may replace them on
 not use `Crystal.Agents.Agent` for the live UI: that Agent completes model
 turns without token streaming.
 
-The live session does not yet use `Crystal.Harness.AgentHarness`. Parent/child
-Agent composition is high-priority work in `TODO.md` and is not in the current
-build. When that topology is implemented,
-the host consumes `AgentHarness` for named invocation ancestry and shared
-budgets while retaining ownership of prompts, tools, approval, persistence, and
-the terminal projection.
+The live parent keeps its streaming loop. Child invocations consume
+`Crystal.Harness.AgentHarness` or its multimodal counterpart through local
+Agent adapters that reuse the host streaming turns. The host owns prompts,
+tool catalogs, approval, compaction, persistence, and terminal projection.
+
+### Child invocation ownership
+
+An Agent definition, a persisted child session, and a Harness invocation are
+three identities. Every `task` without `sessionId` creates a child; continuation
+uses that child id and a fresh invocation id. Concurrent continuation of the
+same child is rejected. The parent is not an `IAgent`: direct child invocations
+are depth zero inside Harness, whose `MaximumDepth` is zero. Child catalogs
+also remove `task`, `question`, and background Bash tools.
+
+`CodingSession` binds child execution, configuration, and commands through its
+Sessions components. `AgentCatalog` loads bounded manifests and prompts from
+Home and workspace; an invalid or disabled workspace directory shadows the
+Home definition. `AgentToolsPlugin` contributes the session-bound task tool
+through the existing plugin registry. Ordinary tool catalogs are built first;
+child catalogs intersect their definition snapshot with the current parent
+ceiling before constructing approved executors. A plugin hook cannot restore
+a tool absent from that executor's catalog. Child todos and transcripts are
+independent. The filesystem remains shared.
+
+The Engine holds one `SharedTurnBudget` per parent turn. Text and multimodal
+turns atomically reserve logical model rounds and whole tool batches from it.
+Retries stay inside a round reservation. Child compaction reserves a model
+call only when its summary client is actually invoked. The parent's turn timer
+and cancellation token also cover child queue waits, approvals, and backoff.
+Harness receives per-invocation limits and enforces invocation lifecycle and
+depth. Its whole-run reservation model is not used as a second copy of the
+parent's remaining quota; otherwise the first parallel invocation could reserve
+all capacity, and text and image Harness instances would spend separate pools.
+
+`TaskBatchExecutor` runs only consecutive task calls in parallel, retaining
+input result order. Every other tool is an execution barrier. The same grouping
+is preserved by the multimodal bridge. A session semaphore counts active
+children rather than Agent types; each child also has single-invocation
+admission. The parent's approval policy is shared, and a semaphore serializes
+classification/review/operator interaction. A scoped child label reaches the
+approval card, and review sees the child's context. No state lock is held while
+waiting for approval or a concurrency slot.
+
+Child clients are cached independently of parent, review, and compaction
+clients by resolved provider, model, service tier, speed, and fitted output cap.
+Changing thinking does not create a client. Parent model changes leave child
+clients alive. Child images require both model `imageInput` and adapter image
+capabilities. The multimodal path reuses `MultimodalStreamingTurn` and the
+approved bridge, allocates media numbers from the parent, and supplies only
+that child's image map to its model. Text children never expose native image
+tools. A child summarizer uses its own context budget and the configured
+compaction prompt overlays; a configured compaction model is honored.
+
+Each completed invocation updates its child ledger and the parent ledger once.
+Parallel increments and saved snapshots are serialized. Live cumulative usage
+uses per-child snapshots rather than adding every stream update. The parent's
+last-request usage stays its own; child usage never replaces it. Missing usage
+retains the existing unknown-total behavior. Failed retry attempts contribute
+only their last reported usage snapshot. `ContextEstimated` carries local
+estimates independently of provider `TokenUsage`.
+
+`SessionDocument.Children` embeds child archives, compacted items, model and
+gear snapshots, todos, usage, notes, and media references. Checkpoints taken while a parent waits for
+children use its live model context, not the pre-turn transcript. Pending tool
+calls receive checkpoint-only results identifying completed children or warning
+that an interrupted operation may already have effects. These results never
+modify the live turn. Children do not create
+session files or appear in saved-session lists. Fork deep-copies child state,
+resume restores counters directly, and clear removes it. Saved running or
+queued children become interrupted rather than restarting side effects.
+Child media is persisted before the parent JSON reference. Export inlines
+available child media using the existing store.
+
+`ChildSessionChanged`, `ChildEventReceived`, and `ChildViewRequested` convey
+immutable event records; the latter is an inspection request, not engine focus.
+The terminal owns parent/child event projections, the picker, composer routing,
+and the focused model/usage chrome. Inactive events remain available when
+switching views. The terminal never submits text to a child. Headless JSON
+labels child events and media provenance; text output keeps the returned
+summary with the task result and reports child usage separately.
 
 Approval is a `ToolInvocationPolicy` supplied to `ToolExecutor`. Rejection
 returns Harness-authored `ToolOutput`. Tool exceptions become model-visible
 only through a Harness `ToolExceptionMapper`.
 
-Tool-call batches run serially. Work and Plan both construct `ToolExecutor`
-with serial mode and a concurrency of one. The multimodal bridge also runs
-its batch one call at a time. Configurable concurrent execution is deferred
-product work; do not reserve a configuration field for it.
+Ordinary tool-call batches run serially. Work and Plan construct `ToolExecutor`
+with serial mode and concurrency one. A host wrapper permits only adjacent
+`task` groups to overlap, in both text and multimodal paths. Configurable
+concurrency for ordinary tools remains deferred; do not reserve a field for it.
 
 ### Image input boundary
 
@@ -1015,8 +1089,9 @@ the usable window (context minus reserved output), the host:
    compaction in a loop.
 
 CTX percent uses the last model round's provider usage while a round is
-streaming, then a local transcript estimate after each tool batch until the
-next round reports. It is not the sum of rounds in
+streaming, then a separately marked `~` local transcript estimate after each
+tool batch until the next round reports. Estimates never replace saved
+provider usage and are not part of cumulative usage. CTX is not the sum of rounds in
 the turn. The status bar can show 100% when usage meets or exceeds the
 window. Compaction does not block the session loop: the progress row
 stays on `Compacting` and the composer remains usable.
@@ -1067,7 +1142,8 @@ from `config.json` until enabled, and uses the same panel. It does not change
 question that summarizes a private copy does not print it.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
-completed turn, after a successful `/compact`, and on an orderly exit
+completed turn, after a child invocation settles, after a successful `/compact`,
+and on an orderly exit
 when the transcript has a user message or a compaction summary. The
 file stores the compacted model transcript (live system prompt, one
 summary, recent tail, and reasoning items with their readable text and
@@ -1828,7 +1904,7 @@ workspace, the latest request's context percent (`CTX`), cumulative
 token counts (`IN` / `OUT`), and, when the bar has room, a cumulative
 Title Case total (`783k Total`). During a turn the status bar updates `CTX`, `IN`, and `OUT` after each
 model round and each tool batch: provider usage as it arrives, then a local
-transcript estimate after tools until the next round reports. It also
+transcript estimate marked `~` after tools until the next round reports. It also
 shows tool count (`Tool` / `Tools`), and
 elapsed time. When the session has todos, a pinned `Todos` bar sits
 above the progress row and status bar. The existing adaptive status bar is the

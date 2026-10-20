@@ -45,17 +45,14 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Switchable thinking-chain compression. After a thinking pass, a model
   summarizes that thinking. It is not context compaction, microcompaction,
   `verboseThinking`, or `thinkingDisplay`.
-- Configurable serial or concurrent execution of one tool-call batch. Work
-  and Plan both run every batch serially today.
+- Configurable serial or concurrent execution of ordinary tool-call batches.
+  Ordinary Work and Plan tools remain serial. Adjacent child `task` groups
+  use their own bounded concurrency.
 
 ## High priority
 
-- Parent/child Agents through `Crystal.Harness.AgentHarness`. Not in the
-  current build. When implemented, the host consumes `AgentHarness` for
-  named invocation ancestry and shared budgets. This product keeps prompts,
-  tools, approval, persistence, and the terminal projection. This is not a
-  new product mode. It does not decide Plan bash, custom modes, tool-limit
-  configuration, plugin dependencies, or further hook methods.
+None. Parent/child Agents are current behavior, defined in `BUSINESS.md`
+and `ARCHITECTURE.md`.
 
 ## Medium priority
 

@@ -21,5 +21,7 @@ public interface ITurnObserver
 
     void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null);
 
+    void OnContextEstimated(int tokens) { }
+
     void OnFault(string message);
 }

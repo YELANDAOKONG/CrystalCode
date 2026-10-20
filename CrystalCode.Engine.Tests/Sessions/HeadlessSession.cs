@@ -28,7 +28,9 @@ internal sealed class HeadlessSession : IDisposable
         HarnessSettings? settings = null,
         HarnessSettings? persistedSettings = null,
         Action<CrystalHome, string>? prepare = null,
-        IReadOnlyList<DirectoryAccess>? launchAccess = null)
+        IReadOnlyList<DirectoryAccess>? launchAccess = null,
+        Crystal.Multimodal.Chat.IStreamingMultimodalChatClient? images = null,
+        Func<IReadOnlyList<ChildSessionDocument>, CancellationToken, Task<string?>>? chooseChild = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -42,7 +44,7 @@ internal sealed class HeadlessSession : IDisposable
 
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());
-        ChatPlugin = new ScriptedChatPlugin(client);
+        ChatPlugin = new ScriptedChatPlugin(client, images);
         plugins.Add(ChatPlugin);
 
         if (resume is not null)
@@ -67,7 +69,7 @@ internal sealed class HeadlessSession : IDisposable
                 Approvals,
                 new FixedUserPrompt("unused"),
                 new DecliningSessionChooser(),
-                new ScriptedTrustPrompt(accept: false)),
+                new ScriptedTrustPrompt(accept: false)) { ChooseChildAsync = chooseChild },
             plugins,
             resume,
             persistedSettings,

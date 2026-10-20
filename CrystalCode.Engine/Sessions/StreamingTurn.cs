@@ -11,6 +11,7 @@ namespace CrystalCode.Engine.Sessions;
 /// </summary>
 public sealed class StreamingTurn
 {
+    private readonly SharedTurnBudget? _budget;
     private readonly IStreamingChatClient _client;
     private readonly IToolExecutor _executor;
     private readonly TurnLimits _limits;
@@ -33,7 +34,8 @@ public sealed class StreamingTurn
         SessionRetryOptions? retry = null,
         Action<IReadOnlyList<ChatItem>>? commit = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null,
-        Func<ChatResponse, CancellationToken, Task>? onModelResponse = null)
+        Func<ChatResponse, CancellationToken, Task>? onModelResponse = null,
+        SharedTurnBudget? budget = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(executor);
@@ -47,6 +49,7 @@ public sealed class StreamingTurn
         _retry = retry ?? SessionRetryOptions.Default;
         _commit = commit;
         _prepareModel = prepareModel;
+        _budget = budget;
         _onModelResponse = onModelResponse;
     }
 
@@ -92,8 +95,8 @@ public sealed class StreamingTurn
                     }
                 }
 
-                if (_limits.MaximumModelCalls is int maximumModelCalls
-                    && modelCallCount >= maximumModelCalls)
+                if ((_limits.MaximumModelCalls is int maximumModelCalls
+                    && modelCallCount >= maximumModelCalls) || _budget?.TryModelCall() == false)
                 {
                     _observer?.OnModelRoundClosed();
                     return Create(
@@ -148,8 +151,8 @@ public sealed class StreamingTurn
                         transcript);
                 }
 
-                if (_limits.MaximumToolCalls is int maximumToolCalls
-                    && toolCalls.Length > maximumToolCalls - toolCallCount)
+                if ((_limits.MaximumToolCalls is int maximumToolCalls
+                    && toolCalls.Length > maximumToolCalls - toolCallCount) || _budget?.TryToolBatch(toolCalls.Length) == false)
                 {
                     CandidateRound.AppendWithoutToolCalls(transcript, candidate.Items);
                     Commit(transcript, marked);
@@ -173,9 +176,7 @@ public sealed class StreamingTurn
                 transcript.AddRange(toolResults);
                 Commit(transcript, marked);
                 _observer?.OnToolResults(toolResults);
-                _observer?.OnUsageUpdated(
-                    new TokenUsage(TokenEstimator.Items(transcript), 0),
-                    usage.Build());
+                _observer?.OnContextEstimated(TokenEstimator.Items(transcript));
             }
         }
         catch (OperationCanceledException) when (durationSource.IsCancellationRequested)
@@ -253,20 +254,30 @@ public sealed class StreamingTurn
         CancellationToken cancellationToken)
     {
         var assembler = new ChatStreamAssembler();
-        await foreach (var streamEvent in _client.StreamAsync(request, cancellationToken))
+        TokenUsage? attemptUsage = null;
+        try
         {
-            _observer?.OnStreamEvent(streamEvent);
-            if (streamEvent is ChatUsageReceived { Usage: not null } usageReceived)
+            await foreach (var streamEvent in _client.StreamAsync(request, cancellationToken))
             {
-                _observer?.OnUsageUpdated(
-                    usageReceived.Usage,
-                    usage.Preview(usageReceived.Usage));
+                _observer?.OnStreamEvent(streamEvent);
+                if (streamEvent is ChatUsageReceived { Usage: not null } usageReceived)
+                {
+                    attemptUsage = usageReceived.Usage;
+                    _observer?.OnUsageUpdated(attemptUsage, usage.Preview(attemptUsage));
+                }
+                assembler.Apply(streamEvent);
             }
-
-            assembler.Apply(streamEvent);
+            return assembler.ToResponse();
         }
-
-        return assembler.ToResponse();
+        catch
+        {
+            if (attemptUsage is not null)
+            {
+                usage.Add(attemptUsage);
+                _observer?.OnUsageUpdated(attemptUsage, usage.Build());
+            }
+            throw;
+        }
     }
 
     private TurnResult Create(

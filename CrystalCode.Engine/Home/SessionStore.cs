@@ -290,7 +290,7 @@ public sealed class SessionStore
         return persisted;
     }
 
-    private static SessionDocument CopyWithImages(
+    private SessionDocument CopyWithImages(
         SessionDocument source,
         List<SessionImageDocument> images) => new()
     {
@@ -309,6 +309,23 @@ public sealed class SessionStore
         ModelCalls = source.ModelCalls,
         ToolCalls = source.ToolCalls,
         Usage = source.Usage,
-        CumulativeUsage = source.CumulativeUsage
+        CumulativeUsage = source.CumulativeUsage,
+        Children = source.Children.Select(child => child with
+        {
+            Items = child.Items.ToArray(), Archive = child.Archive.ToArray(),
+            Images = PersistImages(child.Images).ToArray(),
+            Usage = CloneUsage(child.Usage),
+            CumulativeUsage = CloneUsage(child.CumulativeUsage),
+            Notes = child.Notes.ToArray()
+        }).ToList()
     };
+
+    private static SessionUsageDocument? CloneUsage(SessionUsageDocument? usage) => usage is null
+        ? null
+        : new SessionUsageDocument
+        {
+            InputTokenCount = usage.InputTokenCount,
+            OutputTokenCount = usage.OutputTokenCount,
+            ReasoningTokenCount = usage.ReasoningTokenCount
+        };
 }

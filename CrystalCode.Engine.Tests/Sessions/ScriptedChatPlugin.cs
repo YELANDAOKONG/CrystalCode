@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins;
@@ -19,10 +20,10 @@ internal sealed class ScriptedChatPlugin : IPlugin
 
     private readonly ScriptedChatClientFactory _factory;
 
-    public ScriptedChatPlugin(IStreamingChatClient client)
+    public ScriptedChatPlugin(IStreamingChatClient client, IStreamingMultimodalChatClient? images = null)
     {
         ArgumentNullException.ThrowIfNull(client);
-        _factory = new ScriptedChatClientFactory(client);
+        _factory = new ScriptedChatClientFactory(client, images);
     }
 
     public int Creates => _factory.Creates;

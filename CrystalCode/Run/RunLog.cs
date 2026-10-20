@@ -64,6 +64,19 @@ internal sealed class RunLog : IRunLog
         {
             switch (sessionEvent)
             {
+                case ChildSessionChanged child:
+                    if (child.Child.Status is not ("running" or "queued"))
+                    {
+                        Flush();
+                        WriteSection($"[Child {child.Child.Id} · {child.Child.Agent}]",
+                            $"{child.Child.Label}: {child.Child.Status}\n"
+                            + $"Input {child.Child.CumulativeUsage?.InputTokenCount.ToString() ?? "?"} / "
+                            + $"Output {child.Child.CumulativeUsage?.OutputTokenCount.ToString() ?? "?"}");
+                    }
+                    break;
+                case ChildEventReceived child when child.Event is RetryScheduled retry:
+                    WriteSection($"[Child {child.ChildSessionId}]", $"Retry {retry.Attempt.Attempt}: {retry.Attempt.Message}");
+                    break;
                 case StreamReceived received:
                     Apply(received.StreamEvent);
                     break;

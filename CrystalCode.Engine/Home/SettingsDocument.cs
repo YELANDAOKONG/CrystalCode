@@ -2,6 +2,8 @@ namespace CrystalCode.Engine.Home;
 
 internal sealed class SettingsDocument
 {
+    public CrystalCode.Engine.Configuration.AgentSettings? Agents { get; set; }
+
     public string? Provider { get; set; }
 
     public string? Model { get; set; }

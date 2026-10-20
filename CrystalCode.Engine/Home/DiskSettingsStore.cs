@@ -108,7 +108,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             compactionModel: ReadCompactionModel(document.CompactionModel),
             microCompaction: ReadMicroCompaction(document.MicroCompaction),
             ruleFiles: ReadRuleFiles(document.RuleFiles),
-            reservedOutputTokens: document.ReservedOutputTokens);
+            reservedOutputTokens: document.ReservedOutputTokens,
+            agents: document.Agents);
     }
 
     public void Save(HarnessSettings settings)
@@ -128,6 +129,7 @@ public sealed class DiskSettingsStore : ISettingsStore
 
         var document = new SettingsDocument
         {
+            Agents = settings.Agents == new AgentSettings() ? null : settings.Agents,
             Provider = settings.Provider.Value,
             Model = settings.Model,
             Approval = settings.Approval.Value,

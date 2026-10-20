@@ -230,6 +230,71 @@ separate library with no terminal code. The product can:
   whose attached markers were deleted;
 - register built-in tools and providers through an in-process plugin table.
 
+## Child Agents
+
+Child Agents are delegated conversations inside a parent session. They are
+available in Plan and Work when `agents.enabled` is true; the default is false.
+The model uses one `task` tool with an Agent name, short label, task prompt,
+and optional child session id. A call without an id creates a new child even
+when its Agent name matches another child. A call with an id continues only
+that parent's child, with the same Agent. It cannot select a model or gear.
+
+Built-ins are `general`, strictly read-only `explore`, and Work-only `work`.
+Children cannot ask operator questions, delegate, or use background shell
+tools. They inherit the parent's approval and directory boundaries. Custom
+tool lists can only narrow the parent catalog. Children share the workspace;
+parallel writers must be given non-overlapping work. Separate working copies,
+background Agent completion notifications, and direct operator conversations
+with a child are not implemented.
+
+Children start with their own role prompt, applicable workspace instructions,
+and the delegated task, without parent history or pasted images. Their model,
+thinking, context window, service tier, and speed are resolved at creation
+and retained when continued. Without a configured model they inherit the
+parent's current choices. Explicit models must exist and have credentials;
+an unavailable Agent is omitted with an English diagnostic. Per-model options
+without an explicit model are ignored. Invalid gears or slots are diagnosed
+and fall back without disabling the Agent.
+
+`agents.maxConcurrent` defaults to 4 and accepts 1 through 8. It limits active
+child invocations, including multiple instances of the same Agent. Adjacent
+`task` calls may overlap; other tools are serial execution barriers. Parent
+cancellation stops running and queued children. Approval interactions are
+queued and identify the source child. Headless calls requiring an operator
+are denied by the same parent policy.
+
+`/agents` lists definitions and settings. While idle it accepts `on`, `off`,
+`concurrency <1-8>`, `model <name> [provider model]`, and
+`thinking|context|tier|speed <name> [value]`. Omitting the value clears that
+choice. Model-specific completions use the Agent's model. Built-in settings
+are saved to `config.json`; custom settings go to the corresponding manifest.
+`--agents on|off` and `--agents-concurrency <n>` affect only the process.
+
+Custom definitions live in `~/.crystal/agents/<name>/` and
+`<workspace>/.crystal/agents/<name>/`, containing `agent.json` and `prompt.md`.
+`description` is required; `enabled` defaults false. A workspace entry replaces
+the entire Home entry, including when disabled or invalid. Built-in names are
+reserved. Built-in role prompts do not add prompt-overlay filenames.
+
+`/child` opens a filterable child picker, `/child <unique-id-prefix>` inspects
+one child, and `/child parent` returns. Inspection works during a turn and is
+read-only: ordinary submitted text targets the parent. Esc returns only when
+the composer is empty and no modal owns the key. Child chrome uses the child's
+model and usage; other child streams do not mix into it. Saved-session lists
+continue to show only parents.
+
+Children retain their archive and compacted model context, model choices,
+usage, todos, and image references inside the parent session file. Resume and
+fork carry these records without adding their usage again; clear drops them.
+Interrupted processes do not restart child tasks automatically. Continuing a
+child rechecks current mode and directory boundaries and cannot widen the
+originating parent turn's tool ceiling. Token totals include child model and
+compaction calls, using provider-reported usage only. Context estimates stay
+separate and are shown with `~`. A text child has no `view_image`; an
+image-capable child's tool images go only into that child. `describe_image`
+remains a tool-free side request. Child images use the existing media store
+and JSON export inlines available bytes.
+
 ## Deferred product work
 
 The same items are bucketed in [TODO.md](TODO.md). That file does not add
@@ -240,7 +305,6 @@ authoritative.
 The following capabilities are part of the product direction but are not yet
 implemented in the current build:
 
-- parent/child Agents through `Crystal.Harness.AgentHarness`;
 - MCP servers;
 - the Agent Client Protocol (ACP). An editor would drive a session over
   stdio. That is another front end, not an engine protocol. The terminal
@@ -270,13 +334,12 @@ implemented in the current build:
   field, or command for it. Context compaction, microcompaction, hiding
   Thinking panels, and a provider's summarized thinking display are not
   this path;
-- configurable serial or concurrent execution of one tool-call batch. Today
-  Work and Plan both run every batch serially, including image-capable turns.
-  The setting, its default, its scope, which calls may overlap, and how
-  approval prompts, the single progress row, grants, and side-effect tools
-  stay ordered are not defined. Do not reserve a configuration field or
-  command for it. Crystal's concurrent tool mode is not that setting by
-  itself;
+- configurable serial or concurrent execution of ordinary tool-call batches.
+  Ordinary Work and Plan tools remain serial, including image-capable turns.
+  Adjacent child `task` calls have their own bounded concurrency. A general
+  concurrency setting, its default and scope, and ordering for unrelated
+  side effects are not defined. Do not reserve a configuration field or
+  command for general tool concurrency;
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
@@ -296,10 +359,10 @@ requirement, model choice, and the fate of the original thinking are defined.
 It runs after a thinking pass and summarizes that thinking. It is not context
 compaction, microcompaction, `verboseThinking`, or `thinkingDisplay`.
 
-TODO: add configurable serial or concurrent tool execution only after the
-setting, its default, its scope, and the ordering of approval, progress,
-grants, and side-effect tools are defined. The current serial batch stands
-until then.
+TODO: add configurable serial or concurrent execution of ordinary tools only
+once its default, scope, and ordering of approval, progress, grants, and side
+effects are defined. Ordinary tools remain serial; adjacent child task groups
+have the bounded concurrency described above.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.

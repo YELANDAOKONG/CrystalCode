@@ -31,7 +31,7 @@ namespace CrystalCode.Engine.Sessions;
 /// <see cref="ISessionObserver"/> that receives <see cref="SessionEvent"/>
 /// values, answers prompts, and drives the session through its public methods.
 /// </summary>
-public sealed class CodingSession : ITurnObserver
+public sealed partial class CodingSession : ITurnObserver
 {
     private IStreamingChatClient _client;
     private IStreamingChatClient? _approvalClient;
@@ -57,6 +57,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly object _usageGate = new();
     private readonly SessionReviewContext _reviewContext = new();
     private readonly SessionLedger _ledger = new();
+    private ChildSessionStore _children = new();
     private readonly TodoList _todos = new();
     private readonly MessageQueue _queue = new();
     private Task _promptHistoryTail = Task.CompletedTask;
@@ -741,6 +742,7 @@ public sealed class CodingSession : ITurnObserver
         finally
         {
             _backgroundTasks.Dispose();
+            ReleaseChildClients();
             DisposeClient();
         }
     }
@@ -1020,6 +1022,12 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Fork:
                 await ForkSessionAsync(command.Argument, cancellationToken);
+                return (true, false);
+            case SessionVerb.Agents:
+                ChangeAgents(command.Argument);
+                return (true, false);
+            case SessionVerb.Child:
+                await ShowChildAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Sessions:
                 ShowSessions(command.Argument);
@@ -2383,6 +2391,11 @@ public sealed class CodingSession : ITurnObserver
         var document = CreateDocument();
         document.Items = TranscriptCodec.Write(TranscriptExport.ConversationItems(ArchiveSnapshot()));
         document.UpdatedUtc = DateTimeOffset.UtcNow;
+        document.Children = document.Children.Select(child => child with
+        {
+            Images = [.. SessionMapper.WriteImages(_sessionStore.ReadImages(child.Images).Values),
+                .. child.Images.Where(image => !_sessionStore.ReadImages(child.Images).ContainsKey(image.Number))]
+        }).ToList();
         return document;
     }
     private void WriteExportFile(string path, string contents)
@@ -3270,12 +3283,21 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var protocol = settings.ActiveProvider.Protocol;
+        IStreamingMultimodalChatClient? client;
         if (_plugins.Clients.Any(factory => factory.CanCreate(protocol)))
         {
-            return MultimodalChatClientFactory.Create(settings, apiKey, _plugins);
+            client = MultimodalChatClientFactory.Create(settings, apiKey, _plugins);
         }
-
-        return _loadedPlugins.CreateMultimodal(settings, apiKey);
+        else
+        {
+            client = _loadedPlugins.CreateMultimodal(settings, apiKey);
+        }
+        if (client is not null && !client.Capabilities.Inputs.Any(input => input.Modality == ContentModality.Image))
+        {
+            DisposeClient(client);
+            return null;
+        }
+        return client;
     }
 
     private void DisposeClient()
@@ -3646,6 +3668,7 @@ public sealed class CodingSession : ITurnObserver
         // Stay on the turn's list. A pruned copy would miss assistant and tool
         // messages added later in this round, and returning that same list
         // would let the turn clear the source it then copies from.
+        _parentModelContext = transcript;
         _reviewContext.Conversation = transcript;
         var changed = TryMicrocompact(transcript, out var current);
         if (changed)
@@ -3653,7 +3676,7 @@ public sealed class CodingSession : ITurnObserver
             CloseRecallWindow();
         }
 
-        if (!NeedsCompaction(current, changed ? null : ShownUsage()))
+        if (!NeedsCompaction(current, changed || _parentContextEstimated ? null : ShownUsage()))
         {
             return changed
                 ? new CompactionOutcome([.. current], CompactionKind.Applied)
@@ -3768,7 +3791,13 @@ public sealed class CodingSession : ITurnObserver
 
     private void SaveSession()
     {
-        _sessionStore.Save(CreateDocument());
+        lock (_childGate)
+        {
+            lock (_usageGate)
+            {
+                _sessionStore.Save(CreateDocument());
+            }
+        }
     }
 
     private SessionDocument CreateDocument()
@@ -3788,8 +3817,8 @@ public sealed class CodingSession : ITurnObserver
             PlanMode = _planMode,
             Access = _workspace.Access.Snapshot(),
             CreatedUtc = _sessionCreatedUtc,
-            Items = TranscriptCodec.Write(_transcript),
-            Archive = TranscriptCodec.Write(archiveSnapshot),
+            Items = TranscriptCodec.Write(_turnActive ? CheckpointItems(_parentModelContext ?? _transcript) : _transcript),
+            Archive = TranscriptCodec.Write(_turnActive ? CheckpointItems(archiveSnapshot) : archiveSnapshot),
             ImageMarkersTagged = true,
             Images =
             [
@@ -3798,11 +3827,15 @@ public sealed class CodingSession : ITurnObserver
                 .. _unavailableImages.Where(image => referencedMarkers.Contains(ImageMarkerText.Tag(image.Number)))
             ],
             Todos = SessionMapper.WriteTodos(_todos.Snapshot()),
-            UserTurns = _ledger.UserTurns,
-            ModelCalls = _ledger.ModelCalls,
-            ToolCalls = _ledger.ToolCalls,
-            Usage = SessionMapper.WriteUsage(_ledger.Usage),
-            CumulativeUsage = SessionMapper.WriteUsage(_ledger.CumulativeUsage)
+            UserTurns = _ledger.UserTurns + (_turnActive ? 1 : 0),
+            ModelCalls = _turnActive && _sharedBudget is not null ? _turnModelCallsBaseline + _sharedBudget.ModelCalls : _ledger.ModelCalls,
+            ToolCalls = _turnActive && _sharedBudget is not null ? _turnToolCallsBaseline + _sharedBudget.ToolCalls : _ledger.ToolCalls,
+            Usage = SessionMapper.WriteUsage(_turnActive ? ShownUsage() : _ledger.Usage),
+            CumulativeUsage = SessionMapper.WriteUsage(_turnActive
+                ? _parentTurnUsage is not null && (_ledger.ModelCalls == 0 || _ledger.CumulativeUsage is not null)
+                    ? SessionLedger.Add(_ledger.CumulativeUsage, _parentTurnUsage) : null
+                : _ledger.CumulativeUsage),
+            Children = _children.Snapshot().ToList()
         };
     }
 
@@ -3828,6 +3861,8 @@ public sealed class CodingSession : ITurnObserver
         _unavailableImages.Clear();
         _pendingImages.Clear();
         _draftImages.Clear();
+        _children.Clear();
+        ReleaseChildClients();
         _ledger.Clear();
         _todos.Clear();
         BindReviewConversation();
@@ -4191,12 +4226,14 @@ public sealed class CodingSession : ITurnObserver
         _draftImages.Clear();
         lock (_imagesGate)
         {
-            _nextImageNumber = NextImageNumber();
+            _nextImageNumber = Math.Max(NextImageNumber(), (document.Children ?? [])
+                .Where(child => child is not null).SelectMany(child => child.Images ?? []).Select(image => image.Number).DefaultIfEmpty(0).Max() + 1);
         }
         ReplaceLiveSystem();
 
         _todos.Clear();
         _todos.Replace(SessionMapper.ReadTodos(document.Todos));
+        _children = new ChildSessionStore(document.Children);
         _ledger.Restore(
             Math.Max(0, document.UserTurns),
             Math.Max(0, document.ModelCalls),
@@ -4241,9 +4278,9 @@ public sealed class CodingSession : ITurnObserver
 
     private void RememberCompactedUsage()
     {
-        var input = TokenEstimator.Items(_transcript);
-        _ledger.ReplaceUsage(new TokenUsage(input, 0));
+        _parentContextEstimated = true;
         ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
+        Publish(new ContextEstimated(TokenEstimator.Items(_transcript)));
     }
 
     private bool HasConversation() =>
@@ -4252,7 +4289,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void RebuildExecutors()
     {
-        var approvalPrompt = _frontEnd.Approvals;
+        var approvalPrompt = new ChildApprovalPrompt(_frontEnd.Approvals, () => _childOrigin.Value);
         var question = _frontEnd.Questions;
         var reviewer = new ModelApprovalReviewer(
             ReviewerClient(),
@@ -4275,9 +4312,36 @@ public sealed class CodingSession : ITurnObserver
             _external.AutomaticTools,
             (call, classification) => _hooks.OnApproval(call, classification));
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
+        var childPlanTools = WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), question, _plugins, _skills,
+            _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools).Definitions
+            .Select(tool => tool.Name).Append(ViewImageTool.ToolName).ToHashSet(StringComparer.Ordinal);
+        async ValueTask<ToolInvocationDecision> DecideAsync(ToolCall call, CancellationToken token)
+        {
+            await _approvalQueue.WaitAsync(token);
+            var previous = _reviewContext.Conversation;
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                if (_childOrigin.Value is not null && EffectiveChildPlanMode && !childPlanTools.Contains(call.Name))
+                {
+                    return ToolInvocationDecision.Reject(new ToolOutput("This tool is outside the parent Plan ceiling.", ToolResultStatus.Failure));
+                }
+                if (_childConversation.Value is { } conversation)
+                {
+                    _reviewContext.Conversation = conversation();
+                }
+                return await policy.DecideAsync(call, token);
+            }
+            finally
+            {
+                _reviewContext.Conversation = previous;
+                _approvalQueue.Release();
+            }
+        }
+        _childPolicy = DecideAsync;
         var imageDescriber = CreateImageDescriber();
         var workExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreateWork(
+            WithTask(WorkspaceCatalog.CreateWork(
                 _workspace,
                 _todos,
                 question,
@@ -4288,12 +4352,12 @@ public sealed class CodingSession : ITurnObserver
                 _loadedPlugins,
                 imageDescriber,
                 _backgroundTasks,
-                _settings.DisabledBuiltInTools),
+                _settings.DisabledBuiltInTools), planMode: false),
             options,
-            policy.DecideAsync,
+            DecideAsync,
             HarnessExceptionMapper.MapAsync);
         var planExecutor = new ToolExecutor(
-            WorkspaceCatalog.CreatePlan(
+            WithTask(WorkspaceCatalog.CreatePlan(
                 _workspace,
                 _todos,
                 question,
@@ -4302,23 +4366,23 @@ public sealed class CodingSession : ITurnObserver
                 _external,
                 _loadedPlugins,
                 imageDescriber,
-                _settings.DisabledBuiltInTools),
+                _settings.DisabledBuiltInTools), planMode: true),
             options,
-            policy.DecideAsync,
+            DecideAsync,
             HarnessExceptionMapper.MapAsync);
-        _workExecutor = new PluginToolExecutor(workExecutor, _hooks);
-        _planExecutor = new PluginToolExecutor(planExecutor, _hooks);
+        _workExecutor = new TaskBatchExecutor(new PluginToolExecutor(workExecutor, _hooks));
+        _planExecutor = new TaskBatchExecutor(new PluginToolExecutor(planExecutor, _hooks));
         _workMultimodalExecutor = new PluginMultimodalExecutor(
             new HybridMultimodalToolExecutor(
-                workExecutor,
+                new TaskBatchExecutor(workExecutor),
                 CreateMultimodalTools(question, HostToolCatalog.Work),
-                policy),
+                DecideAsync),
             _hooks);
         _planMultimodalExecutor = new PluginMultimodalExecutor(
             new HybridMultimodalToolExecutor(
-                planExecutor,
+                new TaskBatchExecutor(planExecutor),
                 CreateMultimodalTools(question, HostToolCatalog.Plan),
-                policy),
+                DecideAsync),
             _hooks);
     }
 
@@ -5344,6 +5408,8 @@ public sealed class CodingSession : ITurnObserver
             CompactionThinkingCompletions(),
             CatalogSlotCompletions.For(_settings.ActiveModel.ServiceTiers),
             CatalogSlotCompletions.For(_settings.ActiveModel.Speeds));
+        menu = menu.Select(command => command.Name == "agents"
+            ? command with { Arguments = AgentCompletions() } : command).ToArray();
         Publish(new SlashCommandsChanged(menu));
     }
 
@@ -5665,6 +5731,8 @@ public sealed class CodingSession : ITurnObserver
             or SessionVerb.Stats
             or SessionVerb.Todos
             or SessionVerb.Sessions
+            or SessionVerb.Agents
+            or SessionVerb.Child
             or SessionVerb.Tokens
             or SessionVerb.Verbose
             or SessionVerb.StatusLine
@@ -5804,6 +5872,19 @@ public sealed class CodingSession : ITurnObserver
 
         _turnUserText = message;
         _turnFault = null;
+        _turnModelCallsBaseline = _ledger.ModelCalls;
+        _turnToolCallsBaseline = _ledger.ToolCalls;
+        _parentModelContext = null;
+        _childParentPlanMode = _planMode;
+        _childSlots.Dispose();
+        _childSlots = new SemaphoreSlim(_settings.Agents.MaxConcurrent, _settings.Agents.MaxConcurrent);
+        _sharedBudget = new SharedTurnBudget(_settings.ExecutionBudget);
+        _childModelCalls = 0;
+        _childToolCalls = 0;
+        _childTurnUsage = null;
+        _childUsageComplete = true;
+        _parentTurnUsage = null;
+        _childLiveUsage.Clear();
         try
         {
             await _hooks.OnTurnStartedAsync(
@@ -5889,7 +5970,8 @@ public sealed class CodingSession : ITurnObserver
                 ImageSnapshot,
                 CommitArchive,
                 PrepareOutboundAsync,
-                (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token));
+                (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token),
+                _sharedBudget);
             return multimodalTurn.RunAsync(_transcript, cancellationToken);
         }
 
@@ -5903,7 +5985,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.Retry.ToOptions(),
             CommitArchive,
             PrepareOutboundAsync,
-            (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token));
+            (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token),
+            _sharedBudget);
         return turn.RunAsync(_transcript, cancellationToken);
     }
 
@@ -6223,7 +6306,10 @@ public sealed class CodingSession : ITurnObserver
             _nextImageNumber = Math.Max(_nextImageNumber, NextImageNumber());
         }
         BindReviewConversation();
-        _ledger.Record(result);
+        lock (_usageGate)
+        {
+            _ledger.Record(result);
+        }
 
         if (result.StopReason == TurnStopReason.Completed)
         {
@@ -6245,8 +6331,16 @@ public sealed class CodingSession : ITurnObserver
             _shownCumulative = _ledger.CumulativeUsage;
         }
 
+        var reported = result;
+        if (_childModelCalls > 0)
+        {
+            var accumulated = _childUsageComplete && result.AccumulatedUsage is not null && _childTurnUsage is not null
+                ? SessionLedger.Add(result.AccumulatedUsage, _childTurnUsage) : null;
+            reported = new TurnResult(result.StopReason, checked(result.ModelCallCount + _childModelCalls),
+                checked(result.ToolCallCount + _childToolCalls), result.Usage, result.Transcript, accumulated);
+        }
         Publish(new TurnFinished(
-            result,
+            reported,
             usage,
             _ledger.CumulativeUsage,
             _settings.ContextWindow));
@@ -6264,7 +6358,17 @@ public sealed class CodingSession : ITurnObserver
             CloseRecallWindow();
         }
 
-        _frontEnd.Observer.OnEvent(sessionEvent);
+        lock (_eventGate)
+        {
+            _frontEnd.Observer.OnEvent(sessionEvent);
+            if (sessionEvent is HistoryReplayed)
+            {
+                foreach (var child in _children.Snapshot())
+                {
+                    _frontEnd.Observer.OnEvent(new ChildSessionChanged(child, Guid.Empty));
+                }
+            }
+        }
     }
 
     private void Note(string text)
@@ -6352,6 +6456,12 @@ public sealed class CodingSession : ITurnObserver
         PromoteAfterTools();
     }
 
+    void ITurnObserver.OnContextEstimated(int tokens)
+    {
+        _parentContextEstimated = true;
+        Publish(new ContextEstimated(tokens));
+    }
+
     void ITurnObserver.OnFault(string message)
     {
         CloseRecallWindow();
@@ -6371,14 +6481,14 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        _parentContextEstimated = false;
         TokenUsage? usage;
         TokenUsage? cumulative;
         lock (_usageGate)
         {
             usage = contextUsage ?? _shownUsage;
-            cumulative = turnCumulativeUsage is not null
-                ? SessionLedger.Add(_turnCumulativeBaseline, turnCumulativeUsage)
-                : _shownCumulative;
+            _parentTurnUsage = turnCumulativeUsage;
+            cumulative = LiveCumulativeUsage();
         }
 
         ShowUsage(usage, cumulative, interim: true);

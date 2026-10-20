@@ -337,6 +337,8 @@ public sealed class CodingSessionHeadlessTests
             SessionVerb.Stats,
             SessionVerb.Todos,
             SessionVerb.Sessions,
+            SessionVerb.Child,
+            SessionVerb.Agents,
             SessionVerb.Tokens,
             SessionVerb.Verbose,
             SessionVerb.StatusLine,

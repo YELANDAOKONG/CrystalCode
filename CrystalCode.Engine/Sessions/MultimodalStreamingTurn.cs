@@ -13,6 +13,7 @@ namespace CrystalCode.Engine.Sessions;
 /// <summary>Runs an image-capable user turn while preserving the text transcript.</summary>
 public sealed class MultimodalStreamingTurn
 {
+    private SharedTurnBudget? _budget;
     private readonly IStreamingMultimodalChatClient _client;
     private readonly IMultimodalToolExecutor _executor;
     private readonly TurnLimits _limits;
@@ -91,7 +92,8 @@ public sealed class MultimodalStreamingTurn
         Func<IDictionary<int, ImageAttachment>> imageSnapshot,
         Action<IReadOnlyList<ChatItem>>? commit = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null,
-        Func<ChatResponse, CancellationToken, Task>? onModelResponse = null)
+        Func<ChatResponse, CancellationToken, Task>? onModelResponse = null,
+        SharedTurnBudget? budget = null)
         : this(client, executor, limits, images, observer, reasoning, compactBeforeRound, retry)
     {
         _reserveImageNumber = reserveImageNumber;
@@ -99,6 +101,7 @@ public sealed class MultimodalStreamingTurn
         _imageSnapshot = imageSnapshot;
         _commit = commit;
         _prepareModel = prepareModel;
+        _budget = budget;
         _onModelResponse = onModelResponse;
     }
 
@@ -144,8 +147,8 @@ public sealed class MultimodalStreamingTurn
                     }
                 }
 
-                if (_limits.MaximumModelCalls is int maximumModelCalls
-                    && modelCallCount >= maximumModelCalls)
+                if ((_limits.MaximumModelCalls is int maximumModelCalls
+                    && modelCallCount >= maximumModelCalls) || _budget?.TryModelCall() == false)
                 {
                     _observer?.OnModelRoundClosed();
                     return Create(
@@ -200,8 +203,8 @@ public sealed class MultimodalStreamingTurn
                         transcript);
                 }
 
-                if (_limits.MaximumToolCalls is int maximumToolCalls
-                    && toolCalls.Length > maximumToolCalls - toolCallCount)
+                if ((_limits.MaximumToolCalls is int maximumToolCalls
+                    && toolCalls.Length > maximumToolCalls - toolCallCount) || _budget?.TryToolBatch(toolCalls.Length) == false)
                 {
                     CandidateRound.AppendWithoutToolCalls(transcript, candidate.Items);
                     Commit(transcript, marked);
@@ -234,9 +237,7 @@ public sealed class MultimodalStreamingTurn
                 transcript.AddRange(toolResults);
                 Commit(transcript, marked);
                 _observer?.OnToolResults(toolResults);
-                _observer?.OnUsageUpdated(
-                    new TokenUsage(TokenEstimator.Items(transcript), 0),
-                    usage.Build());
+                _observer?.OnContextEstimated(TokenEstimator.Items(transcript));
             }
         }
         catch (OperationCanceledException) when (durationSource.IsCancellationRequested)
@@ -312,26 +313,35 @@ public sealed class MultimodalStreamingTurn
         CancellationToken cancellationToken)
     {
         var assembler = new ChatStreamAssembler();
-        await foreach (var streamEvent in _client.StreamAsync(request, cancellationToken))
+        TokenUsage? attemptUsage = null;
+        try
         {
-            var converted = MultimodalStreamAdapter.Convert(streamEvent);
-            if (converted is null)
+            await foreach (var streamEvent in _client.StreamAsync(request, cancellationToken))
             {
-                continue;
+                var converted = MultimodalStreamAdapter.Convert(streamEvent);
+                if (converted is null)
+                {
+                    continue;
+                }
+                _observer?.OnStreamEvent(converted);
+                if (converted is ChatUsageReceived { Usage: not null } usageReceived)
+                {
+                    attemptUsage = usageReceived.Usage;
+                    _observer?.OnUsageUpdated(attemptUsage, usage.Preview(attemptUsage));
+                }
+                assembler.Apply(converted);
             }
-
-            _observer?.OnStreamEvent(converted);
-            if (converted is ChatUsageReceived { Usage: not null } usageReceived)
-            {
-                _observer?.OnUsageUpdated(
-                    usageReceived.Usage,
-                    usage.Preview(usageReceived.Usage));
-            }
-
-            assembler.Apply(converted);
+            return assembler.ToResponse();
         }
-
-        return assembler.ToResponse();
+        catch
+        {
+            if (attemptUsage is not null)
+            {
+                usage.Add(attemptUsage);
+                _observer?.OnUsageUpdated(attemptUsage, usage.Build());
+            }
+            throw;
+        }
     }
 
     private TurnResult Create(

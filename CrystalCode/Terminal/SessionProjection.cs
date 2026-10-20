@@ -9,7 +9,7 @@ namespace CrystalCode.Terminal;
 /// <summary>
 /// Projects session events onto the terminal shell.
 /// </summary>
-internal sealed class SessionProjection : ISessionObserver
+internal sealed partial class SessionProjection : ISessionObserver
 {
     private readonly SessionRenderer _renderer;
 
@@ -19,7 +19,7 @@ internal sealed class SessionProjection : ISessionObserver
         _renderer = renderer;
     }
 
-    public void OnEvent(SessionEvent sessionEvent)
+    private void Project(SessionEvent sessionEvent)
     {
         ArgumentNullException.ThrowIfNull(sessionEvent);
         switch (sessionEvent)
@@ -100,6 +100,9 @@ internal sealed class SessionProjection : ISessionObserver
                 break;
             case SideQuestionSnapshot side:
                 _renderer.ShowSideQuestion(side);
+                break;
+            case ContextEstimated estimated:
+                _renderer.ShowContextEstimate(estimated.Tokens);
                 break;
             case UsageChanged usage:
                 _renderer.ContextWindow = usage.ContextWindow;
