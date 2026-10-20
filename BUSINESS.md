@@ -274,14 +274,22 @@ Custom definitions live in `~/.crystal/agents/<name>/` and
 `<workspace>/.crystal/agents/<name>/`, containing `agent.json` and `prompt.md`.
 `description` is required; `enabled` defaults false. A workspace entry replaces
 the entire Home entry, including when disabled or invalid. Built-in names are
-reserved. Built-in role prompts do not add prompt-overlay filenames.
+reserved. Built-in role prompts do not add prompt-overlay filenames. They start with the
+resolved Work prompt (`general` and `work`) or Plan prompt (`explore`, and any
+child created during a parent Plan turn), then append the built-in child role
+and safety rules. Prompt overrides, bindings, and the selected Work/Plan
+attachments therefore apply to built-ins as well as custom Agents.
 
 `/child` opens a filterable child picker, `/child <unique-id-prefix>` inspects
-one child, and `/child parent` returns. Inspection works during a turn and is
-read-only: ordinary submitted text targets the parent. Esc returns only when
-the composer is empty and no modal owns the key. Child chrome uses the child's
-model and usage; other child streams do not mix into it. Saved-session lists
-continue to show only parents.
+one child, and `/child parent` returns. F7 opens the picker from either view;
+F7 and Esc in the child picker dismiss it. Inspection works during a turn and
+is read-only: child text input, paste, and submit are ignored, while the
+parent's composer draft remains untouched. Esc returns to the parent at any
+draft state when no modal owns the key. Child identity and navigation hints
+stay in the view chrome, not duplicate transcript or footer rows. F7 and `/child`
+are unavailable after Agents are disabled. Child chrome uses the child's model
+and usage; other child streams do not mix into it. Saved-session lists continue
+to show only parents.
 
 Children retain their archive and compacted model context, model choices,
 usage, todos, and image references inside the parent session file. Resume and

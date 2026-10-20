@@ -39,6 +39,20 @@ public sealed class SessionRenderer : IDisposable
     private readonly List<string> _modalOverlay = [];
     private readonly List<string> _queueItems = [];
     private string[] _childRows = [];
+    private IReadOnlyList<ChildSessionDocument> _childSessions = [];
+
+    internal string? ChildFocus { get; private set; }
+
+    internal IReadOnlyList<ChildSessionDocument> ChildSessions
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _childSessions;
+            }
+        }
+    }
     private readonly List<TodoBarItem> _todoItems = [];
     private IRenderable? _overlayWidget;
     private readonly List<SlashOption> _slashOptions = [];
@@ -99,6 +113,10 @@ public sealed class SessionRenderer : IDisposable
     public Action? OnSideCleared { get; set; }
 
     public bool ChildViewActive { get; set; }
+
+    public bool ChildSessionsEnabled { get; set; } = true;
+
+    internal Action<string>? OnChildShortcut { get; set; }
 
     public Action? OnSideCancelled { get; set; }
 
@@ -295,6 +313,17 @@ public sealed class SessionRenderer : IDisposable
             lock (_gate)
             {
                 return _chrome.Progress;
+            }
+        }
+    }
+
+    internal string ChromeModel
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _chrome.Model;
             }
         }
     }
@@ -583,6 +612,7 @@ public sealed class SessionRenderer : IDisposable
         {
             CommitLiveUnlocked();
             AddHelpUnlocked(
+                "f7           Inspect child sessions; Esc returns to parent",
                 "enter        Submit; queue while working",
                 "empty enter  Send the queue now",
                 "queue        Stays above the composer; sends after this tool or turn",
@@ -776,6 +806,26 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    internal void ResetView()
+    {
+        lock (_gate)
+        {
+            ClearConversation();
+            ClearRetryUnlocked();
+            _turnClock = null;
+            _toolNames.Clear();
+            _toolCallNames.Clear();
+            _todoItems.Clear();
+            _streamedCharacters = 0;
+            _chrome.Activity = string.Empty;
+            _chrome.Progress = string.Empty;
+            _chrome.Elapsed = string.Empty;
+            _chrome.TokenEstimate = string.Empty;
+            _chrome.ToolCount = 0;
+            ApplyUsageUnlocked(null, null, ContextWindow);
+        }
+    }
+
     public void SeedPromptHistory(IEnumerable<string> entries)
     {
         lock (_gate)
@@ -956,19 +1006,9 @@ public sealed class SessionRenderer : IDisposable
         lock (_gate)
         {
             ChildViewActive = focus is not null;
-            var rows = new List<string>();
-            if (focus is not null && children.FirstOrDefault(child => child.Id == focus) is { } current)
-            {
-                rows.Add($"Child · {current.Agent} · {current.Label} · {current.Id[..Math.Min(8, current.Id.Length)]}  /child parent returns");
-                rows.Add("Send to parent; child transcript is read-only.");
-            }
-            else if (children.Count > 0)
-            {
-                rows.Add($"Child sessions: {children.Count}  /child inspects");
-                rows.AddRange(children.Where(child => child.Status is "running" or "queued").Take(8)
-                    .Select(child => $"  {child.Label} · {child.Agent} · {child.Status} · {child.Id[..Math.Min(8, child.Id.Length)]}"));
-            }
-            _childRows = rows.ToArray();
+            ChildFocus = focus;
+            _childSessions = children.ToArray();
+            _childRows = [];
             PaintUnlocked(force: true);
         }
     }
@@ -1655,6 +1695,23 @@ public sealed class SessionRenderer : IDisposable
             return null;
         }
 
+        if (ChildSessionsEnabled && !_fullPageOverlay && !_sideOpen
+            && item is InputKey { Key: ConsoleKey.F7, Modifiers: ConsoleModifiers.None })
+        {
+            return "/child";
+        }
+
+        if (ChildViewActive && !_fullPageOverlay && !_sideOpen)
+        {
+            return item switch
+            {
+                InputKey { Key: ConsoleKey.Escape, Modifiers: ConsoleModifiers.None } => "/child parent",
+                InputKey key when ScrollInput.TryKeyScroll(key, true, pageRows, out var delta) => ScrollChildUnlocked(delta),
+                InputWheel wheel => ScrollChildUnlocked(wheel.Delta),
+                _ => null
+            };
+        }
+
         if (item is InputKey { Key: ConsoleKey.F6, Modifiers: ConsoleModifiers.None }
             && !_fullPageOverlay && !_sideOpen)
         {
@@ -1707,6 +1764,12 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    private string? ScrollChildUnlocked(int delta)
+    {
+        _scrollBack = Math.Max(0, _scrollBack + delta);
+        return null;
+    }
+
     private string? DispatchFullPageUnlocked(IInputEvent item, int pageRows)
     {
         switch (item)
@@ -1745,10 +1808,6 @@ public sealed class SessionRenderer : IDisposable
 
     private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> togglePlan)
     {
-        if (key.Key == ConsoleKey.Escape && _picker is null && ChildViewActive)
-        {
-            return _composer.IsEmpty ? "/child parent" : null;
-        }
         if (_picker is not null
             && key.Key == ConsoleKey.Tab
             && !key.Modifiers.HasFlag(ConsoleModifiers.Shift))
@@ -1823,6 +1882,7 @@ public sealed class SessionRenderer : IDisposable
             "/btw         Side question; not saved. Esc or Ctrl+C closes, x clears",
             "enter        Submit; queue while working",
             "f6           Quick prompts; Tab: Fill / Send",
+            "f7           Inspect child sessions; Esc returns to parent",
             "empty enter  Send the queue now",
             "queue        Stays above the composer; sends after this tool or turn",
             "ctrl+j       Newline",
@@ -1859,7 +1919,7 @@ public sealed class SessionRenderer : IDisposable
     {
         // A recalled slash command must keep Up/Down on history. Editing it
         // leaves history and opens the picker again.
-        if (_composer.BrowsingHistory || _modalOverlay.Count > 0 || _overlayWidget is not null)
+        if (ChildViewActive || _composer.BrowsingHistory || _modalOverlay.Count > 0 || _overlayWidget is not null)
         {
             _picker = null;
             return;
@@ -1965,7 +2025,7 @@ public sealed class SessionRenderer : IDisposable
             return;
         }
 
-        var composerView = _composer.Project(width, ShellLayout.MaxComposerRows);
+        var composerView = ProjectComposer(width, ShellLayout.MaxComposerRows);
         var overlay = OverlayLines(width);
         var queue = QueueLines(width);
         var todos = TodoLines(width);
@@ -1980,7 +2040,7 @@ public sealed class SessionRenderer : IDisposable
             todos.Count);
         if (composerView.Lines.Count > regions.ComposerRows)
         {
-            composerView = _composer.Project(width, regions.ComposerRows);
+            composerView = ProjectComposer(width, regions.ComposerRows);
         }
 
         if (!_sideOpen)
@@ -2009,7 +2069,7 @@ public sealed class SessionRenderer : IDisposable
             resetFrame,
             progressWanted == 0 ? null : _chrome.ProgressLine(regions.Width),
             todos,
-            showCursor: !_composerPaused && !_sideOpen);
+            showCursor: !_composerPaused && !_sideOpen && !ChildViewActive);
         _paintedWidth = regions.Width;
         _paintedHeight = regions.Height;
         _lastPaint = now;
@@ -2416,10 +2476,19 @@ public sealed class SessionRenderer : IDisposable
         _childRows.Select(row => PaintLine.Colored(Theme.Chrome, row).Fit(width))
             .Concat(TodoBar.Lines(_todoItems, width)).ToArray();
 
+    internal ComposerView ProjectComposer(int width, int maximumRows)
+    {
+        if (ChildViewActive)
+        {
+        return new ComposerView([PaintLine.Blank], 0, 0);
+        }
+        return _composer.Project(width, maximumRows);
+    }
+
     private ShellRegions CurrentRegions()
     {
         _ = ScreenSize.TryRead(out var width, out var height);
-        var composerView = _composer.Project(width, ShellLayout.MaxComposerRows);
+        var composerView = ProjectComposer(width, ShellLayout.MaxComposerRows);
         var progressWanted = string.IsNullOrWhiteSpace(_chrome.Progress) ? 0 : 1;
         return ShellLayout.Measure(
             width,

@@ -44,26 +44,71 @@ public sealed class ChildProjectionTests
         Assert.Contains("1000 IN", renderer.ChromeUsage, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData("", "/child parent")]
-    [InlineData("draft", null)]
-    public async Task ChildEscape_ReturnsOnlyWhenComposerIsEmpty(string draft, string? expected)
+    [Fact]
+    public void AgentsDisabled_ClearsChildFocusAndShortcutAvailability()
     {
-        var renderer = new SessionRenderer { ChildViewActive = true };
-        if (draft.Length > 0)
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Label = "research" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        Assert.True(renderer.ChildViewActive);
+        Assert.True(renderer.ChildSessionsEnabled);
+        projection.OnEvent(new ChromeChanged(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: false)));
+        Assert.False(renderer.ChildViewActive);
+        Assert.False(renderer.ChildSessionsEnabled);
+        Assert.Empty(renderer.ChildSessions);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("draft")]
+    [InlineData("/model")]
+    public async Task ChildView_BlocksSubmissionAndEditingAndEscapePreservesParentDraft(string draft)
+    {
+        using var renderer = new SessionRenderer { ChildViewActive = true };
+        renderer.SeedComposer(draft);
+        var toggled = false;
+        foreach (var key in new[]
         {
-            renderer.SeedComposer(draft);
+            new ConsoleKeyInfo('x', ConsoleKey.X, false, false, false),
+            new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false),
+            new ConsoleKeyInfo('\t', ConsoleKey.Tab, false, false, false),
+            new ConsoleKeyInfo('\0', ConsoleKey.F6, false, false, false),
+            new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true)
+        })
+        {
+            Assert.Null(await renderer.DispatchBurstAsync([key], () => toggled = true,
+                CancellationToken.None, checkSize: false));
         }
-        var submitted = await renderer.DispatchBurstAsync(
+        Assert.False(toggled);
+        Assert.All(renderer.ProjectComposer(80, 8).Lines, line => Assert.True(string.IsNullOrWhiteSpace(line.Plain)));
+        Assert.Equal("/child parent", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false);
-        Assert.Equal(expected, submitted);
-        if (draft.Length > 0)
-        {
-            var text = await renderer.DispatchBurstAsync(
-                [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-                static () => false, CancellationToken.None, checkSize: false);
-            Assert.Equal(draft, text);
-        }
+            static () => false, CancellationToken.None, checkSize: false));
+        renderer.ChildViewActive = false;
+        renderer.SetSlashCommands([]);
+        Assert.Equal(draft, await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ChildShortcut_OpensFromEitherViewAndRespectsModalOwnership(bool childView)
+    {
+        using var renderer = new SessionRenderer { ChildViewActive = childView };
+        renderer.SeedComposer("keep this draft");
+        var key = new ConsoleKeyInfo('\0', ConsoleKey.F7, false, false, false);
+        Assert.Equal("/child", await renderer.DispatchBurstAsync([key], static () => false,
+            CancellationToken.None, checkSize: false));
+        renderer.ChildSessionsEnabled = false;
+        Assert.Null(await renderer.DispatchBurstAsync([key], static () => false,
+            CancellationToken.None, checkSize: false));
+        renderer.PauseComposer();
     }
 }

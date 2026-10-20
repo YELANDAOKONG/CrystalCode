@@ -359,11 +359,21 @@ available child media using the existing store.
 
 `ChildSessionChanged`, `ChildEventReceived`, and `ChildViewRequested` convey
 immutable event records; the latter is an inspection request, not engine focus.
-The terminal owns parent/child event projections, the picker, composer routing,
-and the focused model/usage chrome. Inactive events remain available when
-switching views. The terminal never submits text to a child. Headless JSON
-labels child events and media provenance; text output keeps the returned
-summary with the task result and reports child usage separately.
+The terminal owns parent/child event projections, the F7 child picker, read-only
+child input routing, composer visibility, and the focused model/usage chrome.
+Inactive events remain available when switching views. Parent events are cached
+without being projected into a focused child, and restoring the parent replays
+them without replaying submissions into the composer. Child identity stays in
+the picker and chrome rather than persistent footer rows. Disabling Agents clears
+the terminal's child projection and navigation affordance. The terminal never
+submits text to a child. Headless JSON labels child events and media provenance;
+text output keeps the returned summary with the task result and reports child
+usage separately.
+
+Built-in child role prompts compose the resolved parent Work or Plan prompt,
+including active attachments and placeholder binding, before appending the
+built-in Agent safety/role rules. Custom Agent prompts remain independently
+configured and receive the common child safety rules and bound placeholders.
 
 Approval is a `ToolInvocationPolicy` supplied to `ToolExecutor`. Rejection
 returns Harness-authored `ToolOutput`. Tool exceptions become model-visible

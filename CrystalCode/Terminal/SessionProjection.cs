@@ -35,6 +35,7 @@ internal sealed partial class SessionProjection : ISessionObserver
                     started.Chrome.ContextWindow,
                     started.Chrome.ServiceTier,
                     started.Chrome.Speed);
+                _renderer.ChildSessionsEnabled = started.Chrome.AgentsEnabled;
                 break;
             case ChromeChanged changed:
                 _renderer.SetChrome(
@@ -47,6 +48,7 @@ internal sealed partial class SessionProjection : ISessionObserver
                     changed.Chrome.ContextWindow,
                     changed.Chrome.ServiceTier,
                     changed.Chrome.Speed);
+                _renderer.ChildSessionsEnabled = changed.Chrome.AgentsEnabled;
                 break;
             case PreferencesChanged preferences:
                 ApplyPreferences(preferences.Preferences);

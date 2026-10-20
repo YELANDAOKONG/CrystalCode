@@ -25,6 +25,50 @@ public sealed partial class ChildSessionTests
     [new ChatToolCallDelta(0, 0, id, name, arguments, ToolInputKind.Json), new ChatUsageReceived(new TokenUsage(20, 3, 1)),
         new ChatCandidateCompleted(0, FinishReason.ToolCalls)];
 
+    [Theory]
+    [InlineData("general", false, "work")]
+    [InlineData("explore", false, "plan")]
+    [InlineData("work", false, "work")]
+    [InlineData("general", true, "plan")]
+    [InlineData("explore", true, "plan")]
+    public async Task BuiltInAgent_UsesResolvedOverridesAttachmentsAndChildPlaceholders(string agent, bool plan, string promptMode)
+    {
+        var arguments = JsonSerializer.Serialize(new { agent, label = "prompt test", prompt = "inspect" });
+        using var session = new HeadlessSession(new ScriptedStreamingClient(
+            Tool("task", arguments), Text("child"), Text("parent")), settings: Settings(),
+            prepare: (home, workspace) =>
+            {
+                var projectPrompts = Path.Combine(workspace, ".crystal", "prompts");
+                Directory.CreateDirectory(home.PromptsDirectory);
+                Directory.CreateDirectory(projectPrompts);
+                var attachment = Path.Combine(home.PromptAttachmentsDirectory, "rules");
+                Directory.CreateDirectory(attachment);
+                File.WriteAllText(Path.Combine(attachment, "prompt.json"), "{\"enabled\":true}");
+                foreach (var mode in new[] { "work", "plan" })
+                {
+                    File.WriteAllText(Path.Combine(home.PromptsDirectory, mode + ".md"), "HOME OVERRIDE " + mode);
+                    File.WriteAllText(Path.Combine(projectPrompts, mode + ".md"), "PROJECT OVERRIDE " + mode + " {{session_id}} {{mode}}");
+                    File.WriteAllText(Path.Combine(attachment, mode + ".md"), "ATTACHMENT " + mode + " {{session_id}}");
+                }
+                File.WriteAllText(Path.Combine(workspace, "AGENTS.md"), "WORKSPACE RULE");
+            });
+        await session.Session.StartAsync(CancellationToken.None);
+        if (plan)
+        {
+            session.Session.TogglePlan();
+        }
+        await session.RunTurnAsync("delegate");
+        var child = Assert.Single(session.ReadSaved().Children);
+        var system = Assert.Single(child.Items, item => item.Role == "system").Text!;
+        Assert.Contains("PROJECT OVERRIDE " + promptMode, system, StringComparison.Ordinal);
+        Assert.Contains("ATTACHMENT " + promptMode + " " + child.Id, system, StringComparison.Ordinal);
+        Assert.Contains("WORKSPACE RULE", system, StringComparison.Ordinal);
+        Assert.Contains("You are a child Agent", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("HOME OVERRIDE", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("{{session_id}}", system, StringComparison.Ordinal);
+        Assert.DoesNotContain("{{mode}}", system, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Task_IsAbsentByDefaultAndCannotBeInvoked()
     {

@@ -65,6 +65,7 @@ internal sealed class TerminalHost
             persistedSettings,
             launchAccess);
         renderer.LoadQuickPromptsAsync = new QuickPromptStore(home).LoadAsync;
+        renderer.ChildSessionsEnabled = session.AgentsEnabled;
         renderer.QueueQuickPromptAsync = (text, token) => session.SubmitQuickPromptAsync(text, true, token);
         return new TerminalHost(renderer, session, launchPlan, projection);
     }
@@ -103,6 +104,7 @@ internal sealed class TerminalHost
         _renderer.OnSideCancelled = () => _session.TryCancelSideQuestion();
         _renderer.OnVerboseToggled = PersistVerboseToggle;
         await _session.StartAsync(cancellationToken);
+        _renderer.ChildSessionsEnabled = _session.AgentsEnabled;
         ApplyLaunchPlan(_session, _launchPlan);
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
@@ -115,6 +117,12 @@ internal sealed class TerminalHost
             {
                 _session.TryCancelSideQuestion();
                 _renderer.DismissSideQuestion();
+                return;
+            }
+
+            if (_projection.ReturnToParent())
+            {
+                _idleCancels = 0;
                 return;
             }
 
@@ -212,6 +220,7 @@ internal sealed class TerminalHost
             var quit = await PumpAsync(
                 _session.SubmitAsync(read.Text, promptSource.Token),
                 promptSource.Token);
+            _renderer.ChildSessionsEnabled = _session.AgentsEnabled;
             if (quit)
             {
                 return 0;

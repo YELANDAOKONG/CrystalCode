@@ -1,46 +1,62 @@
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
+using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Home;
 
 namespace CrystalCode.Terminal;
 
 internal sealed class ChildPicker(SessionRenderer renderer)
 {
+    private const int MaximumVisibleRows = 8;
+
     public async Task<string?> ChooseAsync(IReadOnlyList<ChildSessionDocument> children, CancellationToken cancellationToken)
     {
         var query = string.Empty;
-        var selected = 0;
+        var selectedId = renderer.ChildFocus;
+        var activeOnly = false;
         renderer.PauseComposer();
         try
         {
             while (true)
             {
-                var matches = children.Where(child =>
-                    (child.Id + " " + child.Label + " " + child.Agent).Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
-                selected = Math.Clamp(selected, 0, Math.Max(0, matches.Length - 1));
-                var first = Math.Max(0, selected - 7);
-                var lines = new List<string> { "Type to filter  Up/Down select  Enter inspect  Esc cancel", "Search > " + query };
-                for (var index = first; index < Math.Min(first + 8, matches.Length); index++)
-                {
-                    var child = matches[index];
-                    lines.Add($"{(index == selected ? ">" : " ")} {child.Label}  {child.Agent}  {child.Status}  "
-                        + $"input {child.CumulativeUsage?.InputTokenCount.ToString() ?? "?"} / output {child.CumulativeUsage?.OutputTokenCount.ToString() ?? "?"}");
-                    lines.Add("  " + child.Id);
-                }
-                renderer.SetOverlay(new Panel(new Text(string.Join("\n", lines))) { Header = new PanelHeader("Child Sessions"), Expand = true });
+                cancellationToken.ThrowIfCancellationRequested();
+                var current = renderer.ChildSessions;
+                var matches = Filter(current.Count > 0 ? current : children, query, activeOnly);
+                var selected = Math.Max(0, matches.ToList().FindIndex(child => child.Id == selectedId));
+                renderer.SetOverlay(Render(matches, query, selected, renderer.ChildFocus, activeOnly,
+                    ScreenSize.Width, ScreenSize.Height));
                 var key = await renderer.ReadKeyAsync(scrollPlainArrows: false, cancellationToken);
                 switch (key.Key)
                 {
-                    case ConsoleKey.Escape: return null;
-                    case ConsoleKey.Enter when matches.Length > 0: return matches[selected].Id;
-                    case ConsoleKey.UpArrow: selected = Math.Max(0, selected - 1); break;
-                    case ConsoleKey.DownArrow: selected = Math.Min(matches.Length - 1, selected + 1); break;
-                    case ConsoleKey.Backspace when query.Length > 0: query = query[..^1]; selected = 0; break;
+                    case ConsoleKey.Escape:
+                        return renderer.ChildViewActive ? "parent" : null;
+                    case ConsoleKey.F7:
+                        return null;
+                    case ConsoleKey.Enter when matches.Count > 0:
+                        return matches[selected].Id;
+                    case ConsoleKey.UpArrow when matches.Count > 0:
+                        selected = Math.Max(0, selected - 1);
+                        selectedId = matches[selected].Id;
+                        break;
+                    case ConsoleKey.DownArrow when matches.Count > 0:
+                        selected = Math.Min(matches.Count - 1, selected + 1);
+                        selectedId = matches[selected].Id;
+                        break;
+                    case ConsoleKey.A when key.Modifiers == ConsoleModifiers.Control:
+                        activeOnly = !activeOnly;
+                        selectedId = null;
+                        break;
+                    case ConsoleKey.Backspace when query.Length > 0:
+                        query = query[..^1];
+                        selectedId = null;
+                        break;
                     default:
                         if (!char.IsControl(key.KeyChar))
                         {
                             query += key.KeyChar;
-                            selected = 0;
+                            selectedId = null;
                         }
                         break;
                 }
@@ -52,4 +68,56 @@ internal sealed class ChildPicker(SessionRenderer renderer)
             renderer.ResumeComposer();
         }
     }
+
+    internal static IReadOnlyList<ChildSessionDocument> Filter(
+        IReadOnlyList<ChildSessionDocument> children, string query, bool activeOnly) => children
+        .Where(child => (!activeOnly || IsActive(child))
+            && (child.Id.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || child.Label.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || child.Agent.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || child.Status.Contains(query, StringComparison.OrdinalIgnoreCase)))
+        .OrderByDescending(IsActive)
+        .ToArray();
+
+    internal static IRenderable Render(IReadOnlyList<ChildSessionDocument> matches, string query, int selected,
+        string? currentId, bool activeOnly, int width, int height)
+    {
+        var rows = new List<IRenderable>
+        {
+            new Markup($"[{Theme.Muted}]Type to filter  Up/Down select  Enter inspect  Esc cancel[/]"),
+            new Markup($"[{Theme.Muted}]Ctrl+A: {(activeOnly ? "show all" : "active only")}  {matches.Count} sessions[/]"),
+            new Markup($"[{Theme.Accent}]Search > [/]{MarkupText.Escape(query)}")
+        };
+        if (matches.Count == 0)
+        {
+            rows.Add(new Markup($"[{Theme.Muted}]No matching child sessions[/]"));
+        }
+        else
+        {
+            var visible = Math.Min(MaximumVisibleRows, Math.Max(1, (height - 12) / 2));
+            var start = Math.Clamp(selected - visible + 1, 0, Math.Max(0, matches.Count - visible));
+            for (var index = start; index < Math.Min(matches.Count, start + visible); index++)
+            {
+                var child = matches[index];
+                var current = child.Id == currentId ? "  current" : string.Empty;
+                var label = TextWidth.Truncate($"{child.Label}  {child.Agent}  {child.Status}{current}", Math.Max(8, width - 12));
+                var color = index == selected ? Theme.Selected : Theme.User;
+                rows.Add(new Markup($"[{color}]{(index == selected ? "> " : "  ")}{MarkupText.Escape(label)}[/]"));
+                var usage = $"{child.Id}  {child.Model.Model ?? "Unknown model"}  "
+                    + $"IN {child.CumulativeUsage?.InputTokenCount.ToString() ?? "?"} / OUT {child.CumulativeUsage?.OutputTokenCount.ToString() ?? "?"}";
+                rows.Add(new Markup($"[{Theme.Muted}]  {MarkupText.Escape(TextWidth.Truncate(usage, Math.Max(8, width - 12)))}[/]"));
+            }
+        }
+
+        return new Padder(new Panel(new Rows(rows))
+        {
+            Header = new PanelHeader("Child Sessions"),
+            Border = BoxBorder.Rounded,
+            BorderStyle = Style.Parse(Theme.Chrome),
+            Padding = new Padding(1, 0, 1, 0),
+            Expand = true
+        }, new Padding(2, 0, 0, 0));
+    }
+
+    private static bool IsActive(ChildSessionDocument child) => child.Status is "running" or "queued";
 }

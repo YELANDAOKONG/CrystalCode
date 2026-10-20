@@ -3,6 +3,7 @@ using Crystal;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Terminal;
 
@@ -23,11 +24,11 @@ internal sealed partial class SessionProjection
             {
                 case ChildSessionChanged changed:
                     _children[changed.Child.Id] = changed.Child;
-                    _renderer.SetChildSessions(_children.Values.ToArray(), _childFocus);
                     if (changed.Child.Status is not ("running" or "queued"))
                     {
                         _childEvents.Remove(changed.Child.Id);
                     }
+                    _renderer.SetChildSessions(_children.Values.ToArray(), _childFocus);
                     if (_childFocus == changed.Child.Id)
                     {
                         ShowChild(changed.Child.Id);
@@ -50,13 +51,21 @@ internal sealed partial class SessionProjection
                     return;
                 case SessionStarted started:
                     _parentChrome = started.Chrome;
+                    _renderer.ChildSessionsEnabled = started.Chrome.AgentsEnabled;
                     break;
                 case ChromeChanged chrome:
                     _parentChrome = chrome.Chrome;
+                    _renderer.ChildSessionsEnabled = chrome.Chrome.AgentsEnabled;
+                    if (!chrome.Chrome.AgentsEnabled)
+                    {
+                        _children.Clear();
+                        _childEvents.Clear();
+                        _renderer.SetChildSessions([], null);
+                    }
                     break;
-                case UserMessageSent when _childFocus is not null:
-                    SwitchView(null);
-                    break;
+                case UsageChanged when _childFocus is not null:
+                    _parentEvents.Add(sessionEvent);
+                    return;
                 case ConversationCleared:
                     _childFocus = null;
                     _renderer.ChildViewActive = false;
@@ -76,7 +85,17 @@ internal sealed partial class SessionProjection
                 default:
                     break;
             }
-            _parentEvents.Add(sessionEvent);
+
+            if (!_renderer.ChildSessionsEnabled && _childFocus is not null)
+            {
+                SwitchView(null);
+                return;
+            }
+            if (_childFocus is null && sessionEvent is UserMessageSent)
+            {
+                Project(sessionEvent);
+                return;
+            }
             if (_childFocus is null || sessionEvent is PreferencesChanged or SlashCommandsChanged or QueueChanged or PromptHistoryLoaded)
             {
                 Project(sessionEvent);
@@ -97,11 +116,23 @@ internal sealed partial class SessionProjection
         }
     }
 
+    internal void DisableAgents()
+    {
+        lock (_projectionGate)
+        {
+            _childFocus = null;
+            _children.Clear();
+            _childEvents.Clear();
+            _renderer.SetChildSessions([], null);
+            SwitchView(null);
+        }
+    }
+
     private void SwitchView(string? id)
     {
         _childFocus = id;
         _renderer.SetChildSessions(_children.Values.ToArray(), id);
-        _renderer.ClearConversation();
+        _renderer.ResetView();
         if (id is not null)
         {
             ShowChild(id);
@@ -123,19 +154,28 @@ internal sealed partial class SessionProjection
         {
             return;
         }
+        _renderer.ResetView();
         _renderer.WriteHistory(TranscriptCodec.Read(child.Archive.ToList()));
         var model = child.Model;
         Project(new ChromeChanged(_parentChrome with
         {
-            Model = model.Model ?? "Unknown", Thinking = model.Thinking ?? "default", ContextWindow = model.Context ?? 0,
+            Model = $"{model.Model ?? "Unknown"} · {child.Agent} · {child.Label}", Thinking = model.Thinking ?? "default", ContextWindow = model.Context ?? 0,
             ServiceTier = model.Tier ?? string.Empty, Speed = model.Speed ?? string.Empty
         }));
         _renderer.SetProgress(child.Status is "running" or "queued" ? child.Status : string.Empty);
-        _renderer.WriteNote($"Child · {child.Agent} · {child.Label} · {child.Id[..Math.Min(8, child.Id.Length)]}  /child parent returns");
+        _renderer.SetTodos(child.Todos.Select(todo => new CrystalCode.Display.Cards.TodoBarItem(
+            todo.Status switch
+            {
+                "in_progress" => TodoList.StatusMark(TodoStatus.InProgress),
+                "completed" => TodoList.StatusMark(TodoStatus.Completed),
+                "cancelled" => TodoList.StatusMark(TodoStatus.Cancelled),
+                _ => TodoList.StatusMark(TodoStatus.Pending)
+            }, todo.Content ?? string.Empty)).ToArray());
         foreach (var note in child.Notes)
         {
             _renderer.WriteNote(note);
         }
+        Project(new UsageChanged(Usage(child.Usage), Usage(child.CumulativeUsage), model.Context ?? 0, false));
         if (_childEvents.TryGetValue(id, out var events))
         {
             foreach (var item in events)
@@ -143,7 +183,6 @@ internal sealed partial class SessionProjection
                 Project(item);
             }
         }
-        Project(new UsageChanged(Usage(child.Usage), Usage(child.CumulativeUsage), model.Context ?? 0, false));
     }
 
     private static TokenUsage? Usage(SessionUsageDocument? usage) => usage is null ? null
