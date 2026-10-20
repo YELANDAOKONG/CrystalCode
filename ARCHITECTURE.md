@@ -214,6 +214,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Approvals` | Risk, authority, grants, policy, review transcript |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
+| `Catalog` | Plain-text column padding shared by inventory reports (`AlignedRows`). Not a model, tool, or plugin catalog |
 | `Tools` | Workspace fence and built-in `ITool` types |
 | `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` / `IMultimodalTool` loaders, and host-context dispatch |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
