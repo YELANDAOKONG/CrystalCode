@@ -69,7 +69,7 @@
 
 ## Safety
 
-- Write, edit, read, list, tree, glob, grep, and search of paths outside the
+- Outside Full mode, write, edit, read, list, tree, glob, grep, and search of paths outside the
   workspace require approval unless session directory access covers the action.
   Session `read` permits file reads; `write` includes reads and retains normal
   action approval. Explicit read-only writes are rejected before grants, raw
@@ -91,7 +91,11 @@
   may be workspace-relative or absolute and only the requested root is searched.
   Unlisted outside paths retain approval: in Review or Audit
   the reviewing model judges them; otherwise the operator is asked. Edit, Review,
-  and Full do not auto-pass unlisted outside writes or edits. These rules do not
+  and Audit do not auto-pass unlisted outside writes or edits. Full auto-passes
+  all calls regardless of risk, authority, or forced-prompt flags and bypasses
+  session read-only rules and execution path fences. Credential paths remain
+  prohibited. Tool catalogs, validation, OS permissions, cancellation, and budgets
+  still apply. These rules do not
   sandbox shell, background shell, plugins, or external processes.
   External dotnet tools may supply a
   side-effect-free pre-classifier when their actual write paths are embedded
@@ -114,7 +118,7 @@
   them, and workspace-wide search skips those files.
 - Shell classification treats `sudo`, destructive filesystem commands,
   pipe-to-shell downloads, force-push, and credential-path writes as
-  Forbidden or Privileged. Forbidden never fully auto-passes. Review
+  Forbidden or Privileged. Outside Full mode, Forbidden never fully auto-passes. Review
   and Audit may deny those calls or escalate them to the
   operator.
 - `crystal run` has no operator. Review and Audit still ask the reviewing

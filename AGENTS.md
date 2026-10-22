@@ -74,14 +74,14 @@ semantics. Do not copy its Demo UI into this product.
   class libraries from the set directory only.
 - Keep assembly ownership consistent with ARCHITECTURE.md.
 - Write, edit, read, list, tree, glob, grep, and search of paths outside the workspace
-  require approval unless covered by session directory access. Session `write`
-  includes reads and follows the approval mode; `read` rejects file writes before
-  grants or review. These rules are not a shell or extension sandbox.
-  Unlisted outside paths require approval (the Review model in Review or Audit,
-  otherwise the operator). Edit, Review, and Full do not auto-pass unlisted
-  outside writes or edits. When Skills
-  is enabled, any path inside a Skills search directory (`skill` /
-  `skills` trees) auto-passes. Credential paths stay Forbidden.
+  includes session-authorized directories. Outside Full mode, explicit read-only
+  writes are rejected before grants or review, and unlisted outside paths require
+  approval (the Review model in Review or Audit, otherwise the operator).
+  Full auto-passes all tool calls and bypasses directory access restrictions,
+  including outside paths and session read-only directories. Credential paths
+  remain prohibited. When Skills is enabled, any path inside a Skills search
+  directory (`skill` / `skills` trees) auto-passes. These rules are not a shell
+  or extension sandbox.
 - Approval decisions go through `Crystal.Tools.ToolInvocationPolicy`. Do not
   invoke side-effect tools by bypassing the executor.
 - Context compaction is owned here. Crystal will not truncate or summarize.

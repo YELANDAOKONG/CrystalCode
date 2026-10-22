@@ -54,8 +54,11 @@ separate library with no terminal code. The product can:
   `crystal`, `crystal space`, and `crystal run`. An unknown name refuses to
   start. The choice is not written to `config.json`, and the name stays
   reserved;
-- approve side effects manually, by a reviewing model, or by full
-  pass-through according to risk and authority;
+- approve side effects manually, by a reviewing model, or by Full pass-through.
+  Full auto-passes all tool calls, including workspace-external paths, session
+  read-only directories, elevated or forbidden classifications, and forced
+  prompts. Credential paths remain prohibited. Tool catalogs, argument
+  validation, OS permissions, cancellation, and configured budgets still apply;
 - ask one or more operator questions in one request, with described choices,
   single or multiple selection, optional custom answers, and confirmation;
 - compact the context sent to the model when usage approaches the model
@@ -104,7 +107,7 @@ separate library with no terminal code. The product can:
 - manage multiple accessible directories per session through `/access` and
   repeatable `--allow-read` / `--allow-write` launch options. `read` permits
   built-in file reads and searches; `write` includes reads and lets file changes
-  follow the selected approval mode. Explicit read-only writes are rejected
+  follow the selected approval mode. Outside Full mode, explicit read-only writes are rejected
   before grants or review. Rules use canonical absolute paths, with the most
   specific directory winning over parents and the implicit writable workspace.
   They are session metadata, not reusable approval grants. Resume restores the

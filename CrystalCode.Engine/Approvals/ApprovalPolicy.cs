@@ -43,6 +43,7 @@ public sealed class ApprovalPolicy
         ArgumentNullException.ThrowIfNull(prompt);
         _mode = mode;
         _workspace = workspace;
+        _workspace.BypassAccessRestrictions = mode == ApprovalMode.Full;
         _classifier = new ToolClassifier(workspace, classifiers, skills, advise);
         _grants = grants;
         _prompt = prompt;
@@ -161,6 +162,11 @@ public sealed class ApprovalPolicy
 
     private bool CanPassWithoutReview(string toolName, ToolClassification classification)
     {
+        if (_mode == ApprovalMode.Full)
+        {
+            return true;
+        }
+
         if (classification.RequirePrompt)
         {
             return false;
@@ -185,18 +191,8 @@ public sealed class ApprovalPolicy
 
         if (classification.Risk == Risk.Write)
         {
-            if (_mode == ApprovalMode.Full)
-            {
-                return true;
-            }
-
             return toolName is WriteTool.ToolName or EditTool.ToolName
                 && (_mode == ApprovalMode.Edit || _mode == ApprovalMode.Review);
-        }
-
-        if (toolName is BashTool.ToolName or BackgroundBashStartTool.ToolName or BackgroundBashStopTool.ToolName)
-        {
-            return _mode == ApprovalMode.Full;
         }
 
         return false;

@@ -34,10 +34,12 @@ public sealed class TaskRunHostTests
         """;
 
     [Theory]
-    [InlineData("read", "read", true)]
-    [InlineData("write", "write", true)]
-    [InlineData("read", "write", false)]
-    public async Task DirectoryAccess_SeedsSessionWithoutChangingPreferences(string access, string tool, bool writesAllowed)
+    [InlineData("read", "read", "full", true)]
+    [InlineData("write", "write", "full", true)]
+    [InlineData("read", "write", "full", true)]
+    [InlineData("read", "write", "edit", false)]
+    public async Task DirectoryAccess_SeedsSessionWithoutChangingPreferences(
+        string access, string tool, string approval, bool writesAllowed)
     {
         using var fixture = new RunFixture();
         var directory = Directory.CreateDirectory(Path.Combine(fixture.Home, "reference")).FullName;
@@ -46,7 +48,7 @@ public sealed class TaskRunHostTests
         var settings = new TaskRunSettings
         {
             TaskText = "Use the reference", Home = fixture.Home, Workspace = fixture.Workspace,
-            Provider = "ollama", Model = "qwen3:8b", Approval = "full",
+            Provider = "ollama", Model = "qwen3:8b", Approval = approval,
             Skills = "off", ExternalTools = "off", Duration = "60",
             AllowRead = access == "read" ? [directory] : [],
             AllowWrite = access == "write" ? [directory] : []

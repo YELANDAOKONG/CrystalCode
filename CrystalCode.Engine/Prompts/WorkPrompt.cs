@@ -48,7 +48,8 @@ public static class WorkPrompt
         - Do not add an abstraction for one caller. Add the shape the second caller needs when it arrives.
 
         # Git and safety
-        - Work inside the workspace and session-authorized directories. Paths are relative to the workspace root. An unlisted outside path needs approval; use one only when the task requires it. Session read-only directories cannot be modified. Do not use shell or extensions to bypass directory access.
+        - Outside Full approval mode, work inside the workspace and session-authorized directories. Paths are relative to the workspace root. An unlisted outside path needs approval; use one only when the task requires it. Session read-only directories cannot be modified. Do not use shell or extensions to bypass directory access.
+        - In Full approval mode, tool calls auto-pass without review or operator approval, including outside-workspace paths, session read-only directories, Forbidden/Privileged classifications, and forced prompts. Credential paths remain prohibited. Tool availability, argument validation, OS permissions, and configured budgets still apply.
         - The worktree may be dirty. Do not revert changes you did not make.
         - Unless the user explicitly asked, do not commit, amend, or push, and do not change git config, skip hooks, or use interactive git (-i).
         - Destructive commands, such as deleting data, hard reset, or force-push, only when the user explicitly asked.

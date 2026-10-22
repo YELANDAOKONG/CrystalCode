@@ -21,7 +21,7 @@ public sealed class SearchTool : ITool
         + $"{WorkspaceLimits.MaximumSearchPreviewLinesPerFile} matching lines as previews. "
         + "Case-insensitive by default; set caseSensitive true for exact case. "
         + "Optional path may be workspace-relative or absolute and defaults to the workspace root; an optional file-name glob narrows the search. "
-        + "Session read or write access permits searching an outside directory; unlisted outside paths require approval. "
+        + "Session read or write access permits searching an outside directory; unlisted outside paths require approval outside Full mode. "
         + "Searches only the requested root, not all authorized directories. "
         + $"Use offset (1-based) and limit to page through the ranked files; limit defaults to "
         + $"{WorkspaceLimits.DefaultSearchFileLimit} files and is capped at {WorkspaceLimits.MaximumSearchFiles}. "

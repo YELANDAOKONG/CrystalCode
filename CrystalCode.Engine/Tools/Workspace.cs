@@ -36,9 +36,12 @@ public sealed class Workspace
 
     internal DirectoryAccessPolicy Access { get; } = new();
 
+    internal bool BypassAccessRestrictions { get; set; }
+
     internal bool IsAccessible(string fullPath) => Access.ModeFor(fullPath, Root) is not null;
 
-    internal bool IsReadOnly(string fullPath) => Access.ModeFor(fullPath, Root) == "read";
+    internal bool IsReadOnly(string fullPath) =>
+        !BypassAccessRestrictions && Access.ModeFor(fullPath, Root) == "read";
 
     public bool TryResolve(string path, out string candidate, out string error)
     {
@@ -494,7 +497,7 @@ public sealed class Workspace
             return false;
         }
 
-        if (!allowOutside && !IsInsideRoot(candidate))
+        if (!BypassAccessRestrictions && !allowOutside && !IsInsideRoot(candidate))
         {
             error = "Path is outside the workspace.";
             return false;

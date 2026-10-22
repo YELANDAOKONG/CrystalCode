@@ -362,8 +362,9 @@ There is no operator. In Review and Audit the reviewing model still
 judges calls that require review: allow runs the tool, and deny returns
 the reviewer's reason to the model. That model is the session model
 unless the approval-model switch is on for this process. Anything that
-would ask the operator, including Default, Edit, and Full prompts, is
-denied with the usual rejection text. The `question` tool is dismissed.
+would ask the operator, including Default and Edit prompts, is
+denied with the usual rejection text. Full auto-passes tool calls.
+The `question` tool is dismissed.
 Plan does not offer write, edit, or bash. Credential paths stay forbidden.
 
 A reviewer denial is a tool error. If the model then finishes, the
@@ -1083,7 +1084,7 @@ Grant: Once, Session, Persistent.
 | **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
 | **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, tree, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Answers given through the question tool count as user authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. A transient reviewer request failure is retried per `approvalRetry` (five times by default); if it still fails you are asked. Review is not a grant and is not full pass-through. |
 | **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
-| **Full** | Workspace-bounded, policy-allowed actions pass without review, including any loaded external tool that stays Write + Workspace. Forbidden, Privileged, outside-workspace, and forced-prompt calls never fully auto-pass. |
+| **Full** | All tool calls pass without review or operator approval, including outside-workspace paths, session read-only directories, Network, Privileged, Forbidden classifications, and forced prompts. Credential paths remain prohibited. Tool availability, argument validation, OS permissions, cancellation, and budgets still apply. |
 
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through. `/approval` with no argument cycles Default,
@@ -1148,7 +1149,7 @@ allow cards. Asking you still uses the overlay.
 
 Shell classification treats `sudo`, destructive filesystem commands,
 pipe-to-shell downloads, force-push, and credential-path writes as
-Forbidden or Privileged. Forbidden never fully auto-passes. Review and Audit
+Forbidden or Privileged. Outside Full mode, Forbidden never fully auto-passes. Review and Audit
 may deny those calls or escalate them to you. Writes under `.ssh`,
 `.gnupg`, or `~/.crystal/credentials.json` are Forbidden.
 
@@ -1440,8 +1441,7 @@ and `/tools on|off|reload` controls discovery.
 `/tools enable|disable|show <directory>` changes one tool set.
 `crystal tools list|show|enable|disable` does the same outside a session
 and prints a Spectre.Console table unless `--format text` is set.
-Full auto-passes a
-workspace-bounded external write; Edit does not. Details, manifest fields,
+Full auto-passes external tool calls regardless of classification; Edit does not. Details, manifest fields,
 and the
 dotnet publish layout are in
 [External tools](external-tools.md).
@@ -2001,9 +2001,11 @@ command line. They appear in process lists.
 
 ## Safety
 
-- Workspace tools reject paths that leave the workspace root.
-- Credential and keyring paths are classified Forbidden.
-- Forbidden and Privileged actions never fully auto-pass.
+- Outside paths follow the approval mode; Full auto-passes them and bypasses
+  session read-only directory restrictions.
+- File tools prohibit credential and keyring paths in every approval mode.
+- Forbidden and Privileged classifications auto-pass in Full; other modes
+  require review or operator approval.
 - Approval goes through `Crystal.Tools.ToolInvocationPolicy`. Side
   effects are not invoked by bypassing the executor.
 - Runtime text is plain English. No emoji in exceptions, logs, or UI

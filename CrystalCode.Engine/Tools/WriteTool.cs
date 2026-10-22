@@ -15,8 +15,8 @@ public sealed class WriteTool : ITool
     private const string ToolDescription =
         "Creates or overwrites a text file. path may be workspace-relative or absolute. "
         + "Paths inside the workspace follow the approval mode. "
-        + "Unlisted outside paths require approval: the Review model in Review or Audit, otherwise the operator. "
-        + "Session write directories follow the approval mode; session read-only directories cannot be written. "
+        + "Outside Full mode, unlisted outside paths require approval: the Review model in Review or Audit, otherwise the operator. "
+        + "Session write directories follow the approval mode; session read-only directories cannot be written outside Full mode. "
         + "Read an existing file first. "
         + "Prefer edit; use write only to create a file or replace the whole file. "
         + "Do not create a README or other documentation unless the user asked.";

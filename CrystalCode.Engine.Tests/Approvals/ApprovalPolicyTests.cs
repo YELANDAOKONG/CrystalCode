@@ -97,7 +97,7 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Full_StillAsksForOutsideRead()
+    public async Task DecideAsync_Full_AutoExecutesOutsideRead()
     {
         using var context = new ApprovalContext(ApprovalMode.Full);
         using var outside = new TemporaryWorkspace();
@@ -111,7 +111,8 @@ public sealed class ApprovalPolicyTests
             JsonToolCall("1", ReadTool.ToolName, json));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
-        Assert.Equal(1, prompt.Count);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
         Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
     }
 
@@ -330,7 +331,7 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Full_AsksForOutsideWrite()
+    public async Task DecideAsync_Full_AutoExecutesOutsideWrite()
     {
         using var context = new ApprovalContext(ApprovalMode.Full);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
@@ -338,8 +339,9 @@ public sealed class ApprovalPolicyTests
 
         var decision = await policy.DecideAsync(OutsideWriteCall());
 
-        Assert.Equal(ToolInvocationAction.Reject, decision.Action);
-        Assert.Equal(1, prompt.Count);
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
         Assert.Equal(Authority.OutsideWorkspace, prompt.LastClassification?.Authority);
     }
 
@@ -492,7 +494,7 @@ public sealed class ApprovalPolicyTests
     }
 
     [Fact]
-    public async Task DecideAsync_Full_StillAsksForForbiddenBash()
+    public async Task DecideAsync_Full_AutoExecutesForbiddenBash()
     {
         using var context = new ApprovalContext(ApprovalMode.Full);
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowOnce);
@@ -502,7 +504,8 @@ public sealed class ApprovalPolicyTests
             JsonToolCall("1", BashTool.ToolName, """{"command":"sudo ls"}"""));
 
         Assert.Equal(ToolInvocationAction.Execute, decision.Action);
-        Assert.Equal(1, prompt.Count);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(1, prompt.PassCount);
         Assert.Equal(Risk.Forbidden, prompt.LastClassification?.Risk);
     }
 
@@ -592,7 +595,7 @@ public sealed class ApprovalPolicyTests
 
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var second = new ApprovalPolicy(
-            ApprovalMode.Full, workspace, persistent ? new GrantStore(home.Home) : grants, prompt,
+            ApprovalMode.Default, workspace, persistent ? new GrantStore(home.Home) : grants, prompt,
             classifiers: [new FixedApprovalClassifier("apply_patch",
                 new ToolClassification(new Risk(risk), new Authority(authority), "Raised patch", requirePrompt))]);
         var result = await second.DecideAsync(JsonToolCall("2", "apply_patch", "{\"patch\":\"outside\"}"));
@@ -626,7 +629,7 @@ public sealed class ApprovalPolicyTests
 
     [Theory]
     [InlineData("default")]
-    [InlineData("full")]
+    [InlineData("edit")]
     public async Task DecideAsync_RequirePrompt_OverridesAutomaticTool(string mode)
     {
         using var context = new ApprovalContext(new ApprovalMode(mode));
@@ -686,6 +689,33 @@ public sealed class ApprovalPolicyTests
         Assert.Equal(ToolInvocationAction.Execute, (await second.DecideAsync(call)).Action);
         Assert.Equal(0, prompt.Count);
         Assert.Equal(ApprovalPassReason.Grant, prompt.LastPassReason);
+    }
+
+    [Theory]
+    [InlineData("read", "workspace", false)]
+    [InlineData("write", "outside_workspace", false)]
+    [InlineData("write", "network", false)]
+    [InlineData("privileged", "privileged_escalation", false)]
+    [InlineData("forbidden", "privileged_escalation", false)]
+    [InlineData("write", "workspace", true)]
+    public async Task DecideAsync_Full_AutoExecutesRegardlessOfClassification(
+        string risk, string authority, bool requirePrompt)
+    {
+        using var context = new ApprovalContext(ApprovalMode.Full);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Deny("should not run"));
+        var policy = context.CreatePolicy(prompt, reviewer,
+            classifiers: [new FixedApprovalClassifier("apply_patch",
+                new ToolClassification(new Risk(risk), new Authority(authority), "Patch", requirePrompt))]);
+
+        var result = await policy.DecideAsync(JsonToolCall("1", "apply_patch", "{}"));
+
+        Assert.Equal(ToolInvocationAction.Execute, result.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(0, prompt.ReviewCount);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
+        Assert.Null(reviewer.LastRequest);
     }
 
     private static ToolCall WriteCall() =>

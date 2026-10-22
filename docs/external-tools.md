@@ -173,8 +173,8 @@ tool-level `catalogs` replaces that default; it does not merge.
 Built-in Plan is still without `edit`, `write`, and `bash`. External
 tools listed for Plan are extra entries. They keep the Write +
 Workspace floor, so Plan is no longer built-in reads only once such a
-tool is installed. Approval still runs. Plan + Full can auto-pass a
-workspace-bounded write from an external tool. Authors who want
+tool is installed. Approval still runs. Plan + Full auto-passes external
+tool calls regardless of their classification. Authors who want
 Work-only set `"catalogs": ["work"]`.
 
 First-party tools declare `HostToolCatalogs` on `IToolContribution`.
@@ -339,9 +339,11 @@ Host classification looks up the external tool by its model-facing
 name. It does not fall through to "Unknown tool" after a successful
 load.
 
-Full auto-passes workspace-bounded Write for any such tool, not only
-built-in `write` / `edit`. Edit and Review still auto-pass only
-those built-in names. Default asks the operator for external Write.
+Full auto-passes all external tool calls regardless of risk, authority, or
+`RequirePrompt`, including outside-workspace calls. Credential path checks
+still apply at execution. Outside Full mode, the following rules apply:
+Edit and Review auto-pass only built-in `write` / `edit`. Default asks the
+operator for external Write.
 Review and Audit send it to the reviewing model. A tool-provided
 pre-classifier can only raise risk or authority for its own calls and fails
 closed; it never removes the floor or the `pathArguments` checks. Session and

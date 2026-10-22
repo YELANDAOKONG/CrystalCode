@@ -36,7 +36,6 @@ public sealed class DirectoryAccessPolicyTests
     [InlineData("edit")]
     [InlineData("review")]
     [InlineData("audit")]
-    [InlineData("full")]
     public async Task DecideAsync_ReadOnlyWriteCannotUseReviewGrantOrRawAdvice(string mode)
     {
         using var root = new TemporaryWorkspace();
@@ -69,7 +68,7 @@ public sealed class DirectoryAccessPolicyTests
     [InlineData("write", "write", "default", false)]
     [InlineData("write", "write", "audit", false)]
     [InlineData("write", "write", "full", true)]
-    [InlineData("read", "write", "full", false)]
+    [InlineData("read", "write", "full", true)]
     public async Task DecideAsync_AdditionalDirectoryFollowsMode(string access, string tool, string mode, bool executes)
     {
         using var root = new TemporaryWorkspace();
@@ -106,6 +105,58 @@ public sealed class DirectoryAccessPolicyTests
 
         Assert.Equal(ToolResultStatus.Failure, result.Status);
         Assert.Equal("before", await File.ReadAllTextAsync(file));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DecideAsync_Full_BypassesReadOnlyRulesUntilModeChanges(bool outside)
+    {
+        using var root = new TemporaryWorkspace();
+        using var other = new TemporaryWorkspace();
+        using var home = new TemporaryHome();
+        var workspace = new Workspace(root.Path);
+        var target = outside ? new Workspace(other.Path).Root : workspace.Root;
+        workspace.Access.Set(target, "read");
+        var file = Path.Combine(target, "a.txt");
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var grants = new GrantStore(home.Home);
+        var full = new ApprovalPolicy(ApprovalMode.Full, workspace, grants, prompt);
+        var write = JsonToolCall("1", "write", JsonSerializer.Serialize(new { path = file, contents = "before" }));
+
+        Assert.Equal(ToolInvocationAction.Execute, (await full.DecideAsync(write)).Action);
+        Assert.Equal(ToolResultStatus.Success, (await new WriteTool(workspace).InvokeAsync(write)).Status);
+        var edit = JsonToolCall("2", "edit", JsonSerializer.Serialize(new
+        {
+            path = file, old_string = "before", new_string = "after"
+        }));
+        Assert.Equal(ToolInvocationAction.Execute, (await full.DecideAsync(edit)).Action);
+        Assert.Equal(ToolResultStatus.Success, (await new EditTool(workspace).InvokeAsync(edit)).Status);
+        Assert.Equal("after", await File.ReadAllTextAsync(file));
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal("read", workspace.Access.ModeFor(file, workspace.Root));
+
+        var normal = new ApprovalPolicy(ApprovalMode.Default, workspace, grants, prompt);
+        Assert.Equal(ToolInvocationAction.Reject, (await normal.DecideAsync(write)).Action);
+        Assert.Equal(ToolResultStatus.Failure, (await new WriteTool(workspace).InvokeAsync(write)).Status);
+        Assert.Equal("after", await File.ReadAllTextAsync(file));
+    }
+
+    [Fact]
+    public async Task DecideAsync_Full_CredentialFileToolsStillReject()
+    {
+        using var root = new TemporaryWorkspace();
+        using var home = new TemporaryHome();
+        var workspace = new Workspace(root.Path);
+        var policy = new ApprovalPolicy(ApprovalMode.Full, workspace, new GrantStore(home.Home),
+            new RecordingApprovalPrompt(ApprovalChoice.Deny));
+        var call = JsonToolCall("1", "write", """{"path":".ssh/test.txt","contents":"test fixture"}""");
+
+        Assert.Equal(ToolInvocationAction.Execute, (await policy.DecideAsync(call)).Action);
+        Assert.Equal(ToolResultStatus.Failure, (await new WriteTool(workspace).InvokeAsync(call)).Status);
+        Assert.False(Directory.Exists(Path.Combine(root.Path, ".ssh")));
+        var read = JsonToolCall("2", "read", """{"path":".ssh/test.txt"}""");
+        Assert.Equal(ToolResultStatus.Failure, (await new ReadTool(workspace).InvokeAsync(read)).Status);
     }
 
     [Fact]

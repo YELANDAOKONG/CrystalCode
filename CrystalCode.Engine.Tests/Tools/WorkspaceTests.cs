@@ -39,6 +39,20 @@ public sealed class WorkspaceTests
     }
 
     [Fact]
+    public void TryResolveExistingFile_FullBypassesOutsideFenceUntilModeChanges()
+    {
+        using var root = new TemporaryWorkspace();
+        using var outside = new TemporaryWorkspace();
+        var file = Path.Combine(outside.Path, "note.txt");
+        File.WriteAllText(file, "hello");
+        var workspace = new Workspace(root.Path) { BypassAccessRestrictions = true };
+
+        Assert.True(workspace.TryResolveExistingFile(file, out _, out _));
+        workspace.BypassAccessRestrictions = false;
+        Assert.False(workspace.TryResolveExistingFile(file, out _, out _));
+    }
+
+    [Fact]
     public void TryResolveExistingFile_AcceptsRelativeFileInsideRoot()
     {
         using var root = new TemporaryWorkspace();

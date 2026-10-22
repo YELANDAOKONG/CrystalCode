@@ -257,13 +257,31 @@ public sealed class ExternalApprovalClassifierTests
         grants.Remember(root.Path, Call(), GrantScope.Session);
         var classifier = Create(new DelegateClassifier((_, _, _) => throw new InvalidOperationException()));
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
-        var policy = new ApprovalPolicy(ApprovalMode.Full, workspace, grants, prompt, classifiers: [classifier],
+        var policy = new ApprovalPolicy(ApprovalMode.Default, workspace, grants, prompt, classifiers: [classifier],
             automaticTools: new HashSet<string> { "apply_patch" });
 
         var result = await policy.DecideAsync(Call());
 
         Assert.Equal(ToolInvocationAction.Reject, result.Action);
         Assert.Equal(1, prompt.Count);
+        AssertFailure(prompt.LastClassification);
+    }
+
+    [Fact]
+    public async Task DecideAsync_Full_ClassifierFailureStillPasses()
+    {
+        using var root = new TemporaryWorkspace();
+        using var home = new TemporaryHome();
+        var classifier = Create(new DelegateClassifier((_, _, _) => throw new InvalidOperationException()));
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var policy = new ApprovalPolicy(ApprovalMode.Full, new Workspace(root.Path), new GrantStore(home.Home),
+            prompt, classifiers: [classifier]);
+
+        var result = await policy.DecideAsync(Call());
+
+        Assert.Equal(ToolInvocationAction.Execute, result.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(ApprovalPassReason.Policy, prompt.LastPassReason);
         AssertFailure(prompt.LastClassification);
     }
 
@@ -299,9 +317,9 @@ public sealed class ExternalApprovalClassifierTests
             new RecordingApprovalPrompt(ApprovalChoice.AllowSession), classifiers: [classifier]);
         Assert.Equal(ToolInvocationAction.Execute, (await allow.DecideAsync(Call())).Action);
         var deny = new RecordingApprovalPrompt(ApprovalChoice.Deny);
-        var full = new ApprovalPolicy(ApprovalMode.Full, workspace, grants, deny, classifiers: [classifier]);
+        var policy = new ApprovalPolicy(ApprovalMode.Default, workspace, grants, deny, classifiers: [classifier]);
 
-        var result = await full.DecideAsync(JsonToolCall("2", "apply_patch", """{"patch":"../outside.txt"}"""));
+        var result = await policy.DecideAsync(JsonToolCall("2", "apply_patch", """{"patch":"../outside.txt"}"""));
 
         Assert.Equal(ToolInvocationAction.Reject, result.Action);
         Assert.Equal(1, deny.Count);

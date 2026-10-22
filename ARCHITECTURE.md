@@ -897,9 +897,11 @@ alone. Mutations are refused during a turn or compaction.
 
 Built-in file reads in authorized directories use ordinary workspace read
 approval. Writes in writable directories follow the current approval mode.
-`ApprovalPolicy` rejects explicit read-only writes before classification hooks,
+Outside Full mode, `ApprovalPolicy` rejects explicit read-only writes before classification hooks,
 grants, or review; write and edit recheck at path resolution before file I/O.
-Unlisted outside paths retain their existing approval behavior. Credential paths
+Full bypasses these directory restrictions through the shared workspace resolver;
+changing approval mode restores them without altering saved access rules.
+Unlisted outside paths follow the current approval mode. Credential paths
 remain forbidden. Relative paths stay relative to the one primary workspace.
 Search and enumeration keep their existing root fence and do not automatically
 search all authorized directories or traverse cross-root links. The glob, grep,
@@ -928,7 +930,7 @@ policy. An operating-system sandbox remains deferred.
 
 The following mode descriptions use workspace access for built-in file tools to
 include session-authorized directories of the appropriate read/write capability.
-Explicit read-only writes are always rejected; outside paths mean unlisted paths.
+Explicit read-only writes are rejected outside Full; outside paths mean unlisted paths.
 
 Every side-effect tool call is classified before invocation:
 
@@ -974,13 +976,13 @@ Modes:
   not a grant and is not full pass-through.
 - Audit: the same reviewer and transcript rules as Review, but
   workspace `write` and `edit` are also checked. They do not auto-pass.
-- Full: workspace-bounded, policy-allowed actions pass without review.
-  That includes any loaded external tool whose classification stays
-  Write + Workspace, not only built-in `write` / `edit`. Forbidden,
-  Privileged, outside-workspace, and forced-prompt calls never fully auto-pass.
+- Full: all tool calls pass without review or operator approval, including
+  outside-workspace, Network, Privileged, Forbidden, and forced-prompt calls.
+  Session read-only directory rules and execution path fences do not restrict
+  Full. Credential paths remain prohibited by file tools. Tool catalogs,
+  argument validation, OS permissions, cancellation, and budgets still apply.
   Session and Persistent grants apply only to ordinary Workspace Read/Write
-  calls; they are rechecked after every classification and cannot bypass a
-  raised classification.
+  calls outside Full; they cannot bypass a raised classification.
 
 The reviewing model is the session model unless `approvalModel` is
 enabled in `config.json`. The object is `enabled`, `provider`, `model`,
@@ -1036,8 +1038,9 @@ Persistent grants are stored in `~/.crystal/permissions.json`. Existing grants
 remain readable, but only apply when the current classification is Workspace
 Read/Write without `RequirePrompt`. OutsideWorkspace, Network, Privileged,
 Forbidden, unknown classifications, and `RequirePrompt` cannot use or create
-reusable grants. Their operator allow applies once, regardless of a front
-end's returned scope. `RequirePrompt` also prevents a reviewer Allow from
+reusable grants. Their operator allow applies once, regardless of the scope
+returned by the front end. Forced-prompt restrictions apply outside Full mode.
+`RequirePrompt` also prevents a reviewer Allow from
 executing: Deny still rejects, while Allow and Ask reach the operator. The
 headless front end denies any such operator prompt.
 
