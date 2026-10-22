@@ -2,23 +2,31 @@ namespace CrystalCode.Display.Shell;
 
 /// <summary>
 /// Current terminal size, with a fallback when the console is detached.
-/// Width and Height clamp to the layout floor; TryRead reports the raw size.
+/// A non-positive read counts as detached: Unix reports 0 instead of throwing
+/// when there is no terminal. Width and Height clamp a real size to the layout
+/// floor; TryRead reports the raw size, or the fallback when the read fails.
 /// </summary>
 public static class ScreenSize
 {
-    public static int Width => TryRead(out var width, out _) ? Math.Max(width, ShellLayout.MinWidth) : 80;
+    internal const int FallbackWidth = 80;
 
-    public static int Height => TryRead(out _, out var height) ? Math.Max(height, ShellLayout.MinHeight) : 24;
+    internal const int FallbackHeight = 24;
+
+    public static int Width => TryRead(out var width, out _)
+        ? Math.Max(width, ShellLayout.MinWidth)
+        : FallbackWidth;
+
+    public static int Height => TryRead(out _, out var height)
+        ? Math.Max(height, ShellLayout.MinHeight)
+        : FallbackHeight;
 
     public static bool TryRead(out int width, out int height)
     {
-        width = 80;
-        height = 24;
+        width = FallbackWidth;
+        height = FallbackHeight;
         try
         {
-            width = Console.WindowWidth;
-            height = Console.WindowHeight;
-            return true;
+            return TryAccept(Console.WindowWidth, Console.WindowHeight, out width, out height);
         }
         catch (IOException)
         {
@@ -28,6 +36,20 @@ public static class ScreenSize
         {
             return false;
         }
+    }
+
+    internal static bool TryAccept(int width, int height, out int acceptedWidth, out int acceptedHeight)
+    {
+        if (width < 1 || height < 1)
+        {
+            acceptedWidth = FallbackWidth;
+            acceptedHeight = FallbackHeight;
+            return false;
+        }
+
+        acceptedWidth = width;
+        acceptedHeight = height;
+        return true;
     }
 
     public static ShellRegions Current(
