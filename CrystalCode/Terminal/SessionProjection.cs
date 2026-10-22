@@ -19,7 +19,7 @@ internal sealed partial class SessionProjection : ISessionObserver
         _renderer = renderer;
     }
 
-    private void Project(SessionEvent sessionEvent)
+    private void Project(SessionEvent sessionEvent, bool replay = false)
     {
         ArgumentNullException.ThrowIfNull(sessionEvent);
         switch (sessionEvent)
@@ -75,7 +75,7 @@ internal sealed partial class SessionProjection : ISessionObserver
                 _renderer.WriteUser(user.Text);
                 break;
             case UserMessageRecalled recalled:
-                _renderer.RestoreRecalledMessage(recalled.Text);
+                _renderer.RestoreRecalledMessage(recalled.Text, restoreComposer: !replay);
                 break;
             case ConversationCleared:
                 _renderer.ClearConversation();

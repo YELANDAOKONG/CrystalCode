@@ -1,5 +1,9 @@
+using System.Reflection;
+
 using Crystal;
 using Crystal.Chat;
+
+using CrystalCode.Display.Transcript;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
@@ -19,7 +23,7 @@ public sealed class ChildProjectionTests
     {
         var renderer = new SessionRenderer();
         var projection = new SessionProjection(renderer);
-        projection.OnEvent(new SessionStarted(new SessionChrome("parent-model", "/workspace", false, ApprovalMode.Default, "high", "", 1000)));
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent-model", "/workspace", false, ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
         projection.OnEvent(new UsageChanged(new TokenUsage(100, 10), new TokenUsage(100, 10), 1000, false));
         var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Label = "first", Status = "running",
             Model = new AgentModelSettings { Model = "child-model", Context = 2000 },
@@ -42,6 +46,100 @@ public sealed class ChildProjectionTests
         Assert.Equal(1000, renderer.ContextWindow);
         Assert.Equal(300, renderer.LastUsage.InputTokenCount);
         Assert.Contains("1000 IN", renderer.ChromeUsage, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReturnToParent_RestoresMessagesAndHiddenStreamWithoutChangingDraft(bool resumed)
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        if (resumed)
+        {
+            projection.OnEvent(new UserMessageSent("discarded history"));
+            projection.OnEvent(new HistoryReplayed([new ChatMessage(ChatRole.User, "parent question")]));
+        }
+        else
+        {
+            projection.OnEvent(new UserMessageSent("parent question"));
+        }
+        projection.OnEvent(new TurnStarted());
+        projection.OnEvent(new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, "before switching")));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Label = "research" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        renderer.SeedComposer("keep this draft");
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        projection.OnEvent(new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, " after switching")));
+        Assert.DoesNotContain("parent question", TranscriptText(renderer), StringComparison.Ordinal);
+
+        for (var index = 0; index < 2; index++)
+        {
+            Assert.Equal("/child parent", await renderer.DispatchBurstAsync(
+                [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
+                static () => false, CancellationToken.None, checkSize: false));
+            projection.OnEvent(new ChildViewRequested(null));
+            var text = TranscriptText(renderer);
+            Assert.Contains("parent question", text, StringComparison.Ordinal);
+            Assert.Contains("before switching after switching", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("discarded history", text, StringComparison.Ordinal);
+            Assert.Equal(1, text.Split("parent question", StringSplitOptions.None).Length - 1);
+            if (index == 0)
+            {
+                projection.OnEvent(new ChildViewRequested(child.Id));
+            }
+        }
+        Assert.Equal("keep this draft", await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false));
+    }
+
+    [Fact]
+    public async Task ReturnToParent_DoesNotRestoreRecalledTextIntoComposerAgain()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        projection.OnEvent(new UserMessageSent("recalled question"));
+        projection.OnEvent(new UserMessageRecalled("recalled question"));
+        renderer.TryClearComposer();
+        renderer.SeedComposer("new draft");
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Label = "research" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        Assert.True(projection.ReturnToParent());
+        Assert.DoesNotContain("recalled question", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.Equal("new draft", await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false));
+    }
+
+    [Fact]
+    public void ReturnToParent_DoesNotResurrectClearedMessages()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        projection.OnEvent(new UserMessageSent("cleared question"));
+        projection.OnEvent(new ConversationCleared());
+        projection.OnEvent(new UserMessageSent("current question"));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Label = "research" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        Assert.True(projection.ReturnToParent());
+        Assert.Contains("current question", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.DoesNotContain("cleared question", TranscriptText(renderer), StringComparison.Ordinal);
+    }
+
+    private static string TranscriptText(SessionRenderer renderer)
+    {
+        var field = typeof(SessionRenderer).GetField("_log", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var log = Assert.IsType<TranscriptLog>(field.GetValue(renderer));
+        return string.Join("\n", log.BuildLines(120).Select(line => line.Plain));
     }
 
     [Fact]

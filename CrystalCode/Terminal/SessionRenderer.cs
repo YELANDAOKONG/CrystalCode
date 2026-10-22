@@ -1246,17 +1246,20 @@ public sealed class SessionRenderer : IDisposable
     /// it, and puts that submitted text back. Text typed into the composer
     /// while the turn was stopping is kept after the recalled message.
     /// </summary>
-    public void RestoreRecalledMessage(string text)
+    public void RestoreRecalledMessage(string text, bool restoreComposer = true)
     {
         ArgumentNullException.ThrowIfNull(text);
         lock (_gate)
         {
             _log.RemoveUserBeforeNotes(ImageMarkerText.Display(text));
             _suppressInterruptedNote = true;
-            var draft = _composer.SubmissionText;
-            _composer.ReplaceSubmitted(draft.Length == 0 ? text : text + "\n\n" + draft);
-            OnComposerEdited?.Invoke(_composer.SubmissionText);
-            RefreshPickerUnlocked();
+            if (restoreComposer)
+            {
+                var draft = _composer.SubmissionText;
+                _composer.ReplaceSubmitted(draft.Length == 0 ? text : text + "\n\n" + draft);
+                OnComposerEdited?.Invoke(_composer.SubmissionText);
+                RefreshPickerUnlocked();
+            }
             PaintUnlocked(force: true);
         }
     }

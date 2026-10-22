@@ -63,9 +63,6 @@ internal sealed partial class SessionProjection
                         _renderer.SetChildSessions([], null);
                     }
                     break;
-                case UsageChanged when _childFocus is not null:
-                    _parentEvents.Add(sessionEvent);
-                    return;
                 case ConversationCleared:
                     _childFocus = null;
                     _renderer.ChildViewActive = false;
@@ -86,14 +83,10 @@ internal sealed partial class SessionProjection
                     break;
             }
 
+            _parentEvents.Add(sessionEvent);
             if (!_renderer.ChildSessionsEnabled && _childFocus is not null)
             {
                 SwitchView(null);
-                return;
-            }
-            if (_childFocus is null && sessionEvent is UserMessageSent)
-            {
-                Project(sessionEvent);
                 return;
             }
             if (_childFocus is null || sessionEvent is PreferencesChanged or SlashCommandsChanged or QueueChanged or PromptHistoryLoaded)
@@ -144,7 +137,7 @@ internal sealed partial class SessionProjection
         }
         foreach (var item in _parentEvents)
         {
-            Project(item);
+            Project(item, replay: true);
         }
     }
 
