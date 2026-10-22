@@ -10,7 +10,7 @@ Crystal Code works in a local repository through a streaming terminal UI. Ask it
 [![Tests](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml)
 [![Release](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml/badge.svg)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml)
 
-[Get started](#get-started) · [Features](#features) · [Command line](#command-line) · [Configuration](#configuration) · [User guide](docs/user-guide.md)
+[Official site](https://crystalcode.ink) · [Get started](#get-started) · [Features](#features) · [Command line](#command-line) · [Configuration](#configuration) · [User guide](docs/user-guide.md)
 
 ![Crystal Code terminal session in Work mode](docs/terminal.png)
 
