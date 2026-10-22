@@ -7,6 +7,7 @@ using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Tools;
+using CrystalCode.Tools.Interfaces;
 
 using Xunit;
 

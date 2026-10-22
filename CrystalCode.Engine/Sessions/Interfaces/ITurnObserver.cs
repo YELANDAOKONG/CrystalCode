@@ -2,8 +2,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
 
-namespace CrystalCode.Engine.Sessions;
-
+namespace CrystalCode.Engine.Sessions.Interfaces;
 /// <summary>
     /// Receives stream deltas, retry waits, tool calls, tool results, and usage updates for display.
 /// </summary>

@@ -3,6 +3,7 @@ using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Sessions.Interfaces;
 
 namespace CrystalCode.Engine.Sessions;
 

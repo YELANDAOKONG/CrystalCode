@@ -1,5 +1,4 @@
-namespace CrystalCode.Plugins.Clients;
-
+namespace CrystalCode.Plugins.Clients.Interfaces;
 /// <summary>
 /// Opt-in for calling the session model and, when review uses its own
 /// model, the review model. Implementing this interface is what tells the

@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Crystal.Multimodal.Chat;
 using CrystalCode.Providers.Compatible;
+using CrystalCode.Providers.Protocol.Interfaces;
 
 namespace CrystalCode.Providers.Protocol;
 

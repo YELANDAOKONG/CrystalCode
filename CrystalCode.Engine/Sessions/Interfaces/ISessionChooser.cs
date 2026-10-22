@@ -1,7 +1,6 @@
 using CrystalCode.Engine.Home;
 
-namespace CrystalCode.Engine.Sessions;
-
+namespace CrystalCode.Engine.Sessions.Interfaces;
 /// <summary>
 /// Lets the operator choose one saved session. A front end supplies the surface.
 /// </summary>

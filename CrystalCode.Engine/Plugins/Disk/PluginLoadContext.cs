@@ -7,6 +7,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins;
 using CrystalCode.Tools;
+using CrystalCode.Tools.Interfaces;
 
 namespace CrystalCode.Engine.Plugins.Disk;
 

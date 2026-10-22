@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tests.Approvals;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;

@@ -5,6 +5,7 @@ using System.Text.Json;
 
 using Crystal.Chat;
 using CrystalCode.Providers.Compatible;
+using CrystalCode.Providers.Protocol.Interfaces;
 
 namespace CrystalCode.Providers.Protocol;
 

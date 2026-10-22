@@ -25,6 +25,7 @@ using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Prompts;
+using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Models;

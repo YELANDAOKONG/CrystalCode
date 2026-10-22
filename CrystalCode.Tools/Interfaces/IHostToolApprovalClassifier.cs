@@ -1,7 +1,6 @@
 using Crystal.Tools;
 
-namespace CrystalCode.Tools;
-
+namespace CrystalCode.Tools.Interfaces;
 /// <summary>
 /// Classifies one external tool call before the host invokes the tool, for
 /// tools whose paths are embedded in structured arguments the host cannot

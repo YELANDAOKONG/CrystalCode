@@ -2,6 +2,7 @@ using Crystal.Chat;
 using Crystal.Multimodal.Chat;
 
 using CrystalCode.Plugins.Clients;
+using CrystalCode.Plugins.Clients.Interfaces;
 
 namespace CrystalCode.Engine.Plugins;
 

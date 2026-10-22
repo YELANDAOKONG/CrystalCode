@@ -2,6 +2,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Plugins.Status;
+using CrystalCode.Plugins.Status.Interfaces;
 
 using Xunit;
 

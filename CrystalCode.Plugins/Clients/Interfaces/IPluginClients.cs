@@ -1,8 +1,7 @@
 using Crystal.Chat;
 using Crystal.Multimodal.Chat;
 
-namespace CrystalCode.Plugins.Clients;
-
+namespace CrystalCode.Plugins.Clients.Interfaces;
 /// <summary>
 /// Side-channel clients for plugin calls. They are not the instances inside
 /// a turn or a review. Read a property again after the host rebuilds that

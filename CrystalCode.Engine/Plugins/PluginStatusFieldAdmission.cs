@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Plugins.Status;
+using CrystalCode.Plugins.Status.Interfaces;
 
 namespace CrystalCode.Engine.Plugins;
 

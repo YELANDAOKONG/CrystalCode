@@ -6,6 +6,7 @@ using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
+using CrystalCode.Providers.Protocol.Interfaces;
 
 namespace CrystalCode.Providers.Ollama;
 

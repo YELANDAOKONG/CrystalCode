@@ -1,7 +1,6 @@
 using Crystal.Tools;
 
-namespace CrystalCode.Plugins.Hooks;
-
+namespace CrystalCode.Plugins.Hooks.Interfaces;
 /// <summary>
 /// Ordered extension points. Later plugins see earlier plugins' replacements.
 /// The same pipeline wraps built-in tools, other plugins, and external tools.

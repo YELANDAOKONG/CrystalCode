@@ -1,7 +1,6 @@
 using Crystal.Tools;
 
-namespace CrystalCode.Plugins.Hooks;
-
+namespace CrystalCode.Plugins.Hooks.Interfaces;
 /// <summary>
 /// Privileged extension points. A plugin registers raw hooks separately from
 /// <see cref="IPluginHook"/>, on <see cref="PluginContribution.RawHooks"/>.

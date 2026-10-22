@@ -9,6 +9,7 @@ using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Tools;
+using CrystalCode.Tools.Interfaces;
 
 using Xunit;
 

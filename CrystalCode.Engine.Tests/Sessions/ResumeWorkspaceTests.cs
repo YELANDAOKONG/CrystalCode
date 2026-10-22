@@ -4,6 +4,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tests.Approvals;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;

@@ -13,12 +13,15 @@ using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Clients;
+using CrystalCode.Plugins.Clients.Interfaces;
 using CrystalCode.Plugins.Data;
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Hooks.Interfaces;
 using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Tools;
 using CrystalCode.Tools;
+using CrystalCode.Tools.Interfaces;
 
 using DiskContribution = CrystalCode.Plugins.PluginContribution;
 

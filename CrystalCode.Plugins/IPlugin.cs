@@ -1,6 +1,7 @@
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Status;
+using CrystalCode.Plugins.Status.Interfaces;
 
 namespace CrystalCode.Plugins;
 

@@ -9,6 +9,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tests.Approvals;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
@@ -221,6 +222,7 @@ public sealed class PluginSessionRebindTests
             """
             using CrystalCode.Plugins;
             using CrystalCode.Plugins.Hooks;
+            using CrystalCode.Plugins.Hooks.Interfaces;
 
             namespace RecorderPlugin;
 

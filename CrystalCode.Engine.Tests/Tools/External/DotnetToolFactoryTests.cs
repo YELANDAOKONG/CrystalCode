@@ -428,6 +428,7 @@ public sealed class DotnetToolFactoryTests
             using Crystal.Tools;
 
             using CrystalCode.Tools;
+            using CrystalCode.Tools.Interfaces;
 
             namespace FixtureTools;
 
@@ -512,6 +513,7 @@ public sealed class DotnetToolFactoryTests
             using Crystal.Tools;
 
             using CrystalCode.Tools;
+            using CrystalCode.Tools.Interfaces;
 
             namespace FixtureTools;
 
@@ -592,6 +594,7 @@ public sealed class DotnetToolFactoryTests
             using Crystal.Tools;
 
             using CrystalCode.Tools;
+            using CrystalCode.Tools.Interfaces;
 
             namespace FixtureTools;
 

@@ -14,6 +14,7 @@ using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins.Clients;
+using CrystalCode.Plugins.Clients.Interfaces;
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Models;
@@ -278,14 +279,18 @@ public sealed class PluginCatalogTests
             using Crystal.Tools;
             using CrystalCode.Plugins;
             using CrystalCode.Plugins.Clients;
+            using CrystalCode.Plugins.Clients.Interfaces;
             using CrystalCode.Plugins.Data;
             using CrystalCode.Plugins.Environment;
             using CrystalCode.Plugins.Hooks;
+            using CrystalCode.Plugins.Hooks.Interfaces;
             using CrystalCode.Plugins.Models;
             using CrystalCode.Plugins.Placeholders;
             using CrystalCode.Plugins.Status;
+            using CrystalCode.Plugins.Status.Interfaces;
             using CrystalCode.Plugins.Tools;
             using CrystalCode.Tools;
+            using CrystalCode.Tools.Interfaces;
 
             namespace FixturePlugin;
 

@@ -1,5 +1,4 @@
-namespace CrystalCode.Plugins.Status;
-
+namespace CrystalCode.Plugins.Status.Interfaces;
 /// <summary>
 /// One custom status-line field a plugin adds. The operator opts into it
 /// by name. The host does not place it on the default status bar.

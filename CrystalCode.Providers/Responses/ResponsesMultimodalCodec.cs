@@ -11,6 +11,7 @@ using Crystal.Multimodal.Tools;
 using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Providers.Protocol;
+using CrystalCode.Providers.Protocol.Interfaces;
 
 namespace CrystalCode.Providers.Responses;
 

@@ -7,6 +7,7 @@ using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Plugins.Approvals;
 using CrystalCode.Plugins.Hooks;
+using CrystalCode.Plugins.Hooks.Interfaces;
 
 using Xunit;
 

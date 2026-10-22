@@ -4,6 +4,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Tools;
+using CrystalCode.Tools.Interfaces;
 
 namespace CrystalCode.Engine.Tools.External;
 

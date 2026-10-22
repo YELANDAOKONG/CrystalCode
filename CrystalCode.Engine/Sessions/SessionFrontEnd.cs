@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions;

@@ -1,8 +1,7 @@
 using Crystal.Chat;
 using Crystal.Multimodal.Chat;
 
-namespace CrystalCode.Plugins.Clients;
-
+namespace CrystalCode.Plugins.Clients.Interfaces;
 /// <summary>
 /// Builds a streaming chat client for one provider protocol that the built-in
 /// adapters do not already own.

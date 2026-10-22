@@ -1,5 +1,4 @@
-namespace CrystalCode.Plugins.Status;
-
+namespace CrystalCode.Plugins.Status.Interfaces;
 /// <summary>
 /// Push target for one plugin's admitted status fields. The host ignores a
 /// name this plugin did not register. Empty text clears the field. Calls may
