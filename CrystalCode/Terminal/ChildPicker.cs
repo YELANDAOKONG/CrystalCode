@@ -1,13 +1,16 @@
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
+using CrystalCode.Display.Input;
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Home;
 
 namespace CrystalCode.Terminal;
 
-internal sealed class ChildPicker(SessionRenderer renderer)
+internal sealed class ChildPicker(
+    SessionRenderer renderer,
+    Func<bool, CancellationToken, Task<InputKey>>? readKey = null)
 {
     private const int MaximumVisibleRows = 8;
 
@@ -27,11 +30,12 @@ internal sealed class ChildPicker(SessionRenderer renderer)
                 var selected = Math.Max(0, matches.ToList().FindIndex(child => child.Id == selectedId));
                 renderer.SetOverlay(Render(matches, query, selected, renderer.ChildFocus, activeOnly,
                     ScreenSize.Width, ScreenSize.Height));
-                var key = await renderer.ReadKeyAsync(scrollPlainArrows: false, cancellationToken);
+                var key = readKey is null
+                    ? await renderer.ReadKeyAsync(scrollPlainArrows: false, cancellationToken)
+                    : await readKey(false, cancellationToken);
                 switch (key.Key)
                 {
                     case ConsoleKey.Escape:
-                        return renderer.ChildViewActive ? "parent" : null;
                     case ConsoleKey.F7:
                         return null;
                     case ConsoleKey.Enter when matches.Count > 0:

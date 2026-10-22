@@ -26,7 +26,10 @@ internal sealed partial class SessionProjection
                     _children[changed.Child.Id] = changed.Child;
                     if (changed.Child.Status is not ("running" or "queued"))
                     {
-                        _childEvents.Remove(changed.Child.Id);
+                        if (_childEvents.TryGetValue(changed.Child.Id, out var completedEvents))
+                        {
+                            completedEvents.RemoveAll(item => item is not ApprovalPassed);
+                        }
                     }
                     _renderer.SetChildSessions(_children.Values.ToArray(), _childFocus);
                     if (_childFocus == changed.Child.Id)
@@ -173,7 +176,7 @@ internal sealed partial class SessionProjection
         {
             foreach (var item in events)
             {
-                Project(item);
+                Project(item, replay: true);
             }
         }
     }

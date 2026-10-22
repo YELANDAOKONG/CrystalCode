@@ -362,9 +362,16 @@ available child media using the existing store.
 immutable event records; the latter is an inspection request, not engine focus.
 The terminal owns parent/child event projections, the F7 child picker, read-only
 child input routing, composer visibility, and the focused model/usage chrome.
-Inactive events remain available when switching views. Parent events are cached
-without being projected into a focused child, and restoring the parent replays
-them without replaying submissions into the composer. Child identity stays in
+Inactive events remain available when switching views. `ApprovalPassed` and
+`ApprovalReviewing` use the same source-scoped event path; terminal approval
+callbacks own only the shared modal, never the focused transcript or progress.
+Runtime approval cards survive child completion and view switches without
+restarting completed progress. Child tool batches publish `TodosChanged` and
+refresh their stored todo snapshot before the next model round. The input pump
+awaits `CodingSession.EnqueueAsync` for child inspection instead of discarding
+an asynchronous command through the synchronous queue path. Parent events are
+cached without being projected into a focused child, and restoring the parent
+replays them without replaying submissions into the composer. Child identity stays in
 the picker and chrome rather than persistent footer rows. Disabling Agents clears
 the terminal's child projection and navigation affordance. The terminal never
 submits text to a child. Headless JSON labels child events and media provenance;

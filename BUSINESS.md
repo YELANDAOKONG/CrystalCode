@@ -263,8 +263,10 @@ and fall back without disabling the Agent.
 child invocations, including multiple instances of the same Agent. Adjacent
 `task` calls may overlap; other tools are serial execution barriers. Parent
 cancellation stops running and queued children. Approval interactions are
-queued and identify the source child. Headless calls requiring an operator
-are denied by the same parent policy.
+queued and identify the source child. Approval notifications update only their
+originating conversation; opening an approval modal does not commit another
+conversation's stream or change its progress. Headless calls requiring an
+operator are denied by the same parent policy.
 
 `/agents` lists definitions and settings. While idle it accepts `on`, `off`,
 `concurrency <1-8>`, `model <name> [provider model]`, and
@@ -296,7 +298,8 @@ parent's composer draft remains untouched. Esc returns to the parent at any
 draft state when no modal owns the key. Child identity and navigation hints
 stay in the view chrome, not duplicate transcript or footer rows. F7 and `/child`
 are unavailable after Agents are disabled. Child chrome uses the child's model
-and usage; other child streams do not mix into it. Saved-session lists continue
+and usage; its todo panel updates after each child tool batch without waiting
+for task completion. Other child streams do not mix into it. Saved-session lists continue
 to show only parents.
 
 Children retain their archive and compacted model context, model choices,

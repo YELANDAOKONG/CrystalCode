@@ -1,10 +1,14 @@
 using Crystal.Tools;
 
 using CrystalCode.Engine.Approvals.Interfaces;
+using CrystalCode.Engine.Events;
 
 namespace CrystalCode.Engine.Approvals;
 
-internal sealed class ChildApprovalPrompt(IApprovalPrompt inner, Func<string?> source) : IApprovalPrompt
+internal sealed class ChildApprovalPrompt(
+    IApprovalPrompt inner,
+    Func<string?> source,
+    Action<SessionEvent> publish) : IApprovalPrompt
 {
     private ToolClassification Label(ToolClassification classification) => source() is string label
         ? classification with { Summary = $"Child {label}: {classification.Summary}" }
@@ -15,7 +19,16 @@ internal sealed class ChildApprovalPrompt(IApprovalPrompt inner, Func<string?> s
         inner.AskAsync(call, Label(classification), review, cancellationToken);
 
     public void NotifyPassed(ToolCall call, ToolClassification classification, ApprovalPassReason reason,
-        ApprovalReviewVerdict? review = null) => inner.NotifyPassed(call, Label(classification), reason, review);
+        ApprovalReviewVerdict? review = null)
+    {
+        var labeled = Label(classification);
+        publish(new ApprovalPassed(call, labeled, reason, review));
+        inner.NotifyPassed(call, labeled, reason, review);
+    }
 
-    public void NotifyReviewing(ToolCall call) => inner.NotifyReviewing(call);
+    public void NotifyReviewing(ToolCall call)
+    {
+        publish(new ApprovalReviewing(call));
+        inner.NotifyReviewing(call);
+    }
 }

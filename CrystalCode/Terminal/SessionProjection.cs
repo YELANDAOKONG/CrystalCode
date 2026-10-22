@@ -1,8 +1,10 @@
 using CrystalCode.Display.Cards;
+using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Terminal.Approvals;
 
 namespace CrystalCode.Terminal;
 
@@ -120,6 +122,18 @@ internal sealed partial class SessionProjection : ISessionObserver
                 break;
             case ActivityChanged activity:
                 _renderer.SetProgress(Caption(activity.Activity));
+                break;
+            case ApprovalPassed passed:
+                if (!replay)
+                {
+                    _renderer.SetProgress(ProgressText.Running(passed.Call.Name));
+                }
+                _renderer.WriteApprovalPass(
+                    ApprovalCard.PassWidget(passed.Call, passed.Classification, passed.Reason, passed.Review),
+                    passed.Reason == ApprovalPassReason.Review);
+                break;
+            case ApprovalReviewing:
+                _renderer.SetProgress(ProgressText.Reviewing);
                 break;
             case QueueChanged queue:
                 _renderer.SetQueue(queue.Items);

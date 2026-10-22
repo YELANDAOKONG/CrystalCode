@@ -256,7 +256,7 @@ internal sealed class TerminalHost
             {
                 await _renderer.PumpUntilAsync(
                     work,
-                    _session.Enqueue,
+                    _session.EnqueueAsync,
                     _session.PlanMode,
                     _session.TogglePlan,
                     cancellationToken);

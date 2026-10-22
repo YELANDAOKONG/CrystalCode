@@ -1,3 +1,4 @@
+using CrystalCode.Display.Input;
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Home;
 using CrystalCode.Terminal;
@@ -8,6 +9,34 @@ namespace CrystalCode.Tests.Terminal;
 
 public sealed class ChildPickerTests
 {
+    [Theory]
+    [InlineData(false, ConsoleKey.Escape)]
+    [InlineData(true, ConsoleKey.Escape)]
+    [InlineData(false, ConsoleKey.F7)]
+    [InlineData(true, ConsoleKey.F7)]
+    public async Task ChooseAsync_CancelPreservesFocusAndParentDraft(bool childView, ConsoleKey key)
+    {
+        using var renderer = new SessionRenderer();
+        var child = new ChildSessionDocument { Id = "child-one", Label = "research", Agent = "explore" };
+        renderer.SetChildSessions([child], childView ? child.Id : null);
+        renderer.SeedComposer("parent draft");
+        var picker = new ChildPicker(renderer, (scrollPlainArrows, _) =>
+        {
+            Assert.False(scrollPlainArrows);
+            Assert.True(renderer.OverlayVisible);
+            return Task.FromResult(new InputKey(key, '\0', ConsoleModifiers.None));
+        });
+
+        Assert.Null(await picker.ChooseAsync([child], CancellationToken.None));
+        Assert.Equal(childView, renderer.ChildViewActive);
+        Assert.Equal(childView ? child.Id : null, renderer.ChildFocus);
+        Assert.False(renderer.OverlayVisible);
+        renderer.SetChildSessions([child], null);
+        Assert.Equal("parent draft", await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false));
+    }
+
     [Fact]
     public void Filter_PrioritizesActiveAndMatchesIdentityLabelAgentAndStatus()
     {

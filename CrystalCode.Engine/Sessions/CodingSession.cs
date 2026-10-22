@@ -45,6 +45,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly HashSet<string> _agentNotes = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _approvalQueue = new(1, 1);
     private readonly AsyncLocal<string?> _childOrigin = new();
+    private readonly AsyncLocal<Action<SessionEvent>?> _childPublish = new();
     private readonly AsyncLocal<Func<IReadOnlyList<ChatItem>>?> _childConversation = new();
     private readonly object _childGate = new();
     private readonly HashSet<string> _runningChildren = new(StringComparer.Ordinal);
@@ -324,6 +325,11 @@ public sealed class CodingSession : ITurnObserver
             {
                 notes.Add($"Retry {retry.Attempt.Attempt}: {retry.Attempt.Message}");
             }
+            if (value is TodosChanged changed)
+            {
+                child = child with { Todos = SessionMapper.WriteTodos(changed.Items).ToArray() };
+                _children.Set(child);
+            }
             Publish(new ChildEventReceived(child.Id, invocation, value));
         }
         try
@@ -332,6 +338,7 @@ public sealed class CodingSession : ITurnObserver
             await _childSlots.WaitAsync(cancellationToken);
             entered = true;
             _childOrigin.Value = $"{agent} / {child.Label} / {child.Id}";
+            _childPublish.Value = Emit;
             child = child with { Status = "running" };
             _children.Set(child);
             Publish(new ChildSessionChanged(child, invocation));
@@ -393,7 +400,8 @@ public sealed class CodingSession : ITurnObserver
                 UpdateChildUsage(invocation.ToString("N"), usage);
                 Emit(new UsageChanged(context, usage is null ? null : SessionLedger.Add(SessionMapper.ReadUsage(child.CumulativeUsage), usage),
                     selectedModel.ContextWindow, true));
-            }, _ => usageAfterCompaction = null);
+            }, _ => usageAfterCompaction = null,
+                () => Emit(new TodosChanged(todos.Snapshot())));
             var limits = agent == "explore" ? new TurnLimits(32, 128, null) : TurnLimits.Unlimited;
             IReadOnlyList<ChatItem> reviewItems = items;
             async Task<CompactionOutcome> CompactAsync(IReadOnlyList<ChatItem> context, CancellationToken token)
@@ -5142,7 +5150,18 @@ public sealed class CodingSession : ITurnObserver
 
     private void RebuildExecutors()
     {
-        var approvalPrompt = new ChildApprovalPrompt(_frontEnd.Approvals, () => _childOrigin.Value);
+        var approvalPrompt = new ChildApprovalPrompt(_frontEnd.Approvals, () => _childOrigin.Value,
+            value =>
+            {
+                if (_childPublish.Value is { } childPublish)
+                {
+                    childPublish(value);
+                }
+                else
+                {
+                    Publish(value);
+                }
+            });
         var question = _frontEnd.Questions;
         var reviewer = new ModelApprovalReviewer(
             ReviewerClient(),
@@ -6477,6 +6496,22 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public void Enqueue(string input) => AcceptQueuedInput(input, remember: true);
 
+    /// <summary>
+    /// Accepts pump input, awaiting child inspection without starting another turn.
+    /// </summary>
+    public async Task EnqueueAsync(string input, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (SessionCommand.TryParse(input.Trim(), out var command) && command.Verb == SessionVerb.Child)
+        {
+            CloseRecallWindow();
+            await HandleCommandAsync(command, cancellationToken);
+            return;
+        }
+        Enqueue(input);
+    }
+
     private void AcceptQueuedInput(string input, bool remember)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -6613,6 +6648,9 @@ public sealed class CodingSession : ITurnObserver
                 return true;
             case SessionVerb.Sessions:
                 ShowSessions(command.Argument);
+                return true;
+            case SessionVerb.Agents:
+                ChangeAgents(command.Argument);
                 return true;
             case SessionVerb.Tokens:
                 ChangeEstimatedTokens(command.Argument);

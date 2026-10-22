@@ -2,12 +2,12 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Approvals.Interfaces;
-using CrystalCode.Engine.Sessions;
 
 namespace CrystalCode.Terminal.Approvals;
 
 /// <summary>
-/// Permission overlay. Keys share the session frame loop; not a Live widget.
+/// Permission overlay. Notification rendering belongs to the source-scoped session projection.
+/// Keys share the session frame loop; not a Live widget.
 /// </summary>
 public sealed class ApprovalPrompt : IApprovalPrompt
 {
@@ -28,16 +28,11 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
         ArgumentNullException.ThrowIfNull(reason);
-        _renderer.SetProgress(ProgressText.Running(call.Name));
-        _renderer.WriteApprovalPass(
-            ApprovalCard.PassWidget(call, classification, reason, review),
-            reason == ApprovalPassReason.Review);
     }
 
     public void NotifyReviewing(ToolCall call)
     {
         ArgumentNullException.ThrowIfNull(call);
-        _renderer.SetProgress(ProgressText.Reviewing);
     }
 
     public async ValueTask<ApprovalChoice> AskAsync(
@@ -49,9 +44,7 @@ public sealed class ApprovalPrompt : IApprovalPrompt
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
-        _renderer.CloseStream();
         _renderer.PauseComposer();
-        _renderer.SetProgress(ProgressText.AwaitingApproval);
         _renderer.SetOverlay(ApprovalCard.AskWidget(call, classification, review));
         try
         {
@@ -61,15 +54,6 @@ public sealed class ApprovalPrompt : IApprovalPrompt
                 var key = await _renderer.ReadKeyAsync(cancellationToken);
                 if (ApprovalKeys.TryMap(key.Key, out var choice, classification.AllowsReusableGrant))
                 {
-                    if (choice.IsAllow)
-                    {
-                        _renderer.SetProgress(ProgressText.Running(call.Name));
-                    }
-                    else
-                    {
-                        _renderer.SetProgress(ProgressText.WaitingForModel);
-                    }
-
                     return choice;
                 }
             }

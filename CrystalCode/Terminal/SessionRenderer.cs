@@ -1120,7 +1120,7 @@ public sealed class SessionRenderer : IDisposable
 
     public async Task PumpUntilAsync(
         Task wake,
-        Action<string>? onSubmit,
+        Func<string, CancellationToken, Task>? onSubmit,
         bool planMode,
         Func<bool> togglePlan,
         CancellationToken cancellationToken)
@@ -1155,9 +1155,9 @@ public sealed class SessionRenderer : IDisposable
                 {
                     await QueueQuickPromptAsync(submitted, cancellationToken);
                 }
-                else
+                else if (onSubmit is not null)
                 {
-                    onSubmit?.Invoke(submitted.Trim());
+                    await onSubmit(submitted.Trim(), cancellationToken);
                 }
             }
         }

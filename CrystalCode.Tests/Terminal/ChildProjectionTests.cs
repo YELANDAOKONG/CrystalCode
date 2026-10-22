@@ -2,7 +2,9 @@ using System.Reflection;
 
 using Crystal;
 using Crystal.Chat;
+using Crystal.Tools;
 
+using CrystalCode.Display.Cards;
 using CrystalCode.Display.Transcript;
 
 using CrystalCode.Engine.Approvals;
@@ -10,7 +12,9 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 using CrystalCode.Terminal;
+using CrystalCode.Terminal.Approvals;
 
 using Xunit;
 
@@ -18,6 +22,94 @@ namespace CrystalCode.Tests.Terminal;
 
 public sealed class ChildProjectionTests
 {
+    [Fact]
+    public void ApprovalPromptNotifications_DoNotWriteIntoTheFocusedStreamOrProgress()
+    {
+        using var renderer = new SessionRenderer();
+        var prompt = new ApprovalPrompt(renderer);
+        renderer.BeginTurn();
+        renderer.OnStreamEvent(new ChatTextDelta(0, 0, ChatRole.Assistant, "before"));
+        var progress = renderer.ChromeProgress;
+        var call = new ToolCall("other", "read", "{}", ToolInputKind.Json);
+        var classification = new ToolClassification(Risk.Read, Authority.Workspace, "other approval");
+
+        prompt.NotifyReviewing(call);
+        prompt.NotifyPassed(call, classification, ApprovalPassReason.Policy);
+        Assert.Equal(progress, renderer.ChromeProgress);
+        renderer.OnStreamEvent(new ChatTextDelta(0, 0, ChatRole.Assistant, "after"));
+        Assert.Contains("beforeafter", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.DoesNotContain("other approval", TranscriptText(renderer), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApprovalEvents_AreIsolatedAndSurviveSwitchingAndChildCompletion()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var first = new ChildSessionDocument { Id = "child-one", Agent = "explore", Status = "running" };
+        var second = new ChildSessionDocument { Id = "child-two", Agent = "explore", Status = "running" };
+        projection.OnEvent(new ChildSessionChanged(first, Guid.NewGuid()));
+        projection.OnEvent(new ChildSessionChanged(second, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(first.Id));
+        projection.OnEvent(new ChildEventReceived(first.Id, Guid.NewGuid(), Passed("first approval")));
+        var firstProgress = renderer.ChromeProgress;
+        projection.OnEvent(new ChildEventReceived(second.Id, Guid.NewGuid(), Passed("second approval")));
+        projection.OnEvent(new ChildEventReceived(second.Id, Guid.NewGuid(),
+            new ApprovalReviewing(new ToolCall("review", "write", "{}", ToolInputKind.Json))));
+        projection.OnEvent(Passed("parent approval"));
+        Assert.Equal(firstProgress, renderer.ChromeProgress);
+        Assert.Contains("first approval", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.DoesNotContain("second approval", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.DoesNotContain("parent approval", TranscriptText(renderer), StringComparison.Ordinal);
+
+        projection.OnEvent(new ChildViewRequested(second.Id));
+        Assert.Contains("second approval", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.DoesNotContain("first approval", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.Equal(ProgressText.Reviewing, renderer.ChromeProgress);
+        projection.OnEvent(new ChildSessionChanged(second with { Status = "completed" }, Guid.NewGuid()));
+        Assert.Contains("second approval", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.Empty(renderer.ChromeProgress);
+
+        projection.ReturnToParent();
+        Assert.Contains("parent approval", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.DoesNotContain("second approval", TranscriptText(renderer), StringComparison.Ordinal);
+        projection.OnEvent(new ChildViewRequested(second.Id));
+        Assert.Contains("second approval", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.Empty(renderer.ChromeProgress);
+    }
+
+    [Fact]
+    public void TodosChanged_UpdatesOnlyTheFocusedChildAndReplaysLatestState()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "general", Status = "running" };
+        projection.OnEvent(new TodosChanged([new TodoItem("p", "parent todo", TodoStatus.Pending)]));
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        projection.OnEvent(new ChildEventReceived(child.Id, Guid.NewGuid(),
+            new TodosChanged([new TodoItem("a", "child todo", TodoStatus.InProgress)])));
+        projection.OnEvent(new ChildEventReceived("other", Guid.NewGuid(),
+            new TodosChanged([new TodoItem("b", "other todo", TodoStatus.Completed)])));
+        Assert.Equal("child todo", Assert.Single(TodoItems(renderer)).Content);
+        projection.ReturnToParent();
+        Assert.Equal("parent todo", Assert.Single(TodoItems(renderer)).Content);
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        Assert.Equal("child todo", Assert.Single(TodoItems(renderer)).Content);
+    }
+
+    private static ApprovalPassed Passed(string summary) => new(
+        new ToolCall(summary, "read", "{}", ToolInputKind.Json),
+        new ToolClassification(Risk.Read, Authority.Workspace, summary), ApprovalPassReason.Policy);
+
+    private static IReadOnlyList<TodoBarItem> TodoItems(SessionRenderer renderer) =>
+        Assert.IsType<List<TodoBarItem>>(typeof(SessionRenderer)
+            .GetField("_todoItems", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(renderer));
+
     [Fact]
     public void ChildFocus_KeepsOtherChildUsageAndParentEventsOutOfViewAndRestoresParent()
     {
