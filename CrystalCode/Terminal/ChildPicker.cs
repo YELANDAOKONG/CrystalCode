@@ -10,7 +10,7 @@ namespace CrystalCode.Terminal;
 
 internal sealed class ChildPicker(
     SessionRenderer renderer,
-    Func<bool, CancellationToken, Task<InputKey>>? readKey = null)
+    Func<bool, Action, CancellationToken, Task<InputKey>>? readKey = null)
 {
     private const int MaximumVisibleRows = 8;
 
@@ -19,20 +19,49 @@ internal sealed class ChildPicker(
         var query = string.Empty;
         var selectedId = renderer.ChildFocus;
         var activeOnly = false;
+        var followsRenderer = renderer.ChildSessions.Count > 0;
+        IReadOnlyList<ChildSessionDocument> matches = [];
+        var selected = 0;
+        IReadOnlyList<ChildSessionDocument>? rendered = null;
+        var renderedQuery = string.Empty;
+        var renderedActiveOnly = false;
+        string? renderedSelection = null;
+        var renderedWidth = 0;
+        var renderedHeight = 0;
+        void Refresh()
+        {
+            var current = renderer.ChildSessions;
+            followsRenderer |= current.Count > 0;
+            var source = followsRenderer ? current : children;
+            var width = ScreenSize.Width;
+            var height = ScreenSize.Height;
+            if (ReferenceEquals(rendered, source) && renderedQuery == query && renderedActiveOnly == activeOnly
+                && renderedSelection == selectedId && renderedWidth == width && renderedHeight == height)
+            {
+                return;
+            }
+            matches = Filter(source, query, activeOnly);
+            selected = Math.Max(0, matches.ToList().FindIndex(child => child.Id == selectedId));
+            selectedId = matches.Count > 0 ? matches[selected].Id : null;
+            renderer.SetOverlay(Render(matches, query, selected, renderer.ChildFocus, activeOnly, width, height));
+            rendered = source;
+            renderedQuery = query;
+            renderedActiveOnly = activeOnly;
+            renderedSelection = selectedId;
+            renderedWidth = width;
+            renderedHeight = height;
+        }
         renderer.PauseComposer();
         try
         {
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var current = renderer.ChildSessions;
-                var matches = Filter(current.Count > 0 ? current : children, query, activeOnly);
-                var selected = Math.Max(0, matches.ToList().FindIndex(child => child.Id == selectedId));
-                renderer.SetOverlay(Render(matches, query, selected, renderer.ChildFocus, activeOnly,
-                    ScreenSize.Width, ScreenSize.Height));
+                Refresh();
                 var key = readKey is null
-                    ? await renderer.ReadKeyAsync(scrollPlainArrows: false, cancellationToken)
-                    : await readKey(false, cancellationToken);
+                    ? await renderer.ReadKeyAsync(false, Refresh, cancellationToken)
+                    : await readKey(false, Refresh, cancellationToken);
+                Refresh();
                 switch (key.Key)
                 {
                     case ConsoleKey.Escape:

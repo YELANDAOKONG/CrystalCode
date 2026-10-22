@@ -23,7 +23,16 @@ internal sealed partial class SessionProjection
             switch (sessionEvent)
             {
                 case ChildSessionChanged changed:
-                    _children[changed.Child.Id] = changed.Child;
+                    var updated = changed.Child;
+                    if (updated.Status is "running" or "queued"
+                        && _childEvents.TryGetValue(updated.Id, out var liveEvents))
+                    {
+                        foreach (var value in liveEvents)
+                        {
+                            updated = UpdateChildSnapshot(updated, value);
+                        }
+                    }
+                    _children[updated.Id] = updated;
                     if (changed.Child.Status is not ("running" or "queued"))
                     {
                         if (_childEvents.TryGetValue(changed.Child.Id, out var completedEvents))
@@ -38,6 +47,12 @@ internal sealed partial class SessionProjection
                     }
                     return;
                 case ChildEventReceived child:
+                    if (_children.TryGetValue(child.ChildSessionId, out var snapshot)
+                        && child.Event is UsageChanged or TodosChanged)
+                    {
+                        _children[child.ChildSessionId] = UpdateChildSnapshot(snapshot, child.Event);
+                        _renderer.SetChildSessions(_children.Values.ToArray(), _childFocus, repaint: false);
+                    }
                     if (!_childEvents.TryGetValue(child.ChildSessionId, out var events))
                     {
                         events = [];
@@ -51,6 +66,17 @@ internal sealed partial class SessionProjection
                     return;
                 case ChildViewRequested view:
                     SwitchView(view.ChildSessionId);
+                    return;
+                case StatsReported:
+                case SideQuestionSnapshot:
+                case PreferencesChanged:
+                case SlashCommandsChanged:
+                case QueueChanged:
+                case PromptHistoryLoaded:
+                case ImageHistoryInvalidated:
+                case StatusFieldsChanged:
+                    // Shared surface state is applied once; replay must not restore old input or reopen panels.
+                    Project(sessionEvent);
                     return;
                 case SessionStarted started:
                     _parentChrome = started.Chrome;
@@ -92,7 +118,7 @@ internal sealed partial class SessionProjection
                 SwitchView(null);
                 return;
             }
-            if (_childFocus is null || sessionEvent is PreferencesChanged or SlashCommandsChanged or QueueChanged or PromptHistoryLoaded)
+            if (_childFocus is null)
             {
                 Project(sessionEvent);
             }
@@ -103,7 +129,7 @@ internal sealed partial class SessionProjection
     {
         lock (_projectionGate)
         {
-            if (_childFocus is null)
+            if (_childFocus is null || _renderer.OverlayVisible)
             {
                 return false;
             }
@@ -155,7 +181,7 @@ internal sealed partial class SessionProjection
         var model = child.Model;
         Project(new ChromeChanged(_parentChrome with
         {
-            Model = $"{model.Model ?? "Unknown"} · {child.Agent} · {child.Label}", Thinking = model.Thinking ?? "default", ContextWindow = model.Context ?? 0,
+            Model = model.Model ?? "Unknown", Thinking = model.Thinking ?? "default", ContextWindow = model.Context ?? 0,
             ServiceTier = model.Tier ?? string.Empty, Speed = model.Speed ?? string.Empty
         }));
         _renderer.SetProgress(child.Status is "running" or "queued" ? child.Status : string.Empty);
@@ -180,6 +206,39 @@ internal sealed partial class SessionProjection
             }
         }
     }
+
+    private static ChildSessionDocument UpdateChildSnapshot(ChildSessionDocument child, SessionEvent value) => value switch
+    {
+        UsageChanged usage => child with
+        {
+            Usage = UsageDocument(usage.Usage),
+            CumulativeUsage = UsageDocument(usage.CumulativeUsage)
+        },
+        TodosChanged todos => child with
+        {
+            Todos = todos.Items.Select(todo => new SessionTodoDocument
+            {
+                Id = todo.Id,
+                Content = todo.Content,
+                Status = todo.Status switch
+                {
+                    TodoStatus.InProgress => "in_progress",
+                    TodoStatus.Completed => "completed",
+                    TodoStatus.Cancelled => "cancelled",
+                    _ => "pending"
+                }
+            }).ToArray()
+        },
+        _ => child
+    };
+
+    private static SessionUsageDocument? UsageDocument(TokenUsage? usage) => usage is null ? null
+        : new SessionUsageDocument
+        {
+            InputTokenCount = usage.InputTokenCount,
+            OutputTokenCount = usage.OutputTokenCount,
+            ReasoningTokenCount = usage.ReasoningTokenCount
+        };
 
     private static TokenUsage? Usage(SessionUsageDocument? usage) => usage is null ? null
         : new TokenUsage(usage.InputTokenCount, usage.OutputTokenCount, usage.ReasoningTokenCount);

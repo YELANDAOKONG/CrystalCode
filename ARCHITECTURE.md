@@ -371,8 +371,16 @@ refresh their stored todo snapshot before the next model round. The input pump
 awaits `CodingSession.EnqueueAsync` for child inspection instead of discarding
 an asynchronous command through the synchronous queue path. Parent events are
 cached without being projected into a focused child, and restoring the parent
-replays them without replaying submissions into the composer. Child identity stays in
-the picker and chrome rather than persistent footer rows. Disabling Agents clears
+replays them without replaying submissions into the composer. Shared preferences,
+completions, prompt history, image invalidation, queue state, plugin status, and
+stats/side-question panel requests are applied once outside conversation replay.
+Switching views cannot re-seed old prompt history, invalidate new draft image
+attachments, or reopen dismissed panels. Live child usage and todo events update
+the terminal's picker snapshots without rebuilding the focused transcript. The
+pickers refresh through the existing input polling loop and retain selection by
+child id across active-status sorting. The read-only composer region shows the
+child identity and Esc/F7 hints; the model status field retains the model name.
+A shared modal retains input ownership during shortcut returns. Disabling Agents clears
 the terminal's child projection and navigation affordance. The terminal never
 submits text to a child. Headless JSON labels child events and media provenance;
 text output keeps the returned summary with the task result and reports child

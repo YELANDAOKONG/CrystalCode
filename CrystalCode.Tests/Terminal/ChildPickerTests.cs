@@ -20,7 +20,7 @@ public sealed class ChildPickerTests
         var child = new ChildSessionDocument { Id = "child-one", Label = "research", Agent = "explore" };
         renderer.SetChildSessions([child], childView ? child.Id : null);
         renderer.SeedComposer("parent draft");
-        var picker = new ChildPicker(renderer, (scrollPlainArrows, _) =>
+        var picker = new ChildPicker(renderer, (scrollPlainArrows, _, _) =>
         {
             Assert.False(scrollPlainArrows);
             Assert.True(renderer.OverlayVisible);
@@ -35,6 +35,54 @@ public sealed class ChildPickerTests
         Assert.Equal("parent draft", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
             static () => false, CancellationToken.None, checkSize: false));
+    }
+
+    [Fact]
+    public async Task ChooseAsync_RefreshesLiveStatusAndUsageWithoutMovingSelectionToAnotherChild()
+    {
+        using var renderer = new SessionRenderer();
+        var first = new ChildSessionDocument { Id = "first", Agent = "explore", Status = "running" };
+        var second = new ChildSessionDocument { Id = "second", Agent = "explore", Status = "running" };
+        renderer.SetChildSessions([first, second], null);
+        var picker = new ChildPicker(renderer, (_, refresh, _) =>
+        {
+            renderer.SetChildSessions([first with
+            {
+                Status = "completed",
+                CumulativeUsage = new SessionUsageDocument { InputTokenCount = 230, OutputTokenCount = 42 }
+            }, second], null);
+            refresh();
+            var field = typeof(SessionRenderer).GetField("_overlayWidget",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var widget = Assert.IsAssignableFrom<Spectre.Console.Rendering.IRenderable>(field.GetValue(renderer));
+            var lines = WidgetPaint.Lines(widget, 120);
+            Assert.Contains(lines, line => line.Plain.Contains(">   explore  completed", StringComparison.Ordinal));
+            Assert.Contains(lines, line => line.Plain.Contains("IN 230 / OUT 42", StringComparison.Ordinal));
+            return Task.FromResult(new InputKey(ConsoleKey.Enter, '\r', ConsoleModifiers.None));
+        });
+
+        Assert.Equal(first.Id, await picker.ChooseAsync([first, second], CancellationToken.None));
+        Assert.False(renderer.OverlayVisible);
+    }
+
+    [Fact]
+    public async Task ChooseAsync_DoesNotResurrectChildrenAfterTheLiveListIsCleared()
+    {
+        using var renderer = new SessionRenderer();
+        var child = new ChildSessionDocument { Id = "child", Agent = "explore", Status = "running" };
+        renderer.SetChildSessions([child], null);
+        var reads = 0;
+        var picker = new ChildPicker(renderer, (_, refresh, _) =>
+        {
+            reads++;
+            renderer.SetChildSessions([], null);
+            refresh();
+            return Task.FromResult(new InputKey(reads == 1 ? ConsoleKey.Enter : ConsoleKey.Escape,
+                '\0', ConsoleModifiers.None));
+        });
+
+        Assert.Null(await picker.ChooseAsync([child], CancellationToken.None));
+        Assert.Equal(2, reads);
     }
 
     [Fact]

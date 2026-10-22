@@ -1047,11 +1047,13 @@ file.
 
 `/child` opens a filterable picker. `/child <unique-id-prefix>`
 inspects one child. `/child parent` returns. F7 opens the picker from
-either view. F7 and Esc in the picker dismiss it. Inspection works
-during a turn and is read-only: text, paste, and submit aimed at the child are ignored, and
-the parent's composer draft stays. Esc returns to the parent at any
-draft state when no modal owns the key. Identity and navigation stay
-in the view chrome. F7 and `/child` are unavailable after Agents are
+either view. F7 and Esc in the picker dismiss it. The open picker refreshes
+status and usage automatically and keeps the same child selected when the list
+reorders. Inspection works during a turn and is read-only: text, paste, and submit
+aimed at the child are ignored, and the parent's composer draft and image
+attachments stay. Esc returns to the parent at any draft state when no modal
+owns the key. The read-only composer region shows the child's short id, Agent,
+label, and Esc/F7 navigation hints. F7 and `/child` are unavailable after Agents are
 disabled. The child view shows that child's model and usage.
 Saved-session lists show only parents.
 

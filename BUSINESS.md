@@ -291,12 +291,15 @@ by those overlays, sets, or attachments. They keep `prompt.md`, then the
 built-in child safety rules and bound placeholders.
 
 `/child` opens a filterable child picker, `/child <unique-id-prefix>` inspects
-one child, and `/child parent` returns. F7 opens the picker from either view;
+one child, and `/child parent` returns. The picker refreshes status and usage
+while open and retains selection by child id when active children reorder.
+F7 opens the picker from either view;
 F7 and Esc in the child picker dismiss it. Inspection works during a turn and
 is read-only: child text input, paste, and submit are ignored, while the
-parent's composer draft remains untouched. Esc returns to the parent at any
+parent's composer draft and image attachments remain untouched. Esc returns to the parent at any
 draft state when no modal owns the key. Child identity and navigation hints
-stay in the view chrome, not duplicate transcript or footer rows. F7 and `/child`
+replace the composer in the read-only view chrome, including the short child id
+and Esc/F7 hints, not duplicate transcript rows. F7 and `/child`
 are unavailable after Agents are disabled. Child chrome uses the child's model
 and usage; its todo panel updates after each child tool batch without waiting
 for task completion. Other child streams do not mix into it. Saved-session lists continue

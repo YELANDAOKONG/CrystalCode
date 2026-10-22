@@ -102,6 +102,175 @@ public sealed class ChildProjectionTests
         Assert.Equal("child todo", Assert.Single(TodoItems(renderer)).Content);
     }
 
+    [Fact]
+    public async Task ReturnToParent_DoesNotReopenDismissedStatsPage()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        projection.OnEvent(new StatsReported(new SessionStatsReport(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30,
+            null, null, []), false));
+        Assert.True(renderer.OverlayVisible);
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false);
+        Assert.False(renderer.OverlayVisible);
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+
+        Assert.True(projection.ReturnToParent());
+        Assert.False(renderer.OverlayVisible);
+    }
+
+    [Fact]
+    public void ReturnToParent_DoesNotReannounceDismissedSideQuestion()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        projection.OnEvent(new SideQuestionSnapshot(true, [new SideExchange("why", "because")],
+            false, "", "", null, false));
+        Assert.True(renderer.SideQuestionOpen);
+        renderer.DismissSideQuestion();
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+
+        Assert.True(projection.ReturnToParent());
+        Assert.False(renderer.SideQuestionOpen);
+    }
+
+    [Fact]
+    public void LiveChildEvents_RefreshPickerSnapshotsWithoutChangingFocusOrCommittingStream()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Status = "running" };
+        var invocation = Guid.NewGuid();
+        projection.OnEvent(new ChildSessionChanged(child, invocation));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, "before"))));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new UsageChanged(new TokenUsage(220, 22), new TokenUsage(440, 44), 2000, true)));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new TodosChanged([new TodoItem("a", "live todo", TodoStatus.InProgress)])));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, "after"))));
+        projection.OnEvent(new ChildSessionChanged(child, Guid.Empty));
+
+        var snapshot = Assert.Single(renderer.ChildSessions);
+        Assert.Equal(220, snapshot.Usage!.InputTokenCount);
+        Assert.Equal(440, snapshot.CumulativeUsage!.InputTokenCount);
+        Assert.Equal("live todo", Assert.Single(snapshot.Todos).Content);
+        Assert.Equal(child.Id, renderer.ChildFocus);
+        Assert.Contains("beforeafter", TranscriptText(renderer), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReturnToParent_DoesNotReseedOldPromptHistory()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        projection.OnEvent(new PromptHistoryLoaded(["old prompt"]));
+        renderer.SeedComposer("recent prompt");
+        Assert.Equal("recent prompt", await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        Assert.True(projection.ReturnToParent());
+
+        Assert.Equal("recent prompt", await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false),
+                new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false));
+    }
+
+    [Fact]
+    public async Task ReturnToParent_DoesNotInvalidateImagesPastedAfterHistoryWasCleared()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        projection.OnEvent(new ImageHistoryInvalidated());
+        renderer.OnImagePasteAsync = static _ => Task.FromResult<string?>("[Image #7]");
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true)],
+            static () => false, CancellationToken.None, checkSize: false);
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore" };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        Assert.True(projection.ReturnToParent());
+
+        var submitted = await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false);
+        Assert.Contains(ImageMarkerText.Prefix + "[Image #7]", submitted, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReturnToParent_LeavesFocusAndLiveStreamUntouchedWhileAModalOwnsInput()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Status = "running" };
+        var invocation = Guid.NewGuid();
+        projection.OnEvent(new ChildSessionChanged(child, invocation));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, "before"))));
+        renderer.SetOverlay(["Approval modal"]);
+        Assert.False(projection.ReturnToParent());
+        Assert.Equal(child.Id, renderer.ChildFocus);
+        Assert.True(renderer.OverlayVisible);
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, "after"))));
+        Assert.Contains("beforeafter", TranscriptText(renderer), StringComparison.Ordinal);
+        renderer.ClearOverlay();
+        Assert.True(projection.ReturnToParent());
+    }
+
+    [Theory]
+    [InlineData(80)]
+    [InlineData(120)]
+    public void ChildChrome_ShowsIdentityAndNavigationWithoutExposingParentDraft(int width)
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var child = new ChildSessionDocument
+        {
+            Id = "12345678-child", Agent = "explore", Label = "[research] " + new string('x', 120),
+            Model = new AgentModelSettings { Model = "child-model" }
+        };
+        projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
+        renderer.SeedComposer("private parent draft");
+        projection.OnEvent(new ChildViewRequested(child.Id));
+
+        var line = Assert.Single(renderer.ProjectComposer(width, 1).Lines);
+        Assert.Contains("Child 12345678", line.Plain, StringComparison.Ordinal);
+        Assert.Contains("explore", line.Plain, StringComparison.Ordinal);
+        Assert.Contains("Esc: parent", line.Plain, StringComparison.Ordinal);
+        Assert.Contains("F7: children", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("private parent draft", line.Plain, StringComparison.Ordinal);
+        Assert.True(CrystalCode.Display.Paint.TextWidth.Measure(line.Plain) <= width);
+        Assert.DoesNotContain("Esc: parent", TranscriptText(renderer), StringComparison.Ordinal);
+        Assert.Equal("child-model", renderer.ChromeModel);
+    }
+
     private static ApprovalPassed Passed(string summary) => new(
         new ToolCall(summary, "read", "{}", ToolInputKind.Json),
         new ToolClassification(Risk.Read, Authority.Workspace, summary), ApprovalPassReason.Policy);
@@ -275,7 +444,13 @@ public sealed class ChildProjectionTests
                 CancellationToken.None, checkSize: false));
         }
         Assert.False(toggled);
-        Assert.All(renderer.ProjectComposer(80, 8).Lines, line => Assert.True(string.IsNullOrWhiteSpace(line.Plain)));
+        var navigation = Assert.Single(renderer.ProjectComposer(80, 8).Lines).Plain;
+        Assert.Contains("Esc: parent", navigation, StringComparison.Ordinal);
+        Assert.Contains("F7: children", navigation, StringComparison.Ordinal);
+        if (draft.Length > 0)
+        {
+            Assert.DoesNotContain(draft, navigation, StringComparison.Ordinal);
+        }
         Assert.Equal("/child parent", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
             static () => false, CancellationToken.None, checkSize: false));

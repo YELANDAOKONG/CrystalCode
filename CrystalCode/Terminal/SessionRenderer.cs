@@ -1001,7 +1001,8 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
-    internal void SetChildSessions(IReadOnlyList<CrystalCode.Engine.Home.ChildSessionDocument> children, string? focus)
+    internal void SetChildSessions(IReadOnlyList<CrystalCode.Engine.Home.ChildSessionDocument> children, string? focus,
+        bool repaint = true)
     {
         lock (_gate)
         {
@@ -1009,7 +1010,10 @@ public sealed class SessionRenderer : IDisposable
             ChildFocus = focus;
             _childSessions = children.ToArray();
             _childRows = [];
-            PaintUnlocked(force: true);
+            if (repaint)
+            {
+                PaintUnlocked(force: true);
+            }
         }
     }
 
@@ -1465,8 +1469,12 @@ public sealed class SessionRenderer : IDisposable
     public Task<InputKey> ReadKeyAsync(CancellationToken cancellationToken) =>
         ReadKeyAsync(scrollPlainArrows: true, cancellationToken);
 
+    internal Task<InputKey> ReadKeyAsync(bool scrollPlainArrows, CancellationToken cancellationToken) =>
+        ReadKeyAsync(scrollPlainArrows, null, cancellationToken);
+
     internal async Task<InputKey> ReadKeyAsync(
         bool scrollPlainArrows,
+        Action? refresh,
         CancellationToken cancellationToken)
     {
         while (true)
@@ -1475,6 +1483,7 @@ public sealed class SessionRenderer : IDisposable
             var burst = await ReadAvailableKeysAsync(
                 wake: null,
                 ignorePause: true,
+                refresh,
                 cancellationToken);
             if (burst is null)
             {
@@ -2483,7 +2492,13 @@ public sealed class SessionRenderer : IDisposable
     {
         if (ChildViewActive)
         {
-        return new ComposerView([PaintLine.Blank], 0, 0);
+            var child = _childSessions.FirstOrDefault(item => item.Id == ChildFocus);
+            var shortId = ChildFocus is null ? string.Empty : ChildFocus[..Math.Min(8, ChildFocus.Length)];
+            var identity = child is null ? "Child" : $"Child {shortId} · {child.Agent} · {child.Label}";
+            const string navigation = "Esc: parent · F7: children";
+            var label = TextWidth.Truncate(TerminalText.SanitizeLine(identity),
+                Math.Max(0, width - TextWidth.Measure(navigation) - 3));
+            return new ComposerView([PaintLine.Colored(Theme.Muted, $"{label} · {navigation}").Fit(width)], 0, 0);
         }
         return _composer.Project(width, maximumRows);
     }
@@ -2616,15 +2631,23 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    private Task<List<ConsoleKeyInfo>?> ReadAvailableKeysAsync(
+        Task? wake,
+        bool ignorePause,
+        CancellationToken cancellationToken) =>
+        ReadAvailableKeysAsync(wake, ignorePause, null, cancellationToken);
+
     private async Task<List<ConsoleKeyInfo>?> ReadAvailableKeysAsync(
         Task? wake,
         bool ignorePause,
+        Action? refresh,
         CancellationToken cancellationToken)
     {
         var discardQueued = false;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            refresh?.Invoke();
 
             var paused = false;
             var tooSmall = false;
