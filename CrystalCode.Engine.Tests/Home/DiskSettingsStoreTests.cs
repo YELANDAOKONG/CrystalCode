@@ -1170,6 +1170,77 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Load_EnablesMcpByDefault_AndOmitsDefaultsOnSave()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+
+        var settings = store.LoadOrCreate();
+
+        Assert.True(settings.Mcp);
+        Assert.Equal(McpToolApprovalSettings.Default, settings.McpToolApproval);
+        store.Save(settings);
+        var json = File.ReadAllText(root.Home.ConfigPath);
+        Assert.DoesNotContain("\"mcp\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("mcpToolApproval", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_ReadsMcpDisabled()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "mcp": false
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.Mcp);
+        store.Save(settings);
+        Assert.Contains(
+            "\"mcp\": false",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RoundTripsMcpToolApprovalPolicies()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "mcpToolApproval": {
+                "home": "author"
+              }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.Equal(ExternalToolTrustPolicy.Author, settings.McpToolApproval.Home);
+        Assert.Equal(ExternalToolTrustPolicy.Host, settings.McpToolApproval.Project);
+        store.Save(settings);
+        var json = File.ReadAllText(root.Home.ConfigPath);
+        Assert.Contains("\"home\": \"author\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"project\"", json[json.IndexOf("mcpToolApproval", StringComparison.Ordinal)..],
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_ReadsEstimatedTokensEnabled()
     {
         using var root = new TemporaryHome();
