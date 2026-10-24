@@ -508,7 +508,9 @@ internal sealed class AnthropicCodec : IProtocolCodec
     private static FinishReason ReadFinishReason(string? reason) => reason switch
     {
         "end_turn" or "stop_sequence" => FinishReason.Stop,
-        "max_tokens" => FinishReason.Length,
+        // The response filled the context window rather than max_tokens, but
+        // the reply is cut short the same way, so the session treats it alike.
+        "max_tokens" or "model_context_window_exceeded" => FinishReason.Length,
         "tool_use" => FinishReason.ToolCalls,
         "refusal" => FinishReason.ContentFilter,
         null => FinishReason.Stop,

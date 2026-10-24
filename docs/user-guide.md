@@ -770,6 +770,10 @@ count is only what the endpoint had reported by then. A
 stream that ends without a `stop_reason` fails the request, and a retry
 follows the usual retry rules.
 
+`max_tokens` and `model_context_window_exceeded` both end the turn as
+truncated output, and `refusal` ends it as filtered. Any other stop reason,
+such as `pause_turn`, fails the turn and names the reason.
+
 ### Example: add OpenCode Zen protocol endpoints
 
 One gateway can group models that use different wire protocols under one

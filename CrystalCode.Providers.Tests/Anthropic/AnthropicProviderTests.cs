@@ -201,6 +201,47 @@ public sealed class AnthropicProviderTests
         Assert.Equal(new TokenUsage(903, 1), usage.Usage);
     }
 
+    [Theory]
+    [InlineData("max_tokens", "length")]
+    [InlineData("model_context_window_exceeded", "length")]
+    [InlineData("refusal", "content_filter")]
+    public async Task StreamAsync_MapsStopReasonToFinishReason(string stopReason, string expected)
+    {
+        var events = await CollectStreamEvents(
+            $$$$"""
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":3,"output_tokens":1}}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"{{{{stopReason}}}}"},"usage":{"output_tokens":4}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        var completed = events.OfType<ChatCandidateCompleted>().Single();
+        Assert.Equal(expected, completed.FinishReason.Value);
+    }
+
+    [Theory]
+    [InlineData("max_tokens", "length")]
+    [InlineData("model_context_window_exceeded", "length")]
+    [InlineData("refusal", "content_filter")]
+    public async Task CompleteAsync_MapsStopReasonToFinishReason(string stopReason, string expected)
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            $$$$"""
+            {"role":"assistant","content":[{"type":"text","text":"cut"}],"stop_reason":"{{{{stopReason}}}}","usage":{"input_tokens":3,"output_tokens":4}}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var response = await provider.CompleteAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
+
+        Assert.Equal(expected, response.Candidates[0].FinishReason.Value);
+    }
+
     [Fact]
     public async Task StreamAsync_DoesNotRepeatAnUnchangedUsageSnapshot()
     {

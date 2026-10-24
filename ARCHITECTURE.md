@@ -282,7 +282,10 @@ its input. A Messages stream that
 reaches `message_stop` without a `stop_reason` in a `message_delta` fails as
 a truncated stream rather than completing as a normal stop. An event or
 response whose fields are missing or mistyped fails as an Anthropic fault
-instead of leaking a JSON reader exception.
+instead of leaking a JSON reader exception. The Messages adapter maps
+`max_tokens` and `model_context_window_exceeded` to `length`, and `refusal`
+to a content filter. `pause_turn` is not mapped: it only follows a server
+tool such as web search, and the adapter declares no server tools.
 Framed Responses and Anthropic error events keep the provider message as the
 fault text. Session retry then reports the cause instead of treating the
 truncated stream as retryable. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
