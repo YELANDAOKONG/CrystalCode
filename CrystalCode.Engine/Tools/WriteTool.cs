@@ -105,7 +105,15 @@ public sealed class WriteTool : ITool
         File.WriteAllText(fullPath, contents, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         var shown = _workspace.Contains(fullPath) ? _workspace.ToRelative(fullPath) : fullPath;
         var action = existed ? "Wrote" : "Created";
-        return ValueTask.FromResult(new ToolOutput($"{action} {shown} ({contents.Length} characters)."));
+        var summary = $"{action} {shown} ({contents.Length} characters).";
+
+        // The whole file is the change, so show where it starts.
+        var head = SnippetText.Around(contents, firstLine: 1, changedLines: 1);
+        return ValueTask.FromResult(
+            new ToolOutput(
+                head.Length == 0
+                    ? summary
+                    : summary + ToolOutputText.LineSeparator + "First lines:" + ToolOutputText.LineSeparator + head));
     }
 
     internal static bool TryRead(string arguments, out string path, out string contents)

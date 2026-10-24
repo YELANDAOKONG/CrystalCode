@@ -144,8 +144,23 @@ public sealed class EditTool : ITool
             updated,
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         var shown = _workspace.Contains(fullPath) ? _workspace.ToRelative(fullPath) : fullPath;
+
+        // The text before the first match is unchanged, so its line number is
+        // the same in the original and the updated file.
+        var firstLine = SnippetText.LineOf(
+            contents,
+            contents.IndexOf(oldText, StringComparison.Ordinal));
+        var snippet = SnippetText.Around(updated, firstLine, SnippetText.CountLines(newText));
+        var summary = replaceAll ? $"Edited {shown}, replaced {count} occurrences." : $"Edited {shown}.";
+        if (snippet.Length == 0)
+        {
+            return ValueTask.FromResult(new ToolOutput(summary));
+        }
+
+        var heading = replaceAll ? "First change:" : "Changed lines:";
         return ValueTask.FromResult(
-            new ToolOutput(replaceAll ? $"Edited {shown}, replaced {count} occurrences." : $"Edited {shown}."));
+            new ToolOutput(
+                summary + ToolOutputText.LineSeparator + heading + ToolOutputText.LineSeparator + snippet));
     }
 
     internal static bool TryRead(

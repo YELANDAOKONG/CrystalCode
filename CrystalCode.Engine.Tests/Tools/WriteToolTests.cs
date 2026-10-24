@@ -23,8 +23,27 @@ public sealed class WriteToolTests
                 """{"path":"src/App.cs","contents":"class App {}"}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
-        Assert.Equal("Created src/App.cs (12 characters).", output.Text);
+        Assert.Equal(
+            "Created src/App.cs (12 characters).\nFirst lines:\n     1|class App {}",
+            output.Text);
         Assert.Equal("class App {}", File.ReadAllText(Path.Combine(root.Path, "src", "App.cs")));
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ShowsOnlyTheFirstLinesOfALongFile()
+    {
+        using var root = new TemporaryWorkspace();
+        var tool = new WriteTool(new Workspace(root.Path));
+        var body = string.Join('\n', Enumerable.Range(1, 30).Select(n => "line" + n));
+
+        var output = await tool.InvokeAsync(
+            JsonToolCall("1", WriteTool.ToolName, PathArguments("long.txt", body)));
+
+        var shown = output.Text.Split('\n');
+        Assert.Equal("First lines:", shown[1]);
+        Assert.Equal("     1|line1", shown[2]);
+        Assert.Equal("     6|line6", shown[^1]);
+        Assert.Equal(2 + 6, shown.Length);
     }
 
     [Fact]
@@ -37,6 +56,7 @@ public sealed class WriteToolTests
             JsonToolCall("1", WriteTool.ToolName, """{"path":"empty.txt","contents":""}"""));
 
         Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal("Created empty.txt (0 characters).", output.Text);
         Assert.Equal(string.Empty, File.ReadAllText(Path.Combine(root.Path, "empty.txt")));
     }
 

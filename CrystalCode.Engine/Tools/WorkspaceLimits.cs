@@ -18,7 +18,11 @@ public static class WorkspaceLimits
 
     public const int MaximumGrepFileBytes = 8 * 1024 * 1024;
 
-    public const int MaximumGrepMatches = 1000;
+    public const int DefaultGrepMatches = 2000;
+
+    public const int MaximumGrepMatches = 10_000;
+
+    public const int MaximumGrepContextLines = 50;
 
     public const int MaximumGlobMatches = 1000;
 
