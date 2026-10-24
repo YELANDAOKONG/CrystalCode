@@ -76,12 +76,14 @@ or `CrystalCode` on Windows.
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
 High priority, and not in this build: extensible, adjustable, and
 disableable built-in tools; operator-defined modes beyond Plan and Work;
-a NuGet package; MCP servers; the Agent Client Protocol (ACP), working
-name crystal agent; and a refactor of `crystal run`. Medium priority,
-and not in this build: automatically fetching model-list information
-from a provider, a second additional review of the current product, and
-child Agent configuration. An operating-system sandbox, audio and video
-input, non-text model output, editing provider definitions in the TUI,
+a NuGet package; .NET CLI tool support; other packaging support; MCP servers;
+the Agent Client Protocol (ACP), working name crystal agent; and a refactor
+of `crystal run`. Medium priority, and not in this build: automatically
+fetching model-list information from a provider, a second additional review
+of the current product, child Agent configuration, and provider-specific
+custom-format tools such as OpenAI's `apply_patch`. An operating-system
+sandbox, audio and video input, non-text model output, editing provider
+definitions in the TUI,
 and switchable thinking-chain compression remain deferred. That last one
 would, after each thinking pass, ask a model to compress and summarize
 that thinking according to a requirement. Context compaction,

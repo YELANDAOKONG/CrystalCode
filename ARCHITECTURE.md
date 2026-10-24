@@ -645,6 +645,8 @@ tools publish `ToolDefinition.Json`; a dotnet tool set that publishes
 a text-input tool or a text tool call in history with `NotSupportedException`
 instead of wrapping it. Session documents and the plugin model transcript
 preserve `ToolInputKind`, but no current provider maps `ToolInputKind.Text`.
+Provider-specific custom-format tools such as OpenAI's `apply_patch` take
+text input and are medium-priority product work, not part of this build.
 
 `--disable-tool` repeats on `crystal`, `crystal space`, and `crystal run`.
 Each value is one built-in tool name. The process omits that tool from Plan

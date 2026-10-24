@@ -67,10 +67,20 @@ behavior stands until a specific change defines otherwise.
   Behavior and ownership are not defined. No mode registry, configuration
   field, or public type is reserved.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
-  the package is a `dotnet tool` or a library are not defined. Do not reserve
-  a package id or add a project. This item is not permission to add or update
-  a package reference. Current release artifacts and install scripts remain
-  the install path.
+  a library is also published are not defined. Do not reserve a package id or
+  add a project. This item is not permission to add or update a package
+  reference. Current release artifacts and install scripts remain the install
+  path.
+- .NET CLI tool support. Shipping the executable as a `dotnet tool` so that
+  `dotnet tool install` places it on `PATH` with an installed command name.
+  Package id, target frameworks, and which assemblies ship are not defined.
+  Do not reserve a package id, project, command, or package reference. The
+  installed tool stays this executable, not a second assembly, and
+  `crystal run` keeps its current entry semantics.
+- Other packaging support beyond the self-contained archives and install
+  scripts. Channels are not selected, and package names, ownership, signing,
+  update behavior, and platform coverage are not defined. Do not reserve a
+  package name, tap, formula, image, or repository.
 - MCP servers. Do not bypass the existing plugin, approval, and media
   boundaries.
 - The Agent Client Protocol (ACP). The working name is crystal agent. It
@@ -104,6 +114,17 @@ behavior stands until a specific change defines otherwise.
   are not defined. Do not reserve a new configuration field or command. This
   is not a new Agent, not a mode, and not separate working copies or a direct
   operator conversation with a child.
+- Provider-specific custom-format tools, such as OpenAI's `apply_patch`.
+  These tools take freeform text input instead of JSON arguments, and the
+  provider defines the format. The direction is to register and execute them
+  through a Crystal chat contract that carries text-input tools. Which
+  providers and tools participate, how a tool is declared, and how approval,
+  path classification, and errors work on freeform input are not defined. Do
+  not reserve a configuration field, command, public type, or tool-set
+  format. This item does not authorize changes under `../Crystal`. Provider
+  adapters still implement only Crystal chat contracts and do not own tools.
+  This is not the high-priority item for extending, adjusting, or disabling a
+  built-in tool.
 
 ## Low priority
 

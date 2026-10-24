@@ -344,10 +344,21 @@ implemented in the current build.
   Work. They do not add a mode. No mode registry, configuration field, or
   public type is reserved.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
-  the package is a `dotnet tool` or a library are not defined. Do not reserve
-  a package id or add a project. This item is not permission to add or update
-  a package reference. Current release artifacts and install scripts remain
-  the install path.
+  a library is also published are not defined. Do not reserve a package id or
+  add a project. This item is not permission to add or update a package
+  reference. Current release artifacts and install scripts remain the install
+  path.
+- .NET CLI tool support. The direction is to ship the executable as a
+  `dotnet tool` so that `dotnet tool install` places it on `PATH` with an
+  installed command name. Package id, target frameworks, and packed assemblies
+  are not defined. Do not reserve a package id, project, command, or package
+  reference. The installed tool remains this executable, not a second
+  assembly, and `crystal run` keeps its current entry semantics.
+- Other packaging support beyond the self-contained archives and install
+  scripts. Channels are not selected, and ownership, signing, update behavior,
+  and platform coverage are not defined. Do not reserve a package name, tap,
+  formula, image, or repository. Release artifacts and install scripts remain
+  the install path until a specific change defines otherwise.
 - MCP servers. Do not bypass the existing plugin, approval, and media
   boundaries.
 - The Agent Client Protocol (ACP). The working name is crystal agent. An
@@ -379,6 +390,17 @@ implemented in the current build.
   are not defined. Do not reserve a new configuration field or command. This
   is not a new Agent, not a mode, and not separate working copies or a direct
   operator conversation with a child.
+- Provider-specific custom-format tools, such as OpenAI's `apply_patch`.
+  These tools take freeform text input instead of JSON arguments, and the
+  provider defines the format. The direction is to register and execute them
+  through a Crystal chat contract that carries text-input tools. Which
+  providers and tools participate, how a tool is declared, and how approval,
+  path classification, and errors work on freeform input are not defined. Do
+  not reserve a configuration field, command, public type, or tool-set
+  format. This item does not authorize changes under `../Crystal`. Provider
+  adapters still implement only Crystal chat contracts and do not own tools.
+  This is not the high-priority item for extending, adjusting, or disabling a
+  built-in tool.
 
 ### Deferred
 
@@ -459,8 +481,19 @@ overlays, prompt sets, prompt attachments, and external tool catalogs do not
 add a mode.
 
 TODO: publish a NuGet package only after its package id, packed assemblies,
-and tool-or-library shape are defined. Do not reserve a package id or add a
-project. This is not permission to add or update a package reference.
+and whether a library is also published are defined. Do not reserve a package
+id or add a project. This is not permission to add or update a package
+reference.
+
+TODO: ship a .NET CLI tool only after its package id, target frameworks, and
+packed assemblies are defined. Do not reserve a package id, project, command,
+or package reference. The installed tool is not a second assembly, and
+`crystal run` keeps its current entry semantics.
+
+TODO: add packaging channels beyond the self-contained archives and install
+scripts only after the channels, ownership, signing, update behavior, and
+platform coverage are defined. Do not reserve a package name, tap, formula,
+image, or repository.
 
 TODO: refactor and optimize `crystal run` without making it an operator
 surface, a second assembly, or a place for secrets. Do not persist its flags
@@ -485,6 +518,14 @@ TODO: change child Agent configuration only after the settings and their
 scope are defined. Current `/agents` settings, the `agents` object, process
 overrides, and custom `agent.json` manifests stand. Do not reserve a new
 configuration field or command.
+
+TODO: add provider-specific custom-format tools, such as OpenAI's
+`apply_patch`, only after the participating providers and tools, how a tool is
+declared, and approval, path classification, and error behavior on freeform
+text input are defined. Such a tool takes text input, not JSON arguments. Do
+not reserve a configuration field, command, public type, or tool-set format.
+This does not authorize changes under `../Crystal`, and provider adapters
+still own no tools.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
