@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Providers;
 using CrystalCode.Providers.Anthropic;
 
 using Xunit;
@@ -431,6 +432,101 @@ public sealed class AnthropicProviderTests
             "\"type\":\"text\",\"text\":\"Hi\",\"cache_control\"",
             secondHandler.Body,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_KeepsServerBlocksAndResumesAfterPauseTurn()
+    {
+        var firstHandler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"content":[
+              {"type":"text","text":"looking"},
+              {"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{"query":"crystal"}},
+              {"type":"web_search_tool_result","tool_use_id":"srvtoolu_1","content":[
+                {"type":"web_search_result","url":"https://example.test","title":"T","encrypted_content":"enc"}]},
+              {"type":"server_tool_use","id":"srvtoolu_2","name":"web_search","input":{"query":"more"}}
+            ],"stop_reason":"pause_turn"}
+            """));
+        using var firstHttp = new HttpClient(firstHandler);
+        using var firstProvider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            firstHttp);
+        var first = await firstProvider.CompleteAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
+
+        var candidate = first.Candidates[0];
+        Assert.Equal(ProviderFinishReason.PauseTurn, candidate.FinishReason);
+        Assert.DoesNotContain(candidate.Items, static item => item is ToolCall);
+        Assert.Equal(4, candidate.Items.Count);
+
+        var secondHandler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var secondHttp = new HttpClient(secondHandler);
+        using var secondProvider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            secondHttp);
+        await secondProvider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "Hi"),
+            .. candidate.Items
+        ]));
+
+        var body = secondHandler.Body;
+        Assert.Contains(
+            "{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_1\",\"name\":\"web_search\",\"input\":{\"query\":\"crystal\"}}",
+            body,
+            StringComparison.Ordinal);
+        Assert.Contains("\"type\":\"web_search_tool_result\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"encrypted_content\":\"enc\"", body, StringComparison.Ordinal);
+        Assert.True(
+            body.IndexOf("srvtoolu_1", StringComparison.Ordinal) < body.IndexOf("srvtoolu_2", StringComparison.Ordinal));
+        // The paused round ends on a verbatim block, so the cache marker moves up.
+        Assert.Contains(
+            "\"type\":\"text\",\"text\":\"looking\",\"cache_control\"",
+            body,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_AssemblesServerBlocksWithoutSurfacingToolCalls()
+    {
+        var events = await CollectStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":8,"output_tokens":1}}}
+
+            data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":{}}}
+
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"query\":"}}
+
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\"crystal\"}"}}
+
+            data: {"type":"content_block_stop","index":0}
+
+            data: {"type":"content_block_start","index":1,"content_block":{"type":"web_search_tool_result","tool_use_id":"srvtoolu_1","content":[{"type":"web_search_result","url":"https://example.test","encrypted_content":"enc"}]}}
+
+            data: {"type":"content_block_stop","index":1}
+
+            data: {"type":"content_block_start","index":2,"content_block":{"type":"server_tool_use","id":"srvtoolu_2","name":"web_search","input":{}}}
+
+            data: {"type":"content_block_stop","index":2}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"pause_turn"},"usage":{"output_tokens":30}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        Assert.DoesNotContain(events, static streamEvent => streamEvent is ChatToolCallDelta);
+        var states = events.OfType<ChatReasoningStateReceived>().ToArray();
+        Assert.Equal(3, states.Length);
+        Assert.All(states, static state => Assert.Equal("anthropic.messages.server_block", state.State.Format));
+        Assert.Equal(
+            "{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_1\",\"name\":\"web_search\",\"input\":{\"query\":\"crystal\"}}",
+            Encoding.UTF8.GetString(states[0].State.Data.Span));
+        Assert.Contains("\"encrypted_content\":\"enc\"", Encoding.UTF8.GetString(states[1].State.Data.Span), StringComparison.Ordinal);
+        // A call that streamed no input keeps the empty object from its start event.
+        Assert.Contains("\"input\":{}", Encoding.UTF8.GetString(states[2].State.Data.Span), StringComparison.Ordinal);
+        Assert.Equal(ProviderFinishReason.PauseTurn, events.OfType<ChatCandidateCompleted>().Single().FinishReason);
     }
 
     [Fact]

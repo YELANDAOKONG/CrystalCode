@@ -8,6 +8,7 @@ using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Providers;
 
 using Xunit;
 
@@ -116,6 +117,55 @@ public sealed class MultimodalStreamingTurnTests
         Assert.Equal(0, result.ToolCallCount);
         Assert.DoesNotContain(result.Transcript, static item => item is ToolCall or ToolResult);
         Assert.Equal("partial", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    [Fact]
+    public async Task RunAsync_PausedRoundResumesWithItsTextAsTheLastAssistantTurn()
+    {
+        var client = new PausingClient();
+        var turn = new MultimodalStreamingTurn(
+            client,
+            new ImageToolExecutor(),
+            TurnLimits.Unlimited,
+            new Dictionary<int, ImageAttachment>());
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "look it up")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(2, client.Requests.Count);
+        var resumed = Assert.IsType<MultimodalMessage>(client.Requests[1].Items[^1]);
+        Assert.Equal(MultimodalChatRole.Assistant, resumed.Role);
+        Assert.Equal("done", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    private sealed class PausingClient : IStreamingMultimodalChatClient
+    {
+        public MultimodalChatCapabilities Capabilities { get; } = new(
+            [new MultimodalContentCapability(ContentModality.Text)],
+            [new MultimodalContentCapability(ContentModality.Text)],
+            supportsTools: true);
+
+        public List<MultimodalChatRequest> Requests { get; } = [];
+
+        public Task<MultimodalChatResponse> CompleteAsync(
+            MultimodalChatRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public async IAsyncEnumerable<MultimodalChatStreamEvent> StreamAsync(
+            MultimodalChatRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            var paused = Requests.Count == 1;
+            yield return new MultimodalMessageStarted(0, 0, MultimodalChatRole.Assistant);
+            yield return new MultimodalMessageTextDelta(0, 0, 0, paused ? "searching" : "done");
+            yield return new MultimodalChatCandidateCompleted(
+                0,
+                paused ? ProviderFinishReason.PauseTurn : FinishReason.Stop);
+        }
     }
 
     private sealed class BudgetClient : IStreamingMultimodalChatClient

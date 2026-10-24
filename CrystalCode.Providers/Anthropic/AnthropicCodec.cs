@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using Crystal;
 using Crystal.Chat;
@@ -14,6 +15,11 @@ namespace CrystalCode.Providers.Anthropic;
 internal sealed class AnthropicCodec : IProtocolCodec
 {
     internal const string ReasoningStateFormat = "anthropic.messages.thinking";
+
+    // Blocks the provider ran for the model, such as web search calls and their
+    // results. They are not thinking, but the API wants them back unchanged, so
+    // they travel as opaque state under their own format.
+    internal const string ServerBlockStateFormat = "anthropic.messages.server_block";
     private const int DefaultMaxTokens = 8192;
     private const string AnthropicVersion = "2023-06-01";
     private readonly string _vendorName;
@@ -230,8 +236,16 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     private static bool CanWrite(ChatItem item) =>
         item is not ChatReasoningItem reasoning
-        || ReasoningReplay.IsReplayable(reasoning.Content, ReasoningStateFormat)
+        || IsReplayable(reasoning.Content)
         || ReasoningReplay.ReadableText(reasoning.Content).Length > 0;
+
+    private static bool IsReplayable(ReasoningContent content) =>
+        ReasoningReplay.IsReplayable(content, ReasoningStateFormat)
+        || ReasoningReplay.IsReplayable(content, ServerBlockStateFormat);
+
+    private static bool IsServerBlock(string? type) =>
+        type is "server_tool_use" or "mcp_tool_use" or "container_upload"
+        || type is not null && type.EndsWith("_tool_result", StringComparison.Ordinal);
 
     private static ChatItem? LastBlockItem(IReadOnlyList<ChatItem> items)
     {
@@ -243,6 +257,13 @@ internal sealed class AnthropicCodec : IProtocolCodec
             }
 
             if (!CanWrite(items[index]))
+            {
+                continue;
+            }
+
+            // Replayed provider blocks are written verbatim and cannot carry the
+            // marker. A paused round ends on one, so mark the block before it.
+            if (items[index] is ChatReasoningItem reasoning && IsReplayable(reasoning.Content))
             {
                 continue;
             }
@@ -326,7 +347,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
         ReasoningContent content,
         bool markCache)
     {
-        if (!ReasoningReplay.IsReplayable(content, ReasoningStateFormat))
+        if (!IsReplayable(content))
         {
             // Another provider produced this block. Replay its readable text as
             // a plain text block so a model switch does not fail the turn.
@@ -493,6 +514,10 @@ internal sealed class AnthropicCodec : IProtocolCodec
                     block.GetProperty("input").GetRawText(),
                     ToolInputKind.Json));
                 break;
+            case var type when IsServerBlock(type):
+                items.Add(new ChatReasoningItem(new ReasoningContent(
+                    state: CreateState(block, ServerBlockStateFormat))));
+                break;
         }
     }
 
@@ -502,8 +527,8 @@ internal sealed class AnthropicCodec : IProtocolCodec
     private static bool IsMalformedShape(Exception exception) =>
         exception is KeyNotFoundException or InvalidOperationException or FormatException;
 
-    private static OpaqueReasoningState CreateState(JsonElement block) =>
-        new(ReasoningStateFormat, Encoding.UTF8.GetBytes(block.GetRawText()));
+    private static OpaqueReasoningState CreateState(JsonElement block, string format = ReasoningStateFormat) =>
+        new(format, Encoding.UTF8.GetBytes(block.GetRawText()));
 
     private static FinishReason ReadFinishReason(string? reason) => reason switch
     {
@@ -513,6 +538,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
         "max_tokens" or "model_context_window_exceeded" => FinishReason.Length,
         "tool_use" => FinishReason.ToolCalls,
         "refusal" => FinishReason.ContentFilter,
+        "pause_turn" => ProviderFinishReason.PauseTurn,
         null => FinishReason.Stop,
         _ => new FinishReason(reason)
     };
@@ -631,6 +657,12 @@ internal sealed class AnthropicCodec : IProtocolCodec
             var type = block.GetProperty("type").GetString() ?? "";
             var assembly = new BlockAssembly(type);
             _blocks[index] = assembly;
+            if (IsServerBlock(type))
+            {
+                // The document behind block is gone after this event, so keep a copy.
+                assembly.ServerBlock = JsonNode.Parse(block.GetRawText())?.AsObject();
+            }
+
             if (type == "tool_use")
             {
                 events.Add(new ChatToolCallDelta(
@@ -668,6 +700,14 @@ internal sealed class AnthropicCodec : IProtocolCodec
                     break;
                 case "input_json_delta":
                     var partial = delta.GetProperty("partial_json").GetString() ?? "";
+                    if (assembly.ServerBlock is not null)
+                    {
+                        // The provider runs this call. It must not surface as a
+                        // tool call the session would try to execute.
+                        assembly.ServerInput.Append(partial);
+                        break;
+                    }
+
                     events.Add(new ChatToolCallDelta(
                         0,
                         index,
@@ -692,6 +732,21 @@ internal sealed class AnthropicCodec : IProtocolCodec
                     signature = assembly.Signature
                 });
                 events.Add(new ChatReasoningStateReceived(0, index, new OpaqueReasoningState(ReasoningStateFormat, raw)));
+            }
+            else if (assembly.ServerBlock is { } serverBlock)
+            {
+                // The start event carries an empty input; the real one streams in.
+                if (assembly.ServerInput.Length > 0)
+                {
+                    serverBlock["input"] = JsonNode.Parse(assembly.ServerInput.ToString());
+                }
+
+                events.Add(new ChatReasoningStateReceived(
+                    0,
+                    index,
+                    new OpaqueReasoningState(
+                        ServerBlockStateFormat,
+                        Encoding.UTF8.GetBytes(serverBlock.ToJsonString()))));
             }
         }
 
@@ -724,6 +779,8 @@ internal sealed class AnthropicCodec : IProtocolCodec
             public string Type { get; }
             public StringBuilder Thinking { get; } = new();
             public string Signature { get; set; } = "";
+            public JsonObject? ServerBlock { get; set; }
+            public StringBuilder ServerInput { get; } = new();
         }
     }
 }

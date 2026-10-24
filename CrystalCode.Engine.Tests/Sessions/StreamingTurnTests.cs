@@ -7,6 +7,7 @@ using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Providers;
 using CrystalCode.Providers.DeepSeek;
 
 using Xunit;
@@ -472,6 +473,86 @@ public sealed class StreamingTurnTests
             "Model stopped with finish reason 'MALFORMED_FUNCTION_CALL'.",
             observer.Fault);
     }
+
+    [Fact]
+    public async Task RunAsync_PausedRoundResumesWithItsContentAsTheLastAssistantTurn()
+    {
+        var state = new OpaqueReasoningState("test.server_block", "{\"type\":\"server_tool_use\"}"u8.ToArray());
+        var client = new ScriptedStreamingClient(
+            PausedRound(
+                new ChatTextDelta(0, 0, ChatRole.Assistant, "searching"),
+                new ChatReasoningStateReceived(0, 1, state)),
+            TextRound("done"));
+        var turn = CreateTurn(client);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "look it up")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(2, result.ModelCallCount);
+        Assert.Equal(0, result.ToolCallCount);
+        var resumed = client.LastRequest!.Items;
+        Assert.Equal(3, resumed.Count);
+        Assert.Equal("searching", Assert.IsType<ChatMessage>(resumed[1]).Text);
+        Assert.Equal(state.Format, Assert.IsType<ChatReasoningItem>(resumed[2]).Content.State!.Format);
+        Assert.Equal("done", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    [Fact]
+    public async Task RunAsync_PausedRoundDoesNotRunItsToolCalls()
+    {
+        var client = new ScriptedStreamingClient(
+            PausedRound(
+                new ChatTextDelta(0, 0, ChatRole.Assistant, "searching"),
+                JsonChatToolCallDelta(0, 1, "c1", "echo", "{}")),
+            TextRound("done"));
+        var turn = CreateTurn(client);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "look it up")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(0, result.ToolCallCount);
+        Assert.DoesNotContain(result.Transcript, static item => item is ToolCall or ToolResult);
+    }
+
+    [Fact]
+    public async Task RunAsync_FailsWhenTheProviderKeepsPausing()
+    {
+        var observer = new TestObserver();
+        var rounds = Enumerable.Range(0, CandidateRound.MaximumConsecutivePauses + 1)
+            .Select(static _ => PausedRound(new ChatTextDelta(0, 0, ChatRole.Assistant, "more")))
+            .ToArray();
+        var turn = new StreamingTurn(
+            new ScriptedStreamingClient(rounds),
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            TurnLimits.Unlimited,
+            observer);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "look it up")]);
+
+        Assert.Equal(TurnStopReason.Failed, result.StopReason);
+        Assert.Equal(CandidateRound.MaximumConsecutivePauses + 1, result.ModelCallCount);
+        Assert.Equal(CandidateRound.PauseLimitFault, observer.Fault);
+    }
+
+    [Fact]
+    public async Task RunAsync_ToolRoundResetsThePauseCount()
+    {
+        var pauses = () => Enumerable.Range(0, CandidateRound.MaximumConsecutivePauses)
+            .Select(static _ => PausedRound(new ChatTextDelta(0, 0, ChatRole.Assistant, "more")));
+        var client = new ScriptedStreamingClient(
+            [.. pauses(), ToolRound("c1", "echo", "{}"), .. pauses(), TextRound("done")]);
+        var turn = CreateTurn(client, TurnLimits.Unlimited);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "look it up")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(CandidateRound.MaximumConsecutivePauses * 2 + 2, result.ModelCallCount);
+    }
+
+    private static ChatStreamEvent[] PausedRound(params ChatStreamEvent[] content) =>
+        [.. content, new ChatCandidateCompleted(0, ProviderFinishReason.PauseTurn)];
 
     private static SessionRetryOptions InstantRetry(int maximumRetries = 5) =>
         new(

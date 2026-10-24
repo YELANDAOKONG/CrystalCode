@@ -1,6 +1,7 @@
 using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
+using CrystalCode.Providers;
 
 namespace CrystalCode.Engine.Sessions;
 
@@ -10,6 +11,26 @@ namespace CrystalCode.Engine.Sessions;
 /// </summary>
 internal static class CandidateRound
 {
+    /// <summary>
+    /// How many paused rounds may follow one another before the turn fails.
+    /// Each pause already stands for a full server-side tool loop, so a provider
+    /// that keeps pausing without finishing is not making progress.
+    /// </summary>
+    public const int MaximumConsecutivePauses = 5;
+
+    public const string PauseLimitFault = "Model paused the turn too many times in a row.";
+
+    /// <summary>
+    /// Reports whether the provider paused a server-side tool loop. The round is
+    /// unfinished: its content goes back as the last assistant turn so the
+    /// provider can resume, and no tool runs in between.
+    /// </summary>
+    public static bool IsPaused(ChatCandidate candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        return candidate.FinishReason == ProviderFinishReason.PauseTurn;
+    }
+
     public static bool TryStop(
         ChatCandidate candidate,
         List<ChatItem> transcript,

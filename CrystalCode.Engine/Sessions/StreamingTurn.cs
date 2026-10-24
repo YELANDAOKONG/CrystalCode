@@ -62,6 +62,7 @@ public sealed class StreamingTurn
         var transcript = new List<ChatItem>(items);
         var modelCallCount = 0;
         var toolCallCount = 0;
+        var consecutivePauses = 0;
         var usage = new UsageAccumulator();
 
         using var durationSource = _limits.MaximumDuration is TimeSpan duration
@@ -121,6 +122,26 @@ public sealed class StreamingTurn
 
                 var candidate = response.Candidates[0];
                 var marked = transcript.Count;
+                if (CandidateRound.IsPaused(candidate))
+                {
+                    CandidateRound.AppendWithoutToolCalls(transcript, candidate.Items);
+                    Commit(transcript, marked);
+                    _observer?.OnModelRoundClosed();
+                    if (++consecutivePauses > CandidateRound.MaximumConsecutivePauses)
+                    {
+                        _observer?.OnFault(CandidateRound.PauseLimitFault);
+                        return Create(
+                            TurnStopReason.Failed,
+                            modelCallCount,
+                            toolCallCount,
+                            usage,
+                            transcript);
+                    }
+
+                    continue;
+                }
+
+                consecutivePauses = 0;
                 if (CandidateRound.TryStop(candidate, transcript, out var stopReason, out var fault))
                 {
                     Commit(transcript, marked);

@@ -284,8 +284,17 @@ a truncated stream rather than completing as a normal stop. An event or
 response whose fields are missing or mistyped fails as an Anthropic fault
 instead of leaking a JSON reader exception. The Messages adapter maps
 `max_tokens` and `model_context_window_exceeded` to `length`, and `refusal`
-to a content filter. `pause_turn` is not mapped: it only follows a server
-tool such as web search, and the adapter declares no server tools.
+to a content filter, and `pause_turn` to the provider finish reason
+`ProviderFinishReason.PauseTurn`. The adapter declares no server tools, but
+a gateway or later request may run them. Blocks the provider ran itself
+(`server_tool_use`, `mcp_tool_use`, `container_upload`, and every
+`*_tool_result`, including web search results with their encrypted
+content) are never surfaced as tool calls. They are kept as opaque
+reasoning state under the `anthropic.messages.server_block` format, in
+stream order and with streamed input assembled, and written back
+verbatim on the next request. Other providers drop them as non-replayable
+state without readable text. A replayed block carries no cache marker, so
+the moving breakpoint sits on the last block that can hold one.
 Framed Responses and Anthropic error events keep the provider message as the
 fault text. Session retry then reports the cause instead of treating the
 truncated stream as retryable. Outbound chat requests send a constant `User-Agent` of `Crystal Code`
@@ -540,7 +549,15 @@ One user message is one turn:
    be replaced, and then reported with the transport cause instead of
    using the rest of the budget. User cancel still interrupts immediately.
 3. Select candidate zero.
-4. Stop before tools when the finish reason is not a normal stop or a tool
+4. Resume when the finish reason is `ProviderFinishReason.PauseTurn`: the
+   provider paused a server-side tool loop. Append the candidate's items
+   without its tool calls, publish no stop, and start the next round, so
+   the paused content is the last assistant turn the provider sees. Tools
+   do not run on a paused round. Five pauses in a row without a different
+   round in between fail the turn and publish
+   `Model paused the turn too many times in a row.` Each pause counts as a
+   model call against the turn limits.
+   Stop before tools when the finish reason is not a normal stop or a tool
    request. `length` keeps the assistant text, drops tool calls, and stops
    as `output_truncated`. A content filter keeps the text and stops as
    `content_filtered`. Any other reason stops as `failed` and publishes

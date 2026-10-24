@@ -771,8 +771,14 @@ stream that ends without a `stop_reason` fails the request, and a retry
 follows the usual retry rules.
 
 `max_tokens` and `model_context_window_exceeded` both end the turn as
-truncated output, and `refusal` ends it as filtered. Any other stop reason,
-such as `pause_turn`, fails the turn and names the reason.
+truncated output, and `refusal` ends it as filtered. `pause_turn` means the
+provider paused a server-side tool loop such as web search, so the turn sends
+the paused content back and continues on its own. Five pauses in a row fail
+the turn. Any other stop reason fails the turn and names the reason.
+
+Crystal Code does not ask Anthropic to run server tools. If a gateway runs
+them anyway, their calls and results are kept in the transcript and sent back
+unchanged on later requests, but they are not shown in the terminal.
 
 ### Example: add OpenCode Zen protocol endpoints
 
