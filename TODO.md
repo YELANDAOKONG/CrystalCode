@@ -80,6 +80,18 @@ behavior stands until a specific change defines otherwise.
   exists, use the same MCP client as local servers. The terminal remains the
   only operator surface until it exists. `crystal agent` is not a command,
   project, or public type in this build.
+- An agent API server. The working name is crystal server. It would run in a
+  workspace and expose the full Crystal Code capability over our own
+  protocol, so that other front ends can drive it. The operator picks the
+  workspace and the other session parameters when starting it. It would be a
+  front end that implements `SessionFrontEnd`, not an engine protocol, and
+  not ACP. The wire format, transport, authentication, how approval and
+  questions reach the connected front end, and how many sessions one server
+  holds are not defined. Do not bypass approval, trust, the workspace fence,
+  or `ToolInvocationPolicy`. Do not put secrets on the command line or
+  persist its flags to `config.json`. The terminal remains the only operator
+  surface until it exists. `crystal server` is not a command, project, or
+  public type in this build.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags

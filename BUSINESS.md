@@ -410,6 +410,21 @@ implemented in the current build.
   ownership are defined. ACP does not speak MCP itself. Editor-supplied MCP
   servers, when that front end exists, use the same MCP client as local
   servers. Do not bypass approval, trust, or the tool boundary.
+- An agent API server. The working name is crystal server. It would be started
+  in a workspace and expose the full Crystal Code capability over our own
+  protocol, so that other front ends can drive it. The operator selects the
+  workspace and other session parameters at start, in the same way as the
+  existing session overrides. It is another front end that implements
+  `SessionFrontEnd`, not an engine protocol, and not ACP. The wire format,
+  transport, authentication, how approval and operator questions reach the
+  connected front end, and whether one server holds one session or many are
+  not defined. A network-reachable server must not run without an access
+  control decision. Do not bypass approval, trust, the workspace fence, or
+  `ToolInvocationPolicy`. Do not put secrets on the command line, and do not
+  persist its flags to `config.json`. The terminal remains the only operator
+  surface until it exists. `crystal server` is not a command, project, or
+  public type in this build. Do not add it until its behavior and ownership
+  are defined.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
   one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags
