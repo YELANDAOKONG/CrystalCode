@@ -737,8 +737,8 @@ an unknown name skips the mode with a note. `prompt.md` is the system body and
 uses the same `{{name}}` placeholders as Work and Plan, plus `{{mode}}` set to
 the mode name. It is not replaced by prompt sets, direct prompt overrides, or
 prompt attachments. The host appends `{{env}}`, `{{skills}}`,
-`{{instructions_section}}`, and `{{disabled_tools}}` when the body does not
-name that slot, so a short prompt still receives the same workspace facts as
+`{{instructions_section}}`, `{{disabled_tools}}`, `{{clock}}`, and
+`{{session}}` when the body does not name that slot, so a short prompt still receives the same workspace facts as
 Plan and Work.
 
 A custom mode's catalog is built from the built-in tool set for Work, then
@@ -813,8 +813,9 @@ still refuses to pass a `forbidden` call whatever the verdict says.
 
 Live Work and Plan system text is assembled from overlayable templates using
 host-owned placeholders (`{{name}}`). Review and compaction prompts use the
-same placeholder syntax. Composite session slots are `{{env}}`, `{{skills}}`, `{{directories}}`,
-and `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
+same placeholder syntax. Composite session slots are `{{env}}`, `{{clock}}`, `{{session}}`,
+`{{model_info}}`, `{{skills}}`, `{{directories}}`, and
+`{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
 include `{{workspace}}`, `{{is_git_repo}}`, `{{git_root}}`, `{{platform}}`,
 `{{os}}`, `{{architecture}}`, `{{date}}`, `{{time}}`, `{{provider}}`,
 `{{model}}`, `{{model_line}}`, `{{mode}}`, `{{product_name}}`,
@@ -828,9 +829,19 @@ found by walking parent directories, or empty when that walk finds none.
 mode (`plan`, `default`, `edit`, `review`, `audit`, or `full`). `{{mode}}`
 is `plan` or `work` for Work and Plan, the mode name for a custom mode, `review` for Review system text,
 `compaction` for compaction system text, and `image` for image-description
-system text. The `{{env}}` block includes the
-operating system, architecture, and local time, and adds git root, session,
-and approval lines when the host has them. `{{directories}}` is empty when
+system text. The `{{env}}` block holds only stable
+workspace facts: workspace, git, platform, operating system, and
+architecture, plus the git root when one is found. It carries no provider or
+model. `{{clock}}` is a `<clock>` block with the date and local time, and
+`{{session}}` is a `<session>` block with the session id and approval mode;
+each is empty when the host has no value. The built-in Work, Plan, and child
+Agent templates place `{{clock}}` and `{{session}}` last, after the
+instructions, so the volatile text sits at the end of the system message. The
+built-in Review, compaction, and image-description templates declare only
+`{{env}}`. `{{model_info}}` is a `<model>` block with the provider and model.
+No built-in template declares it and a custom mode never gets it appended, so
+the model-bound text names the model only when an operator template writes the
+slot. `{{directories}}` is empty when
 the session has no added directory rules. Otherwise it is the same session
 directory access text appended to workspace instructions. Built-in templates
 do not declare this slot. It refreshes when the live system message is
@@ -1642,7 +1653,8 @@ Review. Files may be `.md`
 or `.txt`. Empty files are treated as missing. The host never writes
 prompt files. The host appends a non-overlayable `<env>` block between
 the Work or Plan body and those instructions. When Skills is enabled,
-available-skill guidance is appended after the env block.
+available-skill guidance is appended after the env block. The `<clock>`
+and `<session>` blocks follow the instructions.
 
 Skills are OpenCode-compatible `SKILL.md` folders. They are loaded
 on demand through the `skill` tool. Available-skill guidance lists

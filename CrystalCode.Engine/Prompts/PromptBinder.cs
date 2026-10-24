@@ -99,6 +99,15 @@ public static partial class PromptBinder
             case PromptPlaceholder.Env:
                 value = context.EnvironmentBlock;
                 return true;
+            case PromptPlaceholder.Clock:
+                value = context.ClockBlock;
+                return true;
+            case PromptPlaceholder.SessionBlock:
+                value = context.SessionBlock;
+                return true;
+            case PromptPlaceholder.ModelInfo:
+                value = context.ModelBlock;
+                return true;
             case PromptPlaceholder.Skills:
                 value = context.Skills;
                 return true;

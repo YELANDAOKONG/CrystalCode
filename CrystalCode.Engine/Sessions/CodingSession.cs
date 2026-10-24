@@ -386,6 +386,8 @@ public sealed class CodingSession : ITurnObserver
                         : _prompts.ComposeAgentGeneral(facts, _placeholders);
             system += "\n\n" + AgentPrompt.Rules + "\n\n" + PromptBinder.Apply(child.SystemPrompt, facts, _placeholders)
                 + "\n\n" + facts.EnvironmentBlock
+                + "\n\n" + facts.ClockBlock
+                + "\n\n" + facts.SessionBlock
                 + "\n\nParent mode: " + (EffectiveChildPlanMode ? "Plan. Inspect and report only." : "Work.")
                 + "\n\n" + _prompts.Instructions + "\n\n" + directories;
             if (skills.Length > 0)

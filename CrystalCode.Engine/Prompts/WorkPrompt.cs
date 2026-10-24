@@ -86,5 +86,9 @@ public static class WorkPrompt
         {{instructions_section}}
 
         {{disabled_tools}}
+
+        {{clock}}
+
+        {{session}}
         """;
 }

@@ -1073,7 +1073,8 @@ A custom mode is a directory `modes/<name>/` under `~/.crystal` or
 built-in tool names; an unknown name skips the mode with a note. `prompt.md`
 is the system text and accepts the same `{{name}}` placeholders as Work and
 Plan, plus `{{mode}}`. When the body does not name `{{env}}`, `{{skills}}`,
-`{{instructions_section}}`, or `{{disabled_tools}}`, the host appends that
+`{{instructions_section}}`, `{{disabled_tools}}`, `{{clock}}`, or
+`{{session}}`, the host appends that
 slot for you. A child Agent started from a custom mode is limited to Plan's
 tools, even when the mode lists write tools. A workspace directory replaces the Home
 directory of the same name, even when disabled or invalid. `plan`, `work`, and
@@ -1336,7 +1337,7 @@ because token estimates and large tool results can exceed the budget.
 ## Model
 
 `/model` lists configured models, or selects one for the next idle
-turn. The conversation stays in place; only the `<env>` model line,
+turn. The conversation stays in place; only the
 status bar, context window, and chat client change. The command is
 refused while a turn is running.
 
@@ -1722,7 +1723,8 @@ ordinary plugin prompt hook appends its own text.
 
 The built-in Work and Plan assistant name is Crystal Code. Work, Plan,
 Review, compaction, and image-description templates use host-owned placeholders (`{{name}}`).
-Composite session slots are `{{env}}`, `{{skills}}`, `{{directories}}`, and
+Composite session slots are `{{env}}`, `{{clock}}`, `{{session}}`,
+`{{model_info}}`, `{{skills}}`, `{{directories}}`, and
 `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
 include `{{workspace}}`, `{{is_git_repo}}`, `{{git_root}}`, `{{platform}}`,
 `{{os}}`, `{{architecture}}`, `{{date}}`, `{{time}}`, `{{provider}}`,
@@ -1737,9 +1739,16 @@ or empty when that walk finds none. `{{session_id}}` is the saved session
 id. `{{approval}}` is the approval mode (`plan`, `default`, `edit`,
 `review`, `audit`, or `full`). `{{mode}}` is `plan` or `work` for Work and
 Plan, the mode name for a custom mode, `review` for Review system text, `compaction` for compaction
-system text, and `image` for image-description system text. The `{{env}}` block includes the operating system,
-architecture, and local time, and adds git root, session, and approval
-lines when the host has them. `{{directories}}` is empty when the session
+system text, and `image` for image-description system text. The `{{env}}` block holds only stable workspace
+facts: workspace, git, platform, operating system, and architecture, plus the
+git root when one is found. It carries no provider or model. `{{clock}}`
+holds the date and local time, and `{{session}}` holds the session id and
+approval mode; each is empty when the host has no value. Built-in Work, Plan,
+and child Agent templates place them last. Review, compaction, and
+image-description templates use only `{{env}}`. `{{model_info}}` holds the
+provider and model. No built-in template uses it and a custom mode does not
+get it appended, so add it to a template yourself when the model should know
+which model it is. `{{directories}}` is empty when the session
 has no added directory rules. Otherwise it is the same session directory
 access text appended to workspace instructions. Built-in templates do not
 declare this slot. It refreshes when the live system message is replaced,
@@ -1835,7 +1844,8 @@ Project, walking from the workspace up to the git root:
 `/cd` and `/space` reload skills and external tool sets from the new
 workspace. Both, and a resume that enters another directory, reload prompts
 from that workspace. Resume refreshes the first system message from the current
-prompt files, the current `<env>` block, and current skill guidance.
+prompt files, the current `<env>`, `<clock>`, and `<session>` blocks, and current
+skill guidance.
 
 ## Sessions
 

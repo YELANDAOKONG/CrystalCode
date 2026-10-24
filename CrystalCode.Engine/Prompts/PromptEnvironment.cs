@@ -72,21 +72,62 @@ public static class PromptEnvironment
         lines.Add($"  Platform: {snapshot.Platform}");
         lines.Add($"  OS: {snapshot.Os}");
         lines.Add($"  Architecture: {snapshot.Architecture}");
-        lines.Add($"  Today's date: {snapshot.Date}");
-        lines.Add($"  Local time: {snapshot.Time}");
-        lines.Add($"  Model: {snapshot.Provider} / {snapshot.Model}");
-        if (snapshot.SessionId.Length > 0)
-        {
-            lines.Add($"  Session: {snapshot.SessionId}");
-        }
-
-        if (snapshot.Approval.Length > 0)
-        {
-            lines.Add($"  Approval: {snapshot.Approval}");
-        }
-
         lines.Add("</env>");
         return string.Join(Environment.NewLine, lines);
+    }
+
+    public static string FormatClock(string date, string time)
+    {
+        ArgumentNullException.ThrowIfNull(date);
+        ArgumentNullException.ThrowIfNull(time);
+        if (date.Length == 0 && time.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            "<clock>",
+            $"  Today's date: {date}",
+            $"  Local time: {time}",
+            "</clock>");
+    }
+
+    public static string FormatModel(string provider, string model)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(model);
+        if (provider.Length == 0 && model.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            "<model>",
+            $"  Provider: {provider}",
+            $"  Model: {model}",
+            "</model>");
+    }
+
+    public static string FormatSession(string sessionId, string approval)
+    {
+        ArgumentNullException.ThrowIfNull(sessionId);
+        ArgumentNullException.ThrowIfNull(approval);
+        var lines = new List<string>();
+        if (sessionId.Length > 0)
+        {
+            lines.Add($"  Session: {sessionId}");
+        }
+
+        if (approval.Length > 0)
+        {
+            lines.Add($"  Approval: {approval}");
+        }
+
+        return lines.Count == 0
+            ? string.Empty
+            : string.Join(Environment.NewLine, ["<session>", .. lines, "</session>"]);
     }
 
     public static string FormatBlock(PromptContext context)

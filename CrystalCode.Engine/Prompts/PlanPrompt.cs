@@ -44,5 +44,9 @@ public static class PlanPrompt
         {{instructions_section}}
 
         {{disabled_tools}}
+
+        {{clock}}
+
+        {{session}}
         """;
 }

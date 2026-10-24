@@ -16,7 +16,9 @@ internal static class ModePrompt
         "{{env}}",
         "{{skills}}",
         "{{instructions_section}}",
-        "{{disabled_tools}}"
+        "{{disabled_tools}}",
+        "{{clock}}",
+        "{{session}}"
     ];
 
     public static string Compose(

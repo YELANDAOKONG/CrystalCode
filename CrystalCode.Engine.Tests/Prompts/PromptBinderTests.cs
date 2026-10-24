@@ -124,9 +124,69 @@ public sealed class PromptBinderTests
                 + RuntimeInformation.OSArchitecture.ToString().ToLowerInvariant(),
             text,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("Session: sess-1", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Local time", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Apply_SplitsClockAndSessionBlocksOutOfEnv()
+    {
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "deepseek",
+            "deepseek-v4-flash",
+            "work",
+            string.Empty,
+            string.Empty,
+            new DateTimeOffset(2026, 8, 31, 15, 4, 5, TimeSpan.FromHours(8)),
+            "sess-1",
+            "audit");
+
+        var text = PromptBinder.Apply("{{clock}}\n{{session}}", context);
+
+        Assert.Contains("<clock>", text, StringComparison.Ordinal);
+        Assert.Contains("Today's date: Monday Aug 31, 2026", text, StringComparison.Ordinal);
+        Assert.Contains("Local time: 15:04:05 +08:00", text, StringComparison.Ordinal);
+        Assert.Contains("<session>", text, StringComparison.Ordinal);
         Assert.Contains("Session: sess-1", text, StringComparison.Ordinal);
         Assert.Contains("Approval: audit", text, StringComparison.Ordinal);
-        Assert.Contains("Local time: 15:04:05 +08:00", text, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, PromptBinder.Apply("{{clock}}{{session}}", PromptContext.InstructionsOnly(string.Empty)));
+    }
+
+    [Fact]
+    public void Apply_ModelInfoRendersProviderAndModelOnlyWhenTheTemplateAsksForIt()
+    {
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "deepseek",
+            "deepseek-v4-flash",
+            "work",
+            string.Empty,
+            string.Empty);
+
+        var text = PromptBinder.Apply("{{model_info}}", context);
+
+        Assert.Contains("<model>", text, StringComparison.Ordinal);
+        Assert.Contains("Provider: deepseek", text, StringComparison.Ordinal);
+        Assert.Contains("Model: deepseek-v4-flash", text, StringComparison.Ordinal);
+        Assert.Equal(
+            string.Empty,
+            PromptBinder.Apply("{{model_info}}", PromptContext.InstructionsOnly(string.Empty)));
+        foreach (var builtIn in new[]
+        {
+            WorkPrompt.Text,
+            PlanPrompt.Text,
+            AgentGeneralPrompt.Text,
+            AgentWorkPrompt.Text,
+            AgentPlanPrompt.Text,
+            ApprovalReviewPrompt.SystemText,
+            CompactionPrompt.SystemText,
+            ImageDescriptionPrompt.SystemText
+        })
+        {
+            Assert.DoesNotContain("{{model_info}}", builtIn, StringComparison.Ordinal);
+            Assert.DoesNotContain("Provider: deepseek", PromptBinder.Apply(builtIn, context), StringComparison.Ordinal);
+        }
     }
 
     [Fact]

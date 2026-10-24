@@ -90,6 +90,12 @@ public sealed record PromptContext
             ? PromptEnvironment.FormatBlock(this)
             : string.Empty;
 
+    public string ClockBlock => PromptEnvironment.FormatClock(Date, Time);
+
+    public string SessionBlock => PromptEnvironment.FormatSession(SessionId, Approval);
+
+    public string ModelBlock => PromptEnvironment.FormatModel(Provider, Model);
+
     public string InstructionsSection =>
         Instructions.Length > 0
             ? "## Workspace instructions\n" + Instructions

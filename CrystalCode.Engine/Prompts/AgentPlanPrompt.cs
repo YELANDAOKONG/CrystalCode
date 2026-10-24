@@ -17,5 +17,9 @@ public static class AgentPlanPrompt
         {{skills}}
 
         {{instructions_section}}
+
+        {{clock}}
+
+        {{session}}
         """;
 }

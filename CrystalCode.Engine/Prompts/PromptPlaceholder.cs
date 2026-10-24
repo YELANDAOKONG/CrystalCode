@@ -8,6 +8,12 @@ public static class PromptPlaceholder
 {
     public const string Env = "env";
 
+    public const string Clock = "clock";
+
+    public const string SessionBlock = "session";
+
+    public const string ModelInfo = "model_info";
+
     public const string Skills = "skills";
 
     public const string Instructions = "instructions";
@@ -73,6 +79,9 @@ public static class PromptPlaceholder
     public static IReadOnlyList<string> All { get; } =
     [
         Env,
+        Clock,
+        SessionBlock,
+        ModelInfo,
         Skills,
         Instructions,
         InstructionsSection,

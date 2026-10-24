@@ -50,6 +50,9 @@ public static class PromptTemplateExport
         ## Session
 
         - {{env}}
+        - {{clock}}
+        - {{session}}
+        - {{model_info}}
         - {{skills}}
         - {{instructions}}
         - {{instructions_section}}
