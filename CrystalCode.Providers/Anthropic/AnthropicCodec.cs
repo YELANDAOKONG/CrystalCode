@@ -538,6 +538,11 @@ internal sealed class AnthropicCodec : IProtocolCodec
         // finished answer.
         private FinishReason? _finishReason;
 
+        // Usage events are cumulative snapshots; the last one wins. Sending one
+        // as soon as the input side is known lets the session charge a request
+        // whose stream breaks before message_stop.
+        private TokenUsage? _reportedUsage;
+
         public StreamParser(AnthropicCodec codec) => _codec = codec;
 
         public bool IsComplete { get; private set; }
@@ -552,7 +557,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 switch (type)
                 {
                     case "message_start":
-                        ReadMessageStart(root);
+                        ReadMessageStart(root, events);
                         break;
                     case "content_block_start":
                         ReadBlockStart(root, events);
@@ -564,7 +569,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
                         ReadBlockStop(root, events);
                         break;
                     case "message_delta":
-                        ReadMessageDelta(root);
+                        ReadMessageDelta(root, events);
                         break;
                     case "message_stop":
                         ReadMessageStop(events);
@@ -585,13 +590,14 @@ internal sealed class AnthropicCodec : IProtocolCodec
             return events;
         }
 
-        private void ReadMessageStart(JsonElement root)
+        private void ReadMessageStart(JsonElement root, List<ChatStreamEvent> events)
         {
             if (root.TryGetProperty("message", out var message)
                 && message.ValueKind == JsonValueKind.Object
                 && message.TryGetProperty("usage", out var usage))
             {
                 _usage.Add(usage);
+                ReportUsage(events);
             }
         }
 
@@ -602,13 +608,18 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 throw _codec.CreateException($"{_codec._vendorName} stream ended without a stop reason.");
             }
 
-            if (_usage.ToUsage() is { } usage)
-            {
-                events.Add(new ChatUsageReceived(usage));
-            }
-
+            ReportUsage(events);
             events.Add(new ChatCandidateCompleted(0, finishReason));
             IsComplete = true;
+        }
+
+        private void ReportUsage(List<ChatStreamEvent> events)
+        {
+            if (_usage.ToUsage() is { } usage && usage != _reportedUsage)
+            {
+                _reportedUsage = usage;
+                events.Add(new ChatUsageReceived(usage));
+            }
         }
 
         private void ReadBlockStart(JsonElement root, List<ChatStreamEvent> events)
@@ -682,7 +693,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
             }
         }
 
-        private void ReadMessageDelta(JsonElement root)
+        private void ReadMessageDelta(JsonElement root, List<ChatStreamEvent> events)
         {
             // message_start carries "stop_reason": null, and some gateways repeat
             // that null here; only a string value ends the message.
@@ -697,6 +708,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
             if (root.TryGetProperty("usage", out var usage))
             {
                 _usage.Add(usage);
+                ReportUsage(events);
             }
         }
 

@@ -48,12 +48,8 @@ public sealed class ChatStreamAssembler
                 GetCandidate(completed.CandidateIndex).Complete(completed.FinishReason);
                 break;
             case ChatUsageReceived usage:
-                if (_usage is not null)
-                {
-                    throw new InvalidOperationException(
-                        "The chat stream reported usage more than once.");
-                }
-
+                // A stream may report usage more than once. Each report is a
+                // cumulative snapshot of the attempt, so the latest one wins.
                 _usage = usage.Usage;
                 break;
             default:

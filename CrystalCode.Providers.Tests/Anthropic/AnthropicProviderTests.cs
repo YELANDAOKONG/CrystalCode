@@ -107,7 +107,7 @@ public sealed class AnthropicProviderTests
 
             """);
 
-        var usage = Assert.Single(events.OfType<ChatUsageReceived>()).Usage;
+        var usage = events.OfType<ChatUsageReceived>().Last().Usage;
         Assert.Equal(1003, usage.InputTokenCount);
         Assert.Equal(20, usage.OutputTokenCount);
     }
@@ -125,7 +125,7 @@ public sealed class AnthropicProviderTests
 
             """);
 
-        var usage = Assert.Single(events.OfType<ChatUsageReceived>()).Usage;
+        var usage = events.OfType<ChatUsageReceived>().Last().Usage;
         Assert.Equal(702, usage.InputTokenCount);
         Assert.Equal(5, usage.OutputTokenCount);
     }
@@ -143,9 +143,78 @@ public sealed class AnthropicProviderTests
 
             """);
 
-        var usage = Assert.Single(events.OfType<ChatUsageReceived>()).Usage;
+        var usage = events.OfType<ChatUsageReceived>().Last().Usage;
         Assert.Equal(50, usage.InputTokenCount);
         Assert.Equal(9, usage.OutputTokenCount);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsUsageAsSoonAsInputIsKnown()
+    {
+        var events = await CollectStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":3,"cache_read_input_tokens":900,"output_tokens":1}}}
+
+            data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working..."}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":20}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        Assert.IsType<ChatUsageReceived>(events[0]);
+        Assert.Equal(
+            [new TokenUsage(903, 1), new TokenUsage(903, 20)],
+            events.OfType<ChatUsageReceived>().Select(static received => received.Usage));
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsUsageBeforeStreamBreaks()
+    {
+        using var http = new HttpClient(new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":3,"cache_read_input_tokens":900,"output_tokens":1}}}
+
+            data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working..."}}
+
+            """)));
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+        var events = new List<ChatStreamEvent>();
+
+        await Assert.ThrowsAsync<AnthropicException>(async () =>
+        {
+            await foreach (var streamEvent in provider.StreamAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+            {
+                events.Add(streamEvent);
+            }
+        });
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>());
+        Assert.Equal(new TokenUsage(903, 1), usage.Usage);
+    }
+
+    [Fact]
+    public async Task StreamAsync_DoesNotRepeatAnUnchangedUsageSnapshot()
+    {
+        var events = await CollectStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":10,"output_tokens":4}}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":4}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        Assert.Single(events.OfType<ChatUsageReceived>());
     }
 
     [Fact]

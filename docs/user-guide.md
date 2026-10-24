@@ -763,7 +763,10 @@ Token usage for this protocol is the sum of `input_tokens`,
 adapter marks prompt-cache breakpoints and a cache hit leaves only a few
 uncached input tokens. Session totals, CTX percent, and usage-based
 compaction read that sum. When the endpoint reports no usage, the request
-counts as unknown, not zero, and the host falls back to its estimate. A
+counts as unknown, not zero, and the host falls back to its estimate. The
+adapter reports usage as soon as the request starts, so a request that is
+interrupted or fails mid-stream still counts its input tokens. Its output
+count is only what the endpoint had reported by then. A
 stream that ends without a `stop_reason` fails the request, and a retry
 follows the usual retry rules.
 

@@ -274,7 +274,11 @@ Anthropic Messages reports uncached input, cache writes, and cache reads as
 separate counts. The adapter sums them into the one input count Crystal
 exposes, because the session reads that count as the prompt size. A usage
 figure the endpoint did not report is absent, never zero, and an event
-stream without any usage emits no usage event. A Messages stream that
+stream without any usage emits no usage event. A stream may report usage
+more than once; each report is a cumulative snapshot of the attempt and the
+latest one wins. The Messages adapter reports as soon as `message_start`
+carries the input side, so a request that breaks mid-stream still charges
+its input. A Messages stream that
 reaches `message_stop` without a `stop_reason` in a `message_delta` fails as
 a truncated stream rather than completing as a normal stop. An event or
 response whose fields are missing or mistyped fails as an Anthropic fault

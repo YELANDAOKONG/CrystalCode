@@ -299,6 +299,72 @@ public sealed class StreamingTurnTests
     }
 
     [Fact]
+    public async Task RunAsync_ChargesUsageOfBrokenAttemptBeforeRetry()
+    {
+        var observer = new TestObserver();
+        var client = new BreakingStreamingClient(
+            [new ChatTextDelta(0, 0, ChatRole.Assistant, "par"), new ChatUsageReceived(new TokenUsage(100, 1))],
+            new DeepSeekException("slow down", statusCode: 429),
+            TextRound("done", new TokenUsage(100, 8)));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer,
+            retry: InstantRetry());
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(new TokenUsage(100, 8), result.Usage);
+        Assert.Equal(new TokenUsage(200, 9), result.AccumulatedUsage);
+    }
+
+    [Fact]
+    public async Task RunAsync_ChargesUsageOfBrokenAttemptWhenNotRetried()
+    {
+        var client = new BreakingStreamingClient(
+            [new ChatUsageReceived(new TokenUsage(100, 1))],
+            new DeepSeekException("bad model", statusCode: 400, errorCode: "invalid_request"),
+            TextRound("unused"));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            new TestObserver(),
+            retry: InstantRetry());
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.Failed, result.StopReason);
+        Assert.Equal(1, client.RequestCount);
+        Assert.Equal(new TokenUsage(100, 1), result.AccumulatedUsage);
+    }
+
+    [Fact]
+    public async Task RunAsync_CountsRepeatedUsageReportsOnce()
+    {
+        ChatStreamEvent[] round =
+        [
+            new ChatUsageReceived(new TokenUsage(100, 1)),
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "done"),
+            new ChatUsageReceived(new TokenUsage(100, 9)),
+            new ChatCandidateCompleted(0, FinishReason.Stop)
+        ];
+        var turn = CreateTurn(new ScriptedStreamingClient(round));
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal(new TokenUsage(100, 9), result.Usage);
+        Assert.Equal(new TokenUsage(100, 9), result.AccumulatedUsage);
+    }
+
+    [Fact]
     public async Task RunAsync_DoesNotRetryClientErrors()
     {
         var client = new FlakyStreamingClient(
@@ -534,6 +600,42 @@ public sealed class StreamingTurnTests
         public string? Fault { get; private set; }
 
         public void OnFault(string message) => Fault = message;
+    }
+
+    // The first request yields some events and then fails mid-stream; later
+    // requests yield the success round.
+    private sealed class BreakingStreamingClient(
+        IReadOnlyList<ChatStreamEvent> brokenRound,
+        Exception failure,
+        IReadOnlyList<ChatStreamEvent> success) : IStreamingChatClient
+    {
+        public int RequestCount { get; private set; }
+
+        public async IAsyncEnumerable<ChatStreamEvent> StreamAsync(
+            ChatRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation]
+            CancellationToken cancellationToken = default)
+        {
+            RequestCount++;
+            foreach (var streamEvent in RequestCount == 1 ? brokenRound : success)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return streamEvent;
+                await Task.Yield();
+            }
+
+            if (RequestCount == 1)
+            {
+                throw failure;
+            }
+        }
+
+        public Task<ChatResponse> CompleteAsync(
+            ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException("StreamingTurn uses StreamAsync.");
+        }
     }
 
     private sealed class FlakyStreamingClient : IStreamingChatClient

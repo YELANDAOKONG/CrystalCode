@@ -29,6 +29,20 @@ public sealed class ChatStreamAssemblerTests
     }
 
     [Fact]
+    public void ToResponse_KeepsLatestUsageSnapshot()
+    {
+        var assembler = new ChatStreamAssembler();
+        assembler.Apply(new ChatUsageReceived(new TokenUsage(3, 1)));
+        assembler.Apply(new ChatTextDelta(0, 0, ChatRole.Assistant, "Hi"));
+        assembler.Apply(new ChatUsageReceived(new TokenUsage(3, 7)));
+        assembler.Apply(new ChatCandidateCompleted(0, FinishReason.Stop));
+
+        var response = assembler.ToResponse();
+
+        Assert.Equal(new TokenUsage(3, 7), response.Usage);
+    }
+
+    [Fact]
     public void ToResponse_KeepsSummaryAndTraceOnOneReasoningItem()
     {
         var assembler = new ChatStreamAssembler();
