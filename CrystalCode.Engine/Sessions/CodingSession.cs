@@ -111,7 +111,7 @@ public sealed class CodingSession : ITurnObserver
         var planNames = plan
             ? WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), _frontEnd.Questions, _plugins, _skills, _external,
                 _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true),
-                _mcp.PlanTools).Definitions.Select(tool => tool.Name)
+                McpPlanTools()).Definitions.Select(tool => tool.Name)
                 .Append("view_image").ToHashSet(StringComparer.Ordinal)
             : null;
         foreach (var definition in catalog.Definitions)
@@ -248,11 +248,11 @@ public sealed class CodingSession : ITurnObserver
     private ToolCatalog ChildCatalog(TodoList todos) => EffectiveChildPlanMode
         ? WorkspaceCatalog.CreatePlan(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
             _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true),
-            _mcp.PlanTools)
+            McpPlanTools())
         : WorkspaceCatalog.CreateWork(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
             _settings.BashTimeoutSeconds, _loadedPlugins, CreateImageDescriber(),
             disabledBuiltInTools: _settings.DisabledBuiltInTools.For(false),
-            mcpTools: _mcp.WorkTools);
+            mcpTools: McpWorkTools());
 
     private IReadOnlyList<Crystal.Multimodal.Tools.IMultimodalTool> ChildImageTools(TodoList todos)
     {
@@ -944,6 +944,8 @@ public sealed class CodingSession : ITurnObserver
     private SkillCatalog? _skills;
     private ExternalCatalog _external = ExternalCatalog.Empty;
     private McpCatalog _mcp = McpCatalog.Empty;
+    private readonly object _mcpGate = new();
+    private readonly HashSet<string> _mcpChanged = new(StringComparer.Ordinal);
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
     private PluginPlaceholderTable _placeholders = PluginPlaceholderTable.Empty;
     private PluginStatusBoard _statusBoard = new(static _ => { }, static _ => { });
@@ -1171,6 +1173,8 @@ public sealed class CodingSession : ITurnObserver
         ReplaceLiveSystem();
         WritePluginNotes();
         WriteExternalNotes();
+        // The menu was first published before any server connected.
+        RefreshSlashCommands();
         await OpenPluginSessionAsync(cancellationToken);
         ShowTodos();
     }
@@ -1314,6 +1318,7 @@ public sealed class CodingSession : ITurnObserver
                 return true;
             }
 
+            await ApplyMcpToolChangesAsync(cancellationToken);
             await StartTurnIfQueuedAsync(cancellationToken);
             if (ConsumeQuit())
             {
@@ -1936,6 +1941,11 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Unknown:
                 if (_plugins.TryExecute(command.Argument, new SlashOutput(this))
                     || _loadedPlugins.TryExecute(command.Argument, new SlashOutput(this)))
+                {
+                    return (true, false);
+                }
+
+                if (await TryRunMcpPromptAsync(command.Argument, cancellationToken))
                 {
                     return (true, false);
                 }
@@ -3594,6 +3604,107 @@ public sealed class CodingSession : ITurnObserver
         WriteToolsUsage();
     }
 
+    /// <summary>
+    /// Runs <c>/mcp__server__prompt name=value</c>: asks the server for the
+    /// prompt, then submits its text as an ordinary user message.
+    /// </summary>
+    private async Task<bool> TryRunMcpPromptAsync(string raw, CancellationToken cancellationToken)
+    {
+        var text = raw.Trim().TrimStart('/');
+        var space = text.IndexOf(' ');
+        var name = space < 0 ? text : text[..space];
+        var entry = _mcp.Prompts.FirstOrDefault(item => item.Command == name);
+        if (entry is null)
+        {
+            return false;
+        }
+
+        // Starting a turn while one runs would interleave two turns on one transcript.
+        if (_turnActive || _compacting)
+        {
+            RefuseCommand(raw);
+            return true;
+        }
+
+        if (!McpPromptText.TryParseArguments(
+                entry,
+                space < 0 ? string.Empty : text[(space + 1)..],
+                out var values,
+                out var error))
+        {
+            Error(error);
+            return true;
+        }
+
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (entry.TimeoutSeconds is { } seconds)
+        {
+            limit.CancelAfter(TimeSpan.FromSeconds(seconds));
+        }
+
+        string message;
+        try
+        {
+            var result = await entry.Client.GetPromptAsync(
+                entry.RemoteName,
+                values.ToDictionary(pair => pair.Key, pair => (object?)pair.Value),
+                cancellationToken: limit.Token);
+            message = McpPromptText.ToUserMessage(result);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Error($"MCP server '{entry.ServerName}' did not return the prompt in time.");
+            return true;
+        }
+        catch (Exception exception) when (exception is ModelContextProtocol.McpException or IOException)
+        {
+            Error($"MCP server '{entry.ServerName}' could not return the prompt. {exception.Message}");
+            return true;
+        }
+
+        if (message.Length == 0)
+        {
+            Error($"MCP prompt '{entry.RemoteName}' from '{entry.ServerName}' is empty.");
+            return true;
+        }
+
+        await StartTurnAsync(message, cancellationToken, attachPendingImages: false);
+        return true;
+    }
+
+    /// <summary>
+    /// A server reported a different tool list. The session reloads between
+    /// turns, so this only records that it must; it never changes tools mid-turn.
+    /// </summary>
+    private void NoteMcpToolsChanged(string serverName)
+    {
+        lock (_mcpGate)
+        {
+            _mcpChanged.Add(serverName);
+        }
+    }
+
+    private async Task ApplyMcpToolChangesAsync(CancellationToken cancellationToken)
+    {
+        string[] changed;
+        lock (_mcpGate)
+        {
+            changed = [.. _mcpChanged.Order(StringComparer.Ordinal)];
+            _mcpChanged.Clear();
+        }
+
+        if (changed.Length == 0 || !_settings.Mcp)
+        {
+            return;
+        }
+
+        await ReloadMcpAsync(cancellationToken);
+        RebuildExecutors();
+        ReplaceLiveSystem();
+        RefreshSlashCommands();
+        Note("MCP tools changed  " + string.Join(", ", changed));
+    }
+
     private async Task ChangeMcpAsync(string argument, CancellationToken cancellationToken)
     {
         var command = argument.Trim().ToLowerInvariant();
@@ -3623,6 +3734,7 @@ public sealed class CodingSession : ITurnObserver
         await ReloadMcpAsync(cancellationToken);
         RebuildExecutors();
         ReplaceLiveSystem();
+        RefreshSlashCommands();
         Note(command == "reload" ? "MCP reloaded" : "MCP  " + Title(command));
         if (_settings.Mcp)
         {
@@ -5103,6 +5215,7 @@ public sealed class CodingSession : ITurnObserver
         await ReloadMcpAsync(cancellationToken);
         RebuildExecutors();
         ReplaceLiveSystem();
+        RefreshSlashCommands();
     }
 
     private async Task ResumeLoadedAsync(string? id, CancellationToken cancellationToken)
@@ -5381,7 +5494,7 @@ public sealed class CodingSession : ITurnObserver
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         var childPlanTools = WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), question, _plugins, _skills,
             _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.Plan,
-            _mcp.PlanTools).Definitions
+            McpPlanTools()).Definitions
             .Select(tool => tool.Name).Append(ViewImageTool.ToolName).ToHashSet(StringComparer.Ordinal);
         async ValueTask<ToolInvocationDecision> DecideAsync(ToolCall call, CancellationToken token)
         {
@@ -5421,7 +5534,7 @@ public sealed class CodingSession : ITurnObserver
                 imageDescriber,
                 _backgroundTasks,
                 _settings.DisabledBuiltInTools.Work,
-                _mcp.WorkTools), planMode: false),
+                McpWorkTools()), planMode: false),
             options,
             DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -5436,7 +5549,7 @@ public sealed class CodingSession : ITurnObserver
                 _loadedPlugins,
                 imageDescriber,
                 _settings.DisabledBuiltInTools.Plan,
-                _mcp.PlanTools), planMode: true),
+                McpPlanTools()), planMode: true),
             options,
             DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -5499,6 +5612,17 @@ public sealed class CodingSession : ITurnObserver
         return tools;
     }
 
+    private IReadOnlyList<ITool> McpPlanTools() =>
+        [.. _mcp.PlanTools, .. PlanResourceTools()];
+
+    private IReadOnlyList<ITool> McpWorkTools() =>
+        [.. _mcp.WorkTools, .. _mcp.ResourceTools];
+
+    // Plan only offers what a server asked to put there, so the shared
+    // resource pair appears in Plan only when some server did.
+    private IReadOnlyList<ITool> PlanResourceTools() =>
+        _mcp.Tools.Any(tool => tool.InPlan) ? _mcp.ResourceTools : [];
+
     private void ReloadSkills()
     {
         _skills = _settings.Skills
@@ -5547,7 +5671,11 @@ public sealed class CodingSession : ITurnObserver
         SetActivity(SessionActivity.LoadingTools);
         try
         {
-            var reserved = new HashSet<string>(_loadedPlugins.ToolNames, StringComparer.Ordinal);
+            var reserved = new HashSet<string>(_loadedPlugins.ToolNames, StringComparer.Ordinal)
+            {
+                McpResourceTools.ListToolName,
+                McpResourceTools.ReadToolName
+            };
             foreach (var tool in _external.PlanTools.Concat(_external.WorkTools))
             {
                 reserved.Add(tool.Definition.Name);
@@ -5558,7 +5686,8 @@ public sealed class CodingSession : ITurnObserver
                 _workspace.Root,
                 _settings.McpToolApproval,
                 reserved,
-                cancellationToken);
+                cancellationToken,
+                new McpHostCallbacks(() => _workspace.Root, _frontEnd.Questions, NoteMcpToolsChanged));
         }
         finally
         {
@@ -6536,7 +6665,16 @@ public sealed class CodingSession : ITurnObserver
             CatalogSlotCompletions.For(_settings.ActiveModel.Speeds));
         menu = menu.Select(command => command.Name == "agents"
             ? command with { Arguments = AgentCompletions() } : command).ToArray();
+        menu = [.. menu, .. _mcp.Prompts.Select(PromptCompletion)];
         Publish(new SlashCommandsChanged(menu));
+    }
+
+    private static SlashCompletion PromptCompletion(McpPromptEntry entry)
+    {
+        var help = string.IsNullOrWhiteSpace(entry.Description)
+            ? $"MCP prompt from {entry.ServerName}"
+            : entry.Description.ReplaceLineEndings(" ").Trim();
+        return new SlashCompletion(entry.Command, help, [entry.Command]);
     }
 
     private IReadOnlyList<SlashCompletion> ApprovalModelCompletions()

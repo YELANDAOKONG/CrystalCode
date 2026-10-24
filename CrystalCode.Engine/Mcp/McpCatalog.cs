@@ -5,6 +5,7 @@ using CrystalCode.Engine.Plugins.Interfaces;
 
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 namespace CrystalCode.Engine.Mcp;
 
@@ -24,22 +25,33 @@ internal sealed class McpCatalog : IAsyncDisposable
         IReadOnlyList<ITool> workTools,
         IReadOnlyList<McpServerInfo> servers,
         IReadOnlyList<McpToolInfo> tools,
-        IReadOnlyList<string> notes)
+        IReadOnlyList<string> notes,
+        McpResourceClients resources,
+        IReadOnlyList<McpPromptEntry> prompts)
     {
         _connections = connections;
+        Resources = resources;
+        Prompts = prompts;
         PlanTools = planTools;
         WorkTools = workTools;
         Servers = servers;
         Tools = tools;
         Notes = notes;
         var all = tools.Select(tool => tool.ModelName).ToHashSet(StringComparer.Ordinal);
+        if (resources.Names.Count > 0)
+        {
+            all.Add(McpResourceTools.ListToolName);
+            all.Add(McpResourceTools.ReadToolName);
+        }
+
         var readOnly = tools.Where(tool => tool.ReadOnly)
             .Select(tool => tool.ModelName)
             .ToHashSet(StringComparer.Ordinal);
         Classifier = new McpApprovalClassifier(all, readOnly);
     }
 
-    public static McpCatalog Empty { get; } = new([], [], [], [], [], []);
+    public static McpCatalog Empty { get; } = new(
+        [], [], [], [], [], [], McpResourceClients.Empty, []);
 
     public IReadOnlyList<ITool> PlanTools { get; }
 
@@ -57,6 +69,17 @@ internal sealed class McpCatalog : IAsyncDisposable
 
     public IApprovalClassifier Classifier { get; }
 
+    internal McpResourceClients Resources { get; }
+
+    internal IReadOnlyList<McpPromptEntry> Prompts { get; }
+
+    /// <summary>
+    /// The two resource host tools, or none when no server offers resources.
+    /// They are classified like the tools of the server they read from, so they
+    /// are always at least a workspace write.
+    /// </summary>
+    public IReadOnlyList<ITool> ResourceTools => McpResourceTools.Create(Resources);
+
     /// <summary>
     /// Connects every definition at the same time and waits until each one
     /// has connected or failed. A failed server is reported in
@@ -70,7 +93,8 @@ internal sealed class McpCatalog : IAsyncDisposable
         string workspaceRoot,
         McpToolApprovalSettings approval,
         IReadOnlySet<string> reservedNames,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        McpHostCallbacks? callbacks = null)
     {
         ArgumentNullException.ThrowIfNull(definitions);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
@@ -82,7 +106,7 @@ internal sealed class McpCatalog : IAsyncDisposable
         }
 
         return await LoadConnectionsAsync(
-            [.. definitions.Select(definition => McpConnection.Connect(definition, workspaceRoot))],
+            [.. definitions.Select(definition => McpConnection.Connect(definition, workspaceRoot, callbacks))],
             approval,
             reservedNames,
             cancellationToken);
@@ -128,7 +152,8 @@ internal sealed class McpCatalog : IAsyncDisposable
         try
         {
             var tools = await ready.Client.ListToolsAsync(cancellationToken: timeout.Token);
-            return new ServerLoad(connection, [.. tools], string.Empty);
+            var prompts = await ListPromptsAsync(ready.Client, timeout.Token);
+            return new ServerLoad(connection, [.. tools], string.Empty, prompts);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -147,6 +172,26 @@ internal sealed class McpCatalog : IAsyncDisposable
         }
     }
 
+    // A server without prompts is normal, and a failure here must not hide its tools.
+    private static async Task<IReadOnlyList<Prompt>> ListPromptsAsync(
+        McpClient client,
+        CancellationToken cancellationToken)
+    {
+        if (client.ServerCapabilities?.Prompts is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            return [.. (await client.ListPromptsAsync(cancellationToken: cancellationToken)).Select(item => item.ProtocolPrompt)];
+        }
+        catch (Exception exception) when (exception is McpException or IOException)
+        {
+            return [];
+        }
+    }
+
     private static async Task<McpCatalog> AssembleAsync(
         IReadOnlyList<ServerLoad> loads,
         McpToolApprovalSettings approval,
@@ -158,6 +203,8 @@ internal sealed class McpCatalog : IAsyncDisposable
         var servers = new List<McpServerInfo>();
         var infos = new List<McpToolInfo>();
         var notes = new List<string>();
+        var resources = new Dictionary<string, McpResourceClients.Entry>(StringComparer.Ordinal);
+        var prompts = new List<McpPromptEntry>();
         var taken = new HashSet<string>(reservedNames, StringComparer.Ordinal);
 
         foreach (var load in loads)
@@ -224,6 +271,38 @@ internal sealed class McpCatalog : IAsyncDisposable
                 count++;
             }
 
+            if (client.ServerCapabilities?.Resources is not null)
+            {
+                resources[definition.Name] = new McpResourceClients.Entry(client, definition.ToolTimeoutSeconds);
+            }
+
+            foreach (var prompt in load.Prompts.OrderBy(item => item.Name, StringComparer.Ordinal))
+            {
+                if (!McpServerNames.TryPromptCommand(definition.Name, prompt.Name, out var command))
+                {
+                    notes.Add(
+                        $"MCP prompt '{prompt.Name}' from '{definition.Name}' was skipped: the name is too long or empty.");
+                    continue;
+                }
+
+                if (prompts.Any(item => item.Command == command))
+                {
+                    notes.Add(
+                        $"MCP prompt '{prompt.Name}' from '{definition.Name}' was skipped: "
+                        + $"the command '/{command}' is already in use.");
+                    continue;
+                }
+
+                prompts.Add(new McpPromptEntry(
+                    command,
+                    definition.Name,
+                    prompt.Name,
+                    prompt.Description ?? prompt.Title ?? string.Empty,
+                    [.. (prompt.Arguments ?? []).Select(item => new McpPromptArgument(item.Name, item.Required == true))],
+                    client,
+                    definition.ToolTimeoutSeconds));
+            }
+
             servers.Add(new McpServerInfo(
                 definition.Name,
                 definition.Source,
@@ -233,7 +312,8 @@ internal sealed class McpCatalog : IAsyncDisposable
                 string.Empty));
         }
 
-        return new McpCatalog(kept, plan, work, servers, infos, notes);
+        return new McpCatalog(
+            kept, plan, work, servers, infos, notes, new McpResourceClients(resources), prompts);
     }
 
     private static async Task DisposeAllAsync(IEnumerable<McpConnection> connections)
@@ -247,5 +327,9 @@ internal sealed class McpCatalog : IAsyncDisposable
     private sealed record ServerLoad(
         McpConnection Connection,
         IReadOnlyList<McpClientTool>? Tools,
-        string Error);
+        string Error,
+        IReadOnlyList<Prompt>? PromptList = null)
+    {
+        public IReadOnlyList<Prompt> Prompts => PromptList ?? [];
+    }
 }

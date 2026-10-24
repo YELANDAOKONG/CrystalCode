@@ -49,12 +49,19 @@ internal sealed class McpConnection : IAsyncDisposable
     /// Starts connecting and returns at once. A stdio server runs in
     /// <paramref name="workspaceRoot"/>.
     /// </summary>
-    public static McpConnection Connect(McpServerDefinition definition, string workspaceRoot)
+    public static McpConnection Connect(
+        McpServerDefinition definition,
+        string workspaceRoot,
+        McpHostCallbacks? callbacks = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var lifecycle = new CancellationTokenSource();
-        var ready = OpenAsync(definition, workspaceRoot, lifecycle.Token);
+        var ready = OpenAsync(
+            definition,
+            workspaceRoot,
+            callbacks ?? McpHostCallbacks.None,
+            lifecycle.Token);
         return new McpConnection(definition, lifecycle, ready);
     }
 
@@ -104,6 +111,7 @@ internal sealed class McpConnection : IAsyncDisposable
     private static async Task<McpConnectionResult> OpenAsync(
         McpServerDefinition definition,
         string workspaceRoot,
+        McpHostCallbacks callbacks,
         CancellationToken cancellationToken)
     {
         var tail = new McpErrorTail();
@@ -118,19 +126,7 @@ internal sealed class McpConnection : IAsyncDisposable
                 $"MCP server '{definition.Name}' was not started: {exception.Message}");
         }
 
-        var options = new McpClientOptions
-        {
-            ClientInfo = new Implementation
-            {
-                Name = "CrystalCode",
-                Version = typeof(McpConnection).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"
-            },
-            InitializationTimeout = TimeSpan.FromSeconds(InitializationTimeoutSeconds),
-            // Servers that predate the newest protocol revision drop the
-            // server/discover probe without answering. The probe wait is the
-            // delay before the initialize fallback, so keep it short.
-            DiscoverProbeTimeout = TimeSpan.FromMilliseconds(DiscoverProbeMilliseconds)
-        };
+        var options = CreateOptions(definition, callbacks);
 
         try
         {
@@ -156,6 +152,72 @@ internal sealed class McpConnection : IAsyncDisposable
                 + (output.Length == 0 ? string.Empty : $" Server output: {output}"));
         }
     }
+
+    /// <summary>
+    /// The client identity, declared capabilities, and handlers every
+    /// connection uses. Tests connect an in-process transport with these too.
+    /// </summary>
+    internal static McpClientOptions CreateOptions(
+        McpServerDefinition definition,
+        McpHostCallbacks callbacks) =>
+        new()
+        {
+            ClientInfo = new Implementation
+            {
+                Name = "CrystalCode",
+                Version = typeof(McpConnection).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"
+            },
+            InitializationTimeout = TimeSpan.FromSeconds(InitializationTimeoutSeconds),
+            // Servers that predate the newest protocol revision drop the
+            // server/discover probe without answering. The probe wait is the
+            // delay before the initialize fallback, so keep it short.
+            DiscoverProbeTimeout = TimeSpan.FromMilliseconds(DiscoverProbeMilliseconds),
+            Capabilities = new ClientCapabilities
+            {
+#pragma warning disable MCP9005 // Roots are deprecated in the newest revision but servers still ask.
+                Roots = new RootsCapability { ListChanged = true },
+#pragma warning restore MCP9005
+                Elicitation = new ElicitationCapability { Form = new FormElicitationCapability() }
+            },
+            Handlers = CreateHandlers(definition, callbacks)
+        };
+
+    private static McpClientHandlers CreateHandlers(
+        McpServerDefinition definition,
+        McpHostCallbacks callbacks) =>
+        new()
+        {
+#pragma warning disable MCP9005
+            RootsHandler = (_, _) => ValueTask.FromResult(new ListRootsResult
+            {
+                Roots =
+                [
+                    new Root
+                    {
+                        Uri = new Uri(Path.GetFullPath(callbacks.WorkspaceRoot())).AbsoluteUri,
+                        Name = Path.GetFileName(
+                            Path.TrimEndingDirectorySeparator(Path.GetFullPath(callbacks.WorkspaceRoot())))
+                    }
+                ]
+            }),
+#pragma warning restore MCP9005
+            ElicitationHandler = (request, token) =>
+                McpElicitation.AskAsync(
+                    definition.Name,
+                    request,
+                    callbacks.Questions,
+                    token),
+            NotificationHandlers =
+            [
+                new KeyValuePair<string, Func<JsonRpcNotification, CancellationToken, ValueTask>>(
+                    NotificationMethods.ToolListChangedNotification,
+                    (_, _) =>
+                    {
+                        callbacks.ToolsChanged(definition.Name);
+                        return ValueTask.CompletedTask;
+                    })
+            ]
+        };
 
     private static IClientTransport CreateTransport(
         McpServerDefinition definition,

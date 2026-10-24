@@ -1577,8 +1577,14 @@ and `mcp/<name>/server.json`; a workspace reads the same names under
 whole, even when the project entry is invalid. Inside one scope, a name in both
 `mcp.json` and a `server.json` directory is ambiguous and neither is used.
 `config.json` field `mcp` enables connections (default `true`). The engine
-owns connections in `CrystalCode.Engine/Mcp`; a front end only sees notes and
-the `/mcp` status. See [docs/mcp.md](docs/mcp.md).
+owns connections in `CrystalCode.Engine/Mcp`; a front end only sees notes, the
+`/mcp` status, and the slash menu. The engine lends each connection three
+things and nothing else: the workspace root for roots, the front end's
+`IUserPrompt` for elicitation, and a callback that records a changed tool list.
+A recorded change is applied after the turn, never during one, so tools do not
+change under a running model. Server prompts are slash commands and resources
+are two host tools; neither reaches a front end except through events and
+tools. See [docs/mcp.md](docs/mcp.md).
 An unreadable or invalid project manifest with the same directory name
 also hides the home set. `timeoutSeconds` defaults to 120 for both runners,
 independent of `bashTimeoutSeconds`;

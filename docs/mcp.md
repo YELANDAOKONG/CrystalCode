@@ -12,14 +12,20 @@ endpoint the session connects to and keeps open.
 ## What this build supports
 
 - Tools from servers over stdio, streamable HTTP, or SSE.
+- Resources, through two host tools.
+- Prompts, as slash commands.
+- Elicitation: a server can ask the operator for input.
+- Roots: a server learns the workspace directory.
+- A server's changed tool list, applied after the turn.
 - Servers from `mcp.json` and `mcp/<name>/server.json`, in Home and in a
   workspace.
 - The `/mcp` command, the `--mcp` launch option, and the `mcp` and
   `mcpToolApproval` settings.
 
-Resources, prompts, elicitation, roots, sampling, and OAuth are not supported.
-A server that offers them still connects and its tools work. The client does
-not declare those capabilities, so a server cannot use them.
+Sampling and OAuth are not supported. The client does not declare sampling, so
+a server cannot ask Crystal to call a model. A remote server that needs OAuth
+fails to connect; use a static header instead. URL-mode elicitation, which
+sends the operator to a browser, is declined.
 
 ## Where servers are defined
 
@@ -104,6 +110,73 @@ short line names what was left out. A result larger than the tool output limit
 is truncated. A server that reports an error produces a failed tool result. The
 SDK may replace the server's error message with a generic one.
 
+## Resources
+
+When at least one connected server offers resources, two host tools appear in
+the Work catalog. There is one pair for all servers, so the tool count does not
+grow with the number of servers.
+
+| Tool                  | Arguments      | Result |
+| --------------------- | -------------- | ------ |
+| `list_mcp_resources`  | `server`       | One line per resource: URI, name, type, description. At most 200 lines. |
+| `read_mcp_resource`   | `server`, `uri`| The text of the resource. Binary content is named, not sent. |
+
+`server` must be a connected server that offers resources; the error names the
+valid ones. Both names are reserved, so a server tool cannot take them.
+
+Plan has the pair only when some server lists `"plan"` in `catalogs`. Calls use
+the same approval and timeout as that server's tools.
+
+## Prompts
+
+A server prompt becomes the slash command `/mcp__<server>__<prompt>`, listed in
+the command menu with the server's description. The command asks the server for
+the prompt and submits its text as an ordinary user message, so the turn,
+approval, and history behave as if the operator had typed it.
+
+Arguments are `name=value` pairs. Quote a value that has spaces:
+
+```text
+/mcp__docs__review file=src/app.cs style="short and plain"
+```
+
+A missing required argument, an unknown argument, a repeated argument, or an
+unclosed quote is reported and no turn starts. A prompt with several messages
+is joined into one user message; an assistant message is prefixed with
+`Assistant:`. Image, audio, and binary parts are named but not sent.
+
+A prompt command name that is already taken is skipped with a note. Prompt
+commands are not available while a turn is running.
+
+## Elicitation
+
+A server can ask the operator for input while a tool runs. Crystal shows it with
+the same question panel as the `question` tool, headed `MCP <server>`, one
+question per field, and returns the answers to the server.
+
+Supported fields are text, number, integer, yes or no, and a single choice from
+a fixed list. A request with more than 8 fields, a multiple-choice or other
+unsupported field, or URL mode is declined without asking. An empty answer to an
+optional field leaves it out. An answer that does not fit its field, such as a
+word for a number, declines the request. Rejecting the panel cancels it.
+
+`crystal run` has no operator, so every elicitation there is cancelled.
+
+## Roots
+
+Crystal declares the roots capability. A server that asks receives one root:
+the current workspace directory as a `file://` URI. It follows `/cd` and
+`/space`, because those reconnect the servers. Session directory access from
+`/access` is not shared. Roots are informational; a server is not confined to
+them.
+
+## Changed tool lists
+
+When a server announces a changed tool list, Crystal does not change the tools
+during a turn. It reconnects the configured servers after the turn ends, writes
+`MCP tools changed  <server>`, and the next turn sees the new tools. Prompt
+commands refresh at the same time.
+
 ## Approval
 
 Every call is at least a workspace write and is reviewed under the current
@@ -122,8 +195,9 @@ Session and persistent grants work as for other tools.
 
 - Connection: 30 seconds in total. Servers that do not support the newest
   protocol revision are probed for 0.5 seconds before the older handshake runs.
-- Listing tools: 30 seconds.
-- A call: `toolTimeoutSeconds`. Cancelling the turn cancels the call.
+- Listing tools and prompts: 30 seconds.
+- A call, a resource read, or a prompt request: `toolTimeoutSeconds`.
+  Cancelling the turn cancels the call.
 
 A server that fails to start, connect, or list its tools is reported as a note
 and the session continues with the other servers. A failed stdio start includes

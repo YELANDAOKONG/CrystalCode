@@ -37,6 +37,13 @@ public static class McpServerNames
         && ServerPattern.IsMatch(name);
 
     /// <summary>
+    /// Builds the slash command for a server prompt, which is the same
+    /// <c>mcp__server__prompt</c> text as a tool name.
+    /// </summary>
+    public static bool TryPromptCommand(string serverName, string promptName, out string command) =>
+        TryToolName(serverName, promptName, out command);
+
+    /// <summary>
     /// Builds <c>mcp__server__tool</c>. Characters providers reject become
     /// underscores. Returns false when the tool name is empty or the result
     /// exceeds the model-facing name limit.
