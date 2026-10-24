@@ -64,6 +64,7 @@ public sealed class CodingSession : ITurnObserver
     private bool InPlanCeiling => _planMode || _customMode is not null;
     private bool EffectiveChildPlanMode => _childParentPlanMode || InPlanCeiling;
     private bool _parentContextEstimated;
+    private ContextAnchor? _contextAnchor;
     private SharedTurnBudget? _sharedBudget;
     private TokenUsage? _childTurnUsage;
     private bool _childUsageComplete = true;
@@ -411,6 +412,7 @@ public sealed class CodingSession : ITurnObserver
                 .Select(tool => catalog.Find(tool.Name)!));
             var executor = new ToolExecutor(filtered, new ToolExecutionOptions(ToolExecutionMode.Serial, 1),
                 _childPolicy, HarnessExceptionMapper.MapAsync);
+            ContextAnchor? childAnchor = null;
             var observer = new ChildTurnObserver(Emit, (context, usage) =>
             {
                 // A null context is a mid-stream update; keep the last finished figure.
@@ -423,15 +425,15 @@ public sealed class CodingSession : ITurnObserver
                 Emit(new UsageChanged(latestUsage, usage is null ? null : SessionLedger.Add(SessionMapper.ReadUsage(child.CumulativeUsage), usage),
                     selectedModel.ContextWindow, true));
             }, _ => usageAfterCompaction = null,
-                () => Emit(new TodosChanged(todos.Snapshot())));
+                () => Emit(new TodosChanged(todos.Snapshot())),
+                anchor => childAnchor = anchor);
             var limits = agent == "explore" ? new TurnLimits(32, 128, null) : TurnLimits.Unlimited;
             IReadOnlyList<ChatItem> reviewItems = items;
             async Task<CompactionOutcome> CompactAsync(IReadOnlyList<ChatItem> context, CancellationToken token)
             {
                 reviewItems = context;
                 var compactionLimits = LimitsFor(selectedModel);
-                if (!ContextAccountant.ShouldCompact(TokenEstimator.Items(context), usageAfterCompaction,
-                    compactionLimits.ContextWindow, compactionLimits.Threshold, compactionLimits.MaxTokens, compactionLimits.ReservedOutputTokens))
+                if (!ContextAccountant.ShouldCompact(context, childAnchor, usageAfterCompaction, compactionLimits))
                 {
                     return new CompactionOutcome(context, CompactionKind.Unchanged);
                 }
@@ -461,6 +463,7 @@ public sealed class CodingSession : ITurnObserver
                         return new CompactionOutcome(context, CompactionKind.Exhausted);
                     }
                     usageAfterCompaction = null;
+                    childAnchor = null;
                     Emit(new NoteWritten("Compacted child context"));
                     return compacted;
                 }
@@ -5133,7 +5136,7 @@ public sealed class CodingSession : ITurnObserver
     {
         var changed = TryMicrocompact(_transcript, out _);
         var usage = changed ? null : result.Usage ?? _ledger.Usage;
-        if (!NeedsCompaction(_transcript, usage))
+        if (!NeedsCompaction(_transcript, usage, changed ? null : _contextAnchor))
         {
             return;
         }
@@ -5159,7 +5162,10 @@ public sealed class CodingSession : ITurnObserver
             CloseRecallWindow();
         }
 
-        if (!NeedsCompaction(current, changed || _parentContextEstimated ? null : ShownUsage()))
+        if (!NeedsCompaction(
+                current,
+                changed || _parentContextEstimated ? null : ShownUsage(),
+                changed ? null : _contextAnchor))
         {
             return changed
                 ? new CompactionOutcome([.. current], CompactionKind.Applied)
@@ -5179,17 +5185,11 @@ public sealed class CodingSession : ITurnObserver
         return outcome;
     }
 
-    private bool NeedsCompaction(IReadOnlyList<ChatItem> transcript, TokenUsage? reportedUsage)
-    {
-        var limits = CurrentLimits();
-        return ContextAccountant.ShouldCompact(
-            TokenEstimator.Items(transcript),
-            reportedUsage,
-            limits.ContextWindow,
-            limits.Threshold,
-            limits.MaxTokens,
-            limits.ReservedOutputTokens);
-    }
+    private bool NeedsCompaction(
+        IReadOnlyList<ChatItem> transcript,
+        TokenUsage? reportedUsage,
+        ContextAnchor? anchor = null) =>
+        ContextAccountant.ShouldCompact(transcript, anchor, reportedUsage, CurrentLimits());
 
     private async Task<CompactionOutcome> RunCompactionAsync(
         IReadOnlyList<ChatItem> transcript,
@@ -5232,6 +5232,9 @@ public sealed class CodingSession : ITurnObserver
 
         if (outcome.Kind == CompactionKind.Applied)
         {
+            // The retained tail can keep the anchored item, but the report
+            // counted text that is now folded into the summary.
+            _contextAnchor = null;
             var printSummary = ShouldPrintSummary(manual) && !string.IsNullOrWhiteSpace(outcome.Summary);
             if (ReferenceEquals(transcript, _transcript))
             {
@@ -6663,6 +6666,8 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
+        // Removed tool text is still inside the last provider report.
+        _contextAnchor = null;
         if (ReferenceEquals(transcript, _transcript))
         {
             _transcript.Clear();
@@ -8197,6 +8202,8 @@ public sealed class CodingSession : ITurnObserver
         _parentContextEstimated = true;
         Publish(new ContextEstimated(tokens));
     }
+
+    void ITurnObserver.OnContextAnchored(ContextAnchor anchor) => _contextAnchor = anchor;
 
     void ITurnObserver.OnFault(string message)
     {

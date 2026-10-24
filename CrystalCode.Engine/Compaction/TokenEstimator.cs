@@ -54,21 +54,51 @@ public static class TokenEstimator
         return total;
     }
 
+    // Provider state (a thinking block, a reasoning item, or a Gemini part)
+    // already carries the readable text, so adding both counts one block twice.
     private static int Reasoning(ChatReasoningItem item)
     {
-        var total = 0;
+        var text = 0;
         foreach (var segment in item.Content.TextSegments)
         {
-            total += Text(segment.Text);
+            text += Text(segment.Text);
         }
 
-        if (item.Content.State is { } state)
-        {
-            total += Characters(state.Data.Length);
-        }
-
-        return total;
+        var state = item.Content.State is { } opaque ? Characters(opaque.Data.Length) : 0;
+        return Math.Max(text, state);
     }
+
+    /// <summary>
+    /// Context size when the provider's last report is still in the list: that
+    /// report plus an estimate of the items after it. Returns false when there
+    /// is no anchor or the anchored item is gone, for example after compaction.
+    /// </summary>
+    public static bool TryContext(IReadOnlyList<ChatItem> items, ContextAnchor? anchor, out int tokens)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        tokens = 0;
+        if (anchor is null)
+        {
+            return false;
+        }
+
+        for (var i = items.Count - 1; i >= 0; i--)
+        {
+            if (!ReferenceEquals(items[i], anchor.Last))
+            {
+                continue;
+            }
+
+            var total = anchor.Tokens + Range(items, i + 1, items.Count - i - 1);
+            tokens = (int)Math.Min(int.MaxValue, total);
+            return true;
+        }
+
+        return false;
+    }
+
+    public static int Context(IReadOnlyList<ChatItem> items, ContextAnchor? anchor) =>
+        TryContext(items, anchor, out var tokens) ? tokens : Items(items);
 
     public static int Item(ChatItem item)
     {

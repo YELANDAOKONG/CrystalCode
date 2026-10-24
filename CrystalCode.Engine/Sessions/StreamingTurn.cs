@@ -64,6 +64,7 @@ public sealed class StreamingTurn
         var toolCallCount = 0;
         var consecutivePauses = 0;
         var usage = new UsageAccumulator();
+        ContextAnchor? anchor = null;
 
         using var durationSource = _limits.MaximumDuration is TimeSpan duration
             ? new CancellationTokenSource(duration)
@@ -94,6 +95,8 @@ public sealed class StreamingTurn
                     {
                         transcript.Clear();
                         transcript.AddRange(compacted.Transcript);
+                        // The report counted text that compaction just removed.
+                        anchor = null;
                     }
                 }
 
@@ -126,6 +129,7 @@ public sealed class StreamingTurn
                 {
                     CandidateRound.AppendWithoutToolCalls(transcript, candidate.Items);
                     Commit(transcript, marked);
+                    anchor = PublishAnchor(response.Usage, transcript) ?? anchor;
                     _observer?.OnModelRoundClosed();
                     if (++consecutivePauses > CandidateRound.MaximumConsecutivePauses)
                     {
@@ -164,6 +168,7 @@ public sealed class StreamingTurn
                 {
                     transcript.AddRange(candidate.Items);
                     Commit(transcript, marked);
+                    PublishAnchor(response.Usage, transcript);
                     _observer?.OnModelRoundClosed();
                     return Create(
                         TurnStopReason.Completed,
@@ -189,6 +194,7 @@ public sealed class StreamingTurn
 
                 transcript.AddRange(candidate.Items);
                 Commit(transcript, marked);
+                anchor = PublishAnchor(response.Usage, transcript) ?? anchor;
 
                 toolCallCount += toolCalls.Length;
                 _observer?.OnModelRoundClosed();
@@ -198,7 +204,7 @@ public sealed class StreamingTurn
                 transcript.AddRange(toolResults);
                 Commit(transcript, marked);
                 _observer?.OnToolResults(toolResults);
-                _observer?.OnContextEstimated(TokenEstimator.Items(transcript));
+                _observer?.OnContextEstimated(TokenEstimator.Context(transcript, anchor));
             }
         }
         catch (OperationCanceledException) when (durationSource.IsCancellationRequested)
@@ -232,6 +238,17 @@ public sealed class StreamingTurn
                 usage,
                 transcript);
         }
+    }
+
+    private ContextAnchor? PublishAnchor(TokenUsage? usage, List<ChatItem> transcript)
+    {
+        var anchor = ContextAnchor.From(usage, transcript);
+        if (anchor is not null)
+        {
+            _observer?.OnContextAnchored(anchor);
+        }
+
+        return anchor;
     }
 
     private async Task<IReadOnlyList<ChatItem>> PrepareOutboundAsync(

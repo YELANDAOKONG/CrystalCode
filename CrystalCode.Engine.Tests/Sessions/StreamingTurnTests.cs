@@ -244,6 +244,50 @@ public sealed class StreamingTurnTests
     }
 
     [Fact]
+    public async Task RunAsync_BasesTheContextEstimateOnTheReportedUsage()
+    {
+        var observer = new TestObserver();
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "echo", """{"message":"hi"}""", new TokenUsage(50_000, 100)),
+            TextRound("ok", new TokenUsage(50_200, 10)));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
+
+        await turn.RunAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        var estimate = Assert.Single(observer.ContextEstimates);
+        Assert.InRange(estimate, 50_100, 50_200);
+        Assert.Equal(2, observer.Anchors.Count);
+        Assert.Equal(50_100, observer.Anchors[0].Tokens);
+    }
+
+    [Fact]
+    public async Task RunAsync_EstimatesTheWholeListWhenTheEndpointReportsNoUsage()
+    {
+        var observer = new TestObserver();
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "echo", """{"message":"hi"}"""),
+            TextRound("ok"));
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
+
+        await turn.RunAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        Assert.True(Assert.Single(observer.ContextEstimates) is > 0 and < 100);
+        Assert.Empty(observer.Anchors);
+    }
+
+    [Fact]
     public async Task RunAsync_DoesNotNotifyToolCallsWhenTheRoundHasNone()
     {
         var observer = new TestObserver();
@@ -675,6 +719,10 @@ public sealed class StreamingTurnTests
         public List<int> ContextEstimates { get; } = [];
 
         public void OnContextEstimated(int tokens) => ContextEstimates.Add(tokens);
+
+        public List<ContextAnchor> Anchors { get; } = [];
+
+        public void OnContextAnchored(ContextAnchor anchor) => Anchors.Add(anchor);
 
         public List<(TokenUsage? Context, TokenUsage? TurnCumulative)> UsageUpdates { get; } = [];
 

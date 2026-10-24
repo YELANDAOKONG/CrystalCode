@@ -1,4 +1,5 @@
 using Crystal;
+using Crystal.Chat;
 
 namespace CrystalCode.Engine.Compaction;
 
@@ -109,6 +110,31 @@ public static class ContextAccountant
     {
         var limit = CompactLimit(contextWindow, threshold, maxTokens, reserved);
         return limit > 0 && estimatedTokens >= limit;
+    }
+
+    /// <summary>
+    /// Decides from a transcript. When <paramref name="anchor"/> still points
+    /// into it, the size is that provider report plus the items after it, and
+    /// <paramref name="reportedUsage"/> is skipped because the anchor already
+    /// holds it. Otherwise the whole transcript is estimated and the reported
+    /// usage is checked beside it.
+    /// </summary>
+    public static bool ShouldCompact(
+        IReadOnlyList<ChatItem> transcript,
+        ContextAnchor? anchor,
+        TokenUsage? reportedUsage,
+        CompactionLimits limits)
+    {
+        ArgumentNullException.ThrowIfNull(transcript);
+        ArgumentNullException.ThrowIfNull(limits);
+        var anchored = TokenEstimator.TryContext(transcript, anchor, out var tokens);
+        return ShouldCompact(
+            anchored ? tokens : TokenEstimator.Items(transcript),
+            anchored ? null : reportedUsage,
+            limits.ContextWindow,
+            limits.Threshold,
+            limits.MaxTokens,
+            limits.ReservedOutputTokens);
     }
 
     public static bool ShouldCompact(

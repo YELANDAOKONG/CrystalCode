@@ -597,7 +597,7 @@ User cancellation and the turn budget still stop the command. External tool
 sets keep their own `timeoutSeconds`, which defaults to 120 seconds and does
 not follow `bashTimeoutSeconds`.
 7. After a completed turn, consider compaction from that last round's
-   reported usage and the estimated model context. `/compact` (alias
+   reported usage plus an estimate of anything added after it. `/compact` (alias
    `/summarize`) summarizes earlier turns immediately, without waiting for
    that threshold. Compaction runs
    inside an engine call the front end awaits; the front end keeps its
@@ -1259,7 +1259,19 @@ cap is fixed when that client is opened. The review client is dropped
 when its own budget or output cap changes, including when review uses
 the session model.
 
-When estimated transcript size or the last model-round usage crosses
+The size that is compared with that limit is the last finished model
+round's provider-reported input plus output, plus a local estimate of the
+items added after the final item of that round (normally tool results). The
+report is the anchor. It is matched by item identity, so a rewrite of the
+transcript, such as microcompaction or compaction, drops the anchor and the
+next check estimates the whole list until a round reports again. A round
+with no usage from the endpoint sets no anchor. Without an anchor, the whole
+list is estimated and the last reported usage is checked beside it. With one,
+the anchor already holds that report. A reasoning block counts once: the
+larger of its readable text and its provider state, because that state
+repeats the text.
+
+When that size crosses
 the lesser of the configured fraction of the model context window and
 the usable window (context minus reserved output), the host:
 
@@ -1284,8 +1296,9 @@ the usable window (context minus reserved output), the host:
    compaction in a loop.
 
 CTX percent uses the last model round's provider usage while a round is
-streaming, then a separately marked `~` local transcript estimate after each
-tool batch until the next round reports. Estimates never replace saved
+streaming, then a separately marked `~` estimate after each tool batch until
+the next round reports. That estimate is the anchored size above, so it adds
+only the new tool results to the last report. Estimates never replace saved
 provider usage and are not part of cumulative usage. CTX is not the sum of rounds in
 the turn. The status bar can show 100% when usage meets or exceeds the
 window. Compaction does not block the session loop: the progress row

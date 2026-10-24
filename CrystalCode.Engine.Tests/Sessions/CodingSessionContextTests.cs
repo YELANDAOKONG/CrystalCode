@@ -137,6 +137,34 @@ public sealed class CodingSessionContextTests
     }
 
     [Fact]
+    public async Task ReportedUsage_KeepsAnOverestimatedReplyFromCompacting()
+    {
+        // About 25,000 estimated tokens against a 24,000 token limit, but the provider counted 1,000.
+        var client = new ReportingClient(new TokenUsage(900, 100), new string('x', 100_000));
+        using var headless = new HeadlessSession(client, settings: NarrowSettings());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("continue");
+
+        Assert.Equal(0, client.Summaries);
+        Assert.Equal(
+            TurnStopReason.Completed,
+            headless.Observer.Events.OfType<TurnFinished>().Single().Result.StopReason);
+    }
+
+    [Fact]
+    public async Task EstimatedReply_CompactsWhenTheEndpointReportsNoUsage()
+    {
+        var client = new ReportingClient(null, new string('x', 100_000));
+        using var headless = new HeadlessSession(client, settings: NarrowSettings());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("continue");
+
+        Assert.Equal(1, client.Summaries);
+    }
+
+    [Fact]
     public async Task AutomaticCompaction_HidesTheSummaryByDefault()
     {
         var notes = await CompactAutomatically(showSummary: false);
@@ -375,6 +403,34 @@ public sealed class CodingSessionContextTests
             ApprovalMode.Default,
             0.8,
             ProviderCatalog.CreateStarter().Overlay([provider]));
+    }
+
+    private sealed class ReportingClient(TokenUsage? usage, string reply) : IStreamingChatClient
+    {
+        public int Summaries { get; private set; }
+
+        public IAsyncEnumerable<ChatStreamEvent> StreamAsync(ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            List<ChatStreamEvent> events = [new ChatTextDelta(0, 0, ChatRole.Assistant, reply)];
+            if (usage is not null)
+            {
+                events.Add(new ChatUsageReceived(usage));
+            }
+
+            events.Add(new ChatCandidateCompleted(0, FinishReason.Stop));
+            return new ScriptedStreamingClient(events).StreamAsync(request, cancellationToken);
+        }
+
+        public Task<ChatResponse> CompleteAsync(ChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Summaries++;
+            return Task.FromResult(new ChatResponse([
+                new ChatCandidate([new ChatMessage(ChatRole.Assistant, "Earlier facts retained.")], FinishReason.Stop)
+            ]));
+        }
     }
 
     private sealed class CompactingClient : IStreamingChatClient

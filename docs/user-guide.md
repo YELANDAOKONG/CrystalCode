@@ -1031,11 +1031,11 @@ arguments lists; its other forms are refused during a turn. `/quit` still exits.
    executor (approval first).
 5. Append exact tool results.
 6. Repeat until there are no tool calls, a limit stops the turn, or
-   you cancel. The host may compact before a model round when the
-   estimated transcript or the last model-round usage is over budget;
+   you cancel. The host may compact before a model round when the last
+   model-round usage plus the tool results added since is over budget;
    if compaction cannot reduce further, the turn stops.
 7. After a completed turn, consider compaction from that last round
-   and the estimated transcript. `/compact` summarizes earlier context
+   and what was added after it. `/compact` summarizes earlier context
    immediately and prints the summary.
 
 ## Modes
@@ -1917,8 +1917,12 @@ budget together; a model without `maxTokens` sends no cap, except on the
 rebuilds the session client and drops cached plugin, review, and
 image-description clients whose output cap depends on that budget.
 
-When estimated transcript size or the last model-round usage crosses the
-compact ceiling, the host:
+The size checked against the compact ceiling is the last model round's
+reported input plus output, plus an estimate of the tool results added
+after it. A rewrite of the history (microcompaction or compaction), or an
+endpoint that reports no usage, makes the host estimate the whole list until
+the next round reports. A reasoning block counts once, not as text plus
+provider state. When that size crosses the compact ceiling, the host:
 
 1. Clears old tool results outside a protected recent band, when that
    frees enough tokens. A summary that stops because it reached its output

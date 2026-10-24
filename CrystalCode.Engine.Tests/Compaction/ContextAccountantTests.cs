@@ -1,4 +1,5 @@
 using Crystal;
+using Crystal.Chat;
 
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
@@ -63,6 +64,53 @@ public sealed class ContextAccountantTests
                 reportedUsage: null,
                 100,
                 0.8));
+    }
+
+    [Fact]
+    public void ShouldCompact_UsesTheAnchorInsteadOfEstimatingTheWholeTranscript()
+    {
+        var limits = new CompactionLimits(100_000);
+        var last = new ChatMessage(ChatRole.Assistant, "done");
+        // About 125,000 estimated tokens, but the provider reported 30,000 for the same list.
+        ChatItem[] items = [new ChatMessage(ChatRole.User, new string('u', 500_000)), last];
+
+        Assert.True(ContextAccountant.ShouldCompact(items, null, null, limits));
+        Assert.False(ContextAccountant.ShouldCompact(items, new ContextAnchor(30_000, last), null, limits));
+    }
+
+    [Fact]
+    public void ShouldCompact_CountsItemsAddedAfterTheAnchor()
+    {
+        var limits = new CompactionLimits(100_000);
+        var last = new ChatMessage(ChatRole.Assistant, "done");
+        var big = new ChatMessage(ChatRole.User, new string('t', 200_000));
+        ChatItem[] items = [last, big];
+
+        Assert.True(ContextAccountant.ShouldCompact(items, new ContextAnchor(30_000, last), null, limits));
+    }
+
+    [Fact]
+    public void ShouldCompact_FallsBackToEstimateAndReportedUsageWithoutAnAnchor()
+    {
+        var limits = new CompactionLimits(100);
+        ChatItem[] items = [new ChatMessage(ChatRole.User, "hi")];
+
+        Assert.True(ContextAccountant.ShouldCompact(items, null, new TokenUsage(80, 5), limits));
+        Assert.False(ContextAccountant.ShouldCompact(items, null, new TokenUsage(10, 1), limits));
+    }
+
+    [Fact]
+    public void ShouldCompact_IgnoresAStaleReportedUsageWhileAnAnchorHolds()
+    {
+        var limits = new CompactionLimits(100_000);
+        var last = new ChatMessage(ChatRole.Assistant, "done");
+        ChatItem[] items = [last];
+
+        Assert.False(ContextAccountant.ShouldCompact(
+            items,
+            new ContextAnchor(30_000, last),
+            new TokenUsage(90_000, 0),
+            limits));
     }
 
     [Fact]
