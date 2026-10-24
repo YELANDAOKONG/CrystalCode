@@ -39,8 +39,7 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   `crystal plugins`, and `crystal tools` are not this path. A custom
   execution mode is not the deferred host setting for serial or concurrent
   ordinary tool batches. Pending hook methods and plugin dependencies stay
-  undecided. Extending, adjusting, or disabling a built-in tool is the
-  high-priority item below, not this one.
+  undecided.
 - Switchable thinking-chain compression. After a thinking pass, a model
   summarizes that thinking. It is not context compaction, microcompaction,
   `verboseThinking`, or `thinkingDisplay`.
@@ -54,14 +53,6 @@ These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work. Current
 behavior stands until a specific change defines otherwise.
 
-- Extensible and adjustable built-in tools. Explicit in-process `IPlugin`
-  replacement is implemented: `Append` keeps duplicate-name rejection, while
-  `Replace` names a reserved built-in and may target Plan or Work independently.
-  The replacement keeps the built-in model-facing name and uses the host
-  executor and approval path. Session-only disablement is implemented.
-  Remaining work is disk-plugin and external-tool replacement, metadata
-  adjustment, and other disable rules. Host-owned numeric limits stay under
-  Pending evaluation.
 - Product modes other than Plan and Work, including operator-defined custom
   modes. The product has exactly two modes today. Prompt overlays, prompt
   sets, prompt attachments, and external tool catalogs do not add a mode.
@@ -124,8 +115,6 @@ behavior stands until a specific change defines otherwise.
   not reserve a configuration field, command, public type, or tool-set
   format. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
-  This is not the high-priority item for extending, adjusting, or disabling a
-  built-in tool.
 - Separate provider files. The direction is to define providers across more
   than one file instead of only the `providers` object embedded in
   `config.json`. Which files are read, their scope, precedence, merge and
@@ -155,8 +144,7 @@ bucket. That decision is recorded under High priority.
   caps are host-owned constants. Timeouts and turn budgets are already
   configurable and are not part of this question. A later decision must
   define which limits may vary, at which scope, and how a larger limit
-  interacts with context compaction. This is not the high-priority item for
-  extending, adjusting, or disabling a built-in tool.
+  interacts with context compaction.
 - More hook methods, added later on the existing hook interfaces. They are
   not reserved as empty types.
 - Whether plugins declare dependencies on one another, and related loading

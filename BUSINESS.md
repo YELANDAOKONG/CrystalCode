@@ -241,6 +241,11 @@ separate library with no terminal code. The product can:
   In-process plugin contributions may explicitly replace a reserved built-in
   tool for Plan, Work, or both while keeping the model-facing name. The host
   still owns approval, execution, cancellation, and budget boundaries.
+  Approval classification is selected by that model-facing name, so a
+  replacement is trusted not to perform effects beyond the replaced built-in's
+  classification. Disk plugins and external tool sets stay append-only: they
+  cannot replace a built-in tool or adjust its model-facing description or
+  input schema, and no such capability is planned.
 
 ## Child Agents
 
@@ -338,19 +343,6 @@ implemented in the current build.
 
 ### High priority
 
-- Extensible, adjustable, and disableable built-in tools. The first defined
-  slice is explicit replacement by an in-process `IPlugin` contribution:
-  `Append` keeps the existing duplicate-name rejection, while `Replace`
-  names a reserved built-in and may apply independently to Plan or Work.
-  The replacement keeps the built-in model-facing name and continues through
-  the host approval and executor path. Approval classification is selected by
-  that model-facing name, so a replacement is trusted not to perform effects
-  beyond the replaced built-in's classification. Disk-plugin and
-  external-tool replacement, and metadata adjustment remain undefined. Home
-  persistence, process-level merging, session-only disablement, and the
-  `{{disabled_tools}}` prompt placeholder are implemented in the current build.
-  Host-owned numeric limits remain a separate pending question and are not
-  decided here.
 - Product modes other than Plan and Work, including operator-defined custom
   modes. The product has exactly two modes today. The direction is to add
   custom modes; their behavior and ownership are not defined. Prompt overlays,
@@ -413,8 +405,6 @@ implemented in the current build.
   not reserve a configuration field, command, public type, or tool-set
   format. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
-  This is not the high-priority item for extending, adjusting, or disabling a
-  built-in tool.
 - Separate provider files. The direction is to define providers in more than
   one file instead of only the `providers` object embedded in `config.json`.
   Which files are read, their scope, precedence, merge and override behavior,
@@ -445,8 +435,7 @@ implemented in the current build.
   Examples include extending the process command line and custom tool
   execution modes. The set is not closed. Behavior and ownership are not
   defined. Do not reserve a command, flag, configuration field, or public
-  type. Extending, adjusting, or disabling a built-in tool is the
-  high-priority item above, not this one;
+  type;
 - switchable thinking-chain compression. After each thinking pass, a model
   compresses and summarizes that thinking according to a requirement. The
   switch, the requirement, which model writes the summary, and whether the
@@ -486,16 +475,7 @@ operator. A custom tool execution mode is not the deferred host setting for
 serial or concurrent ordinary tool batches. Ordinary Work and Plan tools
 remain serial. A plugin must not bypass approval, trust, the workspace
 fence, or `ToolInvocationPolicy`. This item is not the deferred module
-system, not the high-priority way to extend, adjust, or disable a built-in
-tool, and not the undecided extra hook methods or plugin dependencies.
-
-TODO: add disk-plugin and external-tool replacement, metadata adjustment, and
-other built-in-tool extension rules only after each mechanism's scope and
-interaction with approval and reserved tool names are defined. In-process
-plugin replacement, Home Plan/Work disablement, process-level merging,
-session-only disablement, and the `{{disabled_tools}}` prompt placeholder are
-implemented. This is not the pending question of whether host-owned numeric
-limits become operator configuration.
+system and not the undecided extra hook methods or plugin dependencies.
 
 TODO: add operator-defined modes other than Plan and Work only after their
 behavior and ownership are defined. The product has exactly two modes today.
@@ -578,8 +558,7 @@ log bounds, the image size limit, and the todo caps are host-owned constants.
 Timeouts and turn budgets are already configurable and are not part of this
 question. No change is scheduled, and a later decision may revisit it. Such a
 decision must define which limits may vary, at which scope, and how a larger
-limit interacts with context compaction. That question is not the
-high-priority item for extending, adjusting, or disabling a built-in tool.
+limit interacts with context compaction.
 
 More hook methods will be added later on the existing hook interfaces, and
 are not reserved as empty types in advance. Whether plugins declare

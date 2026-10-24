@@ -679,8 +679,7 @@ Resume restores the saved list and drops a name this build no longer reserves.
 change keeps it because the session continues. Child Agents see the merged
 list. `/tools builtin show` still lists only Home names.
 
-Metadata adjustment and disk-plugin or external-tool replacement remain
-undefined. Host-owned numeric limits are a separate pending question.
+Host-owned numeric limits are a separate pending question.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
@@ -2217,8 +2216,7 @@ must return a definition with that same name. A replacement is used for both
 text and multimodal creation when it supplies a multimodal tool; it does not
 inherit the original multimodal implementation. The resulting tools still
 pass through the same approval policy, executor, cancellation, and budget
-boundaries. Disk plugins and external tool sets remain append-only until their
-replacement contracts are defined.
+boundaries. Disk plugins and external tool sets stay append-only.
 Approval classification remains keyed by the model-facing tool name. A
 replacement for `read`, `write`, `edit`, or `bash` therefore inherits that
 name's built-in classification; the host does not infer a replacement's actual

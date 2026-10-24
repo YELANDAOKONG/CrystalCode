@@ -74,8 +74,7 @@ or `CrystalCode` on Windows.
 ## Not yet implemented
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
-High priority, and not in this build: extensible, adjustable, and
-disableable built-in tools; operator-defined modes beyond Plan and Work;
+High priority, and not in this build: operator-defined modes beyond Plan and Work;
 a NuGet package; .NET CLI tool support; other packaging support; MCP servers;
 the Agent Client Protocol (ACP), working name crystal agent; and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
