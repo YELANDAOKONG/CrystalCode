@@ -125,6 +125,13 @@ behavior stands until a specific change defines otherwise.
   adapters still implement only Crystal chat contracts and do not own tools.
   This is not the high-priority item for extending, adjusting, or disabling a
   built-in tool.
+- Separate provider files. The direction is to define providers across more
+  than one file instead of only the `providers` object embedded in
+  `config.json`. Which files are read, their scope, precedence, merge and
+  override behavior, write policy, and trust semantics are not defined. Do
+  not reserve a file path, configuration field, or public type. This is not
+  editing provider definitions in the TUI, and it is not workspace-level
+  configuration.
 
 ## Low priority
 

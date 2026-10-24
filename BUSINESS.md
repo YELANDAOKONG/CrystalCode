@@ -401,6 +401,14 @@ implemented in the current build.
   adapters still implement only Crystal chat contracts and do not own tools.
   This is not the high-priority item for extending, adjusting, or disabling a
   built-in tool.
+- Separate provider files. The direction is to define providers in more than
+  one file instead of only the `providers` object embedded in `config.json`.
+  Which files are read, their scope, precedence, merge and override behavior,
+  write policy, and trust semantics are not defined. A repository-controlled
+  file must not weaken approval or trust. Do not reserve a file path,
+  configuration field, or public type. This is not editing provider
+  definitions in the TUI, and it does not change the deferred workspace-level
+  configuration item.
 
 ### Deferred
 
@@ -526,6 +534,13 @@ text input are defined. Such a tool takes text input, not JSON arguments. Do
 not reserve a configuration field, command, public type, or tool-set format.
 This does not authorize changes under `../Crystal`, and provider adapters
 still own no tools.
+
+TODO: add separate provider files only after the files read, their scope,
+precedence, merge and override behavior, write policy, and trust semantics
+are defined. A repository-controlled file must not weaken approval or trust.
+Do not reserve a file path, configuration field, or public type. This is not
+editing provider definitions in the TUI, and it does not change the deferred
+workspace-level configuration item.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
