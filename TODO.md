@@ -115,13 +115,6 @@ behavior stands until a specific change defines otherwise.
   not reserve a configuration field, command, public type, or tool-set
   format. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
-- Separate provider files. The direction is to define providers across more
-  than one file instead of only the `providers` object embedded in
-  `config.json`. Which files are read, their scope, precedence, merge and
-  override behavior, write policy, and trust semantics are not defined. Do
-  not reserve a file path, configuration field, or public type. This is not
-  editing provider definitions in the TUI, and it is not workspace-level
-  configuration.
 
 ## Low priority
 

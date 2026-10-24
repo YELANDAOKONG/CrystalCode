@@ -424,10 +424,11 @@ Resolution order for the active provider:
 2. `apiKey` on the effective provider definition
 3. `~/.crystal/credentials.json`, keyed by provider name
 
-The effective definition is the provider entry in `providers.json`. When
-that file is absent, it is the entry under the legacy `config.json.providers`
-field. When `providers.json` exists, the legacy field is not used for the
-catalog or for this key lookup. See [Configuration](#configuration).
+The effective definition is the provider entry in `providers.json` or under
+`providers/`. When no provider file exists, it is the entry under the legacy
+`config.json.providers` field. When any provider file exists, the legacy field
+is not used for the catalog or for this key lookup. See
+[Configuration](#configuration).
 
 Environment names, in order:
 
@@ -471,21 +472,57 @@ with status 1. It does not print the secret.
 ## Configuration
 
 Host settings live in `~/.crystal/config.json`. Provider and model definitions
-live in `~/.crystal/providers.json`; the built-in DeepSeek and OpenAI catalog
-is available even when this file is absent. Operator definitions overlay that
-catalog. Edit the file you changed, then restart for the changes to take effect.
-Editing provider definitions in the TUI is deferred. A
+live in `~/.crystal/providers.json` and in the files under
+`~/.crystal/providers/`; the built-in DeepSeek, OpenAI, Gemini, and Ollama
+catalog is available even when none of them exist. Operator definitions overlay
+that catalog. Edit the file you changed, then restart for the changes to take
+effect. Editing provider definitions in the TUI is deferred. A
 `<workspace>/.crystal/config.json` is not read; workspace-level configuration
 is deferred.
 
-When `providers.json` exists, it supplies the operator catalog, and the legacy
-`config.json.providers` field is not read. When `providers.json` is absent,
-that legacy field is read instead, including its `apiKey` and
-`apiKeyEnvironment` values. Saving preferences does not rewrite an existing
-`providers.json`. If that file is absent and `config.json` still has a
-`providers` object, the save copies that object to `providers.json` and keeps
-the original field in `config.json`. After the copy, later edits belong in
-`providers.json`.
+### Split provider files
+
+You can spread providers across several files. The host reads these, in order:
+
+1. `~/.crystal/providers.json`
+2. `~/.crystal/providers/*.json`
+3. `~/.crystal/providers/<category>/*.json`
+
+Every file has the same shape as `providers.json`: an object keyed by provider
+name, with an array under one name for several protocols. Comments and
+trailing commas are allowed. For example,
+`~/.crystal/providers/work/gateway.json`:
+
+```json
+{
+  "gateway": {
+    "protocol": "openai",
+    "baseUri": "https://gateway.example.test/v1/",
+    "models": { "model-id": { "contextWindow": 128000 } }
+  }
+}
+```
+
+The `<category>` directory only groups files for you. It is not the provider
+name, does not appear in `/model` or the status bar, and does not change how
+providers merge. Use 1 to 64 characters: start with a letter, then letters,
+digits, `.`, `_`, or `-`. Any other name stops startup with an error that names
+the directory. Directories below a category and files that do not end in
+`.json` are not read.
+
+A provider name may appear in only one file. If two files define the same name,
+startup stops and names both files. To offer several protocols under one name,
+put them in an array inside a single file. A malformed file also stops startup
+with its path in the error. Provider files are read from `~/.crystal` only; a
+`<workspace>/.crystal/providers` directory is not read.
+
+When any provider file exists, the files supply the operator catalog, and the
+legacy `config.json.providers` field is not read. When none exist, that legacy
+field is read instead, including its `apiKey` and `apiKeyEnvironment` values.
+Saving preferences never rewrites a provider file. If no provider file exists
+and `config.json` still has a `providers` object, the save copies that object
+to `providers.json` and keeps the original field in `config.json`. After the
+copy, later edits belong in the provider files.
 
 Top-level fields:
 
@@ -1868,6 +1905,9 @@ Override with `CRYSTAL_HOME` or `--home`.
   binaries/code/CrystalCode (CrystalCode.exe on Windows)
   config.json
   providers.json
+  providers/
+    <name>.json
+    <category>/<name>.json
   credentials.json
   permissions.json
   trusted.json

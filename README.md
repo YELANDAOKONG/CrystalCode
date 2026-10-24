@@ -125,6 +125,7 @@ Preferences and provider definitions are separate:
 | :--- | :--- |
 | `~/.crystal/config.json` | Active provider and model, approval mode, and session preferences |
 | `~/.crystal/providers.json` | Additional provider endpoints and model definitions |
+| `~/.crystal/providers/` | More provider files, optionally grouped in first-level subdirectories |
 | `~/.crystal/credentials.json` | Plain-text API keys, one entry per provider |
 | `~/.crystal/access.json` | Default extra directories for new sessions, per workspace |
 

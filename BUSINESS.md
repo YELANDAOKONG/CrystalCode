@@ -405,14 +405,6 @@ implemented in the current build.
   not reserve a configuration field, command, public type, or tool-set
   format. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
-- Separate provider files. The direction is to define providers in more than
-  one file instead of only the `providers` object embedded in `config.json`.
-  Which files are read, their scope, precedence, merge and override behavior,
-  write policy, and trust semantics are not defined. A repository-controlled
-  file must not weaken approval or trust. Do not reserve a file path,
-  configuration field, or public type. This is not editing provider
-  definitions in the TUI, and it does not change the deferred workspace-level
-  configuration item.
 
 ### Deferred
 
@@ -530,13 +522,6 @@ not reserve a configuration field, command, public type, or tool-set format.
 This does not authorize changes under `../Crystal`, and provider adapters
 still own no tools.
 
-TODO: add separate provider files only after the files read, their scope,
-precedence, merge and override behavior, write policy, and trust semantics
-are defined. A repository-controlled file must not weaken approval or trust.
-Do not reserve a file path, configuration field, or public type. This is not
-editing provider definitions in the TUI, and it does not change the deferred
-workspace-level configuration item.
-
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
 Implement each capability only when its behavior and ownership are defined, and
@@ -582,9 +567,14 @@ User data lives in `~/.crystal`. Operator preferences load from
 `~/.crystal/config.json` only; a workspace-level `config.json` is not read.
 Prompts may be replaced in
 `~/.crystal/prompts` and the project's `.crystal/prompts`. Provider and model
-definitions live in `~/.crystal/providers.json`; changing preferences in
-`config.json` does not rewrite those definitions. The legacy
-`config.json.providers` field remains readable for existing installations.
+definitions live in `~/.crystal/providers.json` and in `.json` files under
+`~/.crystal/providers/` and its first-level subdirectories; changing
+preferences in `config.json` does not rewrite those definitions. A
+subdirectory only groups files for the operator and has no runtime meaning.
+Provider files are Home-only: a workspace `.crystal/providers` is not read,
+and no repository-controlled file can define a provider. One provider name may
+appear in only one file. The legacy `config.json.providers` field remains
+readable for existing installations that have no provider file.
 Home-only reusable prompt sets live under `~/.crystal/promptsets`. Prompt
 attachments live under `~/.crystal/prompt-attachments` and
 `<workspace>/.crystal/prompt-attachments`. Each directory carries its own

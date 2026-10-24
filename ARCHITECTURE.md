@@ -208,7 +208,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | :--- | :--- |
 | `Configuration` | Loaded options, defaults, thinking and mode labels, display-case helpers |
 | `Events` | Immutable session events, observer interface, chrome and preference snapshots |
-| `Home` | `~/.crystal` paths and file I/O; `DiskSettingsStore` is the default `config.json` and `providers.json` implementation |
+| `Home` | `~/.crystal` paths and file I/O; `DiskSettingsStore` is the default `config.json` implementation and reads provider files through `ProviderFiles` |
 | `Home/Interfaces` | Configuration persistence contracts such as `ISettingsStore` |
 | `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
 | `Approvals` | Risk, authority, grants, policy, review transcript |
@@ -1277,6 +1277,8 @@ contents of `binaries/code/`.
   binaries/code/CrystalCode (CrystalCode.exe on Windows)
   config.json
   providers.json
+  providers/*.json
+  providers/<category>/*.json
   prompt-history.jsonl
   credentials.json
   permissions.json
@@ -1364,19 +1366,34 @@ For example, an unlimited time budget with finite call limits is:
 `backgroundBashTimeoutSeconds` when it is the 10800 second default. `null` and
 `"unlimited"` both mean no timer. The two timers are independent of each other.
 
-`providers.json` stores the provider catalog as a root object keyed
-by provider name, with an array for multiple protocols under one name. The
-catalog overlays built-in definitions. When `providers.json` exists, it takes
-precedence over legacy `config.json.providers`; otherwise the legacy field is
-read. Saving preferences copies legacy provider definitions to `providers.json`
-if needed, then preserves the legacy field in `config.json` so an older running
-version can continue reading it. Preference saves do not rewrite an existing
-`providers.json`. An existing `providers.json` accepts `//` and `/* */`
-comments and trailing commas (JSONC); the host never rewrites it, so comments
-survive. `config.json`, including its legacy `providers` field, and every other
-JSON file remain strict JSON. Duplicate model ids across protocols under one
+The provider catalog is stored as one or more files. Each file is a root
+object keyed by provider name, with an array for multiple protocols under one
+name. `ProviderFiles` (`Home`) reads, in order, `providers.json`, the `.json`
+files directly under `providers/`, and the `.json` files directly under each
+first-level subdirectory of `providers/`, each level sorted by ordinal file or
+directory name. Directories below a category and files that are not `.json`
+are not read. A subdirectory name only groups files on disk. It must satisfy
+`ExternalToolNames.IsDirectoryName` (1-64 characters, a leading letter, then
+letters, digits, `.`, `_`, or `-`), and an invalid name stops startup with an
+error that names it. The name is not a provider name, does not appear in the
+catalog or the UI, and has no effect on merging. A provider name may be
+defined in only one file. A repeat in another file stops startup with an error
+that names both files; several protocols for one name go in an array inside
+one file. A malformed or invalid file stops startup with an error that names
+the file. Provider files are Home-only. No workspace path is read.
+
+The catalog overlays built-in definitions. When any provider file exists, the
+files supply the operator catalog and the legacy `config.json.providers` field
+is not read; otherwise the legacy field is read. Saving preferences copies
+legacy provider definitions to `providers.json` only when no provider file
+exists, then preserves the legacy field in `config.json` so an older running
+version can continue reading it. Preference saves never rewrite a provider
+file. Every provider file accepts `//` and `/* */` comments and trailing
+commas (JSONC); the host never rewrites them, so comments survive.
+`config.json`, including its legacy `providers` field, and every other JSON
+file remain strict JSON. Duplicate model ids across protocols under one
 provider are rejected. Editing provider definitions in the TUI is deferred
-product work. The catalog changes by editing this file, then restarting.
+product work. The catalog changes by editing these files, then restarting.
 
 Project overlay (wins over home for named prompts, prompt attachments,
 Crystal skills, and tool sets of the same directory name):

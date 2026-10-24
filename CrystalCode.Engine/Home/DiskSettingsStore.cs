@@ -9,7 +9,7 @@ namespace CrystalCode.Engine.Home;
 
 /// <summary>
 /// Reads user preferences from <c>config.json</c> and provider definitions
-/// from <c>providers.json</c> under a Crystal home directory.
+/// from <c>providers.json</c> and <c>providers/</c> under a Crystal home directory.
 /// </summary>
 public sealed class DiskSettingsStore : ISettingsStore
 {
@@ -121,7 +121,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             ? JsonSerializer.Deserialize<SettingsDocument>(
                 File.ReadAllText(_home.ConfigPath), HomeJson.Options)
             : null;
-        if (!File.Exists(_home.ProvidersPath)
+        if (ProviderFiles.Discover(_home).Count == 0
             && previous?.Providers is { ValueKind: JsonValueKind.Object } legacyProviders)
         {
             _ = SettingsMapper.ReadProviders(legacyProviders);
@@ -204,15 +204,10 @@ public sealed class DiskSettingsStore : ISettingsStore
 
     private IReadOnlyList<ProviderDefinition> ReadProviders(SettingsDocument document)
     {
-        if (!File.Exists(_home.ProvidersPath))
-        {
-            return SettingsMapper.ReadProviders(document.Providers);
-        }
-
-        using var providers = JsonDocument.Parse(
-            File.ReadAllText(_home.ProvidersPath),
-            HomeJson.ProviderCatalogReadOptions);
-        return SettingsMapper.ReadProviders(providers.RootElement);
+        var files = ProviderFiles.Discover(_home);
+        return files.Count == 0
+            ? SettingsMapper.ReadProviders(document.Providers)
+            : ProviderFiles.Read(_home, files);
     }
 
     private static BuiltInToolDisablement? ReadDisabledBuiltInTools(JsonElement? value)
