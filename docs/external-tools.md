@@ -150,6 +150,11 @@ The product has two **tool catalogs**, Plan and Work. Approval modes
 (Default, Edit, Review, Audit, Full) are not catalogs. Do not
 put `review`, `audit`, `default`, or `full` in this field.
 
+A custom mode is not a catalog either, and its name is not valid here. It
+draws external tools from the Work catalog when it lists `edit`, `write`, or
+a bash tool, and from the Plan catalog otherwise. Write `plan` or `work`, never
+a custom mode name.
+
 Field name is `catalogs`, not `modes`.
 
 ```json

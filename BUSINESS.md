@@ -4,7 +4,8 @@
 
 CrystalCode is a local coding agent for real repositories. A developer runs
 it in a workspace, talks to a model, and lets the agent inspect and change
-code under explicit Plan/Work modes and a risk-aware approval policy.
+code under explicit modes (Plan, Work, and operator-defined custom modes) and
+a risk-aware approval policy.
 
 It is a product, not a library demo. Crystal supplies protocol types and tool
 dispatch. This repository supplies the coding experience: prompts, tools,
@@ -113,8 +114,8 @@ separate library with no terminal code. The product can:
   That flag cannot be combined with `--workspace`;
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
-  approval, the approval model and its thinking gear, Plan or Work,
-  thinking, the selected model's context budget, service tier, speed,
+  approval, the approval model and its thinking gear, Plan, Work, or a custom
+  mode, thinking, the selected model's context budget, service tier, speed,
   prompt set, prompt attachments,
   named prompt attachments, skills, external tools, rule files, and turn quotas for that process only.
   They are not written to `config.json` or `prompt.json`. Stdout is a readable plain-text trace, or one JSON object

@@ -315,7 +315,7 @@ external tools. A hook that throws is skipped with an English note.
 | `OnSessionStartedAsync` / `OnSessionEndedAsync` | Read workspace root, session id, and approval mode | Prompt the operator, or write `config.json` |
 | `OnPrompt` | Append text to the instruction block | Replace Work, Plan, or Review |
 | `OnUserMessageAsync` | Replace the user message before it is stored | Leave the stored message blank, or run for a side question |
-| `OnTurnStartedAsync` / `OnTurnFinishedAsync` | Read the stored user text, mode, and, when the turn ends, the stop reason | Change the transcript |
+| `OnTurnStartedAsync` / `OnTurnFinishedAsync` | Read the stored user text, mode (`plan`, `work`, or a custom mode name), and, when the turn ends, the stop reason | Change the transcript |
 | `TransformModelAsync` | Change user, assistant, or tool-result text for one outbound call, or drop image references already on an item | Reorder, add, or drop items, edit a system message, add an image, or write the archive |
 | `OnModelResponseAsync` | Read the purpose, finish reason, returned items, and usage of one completed work, plan, side, or compaction call | Change the transcript, the archive, or the response the host uses |
 | `OnToolCallAsync` | Replace the name or arguments | Change the call id, skip the call, or skip approval |

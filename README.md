@@ -2,7 +2,7 @@
 
 **A coding agent for your terminal, built on .NET and Crystal.**
 
-Crystal Code works in a local repository through a streaming terminal UI. Ask it to inspect code, plan a change, or edit files. Plan and Work modes, tool approvals, and workspace boundaries keep you in control of what it can do.
+Crystal Code works in a local repository through a streaming terminal UI. Ask it to inspect code, plan a change, or edit files. Plan, Work, and custom modes, tool approvals, and workspace boundaries keep you in control of what it can do.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4.svg)](https://dotnet.microsoft.com/)
@@ -76,7 +76,7 @@ crystal
 
 On Windows, run `CrystalCode` instead of `crystal`. The current directory becomes the workspace. The first run creates `~/.crystal/config.json`; the default selection is DeepSeek's `deepseek-flash` model.
 
-Inside the app, type `/help` for commands and shortcuts. Use Tab or `/plan` to switch between Plan and Work. The [interactive session guide](docs/user-guide.md#interactive-session) covers the composer, image attachments, and follow-up queue.
+Inside the app, type `/help` for commands and shortcuts. Use Tab to cycle modes, `/plan` to toggle Plan and Work, or `/mode <name>` to pick one (including custom modes under `modes/`). The [interactive session guide](docs/user-guide.md#interactive-session) covers the composer, image attachments, and follow-up queue.
 
 ## ⌨️ Everyday Slash commands
 
@@ -85,6 +85,7 @@ Type these inside a running session; `/help` lists them all.
 | Command | What it does |
 | :--- | :--- |
 | `/plan` | Switch between Plan and Work |
+| `/mode` | List modes, or switch with `/mode <name>` |
 | `/model` | List or select a configured provider and model |
 | `/approval` | View or change the approval mode |
 | `/attach <path>` | Attach a supported image from the workspace |

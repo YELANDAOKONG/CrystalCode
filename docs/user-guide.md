@@ -5,7 +5,7 @@ Detailed usage reference. For a shorter introduction, start with the
 
 A production coding TUI for local repositories. The terminal is the
 only operator surface. It runs a streaming model-and-tool loop, with
-Plan/Work modes, risk-aware approval, automatic context compaction,
+Plan, Work, and custom modes, risk-aware approval, automatic context compaction,
 and operator data under `~/.crystal`. `crystal run` runs one task
 without a terminal; anything that would ask the operator is denied.
 
@@ -205,8 +205,8 @@ CLI options:
 These flags shape this process only. They are not written to `config.json`
 or `prompt.json` at startup. A later slash command that saves a preference
 writes that preference. It also writes `--provider` and `--model` when those
-were passed. It does not write the other flags above. `--plan` and `--work`
-together are rejected. `crystal space` accepts the same flags except
+were passed. It does not write the other flags above. Only one of `--plan`,
+`--work`, and `--mode` may be passed. `crystal space` accepts the same flags except
 `--workspace`.
 
 `--help` prints the same options.
@@ -335,7 +335,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Same values as `/compact thinking`. An unsupported gear falls back to the provider default and a note is printed. Does not write the file |
-| `--plan` / `--work` | Start in Plan or Work. The default is Work |
+| `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or an enabled custom mode. The default is Work. An unknown or disabled mode name exits 1. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context`. A model with one budget, or a budget it does not declare, exits 1. Does not write `contextSelections` |
 | `--tier <token>` | Service-tier token the selected model lists. A model that does not list it exits 1. Does not write `tierSelections` |
@@ -867,8 +867,8 @@ set, selected context budget (`Context 272K`), model, workspace,
 context percent (`CTX`), token counts
 (`IN` / `OUT`), a Title Case total when the bar has room, tool count,
 and elapsed time. Named chrome labels are
-Title Case; short status abbreviations are uppercase. Mode is Plan or
-Work on the composer prompt, not repeated on the status bar. A
+Title Case; short status abbreviations are uppercase. Mode (Plan, Work, or
+a custom mode name) is on the composer prompt, not repeated on the status bar. A
 queued-follow-up count appears while items wait. While a turn runs, a
 progress row sits above the status bar (`Awaiting Approval · 5s`,
 `Running Command · 2m18s`, `Thinking · 1m16s · ~1.2k Tokens`,
@@ -1065,8 +1065,10 @@ A custom mode is a directory `modes/<name>/` under `~/.crystal` or
 `description` is required and `enabled` defaults to false. `tools` lists
 built-in tool names; an unknown name skips the mode with a note. `prompt.md`
 is the system text and accepts the same `{{name}}` placeholders as Work and
-Plan, plus `{{mode}}`. Workspace instructions, the environment block, and
-skill guidance are appended for you. A workspace directory replaces the Home
+Plan, plus `{{mode}}`. When the body does not name `{{env}}`, `{{skills}}`,
+`{{instructions_section}}`, or `{{disabled_tools}}`, the host appends that
+slot for you. A child Agent started from a custom mode is limited to Plan's
+tools, even when the mode lists write tools. A workspace directory replaces the Home
 directory of the same name, even when disabled or invalid. `plan`, `work`, and
 `default` are reserved.
 
@@ -1723,7 +1725,7 @@ workspace directory itself contains a `.git` directory or file.
 or empty when that walk finds none. `{{session_id}}` is the saved session
 id. `{{approval}}` is the approval mode (`plan`, `default`, `edit`,
 `review`, `audit`, or `full`). `{{mode}}` is `plan` or `work` for Work and
-Plan, `review` for Review system text, `compaction` for compaction
+Plan, the mode name for a custom mode, `review` for Review system text, `compaction` for compaction
 system text, and `image` for image-description system text. The `{{env}}` block includes the operating system,
 architecture, and local time, and adds git root, session, and approval
 lines when the host has them. `{{directories}}` is empty when the session
@@ -1872,8 +1874,8 @@ cumulative value rather than a partial total. A compacted
 session restores the full conversation on screen. The model continues from
 the summary and recent tail, and only the live system prompt is refreshed.
 
-Fork preserves the full conversation, the model context, todos, Plan/Work mode,
-turn counters, and usage baseline. It does not copy directory access. The new
+Fork preserves the full conversation, the model context, todos, mode (Plan, Work,
+or custom), turn counters, and usage baseline. It does not copy directory access. The new
 branch receives the current workspace's defaults from `~/.crystal/access.json`.
 The source session remains unchanged. The
 new branch receives a new creation time, uses the current workspace, and
@@ -2019,6 +2021,8 @@ Override with `CRYSTAL_HOME` or `--home`.
         plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  modes/<name>/mode.json
+  modes/<name>/prompt.md
   tools/<directory>/tools.json
   data/tools/<directory>/
   mcp.json
@@ -2065,6 +2069,8 @@ directory name win over home):
         plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  modes/<name>/mode.json
+  modes/<name>/prompt.md
   tools/<directory>/tools.json
   mcp.json
   mcp/<name>/server.json

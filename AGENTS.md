@@ -48,6 +48,8 @@ semantics. Do not copy its Demo UI into this product.
   `AGENTS.md` and
   `CLAUDE.md` are OpenCode-compatible instructions that append; they do
   not replace those prompts. Do not invent prompt file names beyond that list.
+  A custom mode's `modes/<name>/prompt.md` is that mode's own body, not a
+  named prompt overlay, and prompt sets, overrides, and attachments never edit it.
 - Provider adapters implement only Crystal chat contracts. They do not own
   tools, prompts, UI, or `~/.crystal` layout.
 - `CrystalCode.Engine` is front-end neutral. It must not reference

@@ -130,7 +130,7 @@ CrystalCode.Engine.Tests.
 ### CrystalCode.Engine
 
 The front-end-neutral class library. Owns session and turn execution,
-Plan/Work catalogs, approval policy, context compaction, `~/.crystal`
+Plan, Work, and custom-mode catalogs, approval policy, context compaction, `~/.crystal`
 storage, built-in coding tools, operator tool sets, operator plugins,
 prompts, in-process plugin contracts, slash commands, and the event stream a front end observes.
 It never reads a key, writes to the console, or paints. See
@@ -218,6 +218,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Tools` | Workspace fence and built-in `ITool` types |
 | `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` / `IMultimodalTool` loaders, and host-context dispatch |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
+| `Modes` | Operator-defined custom modes: `modes/<name>` discovery, tool selection, prompt composition, and launch-name validation |
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
@@ -727,8 +728,10 @@ built-in tool names. Every name must satisfy `ExternalToolNames.IsReserved`;
 an unknown name skips the mode with a note. `prompt.md` is the system body and
 uses the same `{{name}}` placeholders as Work and Plan, plus `{{mode}}` set to
 the mode name. It is not replaced by prompt sets, direct prompt overrides, or
-prompt attachments, and the workspace instruction block, environment block,
-and skill guidance are appended by the host the way they are for Plan and Work.
+prompt attachments. The host appends `{{env}}`, `{{skills}}`,
+`{{instructions_section}}`, and `{{disabled_tools}}` when the body does not
+name that slot, so a short prompt still receives the same workspace facts as
+Plan and Work.
 
 A custom mode's catalog is built from the built-in tool set for Work, then
 filtered to the listed names, then the merged disabled list for Work is
@@ -736,13 +739,14 @@ applied. Disk plugin, external, and MCP tools join only when their `catalogs`
 include the mode's base: `work` when the mode lists any of `edit`, `write`, or
 `bash`, otherwise `plan`. This keeps the Write + Workspace floor of an external
 tool from appearing in a read-only mode. `task` is offered when Agents are
-enabled and `task` is listed, and a child launched from a custom mode uses the
-Plan child ceiling unless the mode lists a write tool.
+enabled and `task` is listed. A child launched from a custom mode always uses
+the Plan child ceiling, even when the mode lists write tools.
 
 A mode changes only the system message and the executor catalog. Approval is
 unchanged: `ApprovalPolicy` classifies by model-facing tool name, so listing
-`bash` never lets a call skip review or the operator, and Plan's explicit
-rejection of side effects applies only to the built-in Plan approval mode.
+`bash` never lets a call skip review or the operator. A tool the mode does
+not list is not registered, so a call to it fails the turn the way a call to
+`bash` does in Plan.
 `SessionDocument.Mode` stores the mode name and `PlanMode` stays written as
 true only for Plan, so an older build reads a custom mode as Work. A session
 that names a missing or disabled mode resumes in Work and writes a note.
@@ -814,7 +818,7 @@ contains a `.git` directory or file. `{{git_root}}` is the repository root
 found by walking parent directories, or empty when that walk finds none.
 `{{session_id}}` is the saved session id. `{{approval}}` is the approval
 mode (`plan`, `default`, `edit`, `review`, `audit`, or `full`). `{{mode}}`
-is `plan` or `work` for Work and Plan, `review` for Review system text,
+is `plan` or `work` for Work and Plan, the mode name for a custom mode, `review` for Review system text,
 `compaction` for compaction system text, and `image` for image-description
 system text. The `{{env}}` block includes the
 operating system, architecture, and local time, and adds git root, session,
@@ -1315,7 +1319,7 @@ are set. A missing or empty session exits without entering the TTY.
 running session. `/resume <id>` restores that transcript and stays in the
 current workspace. The word `all` is reserved. A value that is both an
 existing directory and a session id is rejected. After a workspace change,
-the live system prompt is refreshed from that directory's Plan/Work text;
+the live system prompt is refreshed from that directory's Plan, Work, or custom-mode text;
 the summary and tail are kept. The selector lists resumable sessions newest
 first by update time, supports typing to filter by id, preview, or workspace
 path, and leaves the current session untouched on Escape. Usage is restored
@@ -1904,9 +1908,9 @@ A front end calls `CodingSession`: `Create`, `StartAsync`, `SubmitAsync`
 (slash commands, follow-ups while a turn runs, interrupts, and turn starts;
 returns true when the operator asked to quit), `CompleteTurnAsync` once
 `TurnTask` finishes, `FinishTurnAsync` to collect a turn before exit,
-`TryInterrupt`, `TogglePlan`, `SetVerbose`, `NotifyDraftChanged`, `Enqueue`,
+`TryInterrupt`, `TogglePlan`, `CycleMode`, `TrySetMode`, `SetVerbose`, `NotifyDraftChanged`, `Enqueue`,
 `PasteClipboardImageAsync`, and `Close`. `TurnActive`, `TurnTask`,
-`PlanMode`, and `SessionId` report state. The usual turn is:
+`PlanMode`, `CustomMode`, and `SessionId` report state. The usual turn is:
 `SubmitAsync`, await `TurnTask`, then `CompleteTurnAsync`.
 
 Events are immutable sealed records, one type per file under `Events`:
@@ -1960,7 +1964,8 @@ does not change the contract below until a specific change defines otherwise.
 It reads one task from an argument or from stdin, applies
 process-only overrides, starts one user turn, and exits. The interactive
 `crystal` and `crystal space` commands apply the same session overrides:
-approval, the approval model and its thinking gear, Plan or Work, thinking,
+approval, the approval model and its thinking gear, Plan, Work, or a custom
+mode (`--mode`), thinking,
 the selected model's context budget, service tier, speed, prompt set, prompt attachments, skills,
 external tools, plugins, and turn quotas. Overrides are not written to
 `config.json`. That includes the
