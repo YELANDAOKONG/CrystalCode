@@ -75,8 +75,7 @@ or `CrystalCode` on Windows.
 ## Not yet implemented
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
-High priority, and not in this build: operator-defined modes beyond Plan and Work;
-a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
+High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
 (MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a second additional review
@@ -92,7 +91,7 @@ thinking display are not that path. ACP would be an editor-facing front
 end, not an engine or provider protocol, and not a `crystal agent`
 command yet. The terminal remains the only operator surface until it
 exists. `--disable-tool` only omits a built-in for one process. The
-product still has exactly two modes, Plan and Work. Built-in provider
+product has two built-in modes, Plan and Work, plus operator-defined custom modes. Built-in provider
 protocols are DeepSeek, OpenAI-compatible Chat Completions, OpenAI
 Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
 another protocol. Image input is available for supported models and
@@ -185,7 +184,7 @@ CLI options:
 | `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Does not change `compactionModel.thinkingEffort` on disk |
-| `--plan` / `--work` | Start in Plan or Work. Omit both to keep Work, or the mode saved on a resumed session |
+| `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or a custom mode. Omit all to keep Work, or the mode saved on a resumed session. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context` (`272k`, `1m`, or an exact token count). A model with one budget, or a budget it does not declare, is rejected. Does not write `contextSelections` |
 | `--tier <token>` | Service-tier token the selected model lists. Does not write `tierSelections` |
@@ -943,8 +942,8 @@ its own.
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Toggle Plan/Work, or complete a `/` command (and its argument after `/thinking`, `/context`, `/tier`, `/speed`, `/approval`, `/model`, `/tokens`, `/verbose`, `/agents`, or `/child`) |
-| Shift+Tab | Toggle Plan/Work |
+| Tab | Cycle Plan, Work, and custom modes, or complete a `/` command (and its argument after `/thinking`, `/context`, `/tier`, `/speed`, `/approval`, `/model`, `/tokens`, `/verbose`, `/agents`, or `/child`) |
+| Shift+Tab | Cycle modes |
 | `?` on an empty composer | Show shortcuts and commands |
 | F7 | Open the child picker when child Agents are enabled. F7 in the picker dismisses it |
 | Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open. A recalled prompt that starts with `/` stays in history until you edit it |
@@ -1046,8 +1045,35 @@ otherwise the same conversation.
 | **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
 | **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
-Tab, Shift+Tab, or `/plan` toggles Plan and Work. When child Agents are
+Tab and Shift+Tab cycle Plan, Work, and enabled custom modes. `/plan` toggles
+Plan and Work, and `/mode <name>` picks any mode. When child Agents are
 enabled, Plan and Work also offer `task`. See [Child Agents](#child-agents).
+
+### Custom modes
+
+A custom mode is a directory `modes/<name>/` under `~/.crystal` or
+`<workspace>/.crystal` with `mode.json` and `prompt.md`:
+
+```json
+{
+  "description": "Review code without changing it",
+  "enabled": true,
+  "tools": ["read", "list", "tree", "glob", "grep", "search", "todowrite", "todoread", "question"]
+}
+```
+
+`description` is required and `enabled` defaults to false. `tools` lists
+built-in tool names; an unknown name skips the mode with a note. `prompt.md`
+is the system text and accepts the same `{{name}}` placeholders as Work and
+Plan, plus `{{mode}}`. Workspace instructions, the environment block, and
+skill guidance are appended for you. A workspace directory replaces the Home
+directory of the same name, even when disabled or invalid. `plan`, `work`, and
+`default` are reserved.
+
+A mode does not change approval. Listing `bash` in a mode does not let shell
+calls skip review or the operator. Prompt sets, prompt overrides, and prompt
+attachments do not edit a custom mode prompt. The mode is saved with the
+session; a session whose mode is missing or disabled resumes in Work.
 
 ## Child Agents
 
@@ -1341,6 +1367,7 @@ Submitting returns the transcript viewport to the latest output.
 | :--- | :--- | :--- |
 | `/help` | `/h` | Shortcuts and commands |
 | `/plan` | | Toggle Plan / Work |
+| `/mode` | | List modes, or switch with `/mode <name>` |
 | `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model; `thinking` cycles or sets its gear |
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |

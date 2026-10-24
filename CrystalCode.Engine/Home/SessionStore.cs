@@ -151,7 +151,8 @@ public sealed class SessionStore
                     document.CreatedUtc,
                     document.UpdatedUtc,
                     Math.Max(0, document.UserTurns),
-                    FirstUserText(document)));
+                    FirstUserText(document),
+                    document.Mode));
         }
 
         return sessions
@@ -297,6 +298,7 @@ public sealed class SessionStore
         Id = source.Id,
         Workspace = source.Workspace,
         PlanMode = source.PlanMode,
+        Mode = source.Mode,
         Access = source.Access,
         DisabledBuiltInTools = source.DisabledBuiltInTools,
         CreatedUtc = source.CreatedUtc,

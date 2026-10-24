@@ -17,4 +17,5 @@ public sealed record SessionChrome(
     int ContextWindow = 0,
     string ServiceTier = "",
     string Speed = "",
-    bool AgentsEnabled = false);
+    bool AgentsEnabled = false,
+    string? Mode = null);

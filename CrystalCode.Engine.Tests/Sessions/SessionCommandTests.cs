@@ -9,6 +9,7 @@ public sealed class SessionCommandTests
     [Theory]
     [InlineData("/help", SessionVerb.Help)]
     [InlineData("/plan", SessionVerb.Plan)]
+    [InlineData("/mode audit", SessionVerb.Mode)]
     [InlineData("/approval review", SessionVerb.Approval)]
     [InlineData("/thinking high", SessionVerb.Thinking)]
     [InlineData("/context 272k", SessionVerb.Context)]

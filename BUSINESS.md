@@ -50,6 +50,21 @@ separate library with no terminal code. The product can:
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
   write, shell, and session-local background shell tasks); operator tool sets
   may add extra catalog entries to either;
+- define custom modes as directories `modes/<name>/` under `~/.crystal` and
+  `<workspace>/.crystal`, each with `mode.json` and `prompt.md`. A custom mode
+  names the built-in tools it exposes, carries its own system prompt, and is
+  listed after Plan and Work. `enabled` defaults to false; a workspace entry
+  replaces the entire Home entry of the same name, including when it is
+  disabled or invalid. Plan, Work, and `default` are reserved names. A mode
+  does not change approval: every call still goes through the selected
+  approval mode and the host classification floor, so listing `bash` in a
+  mode does not make shell calls pass. Tab and Shift+Tab cycle Plan, Work, and
+  each enabled custom mode in that order. `/mode` lists modes, `/mode <name>`
+  switches, and `--mode <name>` on `crystal`, `crystal space`, and `crystal run`
+  starts in one for that process only. The current mode is saved with the
+  session. A resumed or forked session whose custom mode is missing or
+  disabled falls back to Work with a note. A custom mode is not a child Agent,
+  prompt set, or prompt attachment, and it is not an approval mode;
 - persistently disable named built-in tools independently for Plan and Work
   through `config.json` `disabledBuiltInTools` and `/tools builtin`. The legacy
   array form applies to both modes. `--disable-tool` remains a process-only
@@ -369,12 +384,6 @@ implemented in the current build.
 
 ### High priority
 
-- Product modes other than Plan and Work, including operator-defined custom
-  modes. The product has exactly two modes today. The direction is to add
-  custom modes; their behavior and ownership are not defined. Prompt overlays,
-  prompt sets, prompt attachments, and external tool catalogs shape Plan and
-  Work. They do not add a mode. No mode registry, configuration field, or
-  public type is reserved.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
   a library is also published are not defined. Do not reserve a package id or
   add a project. This item is not permission to add or update a package
@@ -498,12 +507,6 @@ remain serial. A plugin must not bypass approval, trust, the workspace
 fence, or `ToolInvocationPolicy`. This item is not the deferred module
 system and not the undecided extra hook methods or plugin dependencies.
 
-TODO: add operator-defined modes other than Plan and Work only after their
-behavior and ownership are defined. The product has exactly two modes today.
-Do not reserve a mode registry, configuration field, or public type. Prompt
-overlays, prompt sets, prompt attachments, and external tool catalogs do not
-add a mode.
-
 TODO: publish a NuGet package only after its package id, packed assemblies,
 and whether a library is also published are defined. Do not reserve a package
 id or add a project. This is not permission to add or update a package
@@ -563,8 +566,7 @@ do not reserve empty public types in advance. A high or medium priority does
 not remove that rule.
 
 [TODO.md](TODO.md) lists the items below under Pending evaluation. They are
-not a priority. Parent/child Agents do not decide them. Operator-defined
-modes other than Plan and Work are high priority above, not pending.
+not a priority. Parent/child Agents do not decide them.
 
 Whether Plan may include bash is under consideration and is not decided.
 The current behavior stands: built-in Plan has no edit, write, or bash. No

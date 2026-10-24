@@ -9,16 +9,26 @@ namespace CrystalCode.Display.Tests.Composer;
 public sealed class ComposerBufferTests
 {
     [Fact]
-    public void Handle_TabTogglesPlan()
+    public void Handle_TabCyclesMode()
     {
         var buffer = new ComposerBuffer();
         var tab = new ConsoleKeyInfo('\t', ConsoleKey.Tab, false, false, false);
         var shiftTab = new ConsoleKeyInfo('\t', ConsoleKey.Tab, true, false, false);
         var vtTab = new ConsoleKeyInfo('\t', default, false, false, false);
 
-        Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(tab));
-        Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(shiftTab));
-        Assert.Equal(ComposerAction.TogglePlan, buffer.Handle(vtTab));
+        Assert.Equal(ComposerAction.CycleMode, buffer.Handle(tab));
+        Assert.Equal(ComposerAction.CycleMode, buffer.Handle(shiftTab));
+        Assert.Equal(ComposerAction.CycleMode, buffer.Handle(vtTab));
+    }
+
+    [Fact]
+    public void Project_ShowsTheCustomModeName()
+    {
+        var buffer = new ComposerBuffer { CustomMode = "audit" };
+
+        var view = buffer.Project(80, 4);
+
+        Assert.StartsWith("audit > ", view.Lines[0].Plain, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -21,6 +21,8 @@ public sealed class ShellChrome
 
     public bool PlanMode { get; set; }
 
+    public string? CustomMode { get; set; }
+
     public string Approval { get; set; } = string.Empty;
 
     public string Thinking { get; set; } = string.Empty;

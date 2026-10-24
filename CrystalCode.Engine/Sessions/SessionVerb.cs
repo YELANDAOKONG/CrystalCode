@@ -8,6 +8,7 @@ public enum SessionVerb
     None,
     Help,
     Plan,
+    Mode,
     Approval,
     Thinking,
     Context,

@@ -19,15 +19,15 @@ internal sealed class TerminalHost
     private readonly SessionRenderer _renderer;
     private readonly SessionProjection _projection;
     private readonly CodingSession _session;
-    private readonly bool? _launchPlan;
+    private readonly string? _launchMode;
     private int _idleCancels;
 
-    private TerminalHost(SessionRenderer renderer, CodingSession session, bool? launchPlan, SessionProjection projection)
+    private TerminalHost(SessionRenderer renderer, CodingSession session, string? launchMode, SessionProjection projection)
     {
         _projection = projection;
         _renderer = renderer;
         _session = session;
-        _launchPlan = launchPlan;
+        _launchMode = launchMode;
     }
 
     public static TerminalHost Create(
@@ -39,7 +39,7 @@ internal sealed class TerminalHost
         PluginRegistry plugins,
         SessionDocument? resume,
         HarnessSettings? persistedSettings = null,
-        bool? launchPlan = null,
+        string? launchMode = null,
         IReadOnlyList<DirectoryAccess>? launchAccess = null)
     {
         var renderer = new SessionRenderer();
@@ -67,19 +67,20 @@ internal sealed class TerminalHost
         renderer.LoadQuickPromptsAsync = new QuickPromptStore(home).LoadAsync;
         renderer.ChildSessionsEnabled = session.AgentsEnabled;
         renderer.QueueQuickPromptAsync = (text, token) => session.SubmitQuickPromptAsync(text, true, token);
-        return new TerminalHost(renderer, session, launchPlan, projection);
+        return new TerminalHost(renderer, session, launchMode, projection);
     }
 
     /// <summary>
-    /// Switches Plan or Work only when a launch flag disagrees with the
-    /// session. A missing flag leaves a resumed mode in place.
+    /// Selects the launch mode only when a flag named one. A missing flag
+    /// leaves a resumed mode in place. The name was checked before launch.
     /// </summary>
-    internal static void ApplyLaunchPlan(CodingSession session, bool? launchPlan)
+    internal static void ApplyLaunchMode(CodingSession session, string? launchMode)
     {
         ArgumentNullException.ThrowIfNull(session);
-        if (launchPlan is bool requested && requested != session.PlanMode)
+        if (launchMode is not null
+            && !session.TrySetMode(launchMode, out var error))
         {
-            session.TogglePlan();
+            throw new ArgumentException(error, nameof(launchMode));
         }
     }
 
@@ -105,7 +106,7 @@ internal sealed class TerminalHost
         _renderer.OnVerboseToggled = PersistVerboseToggle;
         await _session.StartAsync(cancellationToken);
         _renderer.ChildSessionsEnabled = _session.AgentsEnabled;
-        ApplyLaunchPlan(_session, _launchPlan);
+        ApplyLaunchMode(_session, _launchMode);
 
         using var promptSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
@@ -160,7 +161,7 @@ internal sealed class TerminalHost
             {
                 read = await _renderer.ReadPromptAsync(
                     _session.PlanMode,
-                    _session.TogglePlan,
+                    _session.CycleMode,
                     _session.TurnTask,
                     preserveStream: _session.TurnActive,
                     ignorePause: false,
@@ -258,7 +259,7 @@ internal sealed class TerminalHost
                     work,
                     _session.EnqueueAsync,
                     _session.PlanMode,
-                    _session.TogglePlan,
+                    _session.CycleMode,
                     cancellationToken);
             }
             catch (OperationCanceledException) when (!work.IsCompleted)

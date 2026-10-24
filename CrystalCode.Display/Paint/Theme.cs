@@ -26,6 +26,8 @@ public static class Theme
 
     public const string Plan = "tan";
 
+    public const string Custom = "orchid";
+
     public const string Review = "lightsteelblue";
 
     public const string Selected = "bold lightsteelblue";

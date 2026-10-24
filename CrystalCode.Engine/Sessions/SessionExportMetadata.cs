@@ -12,7 +12,8 @@ public sealed record SessionExportMetadata(
     string Model,
     string PromptSet,
     bool PlanMode,
-    DateTimeOffset ExportedUtc)
+    DateTimeOffset ExportedUtc,
+    string? Mode = null)
 {
     public string ModelLine => Provider + " / " + Model;
 }

@@ -903,6 +903,37 @@ public sealed class TaskRunHostTests
         Assert.Contains("--plan", modeError, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(true, false, "audit")]
+    [InlineData(false, true, "audit")]
+    [InlineData(true, true, null)]
+    public void Overrides_RejectsMoreThanOneModeFlag(bool plan, bool work, string? mode)
+    {
+        Assert.False(TaskRunOverrides.TryApply(
+            HarnessSettings.CreateDefault(),
+            new TaskRunSettings { Plan = plan, Work = work, Mode = mode },
+            out _,
+            out _,
+            out var error));
+        Assert.Contains("--mode", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, false, null, "plan")]
+    [InlineData(false, true, null, "work")]
+    [InlineData(false, false, " audit ", "audit")]
+    [InlineData(false, false, null, null)]
+    public void Overrides_ReportsTheRequestedMode(bool plan, bool work, string? requested, string? expected)
+    {
+        Assert.True(TaskRunOverrides.TryApply(
+            HarnessSettings.CreateDefault(),
+            new TaskRunSettings { Plan = plan, Work = work, Mode = requested },
+            out _,
+            out var mode,
+            out _));
+        Assert.Equal(expected, mode);
+    }
+
     [Fact]
     public void Overrides_AppliesDisabledBuiltInToolsWithoutSavingThem()
     {
@@ -1090,12 +1121,13 @@ public sealed class TaskRunHostTests
             });
 
         Assert.True(session.PlanMode);
-        TerminalHost.ApplyLaunchPlan(session, null);
+        TerminalHost.ApplyLaunchMode(session, null);
         Assert.True(session.PlanMode);
-        TerminalHost.ApplyLaunchPlan(session, false);
+        TerminalHost.ApplyLaunchMode(session, "work");
         Assert.False(session.PlanMode);
-        TerminalHost.ApplyLaunchPlan(session, true);
+        TerminalHost.ApplyLaunchMode(session, "plan");
         Assert.True(session.PlanMode);
+        Assert.Throws<ArgumentException>(() => TerminalHost.ApplyLaunchMode(session, "missing"));
     }
 
     [Fact]
@@ -1138,9 +1170,9 @@ public sealed class TaskRunHostTests
             current,
             request,
             out var applied,
-            out var planMode,
+            out var mode,
             out var error));
-        Assert.False(planMode);
+        Assert.Null(mode);
         Assert.Equal(string.Empty, error);
         return applied;
     }

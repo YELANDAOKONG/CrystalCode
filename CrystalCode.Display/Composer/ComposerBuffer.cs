@@ -22,6 +22,11 @@ public sealed class ComposerBuffer
 
     public bool PlanMode { get; set; }
 
+    /// <summary>
+    /// Name of the active custom mode, or null while Plan or Work is active.
+    /// </summary>
+    public string? CustomMode { get; set; }
+
     public string Text => _text.ToString();
 
     public const char ImageMarkerPrefix = '\u2063';
@@ -54,7 +59,7 @@ public sealed class ComposerBuffer
         ArgumentNullException.ThrowIfNull(key);
         if (key.Key == ConsoleKey.Tab || key.KeyChar == '\t')
         {
-            return ComposerAction.TogglePlan;
+            return ComposerAction.CycleMode;
         }
 
         if (IsNewline(key))
@@ -330,7 +335,7 @@ public sealed class ComposerBuffer
 
     public ComposerView Project(int width, int maxRows)
     {
-        var mode = PlanMode ? "Plan" : "Work";
+        var mode = string.IsNullOrEmpty(CustomMode) ? PlanMode ? "Plan" : "Work" : CustomMode;
         var promptPlain = mode + " > ";
         var promptColumns = TextWidth.Measure(promptPlain);
         var bodyWidth = Math.Max(width - promptColumns - 1, 8);
@@ -344,7 +349,7 @@ public sealed class ComposerBuffer
 
         var (cursorRow, cursorBody) = MapCursor(text, _cursor, bodyWidth);
         var lines = new List<PaintLine>(wrapped.Count);
-        var modeColor = PlanMode ? Theme.Plan : Theme.Work;
+        var modeColor = !string.IsNullOrEmpty(CustomMode) ? Theme.Custom : PlanMode ? Theme.Plan : Theme.Work;
 
         var bodyStart = 0;
         for (var i = 0; i < wrapped.Count; i++)

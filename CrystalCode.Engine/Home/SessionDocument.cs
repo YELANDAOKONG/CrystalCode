@@ -13,6 +13,11 @@ public sealed class SessionDocument
 
     public bool PlanMode { get; set; }
 
+    /// <summary>
+    /// Custom mode name. Null means Plan or Work, chosen by <see cref="PlanMode"/>.
+    /// </summary>
+    public string? Mode { get; set; }
+
     public IReadOnlyList<DirectoryAccess> Access { get; set; } = [];
 
     /// <summary>

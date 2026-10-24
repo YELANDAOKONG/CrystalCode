@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 
 namespace CrystalCode.Engine.Sessions;
@@ -27,7 +28,7 @@ internal static class SessionListText
                 : " ";
             var updated = session.UpdatedUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm")
                 ?? "Unknown time";
-            var mode = session.PlanMode ? "Plan" : "Work";
+            var mode = ModeLabel.For(session.PlanMode, session.Mode);
             var workspace = includeWorkspace ? $"  {session.Workspace}" : string.Empty;
             lines.Add(
                 $"{marker} {session.Id}  {updated}  {mode}  {session.UserTurns} turns"

@@ -53,11 +53,6 @@ These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work. Current
 behavior stands until a specific change defines otherwise.
 
-- Product modes other than Plan and Work, including operator-defined custom
-  modes. The product has exactly two modes today. Prompt overlays, prompt
-  sets, prompt attachments, and external tool catalogs do not add a mode.
-  Behavior and ownership are not defined. No mode registry, configuration
-  field, or public type is reserved.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
   a library is also published are not defined. Do not reserve a package id or
   add a project. This item is not permission to add or update a package
@@ -133,9 +128,6 @@ None. Do not invent a priority.
 These are under consideration or not decided. They are not a priority and
 are not part of parent/child Agents. Current behavior stands. Do not change
 it speculatively, and do not reserve types or configuration for it.
-
-Operator-defined modes other than Plan and Work are no longer in this
-bucket. That decision is recorded under High priority.
 
 - Whether Plan may include bash. Not decided. Built-in Plan has no edit,
   write, or bash.

@@ -49,7 +49,9 @@ public static class TranscriptExport
             "Workspace: " + metadata.Workspace,
             "Model: " + metadata.ModelLine,
             "Prompt set: " + metadata.PromptSet,
-            "Plan mode: " + (metadata.PlanMode ? "yes" : "no"),
+            metadata.Mode is { Length: > 0 }
+                ? "Mode: " + metadata.Mode
+                : "Plan mode: " + (metadata.PlanMode ? "yes" : "no"),
             "Exported: " + metadata.ExportedUtc.ToString("O"),
             string.Empty
         };

@@ -663,11 +663,10 @@ slash command.
 
 ## Plan and Work
 
-These are product modes, not Crystal types. Operator-defined modes beyond
-Plan and Work are high-priority product work and are not in this build. No
-mode registry, configuration field, or public type is reserved. Prompt
-overlays, prompt sets, prompt attachments, and external tool catalogs do not
-add a mode.
+These are product modes, not Crystal types. Plan and Work are built in.
+Operator-defined custom modes sit beside them (see Custom modes below).
+Prompt overlays, prompt sets, prompt attachments, and external tool catalogs
+do not add a mode.
 
 - Plan registers read, list, tree, glob, grep, search, todowrite, todoread, and
   question. When Skills is enabled, it also registers skill. External tools
@@ -713,6 +712,47 @@ change keeps it because the session continues. Child Agents see the merged
 list. `/tools builtin show` still lists only Home names.
 
 Host-owned numeric limits are a separate pending question.
+
+### Custom modes
+
+`ModeCatalog` (`CrystalCode.Engine/Modes`) loads `modes/<name>/mode.json` and
+`prompt.md` from `~/.crystal` and `<workspace>/.crystal`, Home first. A
+workspace directory of the same name replaces the Home entry as a whole, even
+when it is disabled or invalid. A directory name must satisfy
+`ExternalToolNames.IsDirectoryName`; `plan`, `work`, and `default` are
+reserved. Files must be regular UTF-8 files of at most 64 KiB, not symbolic
+links, and at most 256 directories are read per root. `mode.json` has
+`description` (required), `enabled` (default false), and `tools`, an array of
+built-in tool names. Every name must satisfy `ExternalToolNames.IsReserved`;
+an unknown name skips the mode with a note. `prompt.md` is the system body and
+uses the same `{{name}}` placeholders as Work and Plan, plus `{{mode}}` set to
+the mode name. It is not replaced by prompt sets, direct prompt overrides, or
+prompt attachments, and the workspace instruction block, environment block,
+and skill guidance are appended by the host the way they are for Plan and Work.
+
+A custom mode's catalog is built from the built-in tool set for Work, then
+filtered to the listed names, then the merged disabled list for Work is
+applied. Disk plugin, external, and MCP tools join only when their `catalogs`
+include the mode's base: `work` when the mode lists any of `edit`, `write`, or
+`bash`, otherwise `plan`. This keeps the Write + Workspace floor of an external
+tool from appearing in a read-only mode. `task` is offered when Agents are
+enabled and `task` is listed, and a child launched from a custom mode uses the
+Plan child ceiling unless the mode lists a write tool.
+
+A mode changes only the system message and the executor catalog. Approval is
+unchanged: `ApprovalPolicy` classifies by model-facing tool name, so listing
+`bash` never lets a call skip review or the operator, and Plan's explicit
+rejection of side effects applies only to the built-in Plan approval mode.
+`SessionDocument.Mode` stores the mode name and `PlanMode` stays written as
+true only for Plan, so an older build reads a custom mode as Work. A session
+that names a missing or disabled mode resumes in Work and writes a note.
+`CodingSession.CycleMode` replaces Tab and Shift+Tab and walks Plan, Work, then
+enabled custom modes in name order. `/mode` lists modes and `/mode <name>`
+switches while idle. `--mode <name>` applies for one process, is rejected when
+combined with `--plan` or `--work`, and is never written to `config.json`.
+Disabled-tool lists remain `plan` and `work`; a custom mode uses the Work list.
+`PluginModelPurpose` is Work for a custom mode, and `PluginTurn.Mode` carries
+the mode name.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
@@ -1355,6 +1395,8 @@ contents of `binaries/code/`.
   prompt-attachments/<name>/agents/plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  modes/<name>/mode.json
+  modes/<name>/prompt.md
   tools/<directory>/tools.json
   data/tools/<directory>/
   mcp.json
@@ -1461,6 +1503,8 @@ Crystal skills, and tool sets of the same directory name):
   prompt-attachments/<name>/agents/plan.md
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
+  modes/<name>/mode.json
+  modes/<name>/prompt.md
   tools/<directory>/tools.json
   plugins/<directory>/plugin.json
   data/tools/<directory>/
@@ -2096,7 +2140,7 @@ the list is longer; `/todos` (alias `/todo`) prints the full untruncated
 list in the transcript. The transcript Result card uses the same colors for
 `- [ ]` / `- [~]` / `- [x]` / `- [-]` lines so they are not painted as
 diff removals. Named chrome labels are Title Case. Short status
-abbreviations are uppercase. Mode is Plan or Work on the
+abbreviations are uppercase. Mode (Plan, Work, or a custom mode name) is on the
 composer prompt and is not repeated on the status bar. While a turn
 runs, a progress row sits directly above the status bar
 (`Waiting For Model`, `Thinking`, `Writing`, `Running Command`,
@@ -2194,7 +2238,7 @@ platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
 plain Backspace as Control; that is still one character. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
-newline. Tab toggles Plan/Work or completes a `/` command. Shift+Tab also toggles Plan/Work. Chrome labels are Plan, Work, Review, Default, Edit, Audit, and Full.
+newline. Tab cycles Plan, Work, and enabled custom modes, or completes a `/` command. Shift+Tab also cycles modes. Chrome labels are Plan, Work, Review, Default, Edit, Audit, and Full.
 When the slash picker is open, plain Up/Down moves its selection without
 resetting it and scrolls the visible candidate window to keep that selection
 on screen. Tab accepts the selected completion. Enter accepts a partial

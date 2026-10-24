@@ -9,6 +9,7 @@ public static class SlashCatalog
     [
         new(SessionVerb.Help, "help", ["h"], "Shortcuts and commands"),
         new(SessionVerb.Plan, "plan", [], "toggle Plan / Work"),
+        new(SessionVerb.Mode, "mode", [], "Show or select a mode"),
         new(SessionVerb.Approval, "approval", [],
             "default | edit | review | audit | full, model, or thinking",
             ["default", "edit", "review", "audit", "full", "model", "thinking"]),

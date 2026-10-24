@@ -57,6 +57,9 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--work")]
     public bool Work { get; init; }
 
+    [CommandOption("--mode <NAME>")]
+    public string? Mode { get; init; }
+
     [CommandOption("--thinking <EFFORT>")]
     public string? Thinking { get; init; }
 

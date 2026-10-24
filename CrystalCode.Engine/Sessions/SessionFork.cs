@@ -21,6 +21,7 @@ internal static class SessionFork
             Id = id.Trim(),
             Workspace = Path.GetFullPath(workspaceRoot),
             PlanMode = source.PlanMode,
+            Mode = source.Mode,
             CreatedUtc = createdUtc,
             Items = source.Items.Select(CloneItem).ToList(),
             Archive = source.Archive?.Select(CloneItem).ToList(),

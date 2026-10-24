@@ -26,7 +26,8 @@ public static class SessionJsonExport
                 Model = metadata.Model,
                 ModelLine = metadata.ModelLine,
                 PromptSet = metadata.PromptSet,
-                PlanMode = metadata.PlanMode
+                PlanMode = metadata.PlanMode,
+                Mode = metadata.Mode
             },
             System = string.IsNullOrWhiteSpace(systemText) ? null : systemText.Trim()
         };

@@ -5,5 +5,6 @@ namespace CrystalCode.Engine.Configuration;
 /// </summary>
 public static class ModeLabel
 {
-    public static string For(bool planMode) => planMode ? "Plan" : "Work";
+    public static string For(bool planMode, string? customMode = null) =>
+        string.IsNullOrEmpty(customMode) ? planMode ? "Plan" : "Work" : customMode;
 }

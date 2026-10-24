@@ -428,7 +428,8 @@ public sealed class SessionRenderer : IDisposable
         string promptSet = "",
         int contextWindow = 0,
         string serviceTier = "",
-        string speed = "")
+        string speed = "",
+        string? customMode = null)
     {
         lock (_gate)
         {
@@ -436,6 +437,8 @@ public sealed class SessionRenderer : IDisposable
             _chrome.Model = model;
             _chrome.WorkspaceRoot = workspaceRoot;
             _chrome.PlanMode = planMode;
+            _chrome.CustomMode = customMode;
+            _composer.CustomMode = customMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
             _chrome.ServiceTier = serviceTier;
@@ -450,8 +453,8 @@ public sealed class SessionRenderer : IDisposable
                 return;
             }
 
-            var mode = ModeLabel.For(planMode);
-            var modeColor = planMode ? Theme.Plan : Theme.Work;
+            var mode = MarkupText.Escape(ModeLabel.For(planMode, customMode));
+            var modeColor = customMode is not null ? Theme.Custom : planMode ? Theme.Plan : Theme.Work;
             var thinkingText = string.IsNullOrWhiteSpace(thinking)
                 ? string.Empty
                 : $"  ·  {MarkupText.Escape(thinking)}";
@@ -477,12 +480,15 @@ public sealed class SessionRenderer : IDisposable
         string? promptSet = null,
         int? contextWindow = null,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        string? customMode = null)
     {
         lock (_gate)
         {
             _chrome.PlanMode = planMode;
             _composer.PlanMode = planMode;
+            _chrome.CustomMode = customMode;
+            _composer.CustomMode = customMode;
             _chrome.Approval = ApprovalLabel.For(approval);
             _chrome.Thinking = thinking;
             if (serviceTier is not null)
@@ -618,8 +624,8 @@ public sealed class SessionRenderer : IDisposable
                 "queue        Stays above the composer; sends after this tool or turn",
                 "ctrl+j       Newline",
                 "\\ enter      Newline",
-                "tab          Plan / Work, or complete / and arguments",
-                "shift+tab    Plan / Work",
+                "tab          Cycle modes, or complete / and arguments",
+                "shift+tab    Cycle modes",
                 "?            Shortcuts when empty",
                 "ctrl+o       Toggle verbose tool results",
                 "ctrl+g       Toggle verbose command output",
@@ -661,6 +667,8 @@ public sealed class SessionRenderer : IDisposable
             CommitLiveUnlocked();
             _chrome.WorkspaceRoot = status.WorkspaceRoot;
             _chrome.PlanMode = status.PlanMode;
+            _chrome.CustomMode = status.Mode;
+            _composer.CustomMode = status.Mode;
             _chrome.Approval = ApprovalLabel.For(status.Approval);
             _chrome.Thinking = status.Thinking;
             _chrome.ContextWindow = UsageText.FormatWindow(status.ContextWindow);
@@ -1126,11 +1134,11 @@ public sealed class SessionRenderer : IDisposable
         Task wake,
         Func<string, CancellationToken, Task>? onSubmit,
         bool planMode,
-        Func<bool> togglePlan,
+        Func<bool> cycleMode,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(wake);
-        ArgumentNullException.ThrowIfNull(togglePlan);
+        ArgumentNullException.ThrowIfNull(cycleMode);
         lock (_gate)
         {
             _composer.PlanMode = planMode;
@@ -1151,7 +1159,7 @@ public sealed class SessionRenderer : IDisposable
                 break;
             }
 
-            var submitted = await DispatchBurstAsync(burst, togglePlan, cancellationToken);
+            var submitted = await DispatchBurstAsync(burst, cycleMode, cancellationToken);
 
             if (submitted is not null)
             {
@@ -1311,12 +1319,12 @@ public sealed class SessionRenderer : IDisposable
 
     public async Task<string> ReadInputAsync(
         bool planMode,
-        Func<bool> togglePlan,
+        Func<bool> cycleMode,
         CancellationToken cancellationToken)
     {
         var read = await ReadPromptAsync(
             planMode,
-            togglePlan,
+            cycleMode,
             wake: null,
             preserveStream: false,
             ignorePause: true,
@@ -1326,7 +1334,7 @@ public sealed class SessionRenderer : IDisposable
 
     public async Task<PromptRead> ReadPromptAsync(
         bool planMode,
-        Func<bool> togglePlan,
+        Func<bool> cycleMode,
         Task? wake,
         bool preserveStream,
         bool ignorePause,
@@ -1357,7 +1365,7 @@ public sealed class SessionRenderer : IDisposable
                 return PromptRead.Ended;
             }
 
-            var submitted = await DispatchBurstAsync(burst, togglePlan, cancellationToken);
+            var submitted = await DispatchBurstAsync(burst, cycleMode, cancellationToken);
 
             if (submitted is not null)
             {
@@ -1368,7 +1376,7 @@ public sealed class SessionRenderer : IDisposable
 
     internal async Task<string?> DispatchBurstAsync(
         IReadOnlyList<ConsoleKeyInfo> burst,
-        Func<bool> togglePlan,
+        Func<bool> cycleMode,
         CancellationToken cancellationToken,
         bool checkSize = true)
     {
@@ -1395,7 +1403,7 @@ public sealed class SessionRenderer : IDisposable
                 cancelSide = false;
                 while (index < events.Count)
                 {
-                    submitted = DispatchUnlocked(events[index], pageRows, togglePlan, checkSize);
+                    submitted = DispatchUnlocked(events[index], pageRows, cycleMode, checkSize);
                     index++;
                     pasteImage = _imagePasteRequested;
                     _imagePasteRequested = false;
@@ -1672,7 +1680,7 @@ public sealed class SessionRenderer : IDisposable
     private string? DispatchUnlocked(
         IInputEvent item,
         int pageRows,
-        Func<bool> togglePlan,
+        Func<bool> cycleMode,
         bool checkSize = true)
     {
         if (checkSize && BelowUsableSize(out _, out _))
@@ -1770,7 +1778,7 @@ public sealed class SessionRenderer : IDisposable
                     return null;
                 }
 
-                return HandleComposerKeyUnlocked(key, togglePlan);
+                return HandleComposerKeyUnlocked(key, cycleMode);
             default:
                 return null;
         }
@@ -1818,7 +1826,7 @@ public sealed class SessionRenderer : IDisposable
         _modalOverlay.Clear();
     }
 
-    private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> togglePlan)
+    private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> cycleMode)
     {
         if (_picker is not null
             && key.Key == ConsoleKey.Tab
@@ -1863,8 +1871,8 @@ public sealed class SessionRenderer : IDisposable
             case ComposerAction.PasteImage:
                 _imagePasteRequested = true;
                 break;
-            case ComposerAction.TogglePlan:
-                _composer.PlanMode = togglePlan();
+            case ComposerAction.CycleMode:
+                _composer.PlanMode = cycleMode();
                 _chrome.PlanMode = _composer.PlanMode;
                 break;
             case ComposerAction.ShowHelp:
@@ -1900,8 +1908,8 @@ public sealed class SessionRenderer : IDisposable
             "ctrl+j       Newline",
             "ctrl+v       Paste clipboard image",
             "\\ enter      Newline",
-            "tab          Plan / Work, or complete / and arguments",
-            "shift+tab    Plan / Work",
+            "tab          Cycle modes, or complete / and arguments",
+            "shift+tab    Cycle modes",
             "?            Shortcuts when empty",
             "ctrl+o       Toggle verbose tool results",
             "ctrl+g       Toggle verbose command output",

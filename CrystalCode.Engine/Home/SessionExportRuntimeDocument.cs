@@ -16,4 +16,6 @@ public sealed class SessionExportRuntimeDocument
     public string PromptSet { get; set; } = string.Empty;
 
     public bool PlanMode { get; set; }
+
+    public string? Mode { get; set; }
 }

@@ -65,7 +65,7 @@ internal static class TaskRunHost
 
         HarnessSettings applied;
         HarnessSettings loaded;
-        bool planMode;
+        string? mode;
         CrystalHome home;
         string workspace;
         try
@@ -86,7 +86,7 @@ internal static class TaskRunHost
             }
 
             loaded = new DiskSettingsStore(home).LoadOrCreate();
-            if (!TaskRunOverrides.TryApply(loaded, settings, out applied, out planMode, out var applyError))
+            if (!TaskRunOverrides.TryApply(loaded, settings, out applied, out mode, out var applyError))
             {
                 await error.WriteLineAsync(applyError);
                 return RunExit.Invalid;
@@ -190,9 +190,11 @@ internal static class TaskRunHost
             try
             {
                 await session.StartAsync(cancellationToken);
-                if (planMode && !session.PlanMode)
+                if (mode is not null && !session.TrySetMode(mode, out var modeError))
                 {
-                    session.TogglePlan();
+                    await error.WriteLineAsync(modeError);
+                    code = RunExit.Invalid;
+                    return code;
                 }
 
                 await session.SubmitAsync(task, cancellationToken);

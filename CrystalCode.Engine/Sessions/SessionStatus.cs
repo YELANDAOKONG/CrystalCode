@@ -53,4 +53,5 @@ public sealed record SessionStatus(
     string Speed = "",
     bool McpEnabled = true,
     int McpServers = 0,
-    int McpTools = 0);
+    int McpTools = 0,
+    string? Mode = null);

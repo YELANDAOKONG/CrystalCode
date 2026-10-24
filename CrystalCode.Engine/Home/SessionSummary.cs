@@ -10,4 +10,5 @@ public sealed record SessionSummary(
     DateTimeOffset? CreatedUtc,
     DateTimeOffset? UpdatedUtc,
     int UserTurns,
-    string Preview);
+    string Preview,
+    string? Mode = null);

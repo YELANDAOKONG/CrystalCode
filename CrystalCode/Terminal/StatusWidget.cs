@@ -42,7 +42,7 @@ internal static class StatusWidget
         Card("Workspace",
         [
             ("Path", status.WorkspaceRoot),
-            ("Mode", ModeLabel.For(status.PlanMode)),
+            ("Mode", ModeLabel.For(status.PlanMode, status.Mode)),
             ("Approval", ApprovalLabel.For(status.Approval)),
             ("Prompt set", status.PromptSet)
         ]);

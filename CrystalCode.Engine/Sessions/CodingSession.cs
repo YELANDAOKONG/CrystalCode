@@ -22,6 +22,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Interfaces;
 using CrystalCode.Engine.Mcp;
+using CrystalCode.Engine.Modes;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;
@@ -58,7 +59,10 @@ public sealed class CodingSession : ITurnObserver
     private int _turnModelCallsBaseline;
     private int _turnToolCallsBaseline;
     private bool _childParentPlanMode;
-    private bool EffectiveChildPlanMode => _childParentPlanMode || _planMode;
+    // A child never gets more than Plan from a custom mode, because a mode's
+    // tool list names the parent's tools, not the child's.
+    private bool InPlanCeiling => _planMode || _customMode is not null;
+    private bool EffectiveChildPlanMode => _childParentPlanMode || InPlanCeiling;
     private bool _parentContextEstimated;
     private SharedTurnBudget? _sharedBudget;
     private TokenUsage? _childTurnUsage;
@@ -68,10 +72,13 @@ public sealed class CodingSession : ITurnObserver
     private int _childModelCalls;
     private int _childToolCalls;
 
-    private ToolCatalog WithTask(ToolCatalog catalog, bool planMode)
+    private ToolCatalog WithTask(
+        ToolCatalog catalog,
+        bool planMode,
+        IReadOnlyList<string>? disabledBuiltInTools = null)
     {
         if (!_settings.Agents.Enabled
-            || _settings.DisabledBuiltInTools.For(planMode).Contains(TaskTool.ToolName))
+            || (disabledBuiltInTools ?? _settings.DisabledBuiltInTools.For(planMode)).Contains(TaskTool.ToolName))
         {
             return catalog;
         }
@@ -723,6 +730,13 @@ public sealed class CodingSession : ITurnObserver
         Publish(new ChildViewRequested(matches[0].Id));
     }
 
+    private IReadOnlyList<SlashCompletion> ModeCompletions() =>
+    [
+        new(ModeCatalog.Plan, "Built-in reads; no edit, write, or bash", [ModeCatalog.Plan]),
+        new(ModeCatalog.Work, "Built-in edit, write, shell, and background shell tasks", [ModeCatalog.Work]),
+        .. _modes.Definitions.Select(mode => new SlashCompletion(mode.Name, mode.Description, [mode.Name]))
+    ];
+
     private IReadOnlyList<SlashCompletion> AgentCompletions()
     {
         var catalog = AgentCatalog.Load(_home, _workspace.Root, _settings.Agents with { Enabled = true });
@@ -963,6 +977,9 @@ public sealed class CodingSession : ITurnObserver
     private ApprovalMode _approval;
     private ThinkingSelection _thinkingEffort;
     private bool _planMode;
+    private string? _customMode;
+    private ModeCatalog _modes = ModeCatalog.Empty;
+    private string? _pendingModeNote;
     private List<ChatItem> _transcript;
     private readonly object _archiveGate = new();
     private List<ChatItem> _archive = [];
@@ -975,6 +992,7 @@ public sealed class CodingSession : ITurnObserver
     private string _sessionId;
     private DateTimeOffset _sessionCreatedUtc;
     private IToolExecutor _workExecutor = null!;
+    private Dictionary<string, (IToolExecutor Text, IMultimodalToolExecutor Image)> _customExecutors = [];
     private IToolExecutor _planExecutor = null!;
     private IMultimodalToolExecutor _workMultimodalExecutor = null!;
     private IMultimodalToolExecutor _planMultimodalExecutor = null!;
@@ -1045,6 +1063,7 @@ public sealed class CodingSession : ITurnObserver
         _grants = new GrantStore(home);
         _trust = new WorkspaceTrustStore(home);
         _home = home;
+        _modes = ModeCatalog.Load(home, _workspace.Root);
         _skillDiscovery = SkillDiscovery.Create(home);
         _modelView = new PluginModelView(CurrentPluginModel, CurrentPluginReview);
         _clientView = new PluginClientView(
@@ -1130,6 +1149,11 @@ public sealed class CodingSession : ITurnObserver
     public bool PlanMode => _planMode;
 
     /// <summary>
+    /// The active custom mode name, or null while Plan or Work is active.
+    /// </summary>
+    public string? CustomMode => _customMode;
+
+    /// <summary>
     /// Id of the saved session file. It stays stable for this process.
     /// </summary>
     public string SessionId => _sessionId;
@@ -1150,6 +1174,12 @@ public sealed class CodingSession : ITurnObserver
         }
 
         WritePromptNotes();
+        foreach (var note in _modes.Notes)
+        {
+            Note(note);
+        }
+
+        FlushModeNote();
         if (!string.IsNullOrWhiteSpace(CurrentPromptStatus()))
         {
             Note("Prompt set  " + _promptResolution.PromptSet);
@@ -1548,14 +1578,130 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Switches between Plan and Work, replaces the live system message, and
-    /// returns the new mode.
+    /// returns whether Plan is now active. From a custom mode it enters Plan.
     /// </summary>
     public bool TogglePlan()
     {
         _planMode = !_planMode;
+        _customMode = null;
         ReplaceLiveSystem();
         RefreshChrome();
         return _planMode;
+    }
+
+    /// <summary>
+    /// Moves to the next mode in the order Plan, Work, then enabled custom
+    /// modes by name, and returns whether Plan is now active.
+    /// </summary>
+    public bool CycleMode()
+    {
+        var order = ModeOrder();
+        var current = _customMode ?? (_planMode ? ModeCatalog.Plan : ModeCatalog.Work);
+        var index = order.FindIndex(name => name.Equals(current, StringComparison.OrdinalIgnoreCase));
+        ApplyMode(order[(index + 1) % order.Count]);
+        return _planMode;
+    }
+
+    /// <summary>
+    /// Selects Plan, Work, or an enabled custom mode by name. Returns false
+    /// with an operator-facing error when the name is unavailable.
+    /// </summary>
+    public bool TrySetMode(string name, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        error = string.Empty;
+        var requested = name.Trim();
+        if (requested.Equals(ModeCatalog.Plan, StringComparison.OrdinalIgnoreCase)
+            || requested.Equals(ModeCatalog.Work, StringComparison.OrdinalIgnoreCase)
+            || _modes.Find(requested) is not null)
+        {
+            ApplyMode(requested);
+            return true;
+        }
+
+        error = "Mode not found or not enabled  " + requested;
+        return false;
+    }
+
+    private List<string> ModeOrder() =>
+        [ModeCatalog.Plan, ModeCatalog.Work, .. _modes.Definitions.Select(static mode => mode.Name)];
+
+    private void ApplyMode(string name)
+    {
+        var custom = _modes.Find(name);
+        _planMode = custom is null && name.Equals(ModeCatalog.Plan, StringComparison.OrdinalIgnoreCase);
+        _customMode = custom?.Name;
+        ReplaceLiveSystem();
+        RefreshChrome();
+    }
+
+    private void ChangeMode(string argument)
+    {
+        if (_turnActive || _compacting)
+        {
+            Error("Finish the current turn before changing mode.");
+            return;
+        }
+
+        ReloadModes(announce: true);
+        var requested = argument.Trim();
+        if (requested.Length == 0)
+        {
+            Note("Mode  " + ModeLabel.For(_planMode, _customMode));
+            Note("plan  Built-in reads; no edit, write, or bash");
+            Note("work  Built-in edit, write, shell, and background shell tasks");
+            foreach (var mode in _modes.Definitions)
+            {
+                Note($"{mode.Name}  {mode.Description}");
+            }
+
+            return;
+        }
+
+        if (TrySetMode(requested, out var error))
+        {
+            Note("Mode  " + ModeLabel.For(_planMode, _customMode));
+        }
+        else
+        {
+            Error(error);
+        }
+    }
+
+    /// <summary>
+    /// Reloads custom modes after a workspace change or <c>/mode</c>. A mode
+    /// that is no longer available returns the session to Work.
+    /// </summary>
+    private void ReloadModes(bool announce)
+    {
+        _modes = ModeCatalog.Load(_home, _workspace.Root);
+        if (announce)
+        {
+            foreach (var note in _modes.Notes)
+            {
+                Note(note);
+            }
+        }
+
+        if (_customMode is not null && _modes.Find(_customMode) is null)
+        {
+            Note($"Mode '{_customMode}' is not available here; using Work.");
+            _customMode = null;
+        }
+
+        RebuildExecutors();
+        ReplaceLiveSystem();
+        RefreshSlashCommands();
+        RefreshChrome();
+    }
+
+    private void FlushModeNote()
+    {
+        if (_pendingModeNote is { } note)
+        {
+            _pendingModeNote = null;
+            Note(note);
+        }
     }
 
     /// <summary>
@@ -1854,6 +2000,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Plan:
                 TogglePlan();
                 Note(ModeLabel.For(_planMode));
+                return (true, false);
+            case SessionVerb.Mode:
+                ChangeMode(command.Argument);
                 return (true, false);
             case SessionVerb.Approval:
                 ChangeApproval(command.Argument);
@@ -3297,7 +3446,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.Model,
             _promptResolution.PromptSet,
             _planMode,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            _customMode);
 
     private SessionDocument CreateExportDocument()
     {
@@ -4204,7 +4354,8 @@ public sealed class CodingSession : ITurnObserver
                 Speed: CatalogSlotStatus.For("Speed", _settings.Speed),
                 McpEnabled: _settings.Mcp,
                 McpServers: _mcp.Servers.Count(server => server.Status == McpConnectionStatus.Connected),
-                McpTools: _mcp.Tools.Count),
+                McpTools: _mcp.Tools.Count,
+                Mode: _customMode),
             full));
     }
 
@@ -4709,7 +4860,7 @@ public sealed class CodingSession : ITurnObserver
         ReloadExternalToolsWithProgress();
         PublishPluginEnvironment();
         ReloadPrompts();
-        RebuildExecutors();
+        ReloadModes(announce: true);
         WritePluginNotes();
         WriteExternalNotes();
     }
@@ -4828,7 +4979,7 @@ public sealed class CodingSession : ITurnObserver
             _workspace.Root,
             _settings.Provider.Value,
             _settings.Model,
-            _planMode ? "plan" : "work",
+            CurrentModeName(),
             _skills is null ? string.Empty : SkillGuidance.Render(_skills),
             _prompts.Instructions + (directories.Length == 0 ? string.Empty : "\n\n" + directories),
             sessionId: _sessionId,
@@ -4840,13 +4991,17 @@ public sealed class CodingSession : ITurnObserver
 
     private string CurrentSystemText()
     {
-        var text = ApplyPluginPrompt(
-            _planMode
+        var custom = CurrentCustomMode();
+        var composed = custom is not null
+            ? ModePrompt.Compose(custom, CurrentPromptContext(), _placeholders)
+            : _planMode
                 ? _prompts.ComposePlan(CurrentPromptContext(), _placeholders)
-                : _prompts.ComposeWork(CurrentPromptContext(), _placeholders),
-            _planMode ? "plan" : "work");
-        return text;
+                : _prompts.ComposeWork(CurrentPromptContext(), _placeholders);
+        return ApplyPluginPrompt(composed, CurrentModeName());
     }
+
+    private ModeDefinition? CurrentCustomMode() =>
+        _customMode is null ? null : _modes.Find(_customMode);
 
     private string CurrentReviewSystemText() =>
         ApplyPluginPrompt(
@@ -5097,6 +5252,7 @@ public sealed class CodingSession : ITurnObserver
             Id = _sessionId,
             Workspace = _workspace.Root,
             PlanMode = _planMode,
+            Mode = _customMode,
             Access = _workspace.Access.Snapshot(),
             DisabledBuiltInTools = SessionMapper.WriteDisabledBuiltInTools(_settings.SessionDisabledBuiltInTools),
             CreatedUtc = _sessionCreatedUtc,
@@ -5499,6 +5655,22 @@ public sealed class CodingSession : ITurnObserver
         _sessionId = document.Id!;
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         _planMode = document.PlanMode;
+        _customMode = null;
+        if (!string.IsNullOrWhiteSpace(document.Mode))
+        {
+            var saved = _modes.Find(document.Mode);
+            if (saved is null)
+            {
+                _planMode = false;
+                _pendingModeNote = $"Mode '{document.Mode.Trim()}' is not available; using Work.";
+            }
+            else
+            {
+                _planMode = false;
+                _customMode = saved.Name;
+            }
+        }
+
         var imageNumbers = document.Images.Where(static image => image is not null)
             .Select(static image => image.Number)
             .ToHashSet();
@@ -5556,6 +5728,7 @@ public sealed class CodingSession : ITurnObserver
         ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
         Publish(new HistoryReplayed(ArchiveSnapshot()));
         Note("Resumed  " + _sessionId);
+        FlushModeNote();
         if (_unavailableImages.Count > 0)
         {
             Note(
@@ -5689,6 +5862,25 @@ public sealed class CodingSession : ITurnObserver
             options,
             DecideAsync,
             HarnessExceptionMapper.MapAsync);
+        var customExecutors = new Dictionary<string, (IToolExecutor, IMultimodalToolExecutor)>(StringComparer.Ordinal);
+        foreach (var mode in _modes.Definitions)
+        {
+            var customText = new ToolExecutor(
+                CreateCustomCatalog(mode, question, imageDescriber),
+                options,
+                DecideAsync,
+                HarnessExceptionMapper.MapAsync);
+            customExecutors[mode.Name] = (
+                new TaskBatchExecutor(new PluginToolExecutor(customText, _hooks)),
+                new PluginMultimodalExecutor(
+                    new HybridMultimodalToolExecutor(
+                        new TaskBatchExecutor(customText),
+                        CreateCustomMultimodalTools(mode, question),
+                        DecideAsync),
+                    _hooks));
+        }
+
+        _customExecutors = customExecutors;
         _workExecutor = new TaskBatchExecutor(new PluginToolExecutor(workExecutor, _hooks));
         _planExecutor = new TaskBatchExecutor(new PluginToolExecutor(planExecutor, _hooks));
         _workMultimodalExecutor = new PluginMultimodalExecutor(
@@ -5705,9 +5897,37 @@ public sealed class CodingSession : ITurnObserver
             _hooks);
     }
 
+    // A mode that can change files draws plugin, external, and MCP tools from
+    // the Work catalogs. Any other mode draws them from Plan, so a tool with a
+    // Write + Workspace floor does not appear in a read-only mode. The Work
+    // disabled list applies to every custom mode.
+    private ToolCatalog CreateCustomCatalog(ModeDefinition mode, IUserPrompt question, ImageDescriber? imageDescriber)
+    {
+        var disabled = _settings.DisabledBuiltInTools.Work;
+        var baseCatalog = mode.HasWriteTools
+            ? WorkspaceCatalog.CreateWork(_workspace, _todos, question, _plugins, _skills, _external,
+                _settings.BashTimeoutSeconds, _loadedPlugins, imageDescriber, _backgroundTasks, disabled, McpWorkTools())
+            : WorkspaceCatalog.CreatePlan(_workspace, _todos, question, _plugins, _skills, _external,
+                _loadedPlugins, imageDescriber, disabled, McpPlanTools());
+        var catalog = new ToolCatalog(mode.Select(baseCatalog));
+        return mode.Lists(TaskTool.ToolName)
+            ? WithTask(catalog, planMode: true, disabled)
+            : catalog;
+    }
+
+    private IReadOnlyList<IMultimodalTool> CreateCustomMultimodalTools(ModeDefinition mode, IUserPrompt question)
+    {
+        var tools = CreateMultimodalTools(
+            question,
+            mode.HasWriteTools ? HostToolCatalog.Work : HostToolCatalog.Plan,
+            _settings.DisabledBuiltInTools.Work);
+        return [.. tools.Where(tool => !ExternalToolNames.IsReserved(tool.Definition.Name) || mode.Lists(tool.Definition.Name))];
+    }
+
     private IReadOnlyList<IMultimodalTool> CreateMultimodalTools(
         IUserPrompt prompt,
-        HostToolCatalog catalog)
+        HostToolCatalog catalog,
+        IReadOnlyList<string>? disabledBuiltInTools = null)
     {
         if (_multimodalClient is null)
         {
@@ -5736,7 +5956,7 @@ public sealed class CodingSession : ITurnObserver
 
         // Text-only turns return before this, so view_image stays off that catalog.
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
-        var disabled = _settings.DisabledBuiltInTools.For(catalog == HostToolCatalog.Plan);
+        var disabled = disabledBuiltInTools ?? _settings.DisabledBuiltInTools.For(catalog == HostToolCatalog.Plan);
         if (disabled.Count > 0)
         {
             tools.RemoveAll(tool =>
@@ -6799,8 +7019,12 @@ public sealed class CodingSession : ITurnObserver
             CompactionThinkingCompletions(),
             CatalogSlotCompletions.For(_settings.ActiveModel.ServiceTiers),
             CatalogSlotCompletions.For(_settings.ActiveModel.Speeds));
-        menu = menu.Select(command => command.Name == "agents"
-            ? command with { Arguments = AgentCompletions() } : command).ToArray();
+        menu = menu.Select(command => command.Name switch
+        {
+            "agents" => command with { Arguments = AgentCompletions() },
+            "mode" => command with { Arguments = ModeCompletions() },
+            _ => command
+        }).ToArray();
         menu = [.. menu, .. _mcp.Prompts.Select(PromptCompletion)];
         Publish(new SlashCommandsChanged(menu));
     }
@@ -6918,7 +7142,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.ContextWindow,
             CatalogSlotStatus.For("Tier", _settings.ServiceTier),
             CatalogSlotStatus.For("Speed", _settings.Speed),
-            _settings.Agents.Enabled);
+            _settings.Agents.Enabled,
+            _customMode);
 
     private void RefreshChrome()
     {
@@ -7295,7 +7520,7 @@ public sealed class CodingSession : ITurnObserver
         _turnModelCallsBaseline = _ledger.ModelCalls;
         _turnToolCallsBaseline = _ledger.ToolCalls;
         _parentModelContext = null;
-        _childParentPlanMode = _planMode;
+        _childParentPlanMode = InPlanCeiling;
         _childSlots.Dispose();
         _childSlots = new SemaphoreSlim(_settings.Agents.MaxConcurrent, _settings.Agents.MaxConcurrent);
         _sharedBudget = new SharedTurnBudget(_settings.ExecutionBudget);
@@ -7325,7 +7550,7 @@ public sealed class CodingSession : ITurnObserver
         _turnTask = ExecuteTurnAsync(turnSource.Token);
     }
 
-    private string CurrentModeName() => _planMode ? "plan" : "work";
+    private string CurrentModeName() => _customMode ?? (_planMode ? "plan" : "work");
 
     private PluginModelPurpose CurrentModelPurpose() =>
         _planMode ? PluginModelPurpose.Plan : PluginModelPurpose.Work;
@@ -7372,13 +7597,23 @@ public sealed class CodingSession : ITurnObserver
         return mediaTypes;
     }
 
+    private IToolExecutor CurrentTextExecutor() =>
+        _customMode is not null && _customExecutors.TryGetValue(_customMode, out var custom)
+            ? custom.Text
+            : _planMode ? _planExecutor : _workExecutor;
+
+    private IMultimodalToolExecutor CurrentMultimodalExecutor() =>
+        _customMode is not null && _customExecutors.TryGetValue(_customMode, out var custom)
+            ? custom.Image
+            : _planMode ? _planMultimodalExecutor : _workMultimodalExecutor;
+
     private Task<TurnResult> ExecuteTurnAsync(CancellationToken cancellationToken)
     {
         if (_multimodalClient is not null)
         {
             var multimodalTurn = new MultimodalStreamingTurn(
                 _multimodalClient,
-                _planMode ? _planMultimodalExecutor : _workMultimodalExecutor,
+                CurrentMultimodalExecutor(),
                 _settings.ExecutionBudget,
                 ImageSnapshot(),
                 this,
@@ -7397,7 +7632,7 @@ public sealed class CodingSession : ITurnObserver
 
         var turn = new StreamingTurn(
             _client,
-            _planMode ? _planExecutor : _workExecutor,
+            CurrentTextExecutor(),
             _settings.ExecutionBudget,
             this,
             CurrentReasoning(),

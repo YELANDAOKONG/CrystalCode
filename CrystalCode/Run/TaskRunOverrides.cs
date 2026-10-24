@@ -18,17 +18,17 @@ internal static class TaskRunOverrides
         HarnessSettings current,
         SessionLaunchSettings request,
         out HarnessSettings applied,
-        out bool planMode,
+        out string? mode,
         out string error)
     {
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(request);
         applied = current;
-        planMode = false;
+        mode = null;
         error = string.Empty;
-        if (request.Plan && request.Work)
+        if ((request.Plan ? 1 : 0) + (request.Work ? 1 : 0) + (request.Mode is null ? 0 : 1) > 1)
         {
-            error = "Pass either --plan or --work.";
+            error = "Pass only one of --plan, --work, or --mode.";
             return false;
         }
 
@@ -176,7 +176,7 @@ internal static class TaskRunOverrides
             }
 
             applied = next;
-            planMode = request.Plan;
+            mode = request.Plan ? "plan" : request.Work ? "work" : request.Mode?.Trim();
             return true;
         }
         catch (Exception exception) when (exception is ArgumentException

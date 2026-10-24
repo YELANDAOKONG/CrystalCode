@@ -276,7 +276,7 @@ public sealed class SessionRendererTests
             Task.CompletedTask,
             onSubmit: null,
             planMode: false,
-            togglePlan: static () => false,
+            cycleMode: static () => false,
             CancellationToken.None);
     }
 

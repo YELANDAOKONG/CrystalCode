@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Modes;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
@@ -59,15 +60,15 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         // Provider and model stay eligible for a later preference save.
         // The other launch flags stay on the live settings only.
         var persisted = loaded.WithOverrides(settings.Provider, settings.Model);
-        bool? launchPlan = null;
-        if (settings.Plan)
+        if ((settings.Plan ? 1 : 0) + (settings.Work ? 1 : 0) + (settings.Mode is null ? 0 : 1) > 1)
         {
-            launchPlan = true;
+            AnsiConsole.MarkupLine("[red]Pass only one of --plan, --work, or --mode.[/]");
+            return 1;
         }
-        else if (settings.Work)
-        {
-            launchPlan = false;
-        }
+
+        var launchMode = settings.Plan ? "plan"
+            : settings.Work ? "work"
+            : settings.Mode?.Trim();
         var credentials = new CredentialStore(home);
         if (!credentials.TryResolve(
                 harnessSettings.ActiveProvider,
@@ -225,6 +226,13 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return 1;
         }
 
+        if (launchMode is not null
+            && !ModeSelection.TryResolve(home, workspace, launchMode, out var modeError))
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(modeError)}[/]");
+            return 1;
+        }
+
         var plugins = PluginRegistry.CreateBuiltIn();
         TerminalHost host;
         try
@@ -238,7 +246,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
                 plugins,
                 resumed,
                 persisted,
-                launchPlan,
+                launchMode,
                 launchAccess);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException)

@@ -8,6 +8,6 @@ public enum ComposerAction
     None,
     Submit,
     PasteImage,
-    TogglePlan,
+    CycleMode,
     ShowHelp
 }
