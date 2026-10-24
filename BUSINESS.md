@@ -50,10 +50,13 @@ separate library with no terminal code. The product can:
 - switch Plan (built-in reads; no edit, write, or bash) and Work (edit,
   write, shell, and session-local background shell tasks); operator tool sets
   may add extra catalog entries to either;
-- omit named built-in tools for one process with `--disable-tool` on
-  `crystal`, `crystal space`, and `crystal run`. An unknown name refuses to
-  start. The choice is not written to `config.json`, and the name stays
-  reserved;
+- persistently disable named built-in tools independently for Plan and Work
+  through `config.json` `disabledBuiltInTools` and `/tools builtin`. The legacy
+  array form applies to both modes. `--disable-tool` remains a process-only
+  overlay on `crystal`, `crystal space`, and `crystal run`; an unqualified name
+  applies to both modes, while `plan:<name>` and `work:<name>` target one mode.
+  Unknown names refuse to start or change. The active mode exposes its merged
+  disabled list through `{{disabled_tools}}`, and the name stays reserved;
 - approve side effects manually, by a reviewing model, or by Full pass-through.
   Full auto-passes all tool calls, including workspace-external paths, session
   read-only directories, elevated or forbidden classifications, and forced
@@ -339,14 +342,10 @@ implemented in the current build.
   The replacement keeps the built-in model-facing name and continues through
   the host approval and executor path. Approval classification is selected by
   that model-facing name, so a replacement is trusted not to perform effects
-  beyond the replaced built-in's classification. Home configuration now
-  persistently disables built-in names independently for Plan and Work through
-  `config.json` and `/tools builtin plan|work enable|disable`; process-only
-  `--disable-tool` applies to both modes by default and is merged on top. The
-  system prompt exposes the active mode's disabled list through
-  `{{disabled_tools}}`; replacing the prompt may place that placeholder where
-  needed. Session-only disablement, disk-plugin and
-  external-tool replacement, and metadata adjustment remain undefined.
+  beyond the replaced built-in's classification. Session-only disablement,
+  disk-plugin and external-tool replacement, and metadata adjustment remain
+  undefined. Home persistence, process-level merging, and the
+  `{{disabled_tools}}` prompt placeholder are implemented in the current build.
   Host-owned numeric limits remain a separate pending question and are not
   decided here.
 - Product modes other than Plan and Work, including operator-defined custom
@@ -487,14 +486,13 @@ fence, or `ToolInvocationPolicy`. This item is not the deferred module
 system, not the high-priority way to extend, adjust, or disable a built-in
 tool, and not the undecided extra hook methods or plugin dependencies.
 
-TODO: add session ways to disable or adjust built-in tools, and add
-disk-plugin and external-tool replacement, only after each mechanism's scope
-and interaction with approval and reserved tool names are defined. In-process
-plugin replacement is defined for the explicit `Replace` contribution and
-keeps the built-in model-facing name. Home persistent disablement is defined
-by `config.json` `disabledBuiltInTools` and `/tools builtin`; `--disable-tool`
-remains process-only and is merged on top. This is not the pending question
-of whether host-owned numeric limits become operator configuration.
+TODO: add session-only disablement, disk-plugin and external-tool replacement,
+metadata adjustment, and other built-in-tool extension rules only after each
+mechanism's scope and interaction with approval and reserved tool names are
+defined. In-process plugin replacement, Home Plan/Work disablement,
+process-level merging, and the `{{disabled_tools}}` prompt placeholder are
+implemented. This is not the pending question of whether host-owned numeric
+limits become operator configuration.
 
 TODO: add operator-defined modes other than Plan and Work only after their
 behavior and ownership are defined. The product has exactly two modes today.
