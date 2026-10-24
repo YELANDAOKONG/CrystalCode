@@ -447,6 +447,15 @@ implemented in the current build.
   not reserve a configuration field, command, public type, or tool-set
   format. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
+- A built-in web search tool. The direction is a host-executed tool that lets
+  the model search the web and read the results. The search backend, whether
+  a separate page fetch tool exists, how approval and network access are
+  classified, result size bounds, and failure behavior are not defined. It is
+  not a provider's server-side web search, not an MCP server, and not a
+  plugin or tool set. Results are untrusted data, not instructions. Do not
+  reserve a configuration field, command, public type, or backend name, and
+  do not store a search key in source, logs, or on a command line. Approval,
+  trust, the workspace fence, and `ToolInvocationPolicy` stay as they are.
 - Built-in tool optimization. Improving how the built-in tools behave and
   perform. Which tools and which improvements are not defined. It is not a
   new tool, not operator configuration of tool limits (that question is under
@@ -562,6 +571,12 @@ text input are defined. Such a tool takes text input, not JSON arguments. Do
 not reserve a configuration field, command, public type, or tool-set format.
 This does not authorize changes under `../Crystal`, and provider adapters
 still own no tools.
+
+TODO: add a built-in web search tool only after its backend, approval and
+network classification, result bounds, and failure behavior are defined. It is
+not a provider's server-side web search. Search results are untrusted data and
+must not be followed as instructions. Do not reserve a configuration field,
+command, public type, or backend name.
 
 TODO: optimize the built-in tools only after the affected tools and the
 intended improvements are defined. Approval, trust, the workspace fence, and
