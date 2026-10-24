@@ -28,6 +28,7 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(catalog.Find(QuestionTool.ToolName));
         Assert.Null(catalog.Find(EditTool.ToolName));
         Assert.Null(catalog.Find(WriteTool.ToolName));
+        Assert.Null(catalog.Find(ApplyPatchTool.ToolName));
         Assert.Null(catalog.Find(BashTool.ToolName));
         Assert.Null(catalog.Find(SkillTool.ToolName));
     }
@@ -44,6 +45,7 @@ public sealed class WorkspaceCatalogTests
 
         Assert.NotNull(catalog.Find(EditTool.ToolName));
         Assert.NotNull(catalog.Find(WriteTool.ToolName));
+        Assert.NotNull(catalog.Find(ApplyPatchTool.ToolName));
         Assert.NotNull(catalog.Find(BashTool.ToolName));
         Assert.NotNull(catalog.Find(BackgroundBashStartTool.ToolName));
         Assert.NotNull(catalog.Find(BackgroundBashStatusTool.ToolName));

@@ -5,6 +5,8 @@ namespace CrystalCode.Engine.Events;
 /// </summary>
 public sealed record SessionPreferences(
     bool EstimatedTokens,
+    bool TodoBar,
+    int TodoBarRows,
     bool VerboseTools,
     bool VerboseCommands,
     bool VerboseResults,

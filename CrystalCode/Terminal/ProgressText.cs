@@ -66,6 +66,7 @@ public static class ProgressText
             TreeTool.ToolName => "Listing",
             WriteTool.ToolName => "Writing File",
             EditTool.ToolName => "Editing",
+            ApplyPatchTool.ToolName => "Applying Patch",
             GlobTool.ToolName => "Searching",
             GrepTool.ToolName => "Searching",
             SearchTool.ToolName => "Searching",

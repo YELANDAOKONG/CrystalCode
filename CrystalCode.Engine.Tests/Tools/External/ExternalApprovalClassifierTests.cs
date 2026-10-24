@@ -58,7 +58,7 @@ public sealed class ExternalApprovalClassifierTests
             new HostToolApprovalClassification("forbidden", "privilegedEscalation", "Harmless read\u001b[2K"))), ["path"]);
 
         var result = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", """{"path":".ssh/id_rsa"}"""), new Workspace(root.Path));
+            JsonToolCall("1", "patchsite", """{"path":".ssh/id_rsa"}"""), new Workspace(root.Path));
 
         Assert.NotNull(result);
         Assert.Equal(Risk.Forbidden, result.Risk);
@@ -72,7 +72,7 @@ public sealed class ExternalApprovalClassifierTests
         var classifier = Create(new DelegateClassifier((_, _, _) => throw new InvalidOperationException()), ["path"]);
 
         var result = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", """{"path":".ssh/id_rsa"}"""), new Workspace(root.Path));
+            JsonToolCall("1", "patchsite", """{"path":".ssh/id_rsa"}"""), new Workspace(root.Path));
 
         Assert.NotNull(result);
         Assert.Equal(Risk.Forbidden, result.Risk);
@@ -88,7 +88,7 @@ public sealed class ExternalApprovalClassifierTests
             new HostToolApprovalClassification("unknown", "workspace", "Harmless", RequirePrompt: true))), ["path"]);
 
         var result = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", """{"path":"../outside.txt"}"""), new Workspace(root.Path));
+            JsonToolCall("1", "patchsite", """{"path":"../outside.txt"}"""), new Workspace(root.Path));
 
         Assert.NotNull(result);
         Assert.Equal(Risk.Privileged, result.Risk);
@@ -259,7 +259,7 @@ public sealed class ExternalApprovalClassifierTests
         var classifier = Create(new DelegateClassifier((_, _, _) => throw new InvalidOperationException()));
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = new ApprovalPolicy(ApprovalMode.Default, workspace, grants, prompt, classifiers: [classifier],
-            automaticTools: new HashSet<string> { "apply_patch" });
+            automaticTools: new HashSet<string> { "patchsite" });
 
         var result = await policy.DecideAsync(Call());
 
@@ -320,7 +320,7 @@ public sealed class ExternalApprovalClassifierTests
         var deny = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = new ApprovalPolicy(ApprovalMode.Default, workspace, grants, deny, classifiers: [classifier]);
 
-        var result = await policy.DecideAsync(JsonToolCall("2", "apply_patch", """{"patch":"../outside.txt"}"""));
+        var result = await policy.DecideAsync(JsonToolCall("2", "patchsite", """{"patch":"../outside.txt"}"""));
 
         Assert.Equal(ToolInvocationAction.Reject, result.Action);
         Assert.Equal(1, deny.Count);
@@ -337,7 +337,7 @@ public sealed class ExternalApprovalClassifierTests
         AssertFailure(result);
     }
 
-    private static ToolCall Call() => JsonToolCall("1", "apply_patch", "{}");
+    private static ToolCall Call() => JsonToolCall("1", "patchsite", "{}");
 
     private static void AssertFailure(ToolClassification? result)
     {
@@ -350,9 +350,9 @@ public sealed class ExternalApprovalClassifierTests
     private static ExternalApprovalClassifier Create(IHostToolApprovalClassifier classifier, IReadOnlyList<string>? paths = null) =>
         new(new Dictionary<string, ExternalToolSpec>
         {
-            ["apply_patch"] = new("apply_patch", "Patch", ToolSchema.Parse("""{"type":"object"}"""),
+            ["patchsite"] = new("patchsite", "Patch", ToolSchema.Parse("""{"type":"object"}"""),
                 ExternalCatalogSelection.Both, pathArguments: paths)
-        }, new Dictionary<string, IHostToolApprovalClassifier> { ["apply_patch"] = classifier });
+        }, new Dictionary<string, IHostToolApprovalClassifier> { ["patchsite"] = classifier });
 
     private sealed class DelegateClassifier(
         Func<ToolCall, ToolHostContext, CancellationToken, ValueTask<HostToolApprovalClassification>> classify)

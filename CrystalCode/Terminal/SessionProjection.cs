@@ -195,6 +195,7 @@ internal sealed class SessionProjection : ISessionObserver
     private void ApplyPreferences(SessionPreferences preferences)
     {
         _renderer.ShowEstimatedTokens = preferences.EstimatedTokens;
+        _renderer.SetTodoBar(preferences.TodoBar, preferences.TodoBarRows);
         _renderer.VerboseTools = preferences.VerboseTools;
         _renderer.VerboseCommands = preferences.VerboseCommands;
         _renderer.VerboseResults = preferences.VerboseResults;

@@ -585,20 +585,20 @@ public sealed class ApprovalPolicyTests
         using var home = new TemporaryHome();
         var workspace = new Workspace(root.Path);
         var grants = new GrantStore(home.Home);
-        var firstCall = JsonToolCall("1", "apply_patch", "{\"patch\":\"inside\"}");
+        var firstCall = JsonToolCall("1", "patchsite", "{\"patch\":\"inside\"}");
         var first = new ApprovalPolicy(
             ApprovalMode.Default, workspace, grants,
             new RecordingApprovalPrompt(persistent ? ApprovalChoice.AllowPersistent : ApprovalChoice.AllowSession),
-            classifiers: [new FixedApprovalClassifier("apply_patch",
+            classifiers: [new FixedApprovalClassifier("patchsite",
                 new ToolClassification(Risk.Write, Authority.Workspace, "Workspace patch"))]);
         Assert.Equal(ToolInvocationAction.Execute, (await first.DecideAsync(firstCall)).Action);
 
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var second = new ApprovalPolicy(
             ApprovalMode.Default, workspace, persistent ? new GrantStore(home.Home) : grants, prompt,
-            classifiers: [new FixedApprovalClassifier("apply_patch",
+            classifiers: [new FixedApprovalClassifier("patchsite",
                 new ToolClassification(new Risk(risk), new Authority(authority), "Raised patch", requirePrompt))]);
-        var result = await second.DecideAsync(JsonToolCall("2", "apply_patch", "{\"patch\":\"outside\"}"));
+        var result = await second.DecideAsync(JsonToolCall("2", "patchsite", "{\"patch\":\"outside\"}"));
 
         Assert.Equal(ToolInvocationAction.Reject, result.Action);
         Assert.Equal(1, prompt.Count);
@@ -635,11 +635,11 @@ public sealed class ApprovalPolicyTests
         using var context = new ApprovalContext(new ApprovalMode(mode));
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var policy = context.CreatePolicy(prompt,
-            classifiers: [new FixedApprovalClassifier("apply_patch",
+            classifiers: [new FixedApprovalClassifier("patchsite",
                 new ToolClassification(Risk.Write, Authority.Workspace, "Patch", RequirePrompt: true))],
-            automaticTools: new HashSet<string> { "apply_patch" });
+            automaticTools: new HashSet<string> { "patchsite" });
 
-        var result = await policy.DecideAsync(JsonToolCall("1", "apply_patch", "{}"));
+        var result = await policy.DecideAsync(JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(ToolInvocationAction.Reject, result.Action);
         Assert.Equal(1, prompt.Count);
@@ -657,10 +657,10 @@ public sealed class ApprovalPolicyTests
         using var home = new TemporaryHome();
         using var root = new TemporaryWorkspace();
         var grants = new GrantStore(home.Home);
-        var call = JsonToolCall("1", "apply_patch", "{}");
+        var call = JsonToolCall("1", "patchsite", "{}");
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.AllowPersistent);
         var policy = new ApprovalPolicy(ApprovalMode.Default, new Workspace(root.Path), grants, prompt,
-            classifiers: [new FixedApprovalClassifier("apply_patch",
+            classifiers: [new FixedApprovalClassifier("patchsite",
                 new ToolClassification(new Risk(risk), new Authority(authority), "Patch", requirePrompt))]);
 
         Assert.Equal(ToolInvocationAction.Execute, (await policy.DecideAsync(call)).Action);
@@ -676,8 +676,8 @@ public sealed class ApprovalPolicyTests
         using var home = new TemporaryHome();
         using var root = new TemporaryWorkspace();
         var workspace = new Workspace(root.Path);
-        var call = JsonToolCall("1", "apply_patch", "{}");
-        IApprovalClassifier[] classifiers = [new FixedApprovalClassifier("apply_patch",
+        var call = JsonToolCall("1", "patchsite", "{}");
+        IApprovalClassifier[] classifiers = [new FixedApprovalClassifier("patchsite",
             new ToolClassification(Risk.Write, Authority.Workspace, "Patch"))];
         var first = new ApprovalPolicy(ApprovalMode.Default, workspace, new GrantStore(home.Home),
             new RecordingApprovalPrompt(ApprovalChoice.AllowPersistent), classifiers: classifiers);
@@ -705,10 +705,10 @@ public sealed class ApprovalPolicyTests
         var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Deny("should not run"));
         var policy = context.CreatePolicy(prompt, reviewer,
-            classifiers: [new FixedApprovalClassifier("apply_patch",
+            classifiers: [new FixedApprovalClassifier("patchsite",
                 new ToolClassification(new Risk(risk), new Authority(authority), "Patch", requirePrompt))]);
 
-        var result = await policy.DecideAsync(JsonToolCall("1", "apply_patch", "{}"));
+        var result = await policy.DecideAsync(JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(ToolInvocationAction.Execute, result.Action);
         Assert.Equal(0, prompt.Count);

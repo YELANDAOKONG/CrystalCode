@@ -2089,7 +2089,7 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Compact:
                 return (true, false);
             case SessionVerb.Todos:
-                ShowTodoList();
+                ChangeTodos(command.Argument);
                 return (true, false);
             case SessionVerb.Tools:
                 ChangeTools(command.Argument);
@@ -3051,6 +3051,61 @@ public sealed class CodingSession : ITurnObserver
         PublishPreferences();
         Note(
             "Estimated tokens  " + (_settings.EstimatedTokens ? "On" : "Off"));
+    }
+
+    private void ChangeTodos(string argument)
+    {
+        var parts = argument.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            ShowTodoList();
+            return;
+        }
+
+        var value = parts.Length > 1 ? parts[1] : string.Empty;
+        if (parts[0].Equals("bar", StringComparison.OrdinalIgnoreCase))
+        {
+            bool enabled;
+            if (value.Length == 0)
+            {
+                enabled = !_settings.TodoBar;
+            }
+            else if (!TryParseToggle(value, out enabled))
+            {
+                Error("Todo bar is on or off.");
+                return;
+            }
+
+            SaveSettings(current => current.WithTodoBar(enabled));
+            PublishPreferences();
+            Note("Todo bar  " + (_settings.TodoBar ? "On" : "Off"));
+            return;
+        }
+
+        if (parts[0].Equals("rows", StringComparison.OrdinalIgnoreCase))
+        {
+            if (value.Length == 0)
+            {
+                Note($"Todo bar rows  {_settings.TodoBarRows}");
+                return;
+            }
+
+            if (!int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var rows)
+                || rows is < HarnessSettings.MinimumTodoBarRows or > HarnessSettings.MaximumTodoBarRows)
+            {
+                Error(
+                    $"Todo bar rows is a number from {HarnessSettings.MinimumTodoBarRows} "
+                    + $"to {HarnessSettings.MaximumTodoBarRows}.");
+                return;
+            }
+
+            SaveSettings(current => current.WithTodoBarRows(rows));
+            PublishPreferences();
+            Note($"Todo bar rows  {_settings.TodoBarRows}");
+            return;
+        }
+
+        Error("Usage: /todos, /todos bar [on|off], or /todos rows [3-10].");
     }
 
     private void ChangeVerbose(string argument)
@@ -7153,6 +7208,8 @@ public sealed class CodingSession : ITurnObserver
     private SessionPreferences CurrentPreferences() =>
         new(
             _settings.EstimatedTokens,
+            _settings.TodoBar,
+            _settings.TodoBarRows,
             _settings.VerboseTools,
             _settings.VerboseCommands,
             _settings.VerboseResults,
@@ -7396,7 +7453,7 @@ public sealed class CodingSession : ITurnObserver
                 ShowStats(command.Argument);
                 return true;
             case SessionVerb.Todos:
-                ShowTodoList();
+                ChangeTodos(command.Argument);
                 return true;
             case SessionVerb.Sessions:
                 ShowSessions(command.Argument);

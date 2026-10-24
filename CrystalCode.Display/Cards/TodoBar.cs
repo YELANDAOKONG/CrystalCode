@@ -9,9 +9,16 @@ public static class TodoBar
 {
     public const int MaximumVisible = 4;
 
-    public static IReadOnlyList<PaintLine> Lines(IReadOnlyList<TodoBarItem> items, int width)
+    public static IReadOnlyList<PaintLine> Lines(IReadOnlyList<TodoBarItem> items, int width) =>
+        Lines(items, width, MaximumVisible);
+
+    public static IReadOnlyList<PaintLine> Lines(
+        IReadOnlyList<TodoBarItem> items,
+        int width,
+        int maximumVisible)
     {
         ArgumentNullException.ThrowIfNull(items);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumVisible, 1);
         if (items.Count == 0)
         {
             return [];
@@ -21,15 +28,15 @@ public static class TodoBar
         {
             Fit(PaintLine.Colored(Theme.Chrome, "  Todos"), width)
         };
-        var visible = Math.Min(items.Count, MaximumVisible);
+        var visible = Math.Min(items.Count, maximumVisible);
         for (var i = 0; i < visible; i++)
         {
             lines.Add(ItemLine(items[i], width));
         }
 
-        if (items.Count > MaximumVisible)
+        if (items.Count > maximumVisible)
         {
-            var more = items.Count - MaximumVisible;
+            var more = items.Count - maximumVisible;
             lines.Add(Fit(PaintLine.Colored(Theme.Muted, $"  +{more} more"), width));
         }
 

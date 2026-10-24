@@ -13,6 +13,8 @@ internal static class TranscriptResultDisplay
 
     internal const string WriteToolName = "write";
 
+    internal const string ApplyPatchToolName = "apply_patch";
+
     public static bool ShouldRender(
         TranscriptKind kind,
         string? toolName,
@@ -79,5 +81,6 @@ internal static class TranscriptResultDisplay
 
     private static bool IsEditOrWrite(string? toolName) =>
         string.Equals(toolName, EditToolName, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(toolName, WriteToolName, StringComparison.OrdinalIgnoreCase);
+        || string.Equals(toolName, WriteToolName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, ApplyPatchToolName, StringComparison.OrdinalIgnoreCase);
 }

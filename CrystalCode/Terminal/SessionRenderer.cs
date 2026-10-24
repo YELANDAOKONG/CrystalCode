@@ -79,6 +79,8 @@ public sealed class SessionRenderer : IDisposable
     private bool _composerPaused;
     private bool _suppressInterruptedNote;
     private bool _showEstimatedTokens;
+    private bool _showTodoBar = true;
+    private int _todoBarRows = TodoBar.MaximumVisible;
     private int _streamedCharacters;
     private TokenUsage? _lastUsage;
     private TokenUsage? _cumulativeUsage;
@@ -159,6 +161,16 @@ public sealed class SessionRenderer : IDisposable
                 RefreshTokenEstimateUnlocked();
                 PaintUnlocked(force: true);
             }
+        }
+    }
+
+    public void SetTodoBar(bool visible, int rows)
+    {
+        lock (_gate)
+        {
+            _showTodoBar = visible;
+            _todoBarRows = rows;
+            PaintUnlocked(force: true);
         }
     }
 
@@ -2494,7 +2506,7 @@ public sealed class SessionRenderer : IDisposable
 
     private IReadOnlyList<PaintLine> TodoLines(int width) =>
         _childRows.Select(row => PaintLine.Colored(Theme.Chrome, row).Fit(width))
-            .Concat(TodoBar.Lines(_todoItems, width)).ToArray();
+            .Concat(_showTodoBar ? TodoBar.Lines(_todoItems, width, _todoBarRows) : []).ToArray();
 
     internal ComposerView ProjectComposer(int width, int maximumRows)
     {

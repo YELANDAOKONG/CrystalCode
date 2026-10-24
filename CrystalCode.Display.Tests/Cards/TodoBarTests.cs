@@ -52,6 +52,18 @@ public sealed class TodoBarTests
     }
 
     [Fact]
+    public void Lines_HonorsTheRequestedVisibleCount()
+    {
+        var items = Enumerable.Range(0, 12).Select(i => new TodoBarItem(" ", $"item {i}")).ToArray();
+
+        var lines = TodoBar.Lines(items, 80, 10);
+
+        Assert.Equal(1 + 10 + 1, lines.Count);
+        Assert.Contains("+2 more", lines[^1].Plain, StringComparison.Ordinal);
+        Assert.Equal(1 + 3, TodoBar.Lines(items.Take(3).ToArray(), 80, 10).Count);
+    }
+
+    [Fact]
     public void Lines_NeverCarryControlCharacters()
     {
         var lines = TodoBar.Lines(

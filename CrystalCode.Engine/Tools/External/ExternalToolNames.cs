@@ -32,6 +32,7 @@ public static class ExternalToolNames
         QuestionTool.ToolName,
         EditTool.ToolName,
         WriteTool.ToolName,
+        ApplyPatchTool.ToolName,
         BashTool.ToolName,
         BackgroundBashStartTool.ToolName,
         BackgroundBashStatusTool.ToolName,

@@ -98,6 +98,7 @@ public sealed class ToolClassifier
                 new ToolClassification(Risk.Read, Authority.Workspace, "Read-only tool"),
             WriteTool.ToolName => ClassifyWrite(call.Arguments),
             EditTool.ToolName => ClassifyEdit(call.Arguments),
+            ApplyPatchTool.ToolName => ClassifyPatch(call.Arguments),
             BashTool.ToolName => ClassifyBash(call.Arguments),
             BackgroundBashStartTool.ToolName => ClassifyBash(call.Arguments),
             BackgroundBashStatusTool.ToolName or BackgroundBashLogsTool.ToolName =>
@@ -194,6 +195,36 @@ public sealed class ToolClassifier
         }
 
         return ClassifyFilePath(path, "Edit");
+    }
+
+    /// <summary>
+    /// A patch is as risky as its riskiest path: one credential path makes
+    /// the whole call Forbidden, and one path outside the session's
+    /// directories makes it an outside write. A patch that cannot be read
+    /// fails inside the tool before it writes anything.
+    /// </summary>
+    private ToolClassification ClassifyPatch(string arguments)
+    {
+        if (!ApplyPatchTool.TryReadPaths(arguments, out var paths))
+        {
+            return new ToolClassification(Risk.Write, Authority.Workspace, "Apply patch");
+        }
+
+        var outside = false;
+        foreach (var path in paths)
+        {
+            var classification = ClassifyFilePath(path, "Patch");
+            if (classification.Risk == Risk.Forbidden)
+            {
+                return classification;
+            }
+
+            outside |= classification.Authority == Authority.OutsideWorkspace;
+        }
+
+        return outside
+            ? new ToolClassification(Risk.Write, Authority.OutsideWorkspace, "Patch outside workspace")
+            : new ToolClassification(Risk.Write, Authority.Workspace, "Apply patch");
     }
 
     private ToolClassification ClassifyFilePath(string path, string verb)

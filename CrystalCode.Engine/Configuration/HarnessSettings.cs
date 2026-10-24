@@ -32,6 +32,14 @@ public sealed record HarnessSettings
 
     public const bool DefaultEstimatedTokens = false;
 
+    public const bool DefaultTodoBar = true;
+
+    public const int MinimumTodoBarRows = 3;
+
+    public const int MaximumTodoBarRows = 10;
+
+    public const int DefaultTodoBarRows = 4;
+
     public const bool DefaultVerboseTools = true;
 
     public const bool DefaultVerboseCommands = true;
@@ -58,6 +66,8 @@ public sealed record HarnessSettings
         bool skills = DefaultSkills,
         bool externalTools = DefaultExternalTools,
         bool estimatedTokens = DefaultEstimatedTokens,
+        bool todoBar = DefaultTodoBar,
+        int todoBarRows = DefaultTodoBarRows,
         bool verboseTools = DefaultVerboseTools,
         bool verboseCommands = DefaultVerboseCommands,
         bool verboseResults = DefaultVerboseResults,
@@ -110,6 +120,14 @@ public sealed record HarnessSettings
                 nameof(compactionThreshold),
                 compactionThreshold,
                 "Compaction threshold must be greater than 0 and at most 1.");
+        }
+
+        if (todoBarRows is < MinimumTodoBarRows or > MaximumTodoBarRows)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(todoBarRows),
+                todoBarRows,
+                $"Todo bar rows must be between {MinimumTodoBarRows} and {MaximumTodoBarRows}.");
         }
 
         if (reservedOutputTokens is <= 0)
@@ -168,6 +186,8 @@ public sealed record HarnessSettings
         Mcp = mcp;
         McpToolApproval = mcpToolApproval ?? McpToolApprovalSettings.Default;
         EstimatedTokens = estimatedTokens;
+        TodoBar = todoBar;
+        TodoBarRows = todoBarRows;
         VerboseTools = verboseTools;
         VerboseCommands = verboseCommands;
         VerboseResults = verboseResults;
@@ -375,6 +395,17 @@ public sealed record HarnessSettings
 
     public bool EstimatedTokens { get; }
 
+    /// <summary>
+    /// Whether the pinned todo list is painted above the status bar.
+    /// </summary>
+    public bool TodoBar { get; }
+
+    /// <summary>
+    /// Items the pinned todo list shows before it folds the rest into a
+    /// <c>+N more</c> line.
+    /// </summary>
+    public int TodoBarRows { get; }
+
     public bool VerboseTools { get; }
 
     public bool VerboseCommands { get; }
@@ -554,6 +585,12 @@ public sealed record HarnessSettings
     public HarnessSettings WithEstimatedTokens(bool estimatedTokens) =>
         Copy(estimatedTokens: estimatedTokens);
 
+    public HarnessSettings WithTodoBar(bool todoBar) =>
+        Copy(todoBar: todoBar);
+
+    public HarnessSettings WithTodoBarRows(int todoBarRows) =>
+        Copy(todoBarRows: todoBarRows);
+
     public HarnessSettings WithVerboseTools(bool verboseTools) =>
         Copy(verboseTools: verboseTools);
 
@@ -707,6 +744,8 @@ public sealed record HarnessSettings
         bool? skills = null,
         bool? externalTools = null,
         bool? estimatedTokens = null,
+        bool? todoBar = null,
+        int? todoBarRows = null,
         bool? verboseTools = null,
         bool? verboseCommands = null,
         bool? verboseResults = null,
@@ -767,6 +806,8 @@ public sealed record HarnessSettings
             skills ?? Skills,
             externalTools ?? ExternalTools,
             estimatedTokens ?? EstimatedTokens,
+            todoBar ?? TodoBar,
+            todoBarRows ?? TodoBarRows,
             verboseTools ?? VerboseTools,
             verboseCommands ?? VerboseCommands,
             verboseResults ?? VerboseResults,

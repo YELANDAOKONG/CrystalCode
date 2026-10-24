@@ -77,8 +77,27 @@ public static class ToolCallText
             return title + "  " + OneLine(taskId);
         }
 
+        if (name == ApplyPatchTool.ToolName)
+        {
+            // The argument is the patch text itself, so never fall back to
+            // echoing it as JSON.
+            var patchPaths = ApplyPatchTool.PathsOf(arguments);
+            return patchPaths.Count > 0 ? title + "  " + PatchPaths(patchPaths) : title;
+        }
+
         var compact = CompactFinished(arguments);
         return compact.Length == 0 ? title : title + "  " + compact;
+    }
+
+    private const int ShownPatchPaths = 3;
+
+    private static string PatchPaths(IReadOnlyList<string> paths)
+    {
+        var unique = paths.Select(OneLine).Distinct(StringComparer.Ordinal).ToList();
+        var listed = string.Join(", ", unique.Take(ShownPatchPaths));
+        return unique.Count > ShownPatchPaths
+            ? listed + $" and {unique.Count - ShownPatchPaths} more"
+            : listed;
     }
 
     private static string CompactFinished(string arguments)

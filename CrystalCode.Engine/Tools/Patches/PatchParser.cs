@@ -156,6 +156,28 @@ internal sealed class PatchParser
         }
     }
 
+    /// <summary>
+    /// True when the lines from here to the next section header or the end
+    /// of the text are all empty. Such lines only separate sections.
+    /// </summary>
+    private bool IsSeparatorRun()
+    {
+        for (var index = _index; index < _lines.Length; index++)
+        {
+            if (IsBoundary(_lines[index]))
+            {
+                return true;
+            }
+
+            if (_lines[index].Length > 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private PatchAddition? ReadAddition(out string error)
     {
         if (!TryReadPath(_lines[_index], AddHeader, out var path, out error))
@@ -168,9 +190,8 @@ internal sealed class PatchParser
         while (_index < _lines.Length && !IsBoundary(_lines[_index]))
         {
             var line = _lines[_index];
-            if (line.Length == 0 && IsOnlyBlankUntilBoundary())
+            if (line.Length == 0 && IsSeparatorRun())
             {
-                _index = _lines.Length;
                 break;
             }
 
@@ -182,13 +203,6 @@ internal sealed class PatchParser
 
             contents.Add(line[1..]);
             _index++;
-        }
-
-        // The loop above runs past trailing blank lines to the end of the
-        // array. Step back to the closing marker so the caller sees it.
-        if (_index >= _lines.Length)
-        {
-            _index = LastBoundaryIndex();
         }
 
         error = string.Empty;
@@ -230,7 +244,7 @@ internal sealed class PatchParser
         var chunks = new List<PatchChunk>();
         while (_index < _lines.Length && !IsBoundary(_lines[_index]))
         {
-            if (_lines[_index].Trim().Length == 0 && chunks.Count == 0 && !HasBodyAhead())
+            if (_lines[_index].Length == 0 && (chunks.Count == 0 || IsSeparatorRun()))
             {
                 _index++;
                 continue;
@@ -258,7 +272,8 @@ internal sealed class PatchParser
     private PatchChunk? ReadChunk(out string error)
     {
         var contexts = new List<string>();
-        while (_index < _lines.Length && _lines[_index].StartsWith(ChunkMarker, StringComparison.Ordinal))
+        while (_index < _lines.Length
+            && _lines[_index].StartsWith(ChunkMarker, StringComparison.Ordinal))
         {
             var context = _lines[_index][ChunkMarker.Length..];
             if (context.StartsWith(' '))
@@ -276,6 +291,8 @@ internal sealed class PatchParser
 
         var oldLines = new List<string>();
         var newLines = new List<string>();
+        var removed = new List<string>();
+        var added = new List<string>();
         var atEndOfFile = false;
         var bodyLines = 0;
         while (_index < _lines.Length)
@@ -283,6 +300,11 @@ internal sealed class PatchParser
             var line = _lines[_index];
             if (line.Length == 0)
             {
+                if (IsSeparatorRun())
+                {
+                    break;
+                }
+
                 // A line with no characters at all is a blank context line.
                 oldLines.Add(string.Empty);
                 newLines.Add(string.Empty);
@@ -298,6 +320,15 @@ internal sealed class PatchParser
                 if (line[0] != '-')
                 {
                     newLines.Add(text);
+                }
+
+                if (line[0] == '-')
+                {
+                    removed.Add(text);
+                }
+                else if (line[0] == '+')
+                {
+                    added.Add(text);
                 }
             }
             else if (line.Trim() == EndOfFileMarker)
@@ -327,56 +358,6 @@ internal sealed class PatchParser
         }
 
         error = string.Empty;
-        return new PatchChunk(contexts, oldLines, newLines, atEndOfFile);
-    }
-
-    private bool HasBodyAhead()
-    {
-        for (var index = _index; index < _lines.Length; index++)
-        {
-            var line = _lines[index];
-            if (IsBoundary(line))
-            {
-                return false;
-            }
-
-            if (line.Length > 0)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private bool IsOnlyBlankUntilBoundary()
-    {
-        for (var index = _index; index < _lines.Length; index++)
-        {
-            if (IsBoundary(_lines[index]))
-            {
-                return true;
-            }
-
-            if (_lines[index].Length > 0)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private int LastBoundaryIndex()
-    {
-        for (var index = _lines.Length - 1; index >= 0; index--)
-        {
-            if (IsBoundary(_lines[index]))
-            {
-                return index;
-            }
-        }
-
-        return _lines.Length;
+        return new PatchChunk(contexts, oldLines, newLines, atEndOfFile, removed, added);
     }
 }

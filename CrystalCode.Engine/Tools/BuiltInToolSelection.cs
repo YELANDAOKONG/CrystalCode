@@ -22,6 +22,7 @@ public static class BuiltInToolSelection
         QuestionTool.ToolName,
         EditTool.ToolName,
         WriteTool.ToolName,
+        ApplyPatchTool.ToolName,
         BashTool.ToolName,
         BackgroundBashStartTool.ToolName,
         BackgroundBashStatusTool.ToolName,

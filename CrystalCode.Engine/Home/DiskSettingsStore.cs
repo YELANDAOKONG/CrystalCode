@@ -72,6 +72,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             document.Skills ?? defaults.Skills,
             document.ExternalTools ?? defaults.ExternalTools,
             document.EstimatedTokens ?? defaults.EstimatedTokens,
+            document.TodoBar ?? defaults.TodoBar,
+            document.TodoBarRows ?? defaults.TodoBarRows,
             document.VerboseTools ?? defaults.VerboseTools,
             document.VerboseCommands ?? defaults.VerboseCommands,
             document.VerboseResults ?? defaults.VerboseResults,
@@ -159,6 +161,10 @@ public sealed class DiskSettingsStore : ISettingsStore
             ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
             McpToolApproval = WriteMcpToolApproval(settings.McpToolApproval),
             EstimatedTokens = settings.EstimatedTokens ? true : null,
+            TodoBar = settings.TodoBar ? null : false,
+            TodoBarRows = settings.TodoBarRows == HarnessSettings.DefaultTodoBarRows
+                ? null
+                : settings.TodoBarRows,
             VerboseTools = settings.VerboseTools ? null : false,
             VerboseCommands = settings.VerboseCommands ? null : false,
             VerboseResults = settings.VerboseResults ? null : false,

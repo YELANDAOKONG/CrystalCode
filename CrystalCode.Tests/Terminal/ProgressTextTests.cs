@@ -30,6 +30,7 @@ public sealed class ProgressTextTests
     [InlineData(TreeTool.ToolName, "Listing")]
     [InlineData(EditTool.ToolName, "Editing")]
     [InlineData(WriteTool.ToolName, "Writing File")]
+    [InlineData(ApplyPatchTool.ToolName, "Applying Patch")]
     [InlineData(GrepTool.ToolName, "Searching")]
     [InlineData(SearchTool.ToolName, "Searching")]
     [InlineData(TodoWriteTool.ToolName, "Updating Todos")]

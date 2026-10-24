@@ -11,7 +11,7 @@ public static class ShellLayout
 
     public const int MaxQueueRows = 8;
 
-    public const int MaxTodoRows = 6;
+    public const int MaxTodoRows = 12;
 
     public const int MinTranscriptRows = 3;
 

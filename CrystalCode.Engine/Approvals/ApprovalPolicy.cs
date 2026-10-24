@@ -67,10 +67,7 @@ public sealed class ApprovalPolicy
                     ToolResultStatus.Failure));
         }
 
-        if (call.Name is WriteTool.ToolName or EditTool.ToolName
-            && ToolArguments.TryReadRequiredString(call.Arguments, "path", out var path)
-            && _workspace.TryGetFullPath(path, out var fullPath, out _)
-            && _workspace.IsReadOnly(fullPath))
+        if (TargetsReadOnlyDirectory(call))
         {
             return ToolInvocationDecision.Reject(new ToolOutput(
                 "Writing to a read-only session directory is not allowed. Change its access with /access.",
@@ -191,16 +188,34 @@ public sealed class ApprovalPolicy
 
         if (classification.Risk == Risk.Write)
         {
-            return toolName is WriteTool.ToolName or EditTool.ToolName
+            return toolName is WriteTool.ToolName or EditTool.ToolName or ApplyPatchTool.ToolName
                 && (_mode == ApprovalMode.Edit || _mode == ApprovalMode.Review);
         }
 
         return false;
     }
 
+    private bool TargetsReadOnlyDirectory(ToolCall call)
+    {
+        if (call.Name is WriteTool.ToolName or EditTool.ToolName)
+        {
+            return ToolArguments.TryReadRequiredString(call.Arguments, "path", out var path)
+                && IsReadOnlyPath(path);
+        }
+
+        return call.Name == ApplyPatchTool.ToolName
+            && ApplyPatchTool.TryReadPaths(call.Arguments, out var paths)
+            && paths.Any(IsReadOnlyPath);
+    }
+
+    private bool IsReadOnlyPath(string path) =>
+        _workspace.TryGetFullPath(path, out var fullPath, out _)
+        && _workspace.IsReadOnly(fullPath);
+
     private static bool IsSideEffect(string toolName) =>
         toolName is EditTool.ToolName
             or WriteTool.ToolName
+            or ApplyPatchTool.ToolName
             or BashTool.ToolName
             or BackgroundBashStartTool.ToolName
             or BackgroundBashStopTool.ToolName;

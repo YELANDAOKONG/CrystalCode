@@ -59,6 +59,10 @@ public sealed class WorkspaceToolsPlugin : IPlugin
                     HostToolCatalogs.Work,
                     (workspace, _, _) => new WriteTool(workspace)),
                 new FactoryToolContribution(
+                    ApplyPatchTool.ToolName,
+                    HostToolCatalogs.Work,
+                    (workspace, _, _) => new ApplyPatchTool(workspace)),
+                new FactoryToolContribution(
                     BashTool.ToolName,
                     HostToolCatalogs.Work,
                     (workspace, _, _) => new BashTool(workspace))

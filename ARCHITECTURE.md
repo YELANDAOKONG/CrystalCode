@@ -673,8 +673,8 @@ do not add a mode.
   question. When Skills is enabled, it also registers skill. External tools
   whose `catalogs` include `plan` are appended after the built-ins.
 - Work registers read, list, tree, glob, grep, search, todowrite, todoread,
-  question, and skill when enabled, then edit, write, bash, and the
-  session-local `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`
+  question, and skill when enabled, then edit, write, apply_patch, bash, and
+  the session-local `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`
   tools, then external tools whose `catalogs` include `work`.
 
 CrystalCode currently maps only JSON tool input. Built-in and external dotnet
@@ -736,8 +736,8 @@ Plan and Work.
 A custom mode's catalog is built from the built-in tool set for Work, then
 filtered to the listed names, then the merged disabled list for Work is
 applied. Disk plugin, external, and MCP tools join only when their `catalogs`
-include the mode's base: `work` when the mode lists any of `edit`, `write`, or
-`bash`, otherwise `plan`. This keeps the Write + Workspace floor of an external
+include the mode's base: `work` when the mode lists any of `edit`, `write`,
+`apply_patch`, or `bash`, otherwise `plan`. This keeps the Write + Workspace floor of an external
 tool from appearing in a read-only mode. `task` is offered when Agents are
 enabled and `task` is listed. A child launched from a custom mode always uses
 the Plan child ceiling, even when the mode lists write tools.
@@ -765,7 +765,7 @@ immediately. Multiple questions and multiple-select questions use a shared
 confirmation step. Answers return in question order as arrays of selected
 labels; dismissing the overlay returns a failed tool result.
 
-Built-in Plan still has no edit, write, or bash. An external Plan tool
+Built-in Plan still has no edit, write, apply_patch, or bash. An external Plan tool
 keeps a Write + Workspace floor, so Plan is not built-in reads only
 once such a tool is installed. Approval still runs.
 
@@ -1026,7 +1026,9 @@ alone. Mutations are refused during a turn or compaction.
 Built-in file reads in authorized directories use ordinary workspace read
 approval. Writes in writable directories follow the current approval mode.
 Outside Full mode, `ApprovalPolicy` rejects explicit read-only writes before classification hooks,
-grants, or review; write and edit recheck at path resolution before file I/O.
+grants, or review; write, edit, and apply_patch recheck at path resolution
+before file I/O. A patch is rejected whole when any of its paths, including a
+move destination, is in a read-only directory.
 Full bypasses these directory restrictions through the shared workspace resolver;
 changing approval mode restores them without altering saved access rules.
 Unlisted outside paths follow the current approval mode. Credential paths
@@ -1054,6 +1056,49 @@ and can be removed by their listed canonical target. Shell, background shell, ex
 and plugins retain their existing approval behavior and are not sandboxed by this
 policy. An operating-system sandbox remains deferred.
 
+### File tool results
+
+`edit`, `write`, and `apply_patch` end their result with a numbered excerpt in
+the `read` layout (`     12|text`), so the model can check the outcome without
+another read. `edit` shows the changed lines with 5 lines of context on each
+side; with `replace_all` it shows the first change and the count. `write`
+shows the first lines of the file. An excerpt that would be empty, as after
+emptying a file, is omitted. Excerpts are model-visible tool text, use LF
+separators, and are not stored anywhere else.
+
+`grep` prints `path:line:text` by default. `output_mode` `files` lists each
+matching path once and `count` prints `path:count`. `context` (0 to 50) adds
+neighboring lines as `path-line-text`, with `--` between separate groups; a
+context line that two matches share is printed once. `limit` defaults to 2,000
+and is capped at 10,000 matches in `content` mode, or files in the other modes;
+a stop at the limit says so. Output is also bounded by the tool output size.
+
+`apply_patch` takes `patchText`: Add File, Update File, and Delete File
+sections between `*** Begin Patch` and `*** End Patch`. An Update File section
+may carry `*** Move to:` and holds change blocks. A block may start with one or
+more `@@ <line>` anchors that must be found, in order, before its lines are
+matched. Lines starting with a space are context, `-` removes, `+` adds, and
+`*** End of File` ties a block to the end of the file. Matching tries exact
+text, then ignoring trailing spaces, then ignoring surrounding spaces, then
+ignoring typographic quote, dash, ellipsis, and space differences; the looser
+passes run only when the stricter ones find nothing. The patch is read, every
+path is resolved and checked, and every Update is computed against the bytes
+on disk before the first file is written, so a bad block, a missing file, an
+existing Add or Move destination, a credential path, a read-only directory, a
+binary or non-UTF-8 file, an oversize result, or a path named in two sections
+leaves every file as it was. Sections then apply in order. An Update is written
+only if the file still holds the bytes it was computed from. A move writes the
+destination before deleting the source. If a write fails part way, the result
+names the failing file and the files already changed. Updates keep a byte order
+mark, the file's newline style, and whether it ended with a newline.
+
+The patch is classified by its riskiest path, including each move destination:
+any credential path makes the call Forbidden, any path outside the session's
+directories makes it an outside write, and otherwise it is a workspace write.
+A reusable grant for a patch is keyed by its sorted set of paths, not by the
+patch body. Plan does not offer it. Edit and Review let a workspace patch pass
+without review, like `edit` and `write`.
+
 ## Approval
 
 The following mode descriptions use workspace access for built-in file tools to
@@ -1068,7 +1113,7 @@ Every side-effect tool call is classified before invocation:
 
 Modes:
 
-- Plan: no built-in edit, write, or bash. Workspace reads auto-execute.
+- Plan: no built-in edit, write, apply_patch, or bash. Workspace reads auto-execute.
   Reads, list, tree, glob, grep, and search of paths outside the workspace ask the operator.
   When Skills is enabled, any path inside a Skills search directory
   (`skill` / `skills` trees) auto-executes as a workspace read. The
@@ -1077,10 +1122,10 @@ Modes:
   approval.
 - Default: Workspace Read auto-executes. Write, shell, and
   paths outside the workspace ask the operator.
-- Edit: workspace file changes for built-in `write` and `edit`
+- Edit: workspace file changes for built-in `write`, `edit`, and `apply_patch`
   pass without review. Shell, external tools, and paths outside the
   workspace still ask.
-- Review: workspace file changes for built-in `write` and `edit`
+- Review: workspace file changes for built-in `write`, `edit`, and `apply_patch`
   pass without review, same as Edit. Another model checks
   each remaining side-effect call (Codex guardian-style), including
   bash, bash_start, bash_stop, reads, list, tree, glob, grep, search, write, and edit of paths outside the
@@ -1103,7 +1148,8 @@ Modes:
   model round); if it still fails the host asks the operator. Review is
   not a grant and is not full pass-through.
 - Audit: the same reviewer and transcript rules as Review, but
-  workspace `write` and `edit` are also checked. They do not auto-pass.
+  workspace `write`, `edit`, and `apply_patch` are also checked. They do not
+  auto-pass.
 - Full: all tool calls pass without review or operator approval, including
   outside-workspace, Network, Privileged, Forbidden, and forced-prompt calls.
   Session read-only directory rules and execution path fences do not restrict
@@ -1987,15 +2033,15 @@ The directory check itself runs before the session is created and follows
 denies every call that would have asked the operator. The question prompt
 dismisses. Session choice is declined. Review and Audit still call the
 reviewing model: allow executes the tool, and deny returns the reviewer's
-reason. Plan does not offer write, edit, or bash. The approval policy
+reason. Plan does not offer write, edit, apply_patch, or bash. The approval policy
 also rejects those side effects when a catalog still contains them.
 
 `--format default` writes a readable trace. Each model round prints thinking
 text only when `--show-thinking` is set, then the assistant reply, then each
 tool beside its own result. With `--show-thinking`, the reply is labeled
 `[Assistant]`. `read`, `list`, `glob`, `grep`, and other successful
-tools keep a short head excerpt and an omitted-line count. `edit` and `write`
-keep their result. `bash` keeps the command, the exit status, and a short
+tools keep a short head excerpt and an omitted-line count. `edit`, `write`, and
+`apply_patch` keep their result. `bash` keeps the command, the exit status, and a short
 tail, with a longer tail when the command fails. Other failures keep the
 result text. Labels use square brackets, exit status uses parentheses, and
 omitted-line markers use angle brackets. `--format json` writes one JSON object per
@@ -2140,9 +2186,12 @@ text occupies no cell. A narrow
 custom line still drops `custom` slots from the right.
 Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled
-muted. The bar shows the first four items and a `+N more` line when
+muted. The bar shows the first `todoBarRows` items (3 to 10, default 4) and a `+N more` line when
 the list is longer; `/todos` (alias `/todo`) publishes `TodosListed` and the
-terminal draws the full untruncated list in a rounded `Todos` card. The transcript Result card uses the same colors for
+terminal draws the full untruncated list in a rounded `Todos` card.
+`/todos bar [on|off]` and `/todos rows [3-10]` write `todoBar` and `todoBarRows`
+to `config.json` (defaults on and 4; each omitted when default) and publish
+`PreferencesChanged`. A `todoBarRows` outside 3 to 10 refuses startup. The transcript Result card uses the same colors for
 `- [ ]` / `- [~]` / `- [x]` / `- [-]` lines so they are not painted as
 diff removals. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode (Plan, Work, or a custom mode name) is on the
@@ -2177,8 +2226,8 @@ coalesced per tool call so a repeated snapshot does not become
 result panels honor `verboseResults` (`config.json`, default on, omitted
 when on). It is the parent of `verboseTools` and `verboseCommands`.
 While it is off, every success result is omitted, including read, search,
-skill, `edit`, `write`, `bash`, `bash_start`, `bash_status`, `bash_logs`,
-and `bash_stop`. The Tool card stays unless `verboseCalls` is off.
+skill, `edit`, `write`, `apply_patch`, `bash`, `bash_start`, `bash_status`,
+`bash_logs`, and `bash_stop`. The Tool card stays unless `verboseCalls` is off.
 That switch (default on, omitted when on) hides every Tool card,
 including read, search, edit, write, bash, background bash, and
 external tools. It does not hide success or failure results, and
@@ -2187,7 +2236,7 @@ switches stay stored and do not draw a result until the parent is on
 again; Ctrl+G does not expand a command result in that state because the
 panel is omitted, not collapsed. A missing `verboseResults` field keeps
 the parent on. While the parent is on, tool verbose off omits
-read/search/skill result panels and still shows `edit` and `write`
+read/search/skill result panels and still shows `edit`, `write`, and `apply_patch`
 results, and command verbose off collapses `bash` and the four background
 bash tools to a hidden-line hint plus the last output line. `crystal run`
 does not read `verboseResults`. Policy and grant auto-pass cards honor `verboseApprovals`
@@ -2223,8 +2272,10 @@ either end, and any scroll while the panel already fits, scrolls the
 transcript. Custom answers edit inside the overlay with an independent buffer:
 Enter saves and Escape cancels editing without dismissing the question. The
 paused main composer keeps its draft and hides its cursor. Ask and auto-pass
-cards for `edit` and `write` show a capped `+` / `-` preview
-of `old_string` / `new_string` or `contents`. An `edit` with `replace_all`
+cards for `edit`, `write`, and `apply_patch` show a capped `+` / `-` preview
+of `old_string` / `new_string`, `contents`, or the patch. A patch card heads
+each file (`Add`, `Update`, `Move`, `Delete`) and lists only its removed and
+added lines; the line cap covers the whole card. An `edit` with `replace_all`
 adds a muted `Replaces every occurrence` line above the preview. Overlay keys share the
 session frame loop, so transcript scroll and resize still work while a
 prompt is up. Ask overlays use the same card; `Y` / `S` / `A` / `N` map

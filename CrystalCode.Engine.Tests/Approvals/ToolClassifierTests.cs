@@ -412,7 +412,7 @@ public sealed class ToolClassifierTests
     public async Task Classify_ExternalToolApprovalClassifierRaisesManifestPaths()
     {
         using var root = new TemporaryWorkspace();
-        var spec = CreateExternalSpec("apply_patch");
+        var spec = CreateExternalSpec("patchsite");
         var approvalClassifier = new FixedHostApprovalClassifier(
             new HostToolApprovalClassification(
                 "write",
@@ -421,7 +421,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -465,7 +465,7 @@ public sealed class ToolClassifierTests
     public async Task Classify_ExternalToolApprovalClassifierMixesRaiseAndLower()
     {
         using var root = new TemporaryWorkspace();
-        var spec = CreateExternalSpec("apply_patch");
+        var spec = CreateExternalSpec("patchsite");
         var approvalClassifier = new FixedHostApprovalClassifier(
             new HostToolApprovalClassification(
                 "read",
@@ -474,7 +474,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -485,7 +485,7 @@ public sealed class ToolClassifierTests
     public async Task Classify_ExternalToolApprovalClassifierAcceptsHostSpellings()
     {
         using var root = new TemporaryWorkspace();
-        var spec = CreateExternalSpec("apply_patch");
+        var spec = CreateExternalSpec("patchsite");
         var approvalClassifier = new FixedHostApprovalClassifier(
             new HostToolApprovalClassification(
                 "Write",
@@ -494,7 +494,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
@@ -505,13 +505,13 @@ public sealed class ToolClassifierTests
     public async Task Classify_ExternalToolApprovalClassifierUnknownValuesFailClosed()
     {
         using var root = new TemporaryWorkspace();
-        var spec = CreateExternalSpec("apply_patch");
+        var spec = CreateExternalSpec("patchsite");
         var approvalClassifier = new FixedHostApprovalClassifier(
             new HostToolApprovalClassification("nonsense", "nonsense", "Apply patch"));
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(Risk.Privileged, classification.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
@@ -521,14 +521,14 @@ public sealed class ToolClassifierTests
     public async Task Classify_ExternalToolApprovalClassifierFailureFailsClosed()
     {
         using var root = new TemporaryWorkspace();
-        var spec = CreateExternalSpec("apply_patch");
+        var spec = CreateExternalSpec("patchsite");
         var classifier = CreateExternalClassifier(
             root,
             spec,
             new ThrowingHostApprovalClassifier());
 
         var classification = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(Risk.Privileged, classification.Risk);
         Assert.Equal(Authority.PrivilegedEscalation, classification.Authority);
@@ -539,7 +539,7 @@ public sealed class ToolClassifierTests
     public async Task Classify_ExternalToolApprovalClassifierKeepsPromptRequirement()
     {
         using var root = new TemporaryWorkspace();
-        var spec = CreateExternalSpec("apply_patch");
+        var spec = CreateExternalSpec("patchsite");
         var approvalClassifier = new FixedHostApprovalClassifier(
             new HostToolApprovalClassification(
                 "write",
@@ -549,7 +549,7 @@ public sealed class ToolClassifierTests
         var classifier = CreateExternalClassifier(root, spec, approvalClassifier);
 
         var classification = await classifier.ClassifyAsync(
-            JsonToolCall("1", "apply_patch", "{}"));
+            JsonToolCall("1", "patchsite", "{}"));
 
         Assert.Equal(Risk.Write, classification.Risk);
         Assert.Equal(Authority.Workspace, classification.Authority);

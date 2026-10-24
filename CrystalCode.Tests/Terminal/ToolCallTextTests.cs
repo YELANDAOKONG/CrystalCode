@@ -22,6 +22,25 @@ public sealed class ToolCallTextTests
     }
 
     [Fact]
+    public void Summary_PatchListsItsPaths()
+    {
+        static string Arguments(string sections) =>
+            System.Text.Json.JsonSerializer.Serialize(
+                new { patchText = "*** Begin Patch\n" + sections + "\n*** End Patch" });
+
+        Assert.Equal(
+            "Apply Patch  a.txt, b.txt",
+            ToolCallText.Summary("apply_patch", Arguments("*** Add File: a.txt\n+x\n*** Delete File: b.txt")));
+        Assert.Equal(
+            "Apply Patch  a.txt, b.txt, c.txt and 1 more",
+            ToolCallText.Summary(
+                "apply_patch",
+                Arguments(
+                    "*** Add File: a.txt\n+x\n*** Add File: b.txt\n+x\n*** Add File: c.txt\n+x\n*** Add File: d.txt\n+x")));
+        Assert.Equal("Apply Patch", ToolCallText.Summary("apply_patch", """{"patchText":"nonsense"}"""));
+    }
+
+    [Fact]
     public void Summary_IgnoresPartialJson()
     {
         Assert.Equal("Bash", ToolCallText.Summary("bash", """{"com"""));

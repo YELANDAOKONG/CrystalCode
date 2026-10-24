@@ -21,8 +21,8 @@ From a workspace you want the agent to inspect or change, CrystalCode:
 - retries a failed model round on rate limits, server errors, timeouts,
   network faults, and incomplete streams, waiting with backoff;
 - switches the configured provider and model with `/model`;
-- switches Plan (built-in reads; no edit, write, or bash) and Work
-  (edit, write, shell);
+- switches Plan (built-in reads; no edit, write, apply_patch, or bash) and Work
+  (edit, write, multi-file patches, shell);
 - approves side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
 - compacts conversation context when usage approaches the selected
@@ -303,7 +303,7 @@ echo "Summarize the repository." | crystal run --model-calls 8 --tool-calls 32
 
 `--format default` prints a readable trace: the assistant reply, then each
 tool beside its own result. `read`, `list`, `glob`, and `grep` keep a short head
-excerpt and say how many lines were omitted. `edit` and `write` keep their
+excerpt and say how many lines were omitted. `edit`, `write`, and `apply_patch` keep their
 result. `bash` keeps the command, the exit status, and a short tail, with
 a longer tail when the command fails. Other successful tools use the same
 short excerpt. Failures other than `bash` keep the result text.
@@ -377,7 +377,7 @@ unless the approval-model switch is on for this process. Anything that
 would ask the operator, including Default and Edit prompts, is
 denied with the usual rejection text. Full auto-passes tool calls.
 The `question` tool is dismissed.
-Plan does not offer write, edit, or bash. Credential paths stay forbidden.
+Plan does not offer write, edit, apply_patch, or bash. Credential paths stay forbidden.
 
 A reviewer denial is a tool error. If the model then finishes, the
 process exits 0. A denied operator prompt or a dismissed question does
@@ -551,6 +551,8 @@ Top-level fields:
 | `agents` | Child Agents. Omitted means off, concurrency 4, and the built-in Agents inherit the parent model. `enabled`, `maxConcurrent` (1–8), and `general`, `explore`, and `work` model choices (`provider`, `model`, `thinking`, `context`, `tier`, `speed`). `/agents` writes built-in choices here. Custom Agents are stored in their own `agent.json`, not in this object |
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
+| `todoBar` | Show the pinned `Todos` bar above the status bar (default `true`; omitted when on) |
+| `todoBarRows` | Items the pinned `Todos` bar shows before `+N more`, from 3 to 10 (default `4`; omitted when 4). Other values refuse startup |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `verboseResults` | Parent switch for success result panels (default `true`; omitted when on). Off hides every success result already on screen, including read, search, skill, edit, write, bash, and background bash. Does not hide Tool cards; those follow `verboseCalls`. Failures stay. `verboseTools` and `verboseCommands` do not draw results while this is off. `crystal run` does not read it |
 | `verboseCalls` | Show Tool cards (default `true`; omitted when on). Off hides every Tool card already on screen: read, search, edit, write, bash, background bash, and external tools such as Apply Patch. Success and failure results stay. Independent of `verboseResults`, `verboseTools`, and `verboseCommands`. `crystal run` does not read it |
@@ -878,8 +880,9 @@ Console output is UTF-8, so Windows does not replace those frames with `?`
 or garble CJK text.
 The `~N Tokens` estimate
 appears only when `estimatedTokens` is on. When the session has todos, a
-pinned `Todos` bar sits above that progress row (first four items; `/todos`
-prints the full list). Session start and `/cd`
+pinned `Todos` bar sits above that progress row (first four items by default;
+`todoBar` hides it and `todoBarRows` sets 3 to 10 items; `/todos` prints the
+full list). Session start and `/cd`
 show `Loading Tools` on that row while operator tool sets load, after
 the frame is already up.
 
@@ -887,7 +890,8 @@ Assistant text is rendered as markdown while it streams and after it
 commits (headings, lists, fenced code, inline code and bold). User,
 thinking, tool, result, and compaction-summary blocks are rounded panels. Tool names in
 chrome are Title Case. Approval cards for edit and write show a short
-`+` / `-` preview of the change.
+`+` / `-` preview of the change. A patch card names each file, then lists its
+removed and added lines; the 12-line cap covers the whole card.
 
 ### Result detail
 
@@ -1042,8 +1046,8 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
-| **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
+| **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, apply_patch, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, apply_patch, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
 Tab and Shift+Tab cycle Plan, Work, and enabled custom modes. `/plan` toggles
 Plan and Work, and `/mode <name>` picks any mode. When child Agents are
@@ -1187,9 +1191,9 @@ Grant: Once, Session, Persistent.
 | Mode | Behavior |
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
-| **Edit** | Workspace file changes for built-in `write` and `edit` pass without review. Shell, external tools, and paths outside the workspace still ask. |
-| **Review** | Workspace file changes for built-in `write` and `edit` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, tree, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Answers given through the question tool count as user authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. A transient reviewer request failure is retried per `approvalRetry` (five times by default); if it still fails you are asked. Review is not a grant and is not full pass-through. |
-| **Audit** | The same reviewer and transcript rules as Review, but workspace `write` and `edit` are also checked. They do not auto-pass. |
+| **Edit** | Workspace file changes for built-in `write`, `edit`, and `apply_patch` pass without review. Shell, external tools, and paths outside the workspace still ask. |
+| **Review** | Workspace file changes for built-in `write`, `edit`, and `apply_patch` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, tree, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Answers given through the question tool count as user authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. A transient reviewer request failure is retried per `approvalRetry` (five times by default); if it still fails you are asked. Review is not a grant and is not full pass-through. |
+| **Audit** | The same reviewer and transcript rules as Review, but workspace `write`, `edit`, and `apply_patch` are also checked. They do not auto-pass. |
 | **Full** | All tool calls pass without review or operator approval, including outside-workspace paths, session read-only directories, Network, Privileged, Forbidden classifications, and forced prompts. Credential paths remain prohibited. Tool availability, argument validation, OS permissions, cancellation, and budgets still apply. |
 
 Do not name a mode `auto`. That word is ambiguous between review and
@@ -1398,7 +1402,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `full` folds the whole conversation, including the latest turn, into the summary. `model` shows or sets the compaction model; `thinking` cycles or sets its gear. `summary` toggles the manual summary; `auto` toggles the automatic one. `micro` toggles removal of old tool results. `on` or `off` sets any of those switches |
 | `/export` | | Export markdown or json, or show usage; optional `[path]` and `--system` |
-| `/todos` | `/todo` | Print the full session todo list (no `+N more` truncation) |
+| `/todos` | `/todo` | Print the full session todo list in a `Todos` card (no `+N more` truncation). `bar [on\|off]` toggles the pinned bar, and `rows [3-10]` shows or sets how many items it lists. Both write `config.json` |
 | `/tools` | | List grouped tool catalogs and configure external-tool loading and approval |
 | `/quit` | `/exit`, `/q` | Exit |
 
@@ -1434,9 +1438,11 @@ custom field order.
 
 ## Built-in tools
 
-`read`, `list`, `tree`, `glob`, `grep`, `search`, `edit`, and `write` may use a path outside the
-workspace after approval (you, or the Review model in Review or
-Audit). Workspace `write` and `edit` still follow the approval mode.
+`read`, `list`, `tree`, `glob`, `grep`, `search`, `edit`, `write`, and `apply_patch` may use a path
+outside the workspace after approval (you, or the Review model in Review or
+Audit). Workspace `write`, `edit`, and `apply_patch` still follow the approval mode.
+A patch is judged by its riskiest path: one path outside the workspace makes the whole
+call an outside write, and one credential path makes it forbidden.
 `bash` starts in the workspace root and is approved as a side effect.
 Background Bash tasks are available in Work only. `bash_start` returns a
 session-local task ID without waiting; use `bash_status` or `bash_logs` to
@@ -1461,15 +1467,16 @@ is the workspace root.
 | `list` | Plan, Work | List a directory's immediate entries (`path` optional, 1-based `offset` and `limit` paging) |
 | `tree` | Plan, Work | List the directory structure under a path (`path` optional, `depth` default 2 capped at 4, `files` to include file entries). Depth-first; subdirectories before files; up to 1,000 entries and 20 files per directory |
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`, 1-based `offset` and `limit` paging) |
-| `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`) |
+| `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`). `output_mode` is `content` (default), `files` for matching paths only, or `count` for matching lines per file. `context` adds 0 to 50 lines around each match in `content` mode. `limit` caps matches or files |
 | `search` | Plan, Work | Ranked candidate files by name and content (`query`, optional `path`, `glob`, `caseSensitive`, 1-based `offset` and `limit` paging) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
 | `todoread` | Plan, Work | Read the current session todo list |
 | `question` | Plan, Work | Ask one or more questions with single/multiple choices and custom answers |
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `task` | Plan, Work | Delegate to a child Agent (`agent`, `label`, `prompt`, optional `sessionId`). Present only while child Agents are enabled and at least one Agent is available. `work` is omitted in Plan. A call without `sessionId` creates a child; a call with it continues that child |
-| `edit` | Work | Replace one unique `old_string` in a file, or every occurrence with `replace_all` |
-| `write` | Work | Create or overwrite a UTF-8 text file |
+| `edit` | Work | Replace one unique `old_string` in a file, or every occurrence with `replace_all`. The result shows the changed lines with five lines of context on each side |
+| `write` | Work | Create or overwrite a UTF-8 text file. The result shows the first lines of the file |
+| `apply_patch` | Work | Change several files in one call with `patchText`: Add File, Update File (with optional Move to), and Delete File sections between `*** Begin Patch` and `*** End Patch`. Every section is checked before any file changes. A move needs a destination that does not exist. The result lists each file and shows the changed lines |
 | `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 600 seconds) |
 | `bash_start` | Work | Start a session-local background shell command after approval and return its task ID. Timeout is `backgroundBashTimeoutSeconds` (default 10800 seconds, 3 hours) |
 | `bash_status` | Work | Read the status, exit code, and log offsets of a background task |
@@ -1477,7 +1484,8 @@ is the workspace root.
 | `bash_stop` | Work | Stop a background task and its child processes after approval |
 
 Practical limits: read up to 1,000,000 characters or 20,000 lines;
-write up to 2 MiB; grep up to 1,000 matches and 8 MiB per file; search
+write up to 2 MiB; a patch up to 2 MiB; grep up to 10,000 matches (default 2,000)
+and 8 MiB per file; search
 up to 200 candidate files per page (default 50) with up to 2 preview
 lines per file and 8 MiB per scanned file; glob
 up to 1,000 matches per page; list up to 1,000 entries per page; tree up to

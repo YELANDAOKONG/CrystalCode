@@ -18,6 +18,7 @@ internal sealed record ModeDefinition(
     [
         EditTool.ToolName,
         WriteTool.ToolName,
+        ApplyPatchTool.ToolName,
         BashTool.ToolName,
         BackgroundBashStartTool.ToolName,
         BackgroundBashStatusTool.ToolName,

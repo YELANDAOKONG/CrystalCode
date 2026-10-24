@@ -14,6 +14,9 @@ internal static class GrantFingerprint
                 path.Replace('\\', '/'),
             EditTool.ToolName when EditTool.TryRead(call.Arguments, out var path, out _, out _) =>
                 path.Replace('\\', '/'),
+            ApplyPatchTool.ToolName when ApplyPatchTool.TryReadPaths(call.Arguments, out var patchPaths)
+                && patchPaths.Count > 0 =>
+                string.Join('\n', patchPaths.Select(static p => p.Replace('\\', '/')).Distinct().Order(StringComparer.Ordinal)),
             ReadTool.ToolName when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var readPath) =>
                 readPath.Replace('\\', '/'),
             DescribeImageTool.ToolName or ViewImageTool.ToolName

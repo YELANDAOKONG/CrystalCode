@@ -127,7 +127,7 @@ public sealed class ApprovalCardTests
     {
         var classification = new ToolClassification(new Risk(risk), new Authority(authority), "Patch", requirePrompt);
         var text = string.Join('\n', WidgetPaint.Plain(
-            ApprovalCard.AskWidget(JsonToolCall("1", "apply_patch", "{}"), classification), 100));
+            ApprovalCard.AskWidget(JsonToolCall("1", "patchsite", "{}"), classification), 100));
 
         Assert.Contains("Y Once", text, StringComparison.Ordinal);
         Assert.Contains("N Deny", text, StringComparison.Ordinal);
