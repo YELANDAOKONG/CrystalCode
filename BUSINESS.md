@@ -184,6 +184,21 @@ separate library with no terminal code. The product can:
 - discover operator tool sets under `~/.crystal/tools` and
   `<workspace>/.crystal/tools` and register them as extra catalog tools
   when External Tools is enabled;
+- connect to MCP servers defined in `~/.crystal/mcp.json`, single-server
+  definitions under `~/.crystal/mcp/<name>/server.json`, and their workspace
+  equivalents when MCP is enabled. Server tools are registered with
+  `mcp__<server>__<tool>` names. Resources use two host tools:
+  `list_mcp_resources` and `read_mcp_resource`. Prompts become slash commands
+  `/mcp__<server>__<prompt>`. Server elicitation requests go through the
+  existing operator question modal. Sampling is deferred. The client declares
+  the roots capability, answers with the workspace root, and sends
+  list-changed notifications when the workspace changes. Session-level
+  servers supplied by a front end replace same-name configured servers.
+  Connections start during session startup with a 30-second handshake
+  timeout; tool calls default to 120 seconds, and a server definition may
+  set `"unlimited"`. Failed
+  connections or tools write notes without blocking the session. Servers
+  reconnect on `/cd` and `/space` but stay connected through `/clear`;
 - load operator plugins from `~/.crystal/plugins` and
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
   tools, protocol clients, classifiers, slash commands, hooks, raw
@@ -365,8 +380,6 @@ implemented in the current build.
   and platform coverage are not defined. Do not reserve a package name, tap,
   formula, image, or repository. Release artifacts and install scripts remain
   the install path until a specific change defines otherwise.
-- MCP servers. Do not bypass the existing plugin, approval, and media
-  boundaries.
 - The Agent Client Protocol (ACP). The working name is crystal agent. An
   editor would drive a session over stdio. That is another front end that
   implements `SessionFrontEnd`, not an engine protocol. The terminal remains
@@ -445,9 +458,7 @@ implemented in the current build.
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
-`audioInput` or `videoInput` declaration is not that path. TODO: add
-MCP without bypassing the existing plugin, approval, and media boundaries.
-TODO: add ACP only as a front end that implements `SessionFrontEnd`. The
+`audioInput` or `videoInput` declaration is not that path. TODO: add ACP only as a front end that implements `SessionFrontEnd`. The
 working name is crystal agent. Do not put that protocol in the engine, do not
 add a `crystal agent` command, project, or public type before its behavior and
 ownership are defined, and do not bypass approval, trust, or the tool
