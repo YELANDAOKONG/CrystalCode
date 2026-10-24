@@ -6,6 +6,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Plugins.Providers;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.External;
 
 namespace CrystalCode.Engine.Plugins;
 
@@ -15,6 +16,7 @@ namespace CrystalCode.Engine.Plugins;
 public sealed class PluginRegistry
 {
     private readonly List<IToolContribution> _tools = [];
+    private readonly Dictionary<string, IToolContribution> _replacements = new(StringComparer.Ordinal);
     private readonly List<IChatClientFactory> _clients = [];
     private readonly List<IApprovalClassifier> _classifiers = [];
     private readonly List<ISlashCommand> _commands = [];
@@ -22,7 +24,7 @@ public sealed class PluginRegistry
     private readonly HashSet<string> _commandNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _pluginNames = new(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyList<IToolContribution> Tools => _tools;
+    public IReadOnlyList<IToolContribution> Tools => [.. _tools, .. _replacements.Values];
 
     public IReadOnlyList<IChatClientFactory> Clients => _clients;
 
@@ -63,6 +65,18 @@ public sealed class PluginRegistry
         foreach (var tool in contribution.Tools)
         {
             ArgumentNullException.ThrowIfNull(tool);
+            if (tool.Kind == ToolContributionKind.Replace)
+            {
+                AddReplacement(name, tool);
+                continue;
+            }
+
+            if (tool.Kind != ToolContributionKind.Append)
+            {
+                throw new InvalidOperationException(
+                    $"Plugin '{name}' contributed tool '{tool.Name}' with an unsupported contribution kind.");
+            }
+
             if (!_toolNames.Add(tool.Name))
             {
                 throw new InvalidOperationException(
@@ -115,15 +129,66 @@ public sealed class PluginRegistry
         var tools = new List<ITool>();
         foreach (var contribution in _tools)
         {
-            if (!contribution.Catalogs.Contains(catalog))
+            var selected = SelectContribution(contribution, catalog);
+            if (!selected.Catalogs.Contains(catalog))
             {
                 continue;
             }
 
-            tools.Add(contribution.Create(workspace, todos, prompt));
+            tools.Add(ValidateTool(selected, selected.Create(workspace, todos, prompt)));
         }
 
         return tools;
+    }
+
+    private void AddReplacement(string pluginName, IToolContribution contribution)
+    {
+        var target = contribution.ReplacementTarget;
+        if (string.IsNullOrWhiteSpace(target)
+            || !string.Equals(target, contribution.Name, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' contributed replacement '{contribution.Name}' without a matching target.");
+        }
+
+        if (!ExternalToolNames.IsReserved(target) || !_toolNames.Contains(target))
+        {
+            throw new InvalidOperationException(
+                $"Plugin '{pluginName}' cannot replace unknown built-in tool '{target}'.");
+        }
+
+        if (!_replacements.TryAdd(target, contribution))
+        {
+            throw new InvalidOperationException(
+                $"Built-in tool '{target}' already has a replacement.");
+        }
+    }
+
+    private IToolContribution SelectContribution(
+        IToolContribution contribution,
+        HostToolCatalog catalog)
+    {
+        if (_replacements.TryGetValue(contribution.Name, out var replacement)
+            && replacement.Catalogs.Contains(catalog))
+        {
+            return replacement;
+        }
+
+        return contribution;
+    }
+
+    private static ITool ValidateTool(
+        IToolContribution contribution,
+        ITool tool)
+    {
+        ArgumentNullException.ThrowIfNull(tool);
+        if (!string.Equals(tool.Definition.Name, contribution.Name, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Tool contribution '{contribution.Name}' returned definition '{tool.Definition.Name}'.");
+        }
+
+        return tool;
     }
 
     public IReadOnlyList<IMultimodalTool> CreateMultimodalTools(
@@ -143,21 +208,22 @@ public sealed class PluginRegistry
         var tools = new List<IMultimodalTool>();
         foreach (var contribution in _tools)
         {
-            if (!contribution.Catalogs.Contains(catalog))
+            var selected = SelectContribution(contribution, catalog);
+            if (!selected.Catalogs.Contains(catalog))
             {
                 continue;
             }
 
-            var tool = contribution.CreateMultimodal(workspace, todos, prompt);
+            var tool = selected.CreateMultimodal(workspace, todos, prompt);
             if (tool is not null)
             {
                 if (!string.Equals(
                         tool.Definition.Name,
-                        contribution.Name,
+                        selected.Name,
                         StringComparison.Ordinal))
                 {
                     throw new InvalidOperationException(
-                        $"Multimodal tool '{tool.Definition.Name}' must match contribution '{contribution.Name}'.");
+                        $"Multimodal tool '{tool.Definition.Name}' must match contribution '{selected.Name}'.");
                 }
 
                 tools.Add(tool);

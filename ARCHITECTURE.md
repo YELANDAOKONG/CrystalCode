@@ -2183,7 +2183,17 @@ contribution always has a text `ITool` implementation and may additionally
 provide an `IMultimodalTool` with the same definition name; the latter may
 return generic image content while reusing the host approval policy.
 Built-in tools and all six wire protocol adapters register through that
-table. `PluginRegistry` does not load assemblies from disk.
+table. `PluginRegistry` does not load assemblies from disk. Tool contributions
+default to `Append`, which rejects duplicate names. An in-process contribution
+may explicitly use `Replace` with a reserved built-in name; the target must
+already be registered by the built-in workspace plugin. Replacement is
+selected per Plan or Work catalog, keeps the built-in model-facing name, and
+must return a definition with that same name. A replacement is used for both
+text and multimodal creation when it supplies a multimodal tool; it does not
+inherit the original multimodal implementation. The resulting tools still
+pass through the same approval policy, executor, cancellation, and budget
+boundaries. Disk plugins and external tool sets remain append-only until their
+replacement contracts are defined.
 
 Disk plugins use `CrystalCode.Plugins.IPlugin` and are loaded by
 `PluginCatalog` from `plugins/`. One non-collectible load context serves

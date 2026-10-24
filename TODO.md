@@ -54,13 +54,15 @@ These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work. Current
 behavior stands until a specific change defines otherwise.
 
-- Extensible, adjustable, and disableable built-in tools, including saved,
-  session, and plugin ways to disable a built-in tool and to supply another
-  tool in its place. Process-only `--disable-tool` is not this path: it
-  omits a built-in for one process, does not persist, and does not replace
-  the tool. How a tool is extended or adjusted is not defined. Do not reserve
-  a configuration field, command, or public type. Host-owned numeric limits
-  stay under Pending evaluation.
+- Extensible, adjustable, and disableable built-in tools. Explicit in-process
+  `IPlugin` replacement is now defined: `Append` keeps duplicate-name
+  rejection, while `Replace` names a reserved built-in and may target Plan or
+  Work independently. The replacement keeps the built-in model-facing name
+  and uses the host executor and approval path. Disk-plugin and external-tool
+  replacement, saved and session disablement, metadata adjustment, and other
+  disable rules remain. Process-only `--disable-tool` is still separate and
+  does not persist or replace a tool. Host-owned numeric limits stay under
+  Pending evaluation.
 - Product modes other than Plan and Work, including operator-defined custom
   modes. The product has exactly two modes today. Prompt overlays, prompt
   sets, prompt attachments, and external tool catalogs do not add a mode.

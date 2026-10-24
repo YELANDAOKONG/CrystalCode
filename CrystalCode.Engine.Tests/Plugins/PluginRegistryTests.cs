@@ -1,3 +1,5 @@
+using Crystal.Tools;
+
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
@@ -93,6 +95,36 @@ public sealed class PluginRegistryTests
     }
 
     [Fact]
+    public async Task Add_AllowsExplicitBuiltInReplacement()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var registry = PluginRegistry.CreateBuiltIn();
+        registry.Add(new ReadReplacementPlugin());
+
+        var catalog = WorkspaceCatalog.CreatePlan(
+            new Workspace(workspace.Path),
+            new TodoList(),
+            new FixedUserPrompt("ok"),
+            registry);
+
+        Assert.Equal("replacement", catalog.Find(ReadTool.ToolName)!.Definition.Description);
+        var result = await catalog.Find(ReadTool.ToolName)!.InvokeAsync(
+            new ToolCall("replacement", ReadTool.ToolName, "{}", ToolInputKind.Json));
+        Assert.Equal("replacement", result.Text);
+    }
+
+    [Fact]
+    public void Add_RejectsReplacementForUnknownTool()
+    {
+        var registry = new PluginRegistry();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => registry.Add(new UnknownReplacementPlugin()));
+
+        Assert.Contains("unknown built-in tool", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FindCommand_ExecutesRegisteredSlashVerb()
     {
         var registry = new PluginRegistry();
@@ -162,6 +194,58 @@ public sealed class PluginRegistryTests
                         HostToolCatalogs.PlanAndWork,
                         (workspace, _, _) => new ReadTool(workspace))
                 ]);
+    }
+
+    private sealed class ReadReplacementPlugin : IPlugin
+    {
+        public string Name => "read-replacement";
+
+        public PluginContribution Contribute() =>
+            new(
+                tools:
+                [
+                    new FactoryToolContribution(
+                        ReadTool.ToolName,
+                        HostToolCatalogs.PlanAndWork,
+                        (_, _, _) => new ReplacementReadTool(),
+                        kind: ToolContributionKind.Replace,
+                        replacementTarget: ReadTool.ToolName)
+                ]);
+    }
+
+    private sealed class UnknownReplacementPlugin : IPlugin
+    {
+        public string Name => "unknown-replacement";
+
+        public PluginContribution Contribute() =>
+            new(
+                tools:
+                [
+                    new FactoryToolContribution(
+                        "missing",
+                        HostToolCatalogs.Work,
+                        (_, _, _) => new EchoTool(),
+                        kind: ToolContributionKind.Replace,
+                        replacementTarget: "missing")
+                ]);
+    }
+
+    private sealed class ReplacementReadTool : ITool
+    {
+        public ReplacementReadTool()
+        {
+            Definition = ToolDefinition.Json(
+                ReadTool.ToolName,
+                ToolSchema.Parse("""{"type":"object","properties":{}}"""),
+                "replacement");
+        }
+
+        public ToolDefinition Definition { get; }
+
+        public ValueTask<ToolOutput> InvokeAsync(
+            ToolCall call,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(new ToolOutput("replacement"));
     }
 
     private sealed class NotePlugin : IPlugin

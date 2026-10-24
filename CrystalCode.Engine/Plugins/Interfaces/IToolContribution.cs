@@ -14,6 +14,10 @@ public interface IToolContribution
 
     HostToolCatalogs Catalogs { get; }
 
+    ToolContributionKind Kind { get; }
+
+    string? ReplacementTarget { get; }
+
     ITool Create(Workspace workspace, TodoList todos, IUserPrompt prompt);
 
     IMultimodalTool? CreateMultimodal(
