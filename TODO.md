@@ -46,6 +46,11 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Configurable serial or concurrent execution of ordinary tool-call batches.
   Ordinary Work and Plan tools remain serial. Adjacent child `task` groups
   use their own bounded concurrency.
+- OAuth sign-in for model providers, such as a ChatGPT account login for
+  OpenAI. Today a provider authenticates only with a static API key. Whether
+  it is built, which providers, the token store, and refresh behavior are not
+  defined. Do not reserve a command, configuration field, or public type. It
+  is not OAuth for remote MCP servers (see MCP gaps).
 
 ## High priority
 

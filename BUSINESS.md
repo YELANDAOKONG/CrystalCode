@@ -515,6 +515,16 @@ implemented in the current build.
   concurrency setting, its default and scope, and ordering for unrelated
   side effects are not defined. Do not reserve a configuration field or
   command for general tool concurrency;
+- OAuth sign-in for model providers, such as a ChatGPT account login for
+  OpenAI. A provider authenticates only with a static API key today. Which
+  providers, which endpoints and client identity, where tokens are stored,
+  refresh and concurrent-refresh behavior, how a front end shows the login,
+  and whether the terms of the service allow it are not defined. A sign-in
+  would have to keep adapters free of `~/.crystal` layout and prompts, keep
+  the engine off the console, never put tokens in source, logs, diagnostics,
+  or on a command line, and make `crystal run` fail instead of asking the
+  operator. Do not reserve a command, configuration field, or public type. It
+  is not OAuth for remote MCP servers;
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
