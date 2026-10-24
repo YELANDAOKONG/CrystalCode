@@ -192,7 +192,8 @@ public sealed class InstructionDiscoveryTests
     [Fact]
     public void Collect_SkipsUnreadableAgentsAndUsesClaude()
     {
-        if (OperatingSystem.IsWindows())
+        // Root ignores file modes, so the file cannot be made unreadable.
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
         {
             return;
         }
