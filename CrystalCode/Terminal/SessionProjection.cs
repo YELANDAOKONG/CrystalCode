@@ -107,6 +107,11 @@ internal sealed class SessionProjection : ISessionObserver
                     ToolListWidget.Create(tools.Plan, tools.Work, tools.External, tools.Settings),
                     ToolListText.Format(tools.Plan, tools.Work, tools.External, tools.Settings));
                 break;
+            case TodosListed listed:
+                _renderer.WriteNote(
+                    TodoListWidget.Create(listed.Items),
+                    TodoList.Format(listed.Items));
+                break;
             case StatusReported status:
                 _renderer.WriteStatus(status.Status, status.Full);
                 break;

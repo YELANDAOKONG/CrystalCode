@@ -99,23 +99,26 @@ public sealed class TodoList
         }
     }
 
-    private string FormatUnlocked()
+    private string FormatUnlocked() => Format(_items);
+
+    public static string Format(IReadOnlyList<TodoItem> items)
     {
-        if (_items.Count == 0)
+        ArgumentNullException.ThrowIfNull(items);
+        if (items.Count == 0)
         {
             return "No todos.";
         }
 
-        var inProgress = _items.Count(item => item.Status == TodoStatus.InProgress);
-        var pending = _items.Count(item => item.Status == TodoStatus.Pending);
-        var completed = _items.Count(item => item.Status == TodoStatus.Completed);
-        var cancelled = _items.Count(item => item.Status == TodoStatus.Cancelled);
+        var inProgress = items.Count(item => item.Status == TodoStatus.InProgress);
+        var pending = items.Count(item => item.Status == TodoStatus.Pending);
+        var completed = items.Count(item => item.Status == TodoStatus.Completed);
+        var cancelled = items.Count(item => item.Status == TodoStatus.Cancelled);
         var lines = new List<string>
         {
-            $"{_items.Count} todos ({inProgress} in progress, {pending} pending, "
+            $"{items.Count} todos ({inProgress} in progress, {pending} pending, "
             + $"{completed} completed, {cancelled} cancelled)"
         };
-        foreach (var item in _items)
+        foreach (var item in items)
         {
             lines.Add($"- [{StatusMark(item.Status)}] {item.Content}");
         }

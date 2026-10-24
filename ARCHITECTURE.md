@@ -1924,7 +1924,7 @@ Events are immutable sealed records, one type per file under `Events`:
   `QueueChanged`.
 - Conversation: `HistoryReplayed`, `ConversationCleared`, `TodosChanged`.
 - Text and reports: `NoteWritten`, `ErrorWritten`, `HelpRequested`,
-  `StatusReported`, `ToolsListed`.
+  `StatusReported`, `ToolsListed`, `TodosListed`.
 
 The engine publishes from whichever thread produced the change, including the
 turn thread while a model round streams. Observers must be thread-safe and
@@ -2141,8 +2141,8 @@ custom line still drops `custom` slots from the right.
 Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled
 muted. The bar shows the first four items and a `+N more` line when
-the list is longer; `/todos` (alias `/todo`) prints the full untruncated
-list in the transcript. The transcript Result card uses the same colors for
+the list is longer; `/todos` (alias `/todo`) publishes `TodosListed` and the
+terminal draws the full untruncated list in a rounded `Todos` card. The transcript Result card uses the same colors for
 `- [ ]` / `- [~]` / `- [x]` / `- [-]` lines so they are not painted as
 diff removals. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode (Plan, Work, or a custom mode name) is on the

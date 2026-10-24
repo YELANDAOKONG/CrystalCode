@@ -7184,7 +7184,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void ShowTodoList()
     {
-        Note(_todos.Format());
+        Publish(new TodosListed(_todos.Snapshot()));
     }
 
     private void ShowQueue()
@@ -8031,6 +8031,7 @@ public sealed class CodingSession : ITurnObserver
             or HelpRequested
             or StatusReported
             or StatsReported
+            or TodosListed
             or ToolsListed)
         {
             CloseRecallWindow();
