@@ -95,6 +95,192 @@ public sealed class AnthropicProviderTests
     }
 
     [Fact]
+    public async Task StreamAsync_CountsCacheTokensAsInput()
+    {
+        var events = await CollectStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":3,"cache_creation_input_tokens":100,"cache_read_input_tokens":900,"output_tokens":1}}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":20}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>()).Usage;
+        Assert.Equal(1003, usage.InputTokenCount);
+        Assert.Equal(20, usage.OutputTokenCount);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReadsInputSideFromMessageDelta()
+    {
+        var events = await CollectStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":2,"output_tokens":1}}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":2,"cache_read_input_tokens":700,"cache_creation_input_tokens":null,"output_tokens":5}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>()).Usage;
+        Assert.Equal(702, usage.InputTokenCount);
+        Assert.Equal(5, usage.OutputTokenCount);
+    }
+
+    [Fact]
+    public async Task StreamAsync_KeepsInputWhenMessageDeltaReportsZero()
+    {
+        var events = await CollectStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":50,"output_tokens":1}}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":0,"output_tokens":9}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        var usage = Assert.Single(events.OfType<ChatUsageReceived>()).Usage;
+        Assert.Equal(50, usage.InputTokenCount);
+        Assert.Equal(9, usage.OutputTokenCount);
+    }
+
+    [Fact]
+    public async Task StreamAsync_OmitsUsageWhenProviderReportsNone()
+    {
+        var events = await CollectStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[]}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        Assert.DoesNotContain(events, item => item is ChatUsageReceived);
+        var completed = Assert.IsType<ChatCandidateCompleted>(Assert.Single(events));
+        Assert.Equal(FinishReason.Stop, completed.FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsStreamWithoutMessageDelta()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":8,"output_tokens":1}}}
+
+            data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Working..."}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        Assert.Contains("ended without a stop reason", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReportsMessageDeltaWithNullStopReason()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[],"usage":{"input_tokens":8,"output_tokens":1}}}
+
+            data: {"type":"message_delta","delta":{"stop_reason":null},"usage":{"output_tokens":5}}
+
+            data: {"type":"message_stop"}
+
+            """);
+
+        Assert.Contains("ended without a stop reason", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamAsync_WrapsEventForUnknownBlock()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"type":"message_start","message":{"content":[]}}
+
+            data: {"type":"content_block_delta","index":3,"delta":{"type":"text_delta","text":"x"}}
+
+            """);
+
+        Assert.Contains("malformed content_block_delta event", exception.Message, StringComparison.Ordinal);
+        Assert.IsType<KeyNotFoundException>(exception.InnerException);
+    }
+
+    [Fact]
+    public async Task StreamAsync_WrapsEventWithWrongFieldType()
+    {
+        var exception = await ReadStreamEvents(
+            """
+            data: {"type":"content_block_start","index":"zero","content_block":{"type":"text","text":""}}
+
+            """);
+
+        Assert.Contains("malformed content_block_start event", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_CountsCacheTokensAsInput()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """
+            {"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn",
+             "usage":{"input_tokens":4,"cache_creation_input_tokens":10,"cache_read_input_tokens":600,"output_tokens":7}}
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var response = await provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
+
+        Assert.NotNull(response.Usage);
+        Assert.Equal(614, response.Usage.InputTokenCount);
+        Assert.Equal(7, response.Usage.OutputTokenCount);
+    }
+
+    [Theory]
+    [InlineData("""{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}""")]
+    [InlineData("""{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{}}""")]
+    [InlineData("""{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn","usage":{"output_tokens":7}}""")]
+    public async Task CompleteAsync_ReturnsNoUsageWhenCountsAreMissing(string body)
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(body));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var response = await provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]));
+
+        Assert.Null(response.Usage);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_WrapsContentBlockWithoutType()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"text":"done"}],"stop_reason":"end_turn"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        var exception = await Assert.ThrowsAsync<AnthropicException>(
+            () => provider.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])));
+
+        Assert.Contains("response was malformed", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteAsync_ReplaysSignedThinkingWithToolResult()
     {
         var firstHandler = new RecordingHandler(JsonResponse.Create(
@@ -443,6 +629,22 @@ public sealed class AnthropicProviderTests
         Assert.Equal("invalid_request_error", exception.ErrorCode);
         Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
         Assert.Contains("response failed", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static async Task<List<ChatStreamEvent>> CollectStreamEvents(string events)
+    {
+        using var http = new HttpClient(new RecordingHandler(JsonResponse.CreateStream(events)));
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+        var collected = new List<ChatStreamEvent>();
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            collected.Add(streamEvent);
+        }
+
+        return collected;
     }
 
     private static Task<AnthropicException> ReadStream(string json) =>

@@ -270,6 +270,15 @@ and a JSON body returned where an event stream or JSON lines were expected to
 provider faults carrying the provider code and message. Gemini uses
 `error.status` when `error.code` is a number. A non-streaming JSON response
 with an `error` payload maps the same way even when the HTTP status is 200.
+Anthropic Messages reports uncached input, cache writes, and cache reads as
+separate counts. The adapter sums them into the one input count Crystal
+exposes, because the session reads that count as the prompt size. A usage
+figure the endpoint did not report is absent, never zero, and an event
+stream without any usage emits no usage event. A Messages stream that
+reaches `message_stop` without a `stop_reason` in a `message_delta` fails as
+a truncated stream rather than completing as a normal stop. An event or
+response whose fields are missing or mistyped fails as an Anthropic fault
+instead of leaking a JSON reader exception.
 Framed Responses and Anthropic error events keep the provider message as the
 fault text. Session retry then reports the cause instead of treating the
 truncated stream as retryable. Outbound chat requests send a constant `User-Agent` of `Crystal Code`

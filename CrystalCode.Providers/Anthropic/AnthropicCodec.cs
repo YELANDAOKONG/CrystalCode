@@ -75,6 +75,18 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     public ChatResponse ReadResponse(JsonElement root)
     {
+        try
+        {
+            return ReadResponseBody(root);
+        }
+        catch (Exception exception) when (IsMalformedShape(exception))
+        {
+            throw CreateException($"{_vendorName} response was malformed.", innerException: exception);
+        }
+    }
+
+    private ChatResponse ReadResponseBody(JsonElement root)
+    {
         if (ProtocolFaults.TryCreate(
             root,
             _vendorName,
@@ -484,6 +496,12 @@ internal sealed class AnthropicCodec : IProtocolCodec
         }
     }
 
+    // A gateway that drops a field or reorders events makes System.Text.Json
+    // throw these. The protocol client only maps JsonException, so without this
+    // the raw exception escapes as an unexplained failure.
+    private static bool IsMalformedShape(Exception exception) =>
+        exception is KeyNotFoundException or InvalidOperationException or FormatException;
+
     private static OpaqueReasoningState CreateState(JsonElement block) =>
         new(ReasoningStateFormat, Encoding.UTF8.GetBytes(block.GetRawText()));
 
@@ -499,23 +517,26 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     private static TokenUsage? ReadUsage(JsonElement root)
     {
-        if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+        if (!root.TryGetProperty("usage", out var usage))
         {
             return null;
         }
 
-        var input = usage.TryGetProperty("input_tokens", out var inputElement) ? inputElement.GetInt64() : 0;
-        var output = usage.TryGetProperty("output_tokens", out var outputElement) ? outputElement.GetInt64() : 0;
-        return new TokenUsage(input, output);
+        var tally = new AnthropicUsageTally();
+        tally.Add(usage);
+        return tally.ToUsage();
     }
 
     private sealed class StreamParser : IProtocolStreamParser
     {
         private readonly AnthropicCodec _codec;
         private readonly Dictionary<int, BlockAssembly> _blocks = [];
-        private long _inputTokens;
-        private long _outputTokens;
-        private FinishReason _finishReason = FinishReason.Stop;
+        private readonly AnthropicUsageTally _usage = new();
+
+        // Stays null until a message_delta carries a stop_reason. Defaulting to
+        // a normal stop would turn a stream that lost its final delta into a
+        // finished answer.
+        private FinishReason? _finishReason;
 
         public StreamParser(AnthropicCodec codec) => _codec = codec;
 
@@ -524,33 +545,41 @@ internal sealed class AnthropicCodec : IProtocolCodec
         public IReadOnlyList<ChatStreamEvent> Parse(JsonElement root)
         {
             var events = new List<ChatStreamEvent>();
-            var type = root.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : null;
-            switch (type)
+            string? type = null;
+            try
             {
-                case "message_start":
-                    ReadMessageStart(root);
-                    break;
-                case "content_block_start":
-                    ReadBlockStart(root, events);
-                    break;
-                case "content_block_delta":
-                    ReadBlockDelta(root, events);
-                    break;
-                case "content_block_stop":
-                    ReadBlockStop(root, events);
-                    break;
-                case "message_delta":
-                    ReadMessageDelta(root);
-                    break;
-                case "message_stop":
-                    events.Add(new ChatUsageReceived(new TokenUsage(_inputTokens, _outputTokens)));
-                    events.Add(new ChatCandidateCompleted(0, _finishReason));
-                    IsComplete = true;
-                    break;
-                case "error":
-                    throw _codec.ReadStreamError(root);
-                default:
-                    break;
+                type = root.TryGetProperty("type", out var typeElement) ? typeElement.GetString() : null;
+                switch (type)
+                {
+                    case "message_start":
+                        ReadMessageStart(root);
+                        break;
+                    case "content_block_start":
+                        ReadBlockStart(root, events);
+                        break;
+                    case "content_block_delta":
+                        ReadBlockDelta(root, events);
+                        break;
+                    case "content_block_stop":
+                        ReadBlockStop(root, events);
+                        break;
+                    case "message_delta":
+                        ReadMessageDelta(root);
+                        break;
+                    case "message_stop":
+                        ReadMessageStop(events);
+                        break;
+                    case "error":
+                        throw _codec.ReadStreamError(root);
+                    default:
+                        break;
+                }
+            }
+            catch (Exception exception) when (IsMalformedShape(exception))
+            {
+                throw _codec.CreateException(
+                    $"{_codec._vendorName} stream contained a malformed {type ?? "unknown"} event.",
+                    innerException: exception);
             }
 
             return events;
@@ -558,9 +587,28 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
         private void ReadMessageStart(JsonElement root)
         {
-            var usage = root.GetProperty("message").GetProperty("usage");
-            _inputTokens = usage.TryGetProperty("input_tokens", out var input) ? input.GetInt64() : 0;
-            _outputTokens = usage.TryGetProperty("output_tokens", out var output) ? output.GetInt64() : 0;
+            if (root.TryGetProperty("message", out var message)
+                && message.ValueKind == JsonValueKind.Object
+                && message.TryGetProperty("usage", out var usage))
+            {
+                _usage.Add(usage);
+            }
+        }
+
+        private void ReadMessageStop(List<ChatStreamEvent> events)
+        {
+            if (_finishReason is not { } finishReason)
+            {
+                throw _codec.CreateException($"{_codec._vendorName} stream ended without a stop reason.");
+            }
+
+            if (_usage.ToUsage() is { } usage)
+            {
+                events.Add(new ChatUsageReceived(usage));
+            }
+
+            events.Add(new ChatCandidateCompleted(0, finishReason));
+            IsComplete = true;
         }
 
         private void ReadBlockStart(JsonElement root, List<ChatStreamEvent> events)
@@ -636,16 +684,19 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
         private void ReadMessageDelta(JsonElement root)
         {
-            var delta = root.GetProperty("delta");
-            if (delta.TryGetProperty("stop_reason", out var stopReason))
+            // message_start carries "stop_reason": null, and some gateways repeat
+            // that null here; only a string value ends the message.
+            if (root.TryGetProperty("delta", out var delta)
+                && delta.ValueKind == JsonValueKind.Object
+                && delta.TryGetProperty("stop_reason", out var stopReason)
+                && stopReason.ValueKind == JsonValueKind.String)
             {
                 _finishReason = ReadFinishReason(stopReason.GetString());
             }
 
-            if (root.TryGetProperty("usage", out var usage)
-                && usage.TryGetProperty("output_tokens", out var output))
+            if (root.TryGetProperty("usage", out var usage))
             {
-                _outputTokens = output.GetInt64();
+                _usage.Add(usage);
             }
         }
 

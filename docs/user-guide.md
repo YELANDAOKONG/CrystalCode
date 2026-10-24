@@ -638,7 +638,7 @@ are not supported by the current adapter.
 | `contextWindows` | Optional distinct positive token budgets no greater than `contextWindow`, for example `[272000, 1000000]`. `/context` cycles these values; the lowest is the initial budget. Compaction and the status bar use the selected budget |
 | `temperature` | Optional, 0 to 2 |
 | `topP` | Optional, 0 to 1 |
-| `maxTokens` | Optional positive output-token cap. The host lowers the cap a request asks for so the prompt and the reply fit the selected context budget; it never raises it |
+| `maxTokens` | Optional positive output-token cap. The host lowers the cap a request asks for so the prompt and the reply fit the selected context budget; it never raises it. Anthropic Messages requires a cap on every request, so an `anthropic` model without `maxTokens` is sent 8192 and long replies stop at `max_tokens`. Declare `maxTokens` for every Claude model |
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
@@ -735,7 +735,7 @@ Anthropic entry, so Claude models are reached by adding one to
     "models": {
       "claude-sonnet-4": {
         "contextWindow": 200000,
-        "maxTokens": 8192,
+        "maxTokens": 64000,
         "thinking": true,
         "thinkingEfforts": ["low", "medium", "high"],
         "imageInput": true
@@ -757,6 +757,15 @@ Anthropic `display` field off. `summarized` is the default and is not
 written back. The name is valid only for the `anthropic` protocol. Omit
 `temperature` and `topP` for models that reject sampling parameters.
 Thinking tokens count toward `maxTokens`.
+
+Token usage for this protocol is the sum of `input_tokens`,
+`cache_creation_input_tokens`, and `cache_read_input_tokens`, because the
+adapter marks prompt-cache breakpoints and a cache hit leaves only a few
+uncached input tokens. Session totals, CTX percent, and usage-based
+compaction read that sum. When the endpoint reports no usage, the request
+counts as unknown, not zero, and the host falls back to its estimate. A
+stream that ends without a `stop_reason` fails the request, and a retry
+follows the usual retry rules.
 
 ### Example: add OpenCode Zen protocol endpoints
 
@@ -1840,7 +1849,8 @@ budget minus that reservation. Raising the reservation changes that
 ceiling and the reply cap only when it is already tighter than the
 threshold. A request asks for at most
 `min(maxTokens, budget - ceiling)`, so the prompt and the reply fit the
-budget together; a model without `maxTokens` sends no cap. `/context`
+budget together; a model without `maxTokens` sends no cap, except on the
+`anthropic` protocol, which always sends 8192 when none is declared. `/context`
 rebuilds the session client and drops cached plugin, review, and
 image-description clients whose output cap depends on that budget.
 
