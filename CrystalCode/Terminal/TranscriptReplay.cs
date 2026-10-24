@@ -2,6 +2,7 @@ using Crystal.Chat;
 using Crystal.Tools;
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Transcript;
+using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 
@@ -94,10 +95,10 @@ public static class TranscriptReplay
             return true;
         }
 
-        if (message.Role == ChatRole.System
-            && message.Text.StartsWith(CompactionPrompt.Marker, StringComparison.Ordinal))
+        if (CompactionSelection.IsSummary(message))
         {
-            kind = TranscriptKind.Note;
+            kind = TranscriptKind.Summary;
+            text = message.Text[CompactionPrompt.Marker.Length..].TrimStart('\r', '\n').Trim();
             return true;
         }
 

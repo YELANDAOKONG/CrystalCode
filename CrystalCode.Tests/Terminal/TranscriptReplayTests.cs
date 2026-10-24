@@ -71,8 +71,8 @@ public sealed class TranscriptReplayTests
         var lines = TranscriptReplay.Lines(items);
 
         Assert.Equal(2, lines.Count);
-        Assert.Equal(TranscriptKind.Note, lines[0].Kind);
-        Assert.Contains("Read a.txt.", lines[0].Text, StringComparison.Ordinal);
+        Assert.Equal(TranscriptKind.Summary, lines[0].Kind);
+        Assert.Equal("Read a.txt.", lines[0].Text);
         Assert.Equal(TranscriptKind.User, lines[1].Kind);
     }
 }

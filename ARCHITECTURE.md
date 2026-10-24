@@ -579,6 +579,11 @@ model context. Resume, fork replay, and export read the archive. `/stats`
 tool share reads the archive, and a session file with no archive counts tools
 from its saved items. A session
 file written before the archive existed loads its saved items as the archive.
+A compaction summary that the operator sees (per `showCompactionSummary` and
+`showAutomaticCompactionSummary`) is also appended to the archive as an
+`## Earlier context` system message, so fork replay, resume, and export show
+the same block again. A hidden summary is not archived. Side questions skip
+archived summaries that follow a turn.
 Images stay when either transcript still mentions them. `/clear` drops both.
 
 The composer stays open while a turn runs. Enter with text enqueues a

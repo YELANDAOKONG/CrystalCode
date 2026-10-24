@@ -1,6 +1,7 @@
 using Crystal;
 using Crystal.Chat;
 
+using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Prompts;
@@ -106,6 +107,11 @@ public sealed class ConversationArchiveTests
         Assert.Contains(saved.Archive!, item => item.Text == "older turn");
         Assert.Contains(saved.Archive!, item => item.Text == "latest turn");
         Assert.Contains(
+            saved.Archive!,
+            item => item.Text is not null
+                && item.Text.StartsWith(CompactionPrompt.Marker, StringComparison.Ordinal)
+                && item.Text.Contains("kept the facts", StringComparison.Ordinal));
+        Assert.Contains(
             saved.Items,
             item => item.Text is not null && item.Text.Contains("kept the facts", StringComparison.Ordinal));
         Assert.DoesNotContain(saved.Items, item => item.Text == "older turn");
@@ -127,6 +133,23 @@ public sealed class ConversationArchiveTests
         Assert.Contains(notes, note => note == "Nothing earlier to compact");
         Assert.DoesNotContain(notes, note => note == "Compacted context");
         Assert.DoesNotContain(notes, note => note.Contains("kept the facts", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Fork_ReplaysTheCompactionSummaryFromTheArchive()
+    {
+        using var headless = new HeadlessSession(
+            new SummaryClient(),
+            ShortSession("older turn", "latest turn"));
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("/compact");
+
+        await headless.RunTurnAsync("/fork");
+
+        var replayed = headless.Observer.Events.OfType<HistoryReplayed>().Last();
+        Assert.Contains(
+            replayed.Items,
+            item => item is ChatMessage message && CompactionSelection.IsSummary(message));
     }
 
     [Fact]

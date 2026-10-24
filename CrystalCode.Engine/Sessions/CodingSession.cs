@@ -4702,9 +4702,17 @@ public sealed class CodingSession : ITurnObserver
 
         if (outcome.Kind == CompactionKind.Applied)
         {
+            var printSummary = ShouldPrintSummary(force) && !string.IsNullOrWhiteSpace(outcome.Summary);
             if (ReferenceEquals(transcript, _transcript))
             {
                 _transcript = [.. outcome.Transcript];
+                if (printSummary)
+                {
+                    // CommitArchive skips system messages, so a shown summary is
+                    // recorded here for fork, resume, and export to replay it.
+                    RecordSummaryInArchive(outcome.Summary!);
+                }
+
                 BindReviewConversation();
                 RememberCompactedUsage();
                 SaveSession();
@@ -4716,9 +4724,9 @@ public sealed class CodingSession : ITurnObserver
             }
 
             Note("Compacted context");
-            if (ShouldPrintSummary(force) && !string.IsNullOrWhiteSpace(outcome.Summary))
+            if (printSummary)
             {
-                Note(outcome.Summary);
+                Note(outcome.Summary!);
             }
 
             return outcome;
@@ -7030,6 +7038,14 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    private void RecordSummaryInArchive(string summary)
+    {
+        lock (_archiveGate)
+        {
+            _archive.Add(new ChatMessage(ChatRole.System, summary));
+        }
+    }
+
     private IReadOnlyList<ChatItem> SideBaseSnapshot() =>
         _turnActive ? [.. _transcript] : ArchiveSnapshot();
 
@@ -7068,7 +7084,22 @@ public sealed class CodingSession : ITurnObserver
             body = body.Skip(1).ToArray();
         }
 
-        return [new ChatMessage(ChatRole.System, CurrentSystemText()), .. body];
+        // The archive keeps the raw turns, so a summary recorded after them
+        // would only repeat what the side question already sees.
+        var seenTurn = false;
+        var kept = new List<ChatItem>(body.Count);
+        foreach (var item in body)
+        {
+            if (CompactionSelection.IsSummary(item) && seenTurn)
+            {
+                continue;
+            }
+
+            seenTurn |= !CompactionSelection.IsSummary(item);
+            kept.Add(item);
+        }
+
+        return [new ChatMessage(ChatRole.System, CurrentSystemText()), .. kept];
     }
 
     private bool IsReferencedInTranscript(string marker, IReadOnlyList<ChatItem> archiveSnapshot) =>
