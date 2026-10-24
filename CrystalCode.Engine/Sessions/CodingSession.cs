@@ -21,6 +21,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Interfaces;
+using CrystalCode.Engine.Mcp;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;
@@ -109,7 +110,8 @@ public sealed class CodingSession : ITurnObserver
         var plan = planMode ?? (_turnActive ? EffectiveChildPlanMode : _planMode);
         var planNames = plan
             ? WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), _frontEnd.Questions, _plugins, _skills, _external,
-                _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true)).Definitions.Select(tool => tool.Name)
+                _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true),
+                _mcp.PlanTools).Definitions.Select(tool => tool.Name)
                 .Append("view_image").ToHashSet(StringComparer.Ordinal)
             : null;
         foreach (var definition in catalog.Definitions)
@@ -245,10 +247,12 @@ public sealed class CodingSession : ITurnObserver
 
     private ToolCatalog ChildCatalog(TodoList todos) => EffectiveChildPlanMode
         ? WorkspaceCatalog.CreatePlan(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
-            _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true))
+            _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true),
+            _mcp.PlanTools)
         : WorkspaceCatalog.CreateWork(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
             _settings.BashTimeoutSeconds, _loadedPlugins, CreateImageDescriber(),
-            disabledBuiltInTools: _settings.DisabledBuiltInTools.For(false));
+            disabledBuiltInTools: _settings.DisabledBuiltInTools.For(false),
+            mcpTools: _mcp.WorkTools);
 
     private IReadOnlyList<Crystal.Multimodal.Tools.IMultimodalTool> ChildImageTools(TodoList todos)
     {
@@ -939,6 +943,7 @@ public sealed class CodingSession : ITurnObserver
     private PromptResolution _promptResolution;
     private SkillCatalog? _skills;
     private ExternalCatalog _external = ExternalCatalog.Empty;
+    private McpCatalog _mcp = McpCatalog.Empty;
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
     private PluginPlaceholderTable _placeholders = PluginPlaceholderTable.Empty;
     private PluginStatusBoard _statusBoard = new(static _ => { }, static _ => { });
@@ -1160,6 +1165,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         ReloadExternalToolsWithProgress();
+        await ReloadMcpAsync(cancellationToken);
         PublishPluginEnvironment();
         RebuildExecutors();
         ReplaceLiveSystem();
@@ -1592,6 +1598,8 @@ public sealed class CodingSession : ITurnObserver
     {
         await ClosePluginSessionAsync(cancellationToken);
         await _backgroundTasks.StopAllAsync();
+        await _mcp.DisposeAsync();
+        _mcp = McpCatalog.Empty;
         await FlushPromptHistoryAsync();
         return Close();
     }
@@ -1913,6 +1921,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Plugins:
                 await ChangePluginsAsync(command.Argument, cancellationToken);
+                return (true, false);
+            case SessionVerb.Mcp:
+                await ChangeMcpAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Attach:
                 AttachImage(command.Argument);
@@ -3583,6 +3594,42 @@ public sealed class CodingSession : ITurnObserver
         WriteToolsUsage();
     }
 
+    private async Task ChangeMcpAsync(string argument, CancellationToken cancellationToken)
+    {
+        var command = argument.Trim().ToLowerInvariant();
+        if (command.Length == 0)
+        {
+            Note(McpStatusText.Format(_settings.Mcp, _mcp));
+            return;
+        }
+
+        if (command is not ("on" or "off" or "reload"))
+        {
+            Error("MCP command must be /mcp, /mcp on, /mcp off, or /mcp reload.");
+            return;
+        }
+
+        if (_turnActive)
+        {
+            Error("Finish the current turn before changing MCP.");
+            return;
+        }
+
+        if (command != "reload")
+        {
+            SaveSettings(current => current.WithMcp(command == "on"));
+        }
+
+        await ReloadMcpAsync(cancellationToken);
+        RebuildExecutors();
+        ReplaceLiveSystem();
+        Note(command == "reload" ? "MCP reloaded" : "MCP  " + Title(command));
+        if (_settings.Mcp)
+        {
+            Note(McpStatusText.Format(_settings.Mcp, _mcp));
+        }
+    }
+
     private void AttachImage(string argument)
     {
         if (_multimodalClient is null)
@@ -4396,6 +4443,7 @@ public sealed class CodingSession : ITurnObserver
                 SeedWorkspaceDefaults();
             },
             cancellationToken);
+        await ReconnectMcpAsync(cancellationToken);
         SaveSession();
         RefreshChrome();
         Note("Workspace  " + _workspace.Root);
@@ -5043,6 +5091,18 @@ public sealed class CodingSession : ITurnObserver
                 ApplyResume(document);
             },
             cancellationToken);
+        await ReconnectMcpAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Connects the servers for the current workspace and rebuilds the tool
+    /// executors so the model sees the new tools.
+    /// </summary>
+    private async Task ReconnectMcpAsync(CancellationToken cancellationToken)
+    {
+        await ReloadMcpAsync(cancellationToken);
+        RebuildExecutors();
+        ReplaceLiveSystem();
     }
 
     private async Task ResumeLoadedAsync(string? id, CancellationToken cancellationToken)
@@ -5314,13 +5374,14 @@ public sealed class CodingSession : ITurnObserver
             approvalPrompt,
             reviewer,
             _reviewContext,
-            [.. _plugins.Classifiers, .. _loadedPlugins.Classifiers, _external.Classifier],
+            [.. _plugins.Classifiers, .. _loadedPlugins.Classifiers, _external.Classifier, _mcp.Classifier],
             _skills,
             _external.AutomaticTools,
             (call, classification) => _hooks.OnApproval(call, classification));
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         var childPlanTools = WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), question, _plugins, _skills,
-            _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.Plan).Definitions
+            _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.Plan,
+            _mcp.PlanTools).Definitions
             .Select(tool => tool.Name).Append(ViewImageTool.ToolName).ToHashSet(StringComparer.Ordinal);
         async ValueTask<ToolInvocationDecision> DecideAsync(ToolCall call, CancellationToken token)
         {
@@ -5359,7 +5420,8 @@ public sealed class CodingSession : ITurnObserver
                 _loadedPlugins,
                 imageDescriber,
                 _backgroundTasks,
-                _settings.DisabledBuiltInTools.Work), planMode: false),
+                _settings.DisabledBuiltInTools.Work,
+                _mcp.WorkTools), planMode: false),
             options,
             DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -5373,7 +5435,8 @@ public sealed class CodingSession : ITurnObserver
                 _external,
                 _loadedPlugins,
                 imageDescriber,
-                _settings.DisabledBuiltInTools.Plan), planMode: true),
+                _settings.DisabledBuiltInTools.Plan,
+                _mcp.PlanTools), planMode: true),
             options,
             DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -5452,6 +5515,60 @@ public sealed class CodingSession : ITurnObserver
             _settings.ExternalToolApproval,
             _toolHost,
             _loadedPlugins.ToolNames);
+    }
+
+    /// <summary>
+    /// Closes the current MCP connections and connects the configured servers
+    /// again. Tool names already taken by built-in, plugin, and external tools
+    /// are not reused. Callers rebuild the executors afterwards.
+    /// </summary>
+    private async Task ReloadMcpAsync(CancellationToken cancellationToken)
+    {
+        var previous = _mcp;
+        _mcp = McpCatalog.Empty;
+        await previous.DisposeAsync();
+        if (!_settings.Mcp)
+        {
+            return;
+        }
+
+        var notes = new List<string>();
+        var definitions = new McpServerDiscovery(_home).Collect(_workspace.Root, notes);
+        foreach (var note in notes)
+        {
+            Note(note);
+        }
+
+        if (definitions.Count == 0)
+        {
+            return;
+        }
+
+        SetActivity(SessionActivity.LoadingTools);
+        try
+        {
+            var reserved = new HashSet<string>(_loadedPlugins.ToolNames, StringComparer.Ordinal);
+            foreach (var tool in _external.PlanTools.Concat(_external.WorkTools))
+            {
+                reserved.Add(tool.Definition.Name);
+            }
+
+            _mcp = await McpCatalog.ConnectAsync(
+                definitions,
+                _workspace.Root,
+                _settings.McpToolApproval,
+                reserved,
+                cancellationToken);
+        }
+        finally
+        {
+            SetActivity(SessionActivity.Idle);
+        }
+
+        foreach (var note in _mcp.Notes)
+        {
+            Note(note);
+        }
     }
 
     private void ReloadPlugins()

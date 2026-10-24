@@ -36,6 +36,7 @@ public enum SessionVerb
     Todos,
     Tools,
     Plugins,
+    Mcp,
     Attach,
     Export,
     Verbose,

@@ -1353,6 +1353,8 @@ contents of `binaries/code/`.
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
   data/tools/<directory>/
+  mcp.json
+  mcp/<name>/server.json
   plugins/
   data/plugins/<directory>/
   sessions/<id>.json
@@ -1568,6 +1570,15 @@ name replaces the home set as a whole. `tools.json` field `enabled`
 `externalTools` enables discovery (default `true`). Each set also gets
 runtime-data directories under `data/tools/`. See
 [docs/external-tools.md](docs/external-tools.md).
+
+MCP servers are configured separately from tool sets. Home reads `mcp.json`
+and `mcp/<name>/server.json`; a workspace reads the same names under
+`.crystal/`. A project server of the same name replaces the home server as a
+whole, even when the project entry is invalid. Inside one scope, a name in both
+`mcp.json` and a `server.json` directory is ambiguous and neither is used.
+`config.json` field `mcp` enables connections (default `true`). The engine
+owns connections in `CrystalCode.Engine/Mcp`; a front end only sees notes and
+the `/mcp` status. See [docs/mcp.md](docs/mcp.md).
 An unreadable or invalid project manifest with the same directory name
 also hides the home set. `timeoutSeconds` defaults to 120 for both runners,
 independent of `bashTimeoutSeconds`;
@@ -1770,6 +1781,13 @@ Set it to `false` to skip `tools/` manifests.
 `plugins` enables operator plugin discovery (default `true`).
 Set it to `false` to skip `plugins/` manifests. See
 [docs/plugins.md](docs/plugins.md).
+
+`mcp` enables MCP server connections (default `true`). Set it to `false` to
+connect nothing. `mcpToolApproval` selects, independently for the Home and
+Project sources, whether a server's own read-only declaration lowers a tool
+call to a read. Each member is `author` or `host`; both default to `host`,
+which reviews every call. The object is omitted from the written file when both
+members are the defaults; otherwise only changed members are written.
 
 `externalToolApproval` selects whether author `approval` declarations
 in `tools.json` take effect, independently for the Home and Project

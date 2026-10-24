@@ -21,7 +21,7 @@ truncation, and timeouts. Plugin code does not bypass
 | `PluginRegistry` | First-party in-process contributions (built-in tools and the six wire protocols). |
 | External tool sets | Model-callable tools under `tools/`. They do not implement this contract and have no hooks. See [external-tools.md](external-tools.md). |
 | Skills | Markdown instructions loaded through the `skill` tool. |
-| MCP | Deferred. It is not a plugin runner. |
+| MCP | Servers the session connects to. It is not a plugin runner. See [mcp.md](mcp.md). |
 | ACP | Deferred. It is an editor-facing front end, not a plugin runner. |
 
 ## Identity
@@ -434,7 +434,7 @@ or marketplace.
 
 ## Not included
 
-- MCP. High-priority product work, not in this build, and not a plugin.
+- MCP. It is a separate client, not a plugin. See [mcp.md](mcp.md).
 - ACP. The Agent Client Protocol is a high-priority front end, working name
   crystal agent. It is not in this build and not a plugin.
 - Collectible unload and hot reload.

@@ -53,6 +53,8 @@ public static class SlashCatalog
             ["on", "off", "reload", "builtin", "enable", "disable", "show", "home", "project"]),
         new(SessionVerb.Plugins, "plugins", [], "List plugins or turn one directory on or off",
             ["on", "off", "reload", "enable", "disable", "show", "home", "project"]),
+        new(SessionVerb.Mcp, "mcp", [], "List MCP servers or turn MCP on, off, or reload it",
+            ["on", "off", "reload"]),
         new(SessionVerb.Attach, "attach", ["image"], "Attach a workspace image"),
         new(SessionVerb.Export, "export", [], "Export markdown, json, or show usage"),
         new(SessionVerb.Quit, "quit", ["exit", "q"], "Exit")

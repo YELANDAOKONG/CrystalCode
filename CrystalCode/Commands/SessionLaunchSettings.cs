@@ -90,6 +90,9 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--external-tools <on|off>")]
     public string? ExternalTools { get; init; }
 
+    [CommandOption("--mcp <on|off>")]
+    public string? Mcp { get; init; }
+
     [CommandOption("--plugins <on|off>")]
     public string? Plugins { get; init; }
 

@@ -12,6 +12,7 @@ namespace CrystalCode.Engine.Mcp;
 internal sealed class McpConnection : IAsyncDisposable
 {
     private const int InitializationTimeoutSeconds = 30;
+    private const int DiscoverProbeMilliseconds = 500;
 
     private readonly CancellationTokenSource _lifecycle;
     private readonly Task<McpConnectionResult> _ready;
@@ -124,7 +125,11 @@ internal sealed class McpConnection : IAsyncDisposable
                 Name = "CrystalCode",
                 Version = typeof(McpConnection).Assembly.GetName().Version?.ToString(3) ?? "0.0.0"
             },
-            InitializationTimeout = TimeSpan.FromSeconds(InitializationTimeoutSeconds)
+            InitializationTimeout = TimeSpan.FromSeconds(InitializationTimeoutSeconds),
+            // Servers that predate the newest protocol revision drop the
+            // server/discover probe without answering. The probe wait is the
+            // delay before the initialize fallback, so keep it short.
+            DiscoverProbeTimeout = TimeSpan.FromMilliseconds(DiscoverProbeMilliseconds)
         };
 
         try

@@ -37,7 +37,8 @@ Built-in tools and all provider adapters register through the same in-process
 plugin table. Operators add extra catalog tools as
 tool sets under `~/.crystal/tools` and `<workspace>/.crystal/tools`.
 Operators add plugins under `~/.crystal/plugins` and
-`<workspace>/.crystal/plugins`.
+`<workspace>/.crystal/plugins`. Operators connect MCP servers through
+`mcp.json` in `~/.crystal` and `<workspace>/.crystal`; see [MCP servers](mcp.md).
 
 ## Install
 
@@ -75,8 +76,8 @@ or `CrystalCode` on Windows.
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
 High priority, and not in this build: operator-defined modes beyond Plan and Work;
-a NuGet package; .NET CLI tool support; other packaging support; MCP servers;
-the Agent Client Protocol (ACP), working name crystal agent; and a refactor
+a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
+(MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a second additional review
 of the current product, child Agent configuration, and provider-specific
@@ -192,7 +193,7 @@ CLI options:
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. `/promptset` switching is refused and does not write the file. Listing and export stay available |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing and refuses enable, disable, up, and down. Listing stays available |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set for this process, even when its file says `enabled` false. Does not write the file. Rejected together with `--prompt-attachments off` |
-| `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--skills`, `--external-tools`, `--mcp`, `--plugins` | `on` or `off` for this process |
 | `--agents <on\|off>` | Enable or disable child Agents for this process. Does not write `config.json` |
 | `--agents-concurrency <count>` | Active child invocations for this process, from 1 to 8. Does not write the file |
 | `--rules <value>` | `on` or `off` for both rule-file sides, or `global=on\|off` and `project=on\|off`. Does not affect `instructions.md` or `.crystal.md` |
@@ -339,7 +340,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--prompt-set <name>` | Force one home prompt set for this process, even when its `prompt.json` says `enabled` false. `default` forces the built-in text. Does not write the file |
 | `--prompt-attachments <on\|off>` | `on` follows each attachment's `enabled` flag and `order`. `off` appends nothing. Omitted means `on`. Does not write the file |
 | `--prompt-attachment <name>` | Repeatable. Appends that attachment after the enabled set, even when `enabled` is false. A missing name exits 1. Cannot be combined with `--prompt-attachments off`. Does not write the file |
-| `--skills`, `--external-tools`, `--plugins` | `on` or `off` for this process |
+| `--skills`, `--external-tools`, `--mcp`, `--plugins` | `on` or `off` for this process |
 | `--agents <on\|off>` | Enable or disable child Agents for this process. Does not write `config.json` |
 | `--agents-concurrency <count>` | Active child invocations for this process, from 1 to 8. Does not write the file |
 | `--rules <value>` | `on` or `off` for both rule-file sides, or comma-separated `global=on\|off` and `project=on\|off`. An assignment leaves the other side as saved. Does not write the file, and does not affect `instructions.md` or `.crystal.md` |
@@ -542,6 +543,8 @@ Top-level fields:
 | `ruleFiles` | OpenCode-compatible rule files. `global` and `project` each default to `true` and are omitted until off. Does not affect `instructions.md` or `.crystal.md` |
 | `externalTools` | Enable operator tool set discovery (default `true`) |
 | `plugins` | Enable operator plugin discovery (default `true`) |
+| `mcp` | Connect configured MCP servers (default `true`; omitted when on) |
+| `mcpToolApproval` | Per-source trust for an MCP server's read-only declarations: `home` and `project`, each `author` or `host` (both default `host`) |
 | `agents` | Child Agents. Omitted means off, concurrency 4, and the built-in Agents inherit the parent model. `enabled`, `maxConcurrent` (1–8), and `general`, `explore`, and `work` model choices (`provider`, `model`, `thinking`, `context`, `tier`, `speed`). `/agents` writes built-in choices here. Custom Agents are stored in their own `agent.json`, not in this object |
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
@@ -1553,6 +1556,9 @@ this build.
 and prints a Spectre.Console table unless `--format text` is set.
 Details are in [Plugins](plugins.md).
 
+`/mcp` lists connected MCP servers. `/mcp on|off|reload` controls connections.
+Details are in [MCP servers](mcp.md).
+
 ## Prompts and instructions
 
 Crystal is prompt-neutral. Every model-bound string this product
@@ -1981,6 +1987,8 @@ Override with `CRYSTAL_HOME` or `--home`.
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
   data/tools/<directory>/
+  mcp.json
+  mcp/<name>/server.json
   plugins/<directory>/plugin.json
   data/plugins/<directory>/
   agents/<name>/
@@ -2024,6 +2032,8 @@ directory name win over home):
   skill/<name>/SKILL.md
   skills/<name>/SKILL.md
   tools/<directory>/tools.json
+  mcp.json
+  mcp/<name>/server.json
   plugins/<directory>/plugin.json
   agents/<name>/
     agent.json

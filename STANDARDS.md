@@ -184,6 +184,11 @@ Authorized packages today:
 - Newtonsoft.Json, Newtonsoft.Json.Bson, and System.Text.Json in
   CrystalCode.Engine and CrystalCode.Providers, where the Crystal sibling
   already requires them for project-reference consistency.
+- ModelContextProtocol.Core in CrystalCode.Engine only, pinned to 2.3.0, as
+  the MCP client. Its transitive Microsoft.Extensions.AI.Abstractions and
+  Microsoft.Extensions.Logging.Abstractions packages come with it. The
+  Engine code that uses it stays in `CrystalCode.Engine/Mcp`; no front end or
+  contract assembly references it.
 - xUnit and Microsoft.NET.Test.Sdk in CrystalCode.Tests,
   CrystalCode.Engine.Tests, CrystalCode.Display.Tests, and
   CrystalCode.Providers.Tests.

@@ -20,7 +20,8 @@ public static class WorkspaceCatalog
         ExternalCatalog? external = null,
         PluginCatalog? disk = null,
         ImageDescriber? imageDescriber = null,
-        IReadOnlyList<string>? disabledBuiltInTools = null)
+        IReadOnlyList<string>? disabledBuiltInTools = null,
+        IReadOnlyList<ITool>? mcpTools = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -36,7 +37,8 @@ public static class WorkspaceCatalog
                 HostToolCatalog.Plan,
                 disk: disk,
                 imageDescriber: imageDescriber,
-                disabledBuiltInTools: disabledBuiltInTools));
+                disabledBuiltInTools: disabledBuiltInTools,
+                mcpTools: mcpTools));
     }
 
     public static ToolCatalog CreateWork(
@@ -50,7 +52,8 @@ public static class WorkspaceCatalog
         PluginCatalog? disk = null,
         ImageDescriber? imageDescriber = null,
         BackgroundTaskRegistry? backgroundTasks = null,
-        IReadOnlyList<string>? disabledBuiltInTools = null)
+        IReadOnlyList<string>? disabledBuiltInTools = null,
+        IReadOnlyList<ITool>? mcpTools = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(todos);
@@ -76,7 +79,8 @@ public static class WorkspaceCatalog
                 disk,
                 imageDescriber,
                 backgroundTasks,
-                disabledBuiltInTools));
+                disabledBuiltInTools,
+                mcpTools));
     }
 
     private static IReadOnlyList<ITool> CreateTools(
@@ -91,7 +95,8 @@ public static class WorkspaceCatalog
         PluginCatalog? disk = null,
         ImageDescriber? imageDescriber = null,
         BackgroundTaskRegistry? backgroundTasks = null,
-        IReadOnlyList<string>? disabledBuiltInTools = null)
+        IReadOnlyList<string>? disabledBuiltInTools = null,
+        IReadOnlyList<ITool>? mcpTools = null)
     {
         var tools = new List<ITool>(
             (registry ?? PluginRegistry.CreateBuiltIn())
@@ -116,6 +121,11 @@ public static class WorkspaceCatalog
         if (external is not null)
         {
             tools.AddRange(ToolsFor(catalog, external.PlanTools, external.WorkTools));
+        }
+
+        if (mcpTools is not null)
+        {
+            tools.AddRange(mcpTools);
         }
 
         if (skills is not null)

@@ -116,6 +116,11 @@ internal static class TaskRunOverrides
                 next = next.WithExternalTools(ParseSwitch(request.ExternalTools, "--external-tools"));
             }
 
+            if (request.Mcp is not null)
+            {
+                next = next.WithMcp(ParseSwitch(request.Mcp, "--mcp"));
+            }
+
             if (request.Plugins is not null)
             {
                 next = next.WithPlugins(ParseSwitch(request.Plugins, "--plugins"));
