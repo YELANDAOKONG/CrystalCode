@@ -118,6 +118,11 @@ behavior stands until a specific change defines otherwise.
   not reserve a configuration field, command, public type, or tool-set
   format. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
+- Built-in tool optimization. Improving how the built-in tools behave and
+  perform. Which tools and which improvements are not defined. It is not a
+  new tool, not operator configuration of tool limits (that question is under
+  Pending evaluation), and not a change to approval, trust, or the workspace
+  fence. Do not reserve a configuration field, command, or public type.
 
 ## Low priority
 

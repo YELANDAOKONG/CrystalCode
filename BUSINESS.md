@@ -429,6 +429,13 @@ implemented in the current build.
   not reserve a configuration field, command, public type, or tool-set
   format. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
+- Built-in tool optimization. Improving how the built-in tools behave and
+  perform. Which tools and which improvements are not defined. It is not a
+  new tool, not operator configuration of tool limits (that question is under
+  Pending evaluation below), and not a change to approval, trust, or the
+  workspace fence. Current tool behavior stands until a specific change
+  defines otherwise. Do not reserve a configuration field, command, or public
+  type.
 
 ### Deferred
 
@@ -543,6 +550,11 @@ text input are defined. Such a tool takes text input, not JSON arguments. Do
 not reserve a configuration field, command, public type, or tool-set format.
 This does not authorize changes under `../Crystal`, and provider adapters
 still own no tools.
+
+TODO: optimize the built-in tools only after the affected tools and the
+intended improvements are defined. Approval, trust, the workspace fence, and
+`ToolInvocationPolicy` stay as they are. This is not the undecided question of
+operator-configurable tool limits.
 
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
