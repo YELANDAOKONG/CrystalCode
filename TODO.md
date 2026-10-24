@@ -166,6 +166,8 @@ it speculatively, and do not reserve types or configuration for it.
   configurable and are not part of this question. A later decision must
   define which limits may vary, at which scope, and how a larger limit
   interacts with context compaction.
+- A `/debug` option. Not decided, including whether it exists and what it
+  covers. Do not reserve a command, configuration field, or public type for it.
 - More hook methods, added later on the existing hook interfaces. They are
   not reserved as empty types.
 - Whether plugins declare dependencies on one another, and related loading
