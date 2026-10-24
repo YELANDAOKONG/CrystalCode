@@ -33,6 +33,7 @@ Use a lowercase type and exactly one space after the colon. Allowed types:
 - build
 - ci
 - revert
+- init
 
 Write the summary in plain English, in the imperative mood. Do not end it with a period. Do not use emoji. Keep the subject at 72 characters or fewer.
 
@@ -47,7 +48,7 @@ for arg in "$@"; do
 done
 
 #printf '[%s]\n' 
-"$CMD" run --workspace . --approval review --work --show-thinking --prompt-set default --prompt-attachments off --external-tools off --workspace-trust off --duration 600 "$TASK"
+"$CMD" run --workspace . --approval review --work --show-thinking --prompt-set default --prompt-attachments off --agents off --external-tools off --workspace-trust off --duration 600 "$TASK"
 
 
 
