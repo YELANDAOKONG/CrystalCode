@@ -73,21 +73,28 @@ or `CrystalCode` on Windows.
 
 ## Not yet implemented
 
-The full list is in [TODO.md](../TODO.md). The following planned capabilities
-are not yet implemented in the current
-build: MCP servers, the Agent Client Protocol (ACP), an operating-system sandbox,
-audio and video input, non-text model output,
-editing provider definitions in the TUI, automatically fetching
-model-list information from a provider, and switchable thinking-chain
-compression. That last one would, after each thinking pass, ask a model
-to compress and summarize that thinking according to a requirement.
-Context compaction, microcompaction, `/verbose thinking`, and a
-provider's summarized thinking display are not that path.
-ACP would be an editor-facing front end, not an engine or provider protocol.
-The terminal remains the only operator surface until it exists.
-Built-in provider protocols are DeepSeek, OpenAI-compatible Chat Completions,
-OpenAI Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
-another protocol. Image input is available for supported models and providers.
+The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
+High priority, and not in this build: extensible, adjustable, and
+disableable built-in tools; operator-defined modes beyond Plan and Work;
+a NuGet package; MCP servers; the Agent Client Protocol (ACP), working
+name crystal agent; and a refactor of `crystal run`. Medium priority,
+and not in this build: automatically fetching model-list information
+from a provider, a second additional review of the current product, and
+child Agent configuration. An operating-system sandbox, audio and video
+input, non-text model output, editing provider definitions in the TUI,
+and switchable thinking-chain compression remain deferred. That last one
+would, after each thinking pass, ask a model to compress and summarize
+that thinking according to a requirement. Context compaction,
+microcompaction, `/verbose thinking`, and a provider's summarized
+thinking display are not that path. ACP would be an editor-facing front
+end, not an engine or provider protocol, and not a `crystal agent`
+command yet. The terminal remains the only operator surface until it
+exists. `--disable-tool` only omits a built-in for one process. The
+product still has exactly two modes, Plan and Work. Built-in provider
+protocols are DeepSeek, OpenAI-compatible Chat Completions, OpenAI
+Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
+another protocol. Image input is available for supported models and
+providers.
 
 ## Requirements
 
@@ -545,8 +552,8 @@ thinking unless you add it.
 The Ollama starter assumes a 4,096-token local context. If the local model
 uses a different context size, set that size in `providers.json` and configure
 the Ollama model to match it. Other local or cloud model IDs may be added there.
-Automatically fetching model-list information from a provider is planned
-and is not available in this build.
+Automatically fetching model-list information from a provider is
+medium-priority product work and is not available in this build.
 
 Anthropic Messages is also a built-in protocol, but the starter catalog
 ships no entry for it, so Claude models come from `providers.json`. See
@@ -1024,7 +1031,9 @@ that would ask the operator is denied by the same parent policy.
 Omitting the value clears that choice. Completions for those choices
 use the Agent's model. Built-in settings are saved to `config.json`.
 Custom settings are saved to that Agent's `agent.json`. Changes are
-refused during a turn or compaction.
+refused during a turn or compaction. Improving this configuration is
+medium-priority product work and is not in this build. The settings
+above stand. No new field or command is reserved.
 
 Custom definitions live in `~/.crystal/agents/<name>/` and
 `<workspace>/.crystal/agents/<name>/`, with `agent.json` and
@@ -1239,7 +1248,7 @@ refused while a turn is running.
 - Only models listed under `providers` can be selected. A missing API
   key leaves the current model unchanged.
 - Automatically fetching model-list information from a provider is
-  planned and is not available in this build.
+  medium-priority product work and is not available in this build.
 - The new `provider` and `model` are written to `config.json`.
 
 Switching models never fails because of thinking: unsupported thinking

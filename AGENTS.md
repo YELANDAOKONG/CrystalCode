@@ -9,8 +9,8 @@ Read these documents before changing production code:
 1. BUSINESS.md defines the product boundary and terminology.
 2. ARCHITECTURE.md defines component ownership and runtime semantics.
 3. STANDARDS.md defines coding, dependency, and verification rules.
-4. TODO.md buckets deferred and undecided work. It does not change product
-   scope. BUSINESS.md remains authoritative.
+4. TODO.md buckets deferred, priority, and undecided work. It does not change
+   product scope. BUSINESS.md remains authoritative.
 
 When a design decision changes, update the relevant document in the same
 change. Implementation must never become the only source of truth. A move

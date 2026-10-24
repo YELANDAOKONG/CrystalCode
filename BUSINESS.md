@@ -322,16 +322,66 @@ and JSON export inlines available bytes.
 The same items are bucketed in [TODO.md](TODO.md). That file does not add
 scope and does not authorize implementation. When an item moves between
 buckets, update `TODO.md` in the same change. The constraints below remain
-authoritative.
+authoritative. Nothing in a priority bucket is scheduled.
 
 The following capabilities are part of the product direction but are not yet
-implemented in the current build:
+implemented in the current build.
 
-- MCP servers;
-- the Agent Client Protocol (ACP). An editor would drive a session over
-  stdio. That is another front end, not an engine protocol. The terminal
-  remains the only operator surface until it exists. Do not reserve a
-  command, project, or public type for it;
+### High priority
+
+- Extensible, adjustable, and disableable built-in tools. This includes
+  saved, session, and plugin ways to disable a built-in tool and to supply
+  another tool in its place. Process-only `--disable-tool` is not this path:
+  it omits a built-in for one process, does not persist, and does not replace
+  the tool. How a tool is extended or adjusted, which settings exist, and at
+  which scope are not defined. Do not reserve a configuration field, command,
+  or public type. Host-owned numeric limits remain a separate pending
+  question and are not decided here.
+- Product modes other than Plan and Work, including operator-defined custom
+  modes. The product has exactly two modes today. The direction is to add
+  custom modes; their behavior and ownership are not defined. Prompt overlays,
+  prompt sets, prompt attachments, and external tool catalogs shape Plan and
+  Work. They do not add a mode. No mode registry, configuration field, or
+  public type is reserved.
+- Publishing a NuGet package. Package id, which assemblies ship, and whether
+  the package is a `dotnet tool` or a library are not defined. Do not reserve
+  a package id or add a project. This item is not permission to add or update
+  a package reference. Current release artifacts and install scripts remain
+  the install path.
+- MCP servers. Do not bypass the existing plugin, approval, and media
+  boundaries.
+- The Agent Client Protocol (ACP). The working name is crystal agent. An
+  editor would drive a session over stdio. That is another front end that
+  implements `SessionFrontEnd`, not an engine protocol. The terminal remains
+  the only operator surface until it exists. `crystal agent` is not a command,
+  project, or public type in this build. Do not add it until its behavior and
+  ownership are defined. ACP does not speak MCP itself. Editor-supplied MCP
+  servers, when that front end exists, use the same MCP client as local
+  servers. Do not bypass approval, trust, or the tool boundary.
+- Refactoring and optimizing `crystal run`. It remains the headless entry for
+  one task in this executable, not an operator surface and not a second
+  assembly. The work must not put secrets on the command line, persist flags
+  to `config.json`, or make the run ask the operator. Current flags and exit
+  behavior stand until a specific change defines otherwise.
+
+### Medium priority
+
+- Automatically fetching model-list information from a provider. `/model`
+  still selects only models listed in the configured catalog.
+- A second additional review of the current product. It does not change
+  product scope, reserve a public type, command, or configuration field, or
+  authorize new behavior. Findings stay inside the boundaries in this file
+  and `ARCHITECTURE.md`. It is not the Review or Audit approval mode, and it
+  does not change those modes.
+- Child Agent configuration. Current `/agents` settings, the `agents` object
+  in `config.json`, process `--agents` and `--agents-concurrency`, and custom
+  `agent.json` manifests stand. Which settings change, and at which scope,
+  are not defined. Do not reserve a new configuration field or command. This
+  is not a new Agent, not a mode, and not separate working copies or a direct
+  operator conversation with a child.
+
+### Deferred
+
 - an operating-system sandbox;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
@@ -343,7 +393,6 @@ implemented in the current build:
 - workspace-level configuration, read from `<workspace>/.crystal/config.json`
   once its field scope, precedence, write policy, and trust semantics are
   defined;
-- automatically fetching model-list information from a provider;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
 - more plugin capabilities beyond tools, protocol clients, classifiers,
@@ -352,9 +401,8 @@ implemented in the current build:
   Examples include extending the process command line and custom tool
   execution modes. The set is not closed. Behavior and ownership are not
   defined. Do not reserve a command, flag, configuration field, or public
-  type;
-- saved, session, and plugin ways to disable a built-in tool, and supplying
-  another tool in its place;
+  type. Extending, adjusting, or disabling a built-in tool is the
+  high-priority item above, not this one;
 - switchable thinking-chain compression. After each thinking pass, a model
   compresses and summarizes that thinking according to a requirement. The
   switch, the requirement, which model writes the summary, and whether the
@@ -374,10 +422,12 @@ TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
 `audioInput` or `videoInput` declaration is not that path. TODO: add
 MCP without bypassing the existing plugin, approval, and media boundaries.
-TODO: add ACP only as a front end that implements `SessionFrontEnd`. Do not
-put that protocol in the engine, and do not bypass approval, trust, or the
-tool boundary. ACP does not speak MCP itself. Editor-supplied MCP servers,
-when that front end exists, use the same MCP client as local servers.
+TODO: add ACP only as a front end that implements `SessionFrontEnd`. The
+working name is crystal agent. Do not put that protocol in the engine, do not
+add a `crystal agent` command, project, or public type before its behavior and
+ownership are defined, and do not bypass approval, trust, or the tool
+boundary. ACP does not speak MCP itself. Editor-supplied MCP servers, when
+that front end exists, use the same MCP client as local servers.
 
 TODO: add workspace-level configuration only after its field scope, precedence,
 write policy, and trust semantics are defined; a repository-controlled file
@@ -392,8 +442,30 @@ operator. A custom tool execution mode is not the deferred host setting for
 serial or concurrent ordinary tool batches. Ordinary Work and Plan tools
 remain serial. A plugin must not bypass approval, trust, the workspace
 fence, or `ToolInvocationPolicy`. This item is not the deferred module
-system, not the deferred way to disable and replace a built-in tool, and
-not the undecided extra hook methods or plugin dependencies.
+system, not the high-priority way to extend, adjust, or disable a built-in
+tool, and not the undecided extra hook methods or plugin dependencies.
+
+TODO: add saved, session, and plugin ways to extend, adjust, or disable a
+built-in tool, including supplying another tool in its place, only after the
+mechanism, scope, and interaction with approval and the reserved tool name
+are defined. `--disable-tool` remains process-only. Do not reserve a
+configuration field or public type. This is not the pending question of
+whether host-owned numeric limits become operator configuration.
+
+TODO: add operator-defined modes other than Plan and Work only after their
+behavior and ownership are defined. The product has exactly two modes today.
+Do not reserve a mode registry, configuration field, or public type. Prompt
+overlays, prompt sets, prompt attachments, and external tool catalogs do not
+add a mode.
+
+TODO: publish a NuGet package only after its package id, packed assemblies,
+and tool-or-library shape are defined. Do not reserve a package id or add a
+project. This is not permission to add or update a package reference.
+
+TODO: refactor and optimize `crystal run` without making it an operator
+surface, a second assembly, or a place for secrets. Do not persist its flags
+to `config.json`, and do not make it ask the operator. Current flags and
+exit behavior stand until a specific change defines otherwise.
 
 TODO: add switchable thinking-chain compression only after its switch,
 requirement, model choice, and the fate of the original thinking are defined.
@@ -405,22 +477,24 @@ once its default, scope, and ordering of approval, progress, grants, and side
 effects are defined. Ordinary tools remain serial; adjacent child task groups
 have the bounded concurrency described above.
 
+TODO: fetch model-list information from a provider only after the request,
+failure, and catalog-write behavior are defined. `/model` still selects only
+configured models.
+
+TODO: change child Agent configuration only after the settings and their
+scope are defined. Current `/agents` settings, the `agents` object, process
+overrides, and custom `agent.json` manifests stand. Do not reserve a new
+configuration field or command.
+
 They were deferred until the product had a concrete use case and enough runtime
 infrastructure to support them safely; they are not excluded from the product.
 Implement each capability only when its behavior and ownership are defined, and
-do not reserve empty public types in advance.
+do not reserve empty public types in advance. A high or medium priority does
+not remove that rule.
 
 [TODO.md](TODO.md) lists the items below under Pending evaluation. They are
-not a priority. Parent/child Agents do not decide them.
-
-Deferred on a much longer horizon than the list above, with no schedule:
-
-- product modes other than Plan and Work, including operator-defined custom
-  modes. The product has exactly two modes today. Prompt overlays, prompt
-  sets, prompt attachments, and external tool catalogs shape those two; they
-  do not add a mode, and no mode registry, configuration field, or public
-  type is reserved for a new one in advance. Whether custom modes are added
-  at all is not decided.
+not a priority. Parent/child Agents do not decide them. Operator-defined
+modes other than Plan and Work are high priority above, not pending.
 
 Whether Plan may include bash is under consideration and is not decided.
 The current behavior stands: built-in Plan has no edit, write, or bash. No
@@ -433,7 +507,8 @@ log bounds, the image size limit, and the todo caps are host-owned constants.
 Timeouts and turn budgets are already configurable and are not part of this
 question. No change is scheduled, and a later decision may revisit it. Such a
 decision must define which limits may vary, at which scope, and how a larger
-limit interacts with context compaction.
+limit interacts with context compaction. That question is not the
+high-priority item for extending, adjusting, or disabling a built-in tool.
 
 More hook methods will be added later on the existing hook interfaces, and
 are not reserved as empty types in advance. Whether plugins declare

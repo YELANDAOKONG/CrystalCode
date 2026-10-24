@@ -33,8 +33,8 @@ Exec may use stdin, argv, or both. Dotnet does not use stdin or argv.
 | `IPlugin` / `PluginRegistry` | First-party in-process contributions (built-in tools and the six wire protocols). |
 | `~/.crystal/plugins/` | Operator plugins. They use `CrystalCode.Plugins`, not this manifest. See [plugins.md](plugins.md). |
 | Skills | Markdown instructions loaded through the `skill` tool. They do not become extra `ITool` entries. |
-| MCP | A separate, deferred integration; it is not an external-tool runner. |
-| ACP | A separate, deferred front end; it is not an external-tool runner. |
+| MCP | A separate high-priority integration, not in this build; it is not an external-tool runner. |
+| ACP | A separate high-priority front end (working name crystal agent), not in this build; it is not an external-tool runner. |
 
 First-party code contributions stay on `PluginRegistry`. Operator tools
 are discovered as tool sets. Dotnet runners load **class libraries from

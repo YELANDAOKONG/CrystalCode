@@ -434,10 +434,14 @@ or marketplace.
 
 ## Not included
 
-- MCP.
-- ACP. The Agent Client Protocol is a deferred front end, not a plugin.
+- MCP. High-priority product work, not in this build, and not a plugin.
+- ACP. The Agent Client Protocol is a high-priority front end, working name
+  crystal agent. It is not in this build and not a plugin.
 - Collectible unload and hot reload.
-- Replacing a built-in protocol, built-in tool, or built-in slash verb.
+- Replacing a built-in protocol or built-in slash verb. Replacing or
+  disabling a built-in tool through a plugin is high-priority product work
+  and is not available in this build. Process-only `--disable-tool` is not
+  that path.
 - Hooks on external tool sets.
 - A module system below plugins and raw hooks. A later one may reach the
   host through reflection or another mechanism. Its behavior and ownership

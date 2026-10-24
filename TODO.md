@@ -7,26 +7,19 @@ means and what must not happen. An entry here is not permission to implement
 it, and it does not reserve a public type, command, configuration field, or
 project.
 
-Nothing is scheduled. Medium and low priority have no items until a
-decision recorded in this file moves one. Moving an item still does not
-authorize implementation until `BUSINESS.md` defines its behavior and
-ownership.
+Nothing is scheduled. A bucket records priority only. Moving an item still
+does not authorize implementation until `BUSINESS.md` defines its behavior
+and ownership.
 
 Pending evaluation is not a priority. Whether to do those items is not
-decided. Do not fold one into a deferred or high-priority item.
+decided. Do not fold one into a deferred, high-priority, or
+medium-priority item.
 
 ## Deferred
 
 These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work.
 
-- MCP servers. Do not bypass the existing plugin, approval, and media
-  boundaries.
-- The Agent Client Protocol (ACP). It would be a front end that implements
-  `SessionFrontEnd`, not an engine protocol. Do not bypass approval, trust,
-  or the tool boundary. ACP does not speak MCP itself. Editor-supplied MCP
-  servers, when that front end exists, use the same MCP client as local
-  servers. The terminal remains the only operator surface until it exists.
 - An operating-system sandbox.
 - Provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
@@ -37,7 +30,6 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Workspace-level configuration at `<workspace>/.crystal/config.json`. Field
   scope, precedence, write policy, and trust semantics are not defined. A
   repository-controlled file must not weaken approval or trust.
-- Automatically fetching model-list information from a provider.
 - A module system below plugins and raw hooks, once its behavior and
   ownership are defined.
 - More plugin capabilities beyond the current contribution surface.
@@ -47,9 +39,8 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   `crystal plugins`, and `crystal tools` are not this path. A custom
   execution mode is not the deferred host setting for serial or concurrent
   ordinary tool batches. Pending hook methods and plugin dependencies stay
-  undecided.
-- Saved, session, and plugin ways to disable a built-in tool, and supplying
-  another tool in its place.
+  undecided. Extending, adjusting, or disabling a built-in tool is the
+  high-priority item below, not this one.
 - Switchable thinking-chain compression. After a thinking pass, a model
   summarizes that thinking. It is not context compaction, microcompaction,
   `verboseThinking`, or `thinkingDisplay`.
@@ -59,14 +50,60 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 
 ## High priority
 
-- Complete code review of the current product. It does not change product
-  scope, reserve a public type, command, or configuration field, or
-  authorize new behavior. Findings stay inside the boundaries in
-  `BUSINESS.md` and `ARCHITECTURE.md`.
+These are part of the product direction and are not in the current build.
+The constraints are in `BUSINESS.md` under Deferred product work. Current
+behavior stands until a specific change defines otherwise.
+
+- Extensible, adjustable, and disableable built-in tools, including saved,
+  session, and plugin ways to disable a built-in tool and to supply another
+  tool in its place. Process-only `--disable-tool` is not this path: it
+  omits a built-in for one process, does not persist, and does not replace
+  the tool. How a tool is extended or adjusted is not defined. Do not reserve
+  a configuration field, command, or public type. Host-owned numeric limits
+  stay under Pending evaluation.
+- Product modes other than Plan and Work, including operator-defined custom
+  modes. The product has exactly two modes today. Prompt overlays, prompt
+  sets, prompt attachments, and external tool catalogs do not add a mode.
+  Behavior and ownership are not defined. No mode registry, configuration
+  field, or public type is reserved.
+- Publishing a NuGet package. Package id, which assemblies ship, and whether
+  the package is a `dotnet tool` or a library are not defined. Do not reserve
+  a package id or add a project. This item is not permission to add or update
+  a package reference. Current release artifacts and install scripts remain
+  the install path.
+- MCP servers. Do not bypass the existing plugin, approval, and media
+  boundaries.
+- The Agent Client Protocol (ACP). The working name is crystal agent. It
+  would be a front end that implements `SessionFrontEnd`, not an engine
+  protocol. Do not bypass approval, trust, or the tool boundary. ACP does
+  not speak MCP itself. Editor-supplied MCP servers, when that front end
+  exists, use the same MCP client as local servers. The terminal remains the
+  only operator surface until it exists. `crystal agent` is not a command,
+  project, or public type in this build.
+- Refactoring and optimizing `crystal run`. It remains the headless entry
+  for one task in this executable, not an operator surface and not a second
+  assembly. The work must not put secrets on the command line, persist flags
+  to `config.json`, or make the run ask the operator.
 
 ## Medium priority
 
-None. Do not invent a priority.
+These are part of the product direction and are not in the current build.
+The constraints are in `BUSINESS.md` under Deferred product work. Current
+behavior stands until a specific change defines otherwise.
+
+- Automatically fetching model-list information from a provider. `/model`
+  still selects only models listed in the configured catalog.
+- A second additional review of the current product. It does not change
+  product scope, reserve a public type, command, or configuration field, or
+  authorize new behavior. Findings stay inside the boundaries in
+  `BUSINESS.md` and `ARCHITECTURE.md`. It is not the Review or Audit
+  approval mode, and it does not change those modes.
+- Child Agent configuration. Current `/agents` settings, the `agents` object
+  in `config.json`, process `--agents` and `--agents-concurrency`, and custom
+  `agent.json` manifests stand. Which settings change, and at which scope,
+  are not defined. Do not reserve a new configuration field or command. This
+  is not a new Agent, not a mode, and not separate working copies or a direct
+  operator conversation with a child.
 
 ## Low priority
 
@@ -78,10 +115,9 @@ These are under consideration or not decided. They are not a priority and
 are not part of parent/child Agents. Current behavior stands. Do not change
 it speculatively, and do not reserve types or configuration for it.
 
-- Product modes other than Plan and Work, including operator-defined custom
-  modes. Whether to add them is not decided. No mode registry is reserved.
-  Prompt overlays, prompt sets, prompt attachments, and external tool
-  catalogs do not add a mode.
+Operator-defined modes other than Plan and Work are no longer in this
+bucket. That decision is recorded under High priority.
+
 - Whether Plan may include bash. Not decided. Built-in Plan has no edit,
   write, or bash.
 - Whether built-in tool limits become operator configuration. Not decided.
@@ -90,7 +126,8 @@ it speculatively, and do not reserve types or configuration for it.
   caps are host-owned constants. Timeouts and turn budgets are already
   configurable and are not part of this question. A later decision must
   define which limits may vary, at which scope, and how a larger limit
-  interacts with context compaction.
+  interacts with context compaction. This is not the high-priority item for
+  extending, adjusting, or disabling a built-in tool.
 - More hook methods, added later on the existing hook interfaces. They are
   not reserved as empty types.
 - Whether plugins declare dependencies on one another, and related loading

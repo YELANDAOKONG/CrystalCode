@@ -300,10 +300,14 @@ are depth zero inside Harness, whose `MaximumDepth` is zero. Child catalogs
 also remove `task`, `question`, and background Bash tools.
 
 `CodingSession` binds child execution, configuration, and commands through its
-Sessions components. `AgentCatalog` loads bounded manifests and prompts from
-Home and workspace; an invalid or disabled workspace directory shadows the
-Home definition. `AgentToolsPlugin` contributes the session-bound task tool
-through the existing plugin registry. Ordinary tool catalogs are built first;
+Sessions components. Improving that configuration is medium-priority product
+work and is not in this build. Current manifests, `/agents`, and process
+overrides stand. Which settings change is not defined, and no new
+configuration field or command is reserved. `AgentCatalog` loads bounded
+manifests and prompts from Home and workspace; an invalid or disabled
+workspace directory shadows the Home definition. `AgentToolsPlugin`
+contributes the session-bound task tool through the existing plugin
+registry. Ordinary tool catalogs are built first;
 child catalogs intersect their definition snapshot with the current parent
 ceiling before constructing approved executors. A plugin hook cannot restore
 a tool absent from that executor's catalog. Child todos and transcripts are
@@ -621,7 +625,11 @@ slash command.
 
 ## Plan and Work
 
-These are product modes, not Crystal types.
+These are product modes, not Crystal types. Operator-defined modes beyond
+Plan and Work are high-priority product work and are not in this build. No
+mode registry, configuration field, or public type is reserved. Prompt
+overlays, prompt sets, prompt attachments, and external tool catalogs do not
+add a mode.
 
 - Plan registers read, list, tree, glob, grep, search, todowrite, todoread, and
   question. When Skills is enabled, it also registers skill. External tools
@@ -643,7 +651,12 @@ Each value is one built-in tool name. The process omits that tool from Plan
 and Work, including `describe_image`, `view_image`, `skill`, and a named
 background shell tool. An unknown name refuses to start. The choice is not
 saved. The system text lists the omitted names and tells the model not to
-call them. The name stays reserved for plugins and external tools.
+call them. The name stays reserved for plugins and external tools. Saved, session,
+and plugin ways to extend, adjust, or disable a built-in tool, including
+supplying another tool in its place, are high-priority product work and are
+not this flag. The flag does not persist and does not replace a tool. Do not
+reserve a configuration field or public type for that work. Host-owned numeric
+limits are a separate pending question.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
@@ -1704,7 +1717,8 @@ label is prefixed with `~` so it is not mistaken for provider usage.
 
 `protocol` is `deepseek`, `openai`, `responses`, `anthropic`, `gemini`, or `ollama`. Models that are not listed cannot be
 selected. Automatically fetching model-list information from a provider is
-deferred. There is no global context window.
+medium-priority product work and is not in this build. There is no global
+context window.
 
 A persistent key belongs in `credentials.json` as plain text, keyed by
 provider name. `apiKey` on a provider definition may be a literal secret,
@@ -1790,12 +1804,15 @@ contracts above, and projecting events onto its own surface. The terminal host
 in CrystalCode is the reference implementation. The headless test in
 CrystalCode.Engine.Tests is the smallest correct driver. A later Avalonia
 desktop front end uses C# markup and does not add XAML or AXAML files.
-The Agent Client Protocol (ACP) is deferred. It would be another front end
+The Agent Client Protocol (ACP) is high-priority product work and is not in
+this build. The working name is crystal agent. It would be another front end
 on this contract, not an engine protocol. Do not reserve a command, project,
-or public type for it.
+or public type for it. `crystal agent` is not a command in this build.
 
 `crystal run` is the headless front end in this executable, not a second
-assembly. It reads one task from an argument or from stdin, applies
+assembly. Refactoring and optimizing it is high-priority product work and
+does not change the contract below until a specific change defines otherwise.
+It reads one task from an argument or from stdin, applies
 process-only overrides, starts one user turn, and exits. The interactive
 `crystal` and `crystal space` commands apply the same session overrides:
 approval, the approval model and its thinking gear, Plan or Work, thinking,
