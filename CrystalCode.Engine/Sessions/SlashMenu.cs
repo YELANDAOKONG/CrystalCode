@@ -210,6 +210,7 @@ public static class SlashMenu
             };
             var help = argument switch
             {
+                "full" => "Summarize the whole conversation, including the latest turn",
                 "model" => "Show or set the compaction model; on and off switch it",
                 "thinking" => "Cycle or set the compaction thinking gear",
                 "summary" => "Toggle the summary printed after /compact",

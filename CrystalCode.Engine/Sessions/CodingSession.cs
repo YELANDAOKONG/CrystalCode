@@ -1733,7 +1733,8 @@ public sealed class CodingSession : ITurnObserver
 
         if (parsed.Verb == SessionVerb.Compact)
         {
-            if (!string.IsNullOrWhiteSpace(parsed.Argument))
+            var full = parsed.Argument?.Trim().Equals("full", StringComparison.OrdinalIgnoreCase) == true;
+            if (!string.IsNullOrWhiteSpace(parsed.Argument) && !full)
             {
                 if (CompactionModelArguments.IsModelCommand(parsed.Argument))
                 {
@@ -1786,7 +1787,7 @@ public sealed class CodingSession : ITurnObserver
                 }
                 else
                 {
-                    Error("Compact accepts no argument, or model, thinking, summary, auto, and micro.");
+                    Error("Compact accepts no argument, or full, model, thinking, summary, auto, and micro.");
                 }
 
                 PruneDraftImages(string.Empty);
@@ -1795,7 +1796,7 @@ public sealed class CodingSession : ITurnObserver
 
             try
             {
-                await CompactForcedAsync(cancellationToken);
+                await CompactForcedAsync(full, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -4886,7 +4887,7 @@ public sealed class CodingSession : ITurnObserver
             useSummaryMaxTokens: writer.UseMaxTokens);
     }
 
-    private async Task CompactForcedAsync(CancellationToken cancellationToken)
+    private async Task CompactForcedAsync(bool full, CancellationToken cancellationToken)
     {
         if (_turnActive || _compactSource is not null)
         {
@@ -4898,7 +4899,8 @@ public sealed class CodingSession : ITurnObserver
             _transcript,
             silentSkip: false,
             cancellationToken,
-            force: true);
+            force: true,
+            full);
     }
 
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
@@ -4967,7 +4969,8 @@ public sealed class CodingSession : ITurnObserver
         IReadOnlyList<ChatItem> transcript,
         bool silentSkip,
         CancellationToken cancellationToken,
-        bool force = false)
+        bool force = false,
+        bool full = false)
     {
         CompactionOutcome outcome;
         var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -4984,7 +4987,8 @@ public sealed class CodingSession : ITurnObserver
                 _todos.Format(),
                 CurrentLimits(),
                 compactSource.Token,
-                force);
+                force,
+                full);
         }
         finally
         {

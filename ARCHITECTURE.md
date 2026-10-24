@@ -1205,8 +1205,12 @@ stays on `Compacting` and the composer remains usable.
 the threshold. When the retained tail already holds every turn, it still
 summarizes everything before the latest user turn. A session with nothing
 before that turn prints `Nothing earlier to compact`. It is refused while
-a turn is running. `/compact model` and `/compact thinking` show or set
-the optional summarizer and its gear. `/compact summary` toggles
+a turn is running. `/compact full` folds the whole conversation, including
+the latest user turn, into the summary and keeps no tail, so the model
+context becomes the live system prompt and the summary. It follows the same
+display rules as `/compact` and prints `Nothing earlier to compact` when the
+session has no conversation. `/compact model` and `/compact thinking` show or
+set the optional summarizer and its gear. `/compact summary` toggles
 `showCompactionSummary`, and `/compact auto` (alias `automatic`) toggles
 `showAutomaticCompactionSummary`. `/compact micro` toggles microcompaction.
 Any of those commands accepts `on` or `off`, writes `config.json`, and does

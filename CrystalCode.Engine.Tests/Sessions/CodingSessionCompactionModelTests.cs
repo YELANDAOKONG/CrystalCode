@@ -75,7 +75,7 @@ public sealed class CodingSessionCompactionModelTests
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact later", CancellationToken.None);
         Assert.Equal(
-            "Compact accepts no argument, or model, thinking, summary, auto, and micro.",
+            "Compact accepts no argument, or full, model, thinking, summary, auto, and micro.",
             LastError(headless));
     }
 
@@ -260,6 +260,35 @@ public sealed class CodingSessionCompactionModelTests
         Assert.Equal(2, summarizer.CompleteCount);
         Assert.Equal(2, work.StreamCount);
         Assert.Equal(1, other.StreamCount);
+    }
+
+    [Fact]
+    public async Task CompactFull_SummarizesTheLatestTurnToo()
+    {
+        var work = new SummaryClient(TextRound("Hello."));
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var observer = new RecordingSessionObserver();
+        var session = Open(
+            Settings().WithCompactionModel(new CompactionModelSettings(false, "scripted", "summarizer")),
+            new Dictionary<string, IStreamingChatClient>
+            {
+                ["work"] = work,
+                ["summarizer"] = new SummaryClient()
+            },
+            home,
+            workspace,
+            observer);
+        await session.StartAsync(CancellationToken.None);
+        await RunTurnAsync(session, "only");
+
+        await session.SubmitAsync("/compact", CancellationToken.None);
+        Assert.Equal(0, work.CompleteCount);
+
+        await session.SubmitAsync("/compact full", CancellationToken.None);
+
+        Assert.Equal(1, work.CompleteCount);
+        Assert.Contains("only", ((ChatMessage)work.LastComplete!.Items[^1]).Text, StringComparison.Ordinal);
     }
 
     [Fact]

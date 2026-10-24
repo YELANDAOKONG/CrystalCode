@@ -147,6 +147,31 @@ public sealed class ContextCompactorTests
     }
 
     [Fact]
+    public async Task CompactAsync_FullFoldsTheLatestTurnAndKeepsOnlySystemAndSummary()
+    {
+        var client = new FixedChatClient("## Objective\n- Continue.");
+        var compactor = new ContextCompactor(client);
+        var transcript = new List<ChatItem>
+        {
+            new ChatMessage(ChatRole.System, "work"),
+            new ChatMessage(ChatRole.User, "only"),
+            new ChatMessage(ChatRole.Assistant, "ok")
+        };
+
+        var outcome = await compactor.CompactAsync(
+            transcript,
+            "No todos.",
+            new CompactionLimits(100_000, tailBudget: 10_000),
+            force: true,
+            full: true);
+
+        Assert.Equal(CompactionKind.Applied, outcome.Kind);
+        Assert.NotNull(client.LastRequest);
+        Assert.Equal(2, outcome.Transcript.Count);
+        Assert.True(CompactionSelection.IsSummary(outcome.Transcript[1]));
+    }
+
+    [Fact]
     public async Task CompactAsync_IsExhaustedWhenSummaryFailsAndNothingCanBePruned()
     {
         var compactor = new ContextCompactor(new EmptyChatClient());

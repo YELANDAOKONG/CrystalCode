@@ -63,6 +63,17 @@ public sealed class CompactionSelectionTests
         Assert.Contains(split.Tail, item => item is ChatMessage { Role.Value: "user", Text: "only" });
     }
 
+    [Fact]
+    public void ChooseAll_FoldsEveryTurnAndKeepsNoTail()
+    {
+        var split = CompactionSelection.ChooseAll(Sample());
+
+        Assert.Empty(split.Tail);
+        Assert.Contains(split.Head, item => item is ChatMessage { Role.Value: "user", Text: "first" });
+        Assert.Contains(split.Head, item => item is ChatMessage { Role.Value: "user", Text: "third" });
+        Assert.DoesNotContain(split.Head, item => item is ChatMessage { Role.Value: "system", Text: "work" });
+    }
+
     private static List<ChatItem> Sample() =>
     [
         new ChatMessage(ChatRole.System, "work"),

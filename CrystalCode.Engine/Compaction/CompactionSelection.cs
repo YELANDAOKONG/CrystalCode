@@ -60,6 +60,15 @@ public static class CompactionSelection
         return SplitAt(working, turns[^1], previous);
     }
 
+    /// <summary>
+    /// Folds every turn, including the latest, and keeps nothing verbatim.
+    /// </summary>
+    public static CompactionSplit ChooseAll(IReadOnlyList<ChatItem> items)
+    {
+        var (working, previous) = Prepare(items);
+        return new CompactionSplit(working, [], previous);
+    }
+
     private static (List<ChatItem> Working, string? Previous) Prepare(IReadOnlyList<ChatItem> items)
     {
         ArgumentNullException.ThrowIfNull(items);
