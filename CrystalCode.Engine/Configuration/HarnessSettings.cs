@@ -24,6 +24,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultExternalTools = true;
 
+    public const bool DefaultMcp = true;
+
     public const bool DefaultPlugins = true;
 
     public const bool DefaultWorkspaceTrust = true;
@@ -92,7 +94,9 @@ public sealed record HarnessSettings
         int? outputTokenCap = null,
         AgentSettings? agents = null,
         BuiltInToolDisablement? persistentDisabledBuiltInTools = null,
-        BuiltInToolDisablement? sessionDisabledBuiltInTools = null)
+        BuiltInToolDisablement? sessionDisabledBuiltInTools = null,
+        bool mcp = DefaultMcp,
+        McpToolApprovalSettings? mcpToolApproval = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -161,6 +165,8 @@ public sealed record HarnessSettings
         ApprovalRetry = approvalRetry ?? RetrySettings.Default;
         Skills = skills;
         ExternalTools = externalTools;
+        Mcp = mcp;
+        McpToolApproval = mcpToolApproval ?? McpToolApprovalSettings.Default;
         EstimatedTokens = estimatedTokens;
         VerboseTools = verboseTools;
         VerboseCommands = verboseCommands;
@@ -355,6 +361,8 @@ public sealed record HarnessSettings
 
     public bool ExternalTools { get; }
 
+    public bool Mcp { get; }
+
     public bool Plugins { get; }
 
     public bool WorkspaceTrust { get; }
@@ -429,6 +437,8 @@ public sealed record HarnessSettings
     public BuiltInToolDisablement SessionDisabledBuiltInTools { get; }
 
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
+
+    public McpToolApprovalSettings McpToolApproval { get; }
 
     public string? ExportDirectory { get; }
 
@@ -507,6 +517,8 @@ public sealed record HarnessSettings
 
     public HarnessSettings WithExternalTools(bool externalTools) =>
         Copy(externalTools: externalTools);
+
+    public HarnessSettings WithMcp(bool mcp) => Copy(mcp: mcp);
 
     public HarnessSettings WithPlugins(bool plugins) => Copy(plugins: plugins);
 
@@ -616,6 +628,12 @@ public sealed record HarnessSettings
     {
         ArgumentNullException.ThrowIfNull(approval);
         return Copy(externalToolApproval: approval);
+    }
+
+    public HarnessSettings WithMcpToolApproval(McpToolApprovalSettings approval)
+    {
+        ArgumentNullException.ThrowIfNull(approval);
+        return Copy(mcpToolApproval: approval);
     }
 
     public HarnessSettings WithExportDirectory(string? exportDirectory) =>
@@ -736,7 +754,9 @@ public sealed record HarnessSettings
         int? reservedOutputTokens = null,
         bool setReservedOutputTokens = false,
         int? outputTokenCap = null,
-        AgentSettings? agents = null) =>
+        AgentSettings? agents = null,
+        bool? mcp = null,
+        McpToolApprovalSettings? mcpToolApproval = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -783,7 +803,9 @@ public sealed record HarnessSettings
             outputTokenCap ?? OutputTokenCap,
             agents ?? Agents,
             persistentDisabledBuiltInTools ?? PersistentDisabledBuiltInTools,
-            sessionDisabledBuiltInTools ?? SessionDisabledBuiltInTools);
+            sessionDisabledBuiltInTools ?? SessionDisabledBuiltInTools,
+            mcp ?? Mcp,
+            mcpToolApproval ?? McpToolApproval);
 
     public override string ToString() => nameof(HarnessSettings);
 

@@ -22,6 +22,8 @@ internal sealed class SettingsDocument
 
     public bool? ExternalTools { get; set; }
 
+    public bool? Mcp { get; set; }
+
     public bool? Plugins { get; set; }
 
     public bool? WorkspaceTrust { get; set; }
@@ -29,6 +31,8 @@ internal sealed class SettingsDocument
     public RuleFilesDocument? RuleFiles { get; set; }
 
     public ExternalToolApprovalDocument? ExternalToolApproval { get; set; }
+
+    public McpToolApprovalDocument? McpToolApproval { get; set; }
 
     public bool? EstimatedTokens { get; set; }
 

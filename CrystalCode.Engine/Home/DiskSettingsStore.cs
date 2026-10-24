@@ -58,6 +58,9 @@ public sealed class DiskSettingsStore : ISettingsStore
         var externalToolApproval = ReadExternalToolApproval(
             document.ExternalToolApproval,
             defaults.ExternalToolApproval);
+        var mcpToolApproval = ReadMcpToolApproval(
+            document.McpToolApproval,
+            defaults.McpToolApproval);
 
         return new HarnessSettings(
             provider,
@@ -110,7 +113,9 @@ public sealed class DiskSettingsStore : ISettingsStore
             ruleFiles: ReadRuleFiles(document.RuleFiles),
             reservedOutputTokens: document.ReservedOutputTokens,
             agents: document.Agents,
-            persistentDisabledBuiltInTools: ReadDisabledBuiltInTools(document.DisabledBuiltInTools));
+            persistentDisabledBuiltInTools: ReadDisabledBuiltInTools(document.DisabledBuiltInTools),
+            mcp: document.Mcp ?? defaults.Mcp,
+            mcpToolApproval: mcpToolApproval);
     }
 
     public void Save(HarnessSettings settings)
@@ -148,9 +153,11 @@ public sealed class DiskSettingsStore : ISettingsStore
                 : SettingsMapper.WriteTokenSelections(settings.SpeedSelections),
             Skills = settings.Skills ? null : false,
             ExternalTools = settings.ExternalTools ? null : false,
+            Mcp = settings.Mcp ? null : false,
             Plugins = settings.Plugins ? null : false,
             WorkspaceTrust = settings.WorkspaceTrust ? null : false,
             ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
+            McpToolApproval = WriteMcpToolApproval(settings.McpToolApproval),
             EstimatedTokens = settings.EstimatedTokens ? true : null,
             VerboseTools = settings.VerboseTools ? null : false,
             VerboseCommands = settings.VerboseCommands ? null : false,
@@ -516,6 +523,43 @@ public sealed class DiskSettingsStore : ISettingsStore
                 ? null
                 : settings.Home.Value,
             Project = settings.Project == ExternalToolApprovalSettings.Default.Project
+                ? null
+                : settings.Project.Value
+        };
+    }
+
+    private static McpToolApprovalSettings ReadMcpToolApproval(
+        McpToolApprovalDocument? document,
+        McpToolApprovalSettings defaults)
+    {
+        if (document is null)
+        {
+            return defaults;
+        }
+
+        var home = string.IsNullOrWhiteSpace(document.Home)
+            ? defaults.Home
+            : ExternalToolTrustPolicy.Parse(document.Home);
+        var project = string.IsNullOrWhiteSpace(document.Project)
+            ? defaults.Project
+            : ExternalToolTrustPolicy.Parse(document.Project);
+        return new McpToolApprovalSettings(home, project);
+    }
+
+    private static McpToolApprovalDocument? WriteMcpToolApproval(
+        McpToolApprovalSettings settings)
+    {
+        if (settings == McpToolApprovalSettings.Default)
+        {
+            return null;
+        }
+
+        return new McpToolApprovalDocument
+        {
+            Home = settings.Home == McpToolApprovalSettings.Default.Home
+                ? null
+                : settings.Home.Value,
+            Project = settings.Project == McpToolApprovalSettings.Default.Project
                 ? null
                 : settings.Project.Value
         };

@@ -45,6 +45,10 @@ public sealed class CrystalHome
 
     public string ToolsDirectory => Path.Combine(Root, "tools");
 
+    public string McpDirectory => Path.Combine(Root, "mcp");
+
+    public string McpConfigPath => Path.Combine(Root, "mcp.json");
+
     public string PromptsDirectory => Path.Combine(Root, "prompts");
 
     public string PromptSetsDirectory => Path.Combine(Root, "promptsets");
