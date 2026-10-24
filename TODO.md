@@ -98,6 +98,13 @@ behavior stands until a specific change defines otherwise.
   authorize new behavior. Findings stay inside the boundaries in
   `BUSINESS.md` and `ARCHITECTURE.md`. It is not the Review or Audit
   approval mode, and it does not change those modes.
+- A full code review of the whole codebase. It examines existing code; it
+  does not change product scope, reserve a public type, command, or
+  configuration field, or authorize new behavior. Scope, depth, and how
+  findings are tracked are not defined. Findings stay inside the boundaries
+  in `BUSINESS.md` and `ARCHITECTURE.md`. It is not the Review or Audit
+  approval mode, and it does not change those modes. It is not the second
+  additional review above.
 - Child Agent configuration. Current `/agents` settings, the `agents` object
   in `config.json`, process `--agents` and `--agents-concurrency`, and custom
   `agent.json` manifests stand. Which settings change, and at which scope,

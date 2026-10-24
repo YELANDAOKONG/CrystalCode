@@ -79,7 +79,7 @@ High priority, and not in this build: a NuGet package; .NET CLI tool support; ot
 (MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a second additional review
-of the current product, child Agent configuration, and provider-specific
+of the current product, a full code review, child Agent configuration, and provider-specific
 custom-format tools such as OpenAI's `apply_patch`. An operating-system
 sandbox, audio and video input, non-text model output, editing provider
 definitions in the TUI,
