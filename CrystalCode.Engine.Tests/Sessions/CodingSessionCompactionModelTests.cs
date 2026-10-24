@@ -285,6 +285,12 @@ public sealed class CodingSessionCompactionModelTests
         await session.SubmitAsync("/compact", CancellationToken.None);
         Assert.Equal(0, work.CompleteCount);
 
+        await session.SubmitAsync("/compact full on", CancellationToken.None);
+        Assert.Equal(0, work.CompleteCount);
+        Assert.Contains(
+            observer.Events.OfType<ErrorWritten>(),
+            error => error.Text == "Full compaction takes no argument.");
+
         await session.SubmitAsync("/compact full", CancellationToken.None);
 
         Assert.Equal(1, work.CompleteCount);

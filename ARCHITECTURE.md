@@ -1205,7 +1205,7 @@ stays on `Compacting` and the composer remains usable.
 the threshold. When the retained tail already holds every turn, it still
 summarizes everything before the latest user turn. A session with nothing
 before that turn prints `Nothing earlier to compact`. It is refused while
-a turn is running. `/compact full` folds the whole conversation, including
+a turn is running. `/compact full` takes no argument. It folds the whole conversation, including
 the latest user turn, into the summary and keeps no tail, so the model
 context becomes the live system prompt and the summary. It follows the same
 display rules as `/compact` and prints `Nothing earlier to compact` when the
@@ -2176,7 +2176,7 @@ Enter saves and Escape cancels editing without dismissing the question. The
 paused main composer keeps its draft and hides its cursor. Ask and auto-pass
 cards for `edit` and `write` show a capped `+` / `-` preview
 of `old_string` / `new_string` or `contents`. An `edit` with `replace_all`
-shows the same preview once. Overlay keys share the
+adds a muted `Replaces every occurrence` line above the preview. Overlay keys share the
 session frame loop, so transcript scroll and resize still work while a
 prompt is up. Ask overlays use the same card; `Y` / `S` / `A` / `N` map
 Once / Session / Always / Deny for ordinary workspace calls. Calls that cannot

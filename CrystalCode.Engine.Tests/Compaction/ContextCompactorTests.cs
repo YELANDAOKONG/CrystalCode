@@ -108,7 +108,7 @@ public sealed class ContextCompactorTests
             LongTranscript(),
             "No todos.",
             new CompactionLimits(100_000, tailBudget: 10_000),
-            force: true);
+            scope: CompactionScope.LatestTurn);
 
         Assert.Equal(CompactionKind.Applied, outcome.Kind);
         Assert.NotNull(client.LastRequest);
@@ -139,7 +139,7 @@ public sealed class ContextCompactorTests
             transcript,
             "No todos.",
             new CompactionLimits(100_000, tailBudget: 10_000),
-            force: true);
+            scope: CompactionScope.LatestTurn);
 
         Assert.Equal(CompactionKind.Unchanged, outcome.Kind);
         Assert.Null(client.LastRequest);
@@ -162,8 +162,7 @@ public sealed class ContextCompactorTests
             transcript,
             "No todos.",
             new CompactionLimits(100_000, tailBudget: 10_000),
-            force: true,
-            full: true);
+            scope: CompactionScope.Everything);
 
         Assert.Equal(CompactionKind.Applied, outcome.Kind);
         Assert.NotNull(client.LastRequest);

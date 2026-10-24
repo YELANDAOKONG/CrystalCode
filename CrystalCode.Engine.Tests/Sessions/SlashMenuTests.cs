@@ -50,6 +50,17 @@ public sealed class SlashMenuTests
     }
 
     [Fact]
+    public void Create_OffersCompactFullWithoutNestedOptions()
+    {
+        var menu = SlashMenu.Create(extras: null);
+        var compact = menu.Single(item => item.Name == "compact");
+        var full = compact.ArgumentOptions.Single(item => item.Name == "full");
+
+        Assert.Equal("Summarize the whole conversation, including the latest turn", full.Help);
+        Assert.Empty(full.ArgumentOptions);
+    }
+
+    [Fact]
     public void Create_NestsCompactionSummarySwitches()
     {
         var menu = SlashMenu.Create(extras: null);

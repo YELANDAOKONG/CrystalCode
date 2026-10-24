@@ -1733,8 +1733,24 @@ public sealed class CodingSession : ITurnObserver
 
         if (parsed.Verb == SessionVerb.Compact)
         {
-            var full = parsed.Argument?.Trim().Equals("full", StringComparison.OrdinalIgnoreCase) == true;
-            if (!string.IsNullOrWhiteSpace(parsed.Argument) && !full)
+            var scope = CompactionScope.LatestTurn;
+            var summarizes = string.IsNullOrWhiteSpace(parsed.Argument);
+            if (CompactionFullArguments.IsFullCommand(parsed.Argument))
+            {
+                if (CompactionFullArguments.TryParse(parsed.Argument!, out var fullError))
+                {
+                    scope = CompactionScope.Everything;
+                    summarizes = true;
+                }
+                else
+                {
+                    Error(fullError);
+                    PruneDraftImages(string.Empty);
+                    return (true, false);
+                }
+            }
+
+            if (!summarizes)
             {
                 if (CompactionModelArguments.IsModelCommand(parsed.Argument))
                 {
@@ -1796,7 +1812,7 @@ public sealed class CodingSession : ITurnObserver
 
             try
             {
-                await CompactForcedAsync(full, cancellationToken);
+                await CompactForcedAsync(scope, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -4887,7 +4903,7 @@ public sealed class CodingSession : ITurnObserver
             useSummaryMaxTokens: writer.UseMaxTokens);
     }
 
-    private async Task CompactForcedAsync(bool full, CancellationToken cancellationToken)
+    private async Task CompactForcedAsync(CompactionScope scope, CancellationToken cancellationToken)
     {
         if (_turnActive || _compactSource is not null)
         {
@@ -4899,8 +4915,8 @@ public sealed class CodingSession : ITurnObserver
             _transcript,
             silentSkip: false,
             cancellationToken,
-            force: true,
-            full);
+            manual: true,
+            scope);
     }
 
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
@@ -4969,8 +4985,8 @@ public sealed class CodingSession : ITurnObserver
         IReadOnlyList<ChatItem> transcript,
         bool silentSkip,
         CancellationToken cancellationToken,
-        bool force = false,
-        bool full = false)
+        bool manual = false,
+        CompactionScope scope = CompactionScope.Retained)
     {
         CompactionOutcome outcome;
         var compactSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -4987,8 +5003,7 @@ public sealed class CodingSession : ITurnObserver
                 _todos.Format(),
                 CurrentLimits(),
                 compactSource.Token,
-                force,
-                full);
+                scope);
         }
         finally
         {
@@ -5007,7 +5022,7 @@ public sealed class CodingSession : ITurnObserver
 
         if (outcome.Kind == CompactionKind.Applied)
         {
-            var printSummary = ShouldPrintSummary(force) && !string.IsNullOrWhiteSpace(outcome.Summary);
+            var printSummary = ShouldPrintSummary(manual) && !string.IsNullOrWhiteSpace(outcome.Summary);
             if (ReferenceEquals(transcript, _transcript))
             {
                 _transcript = [.. outcome.Transcript];
@@ -5051,8 +5066,8 @@ public sealed class CodingSession : ITurnObserver
         return outcome;
     }
 
-    private bool ShouldPrintSummary(bool forced) =>
-        forced
+    private bool ShouldPrintSummary(bool manual) =>
+        manual
             ? _settings.ShowCompactionSummary
             : _settings.ShowAutomaticCompactionSummary;
 

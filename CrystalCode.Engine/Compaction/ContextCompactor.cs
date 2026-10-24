@@ -81,18 +81,15 @@ public sealed class ContextCompactor
     }
 
     /// <summary>
-    /// Summarizes older turns. When <paramref name="force"/> is set, history
-    /// that still fits in the retained tail is summarized too, and only the
-    /// latest user turn stays verbatim. When <paramref name="full"/> is set,
-    /// nothing stays verbatim and the whole conversation becomes the summary.
+    /// Summarizes older turns. <paramref name="scope"/> decides how much stays
+    /// verbatim; see <see cref="CompactionScope"/>.
     /// </summary>
     public async Task<CompactionOutcome> CompactAsync(
         IReadOnlyList<ChatItem> transcript,
         string todos,
         CompactionLimits limits,
         CancellationToken cancellationToken = default,
-        bool force = false,
-        bool full = false)
+        CompactionScope scope = CompactionScope.Retained)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(todos);
@@ -105,10 +102,10 @@ public sealed class ContextCompactor
 
         var pruned = ToolResultPruner.Prune(transcript, OmittedResultText);
         var prunedChanged = WasRewritten(transcript, pruned);
-        var split = full
+        var split = scope == CompactionScope.Everything
             ? CompactionSelection.ChooseAll(pruned)
             : CompactionSelection.Choose(pruned, limits.ResolveTailBudget());
-        if (split.Head.Count == 0 && force && !full)
+        if (split.Head.Count == 0 && scope == CompactionScope.LatestTurn)
         {
             split = CompactionSelection.ChooseLatestTurn(pruned);
         }
