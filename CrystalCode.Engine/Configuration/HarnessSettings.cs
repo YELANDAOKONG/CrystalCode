@@ -91,7 +91,7 @@ public sealed record HarnessSettings
         int? reservedOutputTokens = null,
         int? outputTokenCap = null,
         AgentSettings? agents = null,
-        IReadOnlyList<string>? persistentDisabledBuiltInTools = null)
+        BuiltInToolDisablement? persistentDisabledBuiltInTools = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -179,9 +179,9 @@ public sealed record HarnessSettings
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
-        ProcessDisabledBuiltInTools = BuiltInToolSelection.Normalize(disabledBuiltInTools);
-        PersistentDisabledBuiltInTools = BuiltInToolSelection.Normalize(persistentDisabledBuiltInTools);
-        DisabledBuiltInTools = BuiltInToolSelection.Merge(
+        ProcessDisabledBuiltInTools = BuiltInToolDisablement.FromProcessNames(disabledBuiltInTools);
+        PersistentDisabledBuiltInTools = persistentDisabledBuiltInTools ?? new BuiltInToolDisablement();
+        DisabledBuiltInTools = BuiltInToolDisablement.Merge(
             PersistentDisabledBuiltInTools,
             ProcessDisabledBuiltInTools);
         ImageModel = imageModel ?? ImageModelSettings.None;
@@ -406,18 +406,18 @@ public sealed record HarnessSettings
     /// Built-in tool names omitted for this process. Empty keeps the full
     /// catalog. This value is not written to <c>config.json</c>.
     /// </summary>
-    public IReadOnlyList<string> DisabledBuiltInTools { get; }
+    public BuiltInToolDisablement DisabledBuiltInTools { get; }
 
     /// <summary>
     /// Built-in tool names disabled in Home preferences. This list is written
     /// to <c>config.json</c>; process-only launch overrides are not included.
     /// </summary>
-    public IReadOnlyList<string> PersistentDisabledBuiltInTools { get; }
+    public BuiltInToolDisablement PersistentDisabledBuiltInTools { get; }
 
     /// <summary>
     /// Built-in tool names disabled by process-only launch settings.
     /// </summary>
-    public IReadOnlyList<string> ProcessDisabledBuiltInTools { get; }
+    public BuiltInToolDisablement ProcessDisabledBuiltInTools { get; }
 
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
@@ -582,10 +582,18 @@ public sealed record HarnessSettings
     }
 
     public HarnessSettings WithPersistentDisabledBuiltInTools(
-        IReadOnlyList<string> disabledBuiltInTools)
+        BuiltInToolDisablement disabledBuiltInTools)
     {
         ArgumentNullException.ThrowIfNull(disabledBuiltInTools);
         return Copy(persistentDisabledBuiltInTools: disabledBuiltInTools);
+    }
+
+    public HarnessSettings WithPersistentDisabledBuiltInTools(
+        IReadOnlyList<string> disabledBuiltInTools)
+    {
+        ArgumentNullException.ThrowIfNull(disabledBuiltInTools);
+        return WithPersistentDisabledBuiltInTools(
+            BuiltInToolDisablement.FromProcessNames(disabledBuiltInTools));
     }
 
     public HarnessSettings WithExternalToolApproval(ExternalToolApprovalSettings approval)
@@ -705,7 +713,7 @@ public sealed record HarnessSettings
         bool setMicroCompaction = false,
         RuleFileSettings? ruleFiles = null,
         IReadOnlyList<string>? disabledBuiltInTools = null,
-        IReadOnlyList<string>? persistentDisabledBuiltInTools = null,
+        BuiltInToolDisablement? persistentDisabledBuiltInTools = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
         int? reservedOutputTokens = null,
@@ -751,7 +759,7 @@ public sealed record HarnessSettings
             showAutomaticCompactionSummary ?? ShowAutomaticCompactionSummary,
             setMicroCompaction ? microCompaction : MicroCompaction,
             ruleFiles ?? RuleFiles,
-            disabledBuiltInTools ?? ProcessDisabledBuiltInTools,
+            disabledBuiltInTools ?? ProcessDisabledBuiltInTools.All(),
             tierSelections ?? TierSelections,
             speedSelections ?? SpeedSelections,
             setReservedOutputTokens ? reservedOutputTokens : ReservedOutputTokens,

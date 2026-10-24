@@ -69,6 +69,7 @@ public static class PromptTemplateExport
         - {{product_name}}
         - {{session_id}}
         - {{approval}}
+        - {{disabled_tools}}
 
         ## Review user
 

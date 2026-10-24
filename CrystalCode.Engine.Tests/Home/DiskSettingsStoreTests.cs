@@ -1480,7 +1480,7 @@ public sealed class DiskSettingsStoreTests
 
         Assert.DoesNotContain("describe_image", json, StringComparison.Ordinal);
         Assert.DoesNotContain("disabledBuiltInTools", json, StringComparison.Ordinal);
-        Assert.Empty(loaded.DisabledBuiltInTools);
+        Assert.Empty(loaded.DisabledBuiltInTools.All());
     }
 
     [Fact]
@@ -1496,8 +1496,8 @@ public sealed class DiskSettingsStoreTests
         var loaded = store.Load();
 
         Assert.Contains("disabledBuiltInTools", json, StringComparison.Ordinal);
-        Assert.Equal(["describe_image", "bash"], loaded.PersistentDisabledBuiltInTools);
-        Assert.Equal(loaded.PersistentDisabledBuiltInTools, loaded.DisabledBuiltInTools);
+        Assert.Equal(["describe_image", "bash"], loaded.PersistentDisabledBuiltInTools.Plan);
+        Assert.Equal(loaded.PersistentDisabledBuiltInTools.Plan, loaded.DisabledBuiltInTools.Plan);
     }
 
     [Fact]

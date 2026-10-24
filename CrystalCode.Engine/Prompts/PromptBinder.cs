@@ -156,6 +156,9 @@ public static partial class PromptBinder
             case PromptPlaceholder.Approval:
                 value = context.Approval;
                 return true;
+            case PromptPlaceholder.DisabledTools:
+                value = context.DisabledTools;
+                return true;
             default:
                 value = string.Empty;
                 return false;

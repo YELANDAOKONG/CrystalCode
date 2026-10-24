@@ -340,9 +340,12 @@ implemented in the current build.
   the host approval and executor path. Approval classification is selected by
   that model-facing name, so a replacement is trusted not to perform effects
   beyond the replaced built-in's classification. Home configuration now
-  persistently disables built-in names through `config.json` and `/tools
-  builtin enable|disable`; process-only `--disable-tool` is merged on top and
-  remains non-persistent. Session-only disablement, disk-plugin and
+  persistently disables built-in names independently for Plan and Work through
+  `config.json` and `/tools builtin plan|work enable|disable`; process-only
+  `--disable-tool` applies to both modes by default and is merged on top. The
+  system prompt exposes the active mode's disabled list through
+  `{{disabled_tools}}`; replacing the prompt may place that placeholder where
+  needed. Session-only disablement, disk-plugin and
   external-tool replacement, and metadata adjustment remain undefined.
   Host-owned numeric limits remain a separate pending question and are not
   decided here.

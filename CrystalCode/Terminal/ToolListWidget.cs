@@ -64,7 +64,8 @@ internal static class ToolListWidget
             new Markup(
                 $"[{Theme.Chrome}]Commands[/]\n"
                 + $"[{Theme.User}]  /tools on|off|reload\n"
-                + "  /tools builtin show|enable|disable <name>\n"
+                + "  /tools builtin show\n"
+                + "  /tools builtin plan|work show|enable|disable <name>\n"
                 + "  /tools enable|disable|show <directory>\n"
                 + "  /tools home|project enable|disable|show <directory>\n"
                 + "  /tools home|project author|host[/]"));

@@ -911,7 +911,7 @@ public sealed class TaskRunHostTests
             current,
             new TaskRunSettings { DisableTool = [" read ", "bash", "read"] });
 
-        Assert.Equal(["read", "bash"], applied.DisabledBuiltInTools);
+        Assert.Equal(["read", "bash"], applied.DisabledBuiltInTools.Plan);
 
         Assert.False(TaskRunOverrides.TryApply(
             current,

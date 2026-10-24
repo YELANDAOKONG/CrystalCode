@@ -113,6 +113,9 @@ public static class BuiltInToolSelection
             + ". Do not call them.";
     }
 
+    public static string Format(IReadOnlyList<string> names) =>
+        names.Count == 0 ? string.Empty : ModelText(names);
+
     public static string OperatorNote(IReadOnlyList<string> names)
     {
         ArgumentNullException.ThrowIfNull(names);

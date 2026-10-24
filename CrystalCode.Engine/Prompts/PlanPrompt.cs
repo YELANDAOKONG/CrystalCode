@@ -42,5 +42,7 @@ public static class PlanPrompt
         {{skills}}
 
         {{instructions_section}}
+
+        {{disabled_tools}}
         """;
 }

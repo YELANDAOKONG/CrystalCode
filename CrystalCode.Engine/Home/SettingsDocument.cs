@@ -84,5 +84,5 @@ internal sealed class SettingsDocument
 
     public RetryDocument? ApprovalRetry { get; set; }
 
-    public List<string>? DisabledBuiltInTools { get; set; }
+    public System.Text.Json.JsonElement? DisabledBuiltInTools { get; set; }
 }

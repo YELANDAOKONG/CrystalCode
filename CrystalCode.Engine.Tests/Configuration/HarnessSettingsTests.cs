@@ -373,9 +373,10 @@ public sealed class HarnessSettingsTests
 
         var copied = settings.WithSkills(false);
 
-        Assert.Equal(["bash", "read"], settings.DisabledBuiltInTools);
-        Assert.Equal(["bash", "read"], copied.DisabledBuiltInTools);
-        Assert.Empty(HarnessSettings.CreateDefault().DisabledBuiltInTools);
+        Assert.Equal(["bash", "read"], settings.DisabledBuiltInTools.Plan);
+        Assert.Equal(["bash", "read"], settings.DisabledBuiltInTools.Work);
+        Assert.Equal(["bash", "read"], copied.DisabledBuiltInTools.Plan);
+        Assert.Empty(HarnessSettings.CreateDefault().DisabledBuiltInTools.All());
     }
 
     [Fact]
@@ -394,8 +395,24 @@ public sealed class HarnessSettingsTests
             .WithPersistentDisabledBuiltInTools(["read", "bash"])
             .WithDisabledBuiltInTools(["bash", "edit"]);
 
-        Assert.Equal(["read", "bash", "edit"], settings.DisabledBuiltInTools);
-        Assert.Equal(["read", "bash"], settings.PersistentDisabledBuiltInTools);
-        Assert.Equal(["bash", "edit"], settings.ProcessDisabledBuiltInTools);
+        Assert.Equal(["read", "bash", "edit"], settings.DisabledBuiltInTools.Plan);
+        Assert.Equal(["read", "bash", "edit"], settings.DisabledBuiltInTools.Work);
+        Assert.Equal(["read", "bash"], settings.PersistentDisabledBuiltInTools.Plan);
+        Assert.Equal(["bash", "edit"], settings.ProcessDisabledBuiltInTools.Plan);
+    }
+
+    [Fact]
+    public void DisabledBuiltInTools_CanTargetOneMode()
+    {
+        var settings = new HarnessSettings(
+            HarnessSettings.CreateDefault().Provider,
+            HarnessSettings.CreateDefault().Model,
+            HarnessSettings.CreateDefault().Approval,
+            HarnessSettings.CreateDefault().CompactionThreshold,
+            HarnessSettings.CreateDefault().Catalog,
+            persistentDisabledBuiltInTools: new BuiltInToolDisablement(plan: ["read"]));
+
+        Assert.Equal(["read"], settings.DisabledBuiltInTools.Plan);
+        Assert.Empty(settings.DisabledBuiltInTools.Work);
     }
 }

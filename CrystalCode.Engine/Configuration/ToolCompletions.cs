@@ -13,6 +13,19 @@ public static class ToolCompletions
             .Select(name => new SlashCompletion(name, "Configure built-in tool", [name]))
             .ToArray();
 
+    private static readonly IReadOnlyList<SlashCompletion> BuiltInToolActions =
+    [
+        new("show", "Show disabled tools for this mode", ["show"]),
+        new("enable", "Enable a built-in tool for this mode", ["enable"], BuiltInTools),
+        new("disable", "Disable a built-in tool for this mode", ["disable"], BuiltInTools)
+    ];
+
+    private static readonly IReadOnlyList<SlashCompletion> BuiltInModes =
+    [
+        new("plan", "Configure Plan built-in tools", ["plan"], BuiltInToolActions),
+        new("work", "Configure Work built-in tools", ["work"], BuiltInToolActions)
+    ];
+
     private static readonly IReadOnlyList<SlashCompletion> Policies =
     [
         new("author", "Follow author approval declarations", ["author"]),
@@ -27,11 +40,6 @@ public static class ToolCompletions
         new("reload", "Reload external tools", ["reload"]),
         new("on", "Enable external tools", ["on"]),
         new("off", "Disable external tools", ["off"]),
-        new("builtin", "Show or configure built-in tools", ["builtin"],
-            [
-                new("show", "Show persistent built-in tool settings", ["show"]),
-                new("enable", "Enable a built-in tool persistently", ["enable"], BuiltInTools),
-                new("disable", "Disable a built-in tool persistently", ["disable"], BuiltInTools)
-            ])
+        new("builtin", "Show or configure Plan and Work built-in tools", ["builtin"], BuiltInModes)
     ];
 }

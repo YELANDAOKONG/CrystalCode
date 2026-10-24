@@ -649,18 +649,22 @@ Provider-specific custom-format tools such as OpenAI's `apply_patch` take
 text input and are medium-priority product work, not part of this build.
 
 `config.json` `disabledBuiltInTools` stores Home-level persistent built-in tool
-disablement. `/tools builtin show|enable|disable <name>` displays or changes
-that list while idle, rebuilds both executors, and refreshes the live system
-message. An unknown name is rejected. `--disable-tool` repeats on `crystal`,
-`crystal space`, and `crystal run`; each value is one built-in tool name and
-adds a process-only disablement on top of the Home list. Launch overrides are
-not saved, and enabling a Home name does not remove a process-only disablement.
-The merged list omits the tool from Plan and Work, including `describe_image`,
-`skill`, `view_image`, and named background shell tools. The system text lists
-the omitted names and tells the model not to call them. The name stays reserved
-for plugins and external tools. Session-only disablement, metadata adjustment,
-and disk-plugin or external-tool replacement remain undefined. Host-owned
-numeric limits are a separate pending question.
+disablement as an object with separate `plan` and `work` arrays. A legacy array
+is accepted and applies to both modes. `/tools builtin show` displays both
+lists; `/tools builtin plan|work show|enable|disable <name>` changes one list
+while idle, rebuilds both executors, and refreshes the live system message. An
+unknown name is rejected. `--disable-tool` repeats on `crystal`, `crystal
+space`, and `crystal run`; an unqualified name applies to both modes, while
+`plan:<name>` or `work:<name>` targets one mode. Launch overrides are not
+saved, and enabling a Home name does not remove a process-only disablement.
+The active mode's merged list omits the tool from its Plan or Work catalog,
+including `describe_image`, `skill`, `view_image`, and named background shell
+tools. Work and Plan prompt templates expose that list through the host-owned
+`{{disabled_tools}}` placeholder; custom prompt text must include the token if
+it wants the guidance. The name stays reserved for plugins and external
+tools. Session-only disablement, metadata adjustment, and disk-plugin or
+external-tool replacement remain undefined. Host-owned numeric limits are a
+separate pending question.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,

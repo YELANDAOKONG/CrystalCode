@@ -89,7 +89,8 @@ public static class ToolListText
         lines.Add(string.Empty);
         lines.Add("Commands");
         lines.Add("  /tools on|off|reload");
-        lines.Add("  /tools builtin show|enable|disable <name>");
+        lines.Add("  /tools builtin show");
+        lines.Add("  /tools builtin plan|work show|enable|disable <name>");
         lines.Add("  /tools enable|disable|show <directory>");
         lines.Add("  /tools home|project enable|disable|show <directory>");
         lines.Add("  /tools home|project author|host");

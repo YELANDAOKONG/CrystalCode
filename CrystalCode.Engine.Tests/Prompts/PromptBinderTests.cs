@@ -157,6 +157,23 @@ public sealed class PromptBinderTests
     }
 
     [Fact]
+    public void Apply_SubstitutesDisabledTools()
+    {
+        var context = PromptContext.Create(
+            "/tmp/demo",
+            "openai",
+            "gpt-4.1",
+            "work",
+            string.Empty,
+            string.Empty,
+            disabledTools: "Built-in tools disabled: read. Do not call them.");
+
+        Assert.Equal(
+            "Built-in tools disabled: read. Do not call them.",
+            PromptBinder.Apply("{{disabled_tools}}", context));
+    }
+
+    [Fact]
     public void Apply_SubstitutesDirectoryAccessAndLeavesItUnexpanded()
     {
         var listed = DirectoryAccessText.Render(

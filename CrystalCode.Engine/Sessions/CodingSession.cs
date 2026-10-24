@@ -69,7 +69,8 @@ public sealed class CodingSession : ITurnObserver
 
     private ToolCatalog WithTask(ToolCatalog catalog, bool planMode)
     {
-        if (!_settings.Agents.Enabled || _settings.DisabledBuiltInTools.Contains(TaskTool.ToolName))
+        if (!_settings.Agents.Enabled
+            || _settings.DisabledBuiltInTools.For(planMode).Contains(TaskTool.ToolName))
         {
             return catalog;
         }
@@ -108,7 +109,7 @@ public sealed class CodingSession : ITurnObserver
         var plan = planMode ?? (_turnActive ? EffectiveChildPlanMode : _planMode);
         var planNames = plan
             ? WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), _frontEnd.Questions, _plugins, _skills, _external,
-                _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools).Definitions.Select(tool => tool.Name)
+                _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true)).Definitions.Select(tool => tool.Name)
                 .Append("view_image").ToHashSet(StringComparer.Ordinal)
             : null;
         foreach (var definition in catalog.Definitions)
@@ -244,10 +245,10 @@ public sealed class CodingSession : ITurnObserver
 
     private ToolCatalog ChildCatalog(TodoList todos) => EffectiveChildPlanMode
         ? WorkspaceCatalog.CreatePlan(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
-            _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools)
+            _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true))
         : WorkspaceCatalog.CreateWork(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
             _settings.BashTimeoutSeconds, _loadedPlugins, CreateImageDescriber(),
-            disabledBuiltInTools: _settings.DisabledBuiltInTools);
+            disabledBuiltInTools: _settings.DisabledBuiltInTools.For(false));
 
     private IReadOnlyList<Crystal.Multimodal.Tools.IMultimodalTool> ChildImageTools(TodoList todos)
     {
@@ -256,7 +257,8 @@ public sealed class CodingSession : ITurnObserver
         tools.AddRange(EffectiveChildPlanMode ? _loadedPlugins.PlanMultimodalTools : _loadedPlugins.WorkMultimodalTools);
         tools.AddRange(EffectiveChildPlanMode ? _external.PlanMultimodalTools : _external.WorkMultimodalTools);
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
-        return tools.Where(tool => !_settings.DisabledBuiltInTools.Contains(tool.Definition.Name)).ToArray();
+        var disabled = _settings.DisabledBuiltInTools.For(EffectiveChildPlanMode);
+        return tools.Where(tool => !disabled.Contains(tool.Definition.Name)).ToArray();
     }
 
     private async Task<string> RunChildAsync(string agent, string label, string prompt, string? sessionId,
@@ -358,7 +360,11 @@ public sealed class CodingSession : ITurnObserver
                 ? CrystalCode.Engine.Skills.SkillGuidance.Render(_skills) : string.Empty;
             var facts = PromptContext.Create(_workspace.Root, selectedModel.Provider.Value, selectedModel.Model,
                 childPlan ? "plan" : "work", skills, _prompts.Instructions,
-                sessionId: child.Id, approval: _approval.Value, directories: directories);
+                sessionId: child.Id,
+                approval: _approval.Value,
+                directories: directories,
+                disabledTools: BuiltInToolSelection.Format(
+                    _settings.DisabledBuiltInTools.For(childPlan)));
             var system = definition.ManifestPath is not null
                 ? string.Empty
                 : childPlan
@@ -1144,7 +1150,10 @@ public sealed class CodingSession : ITurnObserver
             Note("Prompt attachments  " + attachmentStatus);
         }
 
-        var disabledTools = BuiltInToolSelection.OperatorNote(_settings.DisabledBuiltInTools);
+        var disabledTools = BuiltInToolSelection.OperatorNote(
+            BuiltInToolSelection.Merge(
+                _settings.DisabledBuiltInTools.Plan,
+                _settings.DisabledBuiltInTools.Work));
         if (disabledTools.Length > 0)
         {
             Note(disabledTools);
@@ -3720,22 +3729,32 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeBuiltInTools(IReadOnlyList<string> parts)
     {
-        if (parts.Count == 1
-            || parts.Count == 2
-            && parts[1].Equals("show", StringComparison.OrdinalIgnoreCase))
+        if (parts.Count == 1)
         {
-            Note(_settings.PersistentDisabledBuiltInTools.Count == 0
-                ? "Persistently disabled built-in tools  None"
-                : "Persistently disabled built-in tools  "
-                    + string.Join(", ", _settings.PersistentDisabledBuiltInTools));
+            Note(FormatBuiltInDisablement(_settings.PersistentDisabledBuiltInTools));
             return;
         }
 
-        if (parts.Count != 3
-            || !parts[1].Equals("enable", StringComparison.OrdinalIgnoreCase)
-                && !parts[1].Equals("disable", StringComparison.OrdinalIgnoreCase))
+        if (parts.Count == 3
+            && (parts[1].Equals("plan", StringComparison.OrdinalIgnoreCase)
+                || parts[1].Equals("work", StringComparison.OrdinalIgnoreCase))
+            && parts[2].Equals("show", StringComparison.OrdinalIgnoreCase))
         {
-            Error("Usage: /tools builtin show|enable|disable <name>.");
+            var showingPlan = parts[1].Equals("plan", StringComparison.OrdinalIgnoreCase);
+            Note($"Persistently disabled {(showingPlan ? "Plan" : "Work")} built-in tools  "
+                + (string.Join(", ", _settings.PersistentDisabledBuiltInTools.For(showingPlan)) is { Length: > 0 } names
+                    ? names
+                    : "None"));
+            return;
+        }
+
+        if (parts.Count != 4
+            || !parts[1].Equals("plan", StringComparison.OrdinalIgnoreCase)
+                && !parts[1].Equals("work", StringComparison.OrdinalIgnoreCase)
+            || !parts[2].Equals("enable", StringComparison.OrdinalIgnoreCase)
+                && !parts[2].Equals("disable", StringComparison.OrdinalIgnoreCase))
+        {
+            Error("Usage: /tools builtin show or /tools builtin plan|work enable|disable <name>.");
             return;
         }
 
@@ -3748,7 +3767,7 @@ public sealed class CodingSession : ITurnObserver
         string name;
         try
         {
-            name = BuiltInToolSelection.Normalize([parts[2]])[0];
+            name = BuiltInToolSelection.Normalize([parts[3]])[0];
         }
         catch (ArgumentException exception)
         {
@@ -3756,8 +3775,10 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var disabled = _settings.PersistentDisabledBuiltInTools.ToList();
-        var disable = parts[1].Equals("disable", StringComparison.OrdinalIgnoreCase);
+        var planMode = parts[1].Equals("plan", StringComparison.OrdinalIgnoreCase);
+        var current = _settings.PersistentDisabledBuiltInTools.For(planMode);
+        var disabled = current.ToList();
+        var disable = parts[2].Equals("disable", StringComparison.OrdinalIgnoreCase);
         var changed = disable
             ? !disabled.Contains(name, StringComparer.Ordinal)
             : disabled.Remove(name);
@@ -3772,10 +3793,18 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        SaveSettings(current => current.WithPersistentDisabledBuiltInTools(disabled));
+        var next = _settings.PersistentDisabledBuiltInTools.With(planMode, disabled);
+        SaveSettings(currentSettings => currentSettings.WithPersistentDisabledBuiltInTools(next));
         RebuildExecutors();
         ReplaceLiveSystem();
-        Note($"Built-in tool {name}  {(disable ? "Disabled" : "Enabled")}");
+        Note($"{(planMode ? "Plan" : "Work")} built-in tool {name}  {(disable ? "Disabled" : "Enabled")}");
+    }
+
+    private static string FormatBuiltInDisablement(BuiltInToolDisablement disabled)
+    {
+        var plan = disabled.Plan.Count == 0 ? "None" : string.Join(", ", disabled.Plan);
+        var work = disabled.Work.Count == 0 ? "None" : string.Join(", ", disabled.Work);
+        return $"Persistently disabled built-in tools  Plan {plan}  Work {work}";
     }
 
     private void ShowTools()
@@ -3987,7 +4016,7 @@ public sealed class CodingSession : ITurnObserver
     {
         Error(
             "Tools command must be /tools, /tools approval, /tools on|off|reload, "
-            + "/tools builtin show|enable|disable <name>, "
+            + "/tools builtin show or /tools builtin plan|work enable|disable <name>, "
             + "/tools enable|disable|show <directory>, "
             + "/tools home|project enable|disable|show <directory>, "
             + "/tools home author|host, or /tools project author|host.");
@@ -4486,7 +4515,9 @@ public sealed class CodingSession : ITurnObserver
             _prompts.Instructions + (directories.Length == 0 ? string.Empty : "\n\n" + directories),
             sessionId: _sessionId,
             approval: _approval.Value,
-            directories: directories);
+            directories: directories,
+            disabledTools: BuiltInToolSelection.Format(
+                _settings.DisabledBuiltInTools.For(_planMode)));
     }
 
     private string CurrentSystemText()
@@ -4496,13 +4527,7 @@ public sealed class CodingSession : ITurnObserver
                 ? _prompts.ComposePlan(CurrentPromptContext(), _placeholders)
                 : _prompts.ComposeWork(CurrentPromptContext(), _placeholders),
             _planMode ? "plan" : "work");
-        var disabled = BuiltInToolSelection.ModelText(_settings.DisabledBuiltInTools);
-        if (disabled.Length == 0)
-        {
-            return text;
-        }
-
-        return text.Length == 0 ? disabled : text + "\n\n" + disabled;
+        return text;
     }
 
     private string CurrentReviewSystemText() =>
@@ -5253,7 +5278,7 @@ public sealed class CodingSession : ITurnObserver
             (call, classification) => _hooks.OnApproval(call, classification));
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         var childPlanTools = WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), question, _plugins, _skills,
-            _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools).Definitions
+            _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.Plan).Definitions
             .Select(tool => tool.Name).Append(ViewImageTool.ToolName).ToHashSet(StringComparer.Ordinal);
         async ValueTask<ToolInvocationDecision> DecideAsync(ToolCall call, CancellationToken token)
         {
@@ -5292,7 +5317,7 @@ public sealed class CodingSession : ITurnObserver
                 _loadedPlugins,
                 imageDescriber,
                 _backgroundTasks,
-                _settings.DisabledBuiltInTools), planMode: false),
+                _settings.DisabledBuiltInTools.Work), planMode: false),
             options,
             DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -5306,7 +5331,7 @@ public sealed class CodingSession : ITurnObserver
                 _external,
                 _loadedPlugins,
                 imageDescriber,
-                _settings.DisabledBuiltInTools), planMode: true),
+                _settings.DisabledBuiltInTools.Plan), planMode: true),
             options,
             DecideAsync,
             HarnessExceptionMapper.MapAsync);
@@ -5357,11 +5382,12 @@ public sealed class CodingSession : ITurnObserver
 
         // Text-only turns return before this, so view_image stays off that catalog.
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
-        if (_settings.DisabledBuiltInTools.Count > 0)
+        var disabled = _settings.DisabledBuiltInTools.For(catalog == HostToolCatalog.Plan);
+        if (disabled.Count > 0)
         {
             tools.RemoveAll(tool =>
                 BuiltInToolSelection.Includes(
-                    _settings.DisabledBuiltInTools,
+                    disabled,
                     tool.Definition.Name));
         }
 

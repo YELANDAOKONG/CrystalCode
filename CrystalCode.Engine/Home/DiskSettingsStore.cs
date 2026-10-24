@@ -110,7 +110,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             ruleFiles: ReadRuleFiles(document.RuleFiles),
             reservedOutputTokens: document.ReservedOutputTokens,
             agents: document.Agents,
-            persistentDisabledBuiltInTools: document.DisabledBuiltInTools);
+            persistentDisabledBuiltInTools: ReadDisabledBuiltInTools(document.DisabledBuiltInTools));
     }
 
     public void Save(HarnessSettings settings)
@@ -187,9 +187,16 @@ public sealed class DiskSettingsStore : ISettingsStore
             ImageModel = WriteImageModel(settings.ImageModel),
             Retry = WriteRetry(settings.Retry),
             ApprovalRetry = WriteRetry(settings.ApprovalRetry),
-            DisabledBuiltInTools = settings.PersistentDisabledBuiltInTools.Count == 0
+            DisabledBuiltInTools = settings.PersistentDisabledBuiltInTools.Plan.Count == 0
+                && settings.PersistentDisabledBuiltInTools.Work.Count == 0
                 ? null
-                : [.. settings.PersistentDisabledBuiltInTools]
+                : JsonSerializer.SerializeToElement(
+                    new BuiltInToolDisablementDocument
+                    {
+                        Plan = [.. settings.PersistentDisabledBuiltInTools.Plan],
+                        Work = [.. settings.PersistentDisabledBuiltInTools.Work]
+                    },
+                    HomeJson.Options)
         };
         var json = JsonSerializer.Serialize(document, HomeJson.Options);
         File.WriteAllText(_home.ConfigPath, json);
@@ -206,6 +213,29 @@ public sealed class DiskSettingsStore : ISettingsStore
             File.ReadAllText(_home.ProvidersPath),
             HomeJson.ProviderCatalogReadOptions);
         return SettingsMapper.ReadProviders(providers.RootElement);
+    }
+
+    private static BuiltInToolDisablement? ReadDisabledBuiltInTools(JsonElement? value)
+    {
+        if (value is not { } element || element.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            var names = element.Deserialize<List<string>>(HomeJson.Options);
+            return names is null ? null : new BuiltInToolDisablement(names, names);
+        }
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("disabledBuiltInTools must be an array or an object with plan and work arrays.");
+        }
+
+        var document = element.Deserialize<BuiltInToolDisablementDocument>(HomeJson.Options)
+            ?? throw new InvalidOperationException("disabledBuiltInTools is invalid.");
+        return new BuiltInToolDisablement(document.Plan, document.Work);
     }
 
     private void CopyProviders(JsonElement providers)

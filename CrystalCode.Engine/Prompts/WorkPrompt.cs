@@ -84,5 +84,7 @@ public static class WorkPrompt
         {{skills}}
 
         {{instructions_section}}
+
+        {{disabled_tools}}
         """;
 }

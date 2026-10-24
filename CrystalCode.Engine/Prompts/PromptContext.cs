@@ -24,7 +24,8 @@ public sealed record PromptContext
         string approval,
         string skills,
         string instructions,
-        string directories)
+        string directories,
+        string disabledTools)
     {
         Workspace = workspace;
         IsGitRepo = isGitRepo;
@@ -43,6 +44,7 @@ public sealed record PromptContext
         Skills = skills;
         Instructions = instructions;
         Directories = directories;
+        DisabledTools = disabledTools;
     }
 
     public string Workspace { get; }
@@ -79,6 +81,8 @@ public sealed record PromptContext
 
     public string Directories { get; }
 
+    public string DisabledTools { get; }
+
     public string ModelLine => Provider + " / " + Model;
 
     public string EnvironmentBlock =>
@@ -101,7 +105,8 @@ public sealed record PromptContext
         DateTimeOffset? now = null,
         string sessionId = "",
         string approval = "",
-        string directories = "")
+        string directories = "",
+        string disabledTools = "")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -112,6 +117,7 @@ public sealed record PromptContext
         ArgumentNullException.ThrowIfNull(sessionId);
         ArgumentNullException.ThrowIfNull(approval);
         ArgumentNullException.ThrowIfNull(directories);
+        ArgumentNullException.ThrowIfNull(disabledTools);
 
         var snapshot = PromptEnvironment.CreateSnapshot(
             workspaceRoot,
@@ -137,7 +143,8 @@ public sealed record PromptContext
             snapshot.Approval,
             skills.Trim(),
             instructions.Trim(),
-            directories.Trim());
+            directories.Trim(),
+            disabledTools.Trim());
     }
 
     public static PromptContext InstructionsOnly(string instructions)
@@ -160,6 +167,7 @@ public sealed record PromptContext
             string.Empty,
             string.Empty,
             instructions.Trim(),
+            string.Empty,
             string.Empty);
     }
 
@@ -183,6 +191,7 @@ public sealed record PromptContext
             Approval,
             Skills,
             Instructions,
-            Directories);
+            Directories,
+            DisabledTools);
     }
 }

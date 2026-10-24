@@ -46,6 +46,8 @@ public static class PromptPlaceholder
 
     public const string Approval = "approval";
 
+    public const string DisabledTools = "disabled_tools";
+
     public const string Conversation = "conversation";
 
     public const string ToolName = "tool_name";
@@ -90,6 +92,7 @@ public static class PromptPlaceholder
         ProductName,
         SessionId,
         Approval,
+        DisabledTools,
         Conversation,
         ToolName,
         ToolArguments,
