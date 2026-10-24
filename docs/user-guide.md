@@ -1439,7 +1439,7 @@ is the workspace root.
 | `question` | Plan, Work | Ask one or more questions with single/multiple choices and custom answers |
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `task` | Plan, Work | Delegate to a child Agent (`agent`, `label`, `prompt`, optional `sessionId`). Present only while child Agents are enabled and at least one Agent is available. `work` is omitted in Plan. A call without `sessionId` creates a child; a call with it continues that child |
-| `edit` | Work | Replace one unique `old_string` in a file |
+| `edit` | Work | Replace one unique `old_string` in a file, or every occurrence with `replace_all` |
 | `write` | Work | Create or overwrite a UTF-8 text file |
 | `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 600 seconds) |
 | `bash_start` | Work | Start a session-local background shell command after approval and return its task ID. Timeout is `backgroundBashTimeoutSeconds` (default 10800 seconds, 3 hours) |

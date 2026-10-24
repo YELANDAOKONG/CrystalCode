@@ -2175,7 +2175,8 @@ transcript. Custom answers edit inside the overlay with an independent buffer:
 Enter saves and Escape cancels editing without dismissing the question. The
 paused main composer keeps its draft and hides its cursor. Ask and auto-pass
 cards for `edit` and `write` show a capped `+` / `-` preview
-of `old_string` / `new_string` or `contents`. Overlay keys share the
+of `old_string` / `new_string` or `contents`. An `edit` with `replace_all`
+shows the same preview once. Overlay keys share the
 session frame loop, so transcript scroll and resize still work while a
 prompt is up. Ask overlays use the same card; `Y` / `S` / `A` / `N` map
 Once / Session / Always / Deny for ordinary workspace calls. Calls that cannot

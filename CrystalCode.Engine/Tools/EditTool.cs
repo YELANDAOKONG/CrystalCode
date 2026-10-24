@@ -5,22 +5,22 @@ using Crystal.Tools;
 namespace CrystalCode.Engine.Tools;
 
 /// <summary>
-/// Replaces one unique occurrence of text in a file. Paths outside the
-/// workspace run only after approval.
+/// Replaces one unique occurrence of text in a file, or every occurrence when
+/// asked. Paths outside the workspace run only after approval.
 /// </summary>
 public sealed class EditTool : ITool
 {
     public const string ToolName = "edit";
 
     private const string ToolDescription =
-        "Replaces one unique old_string with new_string in an existing file. "
+        "Replaces one unique old_string with new_string in an existing file, or every occurrence when replace_all is true. "
         + "path may be workspace-relative or absolute. "
         + "Paths inside the workspace follow the approval mode. "
         + "Outside Full mode, unlisted outside paths require approval: the Review model in Review or Audit, otherwise the operator. "
         + "Session write directories follow the approval mode; session read-only directories cannot be edited outside Full mode. "
         + "Read the file first. "
         + "Preserve exact indentation; do not include line-number prefixes. "
-        + "The call fails if old_string is missing or appears more than once; add surrounding lines to make it unique. "
+        + "The call fails if old_string is missing, or appears more than once while replace_all is not true; add surrounding lines to make it unique. "
         + "Prefer edit over rewriting the whole file with write.";
 
     private readonly Workspace _workspace;
@@ -42,11 +42,15 @@ public sealed class EditTool : ITool
                     },
                     "old_string": {
                       "type": "string",
-                      "description": "Exact text that must appear once."
+                      "description": "Exact text that must appear once, unless replace_all is true."
                     },
                     "new_string": {
                       "type": "string",
                       "description": "Replacement text."
+                    },
+                    "replace_all": {
+                      "type": "boolean",
+                      "description": "Replace every occurrence of old_string. Defaults to false."
                     }
                   },
                   "required": ["path", "old_string", "new_string"]
@@ -72,6 +76,13 @@ public sealed class EditTool : ITool
                     ToolResultStatus.Failure));
         }
 
+        if (!ToolArguments.TryReadOptionalBoolean(call.Arguments, "replace_all", out var replaceAllValue))
+        {
+            return ValueTask.FromResult(
+                new ToolOutput("replace_all must be a boolean.", ToolResultStatus.Failure));
+        }
+
+        var replaceAll = replaceAllValue == true;
         if (oldText.Length == 0)
         {
             return ValueTask.FromResult(
@@ -119,7 +130,7 @@ public sealed class EditTool : ITool
                 new ToolOutput("old_string was not found.", ToolResultStatus.Failure));
         }
 
-        if (count > 1)
+        if (count > 1 && !replaceAll)
         {
             return ValueTask.FromResult(
                 new ToolOutput(
@@ -133,7 +144,8 @@ public sealed class EditTool : ITool
             updated,
             new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         var shown = _workspace.Contains(fullPath) ? _workspace.ToRelative(fullPath) : fullPath;
-        return ValueTask.FromResult(new ToolOutput($"Edited {shown}."));
+        return ValueTask.FromResult(
+            new ToolOutput(replaceAll ? $"Edited {shown}, replaced {count} occurrences." : $"Edited {shown}."));
     }
 
     internal static bool TryRead(

@@ -47,6 +47,59 @@ public sealed class EditToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_ReplacesEveryOccurrenceWhenReplaceAllIsTrue()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "App.cs"), "old old\nold\n");
+        var tool = new EditTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            JsonToolCall(
+                "1",
+                EditTool.ToolName,
+                """{"path":"App.cs","old_string":"old","new_string":"new","replace_all":true}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal("Edited App.cs, replaced 3 occurrences.", output.Text);
+        Assert.Equal("new new\nnew\n", File.ReadAllText(Path.Combine(root.Path, "App.cs")));
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ReplaceAllStillFailsWhenTheTextIsMissing()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "App.cs"), "keep\n");
+        var tool = new EditTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            JsonToolCall(
+                "1",
+                EditTool.ToolName,
+                """{"path":"App.cs","old_string":"old","new_string":"new","replace_all":true}"""));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+        Assert.Equal("old_string was not found.", output.Text);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_RejectsANonBooleanReplaceAll()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "App.cs"), "old old\n");
+        var tool = new EditTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(
+            JsonToolCall(
+                "1",
+                EditTool.ToolName,
+                """{"path":"App.cs","old_string":"old","new_string":"new","replace_all":"yes"}"""));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+        Assert.Equal("replace_all must be a boolean.", output.Text);
+        Assert.Equal("old old\n", File.ReadAllText(Path.Combine(root.Path, "App.cs")));
+    }
+
+    [Fact]
     public async Task InvokeAsync_EditsPathOutsideWorkspace()
     {
         using var root = new TemporaryWorkspace();
