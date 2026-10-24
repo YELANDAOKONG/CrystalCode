@@ -21,7 +21,8 @@ internal static class McpConfigParser
         "url",
         "headers",
         "catalogs",
-        "toolTimeoutSeconds"
+        "toolTimeoutSeconds",
+        "enabled"
     };
 
     public static IReadOnlyList<McpConfigEntry> ParseFile(
@@ -93,7 +94,7 @@ internal static class McpConfigParser
         ArgumentNullException.ThrowIfNull(notes);
         if (!TryOpen(json, origin, notes, out var document))
         {
-            return new McpConfigEntry(name, null, origin);
+            return new McpConfigEntry(name, null, origin, "the file is not valid JSON.");
         }
 
         using (document)
@@ -125,7 +126,8 @@ internal static class McpConfigParser
                     notes.Add(
                         $"MCP server '{property.Name}' ({origin}) was skipped: "
                         + "the name appears more than once.");
-                    entries.Add(new McpConfigEntry(property.Name, null, origin));
+                    entries.Add(new McpConfigEntry(
+                        property.Name, null, origin, "the name appears more than once."));
                 }
 
                 continue;
@@ -150,7 +152,7 @@ internal static class McpConfigParser
             notes.Add($"MCP server '{name}' ({origin}) was skipped: {error}");
         }
 
-        return new McpConfigEntry(name, definition, origin);
+        return new McpConfigEntry(name, definition, origin, error);
     }
 
     private static bool TryOpen(
@@ -223,6 +225,7 @@ internal static class McpConfigParser
             || !TryStringMap(fields, "headers", StringComparer.OrdinalIgnoreCase, out var headers, out error)
             || !TryCatalogs(fields, out var inPlan, out var inWork, out error)
             || !TryTimeout(fields, out var timeout, out error)
+            || !TryEnabled(fields, out var enabled, out error)
             || !TryTransport(fields, type, out var transport, out error))
         {
             return null;
@@ -239,7 +242,30 @@ internal static class McpConfigParser
             headers,
             inPlan,
             inWork,
-            timeout);
+            timeout,
+            enabled);
+    }
+
+    private static bool TryEnabled(
+        Dictionary<string, JsonElement> fields,
+        out bool enabled,
+        out string error)
+    {
+        error = string.Empty;
+        enabled = true;
+        if (!fields.TryGetValue("enabled", out var element))
+        {
+            return true;
+        }
+
+        if (element.ValueKind is JsonValueKind.True or JsonValueKind.False)
+        {
+            enabled = element.GetBoolean();
+            return true;
+        }
+
+        error = "'enabled' must be true or false.";
+        return false;
     }
 
     private static bool TryTransport(

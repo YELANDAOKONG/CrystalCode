@@ -259,6 +259,10 @@ They do not open the terminal and do not read configuration.
 directory. They print a Spectre.Console table unless `--format text` is
 set. They do not open a session and do not write `config.json`.
 
+`crystal mcp list|show|enable|disable` does the same for one MCP server. It
+changes only that server's `enabled` field and never prints its command,
+arguments, headers, or URL.
+
 `crystal promptsets` and `crystal prompt-attachments` do the same for
 `prompt.json`. Prompt sets are Home-only: `list`, `show`, `enable`, and
 `disable` accept `--home` and `--format text`. Enabling one set turns the
@@ -1556,8 +1560,11 @@ this build.
 and prints a Spectre.Console table unless `--format text` is set.
 Details are in [Plugins](plugins.md).
 
-`/mcp` lists connected MCP servers. `/mcp on|off|reload` controls connections.
-Details are in [MCP servers](mcp.md).
+`/mcp` lists connected MCP servers. `/mcp list|show|enable|disable` manages
+configured ones, `/mcp on|off|reload` controls connections, and
+`/mcp home|project author|host` sets the per-source approval choice.
+Server prompts appear as `/mcp__<server>__<prompt>` commands. Details are in
+[MCP servers](mcp.md).
 
 ## Prompts and instructions
 

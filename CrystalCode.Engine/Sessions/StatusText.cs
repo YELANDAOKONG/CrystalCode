@@ -87,6 +87,7 @@ public static class StatusText
             [
                 ("Skills", Toggle(status.SkillsEnabled)),
                 ("External tools", Toggle(status.ExternalToolsEnabled)),
+                ("MCP", Toggle(status.McpEnabled)),
                 ("Plugins", Toggle(status.PluginsEnabled)),
                 ("Global rules", Toggle(status.GlobalRulesEnabled)),
                 ("Project rules", Toggle(status.ProjectRulesEnabled)),
@@ -131,6 +132,8 @@ public static class StatusText
                     ("Plan tools", Number(status.PlanTools)),
                     ("Work tools", Number(status.WorkTools)),
                     ("External loaded", Number(status.ExternalTools)),
+                    ("MCP servers", Number(status.McpServers)),
+                    ("MCP tools", Number(status.McpTools)),
                     ("Plugins loaded", Number(status.Plugins))
                 ],
                 trailingBlankLine: false);

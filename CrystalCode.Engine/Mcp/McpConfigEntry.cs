@@ -8,4 +8,6 @@ namespace CrystalCode.Engine.Mcp;
 internal sealed record McpConfigEntry(
     string Name,
     McpServerDefinition? Definition,
-    string Origin);
+    string Origin,
+    string Error = "",
+    bool FromDirectory = false);

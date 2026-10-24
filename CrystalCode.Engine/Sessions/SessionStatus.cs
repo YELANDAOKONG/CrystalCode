@@ -50,4 +50,7 @@ public sealed record SessionStatus(
     bool GlobalRulesEnabled = true,
     bool ProjectRulesEnabled = true,
     string ServiceTier = "",
-    string Speed = "");
+    string Speed = "",
+    bool McpEnabled = true,
+    int McpServers = 0,
+    int McpTools = 0);

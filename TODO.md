@@ -73,8 +73,11 @@ behavior stands until a specific change defines otherwise.
   scripts. Channels are not selected, and package names, ownership, signing,
   update behavior, and platform coverage are not defined. Do not reserve a
   package name, tap, formula, image, or repository.
-- MCP servers. Do not bypass the existing plugin, approval, and media
-  boundaries.
+- MCP gaps. MCP tools, resources, prompts, elicitation, and roots are in this
+  build. Not in it: sampling, OAuth for remote servers, image and audio
+  results (they are named, not sent), servers passed in by a front end for one
+  session, and URL-mode elicitation. Do not bypass the existing plugin,
+  approval, and media boundaries.
 - The Agent Client Protocol (ACP). The working name is crystal agent. It
   would be a front end that implements `SessionFrontEnd`, not an engine
   protocol. Do not bypass approval, trust, or the tool boundary. ACP does

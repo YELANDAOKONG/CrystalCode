@@ -186,19 +186,30 @@ separate library with no terminal code. The product can:
   when External Tools is enabled;
 - connect to MCP servers defined in `~/.crystal/mcp.json`, single-server
   definitions under `~/.crystal/mcp/<name>/server.json`, and their workspace
-  equivalents when MCP is enabled. Server tools are registered with
-  `mcp__<server>__<tool>` names. Resources use two host tools:
-  `list_mcp_resources` and `read_mcp_resource`. Prompts become slash commands
-  `/mcp__<server>__<prompt>`. Server elicitation requests go through the
-  existing operator question modal. Sampling is deferred. The client declares
-  the roots capability, answers with the workspace root, and sends
-  list-changed notifications when the workspace changes. Session-level
-  servers supplied by a front end replace same-name configured servers.
-  Connections start during session startup with a 30-second handshake
-  timeout; tool calls default to 120 seconds, and a server definition may
-  set `"unlimited"`. Failed
-  connections or tools write notes without blocking the session. Servers
-  reconnect on `/cd` and `/space` but stay connected through `/clear`;
+  equivalents when MCP is enabled. A Project server replaces a Home server of
+  the same name as a whole. A server may be switched off with `enabled` and
+  stays listed. Server tools are registered with `mcp__<server>__<tool>`
+  names and need approval on every call; a server's own read-only claim lowers
+  a call only where the operator chose `author` for that source. Resources use
+  two host tools: `list_mcp_resources` and `read_mcp_resource`. Prompts become
+  slash commands `/mcp__<server>__<prompt>` that submit the prompt text as a
+  user message. Server elicitation requests go through the existing operator
+  question panel and are cancelled in `crystal run`. The client declares the
+  roots capability and answers with the current workspace root. Roots are
+  deprecated in the newest protocol revision, so this is for servers that
+  still ask. A changed tool list is applied after the turn, never during one.
+  Sampling and OAuth are deferred. Session-level servers supplied by a front
+  end are deferred until that front end exists.
+  Connections start during session startup and the session waits for them:
+  a 30-second limit applies to the connection and to listing tools, tool
+  calls default to 120 seconds, and a server definition may set
+  `"unlimited"`. A hung server therefore delays startup by at most that
+  limit. Failed connections or tools write notes without ending the session.
+  Servers reconnect on `/cd`, `/space`, and `/mcp reload`, stay connected
+  through `/clear`, and stop when the session closes. `/mcp` and
+  `crystal mcp` list, show, enable, and disable servers, and `/mcp` also sets
+  the MCP switch and the per-source approval choice. They never print a
+  server's command, arguments, environment, headers, or URL;
 - load operator plugins from `~/.crystal/plugins` and
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
   tools, protocol clients, classifiers, slash commands, hooks, raw

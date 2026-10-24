@@ -48,6 +48,18 @@ public static class Program
                 tools.AddCommand<ToolsDisableCommand>("disable")
                     .WithDescription("Disable one external tool set directory.");
             });
+            config.AddBranch<ExtensionSettings>("mcp", mcp =>
+            {
+                mcp.SetDescription("List, show, enable, or disable one MCP server.");
+                mcp.AddCommand<McpListCommand>("list")
+                    .WithDescription("List MCP servers, including disabled ones.");
+                mcp.AddCommand<McpShowCommand>("show")
+                    .WithDescription("Show one MCP server without its command, arguments, or headers.");
+                mcp.AddCommand<McpEnableCommand>("enable")
+                    .WithDescription("Enable one MCP server.");
+                mcp.AddCommand<McpDisableCommand>("disable")
+                    .WithDescription("Disable one MCP server.");
+            });
             config.AddBranch<PromptSetCommandSettings>("promptsets", promptSets =>
             {
                 promptSets.SetDescription("List, show, enable, or disable one Home prompt set.");

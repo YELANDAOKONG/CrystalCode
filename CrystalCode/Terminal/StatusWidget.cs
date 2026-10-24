@@ -135,6 +135,7 @@ internal static class StatusWidget
         [
             ("Skills", Toggle(status.SkillsEnabled)),
             ("External tools", Toggle(status.ExternalToolsEnabled)),
+            ("MCP", Toggle(status.McpEnabled)),
             ("Plugins", Toggle(status.PluginsEnabled)),
             ("Global rules", Toggle(status.GlobalRulesEnabled)),
             ("Project rules", Toggle(status.ProjectRulesEnabled)),
@@ -169,6 +170,8 @@ internal static class StatusWidget
             ("Plan", Number(status.PlanTools)),
             ("Work", Number(status.WorkTools)),
             ("External", Number(status.ExternalTools)),
+            ("MCP servers", Number(status.McpServers)),
+            ("MCP tools", Number(status.McpTools)),
             ("Plugins", Number(status.Plugins))
         ]);
 

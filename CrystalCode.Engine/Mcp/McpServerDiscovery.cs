@@ -17,26 +17,30 @@ internal sealed class McpServerDiscovery
     }
 
     /// <summary>
-    /// Returns the servers that can be connected, in name order. A Project
-    /// entry replaces the Home entry of the same name even when the Project
-    /// entry is invalid. Skipped servers are reported through
-    /// <paramref name="notes"/>.
+    /// Returns the servers to connect, in name order: valid and enabled. A
+    /// Project entry replaces the Home entry of the same name even when the
+    /// Project entry is invalid or disabled. Skipped servers are reported
+    /// through <paramref name="notes"/>.
     /// </summary>
-    public IReadOnlyList<McpServerDefinition> Collect(string workspaceRoot, IList<string> notes)
+    public IReadOnlyList<McpServerDefinition> Collect(string workspaceRoot, IList<string> notes) =>
+        [.. Effective(workspaceRoot, notes)
+            .Where(entry => entry.Definition is { Enabled: true })
+            .Select(entry => entry.Definition!)];
+
+    /// <summary>
+    /// Every entry that takes effect, including invalid and disabled ones, in
+    /// name order. Inventory uses it so a disabled server stays listed.
+    /// </summary>
+    internal IReadOnlyList<McpConfigEntry> Effective(string workspaceRoot, IList<string> notes)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentNullException.ThrowIfNull(notes);
 
         var merged = new Dictionary<string, McpConfigEntry>(StringComparer.Ordinal);
-        var project = Path.Combine(workspaceRoot, McpFiles.CrystalDirectory);
         foreach (var scope in new[]
                  {
-                     Scan(_home.McpConfigPath, _home.McpDirectory, McpServerSource.Home, notes),
-                     Scan(
-                         Path.Combine(project, McpFiles.FileName),
-                         Path.Combine(project, McpFiles.DirectoryName),
-                         McpServerSource.Project,
-                         notes)
+                     Home(notes),
+                     Project(workspaceRoot, notes)
                  })
         {
             foreach (var entry in scope)
@@ -45,10 +49,38 @@ internal sealed class McpServerDiscovery
             }
         }
 
-        return [.. merged.Values
-            .Where(entry => entry.Definition is not null)
-            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
-            .Select(entry => entry.Definition!)];
+        return [.. merged.Values.OrderBy(entry => entry.Name, StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// The entries of one source alone, so a name defined in both Home and
+    /// Project can be shown or changed in either place.
+    /// </summary>
+    internal IReadOnlyList<McpConfigEntry> Scope(
+        McpServerSource source,
+        string workspaceRoot,
+        IList<string> notes)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
+        ArgumentNullException.ThrowIfNull(notes);
+        return [.. (source == McpServerSource.Home ? Home(notes) : Project(workspaceRoot, notes))
+            .OrderBy(entry => entry.Name, StringComparer.Ordinal)];
+    }
+
+    internal static string ProjectConfigPath(string workspaceRoot) =>
+        Path.Combine(workspaceRoot, McpFiles.CrystalDirectory, McpFiles.FileName);
+
+    private IEnumerable<McpConfigEntry> Home(IList<string> notes) =>
+        Scan(_home.McpConfigPath, _home.McpDirectory, McpServerSource.Home, notes);
+
+    private static IEnumerable<McpConfigEntry> Project(string workspaceRoot, IList<string> notes)
+    {
+        var project = Path.Combine(workspaceRoot, McpFiles.CrystalDirectory);
+        return Scan(
+            Path.Combine(project, McpFiles.FileName),
+            Path.Combine(project, McpFiles.DirectoryName),
+            McpServerSource.Project,
+            notes);
     }
 
     /// <summary>
@@ -70,7 +102,11 @@ internal sealed class McpServerDiscovery
                 notes.Add(
                     $"MCP server '{entry.Name}' was skipped: the name appears in both "
                     + $"'{first.Origin}' and '{entry.Origin}'.");
-                scope[entry.Name] = new McpConfigEntry(entry.Name, null, first.Origin);
+                scope[entry.Name] = new McpConfigEntry(
+                    entry.Name,
+                    null,
+                    first.Origin,
+                    $"the name appears in both '{first.Origin}' and '{entry.Origin}'.");
                 continue;
             }
 
@@ -143,11 +179,14 @@ internal sealed class McpServerDiscovery
             if (!TryReadText(manifest, out var json, out var problem))
             {
                 notes.Add($"MCP server '{name}' ({manifest}) was skipped: {problem}");
-                entries.Add(new McpConfigEntry(name, null, manifest));
+                entries.Add(new McpConfigEntry(name, null, manifest, problem, FromDirectory: true));
                 continue;
             }
 
-            entries.Add(McpConfigParser.ParseSingle(json, name, source, manifest, notes));
+            entries.Add(McpConfigParser.ParseSingle(json, name, source, manifest, notes) with
+            {
+                FromDirectory = true
+            });
         }
 
         return entries;

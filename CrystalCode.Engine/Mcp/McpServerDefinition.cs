@@ -23,7 +23,8 @@ public sealed record McpServerDefinition
         IReadOnlyDictionary<string, string>? headers = null,
         bool inPlan = false,
         bool inWork = true,
-        int? toolTimeoutSeconds = DefaultToolTimeoutSeconds)
+        int? toolTimeoutSeconds = DefaultToolTimeoutSeconds,
+        bool enabled = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!McpServerNames.IsServerName(name))
@@ -92,6 +93,7 @@ public sealed record McpServerDefinition
         InPlan = inPlan;
         InWork = inWork;
         ToolTimeoutSeconds = toolTimeoutSeconds;
+        Enabled = enabled;
     }
 
     public string Name { get; }
@@ -118,6 +120,11 @@ public sealed record McpServerDefinition
     /// Seconds one tool call may run, or null for no limit.
     /// </summary>
     public int? ToolTimeoutSeconds { get; }
+
+    /// <summary>
+    /// False keeps the definition on disk and listed but never connects it.
+    /// </summary>
+    public bool Enabled { get; }
 
     // Values can hold secrets, so the record never prints them.
     public override string ToString() => nameof(McpServerDefinition);

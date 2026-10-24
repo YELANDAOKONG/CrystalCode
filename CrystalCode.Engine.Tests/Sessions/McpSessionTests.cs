@@ -71,10 +71,16 @@ public sealed class McpSessionTests
                 names = ["where"]
                 if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), "more.flag")):
                     names.append("extra")
-                send({"jsonrpc": "2.0", "id": identifier, "result": {"tools": [{
+                tools = [{
                     "name": name,
                     "description": "Reports the working directory.",
-                    "inputSchema": {"type": "object", "properties": {}}} for name in names]}})
+                    "inputSchema": {"type": "object", "properties": {}}} for name in names]
+                tools.append({
+                    "name": "peek",
+                    "description": "Declares itself read-only.",
+                    "inputSchema": {"type": "object", "properties": {}},
+                    "annotations": {"readOnlyHint": True}})
+                send({"jsonrpc": "2.0", "id": identifier, "result": {"tools": tools}})
 
             elif method == "tools/call":
                 send({"jsonrpc": "2.0", "id": identifier, "result": {
@@ -179,7 +185,7 @@ public sealed class McpSessionTests
         await headless.Session.SubmitAsync("/mcp", CancellationToken.None);
 
         var status = Notes(headless).Last();
-        Assert.Contains("fake  Home  stdio  Connected  1 tool", status, StringComparison.Ordinal);
+        Assert.Contains("fake  Home  stdio  Connected  2 tools", status, StringComparison.Ordinal);
         Assert.DoesNotContain("python3", status, StringComparison.Ordinal);
     }
 
@@ -355,6 +361,210 @@ public sealed class McpSessionTests
     }
 
     [Fact]
+    public async Task McpList_ShowsDisabledServersWithoutTheirConfiguration()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        using var headless = Open();
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/mcp list", CancellationToken.None);
+
+        var table = string.Join('\n', Notes(headless).Skip(Notes(headless).Count() - 2));
+        Assert.Contains("fake", table, StringComparison.Ordinal);
+        Assert.Contains("Home", table, StringComparison.Ordinal);
+        Assert.DoesNotContain("python3", table, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task McpDisable_StopsTheServerKeepsItListedAndRewritesTheFile()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        using var headless = Open();
+        await headless.Session.StartAsync(CancellationToken.None);
+        var pid = ReadPid(headless);
+
+        await headless.Session.SubmitAsync("/mcp disable fake", CancellationToken.None);
+        await headless.Session.SubmitAsync("/tools", CancellationToken.None);
+        await headless.Session.SubmitAsync("/mcp list", CancellationToken.None);
+
+        Assert.True(await WaitUntilGoneAsync(pid), "The disabled server was still running.");
+        Assert.DoesNotContain(
+            headless.Observer.Events.OfType<ToolsListed>().Last().Work,
+            tool => tool.Name == "mcp__fake__where");
+        Assert.Contains(Notes(headless), text => text == "MCP server fake  Disabled");
+        Assert.Contains("\"enabled\": false", File.ReadAllText(Path.Combine(headless.Home.Root, "mcp.json")), StringComparison.Ordinal);
+        Assert.Contains(Notes(headless), text => text.StartsWith("fake", StringComparison.Ordinal) && text.Contains("No", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task McpEnable_ConnectsTheServerAgain()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        using var headless = Open();
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("/mcp disable fake", CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/mcp enable fake", CancellationToken.None);
+        await headless.Session.SubmitAsync("/tools", CancellationToken.None);
+
+        Assert.Contains(
+            headless.Observer.Events.OfType<ToolsListed>().Last().Work,
+            tool => tool.Name == "mcp__fake__where");
+        Assert.Contains(Notes(headless), text => text == "MCP server fake  Enabled");
+    }
+
+    [Fact]
+    public async Task McpDisable_RefusesDuringATurn()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        var client = new BlockingStreamingClient();
+        using var headless = Open(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("long task", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+
+        await headless.Session.SubmitAsync("/mcp disable fake", CancellationToken.None);
+
+        Assert.DoesNotContain("enabled", File.ReadAllText(Path.Combine(headless.Home.Root, "mcp.json")), StringComparison.Ordinal);
+        headless.Session.TryInterrupt();
+        await headless.Session.FinishTurnAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task McpShow_ReportsTheLiveState()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        using var headless = Open();
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/mcp show fake", CancellationToken.None);
+
+        Assert.Contains(Notes(headless), text => text == "State  Connected, 2 tools");
+        Assert.DoesNotContain(Notes(headless), text => text.Contains("python3", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task McpApproval_SetsAndShowsThePolicyForOneSource()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        using var headless = Open();
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/mcp home author", CancellationToken.None);
+        await headless.Session.SubmitAsync("/mcp approval", CancellationToken.None);
+
+        Assert.Contains(Notes(headless), text => text == "MCP approval  Home  Author");
+        Assert.Contains(Notes(headless), text => text == "MCP approval  Home Author, Project Host");
+        Assert.Contains("\"home\": \"author\"", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task McpApproval_Host_ReviewsEvenAToolThatDeclaresItselfReadOnly()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        var client = new ScriptedStreamingClient(ToolRound("c1", "mcp__fake__peek", "{}"), TextRound("done"));
+        using var headless = Open(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("peek");
+
+        Assert.Equal(1, headless.Approvals.Count);
+        Assert.Equal(Risk.Write, headless.Approvals.LastClassification!.Risk);
+    }
+
+    [Fact]
+    public async Task McpApproval_Author_LowersOnlyTheToolThatDeclaredItselfReadOnly()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "mcp__fake__peek", "{}"),
+            ToolRound("c2", "mcp__fake__where", "{}"),
+            TextRound("done"));
+        using var headless = Open(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("/mcp home author", CancellationToken.None);
+
+        await headless.RunTurnAsync("peek then where");
+
+        // peek is read-only and passes without asking; where declared nothing and is still reviewed.
+        Assert.Equal(1, headless.Approvals.Count);
+        Assert.Equal(Risk.Write, headless.Approvals.LastClassification!.Risk);
+        var results = headless.Observer.Events.OfType<ToolResultsReceived>().SelectMany(received => received.Results).ToArray();
+        Assert.Equal(ToolResultStatus.Success, results[0].Status);
+    }
+
+    [Theory]
+    [InlineData("/mcp bogus")]
+    [InlineData("/mcp enable")]
+    [InlineData("/mcp home maybe")]
+    [InlineData("/mcp enable fake sideways")]
+    public async Task Mcp_RejectsMalformedCommandsWithTheUsage(string input)
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        using var headless = Open();
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync(input, CancellationToken.None);
+
+        Assert.Contains(Errors(headless), text => text.StartsWith("MCP command must be", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Status_ReportsMcpSwitchServersAndTools()
+    {
+        if (!HasPython())
+        {
+            return;
+        }
+
+        using var headless = Open();
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/status full", CancellationToken.None);
+
+        var status = headless.Observer.Events.OfType<StatusReported>().Last().Status;
+        Assert.True(status.McpEnabled);
+        Assert.Equal(1, status.McpServers);
+        Assert.Equal(2, status.McpTools);
+    }
+
+    [Fact]
     public async Task Close_StopsTheServerProcess()
     {
         if (!HasPython())
@@ -389,7 +599,7 @@ public sealed class McpSessionTests
 
         Assert.True(IsAlive(pid));
         Assert.Equal(pid, ReadPid(headless));
-        Assert.Contains("fake  Home  stdio  Connected  1 tool", Notes(headless).Last(), StringComparison.Ordinal);
+        Assert.Contains("fake  Home  stdio  Connected  2 tools", Notes(headless).Last(), StringComparison.Ordinal);
     }
 
     [Fact]

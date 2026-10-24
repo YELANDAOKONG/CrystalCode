@@ -75,6 +75,7 @@ name is the server name.
 | `type`               | `stdio`, `http`, or `sse`. Omitted: `command` means stdio, `url` means http. |
 | `catalogs`           | `["work"]` by default. Add `"plan"` to offer the tools in Plan. |
 | `toolTimeoutSeconds` | Seconds one call may run. Default 120. `"unlimited"` disables it. |
+| `enabled`            | `true` by default. `false` keeps the server listed and never connects it. |
 
 A definition needs exactly one of `command` or `url`. Unknown fields, repeated
 fields, and a repeated server name skip that server and write a note. The file
@@ -215,15 +216,47 @@ the connection timeout.
 
 ## Commands
 
-| Command        | Effect |
-| -------------- | ------ |
-| `/mcp`         | List connected servers with source, transport, state, and tool count. |
-| `/mcp on`      | Turn MCP on, save `mcp`, and reconnect. |
-| `/mcp off`     | Turn MCP off, save `mcp`, and disconnect. |
-| `/mcp reload`  | Read the configuration again and reconnect. |
+In a session:
 
-The status never shows arguments, environment, headers, or URLs, because they
-can hold secrets. These commands need an idle session.
+| Command                                  | Effect |
+| ---------------------------------------- | ------ |
+| `/mcp`                                   | Connected servers with source, transport, state, and tool count. |
+| `/mcp list`                              | Every configured server, including disabled and invalid ones. |
+| `/mcp show <server> [home\|project]`     | One server's definition summary and live state. |
+| `/mcp enable\|disable <server> [home\|project]` | Set `enabled` in the file, then reconnect. |
+| `/mcp on`, `/mcp off`                    | Turn MCP on or off, save `mcp`, and reconnect. |
+| `/mcp reload`                            | Read the configuration again and reconnect. |
+| `/mcp approval`                          | Show the approval choice for Home and Project. |
+| `/mcp home\|project [author\|host]`      | Show or set the approval choice for one source. |
+
+From a shell, without a session:
+
+```text
+crystal mcp list
+crystal mcp show <server>
+crystal mcp enable <server>
+crystal mcp disable <server>
+```
+
+They take `--home`, `-w|--workspace`, `--source home|project`, and
+`--format text`, the same as `crystal tools`. They change files only; they do
+not connect to anything.
+
+When a name exists in both Home and Project, the Project server is the one
+that takes effect, so it is the default target. Pass `home` or `--source home`
+to change the replaced Home server instead.
+
+`enable` and `disable` rewrite only that server's `enabled` field. In a shared
+`mcp.json` every other server and every unknown field is kept, but the file is
+written again as indented JSON, so its original spacing is not preserved. An
+invalid server cannot be enabled or disabled; fix its file first.
+
+None of these print a server's command, arguments, environment, headers, or
+URL, because they can hold secrets. The in-session commands need an idle
+session.
+
+`/status` shows the MCP switch under Options. `/status full` also shows the
+number of connected servers and MCP tools.
 
 `--mcp on|off` overrides `mcp` for one process, for both `crystal` and
 `crystal run`. It is not written to `config.json`.

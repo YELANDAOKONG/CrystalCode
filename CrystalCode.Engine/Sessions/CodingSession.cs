@@ -3707,17 +3707,33 @@ public sealed class CodingSession : ITurnObserver
 
     private async Task ChangeMcpAsync(string argument, CancellationToken cancellationToken)
     {
-        var command = argument.Trim().ToLowerInvariant();
-        if (command.Length == 0)
+        if (!McpCommand.TryParse(argument, out var command))
         {
-            Note(McpStatusText.Format(_settings.Mcp, _mcp));
+            Error(McpCommand.UsageText);
             return;
         }
 
-        if (command is not ("on" or "off" or "reload"))
+        switch (command.Verb)
         {
-            Error("MCP command must be /mcp, /mcp on, /mcp off, or /mcp reload.");
-            return;
+            case "status":
+                Note(McpStatusText.Format(_settings.Mcp, _mcp));
+                return;
+            case "list":
+                foreach (var line in McpInventory.Format(McpInventory.List(_home, _workspace.Root)))
+                {
+                    Note(line);
+                }
+
+                return;
+            case "show":
+                ShowMcpServer(command);
+                return;
+            case "approval":
+                Note(FormatMcpApproval());
+                return;
+            case "approval-show":
+                Note($"MCP approval  {command.Source}  {Title(ApprovalFor(command.Source!.Value).Value)}");
+                return;
         }
 
         if (_turnActive)
@@ -3726,21 +3742,115 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (command != "reload")
+        switch (command.Verb)
         {
-            SaveSettings(current => current.WithMcp(command == "on"));
+            case "on" or "off":
+                SaveSettings(current => current.WithMcp(command.Verb == "on"));
+                await ReconnectMcpForCommandAsync(cancellationToken);
+                Note("MCP  " + Title(command.Verb));
+                break;
+            case "reload":
+                await ReconnectMcpForCommandAsync(cancellationToken);
+                Note("MCP reloaded");
+                break;
+            case "enable" or "disable":
+                await SetMcpServerEnabledAsync(command, cancellationToken);
+                return;
+            case "approval-set":
+                await SetMcpApprovalAsync(command, cancellationToken);
+                return;
         }
 
-        await ReloadMcpAsync(cancellationToken);
-        RebuildExecutors();
-        ReplaceLiveSystem();
-        RefreshSlashCommands();
-        Note(command == "reload" ? "MCP reloaded" : "MCP  " + Title(command));
         if (_settings.Mcp)
         {
             Note(McpStatusText.Format(_settings.Mcp, _mcp));
         }
     }
+
+    private async Task ReconnectMcpForCommandAsync(CancellationToken cancellationToken)
+    {
+        await ReloadMcpAsync(cancellationToken);
+        RebuildExecutors();
+        ReplaceLiveSystem();
+        RefreshSlashCommands();
+    }
+
+    private void ShowMcpServer(McpCommand command)
+    {
+        if (!McpInventory.TryFind(_home, _workspace.Root, command.Server!, command.Source, out var entry, out var error)
+            || entry is null)
+        {
+            Error(error);
+            return;
+        }
+
+        foreach (var line in McpInventory.Format(entry))
+        {
+            Note(line);
+        }
+
+        var live = _mcp.Servers.FirstOrDefault(server => server.Name == entry.Name);
+        Note($"State  {(live is null ? "Not connected" : live.Status + ", " + live.ToolCount + (live.ToolCount == 1 ? " tool" : " tools"))}");
+        if (!_settings.Mcp)
+        {
+            Note("MCP is off. Use /mcp on to connect configured servers.");
+        }
+    }
+
+    private async Task SetMcpServerEnabledAsync(McpCommand command, CancellationToken cancellationToken)
+    {
+        var enabled = command.Verb == "enable";
+        if (!McpInventory.TrySetEnabled(
+                _home,
+                _workspace.Root,
+                command.Server!,
+                command.Source,
+                enabled,
+                out var entry,
+                out var changed,
+                out var error)
+            || entry is null)
+        {
+            Error(error);
+            return;
+        }
+
+        if (changed)
+        {
+            await ReconnectMcpForCommandAsync(cancellationToken);
+        }
+
+        Note(changed
+            ? $"MCP server {entry.Name}  {(enabled ? "Enabled" : "Disabled")}"
+            : $"MCP server {entry.Name} is already {(enabled ? "enabled" : "disabled")}.");
+        if (!entry.Effective)
+        {
+            Note($"The {entry.Source} server '{entry.Name}' is replaced by a Project server of the same name.");
+        }
+
+        if (enabled && !_settings.Mcp)
+        {
+            Note("MCP is off. Use /mcp on to connect configured servers.");
+        }
+    }
+
+    private async Task SetMcpApprovalAsync(McpCommand command, CancellationToken cancellationToken)
+    {
+        var policy = ExternalToolTrustPolicy.Parse(command.Policy!);
+        var approval = command.Source == McpServerSource.Home
+            ? _settings.McpToolApproval.WithHome(policy)
+            : _settings.McpToolApproval.WithProject(policy);
+        SaveSettings(current => current.WithMcpToolApproval(approval));
+        await ReconnectMcpForCommandAsync(cancellationToken);
+        Note($"MCP approval  {command.Source}  {Title(policy.Value)}");
+    }
+
+    private ExternalToolTrustPolicy ApprovalFor(McpServerSource source) =>
+        _settings.McpToolApproval.For(source);
+
+    private string FormatMcpApproval() =>
+        $"MCP approval  Home {Title(_settings.McpToolApproval.Home.Value)}, "
+        + $"Project {Title(_settings.McpToolApproval.Project.Value)}";
 
     private void AttachImage(string argument)
     {
@@ -4070,7 +4180,10 @@ public sealed class CodingSession : ITurnObserver
                 GlobalRulesEnabled: _settings.RuleFiles.Global,
                 ProjectRulesEnabled: _settings.RuleFiles.Project,
                 ServiceTier: CatalogSlotStatus.For("Tier", _settings.ServiceTier),
-                Speed: CatalogSlotStatus.For("Speed", _settings.Speed)),
+                Speed: CatalogSlotStatus.For("Speed", _settings.Speed),
+                McpEnabled: _settings.Mcp,
+                McpServers: _mcp.Servers.Count(server => server.Status == McpConnectionStatus.Connected),
+                McpTools: _mcp.Tools.Count),
             full));
     }
 
