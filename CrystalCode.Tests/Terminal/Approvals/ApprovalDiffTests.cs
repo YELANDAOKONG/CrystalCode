@@ -30,6 +30,36 @@ public sealed class ApprovalDiffTests
     }
 
     [Fact]
+    public void Lines_EditWithReplaceAllSaysEveryOccurrenceChanges()
+    {
+        var call = JsonToolCall(
+            "1",
+            EditTool.ToolName,
+            """{"path":"src/App.cs","old_string":"foo","new_string":"bar","replace_all":true}""");
+
+        var lines = ApprovalDiff.Lines(call);
+
+        Assert.Equal(
+            [
+                (Theme.Muted, ApprovalDiff.ReplaceAllNotice),
+                (Theme.DiffRemoved, "-foo"),
+                (Theme.DiffAdded, "+bar")
+            ],
+            lines);
+    }
+
+    [Fact]
+    public void Lines_EditWithReplaceAllFalseShowsNoNotice()
+    {
+        var call = JsonToolCall(
+            "1",
+            EditTool.ToolName,
+            """{"path":"src/App.cs","old_string":"foo","new_string":"bar","replace_all":false}""");
+
+        Assert.DoesNotContain(ApprovalDiff.Lines(call), line => line.Text == ApprovalDiff.ReplaceAllNotice);
+    }
+
+    [Fact]
     public void Lines_WriteShowsAddedContents()
     {
         var call = JsonToolCall(

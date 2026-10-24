@@ -12,6 +12,8 @@ public static class ApprovalDiff
 {
     public const int MaximumLines = 12;
 
+    public const string ReplaceAllNotice = "Replaces every occurrence";
+
     public static IReadOnlyList<(string Color, string Text)> Lines(ToolCall call)
     {
         ArgumentNullException.ThrowIfNull(call);
@@ -19,6 +21,12 @@ public static class ApprovalDiff
             && ToolArguments.TryReadRequiredString(call.Arguments, "new_string", out var newText))
         {
             var lines = new List<(string Color, string Text)>();
+            if (ToolArguments.TryReadOptionalBoolean(call.Arguments, "replace_all", out var replaceAll)
+                && replaceAll == true)
+            {
+                lines.Add((Theme.Muted, ReplaceAllNotice));
+            }
+
             AddPrefixed(lines, oldText, '-', Theme.DiffRemoved);
             AddPrefixed(lines, newText, '+', Theme.DiffAdded);
             return lines;
