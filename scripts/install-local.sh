@@ -160,6 +160,15 @@ check_not_running() {
     detail "Check passed: ${binary_name} is not running."
 }
 
+# musl libc prints its banner to stderr and exits non-zero for ldd --version.
+is_musl() {
+    if [ -f /etc/alpine-release ]; then
+        return 0
+    fi
+
+    command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl
+}
+
 file_bytes() {
     wc -c < "$1" | tr -d '[:space:]'
 }
@@ -327,12 +336,18 @@ detail "Architecture: ${architecture}"
 
 case "$operating_system" in
     Linux)
+        libc_suffix=""
+        if is_musl; then
+            libc_suffix="musl-"
+            detail "C library: musl"
+        fi
+
         case "$architecture" in
             x86_64 | amd64)
-                runtime_id="linux-x64"
+                runtime_id="linux-${libc_suffix}x64"
                 ;;
             aarch64 | arm64)
-                runtime_id="linux-arm64"
+                runtime_id="linux-${libc_suffix}arm64"
                 ;;
             *)
                 fail "Unsupported Linux architecture: ${architecture}"
@@ -349,7 +364,7 @@ case "$operating_system" in
                     detail "Rosetta translation: yes"
                     runtime_id="osx-arm64"
                 else
-                    fail "macOS x64 is not supported."
+                    runtime_id="osx-x64"
                 fi
                 ;;
             *)

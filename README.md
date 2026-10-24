@@ -6,7 +6,7 @@ Crystal Code works in a local repository through a streaming terminal UI. Ask it
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4.svg)](https://dotnet.microsoft.com/)
-[![Platforms](https://img.shields.io/badge/platforms-linux--x64%20%7C%20linux--arm64%20%7C%20macos--arm64%20%7C%20windows--x64-informational.svg)](#get-started)
+[![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20linux--musl%20%7C%20macos%20%7C%20windows-informational.svg)](#get-started)
 [![Tests](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml)
 [![Release](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml/badge.svg)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml)
 
@@ -33,7 +33,7 @@ Crystal Code is the coding product built on the sibling [Crystal](https://github
 
 ### 📦 1. Install
 
-The self-contained release supports Linux x64 and ARM64, macOS ARM64, and Windows x64.
+The self-contained release supports Linux (glibc and musl, such as Alpine) on x64 and ARM64, macOS on x64 and ARM64, and Windows on x64 and ARM64.
 
 Linux and macOS are the recommended platforms. On Windows, install [Git for Windows](https://git-scm.com/install/windows); its Git Bash provides the `bash` shell the built-in `bash` tool uses.
 

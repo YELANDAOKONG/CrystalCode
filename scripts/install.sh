@@ -179,18 +179,32 @@ print_card() {
     printf '\n'
 }
 
+# musl libc prints its banner to stderr and exits non-zero for ldd --version.
+is_musl() {
+    if [ -f /etc/alpine-release ]; then
+        return 0
+    fi
+
+    command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl
+}
+
 detect_asset() {
     operating_system="$(uname -s)"
     architecture="$(uname -m)"
 
     case "$operating_system" in
         Linux)
+            libc_suffix=
+            if is_musl; then
+                libc_suffix="musl-"
+            fi
+
             case "$architecture" in
                 x86_64 | amd64)
-                    printf '%s\n' "linux-x64"
+                    printf '%s\n' "linux-${libc_suffix}x64"
                     ;;
                 aarch64 | arm64)
-                    printf '%s\n' "linux-arm64"
+                    printf '%s\n' "linux-${libc_suffix}arm64"
                     ;;
                 *)
                     fail "Unsupported Linux architecture: $architecture"
@@ -206,7 +220,7 @@ detect_asset() {
                     if [ "$(sysctl -in sysctl.proc_translated 2>/dev/null || true)" = "1" ]; then
                         printf '%s\n' "macos-arm64"
                     else
-                        fail "macOS x64 is not supported."
+                        printf '%s\n' "macos-x64"
                     fi
                     ;;
                 *)

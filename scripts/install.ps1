@@ -313,11 +313,12 @@ if ([string]::IsNullOrWhiteSpace($architecture)) {
     $architecture = [Environment]::GetEnvironmentVariable("PROCESSOR_ARCHITECTURE")
 }
 
-if ($architecture -ne "AMD64") {
-    Fail "Unsupported Windows architecture: $architecture"
+$asset = switch ($architecture) {
+    "AMD64" { "windows-x64" }
+    "ARM64" { "windows-arm64" }
+    default { Fail "Unsupported Windows architecture: $architecture" }
 }
 
-$asset = "windows-x64"
 $archiveName = "CrystalCode-$asset.zip"
 $downloadUrl = "https://github.com/$repository/releases/latest/download/$archiveName"
 $temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("CrystalCode-" + [Guid]::NewGuid().ToString("N"))

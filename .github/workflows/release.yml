@@ -37,6 +37,21 @@ jobs:
           - os: macos-latest
             rid: osx-arm64
             artifact: macos-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+            artifact: macos-x64
+          - os: windows-11-arm
+            rid: win-arm64
+            artifact: windows-arm64
+          # GitHub has no musl runners. These jobs run in the Alpine SDK image.
+          - os: ubuntu-latest
+            rid: linux-musl-x64
+            artifact: linux-musl-x64
+            musl: true
+          - os: ubuntu-24.04-arm
+            rid: linux-musl-arm64
+            artifact: linux-musl-arm64
+            musl: true
 
     steps:
       # Sibling layout matches project references: ../../Crystal/...
@@ -58,14 +73,17 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Restore
+        if: ${{ !matrix.musl }}
         working-directory: CrystalCode
         run: dotnet restore CrystalCode.sln
 
       - name: Test
+        if: ${{ !matrix.musl }}
         working-directory: CrystalCode
         run: dotnet test CrystalCode.sln --configuration Release --no-restore
 
       - name: Publish
+        if: ${{ !matrix.musl }}
         working-directory: CrystalCode
         run: >
           dotnet publish CrystalCode/CrystalCode.csproj
@@ -74,6 +92,26 @@ jobs:
           --self-contained true
           -p:PublishSingleFile=true
           --output ./publish
+
+      # bash and git are not in the Alpine SDK image; the bash tool and
+      # workspace tests need them.
+      - name: Test and publish (Alpine)
+        if: ${{ matrix.musl }}
+        run: >
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE:/work"
+          --workdir /work/CrystalCode
+          mcr.microsoft.com/dotnet/sdk:10.0-alpine
+          sh -euc 'apk add --no-cache bash git &&
+          git config --global --add safe.directory '*' &&
+          dotnet restore CrystalCode.sln &&
+          dotnet test CrystalCode.sln --configuration Release --no-restore &&
+          dotnet publish CrystalCode/CrystalCode.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          --output ./publish'
 
       - name: Archive published binary
         if: runner.os != 'Windows'

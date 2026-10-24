@@ -209,7 +209,6 @@ $publishDirectory = Join-Path $repositoryRoot "build"
 $crystalRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot "..\Crystal"))
 $installDirectory = Join-Path $HOME ".crystal\binaries\code"
 $stagingDirectory = Join-Path (Split-Path -Parent $installDirectory) "code.new"
-$runtimeId = "win-x64"
 
 Write-Host "Crystal Code local install"
 Write-Host "Repository: $repositoryRoot"
@@ -283,8 +282,10 @@ if ([string]::IsNullOrWhiteSpace($architecture)) {
 
 Detail "Operating system: Windows"
 Detail "Architecture: $architecture"
-if ($architecture -ne "AMD64") {
-    Fail "Unsupported Windows architecture: $architecture"
+$runtimeId = switch ($architecture) {
+    "AMD64" { "win-x64" }
+    "ARM64" { "win-arm64" }
+    default { Fail "Unsupported Windows architecture: $architecture" }
 }
 
 Detail "Runtime identifier: $runtimeId"
