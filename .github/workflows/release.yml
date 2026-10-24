@@ -103,7 +103,7 @@ jobs:
           --workdir /work/CrystalCode
           mcr.microsoft.com/dotnet/sdk:10.0-alpine
           sh -euc 'apk add --no-cache bash git &&
-          git config --global --add safe.directory '*' &&
+          git config --global --add safe.directory "*" &&
           dotnet restore CrystalCode.sln &&
           dotnet test CrystalCode.sln --configuration Release --no-restore &&
           dotnet publish CrystalCode/CrystalCode.csproj
