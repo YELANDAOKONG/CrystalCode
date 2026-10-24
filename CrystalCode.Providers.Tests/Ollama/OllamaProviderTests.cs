@@ -15,6 +15,28 @@ namespace CrystalCode.Providers.Tests.Ollama;
 public sealed class OllamaProviderTests
 {
     [Fact]
+    public async Task CompleteAsync_ReplaysAnEmptyArgumentCallAsAnEmptyObject()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"message":{"role":"assistant","content":"done"},"done":true}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new OllamaProvider(new OllamaOptions("qwen3:8b"), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "list"),
+            new ToolCall("call_1", "list", "", ToolInputKind.Json),
+            new ToolResult("call_1", "a.txt")
+        ]));
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        var arguments = sent.RootElement.GetProperty("messages")[1]
+            .GetProperty("tool_calls")[0].GetProperty("function").GetProperty("arguments");
+        Assert.Equal(JsonValueKind.Object, arguments.ValueKind);
+        Assert.Empty(arguments.EnumerateObject());
+    }
+
+    [Fact]
     public async Task CompleteAsync_UsesNativeToolWireWithoutApiKey()
     {
         var firstHandler = new RecordingHandler(JsonResponse.Create(

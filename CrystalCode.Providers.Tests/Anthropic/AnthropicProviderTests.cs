@@ -435,6 +435,26 @@ public sealed class AnthropicProviderTests
     }
 
     [Fact]
+    public async Task CompleteAsync_ReplaysAnEmptyArgumentCallAsAnEmptyObject()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"content":[{"type":"text","text":"done"}],"stop_reason":"end_turn"}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new AnthropicProvider(
+            new AnthropicOptions("test-key", "claude-test", new Uri("https://example.test/v1/")),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "list"),
+            new ToolCall("toolu_1", "list", "", ToolInputKind.Json),
+            new ToolResult("toolu_1", "a.txt")
+        ]));
+
+        Assert.Contains("\"name\":\"list\",\"input\":{}", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteAsync_KeepsServerBlocksAndResumesAfterPauseTurn()
     {
         var firstHandler = new RecordingHandler(JsonResponse.Create(

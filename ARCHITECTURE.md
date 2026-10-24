@@ -565,7 +565,15 @@ One user message is one turn:
    `Model stopped with finish reason '<value>'.` These stops do not compact.
 5. If the candidate has tool calls, execute the full batch through
    `ToolExecutor`, or the multimodal bridge for an image-capable turn
-   (approval runs first in either case). A batch that does not fit the
+   (approval runs first in either case). `CallScreeningExecutor` sits in front
+   of `ToolExecutor` because Crystal rejects a whole batch when one call names
+   an unregistered tool or has the wrong input kind. A bad call gets its own
+   failed result, naming the available tools, and the other calls in the
+   batch still run in order. A JSON call with no argument text is recorded
+   with `{}`, since a model that calls a tool with no parameters often sends
+   nothing and every provider codec that replays the call parses it as
+   JSON. Sessions saved before this read an empty JSON argument as `{}`.
+   Text-input arguments are never rewritten. A batch that does not fit the
    remaining tool-call budget stops as `tool_call_limit_reached`, keeps
    the assistant text and reasoning, and leaves those calls out of the
    transcript.
@@ -745,8 +753,8 @@ the Plan child ceiling, even when the mode lists write tools.
 A mode changes only the system message and the executor catalog. Approval is
 unchanged: `ApprovalPolicy` classifies by model-facing tool name, so listing
 `bash` never lets a call skip review or the operator. A tool the mode does
-not list is not registered, so a call to it fails the turn the way a call to
-`bash` does in Plan.
+not list is not registered, so a call to it comes back to the model as a
+failed result for that call, as a call to `bash` does in Plan.
 `SessionDocument.Mode` stores the mode name and `PlanMode` stays written as
 true only for Plan, so an older build reads a custom mode as Work. A session
 that names a missing or disabled mode resumes in Work and writes a note.

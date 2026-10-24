@@ -90,9 +90,12 @@ public sealed class CustomModeSessionTests
         await headless.RunTurnAsync("run it");
 
         Assert.Equal(0, headless.Approvals.Count);
-        Assert.Contains(
-            headless.Observer.Events.OfType<ErrorWritten>(),
-            error => error.Text.Contains("not registered", StringComparison.Ordinal));
+        Assert.DoesNotContain(headless.Observer.Events.OfType<ErrorWritten>(), _ => true);
+        var results = headless.Observer.Events.OfType<ToolResultsReceived>().Single().Results;
+        Assert.Equal(ToolResultStatus.Failure, results.Single().Status);
+        Assert.Equal(
+            "Tool 'bash' is not available. Available tools: read.",
+            results.Single().Text);
     }
 
     [Fact]

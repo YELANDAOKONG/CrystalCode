@@ -75,7 +75,7 @@ internal sealed class OllamaCodec : IProtocolCodec
                 }
                 case ToolCall call:
                     ToolInputJson.RequireJsonCall(call, options.VendorName);
-                    var args = JsonNode.Parse(call.Arguments) as JsonObject
+                    var args = JsonNode.Parse(ToolInputJson.ArgumentsOrEmptyObject(call)) as JsonObject
                         ?? throw new JsonException("Ollama tool arguments must be a JSON object.");
                     var assistant = Assistant(messages);
                     var toolCalls = assistant["tool_calls"] as JsonArray;

@@ -28,6 +28,17 @@ internal static class ToolInputJson
         }
     }
 
+    /// <summary>
+    /// Returns the call's arguments as JSON text. A call with no parameters
+    /// can carry empty text, which no JSON parser accepts, so it reads as the
+    /// empty object.
+    /// </summary>
+    public static string ArgumentsOrEmptyObject(ToolCall call)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        return string.IsNullOrWhiteSpace(call.Arguments) ? "{}" : call.Arguments;
+    }
+
     public static JsonElement RequireSchema(
         ToolDefinition tool,
         string vendorName)

@@ -393,14 +393,17 @@ public sealed class TaskRunHostTests
         using var fixture = new RunFixture();
         var client = new ScriptedRunClient(
             AllowReview,
-            ToolRound("c1", "bash", """{"command":"printf ready > ran.txt"}"""));
+            ToolRound("c1", "bash", """{"command":"printf ready > ran.txt"}"""),
+            TextRound("Plan cannot run commands."));
         var settings = Copy(fixture.Settings("Create the marker file"), plan: true);
 
         var result = await fixture.RunAsync(client, settings);
 
-        Assert.Equal(RunExit.Failed, result.Code);
-        Assert.Contains("The requested tool is not registered.", result.Output, StringComparison.Ordinal);
-        Assert.Contains("[Stopped] failed", result.Output, StringComparison.Ordinal);
+        // The model is told the tool is unavailable and gets another round,
+        // instead of the whole run failing.
+        Assert.Contains("Tool 'bash' is not available.", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Plan cannot run commands.", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("[Stopped] failed", result.Output, StringComparison.Ordinal);
         Assert.False(File.Exists(Path.Combine(fixture.Workspace, "ran.txt")));
     }
 

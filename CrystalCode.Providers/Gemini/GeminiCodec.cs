@@ -64,7 +64,7 @@ internal sealed class GeminiCodec : IProtocolCodec
                     break;
                 case ToolCall call:
                     ToolInputJson.RequireJsonCall(call, options.VendorName);
-                    var arguments = JsonNode.Parse(call.Arguments) as JsonObject
+                    var arguments = JsonNode.Parse(ToolInputJson.ArgumentsOrEmptyObject(call)) as JsonObject
                         ?? throw new JsonException("Gemini tool arguments must be a JSON object.");
                     lastPart = new JsonObject
                     {

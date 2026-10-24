@@ -410,8 +410,9 @@ public sealed class CodingSession : ITurnObserver
             catalog = ChildCatalog(todos);
             var filtered = new ToolCatalog(catalog.Definitions.Where(tool => allowed.Contains(tool.Name))
                 .Select(tool => catalog.Find(tool.Name)!));
-            var executor = new ToolExecutor(filtered, new ToolExecutionOptions(ToolExecutionMode.Serial, 1),
-                _childPolicy, HarnessExceptionMapper.MapAsync);
+            var executor = new CallScreeningExecutor(new ToolExecutor(filtered,
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1),
+                _childPolicy, HarnessExceptionMapper.MapAsync));
             ContextAnchor? childAnchor = null;
             var observer = new ChildTurnObserver(Emit, (context, usage) =>
             {
@@ -5888,7 +5889,7 @@ public sealed class CodingSession : ITurnObserver
         }
         _childPolicy = DecideAsync;
         var imageDescriber = CreateImageDescriber();
-        var workExecutor = new ToolExecutor(
+        var workExecutor = new CallScreeningExecutor(new ToolExecutor(
             WithTask(WorkspaceCatalog.CreateWork(
                 _workspace,
                 _todos,
@@ -5904,8 +5905,8 @@ public sealed class CodingSession : ITurnObserver
                 McpWorkTools()), planMode: false),
             options,
             DecideAsync,
-            HarnessExceptionMapper.MapAsync);
-        var planExecutor = new ToolExecutor(
+            HarnessExceptionMapper.MapAsync));
+        var planExecutor = new CallScreeningExecutor(new ToolExecutor(
             WithTask(WorkspaceCatalog.CreatePlan(
                 _workspace,
                 _todos,
@@ -5919,15 +5920,15 @@ public sealed class CodingSession : ITurnObserver
                 McpPlanTools()), planMode: true),
             options,
             DecideAsync,
-            HarnessExceptionMapper.MapAsync);
+            HarnessExceptionMapper.MapAsync));
         var customExecutors = new Dictionary<string, (IToolExecutor, IMultimodalToolExecutor)>(StringComparer.Ordinal);
         foreach (var mode in _modes.Definitions)
         {
-            var customText = new ToolExecutor(
+            var customText = new CallScreeningExecutor(new ToolExecutor(
                 CreateCustomCatalog(mode, question, imageDescriber),
                 options,
                 DecideAsync,
-                HarnessExceptionMapper.MapAsync);
+                HarnessExceptionMapper.MapAsync));
             customExecutors[mode.Name] = (
                 new TaskBatchExecutor(new PluginToolExecutor(customText, _hooks)),
                 new PluginMultimodalExecutor(

@@ -15,6 +15,24 @@ namespace CrystalCode.Providers.Tests.Gemini;
 public sealed class GeminiProviderTests
 {
     [Fact]
+    public async Task CompleteAsync_ReplaysAnEmptyArgumentCallAsAnEmptyObject()
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"candidates":[{"content":{"parts":[{"text":"done"}]},"finishReason":"STOP"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new GeminiProvider(new GeminiOptions("test-key", "gemini-test"), http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "list"),
+            new ToolCall("call_1", "list", "  ", ToolInputKind.Json),
+            new ToolResult("call_1", "a.txt")
+        ]));
+
+        Assert.Contains("\"args\":{}", handler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CompleteAsync_ReplaysSignedToolCallAndResult()
     {
         var firstHandler = new RecordingHandler(JsonResponse.Create(

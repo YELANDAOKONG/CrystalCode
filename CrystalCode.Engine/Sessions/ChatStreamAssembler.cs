@@ -215,15 +215,28 @@ public sealed class ChatStreamAssembler
                 ItemKind.Message => new ChatMessage(
                     _role ?? ChatRole.Assistant,
                     _text.ToString()),
-                ItemKind.ToolCall => new ToolCall(
-                    _callId.ToString(),
-                    _name.ToString(),
-                    _arguments.ToString(),
-                    _inputKind ?? throw new InvalidOperationException(
-                        "A streamed tool call ended without an input kind.")),
+                ItemKind.ToolCall => ToToolCall(),
                 _ => throw new InvalidOperationException(
                     "A streamed item received no content.")
             };
+
+        // A model that calls a tool with no parameters often sends no argument
+        // text at all. Every JSON consumer downstream, including the provider
+        // codecs that replay the call, needs a JSON object, so an empty
+        // argument becomes the empty object here, before it is recorded.
+        // Text input is free-form and stays as the model wrote it.
+        private ToolCall ToToolCall()
+        {
+            var kind = _inputKind ?? throw new InvalidOperationException(
+                "A streamed tool call ended without an input kind.");
+            var arguments = _arguments.ToString();
+            if (kind == ToolInputKind.Json && string.IsNullOrWhiteSpace(arguments))
+            {
+                arguments = "{}";
+            }
+
+            return new ToolCall(_callId.ToString(), _name.ToString(), arguments, kind);
+        }
 
         private ChatReasoningItem? TryToReasoningItem()
         {

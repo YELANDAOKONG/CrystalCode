@@ -14,6 +14,28 @@ namespace CrystalCode.Engine.Tests.Sessions;
 public sealed class TranscriptCodecTests
 {
     [Fact]
+    public void Read_AnEmptyJsonArgumentFromAnOlderSessionBecomesTheEmptyObject()
+    {
+        var saved = TranscriptCodec.Write([new ToolCall("1", "list", "x", ToolInputKind.Json)]).ToList();
+        saved[0].Arguments = "";
+
+        var restored = TranscriptCodec.Read(saved);
+
+        Assert.Equal("{}", Assert.IsType<ToolCall>(restored[0]).Arguments);
+    }
+
+    [Fact]
+    public void Read_AnEmptyTextArgumentIsKept()
+    {
+        var saved = TranscriptCodec.Write([new ToolCall("1", "patch", "x", ToolInputKind.Text)]).ToList();
+        saved[0].Arguments = "";
+
+        var restored = TranscriptCodec.Read(saved);
+
+        Assert.Equal(string.Empty, Assert.IsType<ToolCall>(restored[0]).Arguments);
+    }
+
+    [Fact]
     public void WriteThenRead_RoundTripsMessagesAndTools()
     {
         var original = new List<ChatItem>

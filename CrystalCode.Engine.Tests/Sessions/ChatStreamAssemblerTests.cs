@@ -11,6 +11,32 @@ namespace CrystalCode.Engine.Tests.Sessions;
 
 public sealed class ChatStreamAssemblerTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ToResponse_AJsonToolCallWithNoArgumentTextBecomesTheEmptyObject(string arguments)
+    {
+        var assembler = new ChatStreamAssembler();
+        assembler.Apply(new ChatToolCallDelta(0, 0, "call_1", "list", arguments, ToolInputKind.Json));
+        assembler.Apply(new ChatCandidateCompleted(0, FinishReason.ToolCalls));
+
+        var call = Assert.IsType<ToolCall>(assembler.ToResponse().Candidates[0].Items[0]);
+
+        Assert.Equal("{}", call.Arguments);
+    }
+
+    [Fact]
+    public void ToResponse_ATextToolCallKeepsEmptyTextAsWritten()
+    {
+        var assembler = new ChatStreamAssembler();
+        assembler.Apply(new ChatToolCallDelta(0, 0, "call_1", "patch", "", ToolInputKind.Text));
+        assembler.Apply(new ChatCandidateCompleted(0, FinishReason.ToolCalls));
+
+        var call = Assert.IsType<ToolCall>(assembler.ToResponse().Candidates[0].Items[0]);
+
+        Assert.Equal(string.Empty, call.Arguments);
+    }
+
     [Fact]
     public void ToResponse_AssemblesAssistantText()
     {

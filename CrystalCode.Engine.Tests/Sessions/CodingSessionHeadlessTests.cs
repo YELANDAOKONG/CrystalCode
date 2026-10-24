@@ -1,5 +1,6 @@
 using Crystal;
 using Crystal.Chat;
+using Crystal.Tools;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
@@ -108,6 +109,53 @@ public sealed class CodingSessionHeadlessTests
         Assert.Equal(2, result.ModelCallCount);
         Assert.Equal(1, result.ToolCallCount);
         Assert.Equal(0, headless.Approvals.Count);
+    }
+
+    [Fact]
+    public async Task Turn_AnUnknownToolFailsAloneAndTheValidCallsStillRun()
+    {
+        var client = new ScriptedStreamingClient(
+            [
+                JsonChatToolCallDelta(0, 0, "c1", "read", """{"path":"notes.txt"}"""),
+                JsonChatToolCallDelta(0, 1, "c2", "find_placeholder", ""),
+                JsonChatToolCallDelta(0, 2, "c3", "list", ""),
+                new ChatCandidateCompleted(0, FinishReason.ToolCalls)
+            ],
+            TextRound("Done."));
+        using var headless = new HeadlessSession(client);
+        await File.WriteAllTextAsync(Path.Combine(headless.WorkspacePath, "notes.txt"), "alpha");
+
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("look around");
+
+        var events = headless.Observer.Events;
+        var results = events.OfType<ToolResultsReceived>().Single().Results;
+        Assert.Equal(["c1", "c2", "c3"], results.Select(result => result.CallId));
+        Assert.Contains("alpha", results[0].Text, StringComparison.Ordinal);
+        Assert.Equal(ToolResultStatus.Failure, results[1].Status);
+        Assert.StartsWith("Tool 'find_placeholder' is not available.", results[1].Text, StringComparison.Ordinal);
+        Assert.Equal(ToolResultStatus.Success, results[2].Status);
+        Assert.Empty(events.OfType<ErrorWritten>());
+        var finished = events.OfType<TurnFinished>().Single().Result;
+        Assert.Equal(TurnStopReason.Completed, finished.StopReason);
+        Assert.Equal(2, finished.ModelCallCount);
+    }
+
+    [Fact]
+    public async Task Turn_ANoParameterCallIsRecordedWithAnEmptyObject()
+    {
+        var client = new ScriptedStreamingClient(
+            ToolRound("c1", "list", ""),
+            TextRound("Done."));
+        using var headless = new HeadlessSession(client);
+
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("list files");
+
+        var issued = headless.Observer.Events.OfType<ToolCallsIssued>().Single();
+        Assert.Equal("{}", Assert.Single(issued.Calls).Arguments);
+        var replayed = client.LastRequest!.Items.OfType<ToolCall>().Single();
+        Assert.Equal("{}", replayed.Arguments);
     }
 
     [Fact]

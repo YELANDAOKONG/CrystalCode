@@ -303,7 +303,7 @@ internal sealed class AnthropicCodec : IProtocolCodec
                 writer.WriteString("id", call.CallId);
                 writer.WriteString("name", call.Name);
                 writer.WritePropertyName("input");
-                using (var document = JsonDocument.Parse(call.Arguments))
+                using (var document = JsonDocument.Parse(ToolInputJson.ArgumentsOrEmptyObject(call)))
                 {
                     document.RootElement.WriteTo(writer);
                 }

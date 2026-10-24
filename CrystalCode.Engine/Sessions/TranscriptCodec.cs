@@ -124,10 +124,15 @@ public static class TranscriptCodec
                         return false;
                     }
 
+                    // Sessions saved before empty arguments were normalized hold
+                    // the empty string for a call with no parameters. Replaying
+                    // that to a provider that parses the arguments would fail.
                     item = new ToolCall(
                         document.CallId,
                         document.Name,
-                        document.Arguments,
+                        inputKind == ToolInputKind.Json && string.IsNullOrWhiteSpace(document.Arguments)
+                            ? "{}"
+                            : document.Arguments,
                         inputKind);
                     return true;
                 case "tool_result":
