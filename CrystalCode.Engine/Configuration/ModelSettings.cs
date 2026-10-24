@@ -21,7 +21,8 @@ public sealed record ModelSettings
         bool videoInput = false,
         IReadOnlyList<int>? contextWindows = null,
         IReadOnlyList<string>? serviceTiers = null,
-        IReadOnlyList<string>? speeds = null)
+        IReadOnlyList<string>? speeds = null,
+        bool textTools = false)
     {
         if (contextWindow <= 0)
         {
@@ -78,6 +79,7 @@ public sealed record ModelSettings
         VideoInput = videoInput;
         ServiceTiers = CatalogSlots.Normalize(serviceTiers, "Service tier");
         Speeds = CatalogSlots.Normalize(speeds, "Speed");
+        TextTools = textTools;
     }
 
     public int ContextWindow { get; }
@@ -93,6 +95,13 @@ public sealed record ModelSettings
     public bool Thinking { get; }
 
     public IReadOnlyList<string> ThinkingEfforts { get; }
+
+    /// <summary>
+    /// Gets whether the operator declared that the model writes free-form text
+    /// for tools that take one block of text. Only the responses protocol can
+    /// carry it. The host still runs those tools as JSON tools.
+    /// </summary>
+    public bool TextTools { get; }
 
     /// <summary>Gets whether the configured model accepts image input.</summary>
     public bool ImageInput { get; }

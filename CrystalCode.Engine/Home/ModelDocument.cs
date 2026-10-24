@@ -24,6 +24,8 @@ internal sealed class ModelDocument
 
     public bool? VideoInput { get; set; }
 
+    public bool? TextTools { get; set; }
+
     public List<string>? ServiceTiers { get; set; }
 
     public List<string>? Speeds { get; set; }

@@ -453,14 +453,14 @@ implemented in the current build.
   are not defined. Do not reserve a new configuration field or command. This
   is not a new Agent, not a mode, and not separate working copies or a direct
   operator conversation with a child.
-- Provider-specific custom-format tools, such as OpenAI's `apply_patch`.
-  These tools take freeform text input instead of JSON arguments, and the
-  provider defines the format. The direction is to register and execute them
-  through a Crystal chat contract that carries text-input tools. Which
-  providers and tools participate, how a tool is declared, and how approval,
-  path classification, and errors work on freeform input are not defined. Do
-  not reserve a configuration field, command, public type, or tool-set
-  format. This item does not authorize changes under `../Crystal`. Provider
+- Custom-format tools beyond the one built-in case. A model that declares
+  `textTools` is offered `apply_patch` as a free-form custom tool, so it
+  writes the patch directly instead of wrapping it in JSON (see Data). That
+  is the only tool and the only protocol, the Responses protocol, that does
+  this. Other free-form tools, other protocols, tools that take more than one
+  string, and operator or plugin tools that take free-form text are not
+  defined. Do not reserve a command, public type, or tool-set format for
+  them. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
 - A built-in web search tool. The direction is a host-executed tool that lets
   the model search the web and read the results. The search backend, whether
@@ -579,13 +579,12 @@ scope are defined. Current `/agents` settings, the `agents` object, process
 overrides, and custom `agent.json` manifests stand. Do not reserve a new
 configuration field or command.
 
-TODO: add provider-specific custom-format tools, such as OpenAI's
-`apply_patch`, only after the participating providers and tools, how a tool is
-declared, and approval, path classification, and error behavior on freeform
-text input are defined. Such a tool takes text input, not JSON arguments. Do
-not reserve a configuration field, command, public type, or tool-set format.
-This does not authorize changes under `../Crystal`, and provider adapters
-still own no tools.
+TODO: add further free-form text tools only after the participating protocols
+and tools and their approval, path classification, and error behavior are
+defined. Only `apply_patch` on the Responses protocol, behind a model's
+`textTools` declaration, exists today. Do not reserve a command, public type,
+or tool-set format. This does not authorize changes under `../Crystal`, and
+provider adapters still own no tools.
 
 TODO: add a built-in web search tool only after its backend, approval and
 network classification, result bounds, and failure behavior are defined. It is
@@ -688,7 +687,12 @@ them. `describe_image` is available on Plan and Work when
 a text description from that model. Optional `compactionModel` writes
 summaries when enabled; omitted or off, summaries use the session model. `view_image` is available only while
 the selected model and provider support image input, and returns the image
-itself. Whether each source's author
+itself. A model entry on a `responses` provider may declare `textTools`
+(default off). While it is on, `apply_patch` is offered to that model as a
+free-form custom tool: the model writes the patch as plain text, the adapter
+wraps it as the tool's `patchText` argument, and the host runs, classifies,
+approves, and records it exactly as it does the JSON form. The declaration is
+refused on any other protocol. Whether each source's author
 approval declarations take effect is stored under `externalToolApproval`
 in `config.json`. The application never writes
 secrets into the workspace.

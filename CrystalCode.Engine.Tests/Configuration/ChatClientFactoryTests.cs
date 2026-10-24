@@ -1,5 +1,7 @@
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Plugins.Providers;
+using CrystalCode.Engine.Tools;
 using CrystalCode.Providers.Anthropic;
 using CrystalCode.Providers.Gemini;
 using CrystalCode.Providers.Ollama;
@@ -12,6 +14,58 @@ namespace CrystalCode.Engine.Tests.Configuration;
 
 public sealed class ChatClientFactoryTests
 {
+    [Fact]
+    public void ResponsesFactory_OffersApplyPatchAsTextOnlyForAModelThatDeclaredIt()
+    {
+        var declared = ResponsesClientFactory.TextToolsFor(new ModelSettings(8192, textTools: true));
+        var plain = ResponsesClientFactory.TextToolsFor(new ModelSettings(8192));
+
+        var binding = Assert.Single(declared);
+        Assert.Equal("apply_patch", binding.ToolName);
+        Assert.Equal("patchText", binding.Property);
+        Assert.Empty(plain);
+    }
+
+    [Fact]
+    public async Task ResponsesFactory_BindingMatchesTheRealApplyPatchDefinition()
+    {
+        // The binding is matched against the tool's own schema. If that schema
+        // ever grew a second property, the binding would silently stop matching
+        // and the model would be offered a function tool again.
+        using var root = new Tools.TemporaryWorkspace();
+        var tool = new ApplyPatchTool(new Workspace(root.Path));
+        var binding = Assert.Single(ResponsesClientFactory.TextToolsFor(new ModelSettings(8192, textTools: true)));
+        var handler = new CapturingHandler(
+            """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}]}""");
+        using var http = new HttpClient(handler);
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("key", "m", new Uri("https://example.test/"), textTools: [binding]),
+            http);
+
+        await provider.CompleteAsync(new Crystal.Chat.ChatRequest(
+            [new Crystal.Chat.ChatMessage(Crystal.Chat.ChatRole.User, "go")],
+            [tool.Definition]));
+
+        using var sent = System.Text.Json.JsonDocument.Parse(handler.Body!);
+        Assert.Equal("custom", sent.RootElement.GetProperty("tools")[0].GetProperty("type").GetString());
+    }
+
+    private sealed class CapturingHandler(string response) : HttpMessageHandler
+    {
+        public string? Body { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(response, System.Text.Encoding.UTF8, "application/json")
+            };
+        }
+    }
+
     [Fact]
     public void Create_UsesNativeAdaptersAndKeylessOllama()
     {

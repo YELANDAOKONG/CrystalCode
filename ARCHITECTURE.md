@@ -1081,6 +1081,27 @@ context line that two matches share is printed once. `limit` defaults to 2,000
 and is capped at 10,000 matches in `content` mode, or files in the other modes;
 a stop at the limit says so. Output is also bounded by the tool output size.
 
+A model entry on a `responses` provider may declare `textTools`. The factory
+then gives the adapter a `TextToolBinding` for `apply_patch` and its one
+property, `patchText`. The tool stays a JSON tool everywhere in the host:
+catalog, disabling, replacement, approval, grants, the transcript, the archive,
+and compaction all see `{"patchText": ...}`. Only the Responses adapter changes
+the form, and only when the request's own tool definition for that name is a
+JSON object with exactly that one string property. Such a tool is sent as
+`{"type":"custom","name","description"}` with no schema. A `custom_tool_call`
+for it, whole or streamed, is wrapped back into `{"patchText": <text>}` with
+the JSON input kind; the stream holds the text until
+`response.custom_tool_call_input.done`, falls back to the held deltas when that
+event carries none, and emits it once. A call and its result go out as
+`custom_tool_call` and `custom_tool_call_output` only when the request offers
+the tool as custom and the recorded arguments hold the one string. Otherwise
+the pair keeps its recorded `function_call` form, so switching models,
+disabling the tool, or a replacement that changed its schema never leaves a
+call without a matching result type. A custom call to a name that was not
+offered this way stays text input and is refused by name. A tool that can
+return an image is never folded, since a custom tool's output is text. The
+declaration is refused when the file loads for any protocol but `responses`.
+
 `apply_patch` takes `patchText`: Add File, Update File, and Delete File
 sections between `*** Begin Patch` and `*** End Patch`. An Update File section
 may carry `*** Move to:` and holds change blocks. A block may start with one or
@@ -1412,7 +1433,11 @@ sessions does not.
 
 Self-contained release archives are named
 `CrystalCode-<operating-system>-<architecture>.zip`. The supported values
-are `linux-x64`, `linux-arm64`, `macos-arm64`, and `windows-x64`. The platform
+are `linux-x64`, `linux-arm64`, `linux-musl-x64`, `linux-musl-arm64`,
+`macos-x64`, `macos-arm64`, `windows-x64`, and `windows-arm64`. The `musl`
+variants target Alpine and are built and tested in the Alpine .NET SDK image
+because GitHub provides no musl runners. The shell installer selects a musl
+asset when it finds `/etc/alpine-release` or a musl `ldd`. The platform
 installers replace the full platform release contents under `binaries/code/`.
 Developers install the current checkout with `scripts/install-local.sh` or
 `scripts/install-local.ps1`. Those scripts publish Release into `build/`

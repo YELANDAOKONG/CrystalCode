@@ -298,6 +298,77 @@ public sealed class DiskSettingsStoreTests
             thinkingDisplay: thinkingDisplay);
 
     [Fact]
+    public void ProviderDocument_PreservesDeclaredTextToolsAndOmitsTheDefault()
+    {
+        var catalog = new ProviderCatalog([
+            new ProviderDefinition(
+                new ProviderName("gateway"),
+                ProviderProtocol.Responses,
+                new Uri("https://example.test/v1/"),
+                new Dictionary<string, ModelSettings>
+                {
+                    ["patcher"] = new(8192, textTools: true),
+                    ["plain"] = new(8192)
+                })
+        ]);
+
+        var document = SettingsMapper.WriteProviders(catalog);
+        var models = document.GetProperty("gateway").GetProperty("models");
+
+        Assert.True(models.GetProperty("patcher").GetProperty("textTools").GetBoolean());
+        Assert.False(models.GetProperty("plain").TryGetProperty("textTools", out _));
+        var provider = SettingsMapper.ReadProviders(document).Single();
+        Assert.True(provider.Models["patcher"].TextTools);
+        Assert.False(provider.Models["plain"].TextTools);
+    }
+
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("anthropic")]
+    [InlineData("gemini")]
+    [InlineData("ollama")]
+    [InlineData("deepseek")]
+    public void ReadProviders_RejectsTextToolsOutsideTheResponsesProtocol(string protocol)
+    {
+        using var declared = JsonDocument.Parse(
+            $$"""
+            {
+              "local": {
+                "protocol": "{{protocol}}",
+                "baseUri": "https://example.test/v1/",
+                "models": { "m": { "contextWindow": 8192, "textTools": true } }
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => SettingsMapper.ReadProviders(declared.RootElement));
+
+        Assert.Contains("textTools", error.Message, StringComparison.Ordinal);
+        Assert.Contains("only the responses protocol", error.Message, StringComparison.Ordinal);
+        Assert.Contains("'m'", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReadProviders_AcceptsTextToolsOnTheResponsesProtocol()
+    {
+        using var declared = JsonDocument.Parse(
+            """
+            {
+              "gw": {
+                "protocol": "Responses",
+                "baseUri": "https://example.test/v1/",
+                "models": { "m": { "contextWindow": 8192, "textTools": true } }
+              }
+            }
+            """);
+
+        var provider = SettingsMapper.ReadProviders(declared.RootElement).Single();
+
+        Assert.True(provider.Models["m"].TextTools);
+    }
+
+    [Fact]
     public void ProviderDocument_PreservesDeclaredAudioAndVideoInput()
     {
         var catalog = new ProviderCatalog([

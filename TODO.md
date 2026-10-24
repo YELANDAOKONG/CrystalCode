@@ -123,14 +123,14 @@ behavior stands until a specific change defines otherwise.
   are not defined. Do not reserve a new configuration field or command. This
   is not a new Agent, not a mode, and not separate working copies or a direct
   operator conversation with a child.
-- Provider-specific custom-format tools, such as OpenAI's `apply_patch`.
-  These tools take freeform text input instead of JSON arguments, and the
-  provider defines the format. The direction is to register and execute them
-  through a Crystal chat contract that carries text-input tools. Which
-  providers and tools participate, how a tool is declared, and how approval,
-  path classification, and errors work on freeform input are not defined. Do
-  not reserve a configuration field, command, public type, or tool-set
-  format. This item does not authorize changes under `../Crystal`. Provider
+- Custom-format tools beyond the one built-in case. A model that declares
+  `textTools` is offered `apply_patch` as a free-form custom tool, so it
+  writes the patch directly instead of wrapping it in JSON (see Data). That
+  is the only tool and the only protocol, the Responses protocol, that does
+  this. Other free-form tools, other protocols, tools that take more than one
+  string, and operator or plugin tools that take free-form text are not
+  defined. Do not reserve a command, public type, or tool-set format for
+  them. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
 - A built-in web search tool. A host-executed tool that lets the model search
   the web and read the results. The search backend, whether a separate page

@@ -254,6 +254,13 @@ internal static class SettingsMapper
                         $"Model '{model}' on provider '{name}' is missing contextWindow.");
                 }
 
+                if (modelEntry.TextTools == true
+                    && !string.Equals(entry.Protocol.Trim(), ProviderProtocol.Responses.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Model '{model}' on provider '{name}' declares textTools, which only the responses protocol supports.");
+                }
+
                 models[model] = new ModelSettings(
                     contextWindow,
                     modelEntry.Temperature,
@@ -267,7 +274,8 @@ internal static class SettingsMapper
                     modelEntry.VideoInput ?? false,
                     modelEntry.ContextWindows,
                     modelEntry.ServiceTiers,
-                    modelEntry.Speeds);
+                    modelEntry.Speeds,
+                    modelEntry.TextTools ?? false);
             }
         }
 
@@ -311,6 +319,7 @@ internal static class SettingsMapper
                 ThinkingCanDisable = settings.ThinkingCanDisable ? null : false,
                 AudioInput = settings.AudioInput ? true : null,
                 VideoInput = settings.VideoInput ? true : null,
+                TextTools = settings.TextTools ? true : null,
                 ServiceTiers = settings.ServiceTiers.Count == 0
                     ? null
                     : [.. settings.ServiceTiers],

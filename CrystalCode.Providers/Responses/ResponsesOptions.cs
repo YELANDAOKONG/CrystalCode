@@ -17,7 +17,8 @@ public sealed record ResponsesOptions
         string? vendorName = null,
         TimeSpan? requestTimeout = null,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        IReadOnlyList<TextToolBinding>? textTools = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -58,6 +59,7 @@ public sealed record ResponsesOptions
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
         ProcessingSlots.RequireSharedOrEmpty(ServiceTier, Speed, VendorName);
+        TextTools = textTools is { Count: > 0 } ? [.. textTools] : [];
     }
 
     public string ApiKey { get; }
@@ -72,6 +74,12 @@ public sealed record ResponsesOptions
     public string? ServiceTier { get; }
 
     public string? Speed { get; }
+
+    /// <summary>
+    /// Tools offered to the model as free-form custom tools. Each one still
+    /// reaches the host as a JSON tool.
+    /// </summary>
+    public IReadOnlyList<TextToolBinding> TextTools { get; }
 
     internal ProtocolOptions ToProtocolOptions() =>
         new(

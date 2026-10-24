@@ -42,10 +42,12 @@ Operators add plugins under `~/.crystal/plugins` and
 
 ## Install
 
-The latest self-contained release can be installed on Linux x64, Linux ARM64,
-macOS ARM64, or Windows x64. The installers download the matching standard
-release asset, `CrystalCode-<os>-<architecture>.zip`, then replace the
-full published contents in `~/.crystal/binaries/code/`.
+The latest self-contained release can be installed on Linux x64 or ARM64
+(glibc, or musl such as Alpine), macOS x64 or ARM64, and Windows x64 or ARM64.
+The installers pick the asset for the machine, `CrystalCode-<os>-<architecture>.zip`
+(for example `linux-musl-arm64`), then replace the full published contents in
+`~/.crystal/binaries/code/`. On an Intel-translated shell under Rosetta,
+the macOS installer chooses the ARM64 asset.
 
 On Linux or macOS, run:
 
@@ -655,6 +657,7 @@ are not supported by the current adapter.
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 | `audioInput` | Declared audio input (default `false`). Stored and visible to plugins. The host does not accept or send audio |
 | `videoInput` | Declared video input (default `false`). Stored and visible to plugins. The host does not accept or send video |
+| `textTools` | Offer `apply_patch` to this model as a free-form tool, so it writes the patch as plain text instead of JSON (default `false`). Only the `responses` protocol supports it, and any other protocol refuses the declaration when the file loads. Turn it on only for a model that accepts custom tools |
 
 `audioInput` and `videoInput` only record the claim. Crystal Code stores
 them and shows them to plugins. It does not attach, paste, persist, or send

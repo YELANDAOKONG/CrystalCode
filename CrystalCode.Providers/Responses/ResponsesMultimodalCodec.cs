@@ -20,10 +20,13 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
     private readonly ResponsesCodec _textCodec;
     private readonly string _vendorName;
 
-    public ResponsesMultimodalCodec(string vendorName)
+    private readonly IReadOnlyList<TextToolBinding> _textTools;
+
+    public ResponsesMultimodalCodec(string vendorName, IReadOnlyList<TextToolBinding>? textTools = null)
     {
         _vendorName = vendorName;
-        _textCodec = new ResponsesCodec(vendorName);
+        _textTools = textTools ?? [];
+        _textCodec = new ResponsesCodec(vendorName, _textTools);
     }
 
     public string Path => _textCodec.Path;
@@ -67,9 +70,13 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             writer.WriteString("model", options.Model);
             writer.WritePropertyName("input");
             writer.WriteStartArray();
+            var folded = _textCodec.FoldedCalls(
+                request.Items.OfType<MultimodalToolCall>().Select(static call =>
+                    (call.CallId, call.Name, call.Arguments, call.InputKind)),
+                request.Tools);
             foreach (var item in request.Items)
             {
-                WriteItem(writer, item);
+                WriteItem(writer, item, folded);
             }
 
             writer.WriteEndArray();
@@ -123,7 +130,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             errorCode,
             retryAfter);
 
-    private void WriteItem(Utf8JsonWriter writer, MultimodalChatItem item)
+    private void WriteItem(Utf8JsonWriter writer, MultimodalChatItem item, IReadOnlySet<string> folded)
     {
         switch (item)
         {
@@ -133,8 +140,18 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             case MultimodalReasoningItem reasoning:
                 WriteReasoningItem(writer, reasoning.Content);
                 break;
+            case MultimodalToolCall toolCall when folded.Contains(toolCall.CallId) && toolCall.Contents.Count == 0:
+                ResponsesCodec.WriteCustomCall(
+                    writer,
+                    toolCall.CallId,
+                    toolCall.Name,
+                    _textCodec.UnwrapText(toolCall.Name, toolCall.Arguments));
+                break;
             case MultimodalToolCall toolCall:
                 WriteToolCall(writer, toolCall);
+                break;
+            case MultimodalToolResult toolResult when folded.Contains(toolResult.CallId):
+                WriteCustomResult(writer, toolResult);
                 break;
             case MultimodalToolResult toolResult:
                 WriteToolResult(writer, toolResult);
@@ -227,6 +244,20 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         writer.WriteEndObject();
     }
 
+    // A custom tool's output is plain text, so only text contents are written.
+    // An image from a tool whose call went out as a custom call cannot be
+    // carried, which is why the host never folds a tool that can return one.
+    private static void WriteCustomResult(Utf8JsonWriter writer, MultimodalToolResult result)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("type", "custom_tool_call_output");
+        writer.WriteString("call_id", result.CallId);
+        writer.WriteString(
+            "output",
+            string.Concat(result.Contents.OfType<TextContent>().Select(static text => text.Text)));
+        writer.WriteEndObject();
+    }
+
     private static void WriteToolResult(
         Utf8JsonWriter writer,
         MultimodalToolResult result)
@@ -286,16 +317,21 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         writer.WriteStartArray();
         foreach (var tool in tools)
         {
+            var custom = ResponsesCodec.IsFolded(tool, _textTools);
             writer.WriteStartObject();
-            writer.WriteString("type", "function");
+            writer.WriteString("type", custom ? "custom" : "function");
             writer.WriteString("name", tool.Name);
             if (tool.Description is not null)
             {
                 writer.WriteString("description", tool.Description);
             }
 
-            writer.WritePropertyName("parameters");
-            ToolInputJson.RequireSchema(tool, _vendorName).WriteTo(writer);
+            if (!custom)
+            {
+                writer.WritePropertyName("parameters");
+                ToolInputJson.RequireSchema(tool, _vendorName).WriteTo(writer);
+            }
+
             writer.WriteEndObject();
         }
 

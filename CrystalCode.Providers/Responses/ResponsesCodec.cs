@@ -19,8 +19,13 @@ internal sealed class ResponsesCodec : IProtocolCodec
     // Crystal segment indexes are one sequence, so traces stay after summaries.
     private const int ReasoningTraceSegmentOffset = 1_000_000;
     private readonly string _vendorName;
+    private readonly IReadOnlyList<TextToolBinding> _textTools;
 
-    public ResponsesCodec(string vendorName) => _vendorName = vendorName;
+    public ResponsesCodec(string vendorName, IReadOnlyList<TextToolBinding>? textTools = null)
+    {
+        _vendorName = vendorName;
+        _textTools = textTools ?? [];
+    }
 
     public string Path => "responses";
 
@@ -47,9 +52,10 @@ internal sealed class ResponsesCodec : IProtocolCodec
             writer.WriteString("model", options.Model);
             writer.WritePropertyName("input");
             writer.WriteStartArray();
+            var folded = FoldedCalls(request.Items.OfType<ToolCall>(), request.Tools);
             foreach (var item in request.Items)
             {
-                WriteItem(writer, item);
+                WriteItem(writer, item, folded);
             }
 
             writer.WriteEndArray();
@@ -129,7 +135,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
     public Exception CreateException(string message, int? statusCode = null, Exception? innerException = null, string? errorCode = null, TimeSpan? retryAfter = null) =>
         new ResponsesException(message, statusCode, innerException, errorCode, retryAfter);
 
-    private void WriteItem(Utf8JsonWriter writer, ChatItem item)
+    private void WriteItem(Utf8JsonWriter writer, ChatItem item, IReadOnlySet<string> folded)
     {
         switch (item)
         {
@@ -143,6 +149,9 @@ internal sealed class ResponsesCodec : IProtocolCodec
             case ChatReasoningItem reasoning:
                 WriteReasoningItem(writer, reasoning.Content);
                 break;
+            case ToolCall toolCall when folded.Contains(toolCall.CallId):
+                WriteCustomCall(writer, toolCall.CallId, toolCall.Name, UnwrapText(toolCall.Name, toolCall.Arguments));
+                break;
             case ToolCall toolCall:
                 ToolInputJson.RequireJsonCall(toolCall, _vendorName);
                 writer.WriteStartObject();
@@ -150,6 +159,13 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 writer.WriteString("call_id", toolCall.CallId);
                 writer.WriteString("name", toolCall.Name);
                 writer.WriteString("arguments", toolCall.Arguments);
+                writer.WriteEndObject();
+                break;
+            case ToolResult toolResult when folded.Contains(toolResult.CallId):
+                writer.WriteStartObject();
+                writer.WriteString("type", "custom_tool_call_output");
+                writer.WriteString("call_id", toolResult.CallId);
+                writer.WriteString("output", toolResult.Text);
                 writer.WriteEndObject();
                 break;
             case ToolResult toolResult:
@@ -203,20 +219,93 @@ internal sealed class ResponsesCodec : IProtocolCodec
         foreach (var tool in tools)
         {
             writer.WriteStartObject();
-            writer.WriteString("type", "function");
+            writer.WriteString("type", IsFolded(tool, _textTools) ? "custom" : "function");
             writer.WriteString("name", tool.Name);
             if (tool.Description is not null)
             {
                 writer.WriteString("description", tool.Description);
             }
 
-            writer.WritePropertyName("parameters");
-            ToolInputJson.RequireSchema(tool, _vendorName).WriteTo(writer);
+            if (!IsFolded(tool, _textTools))
+            {
+                writer.WritePropertyName("parameters");
+                ToolInputJson.RequireSchema(tool, _vendorName).WriteTo(writer);
+            }
+
             writer.WriteEndObject();
         }
 
         writer.WriteEndArray();
     }
+
+    /// <summary>
+    /// True when the tool is declared to the model as a free-form custom tool.
+    /// </summary>
+    internal static bool IsFolded(ToolDefinition tool, IReadOnlyList<TextToolBinding> bindings) =>
+        bindings.Any(binding => binding.Matches(tool));
+
+    internal static void WriteCustomCall(Utf8JsonWriter writer, string callId, string name, string text)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("type", "custom_tool_call");
+        writer.WriteString("call_id", callId);
+        writer.WriteString("name", name);
+        writer.WriteString("input", text);
+        writer.WriteEndObject();
+    }
+
+    /// <summary>
+    /// Call ids that go out as custom tool calls: calls to a tool this request
+    /// declares as custom, whose recorded arguments hold the one string. A
+    /// call and its result must use the same form, so the result looks the id
+    /// up here. When the tool is not declared this way, as after the operator
+    /// switched models or a tool set replaced its schema, the history stays in
+    /// the function form it always had.
+    /// </summary>
+    internal IReadOnlySet<string> FoldedCalls(
+        IEnumerable<ToolCall> calls,
+        IReadOnlyList<ToolDefinition> tools) =>
+        FoldedCalls(
+            calls.Select(static call => (call.CallId, call.Name, call.Arguments, call.InputKind)),
+            tools);
+
+    internal IReadOnlySet<string> FoldedCalls(
+        IEnumerable<(string CallId, string Name, string Arguments, ToolInputKind Kind)> calls,
+        IReadOnlyList<ToolDefinition> tools)
+    {
+        var folded = new HashSet<string>(StringComparer.Ordinal);
+        if (_textTools.Count == 0)
+        {
+            return folded;
+        }
+
+        foreach (var (callId, name, arguments, kind) in calls)
+        {
+            if (kind != ToolInputKind.Json)
+            {
+                continue;
+            }
+
+            var binding = ActiveBinding(name, tools);
+            if (binding is not null && binding.TryUnwrap(arguments, out _))
+            {
+                folded.Add(callId);
+            }
+        }
+
+        return folded;
+    }
+
+    internal string UnwrapText(string name, string arguments)
+    {
+        var binding = _textTools.First(item => string.Equals(item.ToolName, name, StringComparison.Ordinal));
+        return binding.TryUnwrap(arguments, out var text) ? text : string.Empty;
+    }
+
+    private TextToolBinding? ActiveBinding(string name, IReadOnlyList<ToolDefinition>? tools = null) =>
+        _textTools.FirstOrDefault(binding =>
+            string.Equals(binding.ToolName, name, StringComparison.Ordinal)
+            && (tools is null || tools.Any(binding.Matches)));
 
     private static void WriteReasoning(Utf8JsonWriter writer, ReasoningOptions? reasoning)
     {
@@ -322,7 +411,44 @@ internal sealed class ResponsesCodec : IProtocolCodec
                     ReadArgumentText(item, "arguments"),
                     ToolInputKind.Json));
                 break;
+            case "custom_tool_call":
+                if (!TryReadString(item, "call_id", out var customId)
+                    || !TryReadString(item, "name", out var customName))
+                {
+                    throw CreateException(
+                        $"{_vendorName} custom tool call is missing an identifier or name.");
+                }
+
+                items.Add(ReadCustomCall(customId, customName, ReadArgumentText(item, "input")));
+                break;
         }
+    }
+
+    /// <summary>
+    /// A custom tool call carries raw text. A tool declared here is wrapped as
+    /// the JSON the host tool reads. A name this request never declared as
+    /// custom stays text input, so the host refuses it by name instead of
+    /// guessing at its shape.
+    /// </summary>
+    internal ToolInputKind KindFor(string name) =>
+        _textTools.Any(item => string.Equals(item.ToolName, name, StringComparison.Ordinal))
+            ? ToolInputKind.Json
+            : ToolInputKind.Text;
+
+    internal string ArgumentsFor(string name, string text)
+    {
+        var binding = _textTools.FirstOrDefault(
+            item => string.Equals(item.ToolName, name, StringComparison.Ordinal));
+        return binding is null ? text : binding.Wrap(text);
+    }
+
+    internal ToolCall ReadCustomCall(string callId, string name, string text)
+    {
+        var binding = _textTools.FirstOrDefault(
+            item => string.Equals(item.ToolName, name, StringComparison.Ordinal));
+        return binding is null
+            ? new ToolCall(callId, name, text, ToolInputKind.Text)
+            : new ToolCall(callId, name, binding.Wrap(text), ToolInputKind.Json);
     }
 
     private static void ReadMessage(JsonElement item, List<ChatItem> items, ref bool refused)
@@ -614,6 +740,10 @@ internal sealed class ResponsesCodec : IProtocolCodec
         private readonly HashSet<int> _functionIdentitySent = [];
         private readonly HashSet<int> _argumentFragments = [];
         private readonly HashSet<int> _argumentsAccepted = [];
+        private readonly HashSet<int> _customIdentitySent = [];
+        private readonly HashSet<int> _customInputAccepted = [];
+        private readonly Dictionary<int, string> _customNames = [];
+        private readonly Dictionary<int, StringBuilder> _customInput = [];
         private int _nextItemIndex;
         private int? _reasoningOutputIndex;
         private bool _hasTools;
@@ -671,6 +801,14 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 case "response.output_item.added":
                     ReadAddedItem(root, outputIndex, events);
                     break;
+                case "response.custom_tool_call_input.delta":
+                    // The wrapped JSON is only known once the text is whole, so
+                    // the text is held and emitted when it is complete.
+                    HoldCustomInput(outputIndex, ReadArgumentText(root, "delta"));
+                    break;
+                case "response.custom_tool_call_input.done":
+                    AcceptCustomInput(outputIndex, ReadArgumentText(root, "input"), events);
+                    break;
                 case "response.function_call_arguments.delta":
                     AppendArgumentFragment(outputIndex, ReadArgumentText(root, "delta"), events);
                     break;
@@ -727,6 +865,10 @@ internal sealed class ResponsesCodec : IProtocolCodec
             {
                 EnsureFunctionIdentity(outputIndex, item, events);
             }
+            else if (type == "custom_tool_call")
+            {
+                EnsureCustomIdentity(outputIndex, item, events);
+            }
         }
 
         private void ReadDoneItem(JsonElement root, int outputIndex, List<ChatStreamEvent> events)
@@ -740,6 +882,13 @@ internal sealed class ResponsesCodec : IProtocolCodec
             {
                 EnsureFunctionIdentity(outputIndex, item, events);
                 AcceptCompleteArguments(outputIndex, ReadArgumentText(item, "arguments"), events);
+                return;
+            }
+
+            if (type == "custom_tool_call")
+            {
+                EnsureCustomIdentity(outputIndex, item, events);
+                AcceptCustomInput(outputIndex, ReadArgumentText(item, "input"), events);
                 return;
             }
 
@@ -797,6 +946,83 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 name,
                 "",
                 ToolInputKind.Json));
+        }
+
+        // The input kind is fixed by the first delta of an item, so the name and
+        // the kind must be known when the identity is sent. The wrapped text
+        // arrives as one delta once the model finishes it.
+        private void EnsureCustomIdentity(int outputIndex, JsonElement item, List<ChatStreamEvent> events)
+        {
+            if (!_customIdentitySent.Add(outputIndex))
+            {
+                return;
+            }
+
+            _hasTools = true;
+            var callId = item.TryGetProperty("call_id", out var id) ? id.GetString() ?? "" : "";
+            var name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? "" : "";
+            _customNames[outputIndex] = name;
+            events.Add(new ChatToolCallDelta(
+                0,
+                ItemIndex(outputIndex, StreamItemKind.ToolCall),
+                callId,
+                name,
+                "",
+                _codec.KindFor(name)));
+        }
+
+        private void HoldCustomInput(int outputIndex, string delta)
+        {
+            if (delta.Length == 0 || _customInputAccepted.Contains(outputIndex))
+            {
+                return;
+            }
+
+            if (!_customInput.TryGetValue(outputIndex, out var text))
+            {
+                text = new StringBuilder();
+                _customInput[outputIndex] = text;
+            }
+
+            text.Append(delta);
+        }
+
+        private void AcceptCustomInput(int outputIndex, string complete, List<ChatStreamEvent> events)
+        {
+            // The text is wrapped by tool name, and the input kind is fixed by
+            // the first event of the item. A server that sends the finished
+            // text before it names the item must not get a text-kind event
+            // first, so the text waits for the item event that carries the name.
+            if (!_customNames.ContainsKey(outputIndex))
+            {
+                if (complete.Length > 0)
+                {
+                    _customInput[outputIndex] = new StringBuilder(complete);
+                }
+
+                return;
+            }
+
+            if (!_customInputAccepted.Add(outputIndex))
+            {
+                return;
+            }
+
+            // The done text is authoritative. Held deltas are only a fallback
+            // for a server that sends deltas and an empty done event.
+            var text = complete.Length > 0
+                ? complete
+                : _customInput.TryGetValue(outputIndex, out var held) ? held.ToString() : "";
+            _customInput.Remove(outputIndex);
+            var name = _customNames.TryGetValue(outputIndex, out var known) ? known : "";
+            _hasTools = true;
+            events.Add(new ChatToolCallDelta(
+                0,
+                ItemIndex(outputIndex, StreamItemKind.ToolCall),
+                "",
+                "",
+                _codec.ArgumentsFor(name, text),
+                _codec.KindFor(name)));
         }
 
         private void AppendArgumentFragment(int outputIndex, string delta, List<ChatStreamEvent> events)

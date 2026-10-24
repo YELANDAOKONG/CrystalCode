@@ -15,6 +15,12 @@ public sealed class ApplyPatchTool : ITool
 {
     public const string ToolName = "apply_patch";
 
+    /// <summary>
+    /// The one property of the tool's JSON input. A provider that can offer the
+    /// tool as free-form text maps the model's text to this property.
+    /// </summary>
+    public const string TextProperty = "patchText";
+
     private const int MaximumPatchBytes = 2 * 1024 * 1024;
 
     private static readonly UTF8Encoding StrictUtf8 = new(
@@ -121,7 +127,7 @@ public sealed class ApplyPatchTool : ITool
     /// the same text the tool will run.
     /// </summary>
     internal static bool TryReadPatch(string arguments, out string patchText) =>
-        ToolArguments.TryReadRequiredString(arguments, "patchText", out patchText);
+        ToolArguments.TryReadRequiredString(arguments, TextProperty, out patchText);
 
     /// <summary>
     /// Every path a patch can write, delete, or create, as written in the
