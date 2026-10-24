@@ -337,13 +337,15 @@ implemented in the current build.
   `Append` keeps the existing duplicate-name rejection, while `Replace`
   names a reserved built-in and may apply independently to Plan or Work.
   The replacement keeps the built-in model-facing name and continues through
-  the host approval and executor path. Disk plugins, external tools, saved
-  configuration, session overrides, and metadata adjustment remain undefined.
-  Process-only `--disable-tool` is still separate: it omits a built-in for one
-  process, does not persist, and does not replace the tool. Saved and session
-  disablement, disk-plugin and external-tool replacement, and metadata
-  adjustment remain high-priority follow-up work. Host-owned numeric limits
-  remain a separate pending question and are not decided here.
+  the host approval and executor path. Approval classification is selected by
+  that model-facing name, so a replacement is trusted not to perform effects
+  beyond the replaced built-in's classification. Home configuration now
+  persistently disables built-in names through `config.json` and `/tools
+  builtin enable|disable`; process-only `--disable-tool` is merged on top and
+  remains non-persistent. Session-only disablement, disk-plugin and
+  external-tool replacement, and metadata adjustment remain undefined.
+  Host-owned numeric limits remain a separate pending question and are not
+  decided here.
 - Product modes other than Plan and Work, including operator-defined custom
   modes. The product has exactly two modes today. The direction is to add
   custom modes; their behavior and ownership are not defined. Prompt overlays,
@@ -482,13 +484,14 @@ fence, or `ToolInvocationPolicy`. This item is not the deferred module
 system, not the high-priority way to extend, adjust, or disable a built-in
 tool, and not the undecided extra hook methods or plugin dependencies.
 
-TODO: add saved and session ways to disable or adjust built-in tools, and add
+TODO: add session ways to disable or adjust built-in tools, and add
 disk-plugin and external-tool replacement, only after each mechanism's scope
 and interaction with approval and reserved tool names are defined. In-process
 plugin replacement is defined for the explicit `Replace` contribution and
-keeps the built-in model-facing name. `--disable-tool` remains process-only.
-This is not the pending question of whether host-owned numeric limits become
-operator configuration.
+keeps the built-in model-facing name. Home persistent disablement is defined
+by `config.json` `disabledBuiltInTools` and `/tools builtin`; `--disable-tool`
+remains process-only and is merged on top. This is not the pending question
+of whether host-owned numeric limits become operator configuration.
 
 TODO: add operator-defined modes other than Plan and Work only after their
 behavior and ownership are defined. The product has exactly two modes today.

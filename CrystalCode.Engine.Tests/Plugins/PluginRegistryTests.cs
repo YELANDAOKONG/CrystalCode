@@ -101,6 +101,12 @@ public sealed class PluginRegistryTests
         var registry = PluginRegistry.CreateBuiltIn();
         registry.Add(new ReadReplacementPlugin());
 
+        Assert.Contains(registry.Tools, tool => tool.Name == ReadTool.ToolName);
+        Assert.Single(registry.Replacements);
+        Assert.Same(
+            registry.Replacements[ReadTool.ToolName],
+            registry.Replacements.Values.Single());
+
         var catalog = WorkspaceCatalog.CreatePlan(
             new Workspace(workspace.Path),
             new TodoList(),
@@ -122,6 +128,25 @@ public sealed class PluginRegistryTests
             () => registry.Add(new UnknownReplacementPlugin()));
 
         Assert.Contains("unknown built-in tool", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreateTools_RejectsAnAppendedToolWithAMismatchedDefinitionName()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var registry = new PluginRegistry();
+        registry.Add(new MismatchedAppendPlugin());
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => WorkspaceCatalog.CreateWork(
+                new Workspace(workspace.Path),
+                new TodoList(),
+                new FixedUserPrompt("ok"),
+                registry));
+
+        Assert.Contains("returned definition", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("mismatch", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("echo", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -227,6 +252,21 @@ public sealed class PluginRegistryTests
                         (_, _, _) => new EchoTool(),
                         kind: ToolContributionKind.Replace,
                         replacementTarget: "missing")
+                ]);
+    }
+
+    private sealed class MismatchedAppendPlugin : IPlugin
+    {
+        public string Name => "mismatched-append";
+
+        public PluginContribution Contribute() =>
+            new(
+                tools:
+                [
+                    new FactoryToolContribution(
+                        "mismatch",
+                        HostToolCatalogs.Work,
+                        (_, _, _) => new EchoTool())
                 ]);
     }
 

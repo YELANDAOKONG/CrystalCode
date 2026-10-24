@@ -1484,6 +1484,23 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Save_RoundTripsPersistentDisabledBuiltInTools()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        var settings = store.LoadOrCreate()
+            .WithPersistentDisabledBuiltInTools(["describe_image", "bash"]);
+
+        store.Save(settings);
+        var json = File.ReadAllText(root.Home.ConfigPath);
+        var loaded = store.Load();
+
+        Assert.Contains("disabledBuiltInTools", json, StringComparison.Ordinal);
+        Assert.Equal(["describe_image", "bash"], loaded.PersistentDisabledBuiltInTools);
+        Assert.Equal(loaded.PersistentDisabledBuiltInTools, loaded.DisabledBuiltInTools);
+    }
+
+    [Fact]
     public void Save_RoundTripsExportDirectory()
     {
         using var root = new TemporaryHome();

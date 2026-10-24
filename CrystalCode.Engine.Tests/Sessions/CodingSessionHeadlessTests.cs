@@ -111,6 +111,24 @@ public sealed class CodingSessionHeadlessTests
     }
 
     [Fact]
+    public async Task ToolsBuiltinDisable_PersistsAndRemovesToolFromTheLiveCatalog()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/tools builtin disable read", CancellationToken.None);
+        await headless.Session.SubmitAsync("/tools", CancellationToken.None);
+
+        var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
+        Assert.DoesNotContain(listed.Plan, tool => tool.Name == ReadTool.ToolName);
+        Assert.DoesNotContain(listed.Work, tool => tool.Name == ReadTool.ToolName);
+        Assert.Contains(
+            "disabledBuiltInTools",
+            File.ReadAllText(headless.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SecondTurn_ReportsCumulativeUsageOnTopOfTheFirst()
     {
         var client = new ScriptedStreamingClient(

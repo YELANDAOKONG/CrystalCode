@@ -386,4 +386,16 @@ public sealed class HarnessSettingsTests
 
         Assert.Contains("Unknown built-in tool", error.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void DisabledBuiltInTools_MergesPersistentAndProcessLists()
+    {
+        var settings = HarnessSettings.CreateDefault()
+            .WithPersistentDisabledBuiltInTools(["read", "bash"])
+            .WithDisabledBuiltInTools(["bash", "edit"]);
+
+        Assert.Equal(["read", "bash", "edit"], settings.DisabledBuiltInTools);
+        Assert.Equal(["read", "bash"], settings.PersistentDisabledBuiltInTools);
+        Assert.Equal(["bash", "edit"], settings.ProcessDisabledBuiltInTools);
+    }
 }

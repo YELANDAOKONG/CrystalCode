@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Configuration;
 
@@ -7,6 +8,11 @@ namespace CrystalCode.Engine.Configuration;
 /// </summary>
 public static class ToolCompletions
 {
+    private static readonly IReadOnlyList<SlashCompletion> BuiltInTools =
+        BuiltInToolSelection.Names
+            .Select(name => new SlashCompletion(name, "Configure built-in tool", [name]))
+            .ToArray();
+
     private static readonly IReadOnlyList<SlashCompletion> Policies =
     [
         new("author", "Follow author approval declarations", ["author"]),
@@ -20,6 +26,12 @@ public static class ToolCompletions
         new("project", "set Project tool approval policy", ["project"], Policies),
         new("reload", "Reload external tools", ["reload"]),
         new("on", "Enable external tools", ["on"]),
-        new("off", "Disable external tools", ["off"])
+        new("off", "Disable external tools", ["off"]),
+        new("builtin", "Show or configure built-in tools", ["builtin"],
+            [
+                new("show", "Show persistent built-in tool settings", ["show"]),
+                new("enable", "Enable a built-in tool persistently", ["enable"], BuiltInTools),
+                new("disable", "Disable a built-in tool persistently", ["disable"], BuiltInTools)
+            ])
     ];
 }

@@ -58,11 +58,12 @@ behavior stands until a specific change defines otherwise.
   `IPlugin` replacement is now defined: `Append` keeps duplicate-name
   rejection, while `Replace` names a reserved built-in and may target Plan or
   Work independently. The replacement keeps the built-in model-facing name
-  and uses the host executor and approval path. Disk-plugin and external-tool
-  replacement, saved and session disablement, metadata adjustment, and other
-  disable rules remain. Process-only `--disable-tool` is still separate and
-  does not persist or replace a tool. Host-owned numeric limits stay under
-  Pending evaluation.
+  and uses the host executor and approval path. Home persistent disablement is
+  defined by `config.json` `disabledBuiltInTools` and `/tools builtin`; it is
+  merged with the process-only `--disable-tool` list. Session-only disablement,
+  disk-plugin and external-tool replacement, metadata adjustment, and other
+  disable rules remain. Host-owned numeric limits stay under Pending
+  evaluation.
 - Product modes other than Plan and Work, including operator-defined custom
   modes. The product has exactly two modes today. Prompt overlays, prompt
   sets, prompt attachments, and external tool catalogs do not add a mode.

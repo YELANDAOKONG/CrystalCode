@@ -3529,6 +3529,12 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var command = parts[0].ToLowerInvariant();
+        if (command == "builtin")
+        {
+            ChangeBuiltInTools(parts);
+            return;
+        }
+
         if (command == "approval" && parts.Length == 1)
         {
             Note(ToolListText.FormatApproval(_settings.ExternalToolApproval));
@@ -3710,6 +3716,66 @@ public sealed class CodingSession : ITurnObserver
         ReplaceLiveSystem();
         WriteExternalNotes();
         Note(command == "reload" ? "Tools reloaded" : "External tools  " + Title(command));
+    }
+
+    private void ChangeBuiltInTools(IReadOnlyList<string> parts)
+    {
+        if (parts.Count == 1
+            || parts.Count == 2
+            && parts[1].Equals("show", StringComparison.OrdinalIgnoreCase))
+        {
+            Note(_settings.PersistentDisabledBuiltInTools.Count == 0
+                ? "Persistently disabled built-in tools  None"
+                : "Persistently disabled built-in tools  "
+                    + string.Join(", ", _settings.PersistentDisabledBuiltInTools));
+            return;
+        }
+
+        if (parts.Count != 3
+            || !parts[1].Equals("enable", StringComparison.OrdinalIgnoreCase)
+                && !parts[1].Equals("disable", StringComparison.OrdinalIgnoreCase))
+        {
+            Error("Usage: /tools builtin show|enable|disable <name>.");
+            return;
+        }
+
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing built-in tools.");
+            return;
+        }
+
+        string name;
+        try
+        {
+            name = BuiltInToolSelection.Normalize([parts[2]])[0];
+        }
+        catch (ArgumentException exception)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        var disabled = _settings.PersistentDisabledBuiltInTools.ToList();
+        var disable = parts[1].Equals("disable", StringComparison.OrdinalIgnoreCase);
+        var changed = disable
+            ? !disabled.Contains(name, StringComparer.Ordinal)
+            : disabled.Remove(name);
+        if (disable && changed)
+        {
+            disabled.Add(name);
+        }
+
+        if (!changed)
+        {
+            Note($"Built-in tool {name} is already {(disable ? "disabled" : "enabled")}.");
+            return;
+        }
+
+        SaveSettings(current => current.WithPersistentDisabledBuiltInTools(disabled));
+        RebuildExecutors();
+        ReplaceLiveSystem();
+        Note($"Built-in tool {name}  {(disable ? "Disabled" : "Enabled")}");
     }
 
     private void ShowTools()
@@ -3921,6 +3987,7 @@ public sealed class CodingSession : ITurnObserver
     {
         Error(
             "Tools command must be /tools, /tools approval, /tools on|off|reload, "
+            + "/tools builtin show|enable|disable <name>, "
             + "/tools enable|disable|show <directory>, "
             + "/tools home|project enable|disable|show <directory>, "
             + "/tools home author|host, or /tools project author|host.");

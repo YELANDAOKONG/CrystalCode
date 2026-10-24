@@ -90,7 +90,8 @@ public sealed record HarnessSettings
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
         int? reservedOutputTokens = null,
         int? outputTokenCap = null,
-        AgentSettings? agents = null)
+        AgentSettings? agents = null,
+        IReadOnlyList<string>? persistentDisabledBuiltInTools = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -178,7 +179,11 @@ public sealed record HarnessSettings
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
-        DisabledBuiltInTools = BuiltInToolSelection.Normalize(disabledBuiltInTools);
+        ProcessDisabledBuiltInTools = BuiltInToolSelection.Normalize(disabledBuiltInTools);
+        PersistentDisabledBuiltInTools = BuiltInToolSelection.Normalize(persistentDisabledBuiltInTools);
+        DisabledBuiltInTools = BuiltInToolSelection.Merge(
+            PersistentDisabledBuiltInTools,
+            ProcessDisabledBuiltInTools);
         ImageModel = imageModel ?? ImageModelSettings.None;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
@@ -403,6 +408,17 @@ public sealed record HarnessSettings
     /// </summary>
     public IReadOnlyList<string> DisabledBuiltInTools { get; }
 
+    /// <summary>
+    /// Built-in tool names disabled in Home preferences. This list is written
+    /// to <c>config.json</c>; process-only launch overrides are not included.
+    /// </summary>
+    public IReadOnlyList<string> PersistentDisabledBuiltInTools { get; }
+
+    /// <summary>
+    /// Built-in tool names disabled by process-only launch settings.
+    /// </summary>
+    public IReadOnlyList<string> ProcessDisabledBuiltInTools { get; }
+
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
     public string? ExportDirectory { get; }
@@ -565,6 +581,13 @@ public sealed record HarnessSettings
         return Copy(disabledBuiltInTools: disabledBuiltInTools);
     }
 
+    public HarnessSettings WithPersistentDisabledBuiltInTools(
+        IReadOnlyList<string> disabledBuiltInTools)
+    {
+        ArgumentNullException.ThrowIfNull(disabledBuiltInTools);
+        return Copy(persistentDisabledBuiltInTools: disabledBuiltInTools);
+    }
+
     public HarnessSettings WithExternalToolApproval(ExternalToolApprovalSettings approval)
     {
         ArgumentNullException.ThrowIfNull(approval);
@@ -682,6 +705,7 @@ public sealed record HarnessSettings
         bool setMicroCompaction = false,
         RuleFileSettings? ruleFiles = null,
         IReadOnlyList<string>? disabledBuiltInTools = null,
+        IReadOnlyList<string>? persistentDisabledBuiltInTools = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
         int? reservedOutputTokens = null,
@@ -727,12 +751,13 @@ public sealed record HarnessSettings
             showAutomaticCompactionSummary ?? ShowAutomaticCompactionSummary,
             setMicroCompaction ? microCompaction : MicroCompaction,
             ruleFiles ?? RuleFiles,
-            disabledBuiltInTools ?? DisabledBuiltInTools,
+            disabledBuiltInTools ?? ProcessDisabledBuiltInTools,
             tierSelections ?? TierSelections,
             speedSelections ?? SpeedSelections,
             setReservedOutputTokens ? reservedOutputTokens : ReservedOutputTokens,
             outputTokenCap ?? OutputTokenCap,
-            agents ?? Agents);
+            agents ?? Agents,
+            persistentDisabledBuiltInTools ?? PersistentDisabledBuiltInTools);
 
     public override string ToString() => nameof(HarnessSettings);
 

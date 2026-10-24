@@ -18,6 +18,9 @@ public interface IToolContribution
 
     string? ReplacementTarget { get; }
 
+    /// <summary>
+    /// Creates a tool whose definition name matches <see cref="Name"/>.
+    /// </summary>
     ITool Create(Workspace workspace, TodoList todos, IUserPrompt prompt);
 
     IMultimodalTool? CreateMultimodal(

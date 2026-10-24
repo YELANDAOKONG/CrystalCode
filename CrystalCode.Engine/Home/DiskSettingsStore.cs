@@ -109,7 +109,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             microCompaction: ReadMicroCompaction(document.MicroCompaction),
             ruleFiles: ReadRuleFiles(document.RuleFiles),
             reservedOutputTokens: document.ReservedOutputTokens,
-            agents: document.Agents);
+            agents: document.Agents,
+            persistentDisabledBuiltInTools: document.DisabledBuiltInTools);
     }
 
     public void Save(HarnessSettings settings)
@@ -185,7 +186,10 @@ public sealed class DiskSettingsStore : ISettingsStore
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
             ImageModel = WriteImageModel(settings.ImageModel),
             Retry = WriteRetry(settings.Retry),
-            ApprovalRetry = WriteRetry(settings.ApprovalRetry)
+            ApprovalRetry = WriteRetry(settings.ApprovalRetry),
+            DisabledBuiltInTools = settings.PersistentDisabledBuiltInTools.Count == 0
+                ? null
+                : [.. settings.PersistentDisabledBuiltInTools]
         };
         var json = JsonSerializer.Serialize(document, HomeJson.Options);
         File.WriteAllText(_home.ConfigPath, json);

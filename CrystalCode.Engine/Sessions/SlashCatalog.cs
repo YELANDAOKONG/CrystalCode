@@ -50,7 +50,7 @@ public static class SlashCatalog
             ["model", "thinking", "summary", "auto", "micro"]),
         new(SessionVerb.Todos, "todos", ["todo"], "Show the full session todo list"),
         new(SessionVerb.Tools, "tools", [], "List tools or configure external tool sets",
-            ["on", "off", "reload", "enable", "disable", "show", "home", "project"]),
+            ["on", "off", "reload", "builtin", "enable", "disable", "show", "home", "project"]),
         new(SessionVerb.Plugins, "plugins", [], "List plugins or turn one directory on or off",
             ["on", "off", "reload", "enable", "disable", "show", "home", "project"]),
         new(SessionVerb.Attach, "attach", ["image"], "Attach a workspace image"),

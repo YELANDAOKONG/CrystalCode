@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 using Crystal.Chat;
 using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
@@ -17,6 +19,7 @@ public sealed class PluginRegistry
 {
     private readonly List<IToolContribution> _tools = [];
     private readonly Dictionary<string, IToolContribution> _replacements = new(StringComparer.Ordinal);
+    private readonly IReadOnlyDictionary<string, IToolContribution> _replacementView;
     private readonly List<IChatClientFactory> _clients = [];
     private readonly List<IApprovalClassifier> _classifiers = [];
     private readonly List<ISlashCommand> _commands = [];
@@ -24,7 +27,20 @@ public sealed class PluginRegistry
     private readonly HashSet<string> _commandNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _pluginNames = new(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyList<IToolContribution> Tools => [.. _tools, .. _replacements.Values];
+    public PluginRegistry()
+    {
+        _replacementView = new ReadOnlyDictionary<string, IToolContribution>(_replacements);
+    }
+
+    /// <summary>
+    /// Gets the contributions that append new tool names, in registration order.
+    /// </summary>
+    public IReadOnlyList<IToolContribution> Tools => _tools;
+
+    /// <summary>
+    /// Gets explicit built-in replacements keyed by the reserved tool name.
+    /// </summary>
+    public IReadOnlyDictionary<string, IToolContribution> Replacements => _replacementView;
 
     public IReadOnlyList<IChatClientFactory> Clients => _clients;
 

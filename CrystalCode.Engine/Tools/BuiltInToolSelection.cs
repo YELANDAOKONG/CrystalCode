@@ -3,10 +3,34 @@ using CrystalCode.Engine.Tools.External;
 namespace CrystalCode.Engine.Tools;
 
 /// <summary>
-/// Built-in tool names omitted for one process. The set is not saved.
+/// Built-in tool names omitted from the active tool catalogs.
 /// </summary>
 public static class BuiltInToolSelection
 {
+    public static IReadOnlyList<string> Names { get; } =
+    [
+        ReadTool.ToolName,
+        DescribeImageTool.ToolName,
+        ViewImageTool.ToolName,
+        ListTool.ToolName,
+        TreeTool.ToolName,
+        GlobTool.ToolName,
+        GrepTool.ToolName,
+        SearchTool.ToolName,
+        TodoWriteTool.ToolName,
+        TodoReadTool.ToolName,
+        QuestionTool.ToolName,
+        EditTool.ToolName,
+        WriteTool.ToolName,
+        BashTool.ToolName,
+        BackgroundBashStartTool.ToolName,
+        BackgroundBashStatusTool.ToolName,
+        BackgroundBashLogsTool.ToolName,
+        BackgroundBashStopTool.ToolName,
+        SkillTool.ToolName,
+        TaskTool.ToolName
+    ];
+
     public static IReadOnlyList<string> Normalize(IReadOnlyList<string>? requested)
     {
         if (requested is null || requested.Count == 0)
@@ -29,6 +53,28 @@ public static class BuiltInToolSelection
             if (seen.Add(name))
             {
                 names.Add(name);
+            }
+        }
+
+        return names.Count == 0 ? [] : names.ToArray();
+    }
+
+    public static IReadOnlyList<string> Merge(
+        IReadOnlyList<string> first,
+        IReadOnlyList<string> second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        var names = new List<string>(first.Count + second.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var source in new[] { first, second })
+        {
+            foreach (var name in source)
+            {
+                if (seen.Add(name))
+                {
+                    names.Add(name);
+                }
             }
         }
 
@@ -62,7 +108,7 @@ public static class BuiltInToolSelection
             return string.Empty;
         }
 
-        return "Built-in tools disabled for this process: "
+        return "Built-in tools disabled: "
             + string.Join(", ", names)
             + ". Do not call them.";
     }

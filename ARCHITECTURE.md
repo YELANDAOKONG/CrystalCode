@@ -648,17 +648,19 @@ preserve `ToolInputKind`, but no current provider maps `ToolInputKind.Text`.
 Provider-specific custom-format tools such as OpenAI's `apply_patch` take
 text input and are medium-priority product work, not part of this build.
 
-`--disable-tool` repeats on `crystal`, `crystal space`, and `crystal run`.
-Each value is one built-in tool name. The process omits that tool from Plan
-and Work, including `describe_image`, `view_image`, `skill`, and a named
-background shell tool. An unknown name refuses to start. The choice is not
-saved. The system text lists the omitted names and tells the model not to
-call them. The name stays reserved for plugins and external tools. Saved, session,
-and plugin ways to extend, adjust, or disable a built-in tool, including
-supplying another tool in its place, are high-priority product work and are
-not this flag. The flag does not persist and does not replace a tool. Do not
-reserve a configuration field or public type for that work. Host-owned numeric
-limits are a separate pending question.
+`config.json` `disabledBuiltInTools` stores Home-level persistent built-in tool
+disablement. `/tools builtin show|enable|disable <name>` displays or changes
+that list while idle, rebuilds both executors, and refreshes the live system
+message. An unknown name is rejected. `--disable-tool` repeats on `crystal`,
+`crystal space`, and `crystal run`; each value is one built-in tool name and
+adds a process-only disablement on top of the Home list. Launch overrides are
+not saved, and enabling a Home name does not remove a process-only disablement.
+The merged list omits the tool from Plan and Work, including `describe_image`,
+`skill`, `view_image`, and named background shell tools. The system text lists
+the omitted names and tells the model not to call them. The name stays reserved
+for plugins and external tools. Session-only disablement, metadata adjustment,
+and disk-plugin or external-tool replacement remain undefined. Host-owned
+numeric limits are a separate pending question.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,
@@ -2182,6 +2184,9 @@ classifiers, or slash commands through `PluginContribution`. A tool
 contribution always has a text `ITool` implementation and may additionally
 provide an `IMultimodalTool` with the same definition name; the latter may
 return generic image content while reusing the host approval policy.
+Every contribution factory must return a definition whose name matches the
+registered contribution name; the host rejects a mismatched definition before
+it enters a catalog.
 Built-in tools and all six wire protocol adapters register through that
 table. `PluginRegistry` does not load assemblies from disk. Tool contributions
 default to `Append`, which rejects duplicate names. An in-process contribution
@@ -2194,6 +2199,12 @@ inherit the original multimodal implementation. The resulting tools still
 pass through the same approval policy, executor, cancellation, and budget
 boundaries. Disk plugins and external tool sets remain append-only until their
 replacement contracts are defined.
+Approval classification remains keyed by the model-facing tool name. A
+replacement for `read`, `write`, `edit`, or `bash` therefore inherits that
+name's built-in classification; the host does not infer a replacement's actual
+side effects from its implementation. In-process replacement is consequently
+a trusted extension point and must not be exposed to untrusted disk or
+external sources without a separate classification contract.
 
 Disk plugins use `CrystalCode.Plugins.IPlugin` and are loaded by
 `PluginCatalog` from `plugins/`. One non-collectible load context serves
