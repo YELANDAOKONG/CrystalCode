@@ -15,6 +15,11 @@ public sealed class SessionDocument
 
     public IReadOnlyList<DirectoryAccess> Access { get; set; } = [];
 
+    /// <summary>
+    /// Built-in tools disabled for this session only. Null means none.
+    /// </summary>
+    public BuiltInToolDisablementDocument? DisabledBuiltInTools { get; set; }
+
     public DateTimeOffset? CreatedUtc { get; set; }
 
     public DateTimeOffset? UpdatedUtc { get; set; }

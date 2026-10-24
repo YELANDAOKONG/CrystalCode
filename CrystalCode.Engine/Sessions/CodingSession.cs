@@ -3729,9 +3729,18 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeBuiltInTools(IReadOnlyList<string> parts)
     {
-        if (parts.Count == 1)
+        var sessionOnly = parts.Count > 1 && parts[1].Equals("session", StringComparison.OrdinalIgnoreCase);
+        if (sessionOnly)
         {
-            Note(FormatBuiltInDisablement(_settings.PersistentDisabledBuiltInTools));
+            parts = [parts[0], .. parts.Skip(2)];
+        }
+
+        var scope = sessionOnly ? "Session" : "Persistently";
+        var current = sessionOnly ? _settings.SessionDisabledBuiltInTools : _settings.PersistentDisabledBuiltInTools;
+        if (parts.Count == 1
+            || parts.Count == 2 && parts[1].Equals("show", StringComparison.OrdinalIgnoreCase))
+        {
+            Note(FormatBuiltInDisablement(scope, current));
             return;
         }
 
@@ -3741,8 +3750,8 @@ public sealed class CodingSession : ITurnObserver
             && parts[2].Equals("show", StringComparison.OrdinalIgnoreCase))
         {
             var showingPlan = parts[1].Equals("plan", StringComparison.OrdinalIgnoreCase);
-            Note($"Persistently disabled {(showingPlan ? "Plan" : "Work")} built-in tools  "
-                + (string.Join(", ", _settings.PersistentDisabledBuiltInTools.For(showingPlan)) is { Length: > 0 } names
+            Note($"{ScopeLabel(scope)} {(showingPlan ? "Plan" : "Work")} built-in tools  "
+                + (string.Join(", ", current.For(showingPlan)) is { Length: > 0 } names
                     ? names
                     : "None"));
             return;
@@ -3754,7 +3763,7 @@ public sealed class CodingSession : ITurnObserver
             || !parts[2].Equals("enable", StringComparison.OrdinalIgnoreCase)
                 && !parts[2].Equals("disable", StringComparison.OrdinalIgnoreCase))
         {
-            Error("Usage: /tools builtin show or /tools builtin plan|work enable|disable <name>.");
+            Error("Usage: /tools builtin [session] show or /tools builtin [session] plan|work enable|disable <name>.");
             return;
         }
 
@@ -3776,8 +3785,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var planMode = parts[1].Equals("plan", StringComparison.OrdinalIgnoreCase);
-        var current = _settings.PersistentDisabledBuiltInTools.For(planMode);
-        var disabled = current.ToList();
+        var disabled = current.For(planMode).ToList();
         var disable = parts[2].Equals("disable", StringComparison.OrdinalIgnoreCase);
         var changed = disable
             ? !disabled.Contains(name, StringComparer.Ordinal)
@@ -3793,18 +3801,34 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var next = _settings.PersistentDisabledBuiltInTools.With(planMode, disabled);
-        SaveSettings(currentSettings => currentSettings.WithPersistentDisabledBuiltInTools(next));
+        var next = current.With(planMode, disabled);
+        if (sessionOnly)
+        {
+            _settings = _settings.WithSessionDisabledBuiltInTools(next);
+        }
+        else
+        {
+            SaveSettings(currentSettings => currentSettings.WithPersistentDisabledBuiltInTools(next));
+        }
+
         RebuildExecutors();
         ReplaceLiveSystem();
-        Note($"{(planMode ? "Plan" : "Work")} built-in tool {name}  {(disable ? "Disabled" : "Enabled")}");
+        if (sessionOnly)
+        {
+            SaveSession();
+        }
+
+        Note($"{(sessionOnly ? "Session " : string.Empty)}{(planMode ? "Plan" : "Work")} built-in tool {name}  {(disable ? "Disabled" : "Enabled")}");
     }
 
-    private static string FormatBuiltInDisablement(BuiltInToolDisablement disabled)
+    private static string ScopeLabel(string scope) =>
+        scope == "Session" ? "Session-disabled" : "Persistently disabled";
+
+    private static string FormatBuiltInDisablement(string scope, BuiltInToolDisablement disabled)
     {
         var plan = disabled.Plan.Count == 0 ? "None" : string.Join(", ", disabled.Plan);
         var work = disabled.Work.Count == 0 ? "None" : string.Join(", ", disabled.Work);
-        return $"Persistently disabled built-in tools  Plan {plan}  Work {work}";
+        return $"{ScopeLabel(scope)} built-in tools  Plan {plan}  Work {work}";
     }
 
     private void ShowTools()
@@ -4778,6 +4802,7 @@ public sealed class CodingSession : ITurnObserver
             Workspace = _workspace.Root,
             PlanMode = _planMode,
             Access = _workspace.Access.Snapshot(),
+            DisabledBuiltInTools = SessionMapper.WriteDisabledBuiltInTools(_settings.SessionDisabledBuiltInTools),
             CreatedUtc = _sessionCreatedUtc,
             Items = TranscriptCodec.Write(_turnActive ? CheckpointItems(_parentModelContext ?? _transcript) : _transcript),
             Archive = TranscriptCodec.Write(_turnActive ? CheckpointItems(archiveSnapshot) : archiveSnapshot),
@@ -4804,6 +4829,8 @@ public sealed class CodingSession : ITurnObserver
     private void BeginNewSession()
     {
         _workspace.Access.Clear();
+        var hadSessionDisablement = _settings.SessionDisabledBuiltInTools.All().Count > 0;
+        _settings = _settings.WithSessionDisabledBuiltInTools(new BuiltInToolDisablement());
         DiscardQueue();
         CancelAndClearSide(announce: true);
         Publish(new ImageHistoryInvalidated());
@@ -4828,6 +4855,11 @@ public sealed class CodingSession : ITurnObserver
         _ledger.Clear();
         _todos.Clear();
         BindReviewConversation();
+        if (hadSessionDisablement)
+        {
+            RebuildExecutors();
+        }
+
         SeedWorkspaceDefaults();
         SaveSession();
         ShowTodos();
@@ -5153,6 +5185,8 @@ public sealed class CodingSession : ITurnObserver
 
         Publish(new ImageHistoryInvalidated());
         var items = TranscriptCodec.Read(document.Items);
+        _settings = _settings.WithSessionDisabledBuiltInTools(
+            SessionMapper.ReadDisabledBuiltInTools(document.DisabledBuiltInTools));
         _sessionId = document.Id!;
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         _planMode = document.PlanMode;

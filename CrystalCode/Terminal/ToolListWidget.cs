@@ -66,6 +66,8 @@ internal static class ToolListWidget
                 + $"[{Theme.User}]  /tools on|off|reload\n"
                 + "  /tools builtin show\n"
                 + "  /tools builtin plan|work show|enable|disable <name>\n"
+                + "  /tools builtin session show\n"
+                + "  /tools builtin session plan|work show|enable|disable <name>\n"
                 + "  /tools enable|disable|show <directory>\n"
                 + "  /tools home|project enable|disable|show <directory>\n"
                 + "  /tools home|project author|host[/]"));

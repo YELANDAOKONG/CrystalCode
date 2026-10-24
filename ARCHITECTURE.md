@@ -667,9 +667,20 @@ including `describe_image`, `skill`, `view_image`, and named background shell
 tools. Work and Plan prompt templates expose that list through the host-owned
 `{{disabled_tools}}` placeholder; custom prompt text must include the token if
 it wants the guidance. The name stays reserved for plugins and external
-tools. Session-only disablement, metadata adjustment, and disk-plugin or
-external-tool replacement remain undefined. Host-owned numeric limits are a
-separate pending question.
+tools.
+
+`/tools builtin session [plan|work] show|enable|disable <name>` keeps a third
+list that lives in `SessionDocument.disabledBuiltInTools`, not in `config.json`
+and not in `HarnessSettings` persistence. The active list is the union of Home,
+process, and session names. Changes are refused during a turn or compaction,
+rebuild both executors, refresh the live system message, and save the session.
+Resume restores the saved list and drops a name this build no longer reserves.
+`/clear` empties it. Fork does not copy it, like directory access. A workspace
+change keeps it because the session continues. Child Agents see the merged
+list. `/tools builtin show` still lists only Home names.
+
+Metadata adjustment and disk-plugin or external-tool replacement remain
+undefined. Host-owned numeric limits are a separate pending question.
 
 The built-in `question` tool accepts an ordered question array. Each question
 has a short header, full text, described options, optional multiple selection,

@@ -91,7 +91,8 @@ public sealed record HarnessSettings
         int? reservedOutputTokens = null,
         int? outputTokenCap = null,
         AgentSettings? agents = null,
-        BuiltInToolDisablement? persistentDisabledBuiltInTools = null)
+        BuiltInToolDisablement? persistentDisabledBuiltInTools = null,
+        BuiltInToolDisablement? sessionDisabledBuiltInTools = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -181,9 +182,10 @@ public sealed record HarnessSettings
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
         ProcessDisabledBuiltInTools = BuiltInToolDisablement.FromProcessNames(disabledBuiltInTools);
         PersistentDisabledBuiltInTools = persistentDisabledBuiltInTools ?? new BuiltInToolDisablement();
+        SessionDisabledBuiltInTools = sessionDisabledBuiltInTools ?? new BuiltInToolDisablement();
         DisabledBuiltInTools = BuiltInToolDisablement.Merge(
-            PersistentDisabledBuiltInTools,
-            ProcessDisabledBuiltInTools);
+            BuiltInToolDisablement.Merge(PersistentDisabledBuiltInTools, ProcessDisabledBuiltInTools),
+            SessionDisabledBuiltInTools);
         ImageModel = imageModel ?? ImageModelSettings.None;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
@@ -403,8 +405,9 @@ public sealed record HarnessSettings
     public bool UsePromptAttachments { get; }
 
     /// <summary>
-    /// Built-in tool names omitted for this process. Empty keeps the full
-    /// catalog. This value is not written to <c>config.json</c>.
+    /// Built-in tool names omitted from the active catalogs: Home preferences,
+    /// process-only launch settings, and the current session combined. Empty
+    /// keeps the full catalog. This value is not written to <c>config.json</c>.
     /// </summary>
     public BuiltInToolDisablement DisabledBuiltInTools { get; }
 
@@ -418,6 +421,12 @@ public sealed record HarnessSettings
     /// Built-in tool names disabled by process-only launch settings.
     /// </summary>
     public BuiltInToolDisablement ProcessDisabledBuiltInTools { get; }
+
+    /// <summary>
+    /// Built-in tool names disabled for the current session only. They are
+    /// saved in the session file, not in <c>config.json</c>.
+    /// </summary>
+    public BuiltInToolDisablement SessionDisabledBuiltInTools { get; }
 
     public ExternalToolApprovalSettings ExternalToolApproval { get; }
 
@@ -588,6 +597,13 @@ public sealed record HarnessSettings
         return Copy(persistentDisabledBuiltInTools: disabledBuiltInTools);
     }
 
+    public HarnessSettings WithSessionDisabledBuiltInTools(
+        BuiltInToolDisablement disabledBuiltInTools)
+    {
+        ArgumentNullException.ThrowIfNull(disabledBuiltInTools);
+        return Copy(sessionDisabledBuiltInTools: disabledBuiltInTools);
+    }
+
     public HarnessSettings WithPersistentDisabledBuiltInTools(
         IReadOnlyList<string> disabledBuiltInTools)
     {
@@ -714,6 +730,7 @@ public sealed record HarnessSettings
         RuleFileSettings? ruleFiles = null,
         IReadOnlyList<string>? disabledBuiltInTools = null,
         BuiltInToolDisablement? persistentDisabledBuiltInTools = null,
+        BuiltInToolDisablement? sessionDisabledBuiltInTools = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? speedSelections = null,
         int? reservedOutputTokens = null,
@@ -765,7 +782,8 @@ public sealed record HarnessSettings
             setReservedOutputTokens ? reservedOutputTokens : ReservedOutputTokens,
             outputTokenCap ?? OutputTokenCap,
             agents ?? Agents,
-            persistentDisabledBuiltInTools ?? PersistentDisabledBuiltInTools);
+            persistentDisabledBuiltInTools ?? PersistentDisabledBuiltInTools,
+            sessionDisabledBuiltInTools ?? SessionDisabledBuiltInTools);
 
     public override string ToString() => nameof(HarnessSettings);
 

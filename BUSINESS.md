@@ -55,8 +55,11 @@ separate library with no terminal code. The product can:
   array form applies to both modes. `--disable-tool` remains a process-only
   overlay on `crystal`, `crystal space`, and `crystal run`; an unqualified name
   applies to both modes, while `plan:<name>` and `work:<name>` target one mode.
-  Unknown names refuse to start or change. The active mode exposes its merged
-  disabled list through `{{disabled_tools}}`, and the name stays reserved;
+  `/tools builtin session` disables names for the current session only: they
+  are saved in that session file, restored by resume, and not copied by fork
+  or kept by `/clear`. Unknown names refuse to start or change. The active
+  mode exposes its merged disabled list (Home, process, and session) through
+  `{{disabled_tools}}`, and the name stays reserved;
 - approve side effects manually, by a reviewing model, or by Full pass-through.
   Full auto-passes all tool calls, including workspace-external paths, session
   read-only directories, elevated or forbidden classifications, and forced
@@ -342,9 +345,9 @@ implemented in the current build.
   The replacement keeps the built-in model-facing name and continues through
   the host approval and executor path. Approval classification is selected by
   that model-facing name, so a replacement is trusted not to perform effects
-  beyond the replaced built-in's classification. Session-only disablement,
-  disk-plugin and external-tool replacement, and metadata adjustment remain
-  undefined. Home persistence, process-level merging, and the
+  beyond the replaced built-in's classification. Disk-plugin and
+  external-tool replacement, and metadata adjustment remain undefined. Home
+  persistence, process-level merging, session-only disablement, and the
   `{{disabled_tools}}` prompt placeholder are implemented in the current build.
   Host-owned numeric limits remain a separate pending question and are not
   decided here.
@@ -486,11 +489,11 @@ fence, or `ToolInvocationPolicy`. This item is not the deferred module
 system, not the high-priority way to extend, adjust, or disable a built-in
 tool, and not the undecided extra hook methods or plugin dependencies.
 
-TODO: add session-only disablement, disk-plugin and external-tool replacement,
-metadata adjustment, and other built-in-tool extension rules only after each
-mechanism's scope and interaction with approval and reserved tool names are
-defined. In-process plugin replacement, Home Plan/Work disablement,
-process-level merging, and the `{{disabled_tools}}` prompt placeholder are
+TODO: add disk-plugin and external-tool replacement, metadata adjustment, and
+other built-in-tool extension rules only after each mechanism's scope and
+interaction with approval and reserved tool names are defined. In-process
+plugin replacement, Home Plan/Work disablement, process-level merging,
+session-only disablement, and the `{{disabled_tools}}` prompt placeholder are
 implemented. This is not the pending question of whether host-owned numeric
 limits become operator configuration.
 

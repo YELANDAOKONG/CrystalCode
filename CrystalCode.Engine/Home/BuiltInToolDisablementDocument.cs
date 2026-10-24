@@ -1,6 +1,9 @@
 namespace CrystalCode.Engine.Home;
 
-internal sealed class BuiltInToolDisablementDocument
+/// <summary>
+/// JSON shape for Plan and Work built-in tool disablement lists.
+/// </summary>
+public sealed class BuiltInToolDisablementDocument
 {
     public List<string>? Plan { get; set; }
 

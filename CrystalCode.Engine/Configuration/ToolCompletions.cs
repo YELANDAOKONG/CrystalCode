@@ -20,10 +20,18 @@ public static class ToolCompletions
         new("disable", "Disable a built-in tool for this mode", ["disable"], BuiltInTools)
     ];
 
+    private static readonly IReadOnlyList<SlashCompletion> SessionModes =
+    [
+        new("show", "Show session-disabled tools", ["show"]),
+        new("plan", "Configure Plan built-in tools for this session", ["plan"], BuiltInToolActions),
+        new("work", "Configure Work built-in tools for this session", ["work"], BuiltInToolActions)
+    ];
+
     private static readonly IReadOnlyList<SlashCompletion> BuiltInModes =
     [
         new("plan", "Configure Plan built-in tools", ["plan"], BuiltInToolActions),
-        new("work", "Configure Work built-in tools", ["work"], BuiltInToolActions)
+        new("work", "Configure Work built-in tools", ["work"], BuiltInToolActions),
+        new("session", "Disable built-in tools for this session only", ["session"], SessionModes)
     ];
 
     private static readonly IReadOnlyList<SlashCompletion> Policies =

@@ -58,9 +58,10 @@ behavior stands until a specific change defines otherwise.
   replacement is implemented: `Append` keeps duplicate-name rejection, while
   `Replace` names a reserved built-in and may target Plan or Work independently.
   The replacement keeps the built-in model-facing name and uses the host
-  executor and approval path. Remaining work is session-only disablement,
-  disk-plugin and external-tool replacement, metadata adjustment, and other
-  disable rules. Host-owned numeric limits stay under Pending evaluation.
+  executor and approval path. Session-only disablement is implemented.
+  Remaining work is disk-plugin and external-tool replacement, metadata
+  adjustment, and other disable rules. Host-owned numeric limits stay under
+  Pending evaluation.
 - Product modes other than Plan and Work, including operator-defined custom
   modes. The product has exactly two modes today. Prompt overlays, prompt
   sets, prompt attachments, and external tool catalogs do not add a mode.

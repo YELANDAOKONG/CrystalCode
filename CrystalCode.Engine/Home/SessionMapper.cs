@@ -1,6 +1,8 @@
 using Crystal;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.External;
 
 namespace CrystalCode.Engine.Home;
 
@@ -86,6 +88,37 @@ internal static class SessionMapper
 
         return images;
     }
+
+    public static BuiltInToolDisablementDocument? WriteDisabledBuiltInTools(
+        BuiltInToolDisablement disabled)
+    {
+        ArgumentNullException.ThrowIfNull(disabled);
+        return disabled.Plan.Count == 0 && disabled.Work.Count == 0
+            ? null
+            : new BuiltInToolDisablementDocument
+            {
+                Plan = [.. disabled.Plan],
+                Work = [.. disabled.Work]
+            };
+    }
+
+    /// <summary>
+    /// Reads saved session disablement. A name this build no longer knows is
+    /// dropped, so a session saved by another version still opens.
+    /// </summary>
+    public static BuiltInToolDisablement ReadDisabledBuiltInTools(
+        BuiltInToolDisablementDocument? document) =>
+        document is null
+            ? new BuiltInToolDisablement()
+            : new BuiltInToolDisablement(
+                KnownNames(document.Plan),
+                KnownNames(document.Work));
+
+    private static List<string> KnownNames(List<string>? names) =>
+        names is null
+            ? []
+            : [.. names.Where(static name => name is not null
+                && ExternalToolNames.IsReserved(name.Trim()))];
 
     public static List<SessionTodoDocument> WriteTodos(IEnumerable<TodoItem> items)
     {

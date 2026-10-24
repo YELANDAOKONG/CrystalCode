@@ -298,6 +298,7 @@ public sealed class SessionStore
         Workspace = source.Workspace,
         PlanMode = source.PlanMode,
         Access = source.Access,
+        DisabledBuiltInTools = source.DisabledBuiltInTools,
         CreatedUtc = source.CreatedUtc,
         UpdatedUtc = source.UpdatedUtc,
         Items = source.Items,
