@@ -128,7 +128,8 @@ public sealed class ProviderCatalog
         }
 
         throw new KeyNotFoundException(
-            $"Provider '{name.Value}' is not configured. Add it to providers.json.");
+            $"Provider '{name.Value}' is not configured. "
+            + "Add it to providers.json or a file under providers/ in the Crystal home.");
     }
 
     public IReadOnlyList<string> GetModelNames(ProviderName name) =>

@@ -157,6 +157,7 @@ public sealed class ModelSelectionTests
         Assert.False(resolved);
         Assert.Null(selection);
         Assert.Contains("Provider 'missing' is not configured", error, StringComparison.Ordinal);
+        Assert.Contains("a file under providers/", error, StringComparison.Ordinal);
     }
 
     [Fact]

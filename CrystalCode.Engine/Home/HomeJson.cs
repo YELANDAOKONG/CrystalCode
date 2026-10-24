@@ -15,7 +15,7 @@ internal static class HomeJson
 
     /// <summary>
     /// Reads the hand-edited provider catalog. The host never rewrites an
-    /// existing providers.json, so comments survive; other Home JSON files
+    /// existing provider file, so comments survive; other Home JSON files
     /// stay strict because the host rewrites them.
     /// </summary>
     public static JsonDocumentOptions ProviderCatalogReadOptions { get; } = new()

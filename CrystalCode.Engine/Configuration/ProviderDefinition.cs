@@ -93,7 +93,7 @@ public sealed record ProviderDefinition
 
     /// <summary>
     /// Gets the Anthropic thinking-text request. Null uses summarized text
-    /// and is not written to <c>providers.json</c>.
+    /// and is not written to a provider file.
     /// </summary>
     public ThinkingDisplay? ThinkingDisplay { get; }
 

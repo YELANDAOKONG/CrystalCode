@@ -99,6 +99,34 @@ public sealed class CredentialStoreTests
         }
     }
 
+    [Fact]
+    public void TryResolve_MissingKeyErrorDoesNotPointAtOneProviderFile()
+    {
+        using var root = new TemporaryHome();
+        var shared = Environment.GetEnvironmentVariable(CredentialStore.SharedApiKeyVariable);
+        Environment.SetEnvironmentVariable(CredentialStore.SharedApiKeyVariable, null);
+        try
+        {
+            var store = new CredentialStore(root.Home);
+            var provider = new ProviderDefinition(
+                new ProviderName("crystaltestnokey"),
+                ProviderProtocol.OpenAI,
+                new Uri("https://example.test/v1/"),
+                new Dictionary<string, ModelSettings> { ["m"] = new(1000) });
+
+            var resolved = store.TryResolve(provider, out _, out var error);
+
+            Assert.False(resolved);
+            Assert.Contains("Missing API key for crystaltestnokey", error, StringComparison.Ordinal);
+            Assert.Contains("provider definition", error, StringComparison.Ordinal);
+            Assert.DoesNotContain("providers.json", error, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(CredentialStore.SharedApiKeyVariable, shared);
+        }
+    }
+
     private static ProviderDefinition CreateProvider(string apiKey) =>
         new(
             new ProviderName("openrouter"),

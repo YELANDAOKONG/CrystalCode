@@ -56,7 +56,7 @@ public sealed class CredentialStore
         var environmentName = ResolveEnvironmentName(provider);
         error =
             $"Missing API key for {provider.Name.Value}. "
-            + $"Set {provider.Name.Value}.apiKey in providers.json "
+            + $"Set {provider.Name.Value}.apiKey in its provider definition "
             + $"(literal, {{env:NAME}}, or {{file:path}}), "
             + $"or set {environmentName} / {SharedApiKeyVariable}, "
             + $"or write {_home.CredentialsPath}.";
