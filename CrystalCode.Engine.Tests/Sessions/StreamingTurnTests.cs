@@ -193,6 +193,34 @@ public sealed class StreamingTurnTests
     }
 
     [Fact]
+    public async Task RunAsync_KeepsPartialStreamUsageOutOfTheContextFigure()
+    {
+        var observer = new TestObserver();
+        ChatStreamEvent[] round =
+        [
+            new ChatUsageReceived(new TokenUsage(2, 1)),
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "done"),
+            new ChatUsageReceived(new TokenUsage(702, 5)),
+            new ChatCandidateCompleted(0, FinishReason.Stop)
+        ];
+        var turn = new StreamingTurn(
+            new ScriptedStreamingClient(round),
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
+
+        await turn.RunAsync([new ChatMessage(ChatRole.User, "hi")]);
+
+        Assert.Equal(new TokenUsage(702, 5), observer.UsageUpdates[^1].Context);
+        Assert.All(
+            observer.UsageUpdates.SkipLast(1),
+            update => Assert.Null(update.Context));
+        Assert.Equal(new TokenUsage(2, 1), observer.UsageUpdates[0].TurnCumulative);
+    }
+
+    [Fact]
     public async Task RunAsync_UpdatesContextEstimateAfterToolResults()
     {
         var observer = new TestObserver();

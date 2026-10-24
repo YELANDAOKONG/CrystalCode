@@ -146,10 +146,14 @@ public sealed class CodingSessionHeadlessTests
         Assert.NotEmpty(interim);
         foreach (var usage in interim)
         {
-            Assert.Equal(40, usage.Usage?.InputTokenCount);
             Assert.Equal(50, usage.CumulativeUsage?.InputTokenCount);
             Assert.Equal(13, usage.CumulativeUsage?.OutputTokenCount);
         }
+
+        // Context moves only when the response finishes, so a mid-stream
+        // update still shows the previous response's figure.
+        Assert.All(interim.SkipLast(1), usage => Assert.Equal(10, usage.Usage?.InputTokenCount));
+        Assert.Equal(40, interim[^1].Usage?.InputTokenCount);
 
         var finished = events.OfType<TurnFinished>().Single();
         Assert.Equal(40, finished.Usage?.InputTokenCount);

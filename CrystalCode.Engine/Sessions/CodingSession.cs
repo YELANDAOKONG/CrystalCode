@@ -406,10 +406,14 @@ public sealed class CodingSession : ITurnObserver
                 _childPolicy, HarnessExceptionMapper.MapAsync);
             var observer = new ChildTurnObserver(Emit, (context, usage) =>
             {
-                latestUsage = context;
-                usageAfterCompaction = context;
+                // A null context is a mid-stream update; keep the last finished figure.
+                if (context is not null)
+                {
+                    latestUsage = context;
+                    usageAfterCompaction = context;
+                }
                 UpdateChildUsage(invocation.ToString("N"), usage);
-                Emit(new UsageChanged(context, usage is null ? null : SessionLedger.Add(SessionMapper.ReadUsage(child.CumulativeUsage), usage),
+                Emit(new UsageChanged(latestUsage, usage is null ? null : SessionLedger.Add(SessionMapper.ReadUsage(child.CumulativeUsage), usage),
                     selectedModel.ContextWindow, true));
             }, _ => usageAfterCompaction = null,
                 () => Emit(new TodosChanged(todos.Snapshot())));

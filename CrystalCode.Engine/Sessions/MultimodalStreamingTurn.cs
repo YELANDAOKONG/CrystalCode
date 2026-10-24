@@ -349,7 +349,9 @@ public sealed class MultimodalStreamingTurn
                 if (converted is ChatUsageReceived { Usage: not null } usageReceived)
                 {
                     attemptUsage = usageReceived.Usage;
-                    _observer?.OnUsageUpdated(attemptUsage, usage.Preview(attemptUsage));
+                    // A mid-stream snapshot can carry a partial input side, so only
+                    // the finished response may move the context figure.
+                    _observer?.OnUsageUpdated(null, usage.Preview(attemptUsage));
                 }
                 assembler.Apply(converted);
             }
