@@ -312,7 +312,11 @@ short excerpt. Failures other than `bash` keep the result text.
 Labels use square brackets, exit status uses parentheses, and omitted-line
 markers use angle brackets, so host text stays distinct from tool output.
 `--format json` prints one JSON object per line and keeps the full tool
-output. Thinking text is omitted unless `--show-thinking` is set. With that
+output. `step_finish` reports the turn's token total in `usage`, the last
+request in `lastRequestUsage`, and the session total in `cumulativeUsage`.
+Child Agent events reuse the parent event shapes with a `child_` prefix and
+a `childSessionID`. A request that fails, including a timeout, exits 2.
+Thinking text is omitted unless `--show-thinking` is set. With that
 flag, thinking is printed under `[Thinking]` and the reply under `[Assistant]`.
 The saved session id is printed at the end. Resume that session with the
 interactive `crystal --resume <id>`.

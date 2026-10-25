@@ -463,6 +463,28 @@ public sealed class StreamingTurnTests
     }
 
     [Fact]
+    public async Task RunAsync_ForeignCancellationFailsTheTurnInsteadOfInterruptingIt()
+    {
+        // HttpClient reports its own timeout as a TaskCanceledException even
+        // though the turn token was never cancelled.
+        var client = new FlakyStreamingClient(new TaskCanceledException("The request timed out."));
+        var observer = new TestObserver();
+        var turn = new StreamingTurn(
+            client,
+            new ToolExecutor(
+                new ToolCatalog([new EchoTool()]),
+                new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer,
+            retry: SessionRetryOptions.None);
+
+        var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "hello")]);
+
+        Assert.Equal(TurnStopReason.Failed, result.StopReason);
+        Assert.Equal("The request timed out.", observer.Fault);
+    }
+
+    [Fact]
     public async Task RunAsync_GivesUpAfterMaximumRetries()
     {
         var client = new FlakyStreamingClient(

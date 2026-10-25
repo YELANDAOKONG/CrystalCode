@@ -208,7 +208,9 @@ internal static class TaskRunHost
                         static state => ((CodingSession)state!).TryInterrupt(),
                         session))
                     {
-                        await session.TurnTask;
+                        // CompleteTurnAsync observes a faulted turn and
+                        // publishes its error; do not throw it here first.
+                        await session.TurnTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
                     }
 
                     if (await session.CompleteTurnAsync(CancellationToken.None))
@@ -218,7 +220,10 @@ internal static class TaskRunHost
                     }
                     else if (log.StopReason is null)
                     {
-                        await error.WriteLineAsync("The task did not finish a turn.");
+                        // The turn faulted before it produced a result. The
+                        // engine has already published the error.
+                        code = RunExit.Failed;
+                        status = TurnStopReason.Failed.Value;
                     }
                     else
                     {

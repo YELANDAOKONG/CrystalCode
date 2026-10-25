@@ -288,8 +288,11 @@ public sealed class MultimodalStreamingTurn
                 usage,
                 transcript);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception)
         {
+            // The filters above own every cancellation this turn requested.
+            // Any other cancellation, such as an HTTP client timeout, is a
+            // failed request rather than an interrupt.
             _observer?.OnModelRoundClosed();
             _observer?.OnFault(exception.Message);
             return Create(

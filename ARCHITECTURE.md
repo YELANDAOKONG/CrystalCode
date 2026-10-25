@@ -2110,12 +2110,31 @@ omitted-line markers use angle brackets. `--format json` writes one JSON object 
 line, with `type`, a UTC `timestamp`, and `sessionID`, and keeps the full
 tool output. Event types are
 `step_start`, `text`, `reasoning`, `tool_use`, `error`, `note`, `retry`,
-`step_finish`, `stopped`, and `session`. Thinking text is omitted unless
+`step_finish`, `stopped`, and `session`. `text` and `reasoning` carry one
+segment each, not stream deltas. A `retry` discards the failed attempt's
+unsent segment. `tool_use` carries `callId`, `status`, and `output`, and
+`name` and `arguments` only when a call with the same id was issued; a
+result is never paired with another call. `output` shows trusted image
+markers as plain `[Image #N]`, and `images` lists those numbers.
+`step_finish` carries `reason`, `modelCalls`, `toolCalls`, `contextWindow`,
+and three usage objects with `inputTokens`, `outputTokens`, and optional
+`reasoningTokens`: `usage` for the turn total, including children,
+`lastRequestUsage` for the final request, and `cumulativeUsage` for the
+session. An object is omitted when a provider did not report it. A turn
+that faults before it reports a result still gets a `step_finish` with
+reason `failed` and no counts. Child events reuse the parent shapes with a
+`child_` prefix (`child_text`, `child_reasoning`, `child_tool_use`,
+`child_error`, `child_note`, `child_retry`) and add `childSessionID` and
+`invocationID`. `child_status` reports `agent`, `label`, `status`,
+`modelCalls`, `toolCalls`, `images`, and, once known, `usage`.
+Thinking text is omitted unless
 `--show-thinking` is set. The process then prints the saved session id.
 Exit 0 means the turn completed and no operator prompt was denied or
 dismissed. Exit 1 is an
 invalid command, configuration, credential, workspace, or prompt set. Exit
-2 is a failed model request. Exit 3 is a model-call, tool-call, or duration
+2 is a failed model request, including a turn that faults before it
+reports a result. A cancellation the turn did not request, such as a
+request timeout, is a failed request, not an interrupt. Exit 3 is a model-call, tool-call, or duration
 budget, or context overflow. Exit 4 is a finish that was not a failure,
 budget stop, or interrupt, after an operator denial or a dismissed question.
 Exit 5 is an interrupt. A failure, budget stop, or interrupt outranks a

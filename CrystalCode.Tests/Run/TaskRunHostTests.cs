@@ -548,6 +548,59 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task JsonFormat_ReportsAFailedRequestWithExitTwo()
+    {
+        using var fixture = new RunFixture();
+        File.WriteAllText(
+            Path.Combine(fixture.Home, "config.json"),
+            """
+            {
+              "provider": "ollama",
+              "model": "qwen3:8b",
+              "retry": { "enabled": false }
+            }
+            """);
+        var client = new ScriptedRunClient(AllowReview)
+        {
+            Failure = new TaskCanceledException("The request timed out.")
+        };
+        var settings = Copy(fixture.Settings("Say hello"), format: "json");
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Failed, result.Code);
+        Assert.Equal(string.Empty, result.Error);
+        var events = ReadEvents(result.Output);
+        Assert.Contains(events, static item => item.GetProperty("type").GetString() == "error"
+            && item.GetProperty("message").GetString() == "The request timed out.");
+        var finish = Assert.Single(events, static item => item.GetProperty("type").GetString() == "step_finish");
+        Assert.Equal("failed", finish.GetProperty("reason").GetString());
+        var stopped = Assert.Single(events, static item => item.GetProperty("type").GetString() == "stopped");
+        Assert.Equal("failed", stopped.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task JsonFormat_ReportsTurnUsageTotals()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(
+            AllowReview,
+            [.. ToolRound("c1", "read", """{"path":"missing.txt"}"""), new ChatUsageReceived(new TokenUsage(10, 2))],
+            [.. TextRound("Done."), new ChatUsageReceived(new TokenUsage(25, 3))]);
+        var settings = Copy(fixture.Settings("Read it"), format: "json");
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.Equal(RunExit.Completed, result.Code);
+        var finish = Assert.Single(ReadEvents(result.Output), static item => item.GetProperty("type").GetString() == "step_finish");
+        Assert.Equal(2, finish.GetProperty("modelCalls").GetInt32());
+        Assert.Equal(35, finish.GetProperty("usage").GetProperty("inputTokens").GetInt64());
+        Assert.Equal(5, finish.GetProperty("usage").GetProperty("outputTokens").GetInt64());
+        Assert.Equal(25, finish.GetProperty("lastRequestUsage").GetProperty("inputTokens").GetInt64());
+        Assert.Equal(35, finish.GetProperty("cumulativeUsage").GetProperty("inputTokens").GetInt64());
+    }
+
+    [Fact]
     public async Task JsonFormat_RejectsAnUnknownName()
     {
         using var fixture = new RunFixture();
@@ -1377,12 +1430,19 @@ public sealed class TaskRunHostTests
 
         public string SystemText { get; private set; } = string.Empty;
 
+        public Exception? Failure { get; init; }
+
         public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
             ChatRequest request,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             RequestCount++;
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
             ToolNames = [.. request.Tools.Select(tool => tool.Name)];
             SystemText = request.Items.Count > 0 && request.Items[0] is ChatMessage system
                 ? system.Text

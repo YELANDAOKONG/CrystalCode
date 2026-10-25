@@ -100,10 +100,13 @@ behavior stands until a specific change defines otherwise.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.
-  The new structure, its field names, and any versioning or compatibility with
-  the current output are not defined. Do not reserve a field, schema, or flag
-  for it. The work must not put secrets on the command line, persist flags
-  to `config.json`, or make the run ask the operator.
+  Turn usage totals, call-id pairing, image-marker text, child event shapes,
+  and the faulted-turn exit are defined in ARCHITECTURE.md. Still not
+  defined: per-round step boundaries, approval and review events, a
+  machine-readable final status and exit code, and any versioning or
+  compatibility policy. Do not reserve a field, schema, or flag for them.
+  The work must not put secrets on the command line, persist flags to
+  `config.json`, or make the run ask the operator.
 
 ## Medium priority
 

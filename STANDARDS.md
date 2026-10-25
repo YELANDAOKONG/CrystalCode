@@ -215,7 +215,9 @@ CrystalCode.Engine.Tests, including a headless session driven by a scripted
 model through `ISessionObserver`. Terminal projection, renderer, and prompt
 surfaces are tested in CrystalCode.Tests. `crystal run` is tested there
 with a scripted model for a completed reply, a review allow that executes
-a tool, and an operator prompt that is denied with a non-zero exit. Frame,
+a tool, an operator prompt that is denied with a non-zero exit, and a
+failed request. Its JSON events, including child events and usage totals,
+are tested against the observer directly. Frame,
 composer, and paint behavior is tested in CrystalCode.Display.Tests.
 Adapters are tested in CrystalCode.Providers.Tests.
 `EngineAssemblyTests` and `DisplayAssemblyTests`

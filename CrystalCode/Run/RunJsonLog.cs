@@ -2,8 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
-using Crystal.Chat;
-using Crystal.Tools;
+using Crystal;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
@@ -12,25 +11,30 @@ namespace CrystalCode.Run;
 
 /// <summary>
 /// JSON Lines transcript for one unattended run. Each stdout line is one
-/// object with <c>type</c>, <c>timestamp</c>, and <c>sessionID</c>. Thinking
-/// text is emitted only when requested. The observer is called from the turn
-/// thread.
+/// object with <c>type</c>, <c>timestamp</c>, and <c>sessionID</c>. Child
+/// events use the parent shapes under a <c>child_</c> type prefix and add
+/// <c>childSessionID</c> and <c>invocationID</c>. Thinking text is emitted
+/// only when requested. The observer is called from the turn thread and from
+/// concurrent child invocations.
 /// </summary>
 internal sealed class RunJsonLog : IRunLog
 {
+    private const string ChildPrefix = "child_";
+
     private readonly TextWriter _output;
     private readonly bool _showThinking;
     private readonly object _gate = new();
-    private readonly StringBuilder _reply = new();
-    private readonly StringBuilder _thinking = new();
-    private readonly List<ToolCall> _calls = [];
+    private readonly RunJsonStream _parent;
+    private readonly Dictionary<string, RunJsonStream> _children = new(StringComparer.Ordinal);
     private string _sessionId = string.Empty;
+    private bool _stepOpen;
 
     public RunJsonLog(TextWriter output, bool showThinking)
     {
         ArgumentNullException.ThrowIfNull(output);
         _output = output;
         _showThinking = showThinking;
+        _parent = new RunJsonStream(Emit, showThinking);
     }
 
     public TurnStopReason? StopReason { get; private set; }
@@ -49,7 +53,19 @@ internal sealed class RunJsonLog : IRunLog
         ArgumentNullException.ThrowIfNull(hint);
         lock (_gate)
         {
-            FlushSegments();
+            foreach (var child in _children.Values)
+            {
+                child.Flush();
+            }
+
+            _parent.Flush();
+            if (_stepOpen)
+            {
+                // The turn faulted before it reported a result, so there are no counts.
+                _stepOpen = false;
+                Emit("step_finish", writer => writer.WriteString("reason", TurnStopReason.Failed.Value));
+            }
+
             if (status is not null)
             {
                 Emit("stopped", writer => writer.WriteString("status", status));
@@ -67,241 +83,152 @@ internal sealed class RunJsonLog : IRunLog
             switch (sessionEvent)
             {
                 case ChildSessionChanged child:
-                    Emit("child_status", writer =>
-                    {
-                        writer.WriteString("childSessionID", child.Child.Id);
-                        writer.WriteString("invocationID", child.InvocationId);
-                        writer.WriteString("agent", child.Child.Agent);
-                        writer.WriteString("label", child.Child.Label);
-                        writer.WriteString("status", child.Child.Status);
-                        writer.WritePropertyName("images");
-                        JsonSerializer.Serialize(writer, child.Child.Images.Select(image => new
-                        {
-                            number = image.Number, mimeType = image.MimeType, contentHash = image.ContentHash,
-                            source = "child_tool"
-                        }));
-                        writer.WritePropertyName("usage");
-                        JsonSerializer.Serialize(writer, child.Child.CumulativeUsage);
-                    });
+                    WriteChildStatus(child);
                     break;
                 case ChildEventReceived child:
-                    EmitChild(child);
-                    break;
-                case StreamReceived received:
-                    Apply(received.StreamEvent);
+                    ChildStream(child.ChildSessionId, child.InvocationId).Apply(child.Event);
                     break;
                 case TurnStarted:
+                    _stepOpen = true;
                     Emit("step_start");
                     break;
-                case ModelRoundClosed:
-                    FlushSegments();
-                    break;
-                case ToolCallsIssued issued:
-                    FlushSegments();
-                    _calls.AddRange(issued.Calls);
-                    break;
-                case ToolResultsReceived received:
-                    FlushSegments();
-                    foreach (var result in received.Results)
-                    {
-                        EmitTool(Take(result.CallId), result);
-                    }
-
-                    break;
-                case ErrorWritten error:
-                    FlushSegments();
-                    Emit("error", writer => writer.WriteString("message", error.Text));
-                    break;
-                case NoteWritten note:
-                    FlushSegments();
-                    Emit("note", writer => writer.WriteString("message", note.Text));
-                    break;
-                case RetryScheduled retry:
-                    Emit(
-                        "retry",
-                        writer =>
-                        {
-                            writer.WriteNumber("attempt", retry.Attempt.Attempt);
-                            writer.WriteString("message", retry.Attempt.Message);
-                            writer.WriteNumber("delaySeconds", retry.Attempt.Delay.TotalSeconds);
-                        });
-                    break;
                 case TurnFinished finished:
-                    FlushSegments();
+                    _parent.Flush();
+                    _stepOpen = false;
                     StopReason = finished.Result.StopReason;
-                    Emit(
-                        "step_finish",
-                        writer =>
-                        {
-                            writer.WriteString("reason", finished.Result.StopReason.Value);
-                            writer.WriteNumber("modelCalls", finished.Result.ModelCallCount);
-                            writer.WriteNumber("toolCalls", finished.Result.ToolCallCount);
-                            if (finished.Usage is not null)
-                            {
-                                writer.WriteNumber("inputTokens", finished.Usage.InputTokenCount);
-                                writer.WriteNumber("outputTokens", finished.Usage.OutputTokenCount);
-                            }
-
-                            writer.WriteNumber("contextWindow", finished.ContextWindow);
-                        });
+                    WriteStepFinish(finished);
+                    break;
+                default:
+                    _parent.Apply(sessionEvent);
                     break;
             }
         }
     }
 
-    private void EmitChild(ChildEventReceived child)
+    private RunJsonStream ChildStream(string childSessionId, Guid invocationId)
     {
-        string? type = null;
-        string? text = null;
-        switch (child.Event)
+        if (!_children.TryGetValue(childSessionId, out var stream))
         {
-            case StreamReceived { StreamEvent: ChatTextDelta delta }:
-                type = "child_text";
-                text = delta.Text;
-                break;
-            case StreamReceived { StreamEvent: ChatReasoningTextDelta delta } when _showThinking:
-                type = "child_reasoning";
-                text = delta.Text;
-                break;
-            case ErrorWritten error:
-                type = "child_error";
-                text = error.Text;
-                break;
-            case RetryScheduled retry:
-                type = "child_retry";
-                text = $"Attempt {retry.Attempt.Attempt}: {retry.Attempt.Message}";
-                break;
-            case ToolCallsIssued calls:
-                type = "child_tools";
-                text = string.Join(", ", calls.Calls.Select(call => call.Name));
-                break;
-            case ToolResultsReceived results:
-                type = "child_results";
-                text = string.Join("\n", results.Results.Select(result => result.Text));
-                break;
-            default:
-                break;
+            stream = new RunJsonStream(
+                (type, write) => Emit(
+                    ChildPrefix + type,
+                    writer =>
+                    {
+                        WriteChildIdentity(writer, childSessionId, invocationId);
+                        write(writer);
+                    }),
+                _showThinking);
+            _children.Add(childSessionId, stream);
         }
-        if (type is null)
-        {
-            return;
-        }
-        Emit(type, writer =>
-        {
-            writer.WriteString("childSessionID", child.ChildSessionId);
-            writer.WriteString("invocationID", child.InvocationId);
-            writer.WriteString("text", ImageMarkerText.Display(text ?? string.Empty));
-        });
+
+        return stream;
     }
 
-    private void Apply(ChatStreamEvent streamEvent)
+    private void WriteChildStatus(ChildSessionChanged changed)
     {
-        switch (streamEvent)
+        var child = changed.Child;
+        // A settled child flushes its last segment before its final status.
+        // A later continuation of the same child is a new invocation.
+        if (child.Status is not ("queued" or "running")
+            && _children.Remove(child.Id, out var stream))
         {
-            case ChatTextDelta text when text.Text.Length > 0:
-                _reply.Append(text.Text);
-                break;
-            case ChatReasoningTextDelta reasoning when _showThinking && reasoning.Text.Length > 0:
-                _thinking.Append(reasoning.Text);
-                break;
-        }
-    }
-
-    private void FlushSegments()
-    {
-        if (_thinking.Length > 0)
-        {
-            var thinking = _thinking.ToString().TrimEnd();
-            _thinking.Clear();
-            if (thinking.Length > 0)
-            {
-                Emit("reasoning", writer => writer.WriteString("text", thinking));
-            }
+            stream.Flush();
         }
 
-        if (_reply.Length == 0)
-        {
-            return;
-        }
-
-        var text = _reply.ToString().TrimEnd();
-        _reply.Clear();
-        if (text.Length > 0)
-        {
-            Emit("text", writer => writer.WriteString("text", text));
-        }
-    }
-
-    private void EmitTool(ToolCall? call, ToolResult result)
-    {
         Emit(
-            "tool_use",
+            ChildPrefix + "status",
             writer =>
             {
-                if (call is not null)
+                WriteChildIdentity(writer, child.Id, changed.InvocationId);
+                writer.WriteString("agent", child.Agent);
+                writer.WriteString("label", child.Label);
+                writer.WriteString("status", child.Status);
+                writer.WriteNumber("modelCalls", child.ModelCalls);
+                writer.WriteNumber("toolCalls", child.ToolCalls);
+                writer.WritePropertyName("images");
+                writer.WriteStartArray();
+                foreach (var image in child.Images)
                 {
-                    writer.WriteString("callId", call.CallId);
-                    writer.WriteString("name", call.Name);
-                    WriteArguments(writer, call.Arguments);
-                }
-                else if (!string.IsNullOrEmpty(result.CallId))
-                {
-                    writer.WriteString("callId", result.CallId);
+                    writer.WriteStartObject();
+                    writer.WriteNumber("number", image.Number);
+                    writer.WriteString("mimeType", image.MimeType);
+                    writer.WriteString("contentHash", image.ContentHash);
+                    writer.WriteString("source", "child_tool");
+                    writer.WriteEndObject();
                 }
 
-                writer.WriteString(
-                    "status",
-                    result.Status == ToolResultStatus.Success ? "success" : "failure");
-                writer.WriteString(
-                    "output",
-                    result.Text.Replace("\r\n", "\n", StringComparison.Ordinal));
+                writer.WriteEndArray();
+                if (child.CumulativeUsage is { } usage)
+                {
+                    WriteUsage(
+                        writer,
+                        "usage",
+                        usage.InputTokenCount,
+                        usage.OutputTokenCount,
+                        usage.ReasoningTokenCount);
+                }
             });
     }
 
-    private static void WriteArguments(Utf8JsonWriter writer, string? arguments)
+    private void WriteStepFinish(TurnFinished finished)
     {
-        if (string.IsNullOrWhiteSpace(arguments))
+        Emit(
+            "step_finish",
+            writer =>
+            {
+                writer.WriteString("reason", finished.Result.StopReason.Value);
+                writer.WriteNumber("modelCalls", finished.Result.ModelCallCount);
+                writer.WriteNumber("toolCalls", finished.Result.ToolCallCount);
+                // Usage is omitted when a provider did not report every round.
+                WriteUsage(writer, "usage", finished.Result.AccumulatedUsage);
+                WriteUsage(writer, "lastRequestUsage", finished.Usage);
+                WriteUsage(writer, "cumulativeUsage", finished.CumulativeUsage);
+                writer.WriteNumber("contextWindow", finished.ContextWindow);
+            });
+    }
+
+    private static void WriteChildIdentity(Utf8JsonWriter writer, string childSessionId, Guid invocationId)
+    {
+        writer.WriteString("childSessionID", childSessionId);
+        writer.WriteString("invocationID", invocationId);
+    }
+
+    private static void WriteUsage(Utf8JsonWriter writer, string name, TokenUsage? usage)
+    {
+        if (usage is null)
         {
-            writer.WriteString("arguments", string.Empty);
             return;
         }
 
-        try
-        {
-            using var document = JsonDocument.Parse(arguments);
-            writer.WritePropertyName("arguments");
-            document.RootElement.WriteTo(writer);
-        }
-        catch (JsonException)
-        {
-            writer.WriteString("arguments", arguments);
-        }
+        WriteUsage(
+            writer,
+            name,
+            usage.InputTokenCount,
+            usage.OutputTokenCount,
+            usage.ReasoningTokenCount);
     }
 
-    private ToolCall? Take(string? callId)
+    private static void WriteUsage(
+        Utf8JsonWriter writer,
+        string name,
+        long inputTokens,
+        long outputTokens,
+        long? reasoningTokens)
     {
-        if (!string.IsNullOrEmpty(callId))
+        writer.WriteStartObject(name);
+        writer.WriteNumber("inputTokens", inputTokens);
+        writer.WriteNumber("outputTokens", outputTokens);
+        if (reasoningTokens is long reasoning)
         {
-            var index = _calls.FindIndex(call => call.CallId == callId);
-            if (index >= 0)
-            {
-                var found = _calls[index];
-                _calls.RemoveAt(index);
-                return found;
-            }
+            writer.WriteNumber("reasoningTokens", reasoning);
         }
 
-        if (_calls.Count == 0)
-        {
-            return null;
-        }
-
-        var first = _calls[0];
-        _calls.RemoveAt(0);
-        return first;
+        writer.WriteEndObject();
     }
 
-    private void Emit(string type, Action<Utf8JsonWriter>? write = null)
+    private void Emit(string type) => Emit(type, static _ => { });
+
+    private void Emit(string type, Action<Utf8JsonWriter> write)
     {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
@@ -316,7 +243,7 @@ internal sealed class RunJsonLog : IRunLog
                 writer.WriteString("sessionID", _sessionId);
             }
 
-            write?.Invoke(writer);
+            write(writer);
             writer.WriteEndObject();
         }
 
