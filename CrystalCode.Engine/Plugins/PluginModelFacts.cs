@@ -54,6 +54,7 @@ internal static class PluginModelFacts
         var providerName = new ProviderName(approval.Provider);
         var provider = catalog.GetModelProvider(providerName, approval.Model);
         var model = catalog.GetModel(providerName, approval.Model);
+        var selected = settings?.ForReviewer(approval);
         return new PluginReview(
             true,
             Describe(
@@ -61,7 +62,7 @@ internal static class PluginModelFacts
                 approval.Model,
                 model,
                 approval.ThinkingEffort.Value,
-                settings?.TierFor(providerName, approval.Model),
-                settings?.SpeedFor(providerName, approval.Model)));
+                selected?.ServiceTier ?? approval.ServiceTier,
+                selected?.Speed ?? approval.Speed));
     }
 }

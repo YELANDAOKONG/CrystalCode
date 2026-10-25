@@ -20,18 +20,22 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
 
     public int ReviewCount { get; private set; }
 
+    public List<ApprovalReviewStage> ReviewStages { get; } = [];
+
     public ApprovalPassReason? LastPassReason { get; private set; }
 
     public ValueTask<ApprovalChoice> AskAsync(
         ToolCall call,
         ToolClassification classification,
         ApprovalReviewVerdict? review = null,
+        ApprovalReviewVerdict? extendedReview = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Count++;
         LastClassification = classification;
         LastReview = review;
+        LastExtendedReview = extendedReview;
         return ValueTask.FromResult(_choice);
     }
 
@@ -39,7 +43,8 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
         ToolCall call,
         ToolClassification classification,
         ApprovalPassReason reason,
-        ApprovalReviewVerdict? review = null)
+        ApprovalReviewVerdict? review = null,
+        ApprovalReviewVerdict? extendedReview = null)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
@@ -48,15 +53,19 @@ internal sealed class RecordingApprovalPrompt : IApprovalPrompt
         LastPassReason = reason;
         LastClassification = classification;
         LastReview = review;
+        LastExtendedReview = extendedReview;
     }
 
-    public void NotifyReviewing(ToolCall call)
+    public void NotifyReviewing(ToolCall call, ApprovalReviewStage stage)
     {
         ArgumentNullException.ThrowIfNull(call);
         ReviewCount++;
+        ReviewStages.Add(stage);
     }
 
     public ToolClassification? LastClassification { get; private set; }
 
     public ApprovalReviewVerdict? LastReview { get; private set; }
+
+    public ApprovalReviewVerdict? LastExtendedReview { get; private set; }
 }

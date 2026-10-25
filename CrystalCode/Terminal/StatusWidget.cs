@@ -67,6 +67,16 @@ internal static class StatusWidget
             rows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
         }
 
+        if (!string.IsNullOrWhiteSpace(status.ExtendedApprovalModel))
+        {
+            rows.Add(("Extended approval", status.ExtendedApprovalModel));
+        }
+
+        if (status.ExtendedApprovalThinking is not null)
+        {
+            rows.Add(("Extended thinking", ThinkingValue(status.ExtendedApprovalThinking)));
+        }
+
         if (!string.IsNullOrWhiteSpace(status.CompactionModel))
         {
             rows.Add(("Compaction model", status.CompactionModel));
@@ -87,6 +97,16 @@ internal static class StatusWidget
             if (!string.IsNullOrWhiteSpace(status.ApprovalRetry))
             {
                 rows.Add(("Approval retry", status.ApprovalRetry));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status.ExtendedApprovalTrigger))
+            {
+                rows.Add(("Extended trigger", status.ExtendedApprovalTrigger));
+            }
+
+            if (status.ExtendedApprovalPrimaryReview is bool primary)
+            {
+                rows.Add(("Extended primary review", primary ? "On" : "Off"));
             }
         }
 

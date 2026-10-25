@@ -22,7 +22,10 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? compactionModelArguments = null,
         IReadOnlyList<SlashCompletion>? compactionThinkingArguments = null,
         IReadOnlyList<SlashCompletion>? tierArguments = null,
-        IReadOnlyList<SlashCompletion>? speedArguments = null)
+        IReadOnlyList<SlashCompletion>? speedArguments = null,
+        IReadOnlyList<SlashCompletion>? approvalTierArguments = null,
+        IReadOnlyList<SlashCompletion>? approvalSpeedArguments = null,
+        IReadOnlyList<SlashCompletion>? extendedApprovalArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -37,8 +40,12 @@ public static class SlashMenu
                 promptAttachmentArguments,
                 toolArguments,
                 exportArguments,
-                approvalModelArguments,
-                approvalThinkingArguments,
+                new ApprovalNested(
+                    approvalModelArguments,
+                    approvalThinkingArguments,
+                    approvalTierArguments,
+                    approvalSpeedArguments,
+                    extendedApprovalArguments),
                 contextArguments,
                 compactionModelArguments,
                 compactionThinkingArguments,
@@ -68,8 +75,7 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? promptAttachmentArguments,
         IReadOnlyList<SlashCompletion>? toolArguments,
         IReadOnlyList<SlashCompletion>? exportArguments,
-        IReadOnlyList<SlashCompletion>? approvalModelArguments,
-        IReadOnlyList<SlashCompletion>? approvalThinkingArguments,
+        ApprovalNested approvalArguments,
         IReadOnlyList<SlashCompletion>? contextArguments,
         IReadOnlyList<SlashCompletion>? compactionModelArguments,
         IReadOnlyList<SlashCompletion>? compactionThinkingArguments,
@@ -93,10 +99,7 @@ public static class SlashMenu
 
         if (spec.Verb == SessionVerb.Approval)
         {
-            return ApprovalArguments(
-                spec.Arguments,
-                approvalModelArguments,
-                approvalThinkingArguments);
+            return ApprovalArguments(spec.Arguments, approvalArguments);
         }
 
         if (spec.Verb == SessionVerb.Compact)
@@ -142,13 +145,13 @@ public static class SlashMenu
 
     /// <summary>
     /// Keeps the static approval arguments and nests the dynamic completion
-    /// lists under <c>model</c> and <c>thinking</c>. Unlike the single-purpose
-    /// verbs, <c>/approval</c> mixes mode words with two subcommands.
+    /// lists under <c>model</c>, <c>thinking</c>, <c>tier</c>, <c>speed</c>,
+    /// and <c>extended</c>. Unlike the single-purpose verbs, <c>/approval</c>
+    /// mixes mode words with subcommands.
     /// </summary>
     private static IReadOnlyList<SlashCompletion> ApprovalArguments(
         IReadOnlyList<string>? arguments,
-        IReadOnlyList<SlashCompletion>? modelArguments,
-        IReadOnlyList<SlashCompletion>? thinkingArguments)
+        ApprovalNested nestedArguments)
     {
         if (arguments is null || arguments.Count == 0)
         {
@@ -160,14 +163,20 @@ public static class SlashMenu
         {
             var nested = argument switch
             {
-                "model" => modelArguments,
-                "thinking" => thinkingArguments,
+                "model" => nestedArguments.Model,
+                "thinking" => nestedArguments.Thinking,
+                "tier" => nestedArguments.Tier,
+                "speed" => nestedArguments.Speed,
+                "extended" => nestedArguments.Extended,
                 _ => null
             };
             var help = argument switch
             {
                 "model" => "Show or set the approval model; on and off switch it",
                 "thinking" => "Cycle or set the reviewer thinking gear",
+                "tier" => "Cycle or set the approval model service tier",
+                "speed" => "Cycle or set the approval model speed",
+                "extended" => "Extended approval after a review allow",
                 _ => argument
             };
             options.Add(nested is { Count: > 0 }
@@ -177,6 +186,13 @@ public static class SlashMenu
 
         return options;
     }
+
+    private sealed record ApprovalNested(
+        IReadOnlyList<SlashCompletion>? Model,
+        IReadOnlyList<SlashCompletion>? Thinking,
+        IReadOnlyList<SlashCompletion>? Tier,
+        IReadOnlyList<SlashCompletion>? Speed,
+        IReadOnlyList<SlashCompletion>? Extended);
 
     private static readonly SlashCompletion[] SummarySwitch =
     [

@@ -16,7 +16,14 @@ public sealed class PromptTemplateExportTests
 
         var written = PromptTemplateExport.Write(directory);
 
-        Assert.Equal(13, written.Count);
+        Assert.Equal(15, written.Count);
+        Assert.Equal(
+            ExtendedApprovalPrompt.SystemText,
+            File.ReadAllText(Path.Combine(directory, "review.extended.md")));
+        Assert.Contains(
+            "{{primary_review}}",
+            File.ReadAllText(Path.Combine(directory, "review.extended.user.md")),
+            StringComparison.Ordinal);
         var work = File.ReadAllText(Path.Combine(directory, "work.md"));
         Assert.Contains("{{env}}", work, StringComparison.Ordinal);
         Assert.Equal(WorkPrompt.Text, work);

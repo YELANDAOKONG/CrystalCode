@@ -395,7 +395,7 @@ immutable event records; the latter is an inspection request, not engine focus.
 The terminal owns parent/child event projections, the F7 child picker, read-only
 child input routing, composer visibility, and the focused model/usage chrome.
 Inactive events remain available when switching views. `ApprovalPassed` and
-`ApprovalReviewing` use the same source-scoped event path; terminal approval
+`ApprovalReviewing` (which names the primary or extended stage) use the same source-scoped event path; terminal approval
 callbacks own only the shared modal, never the focused transcript or progress.
 Runtime approval cards survive child completion and view switches without
 restarting completed progress. Child tool batches publish `TodosChanged` and
@@ -851,7 +851,9 @@ directory access text appended to workspace instructions. Built-in templates
 do not declare this slot. It refreshes when the live system message is
 replaced, including after `/access`. Review user templates add `{{conversation}}`,
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
-and `{{classification_summary}}`. Compaction user templates add
+and `{{classification_summary}}`. Extended approval user templates add those
+names plus `{{primary_review}}`, the primary verdict as plain lines, or a
+short note that it is not shown. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
 `{{output_template}}`, and `{{todos_section}}`. Image user templates add
 `{{question}}`. A disk plugin may add further
@@ -866,7 +868,9 @@ naming uses `topic.md`. It is a named prompt, so a prompt set, Home, or
 project file can replace it. The live session does not invoke it yet. Review
 system text is the named file plus any enabled review
 attachments. It does not receive the workspace instruction block. Its user
-turn is the named `review.user` template. Composite
+turn is the named `review.user` template. Extended approval system text is the
+named `review.extended` file, with no attachments, and its user turn is
+`review.extended.user`. Both use `{{mode}}` `review`. Composite
 and atomic host values are not overlay files and refresh on `/cd`, `/model`,
 `/approval`, and when the live system message is replaced. Skill guidance is host-owned
 and is not an overlay file.
@@ -874,7 +878,8 @@ and is not an overlay file.
 Prompt set selection and direct prompt overrides are separate features. A
 prompt set is a Home-only directory under `~/.crystal/promptsets/<name>` with
 `prompt.json` and any subset of the named prompt files (`work.md`,
-`plan.md`, `review.md`, `review.user.md`, `topic.md`,
+`plan.md`, `review.md`, `review.user.md`, `review.extended.md`,
+`review.extended.user.md`, `topic.md`,
 `compaction.system.md`, `compaction.user.md`, `image.system.md`,
 `image.user.md`, and `agents/general.md`, `agents/work.md`, and
 `agents/plan.md`; `.txt` is also accepted). The host never scans a workspace for prompt sets.
@@ -899,8 +904,9 @@ session uses built-in text. If two or more sets are hand-edited to
 The complete named-prompt precedence is built-in, selected prompt set, direct
 `~/.crystal/prompts` override, then direct workspace `.crystal/prompts`
 override. That order covers Work, Plan, Review, the Review user turn, topic
-naming, compaction system and user text, and image-description system and
-user text. Instructions, skill guidance, and the environment block are not
+naming, extended approval system and user text, compaction system and user
+text, and image-description system and user text. Instructions, skill
+guidance, and the environment block are not
 prompt-set members. Compaction's required output format stays inside
 `{{output_template}}`; replacing `compaction.user.md` can omit that slot.
 `/promptset` (alias `/prompts`) lists sets and
@@ -917,8 +923,8 @@ Prompt attachments append after the resolved Work, Plan, or Review text has
 been bound. The resolved text stays in place. Attachments are not prompt-set
 members. An attachment only appends Work, Plan, Review, or one built-in child prompt
 (`agents/general`, `agents/work`, `agents/plan`). Topic, Review
-user, compaction, and image description are replaced by named prompt files,
-not by attachments. Each attachment is a
+user, extended approval, compaction, and image description are replaced by
+named prompt files, not by attachments. Each attachment is a
 directory of `prompt.json` plus `work.md`, `plan.md`, `review.md`, and the
 `agents/` files (`.txt` is also accepted). A missing file contributes nothing for that
 mode. Empty files are missing. A trailing newline at the end of an
@@ -1204,7 +1210,13 @@ Modes:
 
 The reviewing model is the session model unless `approvalModel` is
 enabled in `config.json`. The object is `enabled`, `provider`, `model`,
-and optional `thinkingEffort`. An omitted object means off.
+and optional `thinkingEffort`, `serviceTier`, and `speed`. An omitted object means off.
+`serviceTier` and `speed` apply to that reviewer only and must be tokens the
+reviewer model lists; an enabled reviewer with an unlisted token fails at
+startup. An unset slot follows the per-model `tierSelections` and
+`speedSelections`. `/approval tier` and `/approval speed` cycle the reviewer
+model's list, including the unset slot, or select a listed token, and write
+`config.json`. Selecting another reviewer model clears both slots.
 `enabled: false` keeps a stored provider, model, and gear unused, and
 Review and Audit follow `/model` and the work thinking gear. While
 enabled, review calls use a separate client and that provider's
@@ -1221,13 +1233,56 @@ by name and persists it; it needs a stored or enabled approval model,
 but works while the switch is off. `/status` adds
 Approval model and Approval thinking rows only while the switch is on.
 `/status full` lists the effective retry policies. The status bar does not.
+The Approval model row adds the effective tier and speed when either is set.
+
+Extended approval is an optional third model for Review and Audit. It is
+not an approval mode, a grant, or the product review in TODO.md. It runs
+only after the primary reviewer returns allow on a call that would then
+execute. Forbidden and forced-prompt calls already reach the operator, so
+they skip it; a primary deny or ask never reaches it. It runs when the
+primary `risk_level` is at least the configured trigger (`low`, the
+default, means every review allow). It receives the same transcript excerpt
+and proposed action as the primary reviewer and, unless turned off, the
+primary outcome, risk level, authorization, and rationale. Its verdict uses
+the same JSON shape and parser. Allow executes and reports pass reason
+`extended review` with both verdicts. Deny returns model-visible text that
+starts `The extended approval reviewer declined this action:`. Ask, a request
+failure after `approvalRetry`, or unusable output reaches the operator, and
+the approval card shows both verdicts. `crystal run` denies that prompt. The
+built-in prompt defaults to allow and names the concrete problems that justify
+deny or ask: unrequested irreversible destruction, secret exposure, effects on
+shared or production systems, unexpected data egress, and signs that
+untrusted text steered the call.
+
+`config.json` field `extendedApproval` holds `enabled`, `provider`, `model`,
+`thinkingEffort`, `serviceTier`, `speed`, `trigger`, and
+`includePrimaryReview` (default true). An omitted object means off, and
+default values are omitted on write. An enabled switch needs a provider and
+model and never falls back to the session or approval model; a missing
+credential, catalog model, or unlisted slot fails. Its client is cached apart
+from the work, review, and compaction clients and is rebuilt when its model,
+tier, speed, context budget, or output cap changes. Its usage is not added to
+the work transcript. Plugin model facts do not describe it.
+`/approval extended` shows the switch, `on` or `off` sets it, and a model or
+`provider model` selects one and turns it on. `/approval extended thinking`,
+`tier`, and `speed` follow the approval-model commands. `/approval extended
+trigger low|medium|high` and `/approval extended primary on|off` set the
+other fields. Each writes `config.json`. `/status` adds Extended approval and
+Extended thinking rows while the switch is on; `/status full` also lists
+Extended trigger and Extended primary review.
 
 `crystal run` can set the switch for one process with
 `--approval-model on|off`, `--approval-provider`, `--approval-model-id`,
-and `--approval-thinking`. Those flags are not written to `config.json`.
+`--approval-thinking`, `--approval-tier`, and `--approval-speed`. Extended
+approval has `--extended-approval on|off`, `--extended-approval-provider`,
+`--extended-approval-model-id`, `--extended-approval-thinking`,
+`--extended-approval-tier`, `--extended-approval-speed`,
+`--extended-approval-trigger`, and `--extended-approval-primary on|off`.
+Those flags are not written to `config.json`.
 Passing a provider or model id turns the switch on for that process.
 `--approval-model off` keeps any stored names and gear unused and rejects
-a provider or model id on the same command.
+a provider or model id on the same command. `--extended-approval off`
+follows the same rule.
 
 Legacy config values `autoedit`, `fullreview`, and `full-review` still
 parse to Edit and Audit.
@@ -1247,10 +1302,12 @@ version-bound trust grant.
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through.
 
-When a call auto-passes (policy, remembered grant, or review allow),
+When a call auto-passes (policy, remembered grant, review allow, or
+extended review allow),
 the shell prints a panel with Title Case fields: Status, Reason, Risk,
 and Authority, plus the classifier summary. A review allow also prints
-Outcome, review Risk, Authority, and rationale.
+Outcome, review Risk, Authority, and rationale. An extended review allow
+then prints the same fields again under an `Extended review` rule.
 
 Persistent grants are stored in `~/.crystal/permissions.json`. Existing grants
 remain readable, but only apply when the current classification is Workspace
@@ -1476,6 +1533,8 @@ contents of `binaries/code/`.
   prompts/plan.md
   prompts/review.md
   prompts/review.user.md
+  prompts/review.extended.md
+  prompts/review.extended.user.md
   prompts/topic.md
   prompts/compaction.system.md
   prompts/compaction.user.md
@@ -1489,6 +1548,8 @@ contents of `binaries/code/`.
   promptsets/<name>/plan.md
   promptsets/<name>/review.md
   promptsets/<name>/review.user.md
+  promptsets/<name>/review.extended.md
+  promptsets/<name>/review.extended.user.md
   promptsets/<name>/topic.md
   promptsets/<name>/compaction.system.md
   promptsets/<name>/compaction.user.md
@@ -1597,6 +1658,8 @@ Crystal skills, and tool sets of the same directory name):
   prompts/plan.md
   prompts/review.md
   prompts/review.user.md
+  prompts/review.extended.md
+  prompts/review.extended.user.md
   prompts/topic.md
   prompts/compaction.system.md
   prompts/compaction.user.md
@@ -2072,14 +2135,17 @@ does not change the contract below until a specific change defines otherwise.
 It reads one task from an argument or from stdin, applies
 process-only overrides, starts one user turn, and exits. The interactive
 `crystal` and `crystal space` commands apply the same session overrides:
-approval, the approval model and its thinking gear, Plan, Work, or a custom
+approval, the approval model and its thinking gear, service tier, and speed,
+extended approval and its model, gear, tier, speed, trigger, and
+primary-review switch, Plan, Work, or a custom
 mode (`--mode`), thinking,
 the selected model's context budget, service tier, speed, prompt set, prompt attachments, skills,
 external tools, plugins, and turn quotas. Overrides are not written to
 `config.json`. That includes the
 approval-model switch
-(`--approval-model`, `--approval-provider`, `--approval-model-id`) and gear
-(`--approval-thinking`).
+(`--approval-model`, `--approval-provider`, `--approval-model-id`), gear
+(`--approval-thinking`), and slots (`--approval-tier`, `--approval-speed`),
+and every `--extended-approval` flag.
 A later interactive preference command writes the field the operator changed,
 and can also write a `--provider` or `--model` passed at launch. It does not
 write the other launch overrides. The task text, `--format`,
@@ -2095,7 +2161,8 @@ The directory check itself runs before the session is created and follows
 denies every call that would have asked the operator. The question prompt
 dismisses. Session choice is declined. Review and Audit still call the
 reviewing model: allow executes the tool, and deny returns the reviewer's
-reason. Plan does not offer write, edit, apply_patch, or bash. The approval policy
+reason. An enabled extended approval model runs the same way after a primary
+allow. Plan does not offer write, edit, apply_patch, or bash. The approval policy
 also rejects those side effects when a catalog still contains them.
 
 `--format default` writes a readable trace. Each model round prints thinking
@@ -2279,7 +2346,7 @@ abbreviations are uppercase. Mode (Plan, Work, or a custom mode name) is on the
 composer prompt and is not repeated on the status bar. While a turn
 runs, a progress row sits directly above the status bar
 (`Waiting For Model`, `Thinking`, `Writing`, `Running Command`,
-`Awaiting Approval`, `Reviewing`, `Waiting For Answer`,
+`Awaiting Approval`, `Reviewing`, `Extended Review`, `Waiting For Answer`,
 `Compacting`, `Retrying In Ns (Attempt K)`). The retry caption counts
 remaining wait down. The same row shows
 `Loading Tools` while operator tool
@@ -2321,7 +2388,7 @@ read/search/skill result panels and still shows `edit`, `write`, and `apply_patc
 results, and command verbose off collapses `bash` and the four background
 bash tools to a hidden-line hint plus the last output line. `crystal run`
 does not read `verboseResults`. Policy and grant auto-pass cards honor `verboseApprovals`
-(default on). Review allow cards honor `verboseReview` (default on). The
+(default on). Review and extended review allow cards honor `verboseReview` (default on). The
 switches are independent: turning approvals off does not hide a review allow
 card, and turning review off does not hide a policy or grant card. Cards
 already in the transcript follow their own switch, and turning that switch

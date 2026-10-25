@@ -16,6 +16,8 @@ public static class ApprovalCard
 {
     public const string KeysHint = "Y Once  ·  S Session  ·  A Always  ·  N Deny";
 
+    private const string ExtendedLabel = "Extended review";
+
     public static string ActionLine(ToolCall call) =>
         ToolCallText.Summary(call.Name, call.Arguments);
 
@@ -30,7 +32,8 @@ public static class ApprovalCard
         ToolCall call,
         ToolClassification classification,
         ApprovalPassReason reason,
-        ApprovalReviewVerdict? review = null)
+        ApprovalReviewVerdict? review = null,
+        ApprovalReviewVerdict? extendedReview = null)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
@@ -48,16 +51,8 @@ public static class ApprovalCard
             lines.Add(classification.Summary);
         }
 
-        if (review is not null)
-        {
-            lines.Add(Field("Outcome", review.Outcome));
-            lines.Add(Field("Risk", review.RiskLevel.Value));
-            lines.Add(Field("Authority", review.UserAuthorization.Value));
-            foreach (var line in SplitRationale(review.Rationale))
-            {
-                lines.Add(line);
-            }
-        }
+        AddVerdictLines(lines, review, label: null);
+        AddVerdictLines(lines, extendedReview, ExtendedLabel);
 
         return lines;
     }
@@ -66,7 +61,8 @@ public static class ApprovalCard
         ToolCall call,
         ToolClassification classification,
         ApprovalPassReason reason,
-        ApprovalReviewVerdict? review = null)
+        ApprovalReviewVerdict? review = null,
+        ApprovalReviewVerdict? extendedReview = null)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
@@ -76,6 +72,7 @@ public static class ApprovalCard
             HostRows(classification, reason),
             classification.Summary,
             review,
+            extendedReview,
             ApprovalDiff.Lines(call),
             footer: null,
             expand: false);
@@ -84,7 +81,8 @@ public static class ApprovalCard
     public static IRenderable AskWidget(
         ToolCall call,
         ToolClassification classification,
-        ApprovalReviewVerdict? review = null)
+        ApprovalReviewVerdict? review = null,
+        ApprovalReviewVerdict? extendedReview = null)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
@@ -93,6 +91,7 @@ public static class ApprovalCard
             AskRows(classification),
             classification.Summary,
             review,
+            extendedReview,
             ApprovalDiff.Lines(call),
             classification.AllowsReusableGrant ? KeysHint : "Y Once  ·  N Deny",
             expand: true);
@@ -138,6 +137,7 @@ public static class ApprovalCard
         IReadOnlyList<(string Label, string Value, string Color)> fields,
         string? summary,
         ApprovalReviewVerdict? review,
+        ApprovalReviewVerdict? extendedReview,
         IReadOnlyList<(string Color, string Text)> preview,
         string? footer,
         bool expand)
@@ -148,21 +148,8 @@ public static class ApprovalCard
             blocks.Add(Prose(summary, Theme.Chrome));
         }
 
-        if (review is not null)
-        {
-            blocks.Add(new Rule { Style = Style.Parse(Theme.Rule) });
-            blocks.Add(
-                FieldGrid(
-                [
-                    ("Outcome", DisplayCase.Token(review.Outcome), Theme.Ok),
-                    ("Risk", DisplayCase.Token(review.RiskLevel.Value), Theme.Review),
-                    ("Authority", DisplayCase.Token(review.UserAuthorization.Value), Theme.Review)
-                ]));
-            foreach (var line in SplitRationale(review.Rationale))
-            {
-                blocks.Add(Prose(line, Theme.Review));
-            }
-        }
+        AddVerdictBlocks(blocks, review, label: null);
+        AddVerdictBlocks(blocks, extendedReview, ExtendedLabel);
 
         foreach (var line in preview)
         {
@@ -183,6 +170,56 @@ public static class ApprovalCard
             Expand = expand
         };
         return new Padder(panel, new Padding(2, 0, 0, 0));
+    }
+
+    private static void AddVerdictLines(
+        List<string> lines,
+        ApprovalReviewVerdict? review,
+        string? label)
+    {
+        if (review is null)
+        {
+            return;
+        }
+
+        if (label is not null)
+        {
+            lines.Add(label);
+        }
+
+        lines.Add(Field("Outcome", review.Outcome));
+        lines.Add(Field("Risk", review.RiskLevel.Value));
+        lines.Add(Field("Authority", review.UserAuthorization.Value));
+        foreach (var line in SplitRationale(review.Rationale))
+        {
+            lines.Add(line);
+        }
+    }
+
+    private static void AddVerdictBlocks(
+        List<IRenderable> blocks,
+        ApprovalReviewVerdict? review,
+        string? label)
+    {
+        if (review is null)
+        {
+            return;
+        }
+
+        blocks.Add(label is null
+            ? new Rule { Style = Style.Parse(Theme.Rule) }
+            : new Rule(MarkupText.Escape(label)) { Style = Style.Parse(Theme.Rule) });
+        blocks.Add(
+            FieldGrid(
+            [
+                ("Outcome", DisplayCase.Token(review.Outcome), Theme.Ok),
+                ("Risk", DisplayCase.Token(review.RiskLevel.Value), Theme.Review),
+                ("Authority", DisplayCase.Token(review.UserAuthorization.Value), Theme.Review)
+            ]));
+        foreach (var line in SplitRationale(review.Rationale))
+        {
+            blocks.Add(Prose(line, Theme.Review));
+        }
     }
 
     private static List<(string Label, string Value, string Color)> HostRows(

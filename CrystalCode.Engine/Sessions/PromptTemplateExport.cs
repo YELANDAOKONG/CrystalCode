@@ -19,6 +19,8 @@ public static class PromptTemplateExport
             ("review.md", ApprovalReviewPrompt.SystemText),
             ("topic.md", TopicNamingPrompt.Text),
             ("review.user.md", ApprovalReviewPrompt.UserTemplate),
+            ("review.extended.md", ExtendedApprovalPrompt.SystemText),
+            ("review.extended.user.md", ExtendedApprovalPrompt.UserTemplate),
             ("compaction.system.md", CompactionPrompt.SystemText),
             ("compaction.user.md", CompactionPrompt.UserTemplate),
             ("image.system.md", ImageDescriptionPrompt.SystemText),
@@ -82,6 +84,12 @@ public static class PromptTemplateExport
         - {{host_risk}}
         - {{host_authority}}
         - {{classification_summary}}
+
+        ## Extended review user
+
+        The Review user names above, plus:
+
+        - {{primary_review}}
 
         ## Compaction user
 

@@ -15,18 +15,22 @@ namespace CrystalCode.Engine.Approvals;
 /// </summary>
 public sealed class ModelApprovalReviewer : IApprovalReviewer
 {
+    private const string DefaultName = "The approval reviewer";
+
     private readonly IChatClient _client;
     private readonly string _systemText;
     private readonly ReasoningOptions? _reasoning;
     private readonly Func<ApprovalReviewRequest, string> _userText;
     private readonly SessionRetryOptions _retry;
+    private readonly string _name;
 
     public ModelApprovalReviewer(
         IChatClient client,
         string? systemText = null,
         ReasoningOptions? reasoning = null,
         Func<ApprovalReviewRequest, string>? userText = null,
-        SessionRetryOptions? retry = null)
+        SessionRetryOptions? retry = null,
+        string? name = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
@@ -37,6 +41,7 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
         _reasoning = reasoning;
         _userText = userText ?? ApprovalReviewPrompt.UserText;
         _retry = retry ?? SessionRetryOptions.Default;
+        _name = string.IsNullOrWhiteSpace(name) ? DefaultName : name.Trim();
     }
 
     public async ValueTask<ApprovalReviewVerdict> ReviewAsync(
@@ -74,14 +79,14 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
         catch (Exception exception)
         {
             return ApprovalReviewVerdict.AskUser(
-                "The approval reviewer failed: " + exception.Message);
+                _name + " failed: " + exception.Message);
         }
 
         var text = ReadAssistantText(response);
         if (!TryParse(text, out var verdict))
         {
             return ApprovalReviewVerdict.AskUser(
-                "The approval reviewer did not return a usable assessment.");
+                _name + " did not return a usable assessment.");
         }
 
         return verdict;

@@ -66,6 +66,8 @@ public static class PromptPlaceholder
 
     public const string ClassificationSummary = "classification_summary";
 
+    public const string PrimaryReview = "primary_review";
+
     public const string PriorSummarySection = "prior_summary_section";
 
     public const string SummaryTask = "summary_task";
@@ -108,6 +110,7 @@ public static class PromptPlaceholder
         HostRisk,
         HostAuthority,
         ClassificationSummary,
+        PrimaryReview,
         PriorSummarySection,
         SummaryTask,
         OutputTemplate,

@@ -42,6 +42,16 @@ public static class StatusText
             modelRows.Add(("Approval thinking", ThinkingValue(status.ApprovalThinking)));
         }
 
+        if (!string.IsNullOrWhiteSpace(status.ExtendedApprovalModel))
+        {
+            modelRows.Add(("Extended approval", status.ExtendedApprovalModel));
+        }
+
+        if (status.ExtendedApprovalThinking is not null)
+        {
+            modelRows.Add(("Extended thinking", ThinkingValue(status.ExtendedApprovalThinking)));
+        }
+
         if (!string.IsNullOrWhiteSpace(status.CompactionModel))
         {
             modelRows.Add(("Compaction model", status.CompactionModel));
@@ -62,6 +72,16 @@ public static class StatusText
             if (!string.IsNullOrWhiteSpace(status.ApprovalRetry))
             {
                 modelRows.Add(("Approval retry", status.ApprovalRetry));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status.ExtendedApprovalTrigger))
+            {
+                modelRows.Add(("Extended trigger", status.ExtendedApprovalTrigger));
+            }
+
+            if (status.ExtendedApprovalPrimaryReview is bool primary)
+            {
+                modelRows.Add(("Extended primary review", Toggle(primary)));
             }
         }
 

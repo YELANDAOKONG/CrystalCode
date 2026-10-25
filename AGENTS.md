@@ -39,9 +39,11 @@ semantics. Do not copy its Demo UI into this product.
 - Crystal remains prompt-neutral. Every model-bound string this product sends
   is authored here: system prompts, compaction summaries, rejection text, and
   tool exception mapping. Operators may replace Work, Plan, Review, the Review
-  user turn, topic naming, compaction, and image description via
+  user turn, extended approval system and user text, topic naming, compaction,
+  and image description via
   `~/.crystal/prompts`, a selected prompt set, and `<workspace>/.crystal/prompts`.
-  The file stems are `work`, `plan`, `review`, `review.user`, `topic`,
+  The file stems are `work`, `plan`, `review`, `review.user`,
+  `review.extended`, `review.extended.user`, `topic`,
   `compaction.system`, `compaction.user`, `image.system`, and `image.user`.
   Built-in child Agents add `agents/general`, `agents/work`, and `agents/plan`
   under those same prompt, prompt-set, and prompt-attachment directories.

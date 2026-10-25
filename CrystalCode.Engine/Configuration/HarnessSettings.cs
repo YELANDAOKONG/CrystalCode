@@ -106,7 +106,8 @@ public sealed record HarnessSettings
         BuiltInToolDisablement? persistentDisabledBuiltInTools = null,
         BuiltInToolDisablement? sessionDisabledBuiltInTools = null,
         bool mcp = DefaultMcp,
-        McpToolApprovalSettings? mcpToolApproval = null)
+        McpToolApprovalSettings? mcpToolApproval = null,
+        ExtendedApprovalSettings? extendedApproval = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -203,6 +204,7 @@ public sealed record HarnessSettings
         BashTimeoutSeconds = bashTimeoutSeconds;
         BackgroundBashTimeoutSeconds = backgroundBashTimeoutSeconds;
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
+        ExtendedApproval = extendedApproval ?? ExtendedApprovalSettings.Off;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
@@ -222,19 +224,8 @@ public sealed record HarnessSettings
             ? null
             : promptSetOverride.Trim();
         UsePromptAttachments = usePromptAttachments;
-        if (ApprovalModel.Enabled)
-        {
-            try
-            {
-                _ = catalog.GetModel(
-                    new ProviderName(ApprovalModel.Provider!),
-                    ApprovalModel.Model!);
-            }
-            catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
-            {
-                throw new InvalidOperationException(exception.Message, exception);
-            }
-        }
+        RequireReviewer(catalog, ApprovalModel, "Approval model");
+        RequireReviewer(catalog, ExtendedApproval.Reviewer, "Extended approval model");
 
         if (CompactionModel.Enabled)
         {
@@ -483,6 +474,8 @@ public sealed record HarnessSettings
 
     public ApprovalModelSettings ApprovalModel { get; }
 
+    public ExtendedApprovalSettings ExtendedApproval { get; }
+
     public CompactionModelSettings CompactionModel { get; }
 
     public MicroCompactionSettings MicroCompaction { get; }
@@ -718,6 +711,39 @@ public sealed record HarnessSettings
         return Copy(approvalModel: approvalModel, setApprovalModel: true);
     }
 
+    public HarnessSettings WithExtendedApproval(ExtendedApprovalSettings extendedApproval)
+    {
+        ArgumentNullException.ThrowIfNull(extendedApproval);
+        return Copy(extendedApproval: extendedApproval);
+    }
+
+    /// <summary>
+    /// Selects a reviewer's provider and model, then applies its own service
+    /// tier and speed. An unset reviewer slot keeps the per-model selection.
+    /// </summary>
+    public HarnessSettings ForReviewer(ApprovalModelSettings reviewer)
+    {
+        ArgumentNullException.ThrowIfNull(reviewer);
+        if (!reviewer.HasSelection)
+        {
+            throw new InvalidOperationException("The reviewer has no model selection.");
+        }
+
+        var provider = new ProviderName(reviewer.Provider!);
+        var selected = WithSelection(provider, reviewer.Model!);
+        if (reviewer.ServiceTier is not null)
+        {
+            selected = selected.WithTier(provider, reviewer.Model!, reviewer.ServiceTier);
+        }
+
+        if (reviewer.Speed is not null)
+        {
+            selected = selected.WithSpeed(provider, reviewer.Model!, reviewer.Speed);
+        }
+
+        return selected;
+    }
+
     public HarnessSettings WithImageModel(ImageModelSettings imageModel)
     {
         ArgumentNullException.ThrowIfNull(imageModel);
@@ -795,7 +821,8 @@ public sealed record HarnessSettings
         int? outputTokenCap = null,
         AgentSettings? agents = null,
         bool? mcp = null,
-        McpToolApprovalSettings? mcpToolApproval = null) =>
+        McpToolApprovalSettings? mcpToolApproval = null,
+        ExtendedApprovalSettings? extendedApproval = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -846,7 +873,8 @@ public sealed record HarnessSettings
             persistentDisabledBuiltInTools ?? PersistentDisabledBuiltInTools,
             sessionDisabledBuiltInTools ?? SessionDisabledBuiltInTools,
             mcp ?? Mcp,
-            mcpToolApproval ?? McpToolApproval);
+            mcpToolApproval ?? McpToolApproval,
+            extendedApproval ?? ExtendedApproval);
 
     public override string ToString() => nameof(HarnessSettings);
 
@@ -941,6 +969,42 @@ public sealed record HarnessSettings
             selections is null
                 ? new Dictionary<ContextSelectionKey, string>()
                 : selections.ToDictionary(pair => pair.Key, pair => pair.Value));
+
+    /// <summary>
+    /// An enabled reviewer must name a catalog model, and its own tier and
+    /// speed must be listed by that model. A disabled one is kept unchecked.
+    /// </summary>
+    private static void RequireReviewer(
+        ProviderCatalog catalog,
+        ApprovalModelSettings reviewer,
+        string label)
+    {
+        if (!reviewer.Enabled)
+        {
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = catalog.GetModel(new ProviderName(reviewer.Provider!), reviewer.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+
+        if (reviewer.ServiceTier is not null && !CatalogSlots.Contains(model.ServiceTiers, reviewer.ServiceTier))
+        {
+            throw new InvalidOperationException(
+                Unavailable(label + " service tier", model.ServiceTiers));
+        }
+
+        if (reviewer.Speed is not null && !CatalogSlots.Contains(model.Speeds, reviewer.Speed))
+        {
+            throw new InvalidOperationException(Unavailable(label + " speed", model.Speeds));
+        }
+    }
 
     private static void RequireImageModel(ProviderCatalog catalog, ImageModelSettings imageModel)
     {

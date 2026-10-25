@@ -117,7 +117,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             agents: document.Agents,
             persistentDisabledBuiltInTools: ReadDisabledBuiltInTools(document.DisabledBuiltInTools),
             mcp: document.Mcp ?? defaults.Mcp,
-            mcpToolApproval: mcpToolApproval);
+            mcpToolApproval: mcpToolApproval,
+            extendedApproval: ReadExtendedApproval(document.ExtendedApproval));
     }
 
     public void Save(HarnessSettings settings)
@@ -194,6 +195,7 @@ public sealed class DiskSettingsStore : ISettingsStore
                 WorkspaceLimits.BackgroundBashTimeoutSeconds),
             Providers = previous?.Providers,
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
+            ExtendedApproval = WriteExtendedApproval(settings.ExtendedApproval),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
@@ -283,33 +285,19 @@ public sealed class DiskSettingsStore : ISettingsStore
             return ApprovalModelSettings.Off;
         }
 
-        var provider = string.IsNullOrWhiteSpace(document.Provider)
-            ? null
-            : document.Provider.Trim();
-        var model = string.IsNullOrWhiteSpace(document.Model)
-            ? null
-            : document.Model.Trim();
-        if (document.Enabled == true && (provider is null || model is null))
-        {
-            throw new InvalidOperationException(
-                "approvalModel.enabled requires provider and model.");
-        }
-
-        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
-            ? ThinkingSelection.Default
-            : ThinkingSelection.Parse(document.ThinkingEffort);
-        return new ApprovalModelSettings(
-            document.Enabled ?? false,
-            provider,
-            model,
-            thinkingEffort);
+        return ReadReviewer(
+            "approvalModel",
+            document.Enabled,
+            document.Provider,
+            document.Model,
+            document.ThinkingEffort,
+            document.ServiceTier,
+            document.Speed);
     }
 
     private static ApprovalModelDocument? WriteApprovalModel(ApprovalModelSettings settings)
     {
-        if (!settings.Enabled
-            && !settings.HasSelection
-            && settings.ThinkingEffort == ThinkingSelection.Default)
+        if (IsEmptyReviewer(settings))
         {
             return null;
         }
@@ -319,11 +307,120 @@ public sealed class DiskSettingsStore : ISettingsStore
             Enabled = settings.Enabled ? true : null,
             Provider = settings.Provider,
             Model = settings.Model,
-            ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
-                ? null
-                : settings.ThinkingEffort.Value
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed
         };
     }
+
+    private static ExtendedApprovalSettings ReadExtendedApproval(ExtendedApprovalDocument? document)
+    {
+        if (document is null)
+        {
+            return ExtendedApprovalSettings.Off;
+        }
+
+        var reviewer = ReadReviewer(
+            "extendedApproval",
+            document.Enabled,
+            document.Provider,
+            document.Model,
+            document.ThinkingEffort,
+            document.ServiceTier,
+            document.Speed);
+        var trigger = ExtendedApprovalSettings.DefaultTrigger;
+        if (document.Trigger is not null && !ReviewRiskLevel.TryParse(document.Trigger, out trigger))
+        {
+            throw new InvalidOperationException(
+                "extendedApproval.trigger must be low, medium, or high.");
+        }
+
+        return new ExtendedApprovalSettings(
+            reviewer,
+            trigger,
+            document.IncludePrimaryReview ?? ExtendedApprovalSettings.DefaultIncludePrimaryReview);
+    }
+
+    private static ExtendedApprovalDocument? WriteExtendedApproval(ExtendedApprovalSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        var reviewer = settings.Reviewer;
+        return new ExtendedApprovalDocument
+        {
+            Enabled = reviewer.Enabled ? true : null,
+            Provider = reviewer.Provider,
+            Model = reviewer.Model,
+            ThinkingEffort = WriteGear(reviewer.ThinkingEffort),
+            ServiceTier = reviewer.ServiceTier,
+            Speed = reviewer.Speed,
+            Trigger = settings.Trigger == ExtendedApprovalSettings.DefaultTrigger
+                ? null
+                : settings.Trigger.Value,
+            IncludePrimaryReview = settings.IncludePrimaryReview
+                == ExtendedApprovalSettings.DefaultIncludePrimaryReview
+                    ? null
+                    : settings.IncludePrimaryReview
+        };
+    }
+
+    private static ApprovalModelSettings ReadReviewer(
+        string field,
+        bool? enabled,
+        string? providerText,
+        string? modelText,
+        string? thinkingText,
+        string? tierText,
+        string? speedText)
+    {
+        var provider = string.IsNullOrWhiteSpace(providerText) ? null : providerText.Trim();
+        var model = string.IsNullOrWhiteSpace(modelText) ? null : modelText.Trim();
+        if (enabled == true && (provider is null || model is null))
+        {
+            throw new InvalidOperationException(
+                field + ".enabled requires provider and model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(thinkingText)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(thinkingText);
+        return new ApprovalModelSettings(
+            enabled ?? false,
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(tierText, field + ".serviceTier"),
+            ReadSlot(speedText, field + ".speed"));
+    }
+
+    private static string? ReadSlot(string? text, string field)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        if (!CatalogToken.TryNormalize(text, out var token))
+        {
+            throw new InvalidOperationException(
+                field + " must start with a letter and then use only letters, digits, underscores, and hyphens.");
+        }
+
+        return token;
+    }
+
+    private static bool IsEmptyReviewer(ApprovalModelSettings settings) =>
+        !settings.Enabled
+        && !settings.HasSelection
+        && settings.ThinkingEffort == ThinkingSelection.Default
+        && settings.ServiceTier is null
+        && settings.Speed is null;
+
+    private static string? WriteGear(ThinkingSelection gear) =>
+        gear == ThinkingSelection.Default ? null : gear.Value;
 
     private static CompactionModelSettings ReadCompactionModel(CompactionModelDocument? document)
     {

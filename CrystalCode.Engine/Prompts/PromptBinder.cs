@@ -196,6 +196,9 @@ public static partial class PromptBinder
             case PromptPlaceholder.ClassificationSummary:
                 value = context.ClassificationSummary;
                 return true;
+            case PromptPlaceholder.PrimaryReview:
+                value = context.PrimaryReview;
+                return true;
             default:
                 value = string.Empty;
                 return false;

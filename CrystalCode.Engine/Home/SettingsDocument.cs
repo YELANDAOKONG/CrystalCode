@@ -82,6 +82,8 @@ internal sealed class SettingsDocument
 
     public ApprovalModelDocument? ApprovalModel { get; set; }
 
+    public ExtendedApprovalDocument? ExtendedApproval { get; set; }
+
     public CompactionModelDocument? CompactionModel { get; set; }
 
     public MicroCompactionDocument? MicroCompaction { get; set; }

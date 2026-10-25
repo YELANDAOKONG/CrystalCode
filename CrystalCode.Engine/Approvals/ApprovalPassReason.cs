@@ -11,6 +11,11 @@ public sealed record ApprovalPassReason
 
     public static ApprovalPassReason Review { get; } = new("review");
 
+    /// <summary>
+    /// The primary reviewer allowed the call and the extended reviewer agreed.
+    /// </summary>
+    public static ApprovalPassReason Extended { get; } = new("extended review");
+
     public ApprovalPassReason(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
@@ -18,6 +23,8 @@ public sealed record ApprovalPassReason
     }
 
     public string Value { get; }
+
+    public bool IsReview => this == Review || this == Extended;
 
     public override string ToString() => Value;
 }

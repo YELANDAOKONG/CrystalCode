@@ -39,6 +39,36 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--approval-thinking <EFFORT>")]
     public string? ApprovalThinking { get; init; }
 
+    [CommandOption("--approval-tier <TOKEN>")]
+    public string? ApprovalTier { get; init; }
+
+    [CommandOption("--approval-speed <TOKEN>")]
+    public string? ApprovalSpeed { get; init; }
+
+    [CommandOption("--extended-approval <on|off>")]
+    public string? ExtendedApproval { get; init; }
+
+    [CommandOption("--extended-approval-provider <PROVIDER>")]
+    public string? ExtendedApprovalProvider { get; init; }
+
+    [CommandOption("--extended-approval-model-id <MODEL>")]
+    public string? ExtendedApprovalModelId { get; init; }
+
+    [CommandOption("--extended-approval-thinking <EFFORT>")]
+    public string? ExtendedApprovalThinking { get; init; }
+
+    [CommandOption("--extended-approval-tier <TOKEN>")]
+    public string? ExtendedApprovalTier { get; init; }
+
+    [CommandOption("--extended-approval-speed <TOKEN>")]
+    public string? ExtendedApprovalSpeed { get; init; }
+
+    [CommandOption("--extended-approval-trigger <low|medium|high>")]
+    public string? ExtendedApprovalTrigger { get; init; }
+
+    [CommandOption("--extended-approval-primary <on|off>")]
+    public string? ExtendedApprovalPrimary { get; init; }
+
     [CommandOption("--compaction-model <on|off>")]
     public string? CompactionModel { get; init; }
 

@@ -22,6 +22,7 @@ public sealed class ApprovalPolicy
     private readonly GrantStore _grants;
     private readonly IApprovalPrompt _prompt;
     private readonly IApprovalReviewer? _reviewer;
+    private readonly ExtendedApprovalReviewer? _extended;
     private readonly IApprovalReviewContext? _reviewContext;
     private readonly IReadOnlySet<string> _automaticTools;
 
@@ -35,7 +36,8 @@ public sealed class ApprovalPolicy
         IReadOnlyList<IApprovalClassifier>? classifiers = null,
         SkillCatalog? skills = null,
         IReadOnlySet<string>? automaticTools = null,
-        Func<ToolCall, ToolClassification, ToolClassification>? advise = null)
+        Func<ToolCall, ToolClassification, ToolClassification>? advise = null,
+        ExtendedApprovalReviewer? extended = null)
     {
         ArgumentNullException.ThrowIfNull(mode);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -48,6 +50,7 @@ public sealed class ApprovalPolicy
         _grants = grants;
         _prompt = prompt;
         _reviewer = reviewer;
+        _extended = extended;
         _reviewContext = reviewContext;
         _automaticTools = automaticTools ?? new HashSet<string>(StringComparer.Ordinal);
     }
@@ -88,6 +91,7 @@ public sealed class ApprovalPolicy
         }
 
         ApprovalReviewVerdict? pendingReview = null;
+        ApprovalReviewVerdict? pendingExtended = null;
         if (ShouldReview())
         {
             var reviewed = await TryReviewAsync(call, classification, cancellationToken);
@@ -97,12 +101,14 @@ public sealed class ApprovalPolicy
             }
 
             pendingReview = reviewed.Verdict;
+            pendingExtended = reviewed.Extended;
         }
 
         var choice = await _prompt.AskAsync(
             call,
             classification,
             pendingReview,
+            pendingExtended,
             cancellationToken);
         if (!choice.IsAllow)
         {
@@ -115,39 +121,60 @@ public sealed class ApprovalPolicy
         return ToolInvocationDecision.Execute;
     }
 
-    private async ValueTask<(ToolInvocationDecision? Decision, ApprovalReviewVerdict Verdict)> TryReviewAsync(
+    private async ValueTask<(ToolInvocationDecision? Decision, ApprovalReviewVerdict Verdict, ApprovalReviewVerdict? Extended)> TryReviewAsync(
         ToolCall call,
         ToolClassification classification,
         CancellationToken cancellationToken)
     {
-        var request = new ApprovalReviewRequest(
-            call,
-            classification,
-            ReviewTranscript.Render(_reviewContext?.Conversation));
-        _prompt.NotifyReviewing(call);
+        var conversation = ReviewTranscript.Render(_reviewContext?.Conversation);
+        var request = new ApprovalReviewRequest(call, classification, conversation);
+        _prompt.NotifyReviewing(call, ApprovalReviewStage.Primary);
         var verdict = await _reviewer!.ReviewAsync(request, cancellationToken);
         if (verdict.IsDeny)
         {
-            return (
-                ToolInvocationDecision.Reject(
-                    new ToolOutput(
-                        "The approval reviewer declined this action: "
-                        + verdict.Rationale
-                        + RetryGuidance,
-                        ToolResultStatus.Failure)),
-                verdict);
+            return (Declined("The approval reviewer", verdict), verdict, null);
         }
 
-        if (verdict.IsAllow
-            && classification.Risk != Risk.Forbidden
-            && !classification.RequirePrompt)
+        // Forbidden and forced-prompt calls reach the operator whatever a
+        // reviewer says, so the extended check would not change the outcome.
+        if (!verdict.IsAllow
+            || classification.Risk == Risk.Forbidden
+            || classification.RequirePrompt)
+        {
+            return (null, verdict, null);
+        }
+
+        if (_extended is null || !_extended.Applies(verdict))
         {
             _prompt.NotifyPassed(call, classification, ApprovalPassReason.Review, verdict);
-            return (ToolInvocationDecision.Execute, verdict);
+            return (ToolInvocationDecision.Execute, verdict, null);
         }
 
-        return (null, verdict);
+        var extendedRequest = request with
+        {
+            PrimaryReview = _extended.IncludePrimaryReview ? verdict : null
+        };
+        _prompt.NotifyReviewing(call, ApprovalReviewStage.Extended);
+        var extended = await _extended.Reviewer.ReviewAsync(extendedRequest, cancellationToken);
+        if (extended.IsDeny)
+        {
+            return (Declined("The extended approval reviewer", extended), verdict, extended);
+        }
+
+        if (!extended.IsAllow)
+        {
+            return (null, verdict, extended);
+        }
+
+        _prompt.NotifyPassed(call, classification, ApprovalPassReason.Extended, verdict, extended);
+        return (ToolInvocationDecision.Execute, verdict, extended);
     }
+
+    private static ToolInvocationDecision Declined(string reviewer, ApprovalReviewVerdict verdict) =>
+        ToolInvocationDecision.Reject(
+            new ToolOutput(
+                reviewer + " declined this action: " + verdict.Rationale + RetryGuidance,
+                ToolResultStatus.Failure));
 
     private bool ShouldReview() =>
         UsesReviewer

@@ -931,6 +931,8 @@ public sealed class CodingSession : ITurnObserver
     private IStreamingChatClient _client;
     private IStreamingChatClient? _approvalClient;
     private string? _approvalClientKey;
+    private IStreamingChatClient? _extendedClient;
+    private string? _extendedClientKey;
     private IStreamingChatClient? _compactionClient;
     private string? _compactionClientKey;
     private IStreamingMultimodalChatClient? _multimodalClient;
@@ -2469,6 +2471,18 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeApproval(string argument)
     {
+        if (ExtendedApprovalArguments.IsExtendedCommand(argument))
+        {
+            if (!ExtendedApprovalArguments.TryParse(argument, out var extended, out var extendedError))
+            {
+                Error(extendedError);
+                return;
+            }
+
+            ChangeExtendedApproval(extended);
+            return;
+        }
+
         if (ApprovalModelArguments.IsModelCommand(argument))
         {
             if (!ApprovalModelArguments.TryParse(argument, out var request, out var parseError))
@@ -2477,13 +2491,19 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
-            ChangeApprovalModel(request);
+            ChangeReviewerModel(extended: false, request.Show, request.Enabled, request.Selection);
             return;
         }
 
         if (ApprovalThinkingArguments.IsThinkingCommand(argument))
         {
-            ChangeApprovalThinking(ApprovalThinkingArguments.Parse(argument));
+            ChangeReviewerThinking(extended: false, ApprovalThinkingArguments.Parse(argument).Effort);
+            return;
+        }
+
+        if (ApprovalSlotArguments.TryParse(argument, out var slot))
+        {
+            ChangeReviewerSlot(extended: false, slot);
             return;
         }
 
@@ -2511,54 +2531,131 @@ public sealed class CodingSession : ITurnObserver
         Note("Approval  " + ApprovalLabel.For(_approval));
     }
 
-    private void ChangeApprovalModel(ApprovalModelArguments.Request request)
+    private void ChangeExtendedApproval(ExtendedApprovalArguments.Request request)
     {
-        if (request.Show)
+        switch (request.Kind)
         {
-            Note(_settings.ApprovalModel.Describe());
+            case ExtendedApprovalArguments.Kind.Show:
+                ChangeReviewerModel(extended: true, show: true, enabled: null, selection: null);
+                return;
+            case ExtendedApprovalArguments.Kind.Switch:
+                ChangeReviewerModel(extended: true, show: false, request.Enabled, selection: null);
+                return;
+            case ExtendedApprovalArguments.Kind.Model:
+                ChangeReviewerModel(extended: true, show: false, enabled: null, request.Value);
+                return;
+            case ExtendedApprovalArguments.Kind.Thinking:
+                ChangeReviewerThinking(extended: true, request.Value);
+                return;
+            case ExtendedApprovalArguments.Kind.Slot:
+                ChangeReviewerSlot(extended: true, request.Slot);
+                return;
+            case ExtendedApprovalArguments.Kind.Trigger:
+                if (!ReviewRiskLevel.TryParse(request.Value, out var trigger))
+                {
+                    Error("Extended approval trigger is low, medium, or high.");
+                    return;
+                }
+
+                SaveSettings(current => current.WithExtendedApproval(current.ExtendedApproval.WithTrigger(trigger)));
+                RebuildExecutors();
+                Note("Extended approval trigger  " + DisplayCase.Token(trigger.Value));
+                return;
+            case ExtendedApprovalArguments.Kind.Primary:
+                var include = request.Enabled == true;
+                SaveSettings(current => current.WithExtendedApproval(
+                    current.ExtendedApproval.WithIncludePrimaryReview(include)));
+                RebuildExecutors();
+                Note("Extended approval primary review  " + (include ? "On" : "Off"));
+                return;
+            default:
+                Error("Unknown extended approval command.");
+                return;
+        }
+    }
+
+    private ApprovalModelSettings Reviewer(bool extended) => ReviewerOf(_settings, extended);
+
+    private static ApprovalModelSettings ReviewerOf(HarnessSettings settings, bool extended) =>
+        extended ? settings.ExtendedApproval.Reviewer : settings.ApprovalModel;
+
+    private static HarnessSettings WithReviewer(
+        HarnessSettings settings,
+        bool extended,
+        ApprovalModelSettings reviewer) =>
+        extended
+            ? settings.WithExtendedApproval(settings.ExtendedApproval.WithReviewer(reviewer))
+            : settings.WithApprovalModel(reviewer);
+
+    private static string ReviewerNoun(bool extended) =>
+        extended ? "extended approval model" : "approval model";
+
+    private static string ReviewerTitle(bool extended) =>
+        extended ? "Extended approval" : "Approval";
+
+    private string DescribeReviewer(bool extended) =>
+        extended ? _settings.ExtendedApproval.Describe() : _settings.ApprovalModel.Describe();
+
+    /// <summary>
+    /// Takes the saved gear, and the saved tier and speed when the saved
+    /// selection names the same model. A launch gear or slot stays process-only.
+    /// </summary>
+    private static ApprovalModelSettings Retune(ApprovalModelSettings next, ApprovalModelSettings saved)
+    {
+        var sameModel = string.Equals(next.Provider, saved.Provider, StringComparison.Ordinal)
+            && string.Equals(next.Model, saved.Model, StringComparison.Ordinal);
+        return sameModel
+            ? next.WithTuningFrom(saved)
+            : next.WithThinkingEffort(saved.ThinkingEffort);
+    }
+
+    private void ChangeReviewerModel(bool extended, bool show, bool? enabled, string? selection)
+    {
+        if (show)
+        {
+            Note(DescribeReviewer(extended));
             return;
         }
 
         if (_turnActive)
         {
-            Error("Finish the current turn before changing the approval model.");
+            Error("Finish the current turn before changing the " + ReviewerNoun(extended) + ".");
             return;
         }
 
+        var current = Reviewer(extended);
         ApprovalModelSettings next;
-        if (request.Enabled is bool enabled)
+        if (enabled is bool on)
         {
-            if (enabled && !_settings.ApprovalModel.HasSelection)
+            if (on && !current.HasSelection)
             {
-                Error("Set an approval model before turning it on.");
+                Error("Set an " + ReviewerNoun(extended) + " before turning it on.");
                 return;
             }
 
-            next = enabled
-                ? _settings.ApprovalModel.EnabledCopy()
-                : _settings.ApprovalModel.DisabledCopy();
+            next = on ? current.EnabledCopy() : current.DisabledCopy();
         }
-        else if (!TrySelectApprovalModel(request.Selection ?? string.Empty, out next, out var selectError))
+        else if (!TrySelectReviewerModel(extended, selection ?? string.Empty, out next, out var selectError))
         {
             Error(selectError);
             return;
         }
 
-        if (!TryPrepareApprovalClient(next, out var client, out var prepareError))
+        if (!TryPrepareReviewerClient(next, out var client, out var prepareError))
         {
             Error(prepareError);
             return;
         }
 
-        // A launch gear is process-only. This command changes the switch or
-        // the selection, so the saved gear stays whatever config.json held.
-        var persistedNext = next.WithThinkingEffort(
-            _persisted.ApprovalModel.ThinkingEffort);
+        // A launch gear or slot is process-only. This command changes the
+        // switch or the selection, so the saved tuning stays what config.json held.
+        var persistedNext = Retune(next, ReviewerOf(_persisted, extended));
         HarnessSettings updated;
+        HarnessSettings persisted;
         try
         {
-            updated = _settings.WithApprovalModel(next);
-            _ = _persisted.WithApprovalModel(persistedNext);
+            updated = WithReviewer(_settings, extended, next);
+            persisted = WithReviewer(_persisted, extended, persistedNext);
         }
         catch (InvalidOperationException exception)
         {
@@ -2572,44 +2669,55 @@ public sealed class CodingSession : ITurnObserver
         }
 
         _settings = updated;
-        _persisted = _persisted.WithApprovalModel(persistedNext);
+        _persisted = persisted;
         _settingsStore.Save(_persisted);
-        ReplaceApprovalClient(next, client);
+        ReplaceReviewerClient(extended, next, client);
         RebuildExecutors();
         RefreshSlashCommands();
-        Note(next.Describe());
+        Note(DescribeReviewer(extended));
     }
 
-    private void ChangeApprovalThinking(ApprovalThinkingArguments.Request request)
+    private bool TryReviewerModel(bool extended, out ModelSettings model)
     {
-        var approval = _settings.ApprovalModel;
-        if (!approval.HasSelection)
-        {
-            Error("Set an approval model before changing its thinking gear.");
-            return;
-        }
-
-        ModelSettings model;
+        model = null!;
+        var reviewer = Reviewer(extended);
         try
         {
             model = _settings.Catalog.GetModel(
-                new ProviderName(approval.Provider!),
-                approval.Model!);
+                new ProviderName(reviewer.Provider!),
+                reviewer.Model!);
+            return true;
         }
         catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
         {
             Error(exception.Message);
+            return false;
+        }
+    }
+
+    private void ChangeReviewerThinking(bool extended, string? effort)
+    {
+        var reviewer = Reviewer(extended);
+        var noun = ReviewerNoun(extended);
+        if (!reviewer.HasSelection)
+        {
+            Error("Set an " + noun + " before changing its thinking gear.");
+            return;
+        }
+
+        if (!TryReviewerModel(extended, out var model))
+        {
             return;
         }
 
         if (!model.Thinking)
         {
-            Error("The approval model does not support thinking.");
+            Error("The " + noun + " does not support thinking.");
             return;
         }
 
-        var selection = approval.ThinkingEffort;
-        if (request.Effort is null)
+        var selection = reviewer.ThinkingEffort;
+        if (effort is null)
         {
             selection = ThinkingSelection.Next(selection, model);
         }
@@ -2618,7 +2726,7 @@ public sealed class CodingSession : ITurnObserver
             ThinkingSelection parsed;
             try
             {
-                parsed = ThinkingSelection.Parse(request.Effort);
+                parsed = ThinkingSelection.Parse(effort);
             }
             catch (ArgumentException exception)
             {
@@ -2628,7 +2736,7 @@ public sealed class CodingSession : ITurnObserver
 
             if (parsed == ThinkingSelection.Off && !model.ThinkingCanDisable)
             {
-                Error("The approval model cannot disable thinking.");
+                Error("The " + noun + " cannot disable thinking.");
                 return;
             }
 
@@ -2637,27 +2745,96 @@ public sealed class CodingSession : ITurnObserver
                 && !model.AllowsEffort(parsed.Value))
             {
                 Error(
-                    $"Thinking effort '{parsed.Value}' is not available for the approval model.");
+                    $"Thinking effort '{parsed.Value}' is not available for the {noun}.");
                 return;
             }
 
             selection = parsed;
         }
 
-        SaveSettings(current => current.WithApprovalModel(
-            current.ApprovalModel.WithThinkingEffort(selection)));
+        SaveSettings(current => WithReviewer(
+            current,
+            extended,
+            ReviewerOf(current, extended).WithThinkingEffort(selection)));
         RebuildExecutors();
         RefreshSlashCommands();
-        Note("Approval thinking  " + ThinkingLabel.For(selection));
+        Note(ReviewerTitle(extended) + " thinking  " + ThinkingLabel.For(selection));
     }
 
-    private bool TrySelectApprovalModel(
+    private void ChangeReviewerSlot(bool extended, ApprovalSlotArguments.Request request)
+    {
+        var reviewer = Reviewer(extended);
+        var noun = ReviewerNoun(extended);
+        var label = request.ServiceTier ? "Service tier" : "Speed";
+        if (!reviewer.HasSelection)
+        {
+            Error("Set an " + noun + " before changing its " + label.ToLowerInvariant() + ".");
+            return;
+        }
+
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before switching the " + noun + " " + label.ToLowerInvariant() + ".");
+            return;
+        }
+
+        if (!TryReviewerModel(extended, out var model))
+        {
+            return;
+        }
+
+        var tokens = request.ServiceTier ? model.ServiceTiers : model.Speeds;
+        if (tokens.Count == 0)
+        {
+            Error(label + " is not available for the " + noun + ".");
+            return;
+        }
+
+        string? selected;
+        if (request.Token is null)
+        {
+            selected = CatalogSlots.Next(request.ServiceTier ? reviewer.ServiceTier : reviewer.Speed, tokens);
+        }
+        else if (!CatalogToken.TryNormalize(request.Token, out var token) || !CatalogSlots.Contains(tokens, token))
+        {
+            Error(label + " is not available for the " + noun + ". Available: " + string.Join(", ", tokens));
+            return;
+        }
+        else
+        {
+            selected = token;
+        }
+
+        ApprovalModelSettings Apply(ApprovalModelSettings value) => request.ServiceTier
+            ? value.WithServiceTier(selected)
+            : value.WithSpeed(selected);
+
+        _settings = WithReviewer(_settings, extended, Apply(reviewer));
+        // A launch selection of another model keeps this slot process-only.
+        var saved = ReviewerOf(_persisted, extended);
+        if (string.Equals(saved.Provider, reviewer.Provider, StringComparison.Ordinal)
+            && string.Equals(saved.Model, reviewer.Model, StringComparison.Ordinal))
+        {
+            _persisted = WithReviewer(_persisted, extended, Apply(saved));
+            _settingsStore.Save(_persisted);
+        }
+
+        RebuildExecutors();
+        RefreshSlashCommands();
+        Note(
+            ReviewerTitle(extended) + (request.ServiceTier ? " tier  " : " speed  ")
+            + (selected is null ? "not set" : DisplayCase.Token(selected)));
+    }
+
+    private bool TrySelectReviewerModel(
+        bool extended,
         string selectionText,
         out ApprovalModelSettings settings,
         out string error)
     {
         settings = ApprovalModelSettings.Off;
-        var currentProvider = _settings.ApprovalModel.Provider is string stored
+        var current = Reviewer(extended);
+        var currentProvider = current.Provider is string stored
             ? new ProviderName(stored)
             : _settings.Provider;
         if (!ModelSelection.TryResolve(
@@ -2670,21 +2847,25 @@ public sealed class CodingSession : ITurnObserver
         {
             error = (error ?? string.Empty).Replace(
                 "/model",
-                "/approval model",
+                extended ? "/approval extended" : "/approval model",
                 StringComparison.Ordinal);
             return false;
         }
 
+        var sameModel = string.Equals(current.Provider, selection.Provider.Value, StringComparison.Ordinal)
+            && string.Equals(current.Model, selection.Model, StringComparison.Ordinal);
         settings = new ApprovalModelSettings(
             true,
             selection.Provider.Value,
             selection.Model,
-            _settings.ApprovalModel.ThinkingEffort);
+            current.ThinkingEffort,
+            sameModel ? current.ServiceTier : null,
+            sameModel ? current.Speed : null);
         error = string.Empty;
         return true;
     }
 
-    private bool TryPrepareApprovalClient(
+    private bool TryPrepareReviewerClient(
         ApprovalModelSettings settings,
         out IStreamingChatClient? client,
         out string error)
@@ -2699,9 +2880,7 @@ public sealed class CodingSession : ITurnObserver
         HarnessSettings approvalSettings;
         try
         {
-            approvalSettings = _settings.WithSelection(
-                new ProviderName(settings.Provider!),
-                settings.Model!);
+            approvalSettings = _settings.ForReviewer(settings);
         }
         catch (Exception exception) when (exception is ArgumentException
             or InvalidOperationException
@@ -2730,8 +2909,20 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private void ReplaceApprovalClient(ApprovalModelSettings settings, IStreamingChatClient? client)
+    private void ReplaceReviewerClient(bool extended, ApprovalModelSettings settings, IStreamingChatClient? client)
     {
+        if (extended)
+        {
+            ReleaseExtendedClient();
+            if (client is not null)
+            {
+                _extendedClient = client;
+                _extendedClientKey = ApprovalClientKey(settings);
+            }
+
+            return;
+        }
+
         ReleaseApprovalClient();
         _clientView.ReleaseReview();
         if (client is null)
@@ -2915,6 +3106,18 @@ public sealed class CodingSession : ITurnObserver
         {
             ReleaseApprovalClient();
             _clientView.ReleaseReview();
+        }
+
+        if (_settings.ExtendedApproval.Enabled
+            && UsesModel(
+                _settings.ExtendedApproval.Reviewer.Provider,
+                _settings.ExtendedApproval.Reviewer.Model,
+                provider,
+                model))
+        {
+            // The next executor rebuild opens a client with the new slot.
+            ReleaseExtendedClient();
+            RebuildExecutors();
         }
 
         if (!_settings.CompactionModel.Enabled
@@ -4401,10 +4604,10 @@ public sealed class CodingSession : ITurnObserver
                 CumulativeUsage: _ledger.CumulativeUsage,
                 CustomStatusLineEnabled: _settings.StatusLine.Enabled,
                 ApprovalModel: _settings.ApprovalModel.Enabled
-                    ? _settings.ApprovalModel.Provider + " / " + _settings.ApprovalModel.Model
+                    ? ReviewerStatus(_settings.ApprovalModel)
                     : null,
                 ApprovalThinking: _settings.ApprovalModel.Enabled
-                    ? CurrentApprovalThinkingStatus()
+                    ? ReviewerThinkingStatus(_settings.ApprovalModel)
                     : null,
                 Retry: DescribeRetry(_settings.Retry),
                 ApprovalRetry: DescribeRetry(_settings.ApprovalRetry),
@@ -4417,6 +4620,18 @@ public sealed class CodingSession : ITurnObserver
                 McpEnabled: _settings.Mcp,
                 McpServers: _mcp.Servers.Count(server => server.Status == McpConnectionStatus.Connected),
                 McpTools: _mcp.Tools.Count,
+                ExtendedApprovalModel: _settings.ExtendedApproval.Enabled
+                    ? ReviewerStatus(_settings.ExtendedApproval.Reviewer)
+                    : null,
+                ExtendedApprovalThinking: _settings.ExtendedApproval.Enabled
+                    ? ReviewerThinkingStatus(_settings.ExtendedApproval.Reviewer)
+                    : null,
+                ExtendedApprovalTrigger: _settings.ExtendedApproval.Enabled
+                    ? DisplayCase.Token(_settings.ExtendedApproval.Trigger.Value)
+                    : null,
+                ExtendedApprovalPrimaryReview: _settings.ExtendedApproval.Enabled
+                    ? _settings.ExtendedApproval.IncludePrimaryReview
+                    : null,
                 Mode: _customMode),
             full));
     }
@@ -4733,10 +4948,7 @@ public sealed class CodingSession : ITurnObserver
             throw new InvalidOperationException("Review is using the session model.");
         }
 
-        var selected = _settings.WithSelection(
-            new ProviderName(approval.Provider),
-            approval.Model);
-        return CreateClient(selected);
+        return CreateClient(_settings.ForReviewer(approval));
     }
 
     private IStreamingChatClient CreateClient(HarnessSettings settings)
@@ -4792,6 +5004,7 @@ public sealed class CodingSession : ITurnObserver
     {
         _clientView.ReleaseSession();
         _clientView.ReleaseReview();
+        ReleaseExtendedClient();
         ReleaseApprovalClient();
         ReleaseCompactionClient();
         DisposeClient(_client);
@@ -5861,7 +6074,8 @@ public sealed class CodingSession : ITurnObserver
             [.. _plugins.Classifiers, .. _loadedPlugins.Classifiers, _external.Classifier, _mcp.Classifier],
             _skills,
             _external.AutomaticTools,
-            (call, classification) => _hooks.OnApproval(call, classification));
+            (call, classification) => _hooks.OnApproval(call, classification),
+            CreateExtendedReviewer());
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         var childPlanTools = WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), question, _plugins, _skills,
             _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.Plan,
@@ -6489,7 +6703,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (!TryPrepareApprovalClient(_settings.ApprovalModel, out var client, out var error)
+        if (!TryPrepareReviewerClient(_settings.ApprovalModel, out var client, out var error)
             || client is null)
         {
             throw new InvalidOperationException(
@@ -6522,8 +6736,7 @@ public sealed class CodingSession : ITurnObserver
 
     private string ApprovalClientKey(ApprovalModelSettings settings)
     {
-        var provider = new ProviderName(settings.Provider!);
-        var selected = _settings.WithSelection(provider, settings.Model!);
+        var selected = _settings.ForReviewer(settings);
         return settings.Provider
             + "\n" + settings.Model
             + "\n" + selected.ServiceTier
@@ -6534,6 +6747,13 @@ public sealed class CodingSession : ITurnObserver
 
     private void ReleaseFittedApprovalClient()
     {
+        if (_settings.ExtendedApproval.Enabled
+            && _extendedClient is not null
+            && _extendedClientKey != ApprovalClientKey(_settings.ExtendedApproval.Reviewer))
+        {
+            ReleaseExtendedClient();
+        }
+
         if (!_settings.ApprovalModel.Enabled)
         {
             return;
@@ -6547,6 +6767,72 @@ public sealed class CodingSession : ITurnObserver
 
         ReleaseApprovalClient();
         _clientView.ReleaseReview();
+    }
+
+    /// <summary>
+    /// The extended reviewer, or null when extended approval is off. Its client
+    /// is cached apart from the work and primary review clients and uses its
+    /// own provider credentials. An enabled switch that cannot build a client fails.
+    /// </summary>
+    private ExtendedApprovalReviewer? CreateExtendedReviewer()
+    {
+        var extended = _settings.ExtendedApproval;
+        if (!extended.Enabled)
+        {
+            ReleaseExtendedClient();
+            return null;
+        }
+
+        var reviewer = extended.Reviewer;
+        var key = ApprovalClientKey(reviewer);
+        if (_extendedClient is null || _extendedClientKey != key)
+        {
+            if (!TryPrepareReviewerClient(reviewer, out var client, out var error) || client is null)
+            {
+                throw new InvalidOperationException(
+                    string.IsNullOrWhiteSpace(error)
+                        ? "The extended approval model could not be created."
+                        : error);
+            }
+
+            ReleaseExtendedClient();
+            _extendedClient = client;
+            _extendedClientKey = key;
+        }
+
+        var model = _settings.Catalog.GetModel(new ProviderName(reviewer.Provider!), reviewer.Model!);
+        var context = CurrentPromptContext().WithMode("review");
+        var system = ApplyPluginPrompt(_prompts.ComposeReviewExtended(context, _placeholders), "review");
+        return new ExtendedApprovalReviewer(
+            new ModelApprovalReviewer(
+                _extendedClient,
+                system,
+                reviewer.ThinkingEffort.ToReasoningOptions(model),
+                request => ExtendedApprovalPrompt.UserText(
+                    request,
+                    CurrentPromptBinding(CurrentPromptContext().WithMode("review")),
+                    _prompts.ReviewExtendedUser),
+                _settings.ApprovalRetry.ToOptions(),
+                "The extended approval reviewer"),
+            extended.Trigger,
+            extended.IncludePrimaryReview);
+    }
+
+    private void ReleaseExtendedClient()
+    {
+        if (_extendedClient is null)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(_extendedClient, _client)
+            && !ReferenceEquals(_extendedClient, _approvalClient))
+        {
+            DisposeClient(_extendedClient);
+        }
+
+        _extendedClient = null;
+        _extendedClientKey = null;
     }
 
     private void ChangeCompactionModel(CompactionModelArguments.Request request)
@@ -7042,12 +7328,34 @@ public sealed class CodingSession : ITurnObserver
     private string CurrentThinkingStatus() =>
         ThinkingStatus.For(_settings.ActiveModel, _thinkingEffort);
 
-    private string CurrentApprovalThinkingStatus()
+    private string ReviewerThinkingStatus(ApprovalModelSettings reviewer)
     {
         var model = _settings.Catalog.GetModel(
-            new ProviderName(_settings.ApprovalModel.Provider!),
-            _settings.ApprovalModel.Model!);
-        return ThinkingStatus.For(model, _settings.ApprovalModel.ThinkingEffort);
+            new ProviderName(reviewer.Provider!),
+            reviewer.Model!);
+        return ThinkingStatus.For(model, reviewer.ThinkingEffort);
+    }
+
+    /// <summary>
+    /// Provider and model, plus the effective tier and speed when either is set.
+    /// </summary>
+    private string ReviewerStatus(ApprovalModelSettings reviewer)
+    {
+        var text = reviewer.Provider + " / " + reviewer.Model;
+        var selected = _settings.ForReviewer(reviewer);
+        var tier = CatalogSlotStatus.For("Tier", selected.ServiceTier);
+        var speed = CatalogSlotStatus.For("Speed", selected.Speed);
+        if (tier.Length > 0)
+        {
+            text += "  ·  " + tier;
+        }
+
+        if (speed.Length > 0)
+        {
+            text += "  ·  " + speed;
+        }
+
+        return text;
     }
 
     private string CurrentPromptStatus() =>
@@ -7076,13 +7384,16 @@ public sealed class CodingSession : ITurnObserver
             PromptAttachmentCompletions.For(_promptResolution),
             ToolCompletions.All,
             ExportCompletions.All,
-            ApprovalModelCompletions(),
-            ApprovalThinkingCompletions(),
+            ReviewerModelCompletions(extended: false),
+            ReviewerThinkingCompletions(_settings.ApprovalModel),
             ContextWindowSelection.Completions(_settings.ActiveModel),
             CompactionModelCompletions(),
             CompactionThinkingCompletions(),
             CatalogSlotCompletions.For(_settings.ActiveModel.ServiceTiers),
-            CatalogSlotCompletions.For(_settings.ActiveModel.Speeds));
+            CatalogSlotCompletions.For(_settings.ActiveModel.Speeds),
+            ReviewerSlotCompletions(_settings.ApprovalModel, serviceTier: true),
+            ReviewerSlotCompletions(_settings.ApprovalModel, serviceTier: false),
+            ExtendedApprovalCompletions());
         menu = menu.Select(command => command.Name switch
         {
             "agents" => command with { Arguments = AgentCompletions() },
@@ -7101,15 +7412,16 @@ public sealed class CodingSession : ITurnObserver
         return new SlashCompletion(entry.Command, help, [entry.Command]);
     }
 
-    private IReadOnlyList<SlashCompletion> ApprovalModelCompletions()
+    private IReadOnlyList<SlashCompletion> ReviewerModelCompletions(bool extended)
     {
+        var noun = extended ? "extended approval" : "the approval model";
         var options = new List<SlashCompletion>
         {
-            new("on", "Turn the approval model on", ["on"]),
-            new("off", "Turn the approval model off", ["off"])
+            new("on", "Turn " + noun + " on", ["on"]),
+            new("off", "Turn " + noun + " off", ["off"])
         };
         var provider = _settings.Provider;
-        if (_settings.ApprovalModel.Provider is string stored)
+        if (Reviewer(extended).Provider is string stored)
         {
             try
             {
@@ -7127,25 +7439,72 @@ public sealed class CodingSession : ITurnObserver
         return options;
     }
 
-    private IReadOnlyList<SlashCompletion> ApprovalThinkingCompletions()
+    private IReadOnlyList<SlashCompletion> ReviewerThinkingCompletions(ApprovalModelSettings reviewer)
     {
-        var approval = _settings.ApprovalModel;
-        if (approval.Provider is null || approval.Model is null)
+        if (ReviewerCatalogModel(reviewer) is not { } model)
         {
             return [];
         }
 
-        try
-        {
-            return ThinkingCompletions.For(
-                _settings.Catalog.GetModel(
-                    new ProviderName(approval.Provider),
-                    approval.Model));
-        }
-        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        return ThinkingCompletions.For(model);
+    }
+
+    private IReadOnlyList<SlashCompletion> ReviewerSlotCompletions(
+        ApprovalModelSettings reviewer,
+        bool serviceTier)
+    {
+        if (ReviewerCatalogModel(reviewer) is not { } model)
         {
             return [];
         }
+
+        return CatalogSlotCompletions.For(serviceTier ? model.ServiceTiers : model.Speeds);
+    }
+
+    private ModelSettings? ReviewerCatalogModel(ApprovalModelSettings reviewer)
+    {
+        if (reviewer.Provider is null || reviewer.Model is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return _settings.Catalog.GetModel(new ProviderName(reviewer.Provider), reviewer.Model);
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    private IReadOnlyList<SlashCompletion> ExtendedApprovalCompletions()
+    {
+        var reviewer = _settings.ExtendedApproval.Reviewer;
+        var options = new List<SlashCompletion>(ReviewerModelCompletions(extended: true));
+        options.Add(Nested("thinking", "Cycle or set the extended reviewer thinking gear",
+            ReviewerThinkingCompletions(reviewer)));
+        options.Add(Nested("tier", "Cycle or set the extended reviewer service tier",
+            ReviewerSlotCompletions(reviewer, serviceTier: true)));
+        options.Add(Nested("speed", "Cycle or set the extended reviewer speed",
+            ReviewerSlotCompletions(reviewer, serviceTier: false)));
+        options.Add(Nested("trigger", "Lowest primary risk level that runs the extended check",
+        [
+            new("low", "Every review allow", ["low"]),
+            new("medium", "Primary risk medium or high", ["medium"]),
+            new("high", "Primary risk high only", ["high"])
+        ]));
+        options.Add(Nested("primary", "Show the primary verdict to the extended reviewer",
+        [
+            new("on", "Include the primary verdict", ["on"]),
+            new("off", "Judge the action on its own", ["off"])
+        ]));
+        return options;
+
+        static SlashCompletion Nested(string name, string help, IReadOnlyList<SlashCompletion> arguments) =>
+            arguments.Count > 0
+                ? new SlashCompletion(name, help, [name], arguments, ArgumentsOptional: name is "thinking" or "tier" or "speed")
+                : new SlashCompletion(name, help, [name]);
     }
 
     private IReadOnlyList<SlashCompletion> CompactionModelCompletions()

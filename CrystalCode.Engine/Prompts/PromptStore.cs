@@ -108,6 +108,16 @@ public sealed class PromptStore
             ApprovalReviewPrompt.UserTemplate,
             selection.Selected,
             project);
+        var reviewExtended = ResolveNamed(
+            PromptNames.ReviewExtended,
+            ExtendedApprovalPrompt.SystemText,
+            selection.Selected,
+            project);
+        var reviewExtendedUser = ResolveNamed(
+            PromptNames.ReviewExtendedUser,
+            ExtendedApprovalPrompt.UserTemplate,
+            selection.Selected,
+            project);
         var topic = ResolveNamed(
             PromptNames.Topic,
             TopicNamingPrompt.Text,
@@ -174,7 +184,9 @@ public sealed class PromptStore
                 agentPlan.Text,
                 enabled.AgentGeneral,
                 enabled.AgentWork,
-                enabled.AgentPlan),
+                enabled.AgentPlan,
+                reviewExtended.Text,
+                reviewExtendedUser.Text),
             selection.Effective,
             catalog.Names,
             work.Source,

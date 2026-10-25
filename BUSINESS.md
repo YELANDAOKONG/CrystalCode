@@ -78,6 +78,15 @@ separate library with no terminal code. The product can:
   mode exposes its merged disabled list (Home, process, and session) through
   `{{disabled_tools}}`, and the name stays reserved;
 - approve side effects manually, by a reviewing model, or by Full pass-through.
+  The reviewing model can have its own provider, model, thinking gear,
+  service tier, and speed. In Review and Audit, an optional extended approval
+  model gives a call the primary reviewer allowed a final safety check. It
+  defaults to allow and blocks or escalates only for a concrete problem. It
+  runs on every review allow by default, or only when the primary risk level
+  reaches a configured `medium` or `high`. It may see the primary verdict or
+  judge on its own, and it can allow, deny, or send the call to the operator.
+  Extended approval is not an approval mode and is not the product review in
+  `TODO.md`.
   Full auto-passes all tool calls, including workspace-external paths, session
   read-only directories, elevated or forbidden classifications, and forced
   prompts. Credential paths remain prohibited. Tool catalogs, argument
@@ -115,7 +124,9 @@ separate library with no terminal code. The product can:
   That flag cannot be combined with `--workspace`;
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
-  approval, the approval model and its thinking gear, Plan, Work, or a custom
+  approval, the approval model and its thinking gear, service tier, and speed,
+  extended approval and its model, gear, tier, speed, trigger, and
+  primary-review switch, Plan, Work, or a custom
   mode, thinking, the selected model's context budget, service tier, speed,
   prompt set, prompt attachments,
   named prompt attachments, skills, external tools, rule files, and turn quotas for that process only.
@@ -186,7 +197,8 @@ separate library with no terminal code. The product can:
   no examples. There is no project override, in-TUI file editor, or run flag;
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace; a set may replace Work, Plan,
-  Review, the Review user turn, topic naming, compaction, and image description;
+  Review, the Review user turn, extended approval system and user text, topic
+  naming, compaction, and image description;
 - enable an ordered list of prompt attachments that append to the resolved
   Work, Plan, and Review text; directories are discovered in Home and in the
   current workspace, and the workspace copy wins when both exist. A repeated

@@ -33,7 +33,7 @@ public sealed class ChildProjectionTests
         var call = new ToolCall("other", "read", "{}", ToolInputKind.Json);
         var classification = new ToolClassification(Risk.Read, Authority.Workspace, "other approval");
 
-        prompt.NotifyReviewing(call);
+        prompt.NotifyReviewing(call, ApprovalReviewStage.Primary);
         prompt.NotifyPassed(call, classification, ApprovalPassReason.Policy);
         Assert.Equal(progress, renderer.ChromeProgress);
         renderer.OnStreamEvent(new ChatTextDelta(0, 0, ChatRole.Assistant, "after"));
@@ -57,7 +57,7 @@ public sealed class ChildProjectionTests
         var firstProgress = renderer.ChromeProgress;
         projection.OnEvent(new ChildEventReceived(second.Id, Guid.NewGuid(), Passed("second approval")));
         projection.OnEvent(new ChildEventReceived(second.Id, Guid.NewGuid(),
-            new ApprovalReviewing(new ToolCall("review", "write", "{}", ToolInputKind.Json))));
+            new ApprovalReviewing(new ToolCall("review", "write", "{}", ToolInputKind.Json), ApprovalReviewStage.Primary)));
         projection.OnEvent(Passed("parent approval"));
         Assert.Equal(firstProgress, renderer.ChromeProgress);
         Assert.Contains("first approval", TranscriptText(renderer), StringComparison.Ordinal);

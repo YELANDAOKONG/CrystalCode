@@ -13,6 +13,10 @@ public static class PromptNames
 
     public const string ReviewUser = "review.user";
 
+    public const string ReviewExtended = "review.extended";
+
+    public const string ReviewExtendedUser = "review.extended.user";
+
     public const string Topic = "topic";
 
     public const string CompactionSystem = "compaction.system";
@@ -44,6 +48,8 @@ public static class PromptNames
         Plan,
         Review,
         ReviewUser,
+        ReviewExtended,
+        ReviewExtendedUser,
         Topic,
         CompactionSystem,
         CompactionUser,

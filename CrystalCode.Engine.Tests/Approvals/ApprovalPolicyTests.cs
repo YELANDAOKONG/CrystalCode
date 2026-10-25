@@ -751,7 +751,7 @@ public sealed class ApprovalPolicyTests
         }
     }
 
-    private sealed class ApprovalContext : IDisposable
+    internal sealed class ApprovalContext : IDisposable
     {
         private readonly TemporaryWorkspace _workspace;
         private readonly TemporaryHome _home;
@@ -772,7 +772,8 @@ public sealed class ApprovalPolicyTests
             SkillCatalog? skills = null,
             IReadOnlyList<IApprovalClassifier>? classifiers = null,
             IReadOnlySet<string>? automaticTools = null,
-            Func<ToolCall, ToolClassification, ToolClassification>? advise = null) =>
+            Func<ToolCall, ToolClassification, ToolClassification>? advise = null,
+            ExtendedApprovalReviewer? extended = null) =>
             new(
                 _mode,
                 new Workspace(_workspace.Path),
@@ -785,7 +786,8 @@ public sealed class ApprovalPolicyTests
                 classifiers,
                 skills,
                 automaticTools,
-                advise);
+                advise,
+                extended);
 
         public void Dispose()
         {

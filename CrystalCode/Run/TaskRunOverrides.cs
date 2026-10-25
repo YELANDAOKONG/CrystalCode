@@ -44,16 +44,23 @@ internal static class TaskRunOverrides
                 || request.ApprovalProvider is not null
                 || request.ApprovalModelId is not null)
             {
-                next = next.WithApprovalModel(ParseApprovalModel(next, request));
+                next = next.WithApprovalModel(ParseReviewer(
+                    next,
+                    next.ApprovalModel,
+                    request.ApprovalModel,
+                    request.ApprovalProvider,
+                    request.ApprovalModelId,
+                    ApprovalFlags));
             }
 
-            if (request.ApprovalThinking is not null)
-            {
-                var effort = ThinkingSelection.Parse(
-                    Required(request.ApprovalThinking, "Approval thinking"));
-                next = next.WithApprovalModel(
-                    next.ApprovalModel.WithThinkingEffort(effort));
-            }
+            next = next.WithApprovalModel(TuneReviewer(
+                next.ApprovalModel,
+                request.ApprovalThinking,
+                request.ApprovalTier,
+                request.ApprovalSpeed,
+                ApprovalFlags));
+
+            next = next.WithExtendedApproval(ParseExtendedApproval(next, request));
 
             if (request.CompactionModel is not null
                 || request.CompactionProvider is not null
@@ -217,6 +224,26 @@ internal static class TaskRunOverrides
             }
         }
 
+        var extended = settings.ExtendedApproval.Reviewer;
+        if (extended.Enabled && extended.HasSelection)
+        {
+            try
+            {
+                var model = settings.Catalog.GetModel(
+                    ProviderName.Parse(extended.Provider!),
+                    extended.Model!);
+                AddUnavailableThinkingNote(
+                    notes,
+                    extended.ThinkingEffort,
+                    model,
+                    "Extended approval thinking effort");
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+            {
+                // A missing extended approval model fails setup on its own.
+            }
+        }
+
         var compaction = settings.CompactionModel;
         if (compaction.Enabled && compaction.HasSelection)
         {
@@ -277,41 +304,100 @@ internal static class TaskRunOverrides
         }
     }
 
-    private static ApprovalModelSettings ParseApprovalModel(
+    private static readonly ReviewerFlags ApprovalFlags = new(
+        "--approval-model",
+        "--approval-provider",
+        "--approval-model-id",
+        "Approval");
+
+    private static readonly ReviewerFlags ExtendedFlags = new(
+        "--extended-approval",
+        "--extended-approval-provider",
+        "--extended-approval-model-id",
+        "Extended approval");
+
+    private static ExtendedApprovalSettings ParseExtendedApproval(
         HarnessSettings current,
         SessionLaunchSettings request)
     {
-        var specifiedProvider = request.ApprovalProvider is not null;
-        var specifiedModel = request.ApprovalModelId is not null;
+        var extended = current.ExtendedApproval;
+        var reviewer = extended.Reviewer;
+        if (request.ExtendedApproval is not null
+            || request.ExtendedApprovalProvider is not null
+            || request.ExtendedApprovalModelId is not null)
+        {
+            reviewer = ParseReviewer(
+                current,
+                reviewer,
+                request.ExtendedApproval,
+                request.ExtendedApprovalProvider,
+                request.ExtendedApprovalModelId,
+                ExtendedFlags);
+        }
+
+        reviewer = TuneReviewer(
+            reviewer,
+            request.ExtendedApprovalThinking,
+            request.ExtendedApprovalTier,
+            request.ExtendedApprovalSpeed,
+            ExtendedFlags);
+        extended = extended.WithReviewer(reviewer);
+        if (request.ExtendedApprovalTrigger is not null)
+        {
+            if (!ReviewRiskLevel.TryParse(request.ExtendedApprovalTrigger, out var trigger))
+            {
+                throw new ArgumentException("--extended-approval-trigger must be low, medium, or high.");
+            }
+
+            extended = extended.WithTrigger(trigger);
+        }
+
+        if (request.ExtendedApprovalPrimary is not null)
+        {
+            extended = extended.WithIncludePrimaryReview(
+                ParseSwitch(request.ExtendedApprovalPrimary, "--extended-approval-primary"));
+        }
+
+        return extended;
+    }
+
+    private static ApprovalModelSettings ParseReviewer(
+        HarnessSettings current,
+        ApprovalModelSettings stored,
+        string? switchText,
+        string? providerText,
+        string? modelText,
+        ReviewerFlags flags)
+    {
+        var specifiedProvider = providerText is not null;
+        var specifiedModel = modelText is not null;
         var specified = specifiedProvider || specifiedModel;
-        bool? enabled = request.ApprovalModel is null
-            ? null
-            : ParseSwitch(request.ApprovalModel, "--approval-model");
+        bool? enabled = switchText is null ? null : ParseSwitch(switchText, flags.Switch);
         if (enabled == false)
         {
             if (specified)
             {
                 throw new ArgumentException(
-                    "Do not pass --approval-provider or --approval-model-id when --approval-model is off.");
+                    $"Do not pass {flags.Provider} or {flags.Model} when {flags.Switch} is off.");
             }
 
-            return current.ApprovalModel.DisabledCopy();
+            return stored.DisabledCopy();
         }
 
         if (enabled is null && !specified)
         {
-            return current.ApprovalModel;
+            return stored;
         }
 
         var provider = specifiedProvider
-            ? ProviderName.Parse(Required(request.ApprovalProvider!, "Approval provider"))
-            : current.ApprovalModel.Provider is string stored
-                ? ProviderName.Parse(stored)
+            ? ProviderName.Parse(Required(providerText!, flags.Label + " provider"))
+            : stored.Provider is string saved
+                ? ProviderName.Parse(saved)
                 : current.Provider;
         var model = specifiedModel
-            ? Required(request.ApprovalModelId!, "Approval model")
-            : current.ApprovalModel.Model
-                ?? throw new ArgumentException("Pass --approval-model-id.");
+            ? Required(modelText!, flags.Label + " model")
+            : stored.Model
+                ?? throw new ArgumentException($"Pass {flags.Model}.");
 
         try
         {
@@ -322,12 +408,57 @@ internal static class TaskRunOverrides
             throw new ArgumentException(exception.Message, exception);
         }
 
+        // A stored tier or speed belongs to the stored model only.
+        var sameModel = string.Equals(stored.Provider, provider.Value, StringComparison.Ordinal)
+            && string.Equals(stored.Model, model, StringComparison.Ordinal);
         return new ApprovalModelSettings(
             true,
             provider.Value,
             model,
-            current.ApprovalModel.ThinkingEffort);
+            stored.ThinkingEffort,
+            sameModel ? stored.ServiceTier : null,
+            sameModel ? stored.Speed : null);
     }
+
+    private static ApprovalModelSettings TuneReviewer(
+        ApprovalModelSettings reviewer,
+        string? thinking,
+        string? tier,
+        string? speed,
+        ReviewerFlags flags)
+    {
+        var next = reviewer;
+        if (thinking is not null)
+        {
+            next = next.WithThinkingEffort(
+                ThinkingSelection.Parse(Required(thinking, flags.Label + " thinking")));
+        }
+
+        if (tier is not null)
+        {
+            next = next.WithServiceTier(Token(tier, flags.Label + " service tier"));
+        }
+
+        if (speed is not null)
+        {
+            next = next.WithSpeed(Token(speed, flags.Label + " speed"));
+        }
+
+        return next;
+    }
+
+    private static string Token(string text, string label)
+    {
+        if (!CatalogToken.TryNormalize(Required(text, label), out var token))
+        {
+            throw new ArgumentException(
+                label + " must start with a letter and then use only letters, digits, underscores, and hyphens.");
+        }
+
+        return token;
+    }
+
+    private sealed record ReviewerFlags(string Switch, string Provider, string Model, string Label);
 
     private static CompactionModelSettings ParseCompactionModel(
         HarnessSettings current,

@@ -700,6 +700,32 @@ public sealed class PromptStoreTests
     }
 
     [Fact]
+    public void Resolve_ExtendedReviewPromptsFollowSetThenHomeThenProject()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var concise = Path.Combine(home.Home.PromptSetsDirectory, "concise");
+        WritePrompt(concise, "review.extended.md", "set extended");
+        WritePrompt(concise, "review.extended.user.md", "set extended user");
+        WriteManifest(concise, enabled: true);
+        WritePrompt(
+            Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName, "prompts"),
+            "review.extended.user.md",
+            "project extended user {{primary_review}}");
+        var store = CreateStore(home);
+
+        var prompts = store.Load(workspace.Path);
+        using var emptyHome = new TemporaryHome();
+        using var emptyWorkspace = new TemporaryWorkspace();
+        var defaults = CreateStore(emptyHome).Load(emptyWorkspace.Path);
+
+        Assert.Equal("set extended", prompts.ReviewExtended);
+        Assert.Equal("project extended user {{primary_review}}", prompts.ReviewExtendedUser);
+        Assert.Equal(ExtendedApprovalPrompt.SystemText, defaults.ReviewExtended);
+        Assert.Equal(ExtendedApprovalPrompt.UserTemplate, defaults.ReviewExtendedUser);
+    }
+
+    [Fact]
     public void Resolve_AgentPromptsAreIndependentOfWorkAndPlan()
     {
         using var home = new TemporaryHome();

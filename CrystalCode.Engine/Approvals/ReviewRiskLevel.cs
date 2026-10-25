@@ -38,7 +38,24 @@ public sealed record ReviewRiskLevel
         return true;
     }
 
+    /// <summary>
+    /// True when this level is the same as or above <paramref name="threshold"/>.
+    /// </summary>
+    public bool IsAtLeast(ReviewRiskLevel threshold)
+    {
+        ArgumentNullException.ThrowIfNull(threshold);
+        return Rank(Value) >= Rank(threshold.Value);
+    }
+
     public override string ToString() => Value;
+
+    private static int Rank(string value) => value switch
+    {
+        "low" => 0,
+        "medium" => 1,
+        "high" => 2,
+        _ => 1
+    };
 
     private static string Normalize(string value)
     {

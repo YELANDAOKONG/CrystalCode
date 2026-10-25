@@ -145,11 +145,18 @@ internal sealed class SessionProjection : ISessionObserver
                     _renderer.SetProgress(ProgressText.Running(passed.Call.Name));
                 }
                 _renderer.WriteApprovalPass(
-                    ApprovalCard.PassWidget(passed.Call, passed.Classification, passed.Reason, passed.Review),
-                    passed.Reason == ApprovalPassReason.Review);
+                    ApprovalCard.PassWidget(
+                        passed.Call,
+                        passed.Classification,
+                        passed.Reason,
+                        passed.Review,
+                        passed.ExtendedReview),
+                    passed.Reason.IsReview);
                 break;
-            case ApprovalReviewing:
-                _renderer.SetProgress(ProgressText.Reviewing);
+            case ApprovalReviewing reviewing:
+                _renderer.SetProgress(reviewing.Stage == ApprovalReviewStage.Extended
+                    ? ProgressText.ExtendedReviewing
+                    : ProgressText.Reviewing);
                 break;
             case QueueChanged queue:
                 _renderer.SetQueue(queue.Items);

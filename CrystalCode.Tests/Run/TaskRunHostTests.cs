@@ -1233,6 +1233,99 @@ public sealed class TaskRunHostTests
         return applied;
     }
 
+    [Fact]
+    public void Overrides_SetExtendedApprovalForThisProcess()
+    {
+        var current = SlotSettings();
+
+        var applied = AssertApplied(
+            current,
+            new TaskRunSettings
+            {
+                ExtendedApprovalModelId = "judge",
+                ExtendedApprovalThinking = "high",
+                ExtendedApprovalSpeed = "Fast",
+                ExtendedApprovalTrigger = "medium",
+                ExtendedApprovalPrimary = "off",
+                ApprovalModelId = "judge",
+                ApprovalTier = "flex"
+            });
+
+        Assert.True(applied.ExtendedApproval.Enabled);
+        Assert.Equal("slots", applied.ExtendedApproval.Reviewer.Provider);
+        Assert.Equal("judge", applied.ExtendedApproval.Reviewer.Model);
+        Assert.Equal("high", applied.ExtendedApproval.Reviewer.ThinkingEffort.Value);
+        Assert.Equal("fast", applied.ExtendedApproval.Reviewer.Speed);
+        Assert.Equal(ReviewRiskLevel.Medium, applied.ExtendedApproval.Trigger);
+        Assert.False(applied.ExtendedApproval.IncludePrimaryReview);
+        Assert.Equal("flex", applied.ApprovalModel.ServiceTier);
+        Assert.False(current.ExtendedApproval.Enabled);
+
+        var off = AssertApplied(applied, new TaskRunSettings { ExtendedApproval = "off" });
+        Assert.False(off.ExtendedApproval.Enabled);
+        Assert.Equal("judge", off.ExtendedApproval.Reviewer.Model);
+    }
+
+    [Fact]
+    public void Overrides_RejectExtendedApprovalConflictsAndBadValues()
+    {
+        var current = SlotSettings();
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { ExtendedApproval = "off", ExtendedApprovalModelId = "judge" },
+            out _,
+            out _,
+            out var combined));
+        Assert.Equal(
+            "Do not pass --extended-approval-provider or --extended-approval-model-id when --extended-approval is off.",
+            combined);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { ExtendedApproval = "on" },
+            out _,
+            out _,
+            out var missing));
+        Assert.Equal("Pass --extended-approval-model-id.", missing);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { ExtendedApprovalModelId = "judge", ExtendedApprovalTrigger = "severe" },
+            out _,
+            out _,
+            out var trigger));
+        Assert.Equal("--extended-approval-trigger must be low, medium, or high.", trigger);
+
+        Assert.False(TaskRunOverrides.TryApply(
+            current,
+            new TaskRunSettings { ExtendedApprovalModelId = "plain", ExtendedApprovalSpeed = "fast" },
+            out _,
+            out _,
+            out var unlisted));
+        Assert.Contains("Extended approval model speed is not available", unlisted, StringComparison.Ordinal);
+    }
+
+    private static HarnessSettings SlotSettings()
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("slots"),
+            ProviderProtocol.Anthropic,
+            new Uri("https://example.test/v1/"),
+            new Dictionary<string, ModelSettings>
+            {
+                ["plain"] = new(200_000, thinking: true, thinkingEfforts: ["high"]),
+                ["judge"] = new(200_000, thinking: true, thinkingEfforts: ["high"], serviceTiers: ["flex"], speeds: ["fast"])
+            },
+            requiresApiKey: false);
+        return new HarnessSettings(
+            provider.Name,
+            "plain",
+            ApprovalMode.Review,
+            0.8,
+            new ProviderCatalog([provider]));
+    }
+
     private static HarnessSettings TieredContextSettings()
     {
         var provider = new ProviderDefinition(

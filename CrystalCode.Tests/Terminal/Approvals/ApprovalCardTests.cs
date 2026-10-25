@@ -65,6 +65,26 @@ public sealed class ApprovalCardTests
     }
 
     [Fact]
+    public void PassLines_ListsTheExtendedReviewAfterThePrimaryReview()
+    {
+        var classification = new ToolClassification(Risk.Write, Authority.Workspace, "Run a command");
+        var call = JsonToolCall("1", "bash", """{"command":"dotnet test"}""");
+
+        var lines = ApprovalCard.PassLines(
+            call,
+            classification,
+            ApprovalPassReason.Extended,
+            ApprovalReviewVerdict.Allow("The user asked for tests."),
+            ApprovalReviewVerdict.Allow("Nothing unsafe."));
+
+        Assert.Contains("Reason  Extended Review", lines);
+        var primary = lines.ToList().IndexOf("The user asked for tests.");
+        var label = lines.ToList().IndexOf("Extended review");
+        var extended = lines.ToList().IndexOf("Nothing unsafe.");
+        Assert.True(primary >= 0 && primary < label && label < extended);
+    }
+
+    [Fact]
     public void PassWidget_RendersAlignedTitleCaseFields()
     {
         var classification = new ToolClassification(

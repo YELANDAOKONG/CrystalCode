@@ -54,4 +54,8 @@ public sealed record SessionStatus(
     bool McpEnabled = true,
     int McpServers = 0,
     int McpTools = 0,
-    string? Mode = null);
+    string? Mode = null,
+    string? ExtendedApprovalModel = null,
+    string? ExtendedApprovalThinking = null,
+    string? ExtendedApprovalTrigger = null,
+    bool? ExtendedApprovalPrimaryReview = null);

@@ -18,6 +18,7 @@ internal sealed class UnattendedApprovalPrompt : IApprovalPrompt
         ToolCall call,
         ToolClassification classification,
         ApprovalReviewVerdict? review = null,
+        ApprovalReviewVerdict? extendedReview = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(call);
@@ -31,15 +32,17 @@ internal sealed class UnattendedApprovalPrompt : IApprovalPrompt
         ToolCall call,
         ToolClassification classification,
         ApprovalPassReason reason,
-        ApprovalReviewVerdict? review = null)
+        ApprovalReviewVerdict? review = null,
+        ApprovalReviewVerdict? extendedReview = null)
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
         ArgumentNullException.ThrowIfNull(reason);
     }
 
-    public void NotifyReviewing(ToolCall call)
+    public void NotifyReviewing(ToolCall call, ApprovalReviewStage stage)
     {
         ArgumentNullException.ThrowIfNull(call);
+        ArgumentNullException.ThrowIfNull(stage);
     }
 }

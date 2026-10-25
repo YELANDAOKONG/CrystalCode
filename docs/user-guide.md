@@ -182,6 +182,15 @@ CLI options:
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
 | `--approval-thinking <effort>` | Reviewer thinking gear for this process. Does not change `approvalModel.thinkingEffort` on disk |
+| `--approval-tier <token>` | Approval-model service tier for this process. Must be listed by that model. Does not write the file |
+| `--approval-speed <token>` | Approval-model speed for this process. Must be listed by that model. Does not write the file |
+| `--extended-approval <on\|off>` | Use the saved extended approval model, or turn it off for this process |
+| `--extended-approval-provider <provider>` | Extended approval provider for this process. Turns the switch on |
+| `--extended-approval-model-id <model>` | Extended approval model id for this process. Turns the switch on |
+| `--extended-approval-thinking <effort>` | Extended reviewer thinking gear for this process |
+| `--extended-approval-tier <token>`, `--extended-approval-speed <token>` | Extended reviewer service tier and speed for this process |
+| `--extended-approval-trigger <low\|medium\|high>` | Lowest primary risk level that runs the extended check, for this process |
+| `--extended-approval-primary <on\|off>` | Show the primary verdict to the extended reviewer, for this process |
 | `--compaction-model <on\|off>` | Use the saved compaction model, or turn it off for this process |
 | `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
@@ -337,6 +346,15 @@ checks the directory. `unlimited` removes that one cap.
 | `--approval-provider <provider>` | Approval-model provider for this process. Turns the switch on |
 | `--approval-model-id <model>` | Approval-model id for this process. Turns the switch on |
 | `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default and a note is printed, and a value that is not an effort token exits 1. Does not write the file |
+| `--approval-tier <token>` | Approval-model service tier for this process. Must be listed by that model. Does not write the file |
+| `--approval-speed <token>` | Approval-model speed for this process. Must be listed by that model. Does not write the file |
+| `--extended-approval <on\|off>` | Use the saved extended approval model, or turn it off for this process |
+| `--extended-approval-provider <provider>` | Extended approval provider for this process. Turns the switch on |
+| `--extended-approval-model-id <model>` | Extended approval model id for this process. Turns the switch on |
+| `--extended-approval-thinking <effort>` | Extended reviewer thinking gear for this process |
+| `--extended-approval-tier <token>`, `--extended-approval-speed <token>` | Extended reviewer service tier and speed for this process |
+| `--extended-approval-trigger <low\|medium\|high>` | Lowest primary risk level that runs the extended check, for this process |
+| `--extended-approval-primary <on\|off>` | Show the primary verdict to the extended reviewer, for this process |
 | `--compaction-model <on\|off>` | Use the saved compaction model, or turn it off for this process. `on` needs a saved selection, or `--compaction-provider` and `--compaction-model-id` on the same command. Does not write the file |
 | `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
@@ -367,7 +385,9 @@ checks the directory. `unlimited` removes that one cap.
 or `--approval-model-id`. `--approval-thinking` sets a gear for this
 process only: `/approval model` keeps the saved gear, and
 `/approval thinking` is the command that writes one. The process gear is
-ignored while the switch is off.
+ignored while the switch is off. A tier or speed the reviewer model does not
+list exits 1. The `--extended-approval` flags follow the same rules, with
+`--extended-approval-model-id` in place of `--approval-model-id`.
 
 `--workspace-trust` is not one of the flags that inherit the saved
 setting. Leaving it out checks the directory even when `workspaceTrust`
@@ -379,7 +399,9 @@ operator space, which is already trusted.
 There is no operator. In Review and Audit the reviewing model still
 judges calls that require review: allow runs the tool, and deny returns
 the reviewer's reason to the model. That model is the session model
-unless the approval-model switch is on for this process. Anything that
+unless the approval-model switch is on for this process. When extended
+approval is on, its model checks each review allow the same way: allow runs
+the tool, deny returns its reason, and ask is denied. Anything that
 would ask the operator, including Default and Edit prompts, is
 denied with the usual rejection text. Full auto-passes tool calls.
 The `question` tool is dismissed.
@@ -541,7 +563,8 @@ Top-level fields:
 | `provider` | Active provider name |
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
-| `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused |
+| `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused. A tier or speed applies to the reviewer only and must be listed by that model |
+| `extendedApproval` | Optional extended approval model for Review and Audit. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, `trigger` (`low`, `medium`, or `high`; default `low`, which checks every review allow), and `includePrimaryReview` (default `true`). Omitted means off. It never falls back to the session or approval model |
 | `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists). Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, and gear unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
 | `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or an effort token the model lists. `max` and `maximum` are different tokens. Tokens are stored in lowercase and sent unchanged |
@@ -1235,6 +1258,34 @@ and Review and Audit follow `/model`. Finish the current turn before
 changing the approval model. `/status` adds Approval model and Approval
 thinking rows only while the switch is on, and `/status full` lists the
 effective `retry` and `approvalRetry` policies. The status bar does not.
+`/approval tier` and `/approval speed` cycle the approval model's service
+tier and speed, including the unset slot, or set a token that model lists,
+and write `config.json`. An unset slot follows the per-model `/tier` and
+`/speed` choice. Selecting another approval model clears both.
+
+Extended approval adds a third model in Review and Audit. When the primary
+reviewer allows a call that would then run, the extended model takes a final
+safety look. Its built-in prompt defaults to allow and only blocks or asks for
+a concrete problem, such as unrequested irreversible damage, exposing a
+secret, touching a shared or production system, or signs that file or tool
+text steered the agent. Allow runs the call and the panel shows both
+verdicts. Deny returns its reason to the model. Ask, a failed request, or
+unusable output asks you, and the card shows both verdicts. Forbidden and
+forced-prompt calls already ask you and skip it.
+
+`/approval extended` shows `Extended approval  Off`, or the stored model.
+`/approval extended on` and `off` set the switch. `/approval extended <model>`
+or `<provider> <model>` selects a catalog model and turns it on.
+`/approval extended thinking`, `tier`, and `speed` work like the approval
+model commands. `/approval extended trigger low|medium|high` sets the lowest
+primary risk level that runs the check; `low`, the default, checks every
+review allow. `/approval extended primary on|off` decides whether the
+extended model sees the primary verdict. Each command writes `config.json`.
+`/status` adds Extended approval and Extended thinking rows while the switch
+is on, and `/status full` adds Extended trigger and Extended primary review.
+The progress row shows `Extended Review` while it runs. Prompt overrides use
+`review.extended.md` and `review.extended.user.md`; the user template adds
+`{{primary_review}}`.
 
 When you are asked, the overlay uses a two-column field grid
 (Status, Reason, Risk, Authority, and for review also Outcome plus
@@ -1382,7 +1433,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/help` | `/h` | Shortcuts and commands |
 | `/plan` | | Toggle Plan / Work |
 | `/mode` | | List modes, or switch with `/mode <name>` |
-| `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model; `thinking` cycles or sets its gear |
+| `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model; `thinking`, `tier`, and `speed` cycle or set its gear and slots; `extended` configures extended approval |
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count; refused during a turn or compaction |
@@ -1622,7 +1673,8 @@ built-in child Agent prompts
 by placing files under `~/.crystal/prompts` and
 `<workspace>/.crystal/prompts`.
 
-Named files (`work.md`, `plan.md`, `review.md`, `review.user.md`, `topic.md`,
+Named files (`work.md`, `plan.md`, `review.md`, `review.user.md`,
+`review.extended.md`, `review.extended.user.md`, `topic.md`,
 `compaction.system.md`, `compaction.user.md`, `image.system.md`,
 `image.user.md`, and `agents/general.md`, `agents/work.md`, and
 `agents/plan.md`; `.txt` is also accepted):
@@ -2015,6 +2067,8 @@ Override with `CRYSTAL_HOME` or `--home`.
     plan.md
     review.md
     review.user.md
+    review.extended.md
+    review.extended.user.md
     topic.md
     compaction.system.md
     compaction.user.md
@@ -2031,6 +2085,8 @@ Override with `CRYSTAL_HOME` or `--home`.
       plan.md
       review.md
       review.user.md
+      review.extended.md
+      review.extended.user.md
       topic.md
       compaction.system.md
       compaction.user.md
@@ -2079,6 +2135,8 @@ directory name win over home):
     plan.md
     review.md
     review.user.md
+    review.extended.md
+    review.extended.user.md
     topic.md
     compaction.system.md
     compaction.user.md

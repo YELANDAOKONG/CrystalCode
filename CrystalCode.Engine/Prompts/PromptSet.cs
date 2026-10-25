@@ -26,7 +26,9 @@ public sealed record PromptSet
         string? agentPlan = null,
         IReadOnlyList<string>? agentGeneralAttachments = null,
         IReadOnlyList<string>? agentWorkAttachments = null,
-        IReadOnlyList<string>? agentPlanAttachments = null)
+        IReadOnlyList<string>? agentPlanAttachments = null,
+        string? reviewExtended = null,
+        string? reviewExtendedUser = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(work);
         ArgumentException.ThrowIfNullOrWhiteSpace(plan);
@@ -42,6 +44,8 @@ public sealed record PromptSet
         ReviewAttachments = CopyAttachments(reviewAttachments);
         Topic = TextOrBuiltIn(topic, TopicNamingPrompt.Text);
         ReviewUser = TextOrBuiltIn(reviewUser, ApprovalReviewPrompt.UserTemplate);
+        ReviewExtended = TextOrBuiltIn(reviewExtended, ExtendedApprovalPrompt.SystemText);
+        ReviewExtendedUser = TextOrBuiltIn(reviewExtendedUser, ExtendedApprovalPrompt.UserTemplate);
         CompactionSystem = TextOrBuiltIn(compactionSystem, CompactionPrompt.SystemText);
         CompactionUser = TextOrBuiltIn(compactionUser, CompactionPrompt.UserTemplate);
         ImageSystem = TextOrBuiltIn(imageSystem, ImageDescriptionPrompt.SystemText);
@@ -71,6 +75,13 @@ public sealed record PromptSet
     public string Topic { get; }
 
     public string ReviewUser { get; }
+
+    /// <summary>
+    /// Extended approval system template. Prompt attachments do not append to it.
+    /// </summary>
+    public string ReviewExtended { get; }
+
+    public string ReviewExtendedUser { get; }
 
     public string CompactionSystem { get; }
 
@@ -109,6 +120,9 @@ public sealed record PromptSet
 
     public string ComposeReview(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
         AppendAttachments(PromptBinder.Apply(Review, context, placeholders), ReviewAttachments, context, placeholders);
+
+    public string ComposeReviewExtended(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        PromptBinder.Apply(ReviewExtended, context, placeholders);
 
     public string ComposeAgentGeneral(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
         AppendAttachments(

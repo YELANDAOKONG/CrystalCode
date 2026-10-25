@@ -22,6 +22,8 @@ public static class ProgressText
 
     public const string Reviewing = "Reviewing";
 
+    public const string ExtendedReviewing = "Extended Review";
+
     public const string WaitingForAnswer = "Waiting For Answer";
 
     public const string Compacting = "Compacting";

@@ -20,12 +20,13 @@ internal sealed class ChildApprovalPrompt(
         : classification;
 
     public async ValueTask<ApprovalChoice> AskAsync(ToolCall call, ToolClassification classification,
-        ApprovalReviewVerdict? review = null, CancellationToken cancellationToken = default)
+        ApprovalReviewVerdict? review = null, ApprovalReviewVerdict? extendedReview = null,
+        CancellationToken cancellationToken = default)
     {
         await operatorGate.WaitAsync(cancellationToken);
         try
         {
-            return await inner.AskAsync(call, Label(classification), review, cancellationToken);
+            return await inner.AskAsync(call, Label(classification), review, extendedReview, cancellationToken);
         }
         finally
         {
@@ -34,16 +35,16 @@ internal sealed class ChildApprovalPrompt(
     }
 
     public void NotifyPassed(ToolCall call, ToolClassification classification, ApprovalPassReason reason,
-        ApprovalReviewVerdict? review = null)
+        ApprovalReviewVerdict? review = null, ApprovalReviewVerdict? extendedReview = null)
     {
         var labeled = Label(classification);
-        publish(new ApprovalPassed(call, labeled, reason, review));
-        inner.NotifyPassed(call, labeled, reason, review);
+        publish(new ApprovalPassed(call, labeled, reason, review, extendedReview));
+        inner.NotifyPassed(call, labeled, reason, review, extendedReview);
     }
 
-    public void NotifyReviewing(ToolCall call)
+    public void NotifyReviewing(ToolCall call, ApprovalReviewStage stage)
     {
-        publish(new ApprovalReviewing(call));
-        inner.NotifyReviewing(call);
+        publish(new ApprovalReviewing(call, stage));
+        inner.NotifyReviewing(call, stage);
     }
 }
