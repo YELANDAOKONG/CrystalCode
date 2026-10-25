@@ -37,6 +37,19 @@ public sealed class BashToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_ClosesStandardInputSoReadersSeeEndOfInput()
+    {
+        using var root = new TemporaryWorkspace();
+        var tool = new BashTool(new Workspace(root.Path), timeoutSeconds: 10);
+
+        var output = await tool.InvokeAsync(
+            JsonToolCall("1", BashTool.ToolName, """{"command":"if [ -t 0 ]; then echo tty; fi; cat; echo done"}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal("exit 0\ndone", output.Text.TrimEnd());
+    }
+
+    [Fact]
     public async Task InvokeAsync_ReportsNonZeroExit()
     {
         using var root = new TemporaryWorkspace();

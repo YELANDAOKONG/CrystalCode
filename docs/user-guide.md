@@ -1447,7 +1447,9 @@ outside the workspace after approval (you, or the Review model in Review or
 Audit). Workspace `write`, `edit`, and `apply_patch` still follow the approval mode.
 A patch is judged by its riskiest path: one path outside the workspace makes the whole
 call an outside write, and one credential path makes it forbidden.
-`bash` starts in the workspace root and is approved as a side effect.
+`bash` starts in the workspace root and is approved as a side effect. Its
+stdin is closed, so a command that reads input sees end of input instead of
+waiting on the terminal.
 Background Bash tasks are available in Work only. `bash_start` returns a
 session-local task ID without waiting; use `bash_status` or `bash_logs` to
 observe it and `bash_stop` to terminate it. The task uses the configured

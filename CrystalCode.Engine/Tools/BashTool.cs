@@ -72,9 +72,12 @@ public sealed class BashTool : ITool
                     "The shell process failed to start.",
                     ToolResultStatus.Failure);
             }
+
+            process.StandardInput.Close();
         }
         catch (Exception exception)
         {
+            BashProcess.TryKill(process);
             return new ToolOutput(
                 "The shell process failed to start: " + exception.Message,
                 ToolResultStatus.Failure);

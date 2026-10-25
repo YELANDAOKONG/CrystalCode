@@ -39,8 +39,7 @@ internal sealed class BackgroundBashTask
         {
             StartInfo = BashProcess.CreateStartInfo(
                 workingDirectory,
-                command,
-                redirectStandardInput: true)
+                command)
         };
     }
 
