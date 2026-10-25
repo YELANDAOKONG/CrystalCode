@@ -99,7 +99,10 @@ behavior stands until a specific change defines otherwise.
   public type in this build.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
-  assembly. The work must not put secrets on the command line, persist flags
+  assembly. This includes optimizing the JSON structure of its JSON output.
+  The new structure, its field names, and any versioning or compatibility with
+  the current output are not defined. Do not reserve a field, schema, or flag
+  for it. The work must not put secrets on the command line, persist flags
   to `config.json`, or make the run ask the operator.
 
 ## Medium priority
