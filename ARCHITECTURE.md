@@ -354,9 +354,11 @@ input result order. Every other tool is an execution barrier. The same grouping
 is preserved by the multimodal bridge. A session semaphore counts active
 children rather than Agent types; each child also has single-invocation
 admission. The parent's approval policy is shared, and a semaphore serializes
-classification/review/operator interaction. A scoped child label reaches the
-approval card, and review sees the child's context. No state lock is held while
-waiting for approval or a concurrency slot.
+classification and review. A separate operator gate serializes the operator
+approval card with the child picker, so a pending review never delays the
+picker. A scoped child label reaches the approval card, and review sees the
+child's context. No state lock is held while waiting for approval or a
+concurrency slot.
 
 Child clients are cached independently of parent, review, and compaction
 clients by resolved provider, model, service tier, speed, and fitted output cap.

@@ -620,6 +620,35 @@ public sealed class ChildSessionTests
     }
 
     [Fact]
+    public async Task ChildPicker_OpensWhileChildApprovalReviewIsPending()
+    {
+        var model = new GatedReviewStreamingClient(
+            Tool("task", """{"agent":"work","label":"build","prompt":"run the build"}"""),
+            Tool("bash", """{"command":"echo build"}"""), Text("child"), Text("parent"));
+        var picked = 0;
+        using var session = new HeadlessSession(model, settings: Settings().WithApproval(Engine.Approvals.ApprovalMode.Review),
+            chooseChild: (_, _) =>
+            {
+                Interlocked.Increment(ref picked);
+                return Task.FromResult<string?>(null);
+            });
+        await session.Session.StartAsync(CancellationToken.None);
+        await session.Session.SubmitAsync("delegate", CancellationToken.None);
+        await model.ReviewEntered.WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            await session.Session.EnqueueAsync("/child", CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(1, picked);
+        }
+        finally
+        {
+            model.Release("""{"outcome":"deny","risk_level":"low","user_authorization":"low","rationale":"test"}""");
+            await session.Session.TurnTask!.WaitAsync(TimeSpan.FromSeconds(10));
+            await session.Session.FinishTurnAsync();
+        }
+    }
+
+    [Fact]
     public async Task PumpNavigation_AwaitsPickerAndPropagatesCancellation()
     {
         using var first = new HeadlessSession(new ScriptedStreamingClient(

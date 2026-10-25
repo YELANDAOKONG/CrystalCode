@@ -47,6 +47,7 @@ public sealed class CodingSession : ITurnObserver
     private ToolInvocationPolicy _childPolicy = null!;
     private readonly HashSet<string> _agentNotes = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _approvalQueue = new(1, 1);
+    private readonly SemaphoreSlim _operatorGate = new(1, 1);
     private readonly AsyncLocal<string?> _childOrigin = new();
     private readonly AsyncLocal<Action<SessionEvent>?> _childPublish = new();
     private readonly AsyncLocal<Func<IReadOnlyList<ChatItem>>?> _childConversation = new();
@@ -711,14 +712,14 @@ public sealed class CodingSession : ITurnObserver
         var id = argument.Trim();
         if (id.Length == 0)
         {
-            await _approvalQueue.WaitAsync(cancellationToken);
+            await _operatorGate.WaitAsync(cancellationToken);
             try
             {
                 id = await _frontEnd.ChooseChildAsync(children, cancellationToken);
             }
             finally
             {
-                _approvalQueue.Release();
+                _operatorGate.Release();
             }
             if (id is null)
             {
@@ -5839,7 +5840,7 @@ public sealed class CodingSession : ITurnObserver
                 {
                     Publish(value);
                 }
-            });
+            }, _operatorGate);
         var question = _frontEnd.Questions;
         var reviewer = new ModelApprovalReviewer(
             ReviewerClient(),

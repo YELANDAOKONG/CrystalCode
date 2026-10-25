@@ -14,7 +14,8 @@ public sealed class ChildApprovalPromptTests
     {
         var inner = new RecordingApprovalPrompt(ApprovalChoice.Deny);
         var events = new List<SessionEvent>();
-        var prompt = new ChildApprovalPrompt(inner, () => "explore / research / child-one", events.Add);
+        using var gate = new SemaphoreSlim(1, 1);
+        var prompt = new ChildApprovalPrompt(inner, () => "explore / research / child-one", events.Add, gate);
         var call = new ToolCall("read-one", "read", "{}", ToolInputKind.Json);
         var classification = new ToolClassification(Risk.Read, Authority.Workspace, "Read notes");
 
