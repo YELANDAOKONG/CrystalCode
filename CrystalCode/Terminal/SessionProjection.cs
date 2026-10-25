@@ -104,8 +104,8 @@ internal sealed class SessionProjection : ISessionObserver
                 break;
             case ToolsListed tools:
                 _renderer.WriteNote(
-                    ToolListWidget.Create(tools.Plan, tools.Work, tools.External, tools.Settings),
-                    ToolListText.Format(tools.Plan, tools.Work, tools.External, tools.Settings));
+                    ToolListWidget.Create(tools.Report),
+                    ToolListText.Format(tools.Report));
                 break;
             case TodosListed listed:
                 _renderer.WriteNote(

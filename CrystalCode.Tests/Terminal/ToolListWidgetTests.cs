@@ -3,6 +3,7 @@ using Crystal.Tools;
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Terminal;
@@ -44,11 +45,11 @@ public sealed class ToolListWidgetTests
             var host = new ReadTool(workspace).Definition;
 
             var lines = WidgetPaint.Lines(
-                ToolListWidget.Create(
+                ToolListWidget.Create(ToolCatalogReport.Create(
                     [host, external.PlanTools[0].Definition],
                     [external.WorkTools[0].Definition],
                     external,
-                    HarnessSettings.CreateDefault()),
+                    HarnessSettings.CreateDefault())),
                 88);
 
             Assert.Contains(lines, line => line.Plain.Contains("Host tools (1)", StringComparison.Ordinal));

@@ -19,7 +19,7 @@ the Crystal library they already own.
 ## Current product
 
 The current product is a terminal application. `crystal` opens the
-terminal, which is the only operator surface. `crystal space` opens that
+terminal, which is the only operator surface in this build. `crystal space` opens that
 terminal in the operator space at `~/.crystal/space`. `crystal` and
 `crystal space` accept the same session overrides as `crystal run`, except
 the task text, `--format`, `--show-thinking`, `--space`, and
@@ -422,21 +422,32 @@ implemented in the current build.
   ownership are defined. ACP does not speak MCP itself. Editor-supplied MCP
   servers, when that front end exists, use the same MCP client as local
   servers. Do not bypass approval, trust, or the tool boundary.
-- An agent API server. The working name is crystal server. It would be started
-  in a workspace and expose the full Crystal Code capability over our own
-  protocol, so that other front ends can drive it. The operator selects the
-  workspace and other session parameters at start, in the same way as the
-  existing session overrides. It is another front end that implements
-  `SessionFrontEnd`, not an engine protocol, and not ACP. The wire format,
-  transport, authentication, how approval and operator questions reach the
-  connected front end, and whether one server holds one session or many are
-  not defined. A network-reachable server must not run without an access
-  control decision. Do not bypass approval, trust, the workspace fence, or
-  `ToolInvocationPolicy`. Do not put secrets on the command line, and do not
-  persist its flags to `config.json`. The terminal remains the only operator
-  surface until it exists. `crystal server` is not a command, project, or
-  public type in this build. Do not add it until its behavior and ownership
-  are defined.
+- An agent API server, `crystal server`. Its behavior and ownership are
+  defined in [docs/server.md](docs/server.md); it is not in this build. An
+  operator or a wrapper program starts it in a workspace with the same
+  session launch options as `crystal`. Separate front ends, such as a web
+  page or a desktop program, connect over HTTP: REST-style commands and a
+  server-sent event stream. Those front ends are not part of this
+  repository. It is the second operator surface, a front end that
+  implements `SessionFrontEnd`, not an engine protocol, and not ACP.
+  - One process hosts one active session. `/clear`, `/resume`, `/fork`,
+    `/cd`, and `/space` behave as in the terminal, including workspace
+    changes with a trust question sent to the client.
+  - Every engine capability is reachable: every slash command, every
+    session operation a front end calls (Plan, Work, custom modes, quick
+    prompts, side questions, recall, images, child inspection, export), and
+    every event, including approval and extended approval.
+  - Approval, questions, trust, and session choices reach clients as
+    interactions. Approval, trust, the workspace fence, and
+    `ToolInvocationPolicy` are unchanged.
+  - Clients refresh from a snapshot and reconnect by event sequence number.
+  - A bearer token is required by default on every listener. `--auth none`
+    turns it off with a warning. Tokens carry `observe`, `operate`, or
+    `admin` scopes. A LAN listener without TLS is allowed with a warning.
+    Host and Origin checks always apply.
+  - The protocol carries no version identifier. Secrets are never command
+    flags, and its flags are not written to `config.json`.
+  `crystal server` is not a command or project in this build.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
   one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags
@@ -537,6 +548,14 @@ implemented in the current build.
   or on a command line, and make `crystal run` fail instead of asking the
   operator. Do not reserve a command, configuration field, or public type. It
   is not OAuth for remote MCP servers;
+- several concurrent tasks in one terminal process. The terminal drives one
+  session at a time; child Agents are not this path. Do not reserve a
+  command, configuration field, or public type;
+- several active sessions in one `crystal server` process. One process hosts
+  one session, and a front end that wants more starts more processes. Plugin
+  and external tool load contexts are not collectible, so per-session loading
+  in one long-lived process would only grow. Do not reserve a route, flag,
+  or public type;
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored

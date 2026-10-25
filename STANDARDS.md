@@ -38,6 +38,11 @@
 - Do not widen `InternalsVisibleTo` to give a front end engine internals.
   Make the member public when a second front end could need it, otherwise
   keep it out of the front end.
+- Events carry plain data that a front end may serialize. Do not put
+  settings, provider definitions, live catalogs, or plugin objects on an
+  event; `SessionEventDataTests` enforces this.
+- Front ends prepare sessions through `CrystalCode.Engine.Launch` and do not
+  copy override, trust, or resume logic.
 
 ## C# conventions
 
@@ -191,7 +196,12 @@ Authorized packages today:
   contract assembly references it.
 - xUnit and Microsoft.NET.Test.Sdk in CrystalCode.Tests,
   CrystalCode.Engine.Tests, CrystalCode.Display.Tests, and
-  CrystalCode.Providers.Tests.
+  CrystalCode.Providers.Tests, and in CrystalCode.Server.Tests when it is
+  added.
+- The `Microsoft.AspNetCore.App` shared framework (`FrameworkReference`) in
+  CrystalCode.Server only, and Microsoft-published ASP.NET Core packages that
+  server needs. The operator approved Microsoft packages for this project.
+  Never in CrystalCode.Engine or CrystalCode.Display.
 
 Do not add another package without asking.
 
@@ -210,8 +220,8 @@ existing temporary-directory helper. A test that only compares path strings
 and never reads or writes the disk is not constrained.
 
 Do not claim coverage a test project does not actually exercise. Session,
-approval, compaction, storage, and tool behavior is tested in
-CrystalCode.Engine.Tests, including a headless session driven by a scripted
+approval, compaction, storage, tool, launch, and session runner behavior is
+tested in CrystalCode.Engine.Tests, including a headless session driven by a scripted
 model through `ISessionObserver`. Terminal projection, renderer, and prompt
 surfaces are tested in CrystalCode.Tests. `crystal run` is tested there
 with a scripted model for a completed reply, a review allow that executes

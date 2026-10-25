@@ -168,8 +168,8 @@ public sealed class CodingSessionHeadlessTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.DoesNotContain(listed.Plan, tool => tool.Name == ReadTool.ToolName);
-        Assert.Contains(listed.Work, tool => tool.Name == ReadTool.ToolName);
+        Assert.DoesNotContain(listed.Report.Plan, tool => tool.Name == ReadTool.ToolName);
+        Assert.Contains(listed.Report.Work, tool => tool.Name == ReadTool.ToolName);
         Assert.Contains(
             "disabledBuiltInTools",
             File.ReadAllText(headless.Home.ConfigPath),

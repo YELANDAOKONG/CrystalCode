@@ -569,11 +569,11 @@ public sealed class DotnetToolFactoryTests
         Assert.Equal(Authority.OutsideWorkspace, classification.Authority);
         Assert.Equal("External tool; classified as write / outside_workspace", classification.Summary);
 
-        var text = ToolListText.Format(
+        var text = ToolListText.Format(ToolCatalogReport.Create(
             [.. catalog.PlanTools.Select(tool => tool.Definition)],
             [.. catalog.WorkTools.Select(tool => tool.Definition)],
             catalog,
-            HarnessSettings.CreateDefault());
+            HarnessSettings.CreateDefault()));
         Assert.Contains("Pre-classifier", text, StringComparison.Ordinal);
         Assert.Contains("Yes", text, StringComparison.Ordinal);
     }

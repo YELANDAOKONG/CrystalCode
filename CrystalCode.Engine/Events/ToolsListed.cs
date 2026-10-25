@@ -1,15 +1,8 @@
-using Crystal.Tools;
-
-using CrystalCode.Engine.Configuration;
-using CrystalCode.Engine.Tools.External;
+using CrystalCode.Engine.Sessions;
 
 namespace CrystalCode.Engine.Events;
 
 /// <summary>
 /// The effective Plan and Work tool catalogs. Format with <c>ToolListText</c> or a richer view.
 /// </summary>
-public sealed record ToolsListed(
-    IReadOnlyList<ToolDefinition> Plan,
-    IReadOnlyList<ToolDefinition> Work,
-    ExternalCatalog External,
-    HarnessSettings Settings) : SessionEvent;
+public sealed record ToolsListed(ToolCatalogReport Report) : SessionEvent;

@@ -1,12 +1,15 @@
-using CrystalCode.Commands;
 using CrystalCode.Engine.Tools;
 
-namespace CrystalCode.Run;
+namespace CrystalCode.Engine.Launch;
 
-internal static class SessionLaunchAccess
+/// <summary>
+/// Reads <c>--allow-read</c> and <c>--allow-write</c> into canonical session
+/// directory rules. The rules are session metadata, never preferences.
+/// </summary>
+public static class SessionLaunchAccess
 {
     public static bool TryRead(
-        SessionLaunchSettings settings,
+        SessionLaunchOptions settings,
         string workspaceRoot,
         out IReadOnlyList<DirectoryAccess> access,
         out string error)

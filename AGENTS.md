@@ -19,7 +19,9 @@ between TODO.md buckets is a design decision.
 ## Product
 
 CrystalCode is a production coding TUI. The terminal is the only
-operator surface. `crystal run` is the headless entry for one task. It
+operator surface in this build. `crystal server` is the defined second
+operator surface (see [docs/server.md](docs/server.md)); it is not in this
+build yet. `crystal run` is the headless entry for one task. It
 is not an operator surface: anything that would ask the operator is
 denied. Do not put secrets on its command line, and do not persist its
 flags to `config.json`. It is not a Crystal demo and not a replacement
@@ -61,14 +63,23 @@ semantics. Do not copy its Demo UI into this product.
   belongs in `CrystalCode`; frame and composer behavior in
   `CrystalCode.Display`. Do not fork engine logic into a front end.
   If a later desktop front end uses Avalonia, write its UI in C# markup.
-  Do not add XAML or AXAML files.
+  Do not add XAML or AXAML files. Launch logic lives in
+  `CrystalCode.Engine.Launch`; a front end maps its own command line onto
+  `SessionLaunchOptions` and does not copy override, trust, or resume code.
+- `CrystalCode.Server`, when added, is a front end like the terminal. It
+  holds no product logic, does not reference `CrystalCode.Display`,
+  Spectre.Console, Terminal.Gui, or the executable, and serializes only its
+  own wire DTOs. Its protocol carries no version identifier. One process
+  hosts one active session.
 - Public data values are immutable. One type per file. File-scoped namespaces.
 - No top-level statements. Explicit `Program.Main`.
 
 ## Change rules
 
 - Ask before adding a project, a public architectural boundary, or a new
-  provider family. `CrystalCode.Platform` is deferred; do not add that
+  provider family. `CrystalCode.Server` and `CrystalCode.Server.Tests` are
+  approved projects with the ownership in ARCHITECTURE.md.
+  `CrystalCode.Platform` is deferred; do not add that
   project. Extra first-party tools and protocols go through
   `IPlugin` / `PluginRegistry`. Operator plugins load from `plugins/`
   through `CrystalCode.Plugins` (`PluginCatalog`), one load context per

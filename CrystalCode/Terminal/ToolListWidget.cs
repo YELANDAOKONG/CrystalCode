@@ -15,16 +15,11 @@ namespace CrystalCode.Terminal;
 /// </summary>
 internal static class ToolListWidget
 {
-    public static IRenderable Create(
-        IReadOnlyList<ToolDefinition> plan,
-        IReadOnlyList<ToolDefinition> work,
-        ExternalCatalog external,
-        HarnessSettings settings)
+    public static IRenderable Create(ToolCatalogReport report)
     {
-        ArgumentNullException.ThrowIfNull(plan);
-        ArgumentNullException.ThrowIfNull(work);
-        ArgumentNullException.ThrowIfNull(external);
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(report);
+        var plan = report.Plan;
+        var work = report.Work;
 
         var planNames = plan.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
         var workNames = work.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
@@ -33,7 +28,7 @@ internal static class ToolListWidget
             .Select(group => group.First())
             .OrderBy(tool => tool.Name, StringComparer.Ordinal)
             .ToArray();
-        var externalByName = external.Tools.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
+        var externalByName = report.External.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
         var host = definitions.Where(tool => !externalByName.ContainsKey(tool.Name)).ToArray();
         var loadedExternal = definitions.Where(tool => externalByName.ContainsKey(tool.Name)).ToArray();
         var blocks = new List<IRenderable>
@@ -45,16 +40,16 @@ internal static class ToolListWidget
             HostTable(host, planNames, workNames),
             SectionRule(
                 $"External tools ({loadedExternal.Length}, "
-                + $"{(settings.ExternalTools ? "On" : "Off")})"),
+                + $"{(report.ExternalToolsEnabled ? "On" : "Off")})"),
             ExternalTable(loadedExternal, externalByName, planNames, workNames),
             SectionRule("External approval"),
-            ApprovalGrid(settings.ExternalToolApproval)
+            ApprovalGrid(report.ExternalApproval)
         };
 
-        if (external.Notes.Count > 0)
+        if (report.ExternalNotes.Count > 0)
         {
             blocks.Add(SectionRule("External tool notes", Theme.Warning));
-            foreach (var note in external.Notes)
+            foreach (var note in report.ExternalNotes)
             {
                 blocks.Add(new Markup($"[{Theme.Warning}]- {MarkupText.Escape(note)}[/]"));
             }

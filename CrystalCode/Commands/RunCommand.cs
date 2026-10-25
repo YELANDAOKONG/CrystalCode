@@ -1,13 +1,9 @@
-using CrystalCode.Engine.Configuration;
-using CrystalCode.Engine.Home;
-using CrystalCode.Engine.Modes;
-using CrystalCode.Engine.Plugins;
-using CrystalCode.Engine.Sessions;
-using CrystalCode.Engine.Tools;
-using CrystalCode.Run;
-using CrystalCode.Terminal;
 using Spectre.Console;
 using Spectre.Console.Cli;
+
+using CrystalCode.Engine.Launch;
+using CrystalCode.Engine.Plugins;
+using CrystalCode.Terminal;
 
 namespace CrystalCode.Commands;
 
@@ -42,212 +38,28 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         ArgumentNullException.ThrowIfNull(settings);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var home = CrystalHome.Resolve(settings.Home);
-        var settingsStore = new DiskSettingsStore(home);
-        var loaded = settingsStore.LoadOrCreate();
-        if (!TaskRunOverrides.TryApply(loaded, settings, out var harnessSettings, out _, out var applyError))
-        {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(applyError)}[/]");
-            return 1;
-        }
-
-        if (!TaskRunOverrides.TryAcceptPromptSet(home, settings.PromptSet, out var promptError))
-        {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(promptError)}[/]");
-            return 1;
-        }
-
-        // Provider and model stay eligible for a later preference save.
-        // The other launch flags stay on the live settings only.
-        var persisted = loaded.WithOverrides(settings.Provider, settings.Model);
-        if ((settings.Plan ? 1 : 0) + (settings.Work ? 1 : 0) + (settings.Mode is null ? 0 : 1) > 1)
-        {
-            AnsiConsole.MarkupLine("[red]Pass only one of --plan, --work, or --mode.[/]");
-            return 1;
-        }
-
-        var launchMode = settings.Plan ? "plan"
-            : settings.Work ? "work"
-            : settings.Mode?.Trim();
-        var credentials = new CredentialStore(home);
-        if (!credentials.TryResolve(
-                harnessSettings.ActiveProvider,
-                out _,
-                out var error))
-        {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(error)}[/]");
-            return 1;
-        }
-
-        var workspace = ResolveWorkspace(workspacePath);
-        SessionDocument? resumed = null;
-        if (resume.IsSet)
-        {
-            var sessions = new SessionStore(home);
-            if (!ResumeRequest.TryParse(
-                    resume.Value,
-                    Environment.CurrentDirectory,
-                    sessions,
-                    out var request,
-                    out var resumeError))
-            {
-                AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
-                return 1;
-            }
-
-            switch (request.Target)
-            {
-                case ResumeRequest.Kind.Session:
-                    if (!TryLoadResume(sessions, workspace, request.Value, out resumed, out resumeError))
-                    {
-                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
-                        return 1;
-                    }
-
-                    break;
-                case ResumeRequest.Kind.CurrentWorkspace:
-                {
-                    var picked = await PickResumeAsync(
-                        sessions.List(workspace),
-                        listWorkspace: false,
-                        "No session for this workspace",
-                        cancellationToken);
-                    if (picked.ExitCode is int currentExit)
-                    {
-                        return currentExit;
-                    }
-
-                    if (!TryLoadResume(sessions, workspace, picked.Id, out resumed, out resumeError))
-                    {
-                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
-                        return 1;
-                    }
-
-                    break;
-                }
-                case ResumeRequest.Kind.Workspace:
-                {
-                    if (!string.IsNullOrWhiteSpace(workspacePath)
-                        && !ResumeRequest.SameDirectory(workspacePath, request.Value!))
-                    {
-                        AnsiConsole.MarkupLine("[red]Workspace and --resume path differ.[/]");
-                        return 1;
-                    }
-
-                    workspace = request.Value!;
-                    var namedTrust = await EnsureTrustedAsync(
-                        home,
-                        harnessSettings,
-                        workspace,
-                        cancellationToken);
-                    if (!namedTrust.Ready)
-                    {
-                        return namedTrust.ExitCode;
-                    }
-
-                    var picked = await PickResumeAsync(
-                        sessions.List(workspace),
-                        listWorkspace: false,
-                        "No session for this workspace",
-                        cancellationToken);
-                    if (picked.ExitCode is int namedExit)
-                    {
-                        return namedExit;
-                    }
-
-                    if (!TryLoadResume(sessions, workspace, picked.Id, out resumed, out resumeError))
-                    {
-                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
-                        return 1;
-                    }
-
-                    break;
-                }
-                case ResumeRequest.Kind.AllWorkspaces:
-                {
-                    var picked = await PickResumeAsync(
-                        sessions.List(workspaceRoot: null),
-                        listWorkspace: true,
-                        "No sessions",
-                        cancellationToken);
-                    if (picked.ExitCode is int allExit)
-                    {
-                        return allExit;
-                    }
-
-                    if (!TryLoadResume(sessions, workspace, picked.Id, out resumed, out resumeError))
-                    {
-                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
-                        return 1;
-                    }
-
-                    if (!ResumeRequest.TryCanonicalWorkspace(
-                            resumed.Workspace,
-                            out workspace,
-                            out resumeError))
-                    {
-                        AnsiConsole.MarkupLine($"[red]{Markup.Escape(resumeError)}[/]");
-                        return 1;
-                    }
-
-                    break;
-                }
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(settings),
-                        request.Target,
-                        "Resume target is not supported.");
-            }
-        }
-
-        var trust = await EnsureTrustedAsync(
-            home,
-            harnessSettings,
-            workspace,
+        // Without a terminal there is nobody to ask, so the launcher reports
+        // the question instead of drawing it.
+        var prompt = Console.IsInputRedirected ? null : new StartupPrompt();
+        var prepared = await SessionLauncher.PrepareAsync(
+            new SessionLaunchRequest(
+                settings.ToOptions(),
+                Environment.CurrentDirectory,
+                workspacePath,
+                Resume: resume.IsSet,
+                ResumeTarget: resume.Value),
+            prompt,
+            prompt,
             cancellationToken);
-        if (!trust.Ready)
+        if (prepared.Launch is not { } launch)
         {
-            return trust.ExitCode;
+            return Report(prepared);
         }
 
-        if (!TaskRunOverrides.TryAcceptPromptAttachments(
-                home,
-                workspace,
-                settings.PromptAttachment,
-                out var attachmentError))
-        {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(attachmentError)}[/]");
-            return 1;
-        }
-
-        if (!SessionLaunchAccess.TryRead(settings, workspace, out var launchAccess, out var accessError))
-        {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(accessError)}[/]");
-            return 1;
-        }
-
-        if (launchMode is not null
-            && !ModeSelection.TryResolve(home, workspace, launchMode, out var modeError))
-        {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(modeError)}[/]");
-            return 1;
-        }
-
-        var plugins = PluginRegistry.CreateBuiltIn();
         TerminalHost host;
         try
         {
-            host = TerminalHost.Create(
-                harnessSettings,
-                settingsStore,
-                credentials,
-                home,
-                workspace,
-                plugins,
-                resumed,
-                persisted,
-                launchMode,
-                launchAccess);
+            host = TerminalHost.Create(launch, PluginRegistry.CreateBuiltIn());
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
         {
@@ -258,117 +70,21 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         return await host.RunAsync(cancellationToken);
     }
 
-    private static bool TryLoadResume(
-        SessionStore sessions,
-        string workspace,
-        string? id,
-        out SessionDocument document,
-        out string error) =>
-        SessionResume.TryLoad(sessions, workspace, id, out document, out error);
-
-    private static async Task<(int? ExitCode, string? Id)> PickResumeAsync(
-        IReadOnlyList<SessionSummary> available,
-        bool listWorkspace,
-        string emptyMessage,
-        CancellationToken cancellationToken)
+    private static int Report(SessionLaunchResult result)
     {
-        ArgumentNullException.ThrowIfNull(available);
-        if (available.Count == 0)
+        var message = result.Failure switch
         {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(emptyMessage)}[/]");
-            return (1, null);
+            SessionLaunchFailureKind.Declined => null,
+            SessionLaunchFailureKind.TrustNeedsOperator => "Trusting this directory requires a terminal.",
+            SessionLaunchFailureKind.ResumeNeedsOperator => "Interactive resume requires a terminal. Pass --resume <id>.",
+            _ => result.Error
+        };
+        if (message is null)
+        {
+            return 0;
         }
 
-        if (Console.IsInputRedirected)
-        {
-            AnsiConsole.MarkupLine(
-                "[red]Interactive resume requires a terminal. Pass --resume <id>.[/]");
-            return (1, null);
-        }
-
-        using var interrupt = TerminalInterrupt.Link(cancellationToken);
-        using var pickerRenderer = new SessionRenderer();
-        try
-        {
-            using (pickerRenderer.Open())
-            {
-                var id = await new SessionPicker(pickerRenderer).ChooseAsync(
-                    available,
-                    currentId: null,
-                    listWorkspace,
-                    interrupt.Token);
-                if (id is null)
-                {
-                    return (0, null);
-                }
-
-                return (null, id);
-            }
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return (0, null);
-        }
-    }
-
-    private readonly record struct TrustDecision(bool Ready, int ExitCode);
-
-    private static async Task<TrustDecision> EnsureTrustedAsync(
-        CrystalHome home,
-        HarnessSettings harnessSettings,
-        string workspace,
-        CancellationToken cancellationToken)
-    {
-        if (!harnessSettings.WorkspaceTrust || !Directory.Exists(workspace))
-        {
-            return new TrustDecision(true, 0);
-        }
-
-        var root = new Workspace(workspace).Root;
-        var trust = new WorkspaceTrustStore(home);
-        var trustRoot = trust.TrustRoot(root);
-        if (trust.Contains(root))
-        {
-            return new TrustDecision(true, 0);
-        }
-
-        if (Console.IsInputRedirected)
-        {
-            AnsiConsole.MarkupLine("[red]Trusting this directory requires a terminal.[/]");
-            return new TrustDecision(false, 1);
-        }
-
-        using var interrupt = TerminalInterrupt.Link(cancellationToken);
-        using var trustRenderer = new SessionRenderer();
-        try
-        {
-            using (trustRenderer.Open())
-            {
-                var accepted = await new TrustPrompt(trustRenderer).ConfirmAsync(
-                    new WorkspaceTrustRequest(root, trustRoot),
-                    interrupt.Token);
-                if (!accepted)
-                {
-                    return new TrustDecision(false, 0);
-                }
-            }
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return new TrustDecision(false, 0);
-        }
-
-        trust.Remember(root);
-        return new TrustDecision(true, 0);
-    }
-
-    private static string ResolveWorkspace(string? workspace)
-    {
-        if (string.IsNullOrWhiteSpace(workspace))
-        {
-            return Path.GetFullPath(Environment.CurrentDirectory);
-        }
-
-        return Path.GetFullPath(workspace);
+        AnsiConsole.MarkupLine($"[red]{Markup.Escape(message)}[/]");
+        return 1;
     }
 }

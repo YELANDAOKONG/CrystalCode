@@ -17,7 +17,6 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
-using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 
@@ -624,7 +623,7 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
-    public void WriteHelp(IReadOnlyList<ISlashCommand>? extras = null)
+    public void WriteHelp(IReadOnlyList<SlashCompletion>? extras = null)
     {
         lock (_gate)
         {

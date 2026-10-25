@@ -101,8 +101,8 @@ public sealed class McpSessionTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.Contains(listed.Work, tool => tool.Name == "mcp__fake__where");
-        Assert.DoesNotContain(listed.Plan, tool => tool.Name == "mcp__fake__where");
+        Assert.Contains(listed.Report.Work, tool => tool.Name == "mcp__fake__where");
+        Assert.DoesNotContain(listed.Report.Plan, tool => tool.Name == "mcp__fake__where");
         Assert.DoesNotContain(Errors(headless), text => text.Contains("MCP", StringComparison.Ordinal));
     }
 
@@ -166,7 +166,7 @@ public sealed class McpSessionTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.DoesNotContain(listed.Work, tool => tool.Name == "mcp__fake__where");
+        Assert.DoesNotContain(listed.Report.Work, tool => tool.Name == "mcp__fake__where");
         Assert.Contains(Notes(headless), text => text == "MCP  Off");
         Assert.Contains("\"mcp\": false", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
     }
@@ -205,7 +205,7 @@ public sealed class McpSessionTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.Contains(listed.Work, tool => tool.Name == "mcp__second__where");
+        Assert.Contains(listed.Report.Work, tool => tool.Name == "mcp__second__where");
         Assert.Contains(Notes(headless), text => text == "MCP reloaded");
     }
 
@@ -230,7 +230,7 @@ public sealed class McpSessionTests
         await headless.Session.SubmitAsync("/cd " + other.Path, CancellationToken.None);
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
-        var names = headless.Observer.Events.OfType<ToolsListed>().Last().Work.Select(tool => tool.Name).ToArray();
+        var names = headless.Observer.Events.OfType<ToolsListed>().Last().Report.Work.Select(tool => tool.Name).ToArray();
         Assert.Contains("mcp__project_only__where", names);
         Assert.Contains("mcp__fake__where", names);
     }
@@ -248,7 +248,7 @@ public sealed class McpSessionTests
         await headless.Session.StartAsync(CancellationToken.None);
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
-        var work = headless.Observer.Events.OfType<ToolsListed>().Last().Work.Select(tool => tool.Name).ToArray();
+        var work = headless.Observer.Events.OfType<ToolsListed>().Last().Report.Work.Select(tool => tool.Name).ToArray();
         Assert.Contains("list_mcp_resources", work);
         Assert.Contains("read_mcp_resource", work);
         var menu = headless.Observer.Events.OfType<SlashCommandsChanged>().Last().Commands;
@@ -355,7 +355,7 @@ public sealed class McpSessionTests
         await headless.RunTurnAsync("anything");
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
-        var work = headless.Observer.Events.OfType<ToolsListed>().Last().Work.Select(tool => tool.Name).ToArray();
+        var work = headless.Observer.Events.OfType<ToolsListed>().Last().Report.Work.Select(tool => tool.Name).ToArray();
         Assert.Contains("mcp__fake__extra", work);
         Assert.Contains(Notes(headless), text => text == "MCP tools changed  fake");
     }
@@ -397,7 +397,7 @@ public sealed class McpSessionTests
 
         Assert.True(await WaitUntilGoneAsync(pid), "The disabled server was still running.");
         Assert.DoesNotContain(
-            headless.Observer.Events.OfType<ToolsListed>().Last().Work,
+            headless.Observer.Events.OfType<ToolsListed>().Last().Report.Work,
             tool => tool.Name == "mcp__fake__where");
         Assert.Contains(Notes(headless), text => text == "MCP server fake  Disabled");
         Assert.Contains("\"enabled\": false", File.ReadAllText(Path.Combine(headless.Home.Root, "mcp.json")), StringComparison.Ordinal);
@@ -420,7 +420,7 @@ public sealed class McpSessionTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         Assert.Contains(
-            headless.Observer.Events.OfType<ToolsListed>().Last().Work,
+            headless.Observer.Events.OfType<ToolsListed>().Last().Report.Work,
             tool => tool.Name == "mcp__fake__where");
         Assert.Contains(Notes(headless), text => text == "MCP server fake  Enabled");
     }
@@ -653,7 +653,7 @@ public sealed class McpSessionTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.DoesNotContain(listed.Work, tool => tool.Name.StartsWith("mcp__", StringComparison.Ordinal));
+        Assert.DoesNotContain(listed.Report.Work, tool => tool.Name.StartsWith("mcp__", StringComparison.Ordinal));
     }
 
     private static HeadlessSession Open(

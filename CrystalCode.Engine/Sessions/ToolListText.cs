@@ -1,7 +1,4 @@
-using Crystal.Tools;
-
 using CrystalCode.Engine.Configuration;
-using CrystalCode.Engine.Tools.External;
 
 namespace CrystalCode.Engine.Sessions;
 
@@ -10,16 +7,11 @@ namespace CrystalCode.Engine.Sessions;
 /// </summary>
 public static class ToolListText
 {
-    public static string Format(
-        IReadOnlyList<ToolDefinition> plan,
-        IReadOnlyList<ToolDefinition> work,
-        ExternalCatalog external,
-        HarnessSettings settings)
+    public static string Format(ToolCatalogReport report)
     {
-        ArgumentNullException.ThrowIfNull(plan);
-        ArgumentNullException.ThrowIfNull(work);
-        ArgumentNullException.ThrowIfNull(external);
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(report);
+        var plan = report.Plan;
+        var work = report.Work;
 
         var planNames = plan.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
         var workNames = work.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
@@ -28,7 +20,7 @@ public static class ToolListText
             .Select(group => group.First())
             .OrderBy(tool => tool.Name, StringComparer.Ordinal)
             .ToArray();
-        var externalByName = external.Tools.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
+        var externalByName = report.External.ToDictionary(tool => tool.Name, StringComparer.Ordinal);
         var hostRows = definitions
             .Where(definition => !externalByName.ContainsKey(definition.Name))
             .Select(
@@ -66,7 +58,7 @@ public static class ToolListText
         lines.Add(string.Empty);
         AddTable(
             lines,
-            $"External tools ({externalRows.Length}, {(settings.ExternalTools ? "On" : "Off")})",
+            $"External tools ({externalRows.Length}, {(report.ExternalToolsEnabled ? "On" : "Off")})",
             ["Name", "Catalog", "Source", "Author", "Effective", "Pre-classifier"],
             externalRows);
         lines.Add(string.Empty);
@@ -75,15 +67,15 @@ public static class ToolListText
             "External approval",
             ["Source", "Policy"],
             [
-                ["Home", Title(settings.ExternalToolApproval.Home.Value)],
-                ["Project", Title(settings.ExternalToolApproval.Project.Value)]
+                ["Home", Title(report.ExternalApproval.Home.Value)],
+                ["Project", Title(report.ExternalApproval.Project.Value)]
             ]);
 
-        if (external.Notes.Count > 0)
+        if (report.ExternalNotes.Count > 0)
         {
             lines.Add(string.Empty);
             lines.Add("External tool notes");
-            lines.AddRange(external.Notes.Select(note => "- " + note));
+            lines.AddRange(report.ExternalNotes.Select(note => "- " + note));
         }
 
         lines.Add(string.Empty);

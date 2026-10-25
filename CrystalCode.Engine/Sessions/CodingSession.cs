@@ -695,7 +695,7 @@ public sealed class CodingSession : ITurnObserver
     {
         if (_frontEnd.ChooseChildAsync is null)
         {
-            Error("Child inspection requires an interactive terminal.");
+            Error("Child inspection is not available in this front end.");
             return;
         }
         if (argument.Trim() == "parent")
@@ -1756,9 +1756,9 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Persists a conversation that has content, releases the model clients,
-    /// and returns the copy that tells the operator how to resume.
+    /// and reports whether it was saved together with the resume copy.
     /// </summary>
-    public async Task<string> CloseAsync(CancellationToken cancellationToken = default)
+    public async Task<SessionClosure> CloseAsync(CancellationToken cancellationToken = default)
     {
         await ClosePluginSessionAsync(cancellationToken);
         await _backgroundTasks.StopAllAsync();
@@ -1768,7 +1768,7 @@ public sealed class CodingSession : ITurnObserver
         return Close();
     }
 
-    public string Close()
+    public SessionClosure Close()
     {
         CancelAndClearSide(announce: false);
         try
@@ -1777,10 +1777,10 @@ public sealed class CodingSession : ITurnObserver
             if (HasConversation())
             {
                 SaveSession();
-                return ResumeHint.ForSaved(_sessionId);
+                return new SessionClosure(_sessionId, true, ResumeHint.ForSaved(_sessionId));
             }
 
-            return ResumeHint.ForWorkspace();
+            return new SessionClosure(_sessionId, false, ResumeHint.ForWorkspace());
         }
         finally
         {
@@ -2004,7 +2004,7 @@ public sealed class CodingSession : ITurnObserver
         switch (command.Verb)
         {
             case SessionVerb.Help:
-                Publish(new HelpRequested(PluginCommands()));
+                Publish(new HelpRequested(PluginHelp()));
                 return (true, false);
             case SessionVerb.Plan:
                 TogglePlan();
@@ -3572,15 +3572,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var metadata = CreateExportMetadata();
-        var items = TranscriptExport.ConversationItems(ArchiveSnapshot());
-        var systemText = includeSystem ? CurrentSystemText() : null;
-        var markdown = TranscriptExport.RenderMarkdown(
-            metadata,
-            items,
-            _todos.Snapshot(),
-            systemText);
-        WriteExportFile(path, markdown);
+        WriteExportFile(path, RenderMarkdownExport(includeSystem));
     }
 
     private void ExportJson(string? explicitPath, bool includeSystem)
@@ -3591,12 +3583,55 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var metadata = CreateExportMetadata();
-        var document = CreateExportDocument();
-        var systemText = includeSystem ? CurrentSystemText() : null;
-        var json = SessionJsonExport.Render(metadata, document, systemText);
-        WriteExportFile(path, json);
+        WriteExportFile(path, RenderJsonExport(includeSystem));
     }
+
+    /// <summary>
+    /// Renders the conversation as <c>/export</c> would, without writing a
+    /// file, so a remote front end can deliver it. <paramref name="format"/>
+    /// is <c>markdown</c> or <c>json</c>. Refused while a turn runs.
+    /// </summary>
+    public bool TryExport(
+        string format,
+        bool includeSystem,
+        out SessionExportContent? content,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        content = null;
+        error = string.Empty;
+        if (_turnActive)
+        {
+            error = "Finish the current turn before exporting.";
+            return false;
+        }
+
+        switch (format.Trim().ToLowerInvariant())
+        {
+            case "markdown":
+                content = new SessionExportContent(_sessionId + ".md", "text/markdown", RenderMarkdownExport(includeSystem));
+                return true;
+            case "json":
+                content = new SessionExportContent(_sessionId + ".json", "application/json", RenderJsonExport(includeSystem));
+                return true;
+            default:
+                error = "Export format must be markdown or json.";
+                return false;
+        }
+    }
+
+    private string RenderMarkdownExport(bool includeSystem) =>
+        TranscriptExport.RenderMarkdown(
+            CreateExportMetadata(),
+            TranscriptExport.ConversationItems(ArchiveSnapshot()),
+            _todos.Snapshot(),
+            includeSystem ? CurrentSystemText() : null);
+
+    private string RenderJsonExport(bool includeSystem) =>
+        SessionJsonExport.Render(
+            CreateExportMetadata(),
+            CreateExportDocument(),
+            includeSystem ? CurrentSystemText() : null);
 
     private void ExportPromptTemplates(string? explicitDirectory)
     {
@@ -4367,6 +4402,64 @@ public sealed class CodingSession : ITurnObserver
         return image.Marker;
     }
 
+    /// <summary>
+    /// Attaches image bytes a front end received, such as an upload or a
+    /// paste on another machine, to the unsent draft. The bytes are checked
+    /// against the host size limit and a PNG, JPEG, GIF, or WebP signature.
+    /// The draft rules match a clipboard paste: put the returned trusted
+    /// marker in the submitted text, and report draft edits through
+    /// <see cref="NotifyDraftChanged"/>.
+    /// </summary>
+    public bool TryAttachImage(
+        ReadOnlyMemory<byte> data,
+        out ImageAttachment? image,
+        out string error)
+    {
+        image = null;
+        error = string.Empty;
+        if (_multimodalClient is null)
+        {
+            error = "The selected model and provider do not support image input.";
+            return false;
+        }
+
+        if (data.IsEmpty)
+        {
+            error = "The image is empty.";
+            return false;
+        }
+
+        if (data.Length > ImageFile.MaximumBytes)
+        {
+            error = "The image exceeds the 20 MiB host limit.";
+            return false;
+        }
+
+        var mimeType = ImageFile.DetectMimeType(data.Span);
+        if (mimeType is null)
+        {
+            error = "The image is not a supported PNG, JPEG, GIF, or WebP image.";
+            return false;
+        }
+
+        image = new ImageAttachment(ReserveImageNumber(), mimeType, data);
+        AddImage(image);
+        _draftImages.Add(image.Number);
+        return true;
+    }
+
+    /// <summary>
+    /// The image a marker in this session refers to, when the session still
+    /// holds it. Child images are not included.
+    /// </summary>
+    public bool TryGetImage(int number, out ImageAttachment? image)
+    {
+        lock (_imagesGate)
+        {
+            return _images.TryGetValue(number, out image);
+        }
+    }
+
     private void ChangeToolApproval(string source, IReadOnlyList<string> parts)
     {
         if (parts.Count == 1)
@@ -4544,7 +4637,7 @@ public sealed class CodingSession : ITurnObserver
         var workDefinitions = _multimodalClient is null
             ? _workExecutor.Definitions
             : _workMultimodalExecutor.Definitions;
-        Publish(new ToolsListed(planDefinitions, workDefinitions, _external, _settings));
+        Publish(new ToolsListed(ToolCatalogReport.Create(planDefinitions, workDefinitions, _external, _settings)));
     }
 
     private void ShowStatus(string argument)
@@ -6608,6 +6701,9 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    private IReadOnlyList<SlashCompletion> PluginHelp() =>
+        [.. PluginCommands().Select(static command => new SlashCompletion(command.Name, command.Help, [command.Name]))];
+
     private IReadOnlyList<ISlashCommand> PluginCommands()
     {
         var commands = new List<ISlashCommand>(_plugins.Commands);
@@ -7812,7 +7908,7 @@ public sealed class CodingSession : ITurnObserver
         switch (command.Verb)
         {
             case SessionVerb.Help:
-                Publish(new HelpRequested(PluginCommands()));
+                Publish(new HelpRequested(PluginHelp()));
                 return true;
             case SessionVerb.Status:
                 ShowStatus(command.Argument);

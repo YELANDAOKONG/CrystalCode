@@ -1,22 +1,22 @@
 using System.Globalization;
 
-using CrystalCode.Commands;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 
-namespace CrystalCode.Run;
+namespace CrystalCode.Engine.Launch;
 
 /// <summary>
-/// Applies <c>crystal run</c> flags to an in-memory settings value.
+/// Applies launch options to an in-memory settings value. Shared by every
+/// front end that starts a session; nothing here writes <c>config.json</c>.
 /// </summary>
-internal static class TaskRunOverrides
+public static class SessionLaunchOverrides
 {
     public static bool TryApply(
         HarnessSettings current,
-        SessionLaunchSettings request,
+        SessionLaunchOptions request,
         out HarnessSettings applied,
         out string? mode,
         out string error)
@@ -144,11 +144,11 @@ internal static class TaskRunOverrides
                 next = next.WithPromptSetOverride(Required(request.PromptSet, "Prompt set"));
             }
 
-            var requestedAttachments = request.PromptAttachment ?? [];
+            var requestedAttachments = request.PromptAttachment;
             if (request.PromptAttachments is not null)
             {
                 var attachmentsOn = ParseSwitch(request.PromptAttachments, "--prompt-attachments");
-                if (!attachmentsOn && requestedAttachments.Length > 0)
+                if (!attachmentsOn && requestedAttachments.Count > 0)
                 {
                     throw new ArgumentException(
                         "Do not pass --prompt-attachment when --prompt-attachments is off.");
@@ -157,7 +157,7 @@ internal static class TaskRunOverrides
                 next = next.WithUsePromptAttachments(attachmentsOn);
             }
 
-            if (requestedAttachments.Length > 0)
+            if (requestedAttachments.Count > 0)
             {
                 next = next.WithPromptAttachments(NormalizeAttachmentNames(requestedAttachments));
             }
@@ -177,7 +177,7 @@ internal static class TaskRunOverrides
                     minimum: 1));
             }
 
-            if (request.DisableTool.Length > 0)
+            if (request.DisableTool.Count > 0)
             {
                 next = next.WithDisabledBuiltInTools(request.DisableTool);
             }
@@ -318,7 +318,7 @@ internal static class TaskRunOverrides
 
     private static ExtendedApprovalSettings ParseExtendedApproval(
         HarnessSettings current,
-        SessionLaunchSettings request)
+        SessionLaunchOptions request)
     {
         var extended = current.ExtendedApproval;
         var reviewer = extended.Reviewer;
@@ -462,7 +462,7 @@ internal static class TaskRunOverrides
 
     private static CompactionModelSettings ParseCompactionModel(
         HarnessSettings current,
-        SessionLaunchSettings request)
+        SessionLaunchOptions request)
     {
         var specifiedProvider = request.CompactionProvider is not null;
         var specifiedModel = request.CompactionModelId is not null;
@@ -512,7 +512,7 @@ internal static class TaskRunOverrides
             current.CompactionModel.ThinkingEffort);
     }
 
-    private static TurnLimits ParseBudget(HarnessSettings current, SessionLaunchSettings request)
+    private static TurnLimits ParseBudget(HarnessSettings current, SessionLaunchOptions request)
     {
         var modelCalls = current.ExecutionBudget.MaximumModelCalls;
         var toolCalls = current.ExecutionBudget.MaximumToolCalls;
@@ -562,7 +562,7 @@ internal static class TaskRunOverrides
         return parsed;
     }
 
-    internal static bool TryAcceptPromptSet(CrystalHome home, string? name, out string error)
+    public static bool TryAcceptPromptSet(CrystalHome home, string? name, out string error)
     {
         ArgumentNullException.ThrowIfNull(home);
         error = string.Empty;
@@ -580,7 +580,7 @@ internal static class TaskRunOverrides
         return false;
     }
 
-    internal static bool TryAcceptPromptAttachments(
+    public static bool TryAcceptPromptAttachments(
         CrystalHome home,
         string workspaceRoot,
         IReadOnlyList<string>? names,
@@ -629,7 +629,7 @@ internal static class TaskRunOverrides
         return normalized;
     }
 
-    internal static bool TryReadWorkspaceTrust(string? value, out bool enabled, out string error)
+    public static bool TryReadWorkspaceTrust(string? value, out bool enabled, out string error)
     {
         enabled = true;
         error = string.Empty;

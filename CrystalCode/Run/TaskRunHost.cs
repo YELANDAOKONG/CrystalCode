@@ -1,8 +1,7 @@
 using System.Text.Json;
 
 using CrystalCode.Commands;
-using CrystalCode.Engine.Configuration;
-using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 
@@ -57,90 +56,39 @@ internal static class TaskRunHost
             return RunExit.Invalid;
         }
 
-        if (settings.Space && !string.IsNullOrWhiteSpace(settings.Workspace))
+        if (!SessionLaunchOverrides.TryReadWorkspaceTrust(
+                settings.WorkspaceTrust,
+                out var checkWorkspaceTrust,
+                out var trustError))
         {
-            await error.WriteLineAsync("--space cannot be combined with --workspace.");
+            await error.WriteLineAsync(trustError);
             return RunExit.Invalid;
         }
 
-        HarnessSettings applied;
-        HarnessSettings loaded;
-        string? mode;
-        CrystalHome home;
-        string workspace;
-        try
+        // A run has no operator: trust is checked, never asked, and the
+        // launch provider and model are never eligible for a later save.
+        var prepared = await SessionLauncher.PrepareAsync(
+            new SessionLaunchRequest(
+                settings.ToOptions(),
+                Environment.CurrentDirectory,
+                settings.Workspace,
+                settings.Space,
+                Trust: checkWorkspaceTrust ? SessionTrustCheck.Require : SessionTrustCheck.Skip,
+                PersistSelection: false),
+            trust: null,
+            chooser: null,
+            cancellationToken);
+        if (prepared.Launch is not { } launch)
         {
-            home = CrystalHome.Resolve(settings.Home);
-            if (settings.Space)
-            {
-                workspace = OperatorSpace.EnsureCreated(home);
-            }
-            else
-            {
-                workspace = ResolveWorkspace(settings.Workspace);
-                if (!Directory.Exists(workspace))
-                {
-                    await error.WriteLineAsync("Workspace directory not found: " + workspace);
-                    return RunExit.Invalid;
-                }
-            }
-
-            loaded = new DiskSettingsStore(home).LoadOrCreate();
-            if (!TaskRunOverrides.TryApply(loaded, settings, out applied, out mode, out var applyError))
-            {
-                await error.WriteLineAsync(applyError);
-                return RunExit.Invalid;
-            }
-
-            foreach (var note in TaskRunOverrides.UnavailableThinkingNotes(applied))
-            {
-                await error.WriteLineAsync(note);
-            }
-
-            if (!TaskRunOverrides.TryReadWorkspaceTrust(
-                    settings.WorkspaceTrust,
-                    out var checkWorkspaceTrust,
-                    out var trustError))
-            {
-                await error.WriteLineAsync(trustError);
-                return RunExit.Invalid;
-            }
-
-            if (checkWorkspaceTrust
-                && !new WorkspaceTrustStore(home).Contains(workspace))
-            {
-                await error.WriteLineAsync(
-                    "This directory is not trusted. Open it in the terminal and trust it, or pass --workspace-trust off for this process.");
-                return RunExit.Denied;
-            }
-        }
-        catch (Exception exception) when (IsSetupFailure(exception))
-        {
-            await error.WriteLineAsync(exception.Message);
-            return RunExit.Invalid;
+            await error.WriteLineAsync(prepared.Error);
+            return prepared.Failure == SessionLaunchFailureKind.Untrusted
+                ? RunExit.Denied
+                : RunExit.Invalid;
         }
 
-        if (!TaskRunOverrides.TryAcceptPromptSet(home, settings.PromptSet, out var promptError))
+        foreach (var note in launch.Notes)
         {
-            await error.WriteLineAsync(promptError);
-            return RunExit.Invalid;
-        }
-
-        if (!TaskRunOverrides.TryAcceptPromptAttachments(
-                home,
-                workspace,
-                settings.PromptAttachment,
-                out var attachmentError))
-        {
-            await error.WriteLineAsync(attachmentError);
-            return RunExit.Invalid;
-        }
-
-        var credentials = new CredentialStore(home);
-        if (!credentials.TryResolve(applied.ActiveProvider, out _, out var credentialError))
-        {
-            await error.WriteLineAsync(credentialError);
-            return RunExit.Invalid;
+            await error.WriteLineAsync(note);
         }
 
         var approvals = new UnattendedApprovalPrompt();
@@ -151,30 +99,14 @@ internal static class TaskRunHost
         CodingSession session;
         try
         {
-            if (!SessionLaunchAccess.TryRead(settings, workspace, out var launchAccess, out var accessError))
-            {
-                await error.WriteLineAsync(accessError);
-                return RunExit.Invalid;
-            }
-
-            // loaded is the disk baseline. A later save must not write this
-            // process's launch overrides, including provider and model.
-            session = CodingSession.Create(
-                applied,
-                new DiskSettingsStore(home),
-                credentials,
-                home,
-                workspace,
+            session = launch.CreateSession(
                 new SessionFrontEnd(
                     log,
                     approvals,
                     questions,
                     new UnattendedSessionChooser(),
                     new UnattendedTrustPrompt()),
-                plugins ?? PluginRegistry.CreateBuiltIn(),
-                resume: null,
-                persistedSettings: loaded,
-                launchAccess: launchAccess);
+                plugins ?? PluginRegistry.CreateBuiltIn());
         }
         catch (Exception exception) when (IsSetupFailure(exception))
         {
@@ -190,46 +122,38 @@ internal static class TaskRunHost
             try
             {
                 await session.StartAsync(cancellationToken);
-                if (mode is not null && !session.TrySetMode(mode, out var modeError))
+                if (launch.Mode is not null && !session.TrySetMode(launch.Mode, out var modeError))
                 {
                     await error.WriteLineAsync(modeError);
                     code = RunExit.Invalid;
                     return code;
                 }
 
-                await session.SubmitAsync(task, cancellationToken);
-                if (session.TurnTask is null)
+                var runner = new SessionRunner(session);
+                var submitted = runner.SubmitAsync(task);
+                runner.Complete();
+                var quit = await runner.RunAsync(cancellationToken);
+                var accepted = await submitted;
+                if (quit)
+                {
+                    code = RunExit.Interrupted;
+                    status = "quit";
+                }
+                else if (!accepted.TurnActive)
                 {
                     await error.WriteLineAsync("The task did not start a turn.");
                 }
+                else if (log.StopReason is null)
+                {
+                    // The turn faulted before it produced a result. The
+                    // engine has already published the error.
+                    code = RunExit.Failed;
+                    status = TurnStopReason.Failed.Value;
+                }
                 else
                 {
-                    using (cancellationToken.Register(
-                        static state => ((CodingSession)state!).TryInterrupt(),
-                        session))
-                    {
-                        // CompleteTurnAsync observes a faulted turn and
-                        // publishes its error; do not throw it here first.
-                        await session.TurnTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
-                    }
-
-                    if (await session.CompleteTurnAsync(CancellationToken.None))
-                    {
-                        code = RunExit.Interrupted;
-                        status = "quit";
-                    }
-                    else if (log.StopReason is null)
-                    {
-                        // The turn faulted before it produced a result. The
-                        // engine has already published the error.
-                        code = RunExit.Failed;
-                        status = TurnStopReason.Failed.Value;
-                    }
-                    else
-                    {
-                        var operatorDenied = approvals.Asked > 0 || questions.Dismissed > 0;
-                        (code, status) = RunExit.From(log.StopReason, operatorDenied);
-                    }
+                    var operatorDenied = approvals.Asked > 0 || questions.Dismissed > 0;
+                    (code, status) = RunExit.From(log.StopReason, operatorDenied);
                 }
             }
             catch (OperationCanceledException)
@@ -263,8 +187,8 @@ internal static class TaskRunHost
         }
         finally
         {
-            var hint = await session.CloseAsync();
-            log.WriteEpilogue(status, hint);
+            var closure = await session.CloseAsync();
+            log.WriteEpilogue(status, closure.Hint);
         }
 
         return code;
@@ -288,16 +212,6 @@ internal static class TaskRunHost
 
         var text = await input.ReadToEndAsync(cancellationToken);
         return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
-    }
-
-    private static string ResolveWorkspace(string? workspace)
-    {
-        if (string.IsNullOrWhiteSpace(workspace))
-        {
-            return Path.GetFullPath(Environment.CurrentDirectory);
-        }
-
-        return Path.GetFullPath(workspace);
     }
 
     private static bool IsSetupFailure(Exception exception) =>

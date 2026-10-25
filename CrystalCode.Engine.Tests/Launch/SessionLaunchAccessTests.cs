@@ -1,10 +1,9 @@
-using CrystalCode.Commands;
+using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Tools;
-using CrystalCode.Run;
 
 using Xunit;
 
-namespace CrystalCode.Tests.Run;
+namespace CrystalCode.Engine.Tests.Launch;
 
 public sealed class SessionLaunchAccessTests
 {
@@ -16,7 +15,7 @@ public sealed class SessionLaunchAccessTests
         {
             Directory.CreateDirectory(Path.Combine(root, "reference"));
             Directory.CreateDirectory(Path.Combine(root, "output"));
-            var settings = new SessionLaunchSettings
+            var settings = new SessionLaunchOptions
             {
                 AllowRead = ["reference", "./reference"], AllowWrite = ["output"]
             };
@@ -45,7 +44,7 @@ public sealed class SessionLaunchAccessTests
             Directory.CreateSymbolicLink(link, target);
 
             Assert.True(SessionLaunchAccess.TryRead(
-                new SessionLaunchSettings { AllowRead = ["reference-link"] }, root,
+                new SessionLaunchOptions { AllowRead = ["reference-link"] }, root,
                 out var rules, out var error), error);
 
             var rule = Assert.Single(rules);
@@ -75,7 +74,7 @@ public sealed class SessionLaunchAccessTests
             Directory.CreateSymbolicLink(link, target);
 
             Assert.True(SessionLaunchAccess.TryRead(
-                new SessionLaunchSettings { AllowRead = ["reference-link"] }, workspace,
+                new SessionLaunchOptions { AllowRead = ["reference-link"] }, workspace,
                 out var rules, out var error), error);
 
             var rule = Assert.Single(rules);
@@ -95,7 +94,7 @@ public sealed class SessionLaunchAccessTests
         var root = Directory.CreateTempSubdirectory("crystal-access-").FullName;
         try
         {
-            var settings = new SessionLaunchSettings { AllowRead = ["."], AllowWrite = [root] };
+            var settings = new SessionLaunchOptions { AllowRead = ["."], AllowWrite = [root] };
             Assert.False(SessionLaunchAccess.TryRead(settings, root, out var rules, out var error));
             Assert.Empty(rules);
             Assert.Contains("both --allow-read and --allow-write", error, StringComparison.Ordinal);
@@ -115,7 +114,7 @@ public sealed class SessionLaunchAccessTests
         try
         {
             Directory.CreateDirectory(Path.Combine(root, ".ssh"));
-            Assert.False(SessionLaunchAccess.TryRead(new SessionLaunchSettings { AllowRead = [name] }, root, out _, out _));
+            Assert.False(SessionLaunchAccess.TryRead(new SessionLaunchOptions { AllowRead = [name] }, root, out _, out _));
         }
         finally
         {

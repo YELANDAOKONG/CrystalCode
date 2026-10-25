@@ -51,6 +51,10 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   it is built, which providers, the token store, and refresh behavior are not
   defined. Do not reserve a command, configuration field, or public type. It
   is not OAuth for remote MCP servers (see MCP gaps).
+- Several concurrent tasks in one terminal process.
+- Several active sessions in one `crystal server` process. Plugin and
+  external tool load contexts are not collectible, so this needs that
+  question answered first.
 
 ## High priority
 
@@ -85,18 +89,13 @@ behavior stands until a specific change defines otherwise.
   exists, use the same MCP client as local servers. The terminal remains the
   only operator surface until it exists. `crystal agent` is not a command,
   project, or public type in this build.
-- An agent API server. The working name is crystal server. It would run in a
-  workspace and expose the full Crystal Code capability over our own
-  protocol, so that other front ends can drive it. The operator picks the
-  workspace and the other session parameters when starting it. It would be a
-  front end that implements `SessionFrontEnd`, not an engine protocol, and
-  not ACP. The wire format, transport, authentication, how approval and
-  questions reach the connected front end, and how many sessions one server
-  holds are not defined. Do not bypass approval, trust, the workspace fence,
-  or `ToolInvocationPolicy`. Do not put secrets on the command line or
-  persist its flags to `config.json`. The terminal remains the only operator
-  surface until it exists. `crystal server` is not a command, project, or
-  public type in this build.
+- An agent API server, `crystal server`. Behavior and ownership are defined
+  in [docs/server.md](docs/server.md) and `BUSINESS.md`: ASP.NET Core Minimal
+  API plus server-sent events in `CrystalCode.Server`, one session per
+  process, token authentication by default, and no version identifier. The
+  engine launch, runner, plain-data report, image, export, and close
+  boundary is in this build. The session state reducer, event origin,
+  per-origin drafts, the project, and the command are not.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.

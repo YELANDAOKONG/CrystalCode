@@ -78,7 +78,7 @@ or `CrystalCode` on Windows.
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
 High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
-(MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; and a refactor
+(MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; `crystal server`, an HTTP front end whose protocol is defined in [server.md](server.md); and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a second additional review
 of the current product, a full code review, child Agent configuration, and provider-specific

@@ -22,8 +22,8 @@ public sealed class SessionBuiltInToolDisablementTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.DoesNotContain(listed.Plan, tool => tool.Name == ReadTool.ToolName);
-        Assert.Contains(listed.Work, tool => tool.Name == ReadTool.ToolName);
+        Assert.DoesNotContain(listed.Report.Plan, tool => tool.Name == ReadTool.ToolName);
+        Assert.Contains(listed.Report.Work, tool => tool.Name == ReadTool.ToolName);
         var saved = headless.ReadSaved().DisabledBuiltInTools;
         Assert.Equal([ReadTool.ToolName], saved?.Plan);
         Assert.Empty(saved?.Work ?? []);
@@ -42,7 +42,7 @@ public sealed class SessionBuiltInToolDisablementTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.Contains(listed.Work, tool => tool.Name == BashTool.ToolName);
+        Assert.Contains(listed.Report.Work, tool => tool.Name == BashTool.ToolName);
         Assert.Null(headless.ReadSaved().DisabledBuiltInTools);
     }
 
@@ -106,8 +106,8 @@ public sealed class SessionBuiltInToolDisablementTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.DoesNotContain(listed.Work, tool => tool.Name == BashTool.ToolName);
-        Assert.Contains(listed.Plan, tool => tool.Name == ReadTool.ToolName);
+        Assert.DoesNotContain(listed.Report.Work, tool => tool.Name == BashTool.ToolName);
+        Assert.Contains(listed.Report.Plan, tool => tool.Name == ReadTool.ToolName);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public sealed class SessionBuiltInToolDisablementTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.DoesNotContain(listed.Work, tool => tool.Name == BashTool.ToolName);
+        Assert.DoesNotContain(listed.Report.Work, tool => tool.Name == BashTool.ToolName);
     }
 
     [Theory]
@@ -141,7 +141,7 @@ public sealed class SessionBuiltInToolDisablementTests
         await headless.Session.SubmitAsync("/tools", CancellationToken.None);
 
         var listed = headless.Observer.Events.OfType<ToolsListed>().Last();
-        Assert.Contains(listed.Work, tool => tool.Name == BashTool.ToolName);
+        Assert.Contains(listed.Report.Work, tool => tool.Name == BashTool.ToolName);
         Assert.Null(headless.ReadSaved().DisabledBuiltInTools);
         Assert.NotEqual(source, headless.Session.SessionId);
         Assert.True(new SessionStore(headless.Home).TryLoad(source, out var original));

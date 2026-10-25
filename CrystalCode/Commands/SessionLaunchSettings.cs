@@ -1,5 +1,7 @@
 using Spectre.Console.Cli;
 
+using CrystalCode.Engine.Launch;
+
 namespace CrystalCode.Commands;
 
 /// <summary>
@@ -146,4 +148,55 @@ public class SessionLaunchSettings : CommandSettings
 
     [CommandOption("--disable-tool <NAME>")]
     public string[] DisableTool { get; init; } = [];
+
+    public SessionLaunchOptions ToOptions() =>
+        new()
+        {
+            Provider = Provider,
+            Model = Model,
+            Home = Home,
+            AllowRead = AllowRead,
+            AllowWrite = AllowWrite,
+            Approval = Approval,
+            ApprovalModel = ApprovalModel,
+            ApprovalProvider = ApprovalProvider,
+            ApprovalModelId = ApprovalModelId,
+            ApprovalThinking = ApprovalThinking,
+            ApprovalTier = ApprovalTier,
+            ApprovalSpeed = ApprovalSpeed,
+            ExtendedApproval = ExtendedApproval,
+            ExtendedApprovalProvider = ExtendedApprovalProvider,
+            ExtendedApprovalModelId = ExtendedApprovalModelId,
+            ExtendedApprovalThinking = ExtendedApprovalThinking,
+            ExtendedApprovalTier = ExtendedApprovalTier,
+            ExtendedApprovalSpeed = ExtendedApprovalSpeed,
+            ExtendedApprovalTrigger = ExtendedApprovalTrigger,
+            ExtendedApprovalPrimary = ExtendedApprovalPrimary,
+            CompactionModel = CompactionModel,
+            CompactionProvider = CompactionProvider,
+            CompactionModelId = CompactionModelId,
+            CompactionThinking = CompactionThinking,
+            Plan = Plan,
+            Work = Work,
+            Mode = Mode,
+            Thinking = Thinking,
+            Context = Context,
+            Tier = Tier,
+            Speed = Speed,
+            PromptSet = PromptSet,
+            PromptAttachments = PromptAttachments,
+            PromptAttachment = PromptAttachment,
+            Agents = Agents,
+            AgentsConcurrency = AgentsConcurrency,
+            Skills = Skills,
+            ExternalTools = ExternalTools,
+            Mcp = Mcp,
+            Plugins = Plugins,
+            Rules = Rules,
+            ModelCalls = ModelCalls,
+            ToolCalls = ToolCalls,
+            Duration = Duration,
+            BashTimeout = BashTimeout,
+            DisableTool = DisableTool
+        };
 }

@@ -1,11 +1,9 @@
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Shell;
-using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
-using CrystalCode.Engine.Home.Interfaces;
+using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
-using CrystalCode.Engine.Tools;
 using CrystalCode.Terminal.Approvals;
 
 namespace CrystalCode.Terminal;
@@ -30,18 +28,10 @@ internal sealed class TerminalHost
         _launchMode = launchMode;
     }
 
-    public static TerminalHost Create(
-        HarnessSettings settings,
-        ISettingsStore settingsStore,
-        CredentialStore credentials,
-        CrystalHome home,
-        string workspaceRoot,
-        PluginRegistry plugins,
-        SessionDocument? resume,
-        HarnessSettings? persistedSettings = null,
-        string? launchMode = null,
-        IReadOnlyList<DirectoryAccess>? launchAccess = null)
+    public static TerminalHost Create(SessionLaunch launch, PluginRegistry plugins)
     {
+        ArgumentNullException.ThrowIfNull(launch);
+        ArgumentNullException.ThrowIfNull(plugins);
         var renderer = new SessionRenderer();
         var projection = new SessionProjection(renderer);
         var frontEnd = new SessionFrontEnd(
@@ -53,21 +43,11 @@ internal sealed class TerminalHost
         {
             ChooseChildAsync = new ChildPicker(renderer).ChooseAsync
         };
-        var session = CodingSession.Create(
-            settings,
-            settingsStore,
-            credentials,
-            home,
-            workspaceRoot,
-            frontEnd,
-            plugins,
-            resume,
-            persistedSettings,
-            launchAccess);
-        renderer.LoadQuickPromptsAsync = new QuickPromptStore(home).LoadAsync;
+        var session = launch.CreateSession(frontEnd, plugins);
+        renderer.LoadQuickPromptsAsync = new QuickPromptStore(launch.Home).LoadAsync;
         renderer.ChildSessionsEnabled = session.AgentsEnabled;
         renderer.QueueQuickPromptAsync = (text, token) => session.SubmitQuickPromptAsync(text, true, token);
-        return new TerminalHost(renderer, session, launchMode, projection);
+        return new TerminalHost(renderer, session, launch.Mode, projection);
     }
 
     /// <summary>
@@ -92,7 +72,7 @@ internal sealed class TerminalHost
         }
         finally
         {
-            Console.WriteLine(await _session.CloseAsync());
+            Console.WriteLine((await _session.CloseAsync()).Hint);
         }
     }
 

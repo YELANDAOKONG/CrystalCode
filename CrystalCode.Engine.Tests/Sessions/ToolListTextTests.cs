@@ -39,11 +39,11 @@ public sealed class ToolListTextTests
             approvalSettings: ExternalToolApprovalSettings.Default);
         var host = new ReadTool(new Workspace(workspace.Path)).Definition;
 
-        var text = ToolListText.Format(
+        var text = ToolListText.Format(ToolCatalogReport.Create(
             [host, external.PlanTools[0].Definition],
             [external.WorkTools[0].Definition],
             external,
-            HarnessSettings.CreateDefault());
+            HarnessSettings.CreateDefault()));
 
         Assert.Contains("Tools  2 loaded  ·  Plan 2  ·  Work 1", text, StringComparison.Ordinal);
         Assert.Contains("Host tools (1)", text, StringComparison.Ordinal);

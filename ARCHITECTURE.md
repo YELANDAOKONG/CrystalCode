@@ -33,6 +33,12 @@ references only Crystal. No project in this repository modifies Crystal.
 
 A second front end (a desktop application, for example) references
 CrystalCode.Engine and supplies its own surface. It does not copy engine code.
+`CrystalCode.Server` (defined, not in this build) sits beside
+`CrystalCode.Display` under the executable: it references
+CrystalCode.Engine and the `Microsoft.AspNetCore.App` shared framework only.
+It does not reference CrystalCode.Display, Spectre.Console, Terminal.Gui, or
+the executable. `CrystalCode.Server.Tests` references CrystalCode.Server and
+guards that direction. See [docs/server.md](docs/server.md).
 If that desktop front end is built with Avalonia, write the UI in C# markup.
 Do not add XAML or AXAML files.
 `EngineAssemblyTests` and `DisplayAssemblyTests` fail the build when either
@@ -139,9 +145,25 @@ It never reads a key, writes to the console, or paints. See
 ### CrystalCode.Engine.Tests
 
 Engine tests: workspace fencing, approval classification, compaction
-selection, session serialization, command behavior, external tool sets, a
-headless session driven by a scripted model, and the dependency guard. Does not
-reference the host executable.
+selection, session serialization, command behavior, external tool sets, launch
+overrides, trust and resume preparation, the session runner, event data
+guards, a headless session driven by a scripted model, and the dependency
+guard. Does not reference the host executable.
+
+### CrystalCode.Server (defined, not in this build)
+
+The HTTP front end behind `crystal server`: ASP.NET Core Minimal API endpoints
+and server-sent events on Kestrel, authentication and scopes, wire DTOs with
+System.Text.Json source generation, the interaction broker, the event log, and
+the host that wires `SessionRunner` to HTTP. One process hosts one active
+session. It holds no product logic. The executable's `Commands/ServerCommand`
+parses the command line and hands off to it. The protocol is in
+[docs/server.md](docs/server.md).
+
+### CrystalCode.Server.Tests (defined, not in this build)
+
+Server tests against a real Kestrel listener and a scripted model, the parity
+guards, the secret-leak test, and the dependency guard.
 
 ### CrystalCode.Display
 
@@ -198,8 +220,8 @@ CrystalCode (executable):
 | Folder | Owns |
 | :--- | :--- |
 | `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `version` prints the build identity |
-| `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, process-only setting overrides, and exit codes |
-| `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, slash-option mapping |
+| `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, and exit codes. Overrides and launch preparation come from `CrystalCode.Engine.Launch` |
+| `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, startup trust and resume prompts (`StartupPrompt`), slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
 
 CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
@@ -210,7 +232,8 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Events` | Immutable session events, observer interface, chrome and preference snapshots |
 | `Home` | `~/.crystal` paths and file I/O; `DiskSettingsStore` is the default `config.json` implementation and reads provider files through `ProviderFiles` |
 | `Home/Interfaces` | Configuration persistence contracts such as `ISettingsStore` |
-| `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
+| `Launch` | Launch options a front end received (`SessionLaunchOptions`), in-memory overrides (`SessionLaunchOverrides`), `--allow-read` / `--allow-write` rules (`SessionLaunchAccess`), and `SessionLauncher`, which resolves the workspace, resume target, trust, prompt attachments, and mode before a session exists |
+| `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, the input loop for front ends without a frame loop (`SessionRunner`), front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
 | `Approvals` | Risk, authority, grants, policy, review transcript |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
@@ -1578,6 +1601,7 @@ contents of `binaries/code/`.
   sessions/<id>.json
   media/<sha256>
   logs/
+  server/<pid>.json   (crystal server discovery file, owner-only; defined, not in this build)
   space/
 ```
 
@@ -2075,14 +2099,53 @@ A front end supplies (`SessionFrontEnd`):
 - `Trust` (`IWorkspaceTrustPrompt`) asks whether to trust a directory.
   A front end that cannot ask returns false.
 
+A front end prepares a session with `SessionLauncher.PrepareAsync`. It maps
+its own command line onto `SessionLaunchOptions` and passes a
+`SessionLaunchRequest` (working directory, workspace, operator space, resume
+target, trust check, and whether the launch provider and model may be saved
+by a later preference command). The launcher applies overrides in memory,
+checks credentials, resolves the resume target, checks trust, and validates
+prompt attachments, directory rules, and the mode. It asks the operator only
+through the `IWorkspaceTrustPrompt` and `ISessionChooser` it receives; a null
+prompt returns `TrustNeedsOperator` or `ResumeNeedsOperator` so the front end
+chooses its wording. `SessionTrustCheck.Prompt` follows `workspaceTrust` and
+remembers a yes, `Require` refuses an untrusted directory without asking
+(`crystal run`), and `Skip` neither checks nor records. The result's
+`SessionLaunch.CreateSession` builds the `CodingSession`. The terminal opens
+its trust and resume prompts on their own alternate screen
+(`StartupPrompt`) before the session frame exists.
+
 A front end calls `CodingSession`: `Create`, `StartAsync`, `SubmitAsync`
 (slash commands, follow-ups while a turn runs, interrupts, and turn starts;
 returns true when the operator asked to quit), `CompleteTurnAsync` once
 `TurnTask` finishes, `FinishTurnAsync` to collect a turn before exit,
-`TryInterrupt`, `TogglePlan`, `CycleMode`, `TrySetMode`, `SetVerbose`, `NotifyDraftChanged`, `Enqueue`,
-`PasteClipboardImageAsync`, and `Close`. `TurnActive`, `TurnTask`,
-`PlanMode`, `CustomMode`, and `SessionId` report state. The usual turn is:
-`SubmitAsync`, await `TurnTask`, then `CompleteTurnAsync`.
+`TryInterrupt`, `TryRecall`, `TogglePlan`, `CycleMode`, `TrySetMode`,
+`SetVerbose`, `NotifyDraftChanged`, `Enqueue`, `EnqueueAsync`,
+`SubmitQuickPromptAsync`, `PasteClipboardImageAsync`, `TryAttachImage`,
+`TryGetImage`, `TryExport`, `TryCancelSideQuestion`, `ClearSideQuestions`,
+`TrySetDirectoryAccess`, and `CloseAsync`. `TurnActive`, `TurnTask`,
+`RecallPending`, `AgentsEnabled`, `PlanMode`, `CustomMode`, and `SessionId`
+report state. The usual turn is: `SubmitAsync`, await `TurnTask`, then
+`CompleteTurnAsync`.
+
+`SessionRunner` is that loop for a front end without a frame loop of its own.
+It is the only caller of the session's input methods while it runs. Inputs
+(`SubmitAsync`, `SubmitQuickPromptAsync`) go through one channel in order.
+Input that arrives while a session call is running goes to `EnqueueAsync`, or
+to a queued quick prompt, as the terminal pump forwards keys. A finished turn
+is collected with `CompleteTurnAsync`, which starts a queued follow-up.
+Cancellation interrupts and collects the turn without starting queued work.
+`crystal run` uses it; the terminal keeps its own pump.
+
+`TryAttachImage` attaches bytes a front end received (an upload, or a paste on
+another machine) to the draft with the same signature and size checks as a
+clipboard paste, and returns the image with its trusted marker. `TryGetImage`
+returns a held session image by number. `TryExport` renders the Markdown or
+JSON export in memory as `SessionExportContent`; `/export` still writes a
+file. `CloseAsync` returns a `SessionClosure` with the session id, whether it
+was saved, and the plain-text resume hint the terminal prints. Without a
+`ChooseChildAsync`, `/child` reports that child inspection is not available in
+this front end.
 
 Events are immutable sealed records, one type per file under `Events`:
 
@@ -2096,6 +2159,14 @@ Events are immutable sealed records, one type per file under `Events`:
 - Conversation: `HistoryReplayed`, `ConversationCleared`, `TodosChanged`.
 - Text and reports: `NoteWritten`, `ErrorWritten`, `HelpRequested`,
   `StatusReported`, `ToolsListed`, `TodosListed`.
+
+Events carry plain data. `ToolsListed` carries a `ToolCatalogReport` (Plan and
+Work definitions, external tool metadata and notes, the external-tools switch,
+and the external approval policy), not the settings object or the live
+catalog. `HelpRequested` carries plugin verbs as `SlashCompletion` values, not
+plugin objects. `SessionEventDataTests` fails when an event can reach
+`HarnessSettings`, a provider definition (which may hold a literal API key),
+`ExternalCatalog`, or a plugin type.
 
 The engine publishes from whichever thread produced the change, including the
 turn thread while a model round streams. Observers must be thread-safe and
@@ -2128,6 +2199,11 @@ The Agent Client Protocol (ACP) is high-priority product work and is not in
 this build. The working name is crystal agent. It would be another front end
 on this contract, not an engine protocol. Do not reserve a command, project,
 or public type for it. `crystal agent` is not a command in this build.
+`crystal server` is the defined HTTP front end on this contract
+([docs/server.md](docs/server.md)). It is not in this build. It uses
+`SessionLauncher` and `SessionRunner`, and it still needs an engine session
+state reducer for snapshots, an origin on request-produced events, and draft
+images tracked per origin before it can be built.
 
 `crystal run` is the headless front end in this executable, not a second
 assembly. Refactoring and optimizing it is high-priority product work and
