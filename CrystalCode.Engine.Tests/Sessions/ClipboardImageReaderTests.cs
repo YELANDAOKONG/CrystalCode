@@ -23,6 +23,17 @@ public sealed class ClipboardImageReaderTests
             ClipboardImageReader.MacClipboardTypes);
     }
 
+    [Fact]
+    public void CreateStartInfo_RedirectsStdinSoTheTerminalStaysRaw()
+    {
+        var startInfo = ClipboardImageReader.CreateStartInfo("xclip", ["-o"]);
+
+        Assert.True(startInfo.RedirectStandardInput);
+        Assert.True(startInfo.RedirectStandardOutput);
+        Assert.True(startInfo.RedirectStandardError);
+        Assert.Equal(["-o"], startInfo.ArgumentList);
+    }
+
     [Theory]
     [InlineData(0, 0, "Empty")]
     [InlineData(0, 2, "Success")]

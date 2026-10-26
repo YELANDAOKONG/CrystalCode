@@ -377,20 +377,7 @@ public static class ClipboardImageReader
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
         timeout.CancelAfter(OperatingSystem.IsWindows() ? WindowsTimeout : Timeout);
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = fileName,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = new Process { StartInfo = startInfo };
+        using var process = new Process { StartInfo = CreateStartInfo(fileName, arguments) };
         try
         {
             if (!process.Start())
@@ -398,6 +385,7 @@ public static class ClipboardImageReader
                 return new CommandResult(CommandStatus.Failed, null);
             }
 
+            process.StandardInput.Close();
             var stderr = process.StandardError.BaseStream.CopyToAsync(Stream.Null, timeout.Token);
             using var output = new MemoryStream();
             var buffer = new byte[81920];
@@ -451,6 +439,32 @@ public static class ClipboardImageReader
             cancellationToken.ThrowIfCancellationRequested();
             return new CommandResult(CommandStatus.Failed, null);
         }
+    }
+
+    /// <summary>
+    /// A child that inherits the terminal's stdin makes .NET take the terminal
+    /// out of raw mode while it runs, so the tty echoes mouse reports and keys
+    /// into the composer. Redirecting stdin keeps the terminal as it was.
+    /// </summary>
+    internal static ProcessStartInfo CreateStartInfo(
+        string fileName,
+        IReadOnlyList<string> arguments)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = fileName,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        return startInfo;
     }
 
     private static void TryKill(Process process)
