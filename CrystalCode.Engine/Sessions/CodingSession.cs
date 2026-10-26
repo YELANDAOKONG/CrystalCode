@@ -7807,7 +7807,8 @@ public sealed class CodingSession : ITurnObserver
             CatalogSlotStatus.For("Tier", _settings.ServiceTier),
             CatalogSlotStatus.For("Speed", _settings.Speed),
             _settings.Agents.Enabled,
-            _customMode);
+            _customMode,
+            _settings.Provider.Value);
 
     private void RefreshChrome()
     {

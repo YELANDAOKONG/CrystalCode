@@ -63,6 +63,20 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task Chrome_NamesTheProvider()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/mode", new { action = "cycle" });
+        var changed = await events.WaitForAsync("chrome.changed");
+
+        var chrome = changed.GetProperty("data").GetProperty("chrome");
+        Assert.Equal("ollama", chrome.GetProperty("provider").GetString());
+    }
+
+    [Fact]
     public async Task Reports_GoOnlyToTheRequestingClient()
     {
         await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
