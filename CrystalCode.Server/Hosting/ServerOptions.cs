@@ -33,6 +33,15 @@ public sealed record ServerOptions
 
     public IReadOnlyList<string> AllowedOrigins { get; init; } = [];
 
+    /// <summary>
+    /// Response headers a page may read, added to the built-in set
+    /// (<c>Retry-After</c>, <c>Content-Disposition</c>, <c>WWW-Authenticate</c>).
+    /// </summary>
+    public IReadOnlyList<string> ExposedHeaders { get; init; } = [];
+
+    /// <summary>Answer the Private Network Access preflight of older browsers.</summary>
+    public bool AllowPrivateNetwork { get; init; }
+
     /// <summary>Event ring buffer bounds.</summary>
     public int EventLogCount { get; init; } = 20_000;
 

@@ -45,6 +45,12 @@ public sealed class ServerSettings : SessionLaunchSettings
     [CommandOption("--allow-origin <ORIGIN>")]
     public string[] AllowOrigin { get; init; } = [];
 
+    [CommandOption("--expose-header <NAME>")]
+    public string[] ExposeHeader { get; init; } = [];
+
+    [CommandOption("--allow-private-network")]
+    public bool AllowPrivateNetwork { get; init; }
+
     [CommandOption("--exit-on-stdin-close")]
     public bool ExitOnStdinClose { get; init; }
 }

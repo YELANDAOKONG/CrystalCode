@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Server.Endpoints;
@@ -61,6 +62,24 @@ public sealed class CrystalServer : IAsyncDisposable
         {
             error = "Pass both --tls-cert and --tls-key.";
             return false;
+        }
+
+        foreach (var origin in options.AllowedOrigins)
+        {
+            if (!ServerHostSettings.TryNormalizeOrigin(origin, out _))
+            {
+                error = "The origin \"" + origin + "\" must look like https://app.example.com, with no path.";
+                return false;
+            }
+        }
+
+        foreach (var header in options.ExposedHeaders)
+        {
+            if (!ServerHostSettings.IsHeaderName(header))
+            {
+                error = "The header name \"" + header + "\" is not valid.";
+                return false;
+            }
         }
 
         if (options.Socket is not null && options.TlsCertificate is not null)
@@ -127,7 +146,12 @@ public sealed class CrystalServer : IAsyncDisposable
         var app = builder.Build();
         var tokens = _options.Token is { } token ? new TokenStore(token) : null;
         var clients = new ClientRegistry();
-        var guard = new AccessGuard(tokens, _options.AllowedHosts, _options.AllowedOrigins);
+        var guard = new AccessGuard(
+            tokens,
+            _options.AllowedHosts,
+            _options.AllowedOrigins,
+            _options.ExposedHeaders,
+            _options.AllowPrivateNetwork);
         if (!_listen.IsLoopback && !_listen.IsAny)
         {
             guard.AllowHost(_listen.Address.ToString());
@@ -157,8 +181,10 @@ public sealed class CrystalServer : IAsyncDisposable
         }
 
         await WarnAsync();
-        var workspace = Path.GetFullPath(_options.Launch.Workspace ?? _options.Launch.WorkingDirectory);
         var home = CrystalHome.Resolve(_options.Launch.Options.Home);
+        var workspace = _options.Launch.Space
+            ? OperatorSpace.Resolve(home)
+            : Path.GetFullPath(_options.Launch.Workspace ?? _options.Launch.WorkingDirectory);
         if (_options.WriteDiscovery)
         {
             _discovery = ServerDiscovery.Write(

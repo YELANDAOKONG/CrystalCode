@@ -163,7 +163,7 @@ line, resolves the token, and hands off to it. The protocol is in
 | Folder | Owns |
 | :--- | :--- |
 | `Hosting` | `CrystalServer` (Kestrel, startup, the listening line, warnings, shutdown), `ServerSession` (launch, the live `CodingSession`, `SessionRunner`, close), `ServerOptions`, `ServerRuntime`, `ListenAddress`, the discovery file, `ClientRegistry`, and the `clientRequestId` ledger |
-| `Security` | `AccessGuard` (Host and Origin checks, bearer tokens, stream tickets, failure rate limit), `TokenStore` (hashed process-local tokens), scopes and the scope of each `SessionVerb`, problem responses |
+| `Security` | `AccessGuard` (Host and Origin checks, CORS and exposed headers for listed origins, bearer tokens, stream tickets, failure rate limit; the lists come from `--allow-*`/`--expose-header` and the `server` section of `config.json`), `TokenStore` (hashed process-local tokens), scopes and the scope of each `SessionVerb`, problem responses |
 | `Events` | `EventHub`: the session observer that numbers, serializes, buffers, and fans out events and owns the `SessionState` reducer |
 | `Interactions` | `InteractionBroker`: approval, question, trust, session, and child prompts as interactions with validated answers |
 | `Wire` | `WireWriter`, `WireEvents`, `SnapshotWriter`: every wire field written explicitly |

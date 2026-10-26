@@ -108,7 +108,8 @@ public sealed record HarnessSettings
         bool mcp = DefaultMcp,
         McpToolApprovalSettings? mcpToolApproval = null,
         ExtendedApprovalSettings? extendedApproval = null,
-        OperatorNotifySettings? operatorNotify = null)
+        OperatorNotifySettings? operatorNotify = null,
+        ServerHostSettings? server = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -207,6 +208,7 @@ public sealed record HarnessSettings
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
         ExtendedApproval = extendedApproval ?? ExtendedApprovalSettings.Off;
         OperatorNotify = operatorNotify ?? OperatorNotifySettings.Off;
+        Server = server ?? ServerHostSettings.Default;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
@@ -479,6 +481,9 @@ public sealed record HarnessSettings
     public ExtendedApprovalSettings ExtendedApproval { get; }
 
     public OperatorNotifySettings OperatorNotify { get; }
+
+    /// <summary>Defaults for <c>crystal server</c>. The terminal ignores them.</summary>
+    public ServerHostSettings Server { get; }
 
     public CompactionModelSettings CompactionModel { get; }
 
@@ -833,7 +838,8 @@ public sealed record HarnessSettings
         bool? mcp = null,
         McpToolApprovalSettings? mcpToolApproval = null,
         ExtendedApprovalSettings? extendedApproval = null,
-        OperatorNotifySettings? operatorNotify = null) =>
+        OperatorNotifySettings? operatorNotify = null,
+        ServerHostSettings? server = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -886,7 +892,8 @@ public sealed record HarnessSettings
             mcp ?? Mcp,
             mcpToolApproval ?? McpToolApproval,
             extendedApproval ?? ExtendedApproval,
-            operatorNotify ?? OperatorNotify);
+            operatorNotify ?? OperatorNotify,
+            server ?? Server);
 
     public override string ToString() => nameof(HarnessSettings);
 

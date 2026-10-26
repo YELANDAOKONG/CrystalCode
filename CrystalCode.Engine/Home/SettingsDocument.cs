@@ -86,6 +86,8 @@ internal sealed class SettingsDocument
 
     public OperatorNotifyDocument? OperatorNotify { get; set; }
 
+    public ServerHostDocument? Server { get; set; }
+
     public CompactionModelDocument? CompactionModel { get; set; }
 
     public MicroCompactionDocument? MicroCompaction { get; set; }

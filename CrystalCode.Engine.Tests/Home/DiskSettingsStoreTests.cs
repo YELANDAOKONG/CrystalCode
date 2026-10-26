@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Crystal.Reasoning;
 
+using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
@@ -94,6 +95,61 @@ public sealed class DiskSettingsStoreTests
         store.Save(settings);
 
         Assert.Equal(before, File.ReadAllText(root.Home.ProvidersPath));
+    }
+
+    [Fact]
+    public void Server_RoundTripsAndSurvivesAnotherSave()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        var created = store.LoadOrCreate();
+        store.Save(created);
+        Assert.DoesNotContain("\"server\"", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            File.ReadAllText(root.Home.ConfigPath).Replace(
+                "{",
+                """
+                {
+                  "server": {
+                    "allowOrigins": ["https://app.example.test"],
+                    "allowHosts": ["crystal.example.test"],
+                    "exposeHeaders": ["X-Request-Id"],
+                    "allowPrivateNetwork": true
+                  },
+                """,
+                StringComparison.Ordinal));
+        var loaded = store.Load();
+        store.Save(loaded.WithApproval(ApprovalMode.Edit));
+        var reloaded = store.Load();
+
+        Assert.Equal(["https://app.example.test"], reloaded.Server.AllowOrigins);
+        Assert.Equal(["crystal.example.test"], reloaded.Server.AllowHosts);
+        Assert.Equal(["X-Request-Id"], reloaded.Server.ExposeHeaders);
+        Assert.True(reloaded.Server.AllowPrivateNetwork);
+    }
+
+    [Theory]
+    [InlineData("""{ "allowOrigins": ["https://app.example.test/path"] }""", "allowOrigins")]
+    [InlineData("""{ "allowOrigins": ["app.example.test"] }""", "allowOrigins")]
+    [InlineData("""{ "allowHosts": [" "] }""", "allowHosts")]
+    [InlineData("""{ "exposeHeaders": ["Bad Header"] }""", "exposeHeaders")]
+    public void Server_RejectsInvalidEntries(string section, string name)
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            File.ReadAllText(root.Home.ConfigPath).Replace(
+                "{",
+                "{ \"server\": " + section + ",",
+                StringComparison.Ordinal));
+
+        var exception = Assert.Throws<InvalidOperationException>(store.Load);
+
+        Assert.Contains(name, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

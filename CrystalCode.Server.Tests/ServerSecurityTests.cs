@@ -100,6 +100,124 @@ public sealed class ServerSecurityTests
     }
 
     [Fact]
+    public async Task RejectedHost_StillCarriesCorsHeadersForAnAllowedOrigin()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), origins: ["https://app.example.test"]);
+        await fixture.WaitReadyAsync();
+
+        var allowed = new HttpRequestMessage(HttpMethod.Get, "/health");
+        allowed.Headers.Host = "attacker.example.test";
+        allowed.Headers.Add("Origin", "https://app.example.test");
+        var foreign = new HttpRequestMessage(HttpMethod.Get, "/health");
+        foreign.Headers.Host = "attacker.example.test";
+        foreign.Headers.Add("Origin", "https://evil.example.test");
+
+        var misdirected = await fixture.Http.SendAsync(allowed);
+        var refused = await fixture.Http.SendAsync(foreign);
+
+        Assert.Equal(HttpStatusCode.MisdirectedRequest, misdirected.StatusCode);
+        Assert.Equal("https://app.example.test", misdirected.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        Assert.Equal(HttpStatusCode.MisdirectedRequest, refused.StatusCode);
+        Assert.False(refused.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.False(refused.Headers.Contains("Access-Control-Expose-Headers"));
+    }
+
+    [Fact]
+    public async Task ForbiddenOrigin_NeverGetsCorsHeaders()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), origins: ["https://app.example.test"]);
+        await fixture.WaitReadyAsync();
+        var foreign = new HttpRequestMessage(HttpMethod.Get, "/snapshot");
+        foreign.Headers.Add("Origin", "https://evil.example.test");
+
+        var response = await fixture.Http.SendAsync(foreign);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.False(response.Headers.Contains("Access-Control-Expose-Headers"));
+    }
+
+    [Fact]
+    public async Task AllowedOrigin_ExposesTheDefaultAndConfiguredHeaders()
+    {
+        await using var fixture = await ServerFixture.StartAsync(
+            new ScriptedModel(false),
+            origins: ["https://app.example.test"],
+            exposedHeaders: ["X-Request-Id", "retry-after"]);
+        await fixture.WaitReadyAsync();
+        using var anonymous = fixture.Client("anon", token: null);
+        var request = new HttpRequestMessage(HttpMethod.Get, "/snapshot");
+        request.Headers.Add("Origin", "https://app.example.test");
+
+        var unauthorized = await anonymous.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        Assert.Equal("https://app.example.test", unauthorized.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        Assert.Equal(
+            "Retry-After, Content-Disposition, WWW-Authenticate, X-Request-Id",
+            unauthorized.Headers.GetValues("Access-Control-Expose-Headers").Single());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public async Task Preflight_AnswersPrivateNetworkAccessOnlyWhenConfigured(bool configured, bool expected)
+    {
+        await using var fixture = await ServerFixture.StartAsync(
+            new ScriptedModel(false),
+            origins: ["https://app.example.test"],
+            allowPrivateNetwork: configured);
+        await fixture.WaitReadyAsync();
+        var preflight = new HttpRequestMessage(HttpMethod.Options, "/input");
+        preflight.Headers.Add("Origin", "https://app.example.test");
+        preflight.Headers.Add("Access-Control-Request-Method", "POST");
+        preflight.Headers.Add("Access-Control-Request-Private-Network", "true");
+
+        var response = await fixture.Http.SendAsync(preflight);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(expected, response.Headers.Contains("Access-Control-Allow-Private-Network"));
+    }
+
+    [Fact]
+    public async Task Health_StillNeedsAnAllowedHostAndOrigin()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), origins: ["https://app.example.test"]);
+        await fixture.WaitReadyAsync();
+        var foreign = new HttpRequestMessage(HttpMethod.Get, "/health");
+        foreign.Headers.Add("Origin", "https://evil.example.test");
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await fixture.Http.SendAsync(foreign)).StatusCode);
+    }
+
+    [Fact]
+    public void TryCreate_RejectsAMalformedOriginOrHeaderName()
+    {
+        var runtime = new Hosting.ServerRuntime(
+            TextWriter.Null,
+            TextWriter.Null,
+            new Engine.Plugins.PluginRegistry(),
+            new Engine.Version.BuildIdentity(null, null, null, null, null, null));
+        var launch = new Engine.Launch.SessionLaunchRequest(new Engine.Launch.SessionLaunchOptions(), ".", ".");
+
+        var badOrigin = Hosting.CrystalServer.TryCreate(
+            new Hosting.ServerOptions { Launch = launch, AllowedOrigins = ["https://app.example.test/path"] },
+            runtime,
+            out _,
+            out var originError);
+        var badHeader = Hosting.CrystalServer.TryCreate(
+            new Hosting.ServerOptions { Launch = launch, ExposedHeaders = ["Bad Header"] },
+            runtime,
+            out _,
+            out var headerError);
+
+        Assert.False(badOrigin);
+        Assert.Contains("https://app.example.test/path", originError, StringComparison.Ordinal);
+        Assert.False(badHeader);
+        Assert.Contains("Bad Header", headerError, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TokenStore_ComparesHashesAndExpiresTickets()
     {
         var time = new ManualTime(DateTimeOffset.UnixEpoch);

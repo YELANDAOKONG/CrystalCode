@@ -106,7 +106,7 @@ Run these from your shell. The interactive terminal and `crystal server` host a 
 
 | Command | What it does |
 | :--- | :--- |
-| `crystal server` | Serve one session over HTTP so another front end, such as a web page or a desktop program, can drive it. Prints one JSON `listening` line and writes `~/.crystal/server/<pid>.json`. A bearer token is required by default (`CRYSTAL_SERVER_TOKEN`, `--token-file`, `--token-stdin`, or generated); `--auth none` turns it off. Accepts the same session options as `crystal`, plus `--listen`, `--socket`, `--tls-cert`/`--tls-key`, `--allow-host`, and `--allow-origin`. See [docs/server.md](docs/server.md) |
+| `crystal server` | Serve one session over HTTP so another front end, such as a web page or a desktop program, can drive it. Prints one JSON `listening` line and writes `~/.crystal/server/<pid>.json`. A bearer token is required by default (`CRYSTAL_SERVER_TOKEN`, `--token-file`, `--token-stdin`, or generated); `--auth none` turns it off. Accepts the same session options as `crystal`, plus `--listen`, `--socket`, `--tls-cert`/`--tls-key`, `--allow-host`, `--allow-origin`, `--expose-header`, and `--allow-private-network`. See [docs/server.md](docs/server.md) |
 | `crystal run <task>` | Run one task without a terminal and exit. Anything that would ask the operator is denied. Accepts process-only overrides such as `--provider`, `--model`, `--workspace`, `--approval`, and repeatable `--prompt-attachment`; they are not written to `config.json` |
 | `crystal space` | Open the terminal in the operator space at `~/.crystal/space` |
 | `crystal version` | Print the build identity and exit |

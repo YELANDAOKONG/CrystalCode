@@ -124,6 +124,42 @@ public sealed class ServerCommandTests
         Assert.DoesNotContain("--format", help, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Merge_KeepsConfigFirstAndDropsRepeats()
+    {
+        var merged = ServerCommand.Merge(
+            ["https://a.example.test", "https://b.example.test"],
+            ["https://B.example.test", "https://c.example.test"]);
+
+        Assert.Equal(
+            ["https://a.example.test", "https://b.example.test", "https://c.example.test"],
+            merged);
+    }
+
+    [Fact]
+    public void Help_ListsTheCorsOptions()
+    {
+        var writer = new StringWriter();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.No,
+            Out = new AnsiConsoleOutput(writer),
+        });
+        var app = new CommandApp<RunCommand>();
+        app.Configure(config =>
+        {
+            config.SetApplicationName("crystal");
+            config.ConfigureConsole(console);
+            config.AddCommand<ServerCommand>("server");
+        });
+
+        Assert.Equal(0, app.Run(["server", "--help"]));
+        var help = writer.ToString();
+        Assert.Contains("--expose-header", help, StringComparison.Ordinal);
+        Assert.Contains("--allow-private-network", help, StringComparison.Ordinal);
+        Assert.Contains("--space", help, StringComparison.Ordinal);
+    }
+
     private static ServerSettings Settings(string? auth = null, string? tokenFile = null, bool tokenStdin = false) =>
         new()
         {

@@ -40,6 +40,11 @@ front end can use too:
 - The protocol carries no version identifier in routes, headers, or fields.
   It is not a public web API. It follows the build: a wrapper knows which
   executable it started, and `GET /info` reports the build identity.
+- Front ends probe `GET /info` instead of a version. These fields keep their
+  names: `product`, `build`, `state`, `scope`, `authentication`,
+  `operations`, `eventTypes`, `interactionKinds`, and `slashCommands`. New
+  fields and new list entries may appear; a name is not changed or removed.
+  A test fixes the list.
 
 ## Projects
 
@@ -63,6 +68,7 @@ crystal server [session launch options] [-w|--workspace <PATH>] [-r|--resume [TA
                [--tls-cert <PATH> --tls-key <PATH>]
                [--auth token|none] [--token-file <PATH>] [--token-stdin]
                [--allow-host <HOST>]... [--allow-origin <ORIGIN>]...
+               [--expose-header <NAME>]... [--allow-private-network]
                [--exit-on-stdin-close]
 ```
 
@@ -168,6 +174,23 @@ and the `server.state` event.
   that address in `--allow-host`. CORS is off unless `--allow-origin` lists an
   origin. A request with an `Origin` header that is not listed is rejected
   with 403, even with `--auth none`.
+- CORS headers (`Access-Control-Allow-Origin`, `Vary: Origin`, and
+  `Access-Control-Expose-Headers`) go on every response to a listed origin,
+  including 401, 421, and 429, so a page can tell the cause apart. A rejected
+  origin gets no CORS header, so a 403 for it is opaque to the page by design.
+  A listed origin that reaches a disallowed `Host` gets a readable 421.
+- `Access-Control-Expose-Headers` always names `Retry-After`,
+  `Content-Disposition`, and `WWW-Authenticate`. `--expose-header <NAME>` and
+  `server.exposeHeaders` add more.
+- `--allow-private-network` (or `server.allowPrivateNetwork`) answers
+  `Access-Control-Allow-Private-Network: true` to a preflight from a listed
+  origin that sends `Access-Control-Request-Private-Network`. It is off by
+  default; current Chrome asks the user instead of sending this preflight.
+- `GET /health` goes through the same Host and Origin checks as every other
+  route. It needs no token.
+- `config.json` may hold the same lists under `server`: `allowOrigins`,
+  `allowHosts`, `exposeHeaders`, and `allowPrivateNetwork`. Command-line
+  values are added to the config values. Invalid entries stop startup.
 - Twenty failed authentications from one address within a minute return 429
   for the rest of that minute. JSON bodies are limited to 1 MiB; image
   uploads keep the 20 MiB host limit.

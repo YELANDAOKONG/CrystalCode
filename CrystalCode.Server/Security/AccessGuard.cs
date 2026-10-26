@@ -3,6 +3,8 @@ using System.Net;
 
 using Microsoft.AspNetCore.Http;
 
+using CrystalCode.Engine.Configuration;
+
 namespace CrystalCode.Server.Security;
 
 /// <summary>
@@ -28,10 +30,18 @@ public sealed class AccessGuard
     private readonly TokenStore? _tokens;
     private readonly HashSet<string> _hosts;
     private readonly HashSet<string> _origins;
+    private readonly string _exposedHeaders;
+    private readonly bool _allowPrivateNetwork;
     private readonly ConcurrentDictionary<string, Failures> _failures = new(StringComparer.Ordinal);
     private readonly TimeProvider _time;
 
-    public AccessGuard(TokenStore? tokens, IEnumerable<string> hosts, IEnumerable<string> origins, TimeProvider? time = null)
+    public AccessGuard(
+        TokenStore? tokens,
+        IEnumerable<string> hosts,
+        IEnumerable<string> origins,
+        IEnumerable<string>? exposedHeaders = null,
+        bool allowPrivateNetwork = false,
+        TimeProvider? time = null)
     {
         ArgumentNullException.ThrowIfNull(hosts);
         ArgumentNullException.ThrowIfNull(origins);
@@ -43,6 +53,12 @@ public sealed class AccessGuard
             "::1"
         };
         _origins = new HashSet<string>(origins.Select(static origin => origin.TrimEnd('/')), StringComparer.OrdinalIgnoreCase);
+        _exposedHeaders = string.Join(
+            ", ",
+            ServerHostSettings.DefaultExposedHeaders
+                .Concat(exposedHeaders ?? [])
+                .Distinct(StringComparer.OrdinalIgnoreCase));
+        _allowPrivateNetwork = allowPrivateNetwork;
         _time = time ?? TimeProvider.System;
     }
 
@@ -53,6 +69,22 @@ public sealed class AccessGuard
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
         var request = context.Request;
+        var origin = request.Headers.Origin.ToString();
+        var originAllowed = origin.Length > 0 && _origins.Contains(origin.TrimEnd('/'));
+        if (origin.Length > 0)
+        {
+            context.Response.Headers.Vary = "Origin";
+        }
+
+        // An allowed page gets the CORS headers on every answer, including a
+        // rejected Host, so it can tell that apart from a network failure. A
+        // page whose Origin is refused never receives them.
+        if (originAllowed)
+        {
+            context.Response.Headers.AccessControlAllowOrigin = origin;
+            context.Response.Headers.AccessControlExposeHeaders = _exposedHeaders;
+        }
+
         // A Unix socket has no Host to rebind; Kestrel reports "localhost".
         if (!HostAllowed(request.Host))
         {
@@ -60,25 +92,25 @@ public sealed class AccessGuard
             return;
         }
 
-        var origin = request.Headers.Origin.ToString();
-        if (origin.Length > 0 && !_origins.Contains(origin.TrimEnd('/')))
+        if (origin.Length > 0 && !originAllowed)
         {
             await Problems.WriteAsync(context, StatusCodes.Status403Forbidden, "The request Origin is not allowed.");
             return;
         }
 
-        if (origin.Length > 0)
+        if (originAllowed && HttpMethods.IsOptions(request.Method))
         {
-            context.Response.Headers.AccessControlAllowOrigin = origin;
-            context.Response.Headers.Vary = "Origin";
-            if (HttpMethods.IsOptions(request.Method))
+            context.Response.Headers.AccessControlAllowMethods = "GET, POST, PUT, DELETE, OPTIONS";
+            context.Response.Headers.AccessControlAllowHeaders = "Authorization, Content-Type, X-Crystal-Client, Last-Event-ID";
+            context.Response.Headers.AccessControlMaxAge = "600";
+            if (_allowPrivateNetwork
+                && request.Headers["Access-Control-Request-Private-Network"].ToString() == "true")
             {
-                context.Response.Headers.AccessControlAllowMethods = "GET, POST, PUT, DELETE, OPTIONS";
-                context.Response.Headers.AccessControlAllowHeaders = "Authorization, Content-Type, X-Crystal-Client, Last-Event-ID";
-                context.Response.Headers.AccessControlMaxAge = "600";
-                context.Response.StatusCode = StatusCodes.Status204NoContent;
-                return;
+                context.Response.Headers["Access-Control-Allow-Private-Network"] = "true";
             }
+
+            context.Response.StatusCode = StatusCodes.Status204NoContent;
+            return;
         }
 
         context.Items[ClientItem] = ClientId(context);

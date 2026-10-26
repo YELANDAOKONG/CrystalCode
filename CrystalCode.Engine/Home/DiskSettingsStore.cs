@@ -119,7 +119,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             mcp: document.Mcp ?? defaults.Mcp,
             mcpToolApproval: mcpToolApproval,
             extendedApproval: ReadExtendedApproval(document.ExtendedApproval),
-            operatorNotify: ReadOperatorNotify(document.OperatorNotify));
+            operatorNotify: ReadOperatorNotify(document.OperatorNotify),
+            server: ReadServer(document.Server));
     }
 
     public void Save(HarnessSettings settings)
@@ -198,6 +199,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
             ExtendedApproval = WriteExtendedApproval(settings.ExtendedApproval),
             OperatorNotify = WriteOperatorNotify(settings.OperatorNotify),
+            Server = WriteServer(settings.Server),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
@@ -595,6 +597,43 @@ public sealed class DiskSettingsStore : ISettingsStore
         }
 
         return new OperatorNotifySettings(enabled, command, events, delay, timeout);
+    }
+
+    private static ServerHostSettings ReadServer(ServerHostDocument? document)
+    {
+        if (document is null)
+        {
+            return ServerHostSettings.Default;
+        }
+
+        try
+        {
+            return new ServerHostSettings(
+                document.AllowOrigins ?? [],
+                document.AllowHosts ?? [],
+                document.ExposeHeaders ?? [],
+                document.AllowPrivateNetwork ?? false);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+    }
+
+    private static ServerHostDocument? WriteServer(ServerHostSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new ServerHostDocument
+        {
+            AllowOrigins = settings.AllowOrigins.Count == 0 ? null : [.. settings.AllowOrigins],
+            AllowHosts = settings.AllowHosts.Count == 0 ? null : [.. settings.AllowHosts],
+            ExposeHeaders = settings.ExposeHeaders.Count == 0 ? null : [.. settings.ExposeHeaders],
+            AllowPrivateNetwork = settings.AllowPrivateNetwork ? true : null
+        };
     }
 
     private static OperatorNotifyDocument? WriteOperatorNotify(OperatorNotifySettings settings)

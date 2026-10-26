@@ -115,6 +115,35 @@ public sealed class ServerParityTests
         Assert.True(unmapped.Length == 0, "Unmapped stream events: " + string.Join(", ", unmapped));
     }
 
+    /// <summary>
+    /// Front ends probe these <c>GET /info</c> fields instead of a version.
+    /// Renaming or removing one silently breaks them, so the names are fixed
+    /// here and listed in docs/server.md. Adding a field is allowed.
+    /// </summary>
+    [Fact]
+    public async Task Info_KeepsTheFieldNamesFrontEndsProbe()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+
+        var info = await fixture.GetAsync(fixture.Http, "/info");
+
+        string[] contract =
+        [
+            "product", "build", "state", "scope", "authentication",
+            "operations", "eventTypes", "interactionKinds", "slashCommands"
+        ];
+        foreach (var name in contract)
+        {
+            Assert.True(info.TryGetProperty(name, out _), "GET /info lost the field " + name);
+        }
+
+        foreach (var name in new[] { "operations", "eventTypes", "interactionKinds", "slashCommands" })
+        {
+            Assert.Equal(System.Text.Json.JsonValueKind.Array, info.GetProperty(name).ValueKind);
+        }
+    }
+
     [Fact]
     public void Info_ListsEveryRoute()
     {

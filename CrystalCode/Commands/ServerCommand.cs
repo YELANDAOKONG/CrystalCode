@@ -2,6 +2,8 @@ using System.Runtime.InteropServices;
 
 using Spectre.Console.Cli;
 
+using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Version;
@@ -44,6 +46,17 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
             return 1;
         }
 
+        ServerHostSettings configured;
+        try
+        {
+            configured = new DiskSettingsStore(CrystalHome.Resolve(settings.Home)).LoadOrCreate().Server;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            await error.WriteLineAsync("Could not read config.json  " + exception.Message);
+            return 1;
+        }
+
         var options = new ServerOptions
         {
             Launch = new SessionLaunchRequest(
@@ -59,8 +72,10 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
             TlsKey = settings.TlsKey,
             Token = token,
             TokenGenerated = generated,
-            AllowedHosts = settings.AllowHost,
-            AllowedOrigins = settings.AllowOrigin
+            AllowedHosts = Merge(configured.AllowHosts, settings.AllowHost),
+            AllowedOrigins = Merge(configured.AllowOrigins, settings.AllowOrigin),
+            ExposedHeaders = Merge(configured.ExposeHeaders, settings.ExposeHeader),
+            AllowPrivateNetwork = configured.AllowPrivateNetwork || settings.AllowPrivateNetwork
         };
         var runtime = new ServerRuntime(
             output,
@@ -103,6 +118,10 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
             return code;
         }
     }
+
+    /// <summary>The config list first, then the command line, without repeats.</summary>
+    internal static string[] Merge(IReadOnlyList<string> configured, IReadOnlyList<string> flags) =>
+        [.. configured.Concat(flags).Distinct(StringComparer.OrdinalIgnoreCase)];
 
     private static async Task WatchStdinAsync(TextReader input, CrystalServer server, CancellationToken cancellationToken)
     {

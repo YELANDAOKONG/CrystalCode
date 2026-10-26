@@ -465,7 +465,15 @@ session options `crystal` accepts, plus `--workspace`, `--space`, and
   and add the address clients use with `--allow-host`. Without
   `--tls-cert`/`--tls-key` the server warns that traffic is in clear text.
   A key password comes from `CRYSTAL_SERVER_TLS_PASSWORD`.
-- A browser page on another origin needs `--allow-origin <origin>`.
+- A browser page on another origin needs `--allow-origin <origin>`. The
+  response then carries CORS headers, including on 401, 421, and 429.
+  `--expose-header <name>` adds to the exposed response headers (`Retry-After`,
+  `Content-Disposition`, and `WWW-Authenticate` are always exposed), and
+  `--allow-private-network` answers the Private Network Access preflight.
+  The same lists live in `config.json` under `server` (`allowOrigins`,
+  `allowHosts`, `exposeHeaders`, `allowPrivateNetwork`); command-line values
+  are added to them.
+- `--space` serves the operator space instead of a project directory.
 - `--exit-on-stdin-close` ends the server when its wrapper closes stdin.
 - `/quit`, `POST /shutdown`, Ctrl+C, and SIGTERM save the session and exit,
   also while the server waits on a startup question. Clients receive
@@ -644,6 +652,7 @@ Top-level fields:
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
 | `approvalRetry` | The same object shape for the Review and Audit approval reviewer. Independent of `retry`. Reviewer retries are silent; exhausted retries fall back to your approval prompt |
+| `server` | Defaults for `crystal server`. `allowOrigins` (origins such as `https://app.example.test`, no path), `allowHosts` (extra `Host` values), `exposeHeaders` (extra `Access-Control-Expose-Headers` names), and `allowPrivateNetwork` (default `false`). The matching command-line options add to these. Invalid entries stop startup |
 | `operatorNotify` | Optional command run when the session waits for you. Omitted means off. `command` (executable and arguments, no shell), `enabled` (default `true` when `command` is set), `events` (`approval`, `question`, `turn`; default `["approval", "question"]`), `delaySeconds` (0-3600, default 0), and `timeoutSeconds` (1-600, default 10). Invalid values stop startup. See [Operator notification](#operator-notification) |
 
 Add named endpoints and model tables in `providers.json`, not in new

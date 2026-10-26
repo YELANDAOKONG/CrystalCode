@@ -56,7 +56,9 @@ internal sealed class ServerFixture : IAsyncDisposable
         bool authentication = true,
         Func<SessionLaunchOptions, SessionLaunchOptions>? options = null,
         Action<CrystalHome, string>? prepare = null,
-        IReadOnlyList<string>? origins = null)
+        IReadOnlyList<string>? origins = null,
+        IReadOnlyList<string>? exposedHeaders = null,
+        bool allowPrivateNetwork = false)
     {
         var fixture = new ServerFixture(Directory.CreateTempSubdirectory("crystal-server-").FullName);
         var home = new CrystalHome(fixture.Home);
@@ -85,6 +87,8 @@ internal sealed class ServerFixture : IAsyncDisposable
             Launch = new SessionLaunchRequest(options?.Invoke(launch) ?? launch, fixture.Workspace, fixture.Workspace),
             Token = authentication ? Token : null,
             AllowedOrigins = origins ?? [],
+            ExposedHeaders = exposedHeaders ?? [],
+            AllowPrivateNetwork = allowPrivateNetwork,
             Heartbeat = TimeSpan.FromSeconds(1),
             WriteDiscovery = true
         };
