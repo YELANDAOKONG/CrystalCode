@@ -2284,9 +2284,10 @@ in CrystalCode is the reference implementation. The headless test in
 CrystalCode.Engine.Tests is the smallest correct driver. A later Avalonia
 desktop front end uses C# markup and does not add XAML or AXAML files.
 The Agent Client Protocol (ACP) is high-priority product work and is not in
-this build. The working name is crystal agent. It would be another front end
+this build. The name is Bridge: the command would be `crystal bridge` and the
+project `CrystalCode.Bridge`. It would be another front end
 on this contract, not an engine protocol. Do not reserve a command, project,
-or public type for it. `crystal agent` is not a command in this build.
+or public type for it. `crystal bridge` is not a command in this build.
 `crystal server` is the HTTP front end on this contract
 ([docs/server.md](docs/server.md)). It uses `SessionLauncher`,
 `SessionRunner`, `SessionState`, and event origins, and maps every event to

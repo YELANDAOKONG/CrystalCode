@@ -79,7 +79,7 @@ or `CrystalCode` on Windows.
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
 High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
-(MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; and a refactor
+(MCP tools are in this build); the Agent Client Protocol (ACP), named Bridge (`crystal bridge`); and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a second additional review
 of the current product, a full code review, child Agent configuration, and provider-specific
@@ -91,7 +91,7 @@ would, after each thinking pass, ask a model to compress and summarize
 that thinking according to a requirement. Context compaction,
 microcompaction, `/verbose thinking`, and a provider's summarized
 thinking display are not that path. ACP would be an editor-facing front
-end, not an engine or provider protocol, and not a `crystal agent`
+end, not an engine or provider protocol, and not a `crystal bridge`
 command yet. `--disable-tool` only omits a built-in for one process. The
 product has two built-in modes, Plan and Work, plus operator-defined custom modes. Built-in provider
 protocols are DeepSeek, OpenAI-compatible Chat Completions, OpenAI

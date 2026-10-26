@@ -446,12 +446,15 @@ implemented in the current build.
   and platform coverage are not defined. Do not reserve a package name, tap,
   formula, image, or repository. Release artifacts and install scripts remain
   the install path until a specific change defines otherwise.
-- The Agent Client Protocol (ACP). The working name is crystal agent. An
+- The Agent Client Protocol (ACP). The name is Bridge: the command would be
+  `crystal bridge` and the project `CrystalCode.Bridge`. An
   editor would drive a session over stdio. That is another front end that
   implements `SessionFrontEnd`, not an engine protocol. It is not
-  `crystal server`. `crystal agent` is not a command,
-  project, or public type in this build. Do not add it until its behavior and
-  ownership are defined. ACP does not speak MCP itself. Editor-supplied MCP
+  `crystal server` and not child Agents. `crystal bridge` and
+  `CrystalCode.Bridge` are not a command, project, or public type in this
+  build. Do not add them until its behavior and
+  ownership are defined. The proposed design is in
+  [docs/bridge.md](docs/bridge.md). ACP does not speak MCP itself. Editor-supplied MCP
   servers, when that front end exists, use the same MCP client as local
   servers. Do not bypass approval, trust, or the tool boundary.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
@@ -566,8 +569,9 @@ implemented in the current build.
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
 `audioInput` or `videoInput` declaration is not that path. TODO: add ACP only as a front end that implements `SessionFrontEnd`. The
-working name is crystal agent. Do not put that protocol in the engine, do not
-add a `crystal agent` command, project, or public type before its behavior and
+name is Bridge (`crystal bridge`, `CrystalCode.Bridge`). Do not put that
+protocol in the engine, do not add the `crystal bridge` command, the
+`CrystalCode.Bridge` project, or a public type before its behavior and
 ownership are defined, and do not bypass approval, trust, or the tool
 boundary. ACP does not speak MCP itself. Editor-supplied MCP servers, when
 that front end exists, use the same MCP client as local servers.

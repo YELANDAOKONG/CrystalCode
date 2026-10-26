@@ -435,8 +435,8 @@ or marketplace.
 ## Not included
 
 - MCP. It is a separate client, not a plugin. See [mcp.md](mcp.md).
-- ACP. The Agent Client Protocol is a high-priority front end, working name
-  crystal agent. It is not in this build and not a plugin.
+- ACP. The Agent Client Protocol is a high-priority front end named Bridge
+  (`crystal bridge`). It is not in this build and not a plugin.
 - Collectible unload and hot reload.
 - Replacing a built-in protocol or built-in slash verb. A disk plugin cannot
   replace or adjust a built-in tool; only an in-process `IPlugin` can replace

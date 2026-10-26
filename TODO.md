@@ -82,13 +82,15 @@ behavior stands until a specific change defines otherwise.
   results (they are named, not sent), servers passed in by a front end for one
   session, and URL-mode elicitation. Do not bypass the existing plugin,
   approval, and media boundaries.
-- The Agent Client Protocol (ACP). The working name is crystal agent. It
+- The Agent Client Protocol (ACP). The name is Bridge: the command would be
+  `crystal bridge` and the project `CrystalCode.Bridge`. It
   would be a front end that implements `SessionFrontEnd`, not an engine
   protocol. Do not bypass approval, trust, or the tool boundary. ACP does
   not speak MCP itself. Editor-supplied MCP servers, when that front end
   exists, use the same MCP client as local servers. It is not
-  `crystal server`. `crystal agent` is not a command,
-  project, or public type in this build.
+  `crystal server` and not child Agents. `crystal bridge` and
+  `CrystalCode.Bridge` are not a command, project, or public type in this
+  build. The design is in [docs/bridge.md](docs/bridge.md).
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.
