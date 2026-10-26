@@ -73,10 +73,11 @@ public sealed class GrantStore
                 Tool = call.Name,
                 Fingerprint = fingerprint
             });
-        File.WriteAllText(
+        AtomicFile.WriteText(
             _home.PermissionsPath,
-            JsonSerializer.Serialize(document, HomeJson.Options));
-        RestrictOwnerAccess(_home.PermissionsPath);
+            JsonSerializer.Serialize(document, HomeJson.Options),
+            ownerOnly: true,
+            followLink: true);
     }
 
     private HashSet<string> PersistentKeys()
@@ -114,16 +115,4 @@ public sealed class GrantStore
 
     private static string Compose(string workspace, string tool, string fingerprint) =>
         workspace + "\n" + tool + "\n" + fingerprint;
-
-    private static void RestrictOwnerAccess(string path)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        File.SetUnixFileMode(
-            path,
-            UnixFileMode.UserRead | UnixFileMode.UserWrite);
-    }
 }

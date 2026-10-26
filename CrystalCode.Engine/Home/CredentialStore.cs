@@ -75,9 +75,11 @@ public sealed class CredentialStore
             ApiKey = apiKey
         };
 
-        var json = JsonSerializer.Serialize(document, HomeJson.Options);
-        File.WriteAllText(_home.CredentialsPath, json);
-        RestrictOwnerAccess(_home.CredentialsPath);
+        AtomicFile.WriteText(
+            _home.CredentialsPath,
+            JsonSerializer.Serialize(document, HomeJson.Options),
+            ownerOnly: true,
+            followLink: true);
     }
 
     private static string? ReadEnvironment(ProviderDefinition provider)
@@ -147,17 +149,5 @@ public sealed class CredentialStore
             json,
             HomeJson.Options)
             ?? new Dictionary<string, ProviderCredentialsDocument>(StringComparer.Ordinal);
-    }
-
-    private static void RestrictOwnerAccess(string path)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        File.SetUnixFileMode(
-            path,
-            UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 }

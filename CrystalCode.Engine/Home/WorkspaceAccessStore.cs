@@ -332,16 +332,11 @@ public sealed class WorkspaceAccessStore
             }
 
             _home.EnsureCreated();
-            File.WriteAllText(
+            AtomicFile.WriteText(
                 _home.AccessPath,
-                JsonSerializer.Serialize(document, HomeJson.Options));
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(
-                    _home.AccessPath,
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-
+                JsonSerializer.Serialize(document, HomeJson.Options),
+                ownerOnly: true,
+                followLink: true);
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

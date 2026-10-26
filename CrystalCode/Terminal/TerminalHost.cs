@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+
+using CrystalCode.Commands;
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Home;
@@ -14,6 +17,19 @@ namespace CrystalCode.Terminal;
 /// </summary>
 internal sealed class TerminalHost
 {
+    /// <summary>
+    /// SIGTERM is a kill or system shutdown; SIGHUP is a closed terminal
+    /// window (CTRL_CLOSE_EVENT on Windows). SIGINT stays with Ctrl+C.
+    /// </summary>
+    private static readonly PosixSignal[] ShutdownSignalSet = [PosixSignal.SIGTERM, PosixSignal.SIGHUP];
+
+    /// <summary>
+    /// How long a signal handler holds the process open for the save. Windows
+    /// ends the process when the handler returns and allows about five
+    /// seconds for a closing console window.
+    /// </summary>
+    private static readonly TimeSpan SignalGrace = TimeSpan.FromSeconds(4);
+
     private readonly SessionRenderer _renderer;
     private readonly SessionProjection _projection;
     private readonly CodingSession _session;
@@ -66,13 +82,72 @@ internal sealed class TerminalHost
 
     public async Task<int> RunAsync(CancellationToken cancellationToken)
     {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var closed = new ManualResetEventSlim();
+        using var signals = ShutdownSignals.Register(ShutdownSignalSet, () =>
+        {
+            try
+            {
+                _session.TryInterrupt();
+                stop.Cancel();
+                closed.Wait(SignalGrace);
+            }
+            catch (ObjectDisposedException)
+            {
+                // The session already closed; nothing is left to save.
+            }
+        });
         try
         {
-            return await RunLoopAsync(cancellationToken);
+            return await RunLoopAsync(stop.Token);
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+            return 0;
         }
         finally
         {
-            Console.WriteLine((await _session.CloseAsync()).Hint);
+            try
+            {
+                await CloseSessionAsync();
+            }
+            finally
+            {
+                closed.Set();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Saves and closes the session even when the loop left by an exception
+    /// with a turn still running. The screen is already closed here, so the
+    /// turn is collected without the key pump.
+    /// </summary>
+    private async Task CloseSessionAsync()
+    {
+        try
+        {
+            if (_session.TurnTask is not null)
+            {
+                _session.TryInterrupt();
+                await _session.FinishTurnAsync(CancellationToken.None);
+            }
+        }
+        finally
+        {
+            WriteHint((await _session.CloseAsync()).Hint);
+        }
+    }
+
+    private static void WriteHint(string hint)
+    {
+        try
+        {
+            Console.WriteLine(hint);
+        }
+        catch (IOException)
+        {
+            // The terminal is gone after SIGHUP. The session is already saved.
         }
     }
 
@@ -152,9 +227,7 @@ internal sealed class TerminalHost
             {
                 if (_idleCancels >= 2 || cancellationToken.IsCancellationRequested)
                 {
-                    await PumpAsync(
-                        _session.FinishTurnAsync(promptSource.Token),
-                        promptSource.Token);
+                    await CollectTurnAsync(promptSource.Token);
                     return 0;
                 }
 
@@ -166,9 +239,7 @@ internal sealed class TerminalHost
                 _renderer.WriteNote("Ctrl+C again to exit");
                 if (!promptSource.TryReset())
                 {
-                    await PumpAsync(
-                        _session.FinishTurnAsync(promptSource.Token),
-                        promptSource.Token);
+                    await CollectTurnAsync(promptSource.Token);
                     return 0;
                 }
 
@@ -222,6 +293,24 @@ internal sealed class TerminalHost
             default:
                 break;
         }
+    }
+
+    /// <summary>
+    /// Interrupts a turn that is still running at exit and collects it while
+    /// the frame is open, so its transcript is saved. The collection itself
+    /// gets no token: the exit token is already cancelled, and a cancelled
+    /// collection would skip the transcript update and let the close save an
+    /// older state over the checkpoint.
+    /// </summary>
+    private async Task CollectTurnAsync(CancellationToken cancellationToken)
+    {
+        if (_session.TurnTask is null)
+        {
+            return;
+        }
+
+        _session.TryInterrupt();
+        await PumpAsync(_session.FinishTurnAsync(CancellationToken.None), cancellationToken);
     }
 
     /// <summary>

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using CrystalCode.Engine.Home;
+
 namespace CrystalCode.Engine.Configuration;
 
 /// <summary>
@@ -55,8 +57,6 @@ internal static class JsonEnabledField
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(document);
         document["enabled"] = JsonValue.Create(enabled);
-        var temporary = path + ".tmp";
-        File.WriteAllText(temporary, document.ToJsonString(Indented) + Environment.NewLine);
-        File.Move(temporary, path, overwrite: true);
+        AtomicFile.WriteText(path, document.ToJsonString(Indented) + Environment.NewLine, ownerOnly: false);
     }
 }

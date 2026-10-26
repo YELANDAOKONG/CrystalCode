@@ -1999,11 +1999,21 @@ skill guidance.
 
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, and again on an orderly exit when the transcript has
-a user message. The file stores the transcript, todos, last-request and
-cumulative provider-reported token usage, and turn counts.
+a user message. A running turn is also saved after your message, after
+each model reply, and after each batch of tool results, so a crash, a
+`kill -9`, or a power loss loses at most the reply or tool batch that was in
+progress. Resuming such a session shows an interrupted tool call as not
+completed; check its effects before you retry it. If a checkpoint cannot be
+written, one note says so and the turn continues. The file stores the
+transcript, todos, last-request and cumulative provider-reported token
+usage, and turn counts. Home files are replaced in one step, so a crash
+never leaves a half-written `config.json` or session file.
 
 `/quit` and two Ctrl+C presses on an empty composer leave the
 alternate screen, then print the session id and `crystal --resume <id>`.
+`kill` (SIGTERM), a system shutdown, or closing the terminal window
+(SIGHUP) interrupts the running turn, saves the session, and exits the same
+way. A second signal exits at once.
 `--resume` without a value opens a selector for this workspace before the
 alternate screen. `--resume <id>` loads that file and stays in the process
 workspace. `--resume <path>` lists that directory and, after a session is

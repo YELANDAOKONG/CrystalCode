@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 
 using CrystalCode.Engine.Sessions;
@@ -52,39 +53,14 @@ internal sealed class PromptHistoryStore
         TrimEachWorkspace(entries, MaximumEntries);
 
         _home.EnsureCreated();
-        var temporaryPath = _home.PromptHistoryPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
+        var lines = new StringBuilder();
+        foreach (var entry in entries)
         {
-            var options = new FileStreamOptions
-            {
-                Mode = FileMode.CreateNew,
-                Access = FileAccess.Write,
-                Share = FileShare.None
-            };
-            if (!OperatingSystem.IsWindows())
-            {
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            }
-
-            await using (var stream = new FileStream(temporaryPath, options))
-            await using (var writer = new StreamWriter(stream))
-            {
-                foreach (var entry in entries)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await writer.WriteLineAsync(JsonSerializer.Serialize(entry, HistoryJson));
-                }
-            }
-
-            File.Move(temporaryPath, _home.PromptHistoryPath, overwrite: true);
+            cancellationToken.ThrowIfCancellationRequested();
+            lines.Append(JsonSerializer.Serialize(entry, HistoryJson)).Append(Environment.NewLine);
         }
-        finally
-        {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
+
+        AtomicFile.WriteText(_home.PromptHistoryPath, lines.ToString(), ownerOnly: true);
     }
 
     private async Task<IReadOnlyList<PromptHistoryDocument>> ReadAsync(

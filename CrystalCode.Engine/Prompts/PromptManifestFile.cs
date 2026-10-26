@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using CrystalCode.Engine.Home;
+
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
@@ -166,11 +168,9 @@ internal static class PromptManifestFile
     private static bool TryWrite(string path, JsonObject document, out string error)
     {
         error = string.Empty;
-        var temporary = path + ".tmp";
         try
         {
-            File.WriteAllText(temporary, document.ToJsonString(Indented) + Environment.NewLine);
-            File.Move(temporary, path, overwrite: true);
+            AtomicFile.WriteText(path, document.ToJsonString(Indented) + Environment.NewLine, ownerOnly: false);
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)

@@ -219,9 +219,8 @@ public static class McpInventory
             }
 
             target["enabled"] = JsonValue.Create(enabled);
-            var temporary = entry.Path + ".tmp";
-            File.WriteAllText(temporary, root.ToJsonString(Indented) + Environment.NewLine);
-            File.Move(temporary, entry.Path, overwrite: true);
+            // mcp.json may carry headers or environment values; keep its mode.
+            AtomicFile.WriteText(entry.Path, root.ToJsonString(Indented) + Environment.NewLine, ownerOnly: false);
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)

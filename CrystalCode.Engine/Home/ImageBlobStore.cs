@@ -50,35 +50,7 @@ internal sealed class ImageBlobStore
             return hash;
         }
 
-        var temporaryPath = Path.Combine(
-            _home.MediaDirectory,
-            $".{hash}.{Guid.NewGuid():N}.tmp");
-        var options = new FileStreamOptions
-        {
-            Mode = FileMode.CreateNew,
-            Access = FileAccess.Write,
-            Share = FileShare.None
-        };
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        }
-
-        try
-        {
-            using (var stream = new FileStream(temporaryPath, options))
-            {
-                stream.Write(data);
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporaryPath, path, overwrite: true);
-        }
-        finally
-        {
-            File.Delete(temporaryPath);
-        }
-
+        AtomicFile.Write(path, data, ownerOnly: true);
         return hash;
     }
 

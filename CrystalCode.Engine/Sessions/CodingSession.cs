@@ -904,16 +904,7 @@ public sealed class CodingSession : ITurnObserver
                     manifest.Remove("speed");
                     manifest["thinking"] = model.Thinking;
                 }
-                var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-                try
-                {
-                    File.WriteAllText(temporary, manifest.ToJsonString(HomeJson.Options));
-                    File.Move(temporary, path, true);
-                }
-                finally
-                {
-                    File.Delete(temporary);
-                }
+                AtomicFile.WriteText(path, manifest.ToJsonString(HomeJson.Options), ownerOnly: false);
             }
             else
             {
@@ -1043,6 +1034,7 @@ public sealed class CodingSession : ITurnObserver
     private TokenUsage? _shownCumulative;
     private TokenUsage? _turnCumulativeBaseline;
     private bool _promptHistoryAvailable = true;
+    private bool _checkpointFailed;
 
     private CodingSession(
         HarnessSettings settings,
@@ -5729,6 +5721,35 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    /// <summary>
+    /// Saves the running turn so a killed process or power loss loses at
+    /// most the model round or tool batch in flight. A failed checkpoint is
+    /// reported once and does not fail the turn; the turn-end save still
+    /// runs and reports its own failure.
+    /// </summary>
+    private void CheckpointSession()
+    {
+        try
+        {
+            SaveSession();
+            _checkpointFailed = false;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            if (!_checkpointFailed)
+            {
+                _checkpointFailed = true;
+                Note("Session checkpoint could not be saved");
+            }
+        }
+    }
+
+    private void CommitTurnItems(IReadOnlyList<ChatItem> items)
+    {
+        CommitArchive(items);
+        CheckpointSession();
+    }
+
     private SessionDocument CreateDocument()
     {
         var (archiveSnapshot, archiveCount) = ArchiveSnapshotWithCount();
@@ -8196,6 +8217,7 @@ public sealed class CodingSession : ITurnObserver
 
         OpenRecallWindow(message);
         Publish(new TurnStarted());
+        CheckpointSession();
         using (BeginOrigin(null))
         {
             _turnTask = ExecuteTurnAsync(turnSource.Token);
@@ -8275,7 +8297,7 @@ public sealed class CodingSession : ITurnObserver
                 ReserveImageNumber,
                 AddImage,
                 ImageSnapshot,
-                CommitArchive,
+                CommitTurnItems,
                 PrepareOutboundAsync,
                 (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token),
                 _sharedBudget);
@@ -8290,7 +8312,7 @@ public sealed class CodingSession : ITurnObserver
             CurrentReasoning(),
             CompactRoundAsync,
             _settings.Retry.ToOptions(),
-            CommitArchive,
+            CommitTurnItems,
             PrepareOutboundAsync,
             (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token),
             _sharedBudget);
@@ -8621,33 +8643,49 @@ public sealed class CodingSession : ITurnObserver
         var stop = result?.StopReason ?? TurnStopReason.Failed;
         _lastStop = stop;
         var error = string.IsNullOrWhiteSpace(failure) ? _turnFault : failure;
-        await _hooks.OnTurnFinishedAsync(
-            new PluginTurn(
-                _sessionId,
-                CurrentModeName(),
-                _turnUserText ?? string.Empty,
-                stop.Value,
-                error),
-            cancellationToken);
-        _turnUserText = null;
-        _turnFault = null;
+        // Record the result before the plugin hook: a cancelled hook must not
+        // leave the pre-turn transcript for Close to save over the checkpoint.
+        if (result is not null)
+        {
+            _transcript = [.. result.Transcript];
+            lock (_imagesGate)
+            {
+                _nextImageNumber = Math.Max(_nextImageNumber, NextImageNumber());
+            }
+            BindReviewConversation();
+            lock (_usageGate)
+            {
+                _ledger.Record(result);
+            }
+        }
 
-        if (result is null)
+        try
+        {
+            await _hooks.OnTurnFinishedAsync(
+                new PluginTurn(
+                    _sessionId,
+                    CurrentModeName(),
+                    _turnUserText ?? string.Empty,
+                    stop.Value,
+                    error),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
         {
             PublishRecallIfStripped();
-            return;
+            CheckpointSession();
+            throw;
         }
 
-        _transcript = [.. result.Transcript];
+        _turnUserText = null;
+        _turnFault = null;
         PublishRecallIfStripped();
-        lock (_imagesGate)
+        if (result is null)
         {
-            _nextImageNumber = Math.Max(_nextImageNumber, NextImageNumber());
-        }
-        BindReviewConversation();
-        lock (_usageGate)
-        {
-            _ledger.Record(result);
+            // Replace checkpoints taken during the faulted turn with the
+            // state the next turn starts from.
+            CheckpointSession();
+            return;
         }
 
         if (result.StopReason == TurnStopReason.Completed)

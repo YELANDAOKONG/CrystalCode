@@ -5,9 +5,11 @@ using CrystalCode.Server.Hosting;
 namespace CrystalCode.Commands;
 
 /// <summary>
-/// Turns SIGINT (Ctrl+C), SIGTERM, and SIGQUIT into an orderly shutdown of
-/// the server instead of an immediate process exit. A second signal while
-/// the server is already stopping ends the process at once.
+/// Turns termination signals into an orderly shutdown instead of an
+/// immediate process exit. The server registers SIGINT (Ctrl+C), SIGTERM,
+/// and SIGQUIT. The terminal leaves SIGINT to its own Ctrl+C handling and
+/// registers SIGTERM and SIGHUP. A second signal while shutdown is already
+/// running ends the process at once.
 /// </summary>
 internal sealed class ShutdownSignals : IDisposable
 {
@@ -22,13 +24,32 @@ internal sealed class ShutdownSignals : IDisposable
     {
         ArgumentNullException.ThrowIfNull(stop);
         var signals = new ShutdownSignals();
-        signals.Add(PosixSignal.SIGINT, ServerStopReason.Interrupt, stop);
-        signals.Add(PosixSignal.SIGTERM, ServerStopReason.Terminate, stop);
-        signals.Add(PosixSignal.SIGQUIT, ServerStopReason.QuitSignal, stop);
+        signals.Add(PosixSignal.SIGINT, () => stop(ServerStopReason.Interrupt));
+        signals.Add(PosixSignal.SIGTERM, () => stop(ServerStopReason.Terminate));
+        signals.Add(PosixSignal.SIGQUIT, () => stop(ServerStopReason.QuitSignal));
         return signals;
     }
 
-    private void Add(PosixSignal signal, string reason, Action<string> stop)
+    /// <summary>
+    /// Runs <paramref name="stop"/> for the first of
+    /// <paramref name="signals"/> in place of the default termination. The
+    /// runtime calls it on its own thread, so it may block; on Windows the
+    /// process ends as soon as a close or shutdown handler returns.
+    /// </summary>
+    public static ShutdownSignals Register(IReadOnlyList<PosixSignal> signals, Action stop)
+    {
+        ArgumentNullException.ThrowIfNull(signals);
+        ArgumentNullException.ThrowIfNull(stop);
+        var registrations = new ShutdownSignals();
+        foreach (var signal in signals)
+        {
+            registrations.Add(signal, stop);
+        }
+
+        return registrations;
+    }
+
+    private void Add(PosixSignal signal, Action stop)
     {
         _registrations.Add(PosixSignalRegistration.Create(signal, context =>
         {
@@ -39,7 +60,7 @@ internal sealed class ShutdownSignals : IDisposable
             }
 
             context.Cancel = true;
-            stop(reason);
+            stop();
         }));
     }
 

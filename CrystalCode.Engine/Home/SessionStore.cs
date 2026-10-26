@@ -35,37 +35,7 @@ public sealed class SessionStore
         document.CreatedUtc ??= document.UpdatedUtc;
         var path = PathFor(id);
         var stored = CopyWithImages(document, PersistImages(document.Images));
-        var json = JsonSerializer.Serialize(stored, HomeJson.Options);
-        var temporaryPath = Path.Combine(
-            _home.SessionsDirectory,
-            $".{id}.{Guid.NewGuid():N}.tmp");
-        var options = new FileStreamOptions
-        {
-            Mode = FileMode.CreateNew,
-            Access = FileAccess.Write,
-            Share = FileShare.None
-        };
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        }
-
-        try
-        {
-            using (var stream = new FileStream(temporaryPath, options))
-            using (var writer = new StreamWriter(stream))
-            {
-                writer.Write(json);
-                writer.Flush();
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporaryPath, path, overwrite: true);
-        }
-        finally
-        {
-            File.Delete(temporaryPath);
-        }
+        AtomicFile.WriteText(path, JsonSerializer.Serialize(stored, HomeJson.Options), ownerOnly: true);
     }
 
     internal IReadOnlyDictionary<int, ImageAttachment> ReadImages(

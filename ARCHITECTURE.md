@@ -66,7 +66,7 @@ CrystalCode.Providers.Tests references CrystalCode.Providers.
 ### CrystalCode
 
 The terminal host and the only executable. Owns CLI commands, the terminal
-host loop (alternate screen, key loop, Ctrl+C), the headless `crystal run`
+host loop (alternate screen, key loop, Ctrl+C, termination signals), the headless `crystal run`
 entry, and the projection of engine events onto CrystalCode.Display. It also
 owns the terminal surfaces for the engine's prompts: approval cards and keys,
 the question overlay, and the saved-session picker. `crystal run` supplies
@@ -681,6 +681,19 @@ adjust the display run immediately. `/quit` cancels compaction and exits.
 Ctrl+C interrupts and does not drop queued text.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
+
+The terminal registers SIGTERM and SIGHUP through `PosixSignalRegistration`
+(on Windows these are the console shutdown and close events). SIGINT stays
+with the Ctrl+C rules above. The first signal cancels the default termination,
+interrupts the running turn or compaction, and stops the key loop. The loop
+collects an interrupted turn with no cancellation token, so the plugin
+turn-end hook and the transcript update are not skipped, and then the
+session closes and saves as on `/quit`. The handler holds the process open
+for up to four seconds while that runs, because Windows ends the process
+when a close or shutdown handler returns. A second signal uses the default
+termination. SIGKILL and power loss cannot be handled; the turn checkpoints
+cover them. This handling lives in the executable. The engine has no signal
+code.
 
 `/btw` (alias `/side`) asks one side question from the archive
 and the newest 20 side exchanges in this process. The request uses the work
@@ -1490,7 +1503,17 @@ question that summarizes a private copy does not print it.
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a child invocation settles, after a successful `/compact`,
 and on an orderly exit
-when the transcript has a user message or a compaction summary. The
+when the transcript has a user message or a compaction summary. A running
+turn is also checkpointed: after its user message is added, after each model
+round, and after each tool batch is committed to the archive. A checkpoint
+uses the live model context, and a tool call without a result gets the
+checkpoint-only result described for child checkpoints; the live turn is not
+changed. A turn that ends without a result, including a recalled message, is
+saved again with the state the next turn starts from. A checkpoint that cannot
+be written prints one note and does not fail the turn. A process that is killed
+or loses power therefore loses at most the model round or tool batch in flight.
+Child invocations are not checkpointed while they run; the parent checkpoint
+records them as unfinished. The
 file stores the compacted model transcript (live system prompt, one
 summary, recent tail, and reasoning items with their readable text and
 opaque provider state), the last usage snapshot, and cumulative provider usage.
@@ -1614,6 +1637,19 @@ contents of `binaries/code/`.
   server/<pid>.json   (crystal server discovery file, owner-only)
   space/
 ```
+
+Every Home file the host replaces (`config.json`, `credentials.json`,
+`permissions.json`, `trusted.json`, `access.json`, sessions, media, prompt
+history, and the `enabled` or model fields it edits in manifests) is written
+through `AtomicFile`: a uniquely named dot-prefixed `.tmp` sibling, flushed
+with `FileStream.Flush(flushToDisk: true)`, then renamed over the target. A
+crash or power loss leaves the old or the new file, never a truncated one.
+Owner-only files are created with that mode; other files keep the mode of the
+file they replace. Operator configuration files follow a symbolic link and
+replace its target; sessions, media, and manifests replace the link itself.
+.NET has no managed directory fsync, so a rename that has not reached the
+disk at power loss leaves the previous file. Workspace files written by
+`write`, `edit`, and `apply_patch` are not covered.
 
 `config.json` stores mutable operator preferences such as the selected provider
 and model. `workspaceTrust` asks before the first interactive entry into a

@@ -215,8 +215,11 @@ public sealed class DiskSettingsStore : ISettingsStore
                     },
                     HomeJson.Options)
         };
-        var json = JsonSerializer.Serialize(document, HomeJson.Options);
-        File.WriteAllText(_home.ConfigPath, json);
+        AtomicFile.WriteText(
+            _home.ConfigPath,
+            JsonSerializer.Serialize(document, HomeJson.Options),
+            ownerOnly: false,
+            followLink: true);
     }
 
     private IReadOnlyList<ProviderDefinition> ReadProviders(SettingsDocument document)
@@ -270,8 +273,12 @@ public sealed class DiskSettingsStore : ISettingsStore
             using (var writer = new StreamWriter(stream))
             {
                 writer.Write(JsonSerializer.Serialize(providers, HomeJson.Options));
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
             }
 
+            // No overwrite: the migration must not replace a providers.json
+            // that appeared after discovery.
             File.Move(temporaryPath, _home.ProvidersPath);
         }
         finally

@@ -109,17 +109,11 @@ public sealed class WorkspaceTrustStore
     private void Write(TrustedDirectoryDocument document)
     {
         _home.EnsureCreated();
-        File.WriteAllText(
+        AtomicFile.WriteText(
             _home.TrustedPath,
-            JsonSerializer.Serialize(document, HomeJson.Options));
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        File.SetUnixFileMode(
-            _home.TrustedPath,
-            UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            JsonSerializer.Serialize(document, HomeJson.Options),
+            ownerOnly: true,
+            followLink: true);
     }
 
     private static bool Same(string left, string right) =>
