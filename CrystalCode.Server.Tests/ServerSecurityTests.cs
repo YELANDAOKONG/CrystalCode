@@ -194,6 +194,23 @@ public sealed class ServerSecurityTests
         Assert.Contains("any web page", fixture.Error, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("192.168.0.205:8080")]
+    [InlineData("[fe80::1]:8080")]
+    public async Task IpLiteralHost_PassesThePreflight(string host)
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), origins: ["*"]);
+        await fixture.WaitReadyAsync();
+        var preflight = new HttpRequestMessage(HttpMethod.Options, "/snapshot");
+        preflight.Headers.Host = host;
+        preflight.Headers.Add("Origin", "https://anything.example.test");
+        preflight.Headers.Add("Access-Control-Request-Method", "GET");
+
+        var response = await fixture.Http.SendAsync(preflight);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     [Fact]
     public async Task WildcardOrigin_StillChecksTheHostAndTheToken()
     {

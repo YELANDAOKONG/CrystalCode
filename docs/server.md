@@ -168,10 +168,11 @@ and the `server.state` event.
   single-use ticket valid for 30 seconds. Only `GET /events?ticket=` accepts
   it, with the scope of the token that asked for it. A long-lived token never
   goes in a URL.
-- The `Host` header must name `localhost`, `127.0.0.1`, `::1`, the listen
-  address, or an `--allow-host` value, which blocks DNS rebinding; otherwise
-  the response is 421. A server on `0.0.0.0` reached by a LAN address needs
-  that address in `--allow-host`. CORS is off unless `--allow-origin` lists an
+- The `Host` header must name `localhost`, an IP address, or an
+  `--allow-host` value, which blocks DNS rebinding; otherwise the response is
+  421. An IP literal cannot be a name an attacker controls, so a server on
+  `0.0.0.0` reached by a LAN address needs no `--allow-host`; a DNS name does.
+  CORS is off unless `--allow-origin` lists an
   origin. A request with an `Origin` header that is not listed is rejected
   with 403, even with `--auth none`.
 - `--allow-origin '*'` lists every origin. Each response then echoes the

@@ -461,8 +461,9 @@ session options `crystal` accepts, plus `--workspace`, `--space`, and
   on stdin with `--token-stdin`. Otherwise it generates one and writes it to
   the discovery file. A token is never a command flag. `--auth none` turns
   authentication off and prints a warning.
-- To reach it from another machine on the LAN, listen on `0.0.0.0:<port>`
-  and add the address clients use with `--allow-host`. Without
+- To reach it from another machine on the LAN, listen on `0.0.0.0:<port>`.
+  A client that uses a DNS name also needs that name in `--allow-host`; an IP
+  address needs nothing. Without
   `--tls-cert`/`--tls-key` the server warns that traffic is in clear text.
   A key password comes from `CRYSTAL_SERVER_TLS_PASSWORD`.
 - A browser page on another origin needs `--allow-origin <origin>`, or

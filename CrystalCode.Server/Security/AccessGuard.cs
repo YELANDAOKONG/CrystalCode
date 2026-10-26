@@ -8,8 +8,8 @@ using CrystalCode.Engine.Configuration;
 namespace CrystalCode.Server.Security;
 
 /// <summary>
-/// Runs before every endpoint. Checks the Host header against loopback, the
-/// listen address, and <c>--allow-host</c> (DNS rebinding), rejects an
+/// Runs before every endpoint. Checks the Host header against any IP literal,
+/// <c>localhost</c>, and <c>--allow-host</c> (DNS rebinding), rejects an
 /// Origin that is not allowed, then authenticates the bearer token or a
 /// single-use event-stream ticket. Repeated failures from one address are
 /// slowed down. <c>/health</c> needs no token. With authentication off,
@@ -180,7 +180,10 @@ public sealed class AccessGuard
             return false;
         }
 
-        return _hosts.Contains(Normalize(host.Host));
+        // DNS rebinding needs a name the attacker controls. A browser that
+        // connected by IP literal sends that literal, so it cannot be one.
+        var name = Normalize(host.Host);
+        return IPAddress.TryParse(name, out _) || _hosts.Contains(name);
     }
 
     private static string ClientId(HttpContext context)
