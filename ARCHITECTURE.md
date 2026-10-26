@@ -251,6 +251,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` / `IMultimodalTool` loaders, and host-context dispatch |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
 | `Modes` | Operator-defined custom modes: `modes/<name>` discovery, tool selection, prompt composition, and launch-name validation |
+| `Notifications` | Operator notification: `OperatorNotifier` runs the `operatorNotify` command, and `NotifyingApprovalPrompt` and `NotifyingUserPrompt` wrap the front-end prompts so every operator wait reaches it |
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
@@ -2107,6 +2108,22 @@ A front end supplies (`SessionFrontEnd`):
   one workspace or every workspace.
 - `Trust` (`IWorkspaceTrustPrompt`) asks whether to trust a directory.
   A front end that cannot ask returns false.
+
+`CodingSession` wraps `Approvals` and `Questions` once, at construction, in
+`NotifyingApprovalPrompt` and `NotifyingUserPrompt`. Every engine path that
+asks the operator, including child approvals behind the operator gate and MCP
+elicitation, uses the wrapped prompts, so the `operatorNotify` command runs
+for the terminal, `crystal server`, and children alike without front-end
+code. The notifier starts the command on the thread pool after
+`delaySeconds`, and the wrapper cancels the pending start when the prompt
+returns. A started command runs to exit or `timeoutSeconds`, with no shell,
+the workspace as working directory, and `CRYSTAL_NOTIFY_*` variables plus the
+same values as JSON on stdin. Output is drained and discarded. The first
+failure in a session is one English note. `CloseAsync` stops pending and
+running commands. The `turn` event is raised from `CompleteTurnAsync` when no
+follow-up started and the turn was not interrupted, and the next submission
+cancels it. Trust, `/resume`, and child choices are operator-initiated and do
+not notify. `crystal run` replaces the setting with off in memory.
 
 A front end prepares a session with `SessionLauncher.PrepareAsync`. It maps
 its own command line onto `SessionLaunchOptions` and passes a

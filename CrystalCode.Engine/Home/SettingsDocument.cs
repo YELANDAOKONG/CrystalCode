@@ -84,6 +84,8 @@ internal sealed class SettingsDocument
 
     public ExtendedApprovalDocument? ExtendedApproval { get; set; }
 
+    public OperatorNotifyDocument? OperatorNotify { get; set; }
+
     public CompactionModelDocument? CompactionModel { get; set; }
 
     public MicroCompactionDocument? MicroCompaction { get; set; }

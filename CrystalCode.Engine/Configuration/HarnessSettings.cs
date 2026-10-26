@@ -107,7 +107,8 @@ public sealed record HarnessSettings
         BuiltInToolDisablement? sessionDisabledBuiltInTools = null,
         bool mcp = DefaultMcp,
         McpToolApprovalSettings? mcpToolApproval = null,
-        ExtendedApprovalSettings? extendedApproval = null)
+        ExtendedApprovalSettings? extendedApproval = null,
+        OperatorNotifySettings? operatorNotify = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -205,6 +206,7 @@ public sealed record HarnessSettings
         BackgroundBashTimeoutSeconds = backgroundBashTimeoutSeconds;
         ApprovalModel = approvalModel ?? ApprovalModelSettings.Off;
         ExtendedApproval = extendedApproval ?? ExtendedApprovalSettings.Off;
+        OperatorNotify = operatorNotify ?? OperatorNotifySettings.Off;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
@@ -476,6 +478,8 @@ public sealed record HarnessSettings
 
     public ExtendedApprovalSettings ExtendedApproval { get; }
 
+    public OperatorNotifySettings OperatorNotify { get; }
+
     public CompactionModelSettings CompactionModel { get; }
 
     public MicroCompactionSettings MicroCompaction { get; }
@@ -717,6 +721,12 @@ public sealed record HarnessSettings
         return Copy(extendedApproval: extendedApproval);
     }
 
+    public HarnessSettings WithOperatorNotify(OperatorNotifySettings operatorNotify)
+    {
+        ArgumentNullException.ThrowIfNull(operatorNotify);
+        return Copy(operatorNotify: operatorNotify);
+    }
+
     /// <summary>
     /// Selects a reviewer's provider and model, then applies its own service
     /// tier and speed. An unset reviewer slot keeps the per-model selection.
@@ -822,7 +832,8 @@ public sealed record HarnessSettings
         AgentSettings? agents = null,
         bool? mcp = null,
         McpToolApprovalSettings? mcpToolApproval = null,
-        ExtendedApprovalSettings? extendedApproval = null) =>
+        ExtendedApprovalSettings? extendedApproval = null,
+        OperatorNotifySettings? operatorNotify = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -874,7 +885,8 @@ public sealed record HarnessSettings
             sessionDisabledBuiltInTools ?? SessionDisabledBuiltInTools,
             mcp ?? Mcp,
             mcpToolApproval ?? McpToolApproval,
-            extendedApproval ?? ExtendedApproval);
+            extendedApproval ?? ExtendedApproval,
+            operatorNotify ?? OperatorNotify);
 
     public override string ToString() => nameof(HarnessSettings);
 

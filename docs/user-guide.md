@@ -637,9 +637,56 @@ Top-level fields:
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
 | `approvalRetry` | The same object shape for the Review and Audit approval reviewer. Independent of `retry`. Reviewer retries are silent; exhausted retries fall back to your approval prompt |
+| `operatorNotify` | Optional command run when the session waits for you. Omitted means off. `command` (executable and arguments, no shell), `enabled` (default `true` when `command` is set), `events` (`approval`, `question`, `turn`; default `["approval", "question"]`), `delaySeconds` (0-3600, default 0), and `timeoutSeconds` (1-600, default 10). Invalid values stop startup. See [Operator notification](#operator-notification) |
 
 Add named endpoints and model tables in `providers.json`, not in new
 `config.json` configurations.
+
+### Operator notification
+
+`operatorNotify` runs a command you choose when the session needs you. There
+is no built-in command. For example, on macOS:
+
+```json
+"operatorNotify": {
+  "command": ["osascript", "-e", "display notification (system attribute \"CRYSTAL_NOTIFY_TEXT\") with title \"CrystalCode\""],
+  "events": ["approval", "question", "turn"],
+  "delaySeconds": 5
+}
+```
+
+On Linux, `["sh", "-c", "notify-send \"$CRYSTAL_NOTIFY_TITLE\" \"$CRYSTAL_NOTIFY_TEXT\""]`
+does the same. Set `"enabled": false` to keep the command and stop
+notifications, or use `/notify off`.
+
+| Event | When |
+| :--- | :--- |
+| `approval` | A tool call waits for your approval, after any Review or Audit model judged it. Auto-pass and grants do not notify. Child approvals notify when their card opens |
+| `question` | The `question` tool or an MCP server asks you something |
+| `turn` | A turn ended and nothing queued started. An interrupted turn does not notify |
+
+With `delaySeconds`, the command runs only if you have not answered by then;
+for `turn`, the next submission cancels it. The command does not block the
+prompt. It runs in the workspace, inherits the CrystalCode environment, and
+gets these variables, plus the same values as one JSON object on stdin:
+
+| Variable | Value |
+| :--- | :--- |
+| `CRYSTAL_NOTIFY_EVENT` | `approval`, `question`, `turn`, or `test` |
+| `CRYSTAL_NOTIFY_TITLE` | `CrystalCode` |
+| `CRYSTAL_NOTIFY_TEXT` | One plain line, such as `Approval needed: Run bash: git push` |
+| `CRYSTAL_NOTIFY_TOOL`, `CRYSTAL_NOTIFY_SUMMARY`, `CRYSTAL_NOTIFY_RISK`, `CRYSTAL_NOTIFY_AUTHORITY` | Approval only |
+| `CRYSTAL_NOTIFY_HEADER`, `CRYSTAL_NOTIFY_QUESTION`, `CRYSTAL_NOTIFY_COUNT` | Question only: the first question and how many there are |
+| `CRYSTAL_NOTIFY_STOP` | Turn only: the stop reason, such as `completed` |
+| `CRYSTAL_WORKSPACE`, `CRYSTAL_SESSION` | Workspace root and session id |
+
+Each value is one line of at most 500 characters. An approval summary can
+quote the command or path being approved, so it reaches whatever your command
+sends it to, such as the system notification center or a webhook. Output is
+discarded. A command that cannot start, exits non-zero, or exceeds
+`timeoutSeconds` is stopped, and the first such failure in a session prints
+one note. `crystal run` never runs the command. Under `crystal server` it
+runs on the server host.
 
 There is no global context window. Models that are not listed cannot
 be selected.
@@ -1489,6 +1536,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/space` | | Switch to the operator space. Creates `{home}/space` when it is missing. Takes no path. Refused while a turn is running |
 | `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry. `forget` leaves the operator space trusted |
 | `/rules` | | Show global and project rule files, set both with `on` / `off`, or set one side with `global` or `project` and `on` / `off`. Writes `config.json`. Does not change `instructions.md` or `.crystal.md`. Refused during a turn or compaction |
+| `/notify` | | Show operator notification. `on` / `off` writes `operatorNotify.enabled` to `config.json`; `on` needs a configured command. `test` runs the command once, even while off, with `CRYSTAL_NOTIFY_EVENT=test`, and reports its exit |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
 | `/agents` | | List child Agents and settings. While idle: `on`, `off`, `concurrency <1-8>`, `model <name> [provider model]`, and `thinking`, `context`, `tier`, or `speed` with `<name> [value]`. Omitting the value clears that choice. Built-in choices go to `config.json`; custom choices go to that Agent's `agent.json`. Changes are refused during a turn or compaction |

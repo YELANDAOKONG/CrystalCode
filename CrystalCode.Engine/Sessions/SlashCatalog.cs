@@ -41,6 +41,8 @@ public static class SlashCatalog
             ["on", "off", "forget"]),
         new(SessionVerb.Rules, "rules", [], "Show or set global and project rule files",
             ["on", "off", "global", "project"]),
+        new(SessionVerb.Notify, "notify", [], "Show operator notification, turn it on or off, or run a test",
+            ["on", "off", "test"]),
         new(SessionVerb.Resume, "resume", ["continue"], "Choose a session, workspace, or all", ["all"]),
         new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
         new(SessionVerb.Agents, "agents", [], "List or configure child Agents", ["on", "off", "concurrency", "model", "thinking", "context", "tier", "speed"]),

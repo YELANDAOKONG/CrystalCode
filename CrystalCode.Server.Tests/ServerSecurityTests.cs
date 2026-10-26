@@ -130,6 +130,8 @@ public sealed class ServerSecurityTests
         Assert.Equal(ServerScope.Admin, ServerScopes.ForInput("/cd .."));
         Assert.Equal(ServerScope.Operate, ServerScopes.ForInput("/cd"));
         Assert.Equal(ServerScope.Admin, ServerScopes.ForInput("/quit"));
+        Assert.Equal(ServerScope.Operate, ServerScopes.ForInput("/notify"));
+        Assert.Equal(ServerScope.Admin, ServerScopes.ForInput("/notify test"));
     }
 
     private sealed class ManualTime(DateTimeOffset now) : TimeProvider

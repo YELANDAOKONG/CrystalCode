@@ -27,6 +27,7 @@ public enum SessionVerb
     Space,
     Trust,
     Rules,
+    Notify,
     Access,
     Resume,
     Fork,

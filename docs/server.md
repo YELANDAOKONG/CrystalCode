@@ -133,8 +133,8 @@ and the `server.state` event.
     slash commands that only report or act inside the session: `/help`,
     `/status`, `/stats`, `/btw`, `/clear`, `/fork`, `/child`, `/sessions`,
     `/compact` and `/compact full`, `/todos`, `/attach`, `/export`, `/tools`,
-    `/plugins`, and `/mcp` without arguments, `/mcp list|show`, `/cd` without
-    a path, `/plan`, `/mode`, and plugin or MCP prompt commands.
+    `/plugins`, `/notify`, and `/mcp` without arguments, `/mcp list|show`,
+    `/cd` without a path, `/plan`, `/mode`, and plugin or MCP prompt commands.
   - `admin`: shutdown, token management, answering a `trust` interaction,
     and slash commands that change trust, directory access, approval, the
     model or its slots, prompt sets, rules, agents, the workspace, saved
@@ -142,7 +142,9 @@ and the `server.state` event.
     `/tier`, `/speed`, `/tokens`, `/model`, `/promptset`, `/promptattach`,
     `/statusline`, `/cd <path>`, `/space`, `/trust`, `/rules`, `/access`,
     `/resume`, `/agents`, `/verbose`, `/quit`, and the argument forms of
-    `/compact`, `/todos`, `/tools`, `/plugins`, and `/mcp`).
+    `/compact`, `/todos`, `/tools`, `/plugins`, `/notify`, and `/mcp`).
+    `/notify test` runs the operator's `operatorNotify` command on the server
+    host, so it needs `admin`.
     `ServerScopes.ForVerb` throws for a verb it does not classify, and a test
     covers the whole enum.
 - The startup token has every scope. `POST /auth/tokens` issues a narrower

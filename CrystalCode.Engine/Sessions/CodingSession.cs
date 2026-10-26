@@ -16,6 +16,7 @@ using Crystal.Multimodal.Tools;
 using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
@@ -23,6 +24,7 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Interfaces;
 using CrystalCode.Engine.Mcp;
 using CrystalCode.Engine.Modes;
+using CrystalCode.Engine.Notifications;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;
@@ -94,7 +96,7 @@ public sealed class CodingSession : ITurnObserver
         var registry = new PluginRegistry();
         registry.Add(new AgentToolsPlugin(task));
         return new ToolCatalog(catalog.Definitions.Select(definition => catalog.Find(definition.Name)!)
-            .Concat(registry.CreateTools(_workspace, _todos, _frontEnd.Questions,
+            .Concat(registry.CreateTools(_workspace, _todos, _questions,
                 planMode ? HostToolCatalog.Plan : HostToolCatalog.Work)));
     }
 
@@ -119,7 +121,7 @@ public sealed class CodingSession : ITurnObserver
         }
         var plan = planMode ?? (_turnActive ? EffectiveChildPlanMode : _planMode);
         var planNames = plan
-            ? WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), _frontEnd.Questions, _plugins, _skills, _external,
+            ? WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), _questions, _plugins, _skills, _external,
                 _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true),
                 McpPlanTools()).Definitions.Select(tool => tool.Name)
                 .Append("view_image").ToHashSet(StringComparer.Ordinal)
@@ -256,10 +258,10 @@ public sealed class CodingSession : ITurnObserver
         or "bash_start" or "bash_status" or "bash_logs" or "bash_stop");
 
     private ToolCatalog ChildCatalog(TodoList todos) => EffectiveChildPlanMode
-        ? WorkspaceCatalog.CreatePlan(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
+        ? WorkspaceCatalog.CreatePlan(_workspace, todos, _questions, _plugins, _skills, _external,
             _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.For(true),
             McpPlanTools())
-        : WorkspaceCatalog.CreateWork(_workspace, todos, _frontEnd.Questions, _plugins, _skills, _external,
+        : WorkspaceCatalog.CreateWork(_workspace, todos, _questions, _plugins, _skills, _external,
             _settings.BashTimeoutSeconds, _loadedPlugins, CreateImageDescriber(),
             disabledBuiltInTools: _settings.DisabledBuiltInTools.For(false),
             mcpTools: McpWorkTools());
@@ -267,7 +269,7 @@ public sealed class CodingSession : ITurnObserver
     private IReadOnlyList<Crystal.Multimodal.Tools.IMultimodalTool> ChildImageTools(TodoList todos)
     {
         var catalog = EffectiveChildPlanMode ? HostToolCatalog.Plan : HostToolCatalog.Work;
-        var tools = _plugins.CreateMultimodalTools(_workspace, todos, _frontEnd.Questions, catalog).ToList();
+        var tools = _plugins.CreateMultimodalTools(_workspace, todos, _questions, catalog).ToList();
         tools.AddRange(EffectiveChildPlanMode ? _loadedPlugins.PlanMultimodalTools : _loadedPlugins.WorkMultimodalTools);
         tools.AddRange(EffectiveChildPlanMode ? _external.PlanMultimodalTools : _external.WorkMultimodalTools);
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
@@ -952,6 +954,13 @@ public sealed class CodingSession : ITurnObserver
     private ContextCompactor _compactor;
     private readonly PluginRegistry _plugins;
     private readonly SessionFrontEnd _frontEnd;
+
+    // The front-end prompts wrapped so every operator wait can notify.
+    private readonly IApprovalPrompt _approvals;
+    private readonly IUserPrompt _questions;
+    private readonly OperatorNotifier _notifier;
+    private IDisposable? _turnNotice;
+    private TurnStopReason? _lastStop;
     private readonly object _usageGate = new();
     private readonly SessionReviewContext _reviewContext = new();
     private readonly SessionLedger _ledger = new();
@@ -1061,6 +1070,13 @@ public sealed class CodingSession : ITurnObserver
         _workspace = workspace;
         _plugins = plugins;
         _frontEnd = frontEnd;
+        _notifier = new OperatorNotifier(
+            () => _settings.OperatorNotify,
+            () => _workspace.Root,
+            () => _sessionId ?? string.Empty,
+            Note);
+        _approvals = new NotifyingApprovalPrompt(frontEnd.Approvals, _notifier);
+        _questions = new NotifyingUserPrompt(frontEnd.Questions, _notifier);
         _approval = settings.Approval;
         _toolHost = new SessionToolHost(
             _workspace,
@@ -1235,6 +1251,7 @@ public sealed class CodingSession : ITurnObserver
     public async Task<bool> SubmitAsync(string text, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(text);
+        ClearTurnNotice();
         try
         {
             if (await SubmitCoreAsync(text, cancellationToken))
@@ -1333,6 +1350,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         await SavePromptHistoryAsync(text, cancellationToken);
+        ClearTurnNotice();
         if (_turnActive || queueOnly)
         {
             _queue.Enqueue(text, interruptAfterTools: false, preserveText: true);
@@ -1349,6 +1367,7 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public async Task<bool> CompleteTurnAsync(CancellationToken cancellationToken)
     {
+        _lastStop = null;
         try
         {
             await FinishTurnAsync(cancellationToken);
@@ -1371,12 +1390,41 @@ public sealed class CodingSession : ITurnObserver
                 return true;
             }
 
-            return await DrainDeferredStopAsync(cancellationToken);
+            if (await DrainDeferredStopAsync(cancellationToken))
+            {
+                return true;
+            }
+
+            NoticeTurnFinished();
+            return false;
         }
         finally
         {
             await FlushPromptHistoryAsync();
         }
+    }
+
+    /// <summary>
+    /// The session is idle and waits for the next prompt. An interrupted turn
+    /// is the operator's own action, so it does not notify.
+    /// </summary>
+    private void NoticeTurnFinished()
+    {
+        if (_turnActive || _lastStop is null || _lastStop == TurnStopReason.Interrupted)
+        {
+            return;
+        }
+
+        ClearTurnNotice();
+        _turnNotice = _notifier.Begin(new OperatorNotice(
+            OperatorNotifyEvent.Turn,
+            "Turn finished: " + _lastStop.Value,
+            [new("STOP", _lastStop.Value)]));
+    }
+
+    private void ClearTurnNotice()
+    {
+        Interlocked.Exchange(ref _turnNotice, null)?.Dispose();
     }
 
     /// <summary>
@@ -1787,6 +1835,7 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public async Task<SessionClosure> CloseAsync(CancellationToken cancellationToken = default)
     {
+        await _notifier.StopAsync();
         await ClosePluginSessionAsync(cancellationToken);
         await _backgroundTasks.StopAllAsync();
         await _mcp.DisposeAsync();
@@ -1797,6 +1846,7 @@ public sealed class CodingSession : ITurnObserver
 
     public SessionClosure Close()
     {
+        _notifier.Cancel();
         CancelAndClearSide(announce: false);
         try
         {
@@ -2109,6 +2159,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, await ChangeTrustAsync(command.Argument, cancellationToken));
             case SessionVerb.Rules:
                 ChangeRules(command.Argument);
+                return (true, false);
+            case SessionVerb.Notify:
+                await ChangeNotifyAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Fork:
                 await ForkSessionAsync(command.Argument, cancellationToken);
@@ -5342,6 +5395,50 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
+    private async Task ChangeNotifyAsync(string argument, CancellationToken cancellationToken)
+    {
+        if (!OperatorNotifyArguments.TryParse(argument, out var action, out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        var current = _settings.OperatorNotify;
+        switch (action)
+        {
+            case OperatorNotifyArguments.Action.Show:
+                Note(OperatorNotifyArguments.Format(current));
+                return;
+            case OperatorNotifyArguments.Action.Test:
+                Note("Running the operator notification command.");
+                var failure = await _notifier.TestAsync(cancellationToken);
+                if (failure is null)
+                {
+                    Note("Operator notification command exited with code 0.");
+                }
+                else
+                {
+                    Error("Operator notification test failed: " + failure);
+                }
+
+                return;
+            case OperatorNotifyArguments.Action.On or OperatorNotifyArguments.Action.Off:
+                var enabled = action == OperatorNotifyArguments.Action.On;
+                if (enabled && !current.HasCommand)
+                {
+                    Error("Set operatorNotify.command in config.json before turning notification on.");
+                    return;
+                }
+
+                SaveSettings(settings => settings.WithOperatorNotify(settings.OperatorNotify.WithEnabled(enabled)));
+                Note("Operator notification  " + (enabled ? "on" : "off"));
+                return;
+            default:
+                Error(OperatorNotifyArguments.Usage);
+                return;
+        }
+    }
+
     private void ChangeRules(string argument)
     {
         if (!RuleFileArguments.TryParse(argument, out var change, out var error))
@@ -6162,7 +6259,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void RebuildExecutors()
     {
-        var approvalPrompt = new ChildApprovalPrompt(_frontEnd.Approvals, () => _childOrigin.Value,
+        var approvalPrompt = new ChildApprovalPrompt(_approvals, () => _childOrigin.Value,
             value =>
             {
                 if (_childPublish.Value is { } childPublish)
@@ -6174,7 +6271,7 @@ public sealed class CodingSession : ITurnObserver
                     Publish(value);
                 }
             }, _operatorGate);
-        var question = _frontEnd.Questions;
+        var question = _questions;
         var reviewer = new ModelApprovalReviewer(
             ReviewerClient(),
             CurrentReviewSystemText(),
@@ -6439,7 +6536,7 @@ public sealed class CodingSession : ITurnObserver
                 _settings.McpToolApproval,
                 reserved,
                 cancellationToken,
-                new McpHostCallbacks(() => _workspace.Root, _frontEnd.Questions, NoteMcpToolsChanged));
+                new McpHostCallbacks(() => _workspace.Root, _questions, NoteMcpToolsChanged));
         }
         finally
         {
@@ -8522,6 +8619,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var stop = result?.StopReason ?? TurnStopReason.Failed;
+        _lastStop = stop;
         var error = string.IsNullOrWhiteSpace(failure) ? _turnFault : failure;
         await _hooks.OnTurnFinishedAsync(
             new PluginTurn(

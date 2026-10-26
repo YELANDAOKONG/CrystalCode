@@ -118,7 +118,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             persistentDisabledBuiltInTools: ReadDisabledBuiltInTools(document.DisabledBuiltInTools),
             mcp: document.Mcp ?? defaults.Mcp,
             mcpToolApproval: mcpToolApproval,
-            extendedApproval: ReadExtendedApproval(document.ExtendedApproval));
+            extendedApproval: ReadExtendedApproval(document.ExtendedApproval),
+            operatorNotify: ReadOperatorNotify(document.OperatorNotify));
     }
 
     public void Save(HarnessSettings settings)
@@ -196,6 +197,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             Providers = previous?.Providers,
             ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
             ExtendedApproval = WriteExtendedApproval(settings.ExtendedApproval),
+            OperatorNotify = WriteOperatorNotify(settings.OperatorNotify),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
@@ -529,6 +531,85 @@ public sealed class DiskSettingsStore : ISettingsStore
             ? ThinkingSelection.Default
             : ThinkingSelection.Parse(document.ThinkingEffort);
         return new ImageModelSettings(provider, model, thinkingEffort);
+    }
+
+    /// <summary>
+    /// An object with a command but no <c>enabled</c> field is on, so the
+    /// smallest useful entry is just the command. <c>enabled: false</c> keeps
+    /// the command unused.
+    /// </summary>
+    private static OperatorNotifySettings ReadOperatorNotify(OperatorNotifyDocument? document)
+    {
+        if (document is null)
+        {
+            return OperatorNotifySettings.Off;
+        }
+
+        var command = document.Command ?? [];
+        if (command.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException("operatorNotify.command entries cannot be empty.");
+        }
+
+        var enabled = document.Enabled ?? command.Count > 0;
+        if (enabled && command.Count == 0)
+        {
+            throw new InvalidOperationException("operatorNotify.enabled requires a command array.");
+        }
+
+        List<OperatorNotifyEvent>? events = null;
+        if (document.Events is not null)
+        {
+            events = [];
+            foreach (var text in document.Events)
+            {
+                if (!OperatorNotifyEvent.TryParse(text, out var parsed))
+                {
+                    throw new InvalidOperationException(
+                        "operatorNotify.events entries must be approval, question, or turn.");
+                }
+
+                events.Add(parsed);
+            }
+        }
+
+        var delay = document.DelaySeconds ?? OperatorNotifySettings.DefaultDelaySeconds;
+        if (delay is < 0 or > OperatorNotifySettings.MaximumDelaySeconds)
+        {
+            throw new InvalidOperationException(
+                $"operatorNotify.delaySeconds must be between 0 and {OperatorNotifySettings.MaximumDelaySeconds}.");
+        }
+
+        var timeout = document.TimeoutSeconds ?? OperatorNotifySettings.DefaultTimeoutSeconds;
+        if (timeout is < 1 or > OperatorNotifySettings.MaximumTimeoutSeconds)
+        {
+            throw new InvalidOperationException(
+                $"operatorNotify.timeoutSeconds must be between 1 and {OperatorNotifySettings.MaximumTimeoutSeconds}.");
+        }
+
+        return new OperatorNotifySettings(enabled, command, events, delay, timeout);
+    }
+
+    private static OperatorNotifyDocument? WriteOperatorNotify(OperatorNotifySettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new OperatorNotifyDocument
+        {
+            // Written explicitly, so a hand-edited file keeps its meaning after a save.
+            Enabled = settings.Enabled,
+            Command = settings.HasCommand ? [.. settings.Command] : null,
+            Events = settings.HasDefaultEvents ? null : [.. settings.Events.Select(static value => value.Value)],
+            DelaySeconds = settings.DelaySeconds == OperatorNotifySettings.DefaultDelaySeconds
+                ? null
+                : settings.DelaySeconds,
+            TimeoutSeconds = settings.TimeoutSeconds == OperatorNotifySettings.DefaultTimeoutSeconds
+                ? null
+                : settings.TimeoutSeconds
+        };
     }
 
     private static ImageModelDocument? WriteImageModel(ImageModelSettings settings)

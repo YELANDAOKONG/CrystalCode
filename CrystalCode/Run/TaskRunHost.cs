@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using CrystalCode.Commands;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
@@ -91,6 +92,8 @@ internal static class TaskRunHost
             await error.WriteLineAsync(note);
         }
 
+        // A run has no operator to notify. The saved setting stays on disk.
+        launch = launch with { Settings = launch.Settings.WithOperatorNotify(OperatorNotifySettings.Off) };
         var approvals = new UnattendedApprovalPrompt();
         var questions = new UnattendedUserPrompt();
         IRunLog log = format == RunFormat.Json

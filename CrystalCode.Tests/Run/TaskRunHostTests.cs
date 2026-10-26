@@ -366,6 +366,40 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task OperatorPrompt_DoesNotRunTheSavedNotificationCommand()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var fixture = new RunFixture();
+        File.WriteAllText(
+            Path.Combine(fixture.Home, "config.json"),
+            """
+            {
+              "provider": "ollama",
+              "model": "qwen3:8b",
+              "operatorNotify": {
+                "command": ["/bin/sh", "-c", "printf x > notified.txt"],
+                "events": ["approval", "turn"]
+              }
+            }
+            """);
+        var client = new ScriptedRunClient(
+            AllowReview,
+            ToolRound("c1", "bash", """{"command":"printf ready > ran.txt"}"""),
+            TextRound("I could not run it."));
+
+        var result = await fixture.RunAsync(client, "Create the marker file");
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        Assert.Equal(RunExit.Denied, result.Code);
+        Assert.False(File.Exists(Path.Combine(fixture.Workspace, "notified.txt")));
+        Assert.True(fixture.Reload().OperatorNotify.Enabled);
+    }
+
+    [Fact]
     public async Task ModelCallBudget_StopsBeforeTheNextRound()
     {
         using var fixture = new RunFixture();

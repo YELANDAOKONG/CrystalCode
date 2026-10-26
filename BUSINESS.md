@@ -95,6 +95,16 @@ separate library with no terminal code. The product can:
   validation, OS permissions, cancellation, and configured budgets still apply;
 - ask one or more operator questions in one request, with described choices,
   single or multiple selection, optional custom answers, and confirmation;
+- run an operator-authored command when the session waits for the operator,
+  such as a desktop notification or a webhook. `operatorNotify` in
+  `config.json` holds the command, an `enabled` switch, the events
+  (`approval`, `question`, and `turn`), a delay, and a timeout. There is no
+  built-in command and it is off until a command is set. An approval notifies
+  only when the operator is asked, after any review; auto-pass and grants do
+  not. `turn` notifies when a turn ends without a queued follow-up, and not
+  after an interrupt. The command never blocks the prompt. `/notify` shows
+  the setting, `/notify on|off` writes `config.json`, and `/notify test`
+  runs the command once. `crystal run` never runs it;
 - compact the context sent to the model when usage approaches the model
   window, or when the operator runs `/compact`. Manual compaction summarizes
   earlier turns without waiting for that threshold, prints the summary unless
