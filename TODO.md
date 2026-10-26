@@ -86,16 +86,9 @@ behavior stands until a specific change defines otherwise.
   would be a front end that implements `SessionFrontEnd`, not an engine
   protocol. Do not bypass approval, trust, or the tool boundary. ACP does
   not speak MCP itself. Editor-supplied MCP servers, when that front end
-  exists, use the same MCP client as local servers. The terminal remains the
-  only operator surface until it exists. `crystal agent` is not a command,
+  exists, use the same MCP client as local servers. It is not
+  `crystal server`. `crystal agent` is not a command,
   project, or public type in this build.
-- An agent API server, `crystal server`. Behavior and ownership are defined
-  in [docs/server.md](docs/server.md) and `BUSINESS.md`: ASP.NET Core Minimal
-  API plus server-sent events in `CrystalCode.Server`, one session per
-  process, token authentication by default, and no version identifier. The
-  engine launch, runner, plain-data report, image, export, and close
-  boundary is in this build. The session state reducer, event origin,
-  per-origin drafts, the project, and the command are not.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.

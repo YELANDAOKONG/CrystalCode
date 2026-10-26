@@ -5,18 +5,21 @@ namespace CrystalCode.Engine.Sessions;
 /// <summary>
 /// Drives one <see cref="CodingSession"/> for a front end that has no frame
 /// loop of its own. It is the only caller of the session's input methods:
-/// inputs arrive on one channel and are handled in order, a finished turn is
+/// work arrives on one channel and runs in order, a finished turn is
 /// collected with <see cref="CodingSession.CompleteTurnAsync"/> (which also
-/// starts a queued follow-up), and input that arrives while a session call is
+/// starts a queued follow-up), and text that arrives while a session call is
 /// still running goes to <see cref="CodingSession.EnqueueAsync"/>, the same
-/// way the terminal pump forwards keys. Interrupt, recall, mode, and the
-/// other immediate operations stay direct calls on the session.
+/// way the terminal pump forwards keys. Operations such as a mode change or
+/// a draft update also run here, in order with the input, even while a call
+/// is running. Interrupt, recall, and side-question cancellation stay direct
+/// calls on the session because Ctrl+C makes them from any thread.
 /// </summary>
 public sealed class SessionRunner
 {
-    private readonly Channel<PendingInput> _inputs = Channel.CreateUnbounded<PendingInput>(
+    private readonly Channel<Work> _inputs = Channel.CreateUnbounded<Work>(
         new UnboundedChannelOptions { SingleReader = true });
     private Task<bool>? _wait;
+    private bool _pumped;
     private int _running;
 
     public SessionRunner(CodingSession session)
@@ -30,22 +33,35 @@ public sealed class SessionRunner
     /// <summary>
     /// Queues text exactly as the terminal composer submits it: a prompt, a
     /// slash command, a follow-up while a turn runs, or empty text that
-    /// releases the queue.
+    /// releases the queue. Events it produces carry <paramref name="origin"/>.
     /// </summary>
-    public Task<SessionInputResult> SubmitAsync(string text)
+    public Task<SessionInputResult> SubmitAsync(string text, string? origin = null)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return Post(new PendingInput(text, Quick: false));
+        var work = new InputWork(text, Quick: false, origin);
+        return Post(work, work.Completion.Task);
     }
 
     /// <summary>
     /// Queues a quick prompt Send. It bypasses slash parsing and never takes
     /// the pending draft images.
     /// </summary>
-    public Task<SessionInputResult> SubmitQuickPromptAsync(string text)
+    public Task<SessionInputResult> SubmitQuickPromptAsync(string text, string? origin = null)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return Post(new PendingInput(text, Quick: true));
+        var work = new InputWork(text, Quick: true, origin);
+        return Post(work, work.Completion.Task);
+    }
+
+    /// <summary>
+    /// Runs a synchronous session operation in order with the queued input,
+    /// under <paramref name="origin"/>.
+    /// </summary>
+    public Task<T> InvokeAsync<T>(Func<CodingSession, T> operation, string? origin = null)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var work = new OperationWork<T>(operation, origin);
+        return Post(work, work.Completion.Task);
     }
 
     /// <summary>
@@ -85,20 +101,20 @@ public sealed class SessionRunner
             _inputs.Writer.TryComplete();
             while (_inputs.Reader.TryRead(out var left))
             {
-                left.Completion.TrySetCanceled(CancellationToken.None);
+                left.Cancel(CancellationToken.None);
             }
         }
     }
 
-    private Task<SessionInputResult> Post(PendingInput input)
+    private Task<T> Post<T>(Work work, Task<T> completion)
     {
-        if (!_inputs.Writer.TryWrite(input))
+        if (!_inputs.Writer.TryWrite(work))
         {
-            return Task.FromException<SessionInputResult>(
+            return Task.FromException<T>(
                 new InvalidOperationException("The session no longer accepts input."));
         }
 
-        return input.Completion.Task;
+        return completion;
     }
 
     private async Task<bool> LoopAsync(CancellationToken cancellationToken)
@@ -141,7 +157,22 @@ public sealed class SessionRunner
             }
 
             _wait = null;
-            if (_inputs.Reader.TryRead(out var input) && await DispatchAsync(input, cancellationToken))
+            if (!_inputs.Reader.TryRead(out var work))
+            {
+                continue;
+            }
+
+            _pumped = false;
+            if (await RunWorkAsync(work, idle: true, cancellationToken))
+            {
+                return true;
+            }
+
+            // Text that arrived while a command ran was queued. With no turn
+            // to collect, nothing else would start it.
+            if (_pumped
+                && Session.TurnTask is null
+                && await PumpAsync(Session.CompleteTurnAsync(CancellationToken.None), cancellationToken))
             {
                 return true;
             }
@@ -162,32 +193,29 @@ public sealed class SessionRunner
         return _wait;
     }
 
-    private async Task<bool> DispatchAsync(PendingInput input, CancellationToken cancellationToken)
+    private async Task<bool> RunWorkAsync(Work work, bool idle, CancellationToken cancellationToken)
     {
         try
         {
-            var quit = false;
-            if (input.Quick)
+            using (Session.BeginOrigin(work.Origin))
             {
-                await PumpAsync(Session.SubmitQuickPromptAsync(input.Text, false, cancellationToken), cancellationToken);
+                return await work.RunAsync(this, idle, cancellationToken);
             }
-            else
-            {
-                quit = await PumpAsync(Session.SubmitAsync(input.Text, cancellationToken), cancellationToken);
-            }
-
-            input.Completion.TrySetResult(new SessionInputResult(Session.TurnActive, quit));
-            return quit;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            input.Completion.TrySetCanceled(cancellationToken);
-            throw;
+            work.Cancel(cancellationToken);
+            if (idle)
+            {
+                throw;
+            }
+
+            return false;
         }
         catch (Exception exception)
         {
             // One bad input fails its own request; the session keeps running.
-            input.Completion.TrySetException(exception);
+            work.Fail(exception);
             return false;
         }
     }
@@ -199,10 +227,11 @@ public sealed class SessionRunner
     }
 
     /// <summary>
-    /// Keeps accepting input while a session call runs. The call cannot be
-    /// re-entered, so text goes to <see cref="CodingSession.EnqueueAsync"/> and
-    /// a quick prompt is queued. Blank text is forwarded too, so a waiting
-    /// follow-up can interrupt the turn or compaction.
+    /// Keeps accepting work while a session call runs. The call cannot be
+    /// re-entered, so text goes to <see cref="CodingSession.EnqueueAsync"/>, a
+    /// quick prompt is queued, and operations run between the call's awaits.
+    /// Blank text is forwarded too, so a waiting follow-up can interrupt the
+    /// turn or compaction.
     /// </summary>
     private async Task PumpAsync(Task work, CancellationToken cancellationToken)
     {
@@ -216,38 +245,14 @@ public sealed class SessionRunner
             }
 
             _wait = null;
-            while (!work.IsCompleted && _inputs.Reader.TryRead(out var input))
+            while (!work.IsCompleted && _inputs.Reader.TryRead(out var pending))
             {
-                await EnqueueAsync(input, cancellationToken);
+                _pumped = true;
+                await RunWorkAsync(pending, idle: false, cancellationToken);
             }
         }
 
         await work;
-    }
-
-    private async Task EnqueueAsync(PendingInput input, CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (input.Quick)
-            {
-                await Session.SubmitQuickPromptAsync(input.Text, true, cancellationToken);
-            }
-            else
-            {
-                await Session.EnqueueAsync(input.Text, cancellationToken);
-            }
-
-            input.Completion.TrySetResult(new SessionInputResult(Session.TurnActive, Quit: false));
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            input.Completion.TrySetCanceled(cancellationToken);
-        }
-        catch (Exception exception)
-        {
-            input.Completion.TrySetException(exception);
-        }
     }
 
     /// <summary>
@@ -263,9 +268,74 @@ public sealed class SessionRunner
         }
     }
 
-    private sealed record PendingInput(string Text, bool Quick)
+    private abstract class Work(string? origin)
+    {
+        public string? Origin { get; } = origin;
+
+        /// <summary>
+        /// Runs the work. <paramref name="idle"/> is false while another session
+        /// call is still running. Returns true when the session asked to quit.
+        /// </summary>
+        public abstract Task<bool> RunAsync(SessionRunner runner, bool idle, CancellationToken cancellationToken);
+
+        public abstract void Cancel(CancellationToken cancellationToken);
+
+        public abstract void Fail(Exception exception);
+    }
+
+    private sealed class InputWork(string text, bool Quick, string? origin) : Work(origin)
     {
         public TaskCompletionSource<SessionInputResult> Completion { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async Task<bool> RunAsync(SessionRunner runner, bool idle, CancellationToken cancellationToken)
+        {
+            var session = runner.Session;
+            var quit = false;
+            if (!idle)
+            {
+                if (Quick)
+                {
+                    await session.SubmitQuickPromptAsync(text, true, cancellationToken);
+                }
+                else
+                {
+                    await session.EnqueueAsync(text, cancellationToken);
+                }
+            }
+            else if (Quick)
+            {
+                await runner.PumpAsync(session.SubmitQuickPromptAsync(text, false, cancellationToken), cancellationToken);
+            }
+            else
+            {
+                quit = await runner.PumpAsync(session.SubmitAsync(text, cancellationToken), cancellationToken);
+            }
+
+            Completion.TrySetResult(new SessionInputResult(session.TurnActive, quit));
+            return quit;
+        }
+
+        public override void Cancel(CancellationToken cancellationToken) =>
+            Completion.TrySetCanceled(cancellationToken);
+
+        public override void Fail(Exception exception) => Completion.TrySetException(exception);
+    }
+
+    private sealed class OperationWork<T>(Func<CodingSession, T> operation, string? origin) : Work(origin)
+    {
+        public TaskCompletionSource<T> Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override Task<bool> RunAsync(SessionRunner runner, bool idle, CancellationToken cancellationToken)
+        {
+            Completion.TrySetResult(operation(runner.Session));
+            return Task.FromResult(false);
+        }
+
+        public override void Cancel(CancellationToken cancellationToken) =>
+            Completion.TrySetCanceled(cancellationToken);
+
+        public override void Fail(Exception exception) => Completion.TrySetException(exception);
     }
 }

@@ -1,5 +1,3 @@
-using Crystal;
-
 using CrystalCode.Display.Cards;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
@@ -243,16 +241,16 @@ internal sealed class SessionProjection : ISessionObserver
             {
                 case ChildSessionChanged changed:
                     var updated = changed.Child;
-                    if (updated.Status is "running" or "queued"
+                    if (ChildSessionFold.IsActive(updated)
                         && _childEvents.TryGetValue(updated.Id, out var liveEvents))
                     {
                         foreach (var value in liveEvents)
                         {
-                            updated = UpdateChildSnapshot(updated, value);
+                            updated = ChildSessionFold.Apply(updated, value);
                         }
                     }
                     _children[updated.Id] = updated;
-                    if (changed.Child.Status is not ("running" or "queued"))
+                    if (!ChildSessionFold.IsActive(changed.Child))
                     {
                         if (_childEvents.TryGetValue(changed.Child.Id, out var completedEvents))
                         {
@@ -269,7 +267,7 @@ internal sealed class SessionProjection : ISessionObserver
                     if (_children.TryGetValue(child.ChildSessionId, out var snapshot)
                         && child.Event is UsageChanged or TodosChanged)
                     {
-                        _children[child.ChildSessionId] = UpdateChildSnapshot(snapshot, child.Event);
+                        _children[child.ChildSessionId] = ChildSessionFold.Apply(snapshot, child.Event);
                         _renderer.SetChildSessions(_children.Values.ToArray(), _childFocus, repaint: false);
                     }
                     if (!_childEvents.TryGetValue(child.ChildSessionId, out var events))
@@ -403,20 +401,18 @@ internal sealed class SessionProjection : ISessionObserver
             Model = model.Model ?? "Unknown", Thinking = model.Thinking ?? "default", ContextWindow = model.Context ?? 0,
             ServiceTier = model.Tier ?? string.Empty, Speed = model.Speed ?? string.Empty
         }));
-        _renderer.SetProgress(child.Status is "running" or "queued" ? child.Status : string.Empty);
-        _renderer.SetTodos(child.Todos.Select(todo => new CrystalCode.Display.Cards.TodoBarItem(
-            todo.Status switch
-            {
-                "in_progress" => TodoList.StatusMark(TodoStatus.InProgress),
-                "completed" => TodoList.StatusMark(TodoStatus.Completed),
-                "cancelled" => TodoList.StatusMark(TodoStatus.Cancelled),
-                _ => TodoList.StatusMark(TodoStatus.Pending)
-            }, todo.Content ?? string.Empty)).ToArray());
+        _renderer.SetProgress(ChildSessionFold.IsActive(child) ? child.Status : string.Empty);
+        _renderer.SetTodos(
+            [
+                .. ChildSessionFold.Todos(child).Select(static todo => new TodoBarItem(
+                    TodoList.StatusMark(todo.Status),
+                    todo.Content))
+            ]);
         foreach (var note in child.Notes)
         {
             _renderer.WriteNote(note);
         }
-        Project(new UsageChanged(Usage(child.Usage), Usage(child.CumulativeUsage), model.Context ?? 0, false));
+        Project(new UsageChanged(ChildSessionFold.Usage(child.Usage), ChildSessionFold.Usage(child.CumulativeUsage), model.Context ?? 0, false));
         if (_childEvents.TryGetValue(id, out var events))
         {
             foreach (var item in events)
@@ -425,40 +421,4 @@ internal sealed class SessionProjection : ISessionObserver
             }
         }
     }
-
-    private static ChildSessionDocument UpdateChildSnapshot(ChildSessionDocument child, SessionEvent value) => value switch
-    {
-        UsageChanged usage => child with
-        {
-            Usage = UsageDocument(usage.Usage),
-            CumulativeUsage = UsageDocument(usage.CumulativeUsage)
-        },
-        TodosChanged todos => child with
-        {
-            Todos = todos.Items.Select(todo => new SessionTodoDocument
-            {
-                Id = todo.Id,
-                Content = todo.Content,
-                Status = todo.Status switch
-                {
-                    TodoStatus.InProgress => "in_progress",
-                    TodoStatus.Completed => "completed",
-                    TodoStatus.Cancelled => "cancelled",
-                    _ => "pending"
-                }
-            }).ToArray()
-        },
-        _ => child
-    };
-
-    private static SessionUsageDocument? UsageDocument(TokenUsage? usage) => usage is null ? null
-        : new SessionUsageDocument
-        {
-            InputTokenCount = usage.InputTokenCount,
-            OutputTokenCount = usage.OutputTokenCount,
-            ReasoningTokenCount = usage.ReasoningTokenCount
-        };
-
-    private static TokenUsage? Usage(SessionUsageDocument? usage) => usage is null ? null
-        : new TokenUsage(usage.InputTokenCount, usage.OutputTokenCount, usage.ReasoningTokenCount);
 }

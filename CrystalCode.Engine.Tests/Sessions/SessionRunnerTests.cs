@@ -104,6 +104,41 @@ public sealed class SessionRunnerTests
     }
 
     [Fact]
+    public async Task Prompt_SentWhileACommandRunsStartsAfterIt()
+    {
+        var client = new ScriptedStreamingClient(TextRound("done"));
+        using var headless = new HeadlessSession(client);
+        await headless.Session.StartAsync(CancellationToken.None);
+        var runner = new SessionRunner(headless.Session);
+
+        var status = runner.SubmitAsync("/status");
+        var prompt = runner.SubmitAsync("hi");
+        runner.Complete();
+        await runner.RunAsync(CancellationToken.None).WaitAsync(Wait);
+        await status;
+        await prompt;
+
+        Assert.Equal("hi", Assert.Single(headless.Observer.Events.OfType<UserMessageSent>()).Text);
+        Assert.Single(headless.Observer.Events.OfType<TurnFinished>());
+    }
+
+    [Fact]
+    public async Task Invoke_RunsAnOperationInOrder()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+        var runner = new SessionRunner(headless.Session);
+        using var stop = new CancellationTokenSource();
+        var running = runner.RunAsync(stop.Token);
+
+        var plan = await runner.InvokeAsync(session => session.TogglePlan()).WaitAsync(Wait);
+
+        Assert.Equal(plan, headless.Session.PlanMode);
+        await stop.CancelAsync();
+        await running.WaitAsync(Wait);
+    }
+
+    [Fact]
     public async Task Run_CannotStartTwice()
     {
         using var headless = new HeadlessSession(new ScriptedStreamingClient());

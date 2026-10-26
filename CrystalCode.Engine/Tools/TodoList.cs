@@ -136,7 +136,7 @@ public sealed class TodoList
             _ => throw new ArgumentOutOfRangeException(nameof(status), status, null)
         };
 
-    internal static string StatusName(TodoStatus status) =>
+    public static string StatusName(TodoStatus status) =>
         status switch
         {
             TodoStatus.Pending => "pending",

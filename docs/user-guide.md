@@ -3,8 +3,9 @@
 Detailed usage reference. For a shorter introduction, start with the
 [project README](../README.md).
 
-A production coding TUI for local repositories. The terminal is the
-only operator surface. It runs a streaming model-and-tool loop, with
+A production coding TUI for local repositories. The terminal and
+`crystal server` (an HTTP front end for other clients; see
+[server.md](server.md)) are the operator surfaces. It runs a streaming model-and-tool loop, with
 Plan, Work, and custom modes, risk-aware approval, automatic context compaction,
 and operator data under `~/.crystal`. `crystal run` runs one task
 without a terminal; anything that would ask the operator is denied.
@@ -78,7 +79,7 @@ or `CrystalCode` on Windows.
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
 High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
-(MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; `crystal server`, an HTTP front end whose protocol is defined in [server.md](server.md); and a refactor
+(MCP tools are in this build); the Agent Client Protocol (ACP), working name crystal agent; and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a second additional review
 of the current product, a full code review, child Agent configuration, and provider-specific
@@ -91,8 +92,7 @@ that thinking according to a requirement. Context compaction,
 microcompaction, `/verbose thinking`, and a provider's summarized
 thinking display are not that path. ACP would be an editor-facing front
 end, not an engine or provider protocol, and not a `crystal agent`
-command yet. The terminal remains the only operator surface until it
-exists. `--disable-tool` only omits a built-in for one process. The
+command yet. `--disable-tool` only omits a built-in for one process. The
 product has two built-in modes, Plan and Work, plus operator-defined custom modes. Built-in provider
 protocols are DeepSeek, OpenAI-compatible Chat Completions, OpenAI
 Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add
@@ -433,6 +433,41 @@ are `step_start`, `text`, `reasoning`, `tool_use`, `error`, `note`,
 only when the process will exit non-zero. `session.text` is the same
 resume hint the plain format prints. Invalid commands and missing
 credentials are still plain text on stderr.
+
+## Server
+
+`crystal server` serves one session over HTTP so that another front end, such
+as a web page or a desktop program, can drive it. Those front ends are not
+part of this repository. Start it in the workspace, or let a wrapper start it:
+
+```bash
+cd your-repo
+crystal server
+```
+
+It prints one JSON line to stdout, `{"event":"listening","url":…,"pid":…,
+"workspace":…,"discovery":…}`, and writes the same details to
+`~/.crystal/server/<pid>.json` with owner-only permissions. It accepts the
+session options `crystal` accepts, plus `--workspace`, `--space`, and
+`--resume`, and none of them are written to `config.json`.
+
+- `--listen <host:port>` defaults to `127.0.0.1:0` (a free port).
+  `--socket <path>` uses a Unix socket instead.
+- A bearer token is required by default, even on loopback. The server takes
+  it from `CRYSTAL_SERVER_TOKEN`, an owner-only `--token-file`, or one line
+  on stdin with `--token-stdin`. Otherwise it generates one and writes it to
+  the discovery file. A token is never a command flag. `--auth none` turns
+  authentication off and prints a warning.
+- To reach it from another machine on the LAN, listen on `0.0.0.0:<port>`
+  and add the address clients use with `--allow-host`. Without
+  `--tls-cert`/`--tls-key` the server warns that traffic is in clear text.
+  A key password comes from `CRYSTAL_SERVER_TLS_PASSWORD`.
+- A browser page on another origin needs `--allow-origin <origin>`.
+- `--exit-on-stdin-close` ends the server when its wrapper closes stdin.
+- `/quit`, `POST /shutdown`, Ctrl+C, and SIGTERM save the session and exit.
+
+The protocol, scopes, endpoints, events, and reconnect rules are in
+[server.md](server.md).
 
 ## Credentials
 
@@ -2207,6 +2242,8 @@ sets still load class libraries from the tool-set directory only. See
 | `<PROVIDER>_API_KEY` | Key for a named provider (hyphens become underscores) |
 | `CRYSTAL_API_KEY` | Shared key for this process when no provider-specific variable is set |
 | `XDG_CONFIG_HOME` | Base for the global OpenCode `AGENTS.md` fallback |
+| `CRYSTAL_SERVER_TOKEN` | Startup token for `crystal server` |
+| `CRYSTAL_SERVER_TLS_PASSWORD` | Password for an encrypted `crystal server` TLS key |
 
 Provider key variables override `credentials.json` for the process that
 receives them. A lasting install stores the key in that file. A single
@@ -2236,3 +2273,4 @@ command line. They appear in process lists.
 - [AGENTS.md](../AGENTS.md) — instructions for coding agents
 - [external-tools.md](external-tools.md) — operator tool sets
 - [plugins.md](plugins.md) — operator plugins and hooks
+- [server.md](server.md) — `crystal server` protocol

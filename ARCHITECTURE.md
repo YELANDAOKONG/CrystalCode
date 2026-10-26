@@ -33,12 +33,12 @@ references only Crystal. No project in this repository modifies Crystal.
 
 A second front end (a desktop application, for example) references
 CrystalCode.Engine and supplies its own surface. It does not copy engine code.
-`CrystalCode.Server` (defined, not in this build) sits beside
-`CrystalCode.Display` under the executable: it references
-CrystalCode.Engine and the `Microsoft.AspNetCore.App` shared framework only.
-It does not reference CrystalCode.Display, Spectre.Console, Terminal.Gui, or
-the executable. `CrystalCode.Server.Tests` references CrystalCode.Server and
-guards that direction. See [docs/server.md](docs/server.md).
+`CrystalCode.Server` sits beside `CrystalCode.Display` under the executable:
+it references CrystalCode.Engine and the `Microsoft.AspNetCore.App` shared
+framework only. It does not reference CrystalCode.Display, Spectre.Console,
+Terminal.Gui, the executable, or `System.Console`. The executable references
+it. `CrystalCode.Server.Tests` references CrystalCode.Server and guards that
+direction. See [docs/server.md](docs/server.md).
 If that desktop front end is built with Avalonia, write the UI in C# markup.
 Do not add XAML or AXAML files.
 `EngineAssemblyTests` and `DisplayAssemblyTests` fail the build when either
@@ -150,20 +150,29 @@ overrides, trust and resume preparation, the session runner, event data
 guards, a headless session driven by a scripted model, and the dependency
 guard. Does not reference the host executable.
 
-### CrystalCode.Server (defined, not in this build)
+### CrystalCode.Server
 
 The HTTP front end behind `crystal server`: ASP.NET Core Minimal API endpoints
-and server-sent events on Kestrel, authentication and scopes, wire DTOs with
-System.Text.Json source generation, the interaction broker, the event log, and
-the host that wires `SessionRunner` to HTTP. One process hosts one active
-session. It holds no product logic. The executable's `Commands/ServerCommand`
-parses the command line and hands off to it. The protocol is in
+and server-sent events on Kestrel, authentication and scopes, the explicit
+wire mapping, the interaction broker, the event log, and the host that wires
+`SessionRunner` to HTTP. One process hosts one active session. It holds no
+product logic. The executable's `Commands/ServerCommand` parses the command
+line, resolves the token, and hands off to it. The protocol is in
 [docs/server.md](docs/server.md).
 
-### CrystalCode.Server.Tests (defined, not in this build)
+| Folder | Owns |
+| :--- | :--- |
+| `Hosting` | `CrystalServer` (Kestrel, startup, the listening line, warnings, shutdown), `ServerSession` (launch, the live `CodingSession`, `SessionRunner`, close), `ServerOptions`, `ServerRuntime`, `ListenAddress`, the discovery file, `ClientRegistry`, and the `clientRequestId` ledger |
+| `Security` | `AccessGuard` (Host and Origin checks, bearer tokens, stream tickets, failure rate limit), `TokenStore` (hashed process-local tokens), scopes and the scope of each `SessionVerb`, problem responses |
+| `Events` | `EventHub`: the session observer that numbers, serializes, buffers, and fans out events and owns the `SessionState` reducer |
+| `Interactions` | `InteractionBroker`: approval, question, trust, session, and child prompts as interactions with validated answers |
+| `Wire` | `WireWriter`, `WireEvents`, `SnapshotWriter`: every wire field written explicitly |
+| `Endpoints` | Route groups for input and modes, images, quick prompts, side questions, children, export, interactions, tokens, and the event stream |
 
-Server tests against a real Kestrel listener and a scripted model, the parity
-guards, the secret-leak test, and the dependency guard.
+### CrystalCode.Server.Tests
+
+Server tests against a real Kestrel listener on a loopback port and a scripted
+model, the parity guards, the secret-leak test, and the dependency guard.
 
 ### CrystalCode.Display
 
@@ -219,7 +228,7 @@ CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
-| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `version` prints the build identity |
+| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `version` prints the build identity |
 | `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, and exit codes. Overrides and launch preparation come from `CrystalCode.Engine.Launch` |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, startup trust and resume prompts (`StartupPrompt`), slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
@@ -233,7 +242,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Home` | `~/.crystal` paths and file I/O; `DiskSettingsStore` is the default `config.json` implementation and reads provider files through `ProviderFiles` |
 | `Home/Interfaces` | Configuration persistence contracts such as `ISettingsStore` |
 | `Launch` | Launch options a front end received (`SessionLaunchOptions`), in-memory overrides (`SessionLaunchOverrides`), `--allow-read` / `--allow-write` rules (`SessionLaunchAccess`), and `SessionLauncher`, which resolves the workspace, resume target, trust, prompt attachments, and mode before a session exists |
-| `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, the input loop for front ends without a frame loop (`SessionRunner`), front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
+| `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, the input loop for front ends without a frame loop (`SessionRunner`), the front-end-neutral reducer (`SessionState`, `SessionSnapshot`, `LiveRound`, `ChildSessionFold`), front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
 | `Approvals` | Risk, authority, grants, policy, review transcript |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
@@ -1601,7 +1610,7 @@ contents of `binaries/code/`.
   sessions/<id>.json
   media/<sha256>
   logs/
-  server/<pid>.json   (crystal server discovery file, owner-only; defined, not in this build)
+  server/<pid>.json   (crystal server discovery file, owner-only)
   space/
 ```
 
@@ -2134,8 +2143,34 @@ It is the only caller of the session's input methods while it runs. Inputs
 Input that arrives while a session call is running goes to `EnqueueAsync`, or
 to a queued quick prompt, as the terminal pump forwards keys. A finished turn
 is collected with `CompleteTurnAsync`, which starts a queued follow-up.
-Cancellation interrupts and collects the turn without starting queued work.
-`crystal run` uses it; the terminal keeps its own pump.
+`InvokeAsync` runs a synchronous operation (a mode change, a draft update, an
+image attach, an export) in order with the inputs, also while a call is
+running. Text that was queued while a command ran, with no turn to collect, is
+started once that command returns. Cancellation interrupts and collects the
+turn without starting queued work. `crystal run` and `crystal server` use it;
+the terminal keeps its own pump. `TryInterrupt`, `TryRecall`, and
+`TryCancelSideQuestion` stay direct calls because Ctrl+C makes them from any
+thread.
+
+`SessionEvent.Origin` names the client whose request produced an event. A
+front end serving several clients wraps each request in
+`CodingSession.BeginOrigin`; `SessionRunner` does this per input. The turn
+task and child invocations start under no origin, so their events have none,
+and the engine never sets an origin for a single-operator front end. Draft
+images from a paste or `TryAttachImage`, pending `/attach` images, and the
+recall window belong to the origin that made them: `NotifyDraftChanged`
+discards only that origin's draft images, a submission takes only that
+origin's pending images, and `UserMessageRecalled` carries the sending
+origin. Closing the session discards every origin's drafts.
+
+`SessionState` is the front-end-neutral reducer. A front end that must redraw
+at any time applies every event and reads `SessionSnapshot`: chrome,
+preferences, slash commands, prompt history, the committed conversation, the
+round still streaming (`LiveRound`, without opaque reasoning state), queue,
+todos, status fields, activity, usage, the side-question thread, children
+with live usage and todos folded in, and the last turn. Reports addressed to
+one client are not session state. `ChildSessionFold` holds the child folding
+the terminal's child projection also uses.
 
 `TryAttachImage` attaches bytes a front end received (an upload, or a paste on
 another machine) to the draft with the same signature and size checks as a
@@ -2199,11 +2234,10 @@ The Agent Client Protocol (ACP) is high-priority product work and is not in
 this build. The working name is crystal agent. It would be another front end
 on this contract, not an engine protocol. Do not reserve a command, project,
 or public type for it. `crystal agent` is not a command in this build.
-`crystal server` is the defined HTTP front end on this contract
-([docs/server.md](docs/server.md)). It is not in this build. It uses
-`SessionLauncher` and `SessionRunner`, and it still needs an engine session
-state reducer for snapshots, an origin on request-produced events, and draft
-images tracked per origin before it can be built.
+`crystal server` is the HTTP front end on this contract
+([docs/server.md](docs/server.md)). It uses `SessionLauncher`,
+`SessionRunner`, `SessionState`, and event origins, and maps every event to
+wire JSON itself.
 
 `crystal run` is the headless front end in this executable, not a second
 assembly. Refactoring and optimizing it is high-priority product work and

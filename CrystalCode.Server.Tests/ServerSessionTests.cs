@@ -1,0 +1,428 @@
+using System.Net;
+using System.Text.Json;
+
+using Crystal;
+using Crystal.Chat;
+using Crystal.Tools;
+
+using CrystalCode.Server.Tests.Support;
+
+using Xunit;
+
+namespace CrystalCode.Server.Tests;
+
+public sealed class ServerSessionTests
+{
+    [Fact]
+    public async Task Turn_StreamsEventsAndSnapshotHoldsTheConversation()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("Hello there.")));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        var accepted = await fixture.PostAsync(fixture.Http, "/input", new { text = "hi" });
+        await events.WaitForAsync("turn.finished");
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+
+        Assert.True(accepted.GetProperty("turnActive").GetBoolean());
+        var types = events.Types();
+        Assert.Contains("message.sent", types);
+        Assert.Contains("stream.text", types);
+        Assert.True(types.ToList().IndexOf("turn.started") < types.ToList().IndexOf("turn.finished"));
+        var conversation = snapshot.GetProperty("conversation").EnumerateArray().ToArray();
+        Assert.Equal("hi", conversation[0].GetProperty("text").GetString());
+        Assert.Equal("Hello there.", conversation[^1].GetProperty("text").GetString());
+        Assert.True(snapshot.GetProperty("lastSeq").GetInt64() > 0);
+        Assert.Equal("ready", snapshot.GetProperty("state").GetString());
+        Assert.NotEmpty(snapshot.GetProperty("commands").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Events_ResumeAfterASequenceWithoutRepeats()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("one"), TextRound("two")));
+        await fixture.WaitReadyAsync();
+        using (var first = await fixture.OpenEventsAsync(fixture.Http))
+        {
+            await fixture.PostAsync(fixture.Http, "/input", new { text = "a" });
+            await first.WaitForAsync("turn.finished");
+        }
+
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+        var cursor = snapshot.GetProperty("lastSeq").GetInt64();
+        using var second = await fixture.OpenEventsAsync(fixture.Http, cursor);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "b" });
+        await second.WaitForAsync("turn.finished");
+
+        lock (second.Seen)
+        {
+            Assert.All(second.Seen, value => Assert.True(value.GetProperty("seq").GetInt64() > cursor));
+        }
+
+        Assert.DoesNotContain(second.Seen, value => value.GetProperty("type").GetString() == "session.started");
+    }
+
+    [Fact]
+    public async Task Reports_GoOnlyToTheRequestingClient()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+        using var alice = fixture.Client("alice");
+        using var bob = fixture.Client("bob");
+        using var aliceEvents = await fixture.OpenEventsAsync(alice);
+        using var bobEvents = await fixture.OpenEventsAsync(bob);
+
+        await fixture.PostAsync(alice, "/input", new { text = "/status" });
+        await fixture.PostAsync(bob, "/input", new { text = "/help" });
+        await aliceEvents.WaitForAsync("report.status");
+        await bobEvents.WaitForAsync("report.help");
+        await fixture.PostAsync(alice, "/mode", new { action = "cycle" });
+        await bobEvents.WaitForAsync("chrome.changed");
+
+        Assert.DoesNotContain("report.help", aliceEvents.Types());
+        Assert.DoesNotContain("report.status", bobEvents.Types());
+    }
+
+    [Fact]
+    public async Task Approval_IsAnsweredByAClientAndRunsTheTool()
+    {
+        var model = new ScriptedModel(false, ToolRound("call-1", "bash", """{"command":"echo served"}"""), TextRound("done"));
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "run it" });
+        var opened = await events.WaitForAsync("interaction.opened");
+        var interaction = opened.GetProperty("data").GetProperty("interaction");
+        Assert.Equal("approval", interaction.GetProperty("kind").GetString());
+        var payload = interaction.GetProperty("payload");
+        Assert.Equal("bash", payload.GetProperty("call").GetProperty("name").GetString());
+        Assert.Contains("deny", payload.GetProperty("choices").EnumerateArray().Select(static value => value.GetString()));
+        var id = interaction.GetProperty("id").GetString();
+
+        var invalid = await fixture.Http.PostAsync("/interactions/" + id, ServerFixture.Body(new { choice = "maybe" }));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        await fixture.PostAsync(fixture.Http, "/interactions/" + id, new { choice = "once" });
+        var late = await fixture.Http.PostAsync("/interactions/" + id, ServerFixture.Body(new { choice = "deny" }));
+        var results = await events.WaitForAsync("tools.results");
+        await events.WaitForAsync("turn.finished");
+
+        Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
+        var result = results.GetProperty("data").GetProperty("results")[0];
+        Assert.Equal("success", result.GetProperty("status").GetString());
+        Assert.Contains("served", result.GetProperty("text").GetString(), StringComparison.Ordinal);
+        Assert.Contains("interaction.resolved", events.Types());
+    }
+
+    [Fact]
+    public async Task Question_TakesLabelsAndRejectsUnofferedOnes()
+    {
+        var question = """
+            {"questions":[{"header":"Pick","question":"Which?","options":[{"label":"A","description":"a"},{"label":"B","description":"b"}],"custom":false}]}
+            """;
+        var model = new ScriptedModel(false, ToolRound("q-1", "question", question), TextRound("thanks"));
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "ask me" });
+        var opened = await events.WaitForAsync("interaction.opened");
+        var id = opened.GetProperty("data").GetProperty("interaction").GetProperty("id").GetString();
+        var wrong = await fixture.Http.PostAsync("/interactions/" + id, ServerFixture.Body(new { answers = new[] { new[] { "C" } } }));
+        await fixture.PostAsync(fixture.Http, "/interactions/" + id, new { answers = new[] { new[] { "B" } } });
+        var results = await events.WaitForAsync("tools.results");
+
+        Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        Assert.Contains("B", results.GetProperty("data").GetProperty("results")[0].GetProperty("text").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Trust_IsAskedBeforeTheSessionOpens()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), trusted: false);
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        var opened = await events.WaitForAsync("interaction.opened");
+        var health = await fixture.GetAsync(fixture.Http, "/health");
+        Assert.Equal("awaiting_operator", health.GetProperty("state").GetString());
+
+        var interaction = opened.GetProperty("data").GetProperty("interaction");
+        Assert.Equal("trust", interaction.GetProperty("kind").GetString());
+        await fixture.PostAsync(fixture.Http, "/interactions/" + interaction.GetProperty("id").GetString(), new { trust = true });
+        await fixture.WaitReadyAsync();
+
+        var ready = await fixture.GetAsync(fixture.Http, "/health");
+        Assert.Equal("ready", ready.GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public async Task TrustDeclined_EndsTheServerWithAnError()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), trusted: false);
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        var opened = await events.WaitForAsync("interaction.opened");
+
+        await fixture.PostAsync(fixture.Http, "/interactions/" + opened.GetProperty("data").GetProperty("interaction").GetProperty("id").GetString(), new { trust = false });
+
+        Assert.Equal(1, await fixture.ExitAsync());
+        Assert.Contains("declined", fixture.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Interrupt_StopsARunningTurnAndQueueFollowsUp()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        var queued = await fixture.PostAsync(fixture.Http, "/input", new { text = "later" });
+        await events.WaitForAsync("queue.changed", value => value.GetProperty("data").GetProperty("items").GetArrayLength() == 1);
+        var interrupted = await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+        var finished = await events.WaitForAsync("turn.finished");
+
+        Assert.True(queued.GetProperty("turnActive").GetBoolean());
+        Assert.True(interrupted.GetProperty("interrupted").GetBoolean());
+        Assert.Equal("interrupted", finished.GetProperty("data").GetProperty("reason").GetString());
+        await events.WaitForAsync("message.sent", value => value.GetProperty("data").GetProperty("text").GetString() == "later");
+    }
+
+    [Fact]
+    public async Task Recall_ReturnsTheMessageToItsSender()
+    {
+        var model = new ScriptedModel(true) { Silent = true };
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var alice = fixture.Client("alice");
+        using var events = await fixture.OpenEventsAsync(alice);
+
+        await fixture.PostAsync(alice, "/input", new { text = "oops" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        var recalled = await fixture.PostAsync(alice, "/recall", new { });
+
+        Assert.True(recalled.GetProperty("recalled").GetBoolean());
+        var message = await events.WaitForAsync("message.recalled");
+        Assert.Equal("alice", message.GetProperty("origin").GetString());
+        Assert.Equal("oops", message.GetProperty("data").GetProperty("draft").GetString());
+    }
+
+    [Fact]
+    public async Task QuickPrompt_SendsTheTemplate()
+    {
+        await using var fixture = await ServerFixture.StartAsync(
+            new ScriptedModel(false, TextRound("reviewed")),
+            prepare: (home, _) =>
+            {
+                Directory.CreateDirectory(home.ShortcutsDirectory);
+                File.WriteAllText(Path.Combine(home.ShortcutsDirectory, "review.md"), "Review the diff");
+            });
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        var catalog = await fixture.GetAsync(fixture.Http, "/quick-prompts");
+        Assert.Equal("review", catalog.GetProperty("prompts")[0].GetProperty("name").GetString());
+        await fixture.PostAsync(fixture.Http, "/quick-prompts/review/send", new { });
+        var sent = await events.WaitForAsync("message.sent");
+        var missing = await fixture.Http.PostAsync("/quick-prompts/missing/send", ServerFixture.Body(new { }));
+
+        Assert.Equal("Review the diff", sent.GetProperty("data").GetProperty("text").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Export_ReturnsADownload()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("exported text")));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "hi" });
+        await events.WaitForAsync("turn.finished");
+
+        var response = await fixture.Http.GetAsync("/export?format=markdown");
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("text/markdown", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("attachment", response.Content.Headers.ContentDisposition?.ToString() ?? response.Headers.ToString(), StringComparison.Ordinal);
+        Assert.Contains("exported text", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Images_AreRefusedForATextModelAndUnknownNumbers()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+
+        var upload = await fixture.Http.PostAsync("/images", new ByteArrayContent([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0]));
+        var missing = await fixture.Http.GetAsync("/images/7");
+
+        Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);
+        Assert.Contains("do not support image input", await upload.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Image_UploadIsSentWithThePrompt()
+    {
+        var vision = new VisionModel();
+        await using var fixture = await ServerFixture.StartAsync(
+            new ScriptedModel(false) { Vision = vision },
+            options: launch => launch with { Provider = "seen", Model = "eyes" },
+            prepare: (home, _) => File.WriteAllText(
+                Path.Combine(home.Root, "providers.json"),
+                """
+                {
+                  "seen": {
+                    "protocol": "ollama",
+                    "baseUri": "http://127.0.0.1:9/",
+                    "models": { "eyes": { "contextWindow": 8192, "imageInput": true } }
+                  }
+                }
+                """));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        byte[] png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0];
+
+        var attached = await ServerFixture.ReadJsonAsync(await fixture.Http.PostAsync("/images", new ByteArrayContent(png)));
+        var number = attached.GetProperty("number").GetInt32();
+        var bytes = await fixture.Http.GetByteArrayAsync("/images/" + number);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "what is this " + attached.GetProperty("trustedMarker").GetString() });
+        var sent = await events.WaitForAsync("message.sent");
+        await events.WaitForAsync("turn.finished");
+
+        Assert.Equal(png, bytes);
+        Assert.Equal("what is this [Image #" + number + "]", sent.GetProperty("data").GetProperty("text").GetString());
+        Assert.Equal(number, sent.GetProperty("data").GetProperty("images")[0].GetInt32());
+        Assert.Contains(
+            Assert.Single(vision.Requests).Items.OfType<Crystal.Multimodal.Chat.MultimodalMessage>().SelectMany(static message => message.Contents),
+            content => content is Crystal.Multimodal.ImageContent);
+    }
+
+    [Fact]
+    public async Task Resume_AsksTheRequestingClientToChooseASession()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("first"), TextRound("second")));
+        await fixture.WaitReadyAsync();
+        using var alice = fixture.Client("alice");
+        using var bob = fixture.Client("bob");
+        using var aliceEvents = await fixture.OpenEventsAsync(alice);
+        using var bobEvents = await fixture.OpenEventsAsync(bob);
+        await fixture.PostAsync(alice, "/input", new { text = "remember me" });
+        await aliceEvents.WaitForAsync("turn.finished");
+        await fixture.PostAsync(alice, "/input", new { text = "/clear" });
+        await fixture.PostAsync(alice, "/input", new { text = "second session" });
+        await aliceEvents.WaitForAsync("turn.finished", value => value.GetProperty("data").GetProperty("reason").GetString() == "completed"
+            && aliceEvents.Types().Count(static type => type == "turn.finished") == 2);
+
+        var resume = fixture.PostAsync(alice, "/input", new { text = "/resume" });
+        var opened = await aliceEvents.WaitForAsync("interaction.opened", value =>
+            value.GetProperty("data").GetProperty("interaction").GetProperty("kind").GetString() == "choose_session");
+        var interaction = opened.GetProperty("data").GetProperty("interaction");
+        Assert.Equal("alice", interaction.GetProperty("target").GetString());
+        var choice = interaction.GetProperty("payload").GetProperty("sessions").EnumerateArray()
+            .First(session => session.GetProperty("preview").GetString()!.Contains("remember", StringComparison.Ordinal))
+            .GetProperty("id").GetString();
+        var stolen = await bob.PostAsync("/interactions/" + interaction.GetProperty("id").GetString(), ServerFixture.Body(new { sessionId = choice }));
+        await fixture.PostAsync(alice, "/interactions/" + interaction.GetProperty("id").GetString(), new { sessionId = choice });
+        await resume;
+        await aliceEvents.WaitForAsync("conversation.replayed");
+
+        Assert.Equal(HttpStatusCode.Conflict, stolen.StatusCode);
+        Assert.DoesNotContain(bobEvents.Types(), type => type == "interaction.opened");
+        var snapshot = await fixture.GetAsync(bob, "/snapshot");
+        Assert.Equal(choice, snapshot.GetProperty("sessionId").GetString());
+        Assert.Contains(snapshot.GetProperty("conversation").EnumerateArray(), item => item.GetProperty("kind").GetString() == "message"
+            && item.GetProperty("text").GetString() == "remember me");
+    }
+
+    [Fact]
+    public async Task Children_ListIsEmptyWithoutAgents()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+
+        var children = await fixture.GetAsync(fixture.Http, "/children");
+        var missing = await fixture.Http.GetAsync("/children/nope");
+
+        Assert.Empty(children.GetProperty("children").EnumerateArray());
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Mode_CyclesAndSetsByName()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+
+        var first = await fixture.PostAsync(fixture.Http, "/mode", new { action = "set", name = "plan" });
+        var bad = await fixture.Http.PostAsync("/mode", ServerFixture.Body(new { action = "set", name = "missing" }));
+        var cycled = await fixture.PostAsync(fixture.Http, "/mode", new { action = "cycle" });
+
+        Assert.Equal("plan", first.GetProperty("mode").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        Assert.Equal("work", cycled.GetProperty("mode").GetString());
+    }
+
+    [Fact]
+    public async Task ClientRequestId_RunsAnInputOnce()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("once")));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "hi", clientRequestId = "r1" });
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "hi", clientRequestId = "r1" });
+        await events.WaitForAsync("turn.finished");
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "/status" });
+        await events.WaitForAsync("report.status");
+
+        Assert.Single(events.Types(), type => type == "message.sent");
+    }
+
+    [Fact]
+    public async Task Shutdown_ClosesTheSessionAndRemovesTheDiscoveryFile()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("saved")));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        var listening = JsonDocument.Parse(fixture.Output.Trim()).RootElement;
+        var discovery = listening.GetProperty("discovery").GetString()!;
+        Assert.True(File.Exists(discovery));
+        Assert.DoesNotContain(ServerFixture.Token, File.ReadAllText(discovery), StringComparison.Ordinal);
+        Assert.DoesNotContain(ServerFixture.Token, fixture.Output, StringComparison.Ordinal);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "hi" });
+        await events.WaitForAsync("turn.finished");
+
+        await fixture.PostAsync(fixture.Http, "/shutdown", new { });
+        var closing = await events.WaitForAsync("server.closing");
+
+        Assert.Equal(0, await fixture.ExitAsync());
+        Assert.True(closing.GetProperty("data").GetProperty("saved").GetBoolean());
+        await fixture.Server.DisposeAsync();
+        Assert.False(File.Exists(discovery));
+    }
+
+    [Fact]
+    public async Task QuitCommand_EndsTheProcess()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+
+        var quit = await fixture.PostAsync(fixture.Http, "/input", new { text = "/quit" });
+
+        Assert.True(quit.GetProperty("quit").GetBoolean());
+        Assert.Equal(0, await fixture.ExitAsync());
+    }
+
+    private static ChatStreamEvent[] TextRound(string text) =>
+    [
+        new ChatTextDelta(0, 0, ChatRole.Assistant, text),
+        new ChatCandidateCompleted(0, FinishReason.Stop)
+    ];
+
+    private static ChatStreamEvent[] ToolRound(string callId, string name, string arguments) =>
+    [
+        new ChatToolCallDelta(0, 0, callId, name, arguments, ToolInputKind.Json),
+        new ChatCandidateCompleted(0, FinishReason.ToolCalls)
+    ];
+}

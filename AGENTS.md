@@ -18,10 +18,10 @@ between TODO.md buckets is a design decision.
 
 ## Product
 
-CrystalCode is a production coding TUI. The terminal is the only
-operator surface in this build. `crystal server` is the defined second
-operator surface (see [docs/server.md](docs/server.md)); it is not in this
-build yet. `crystal run` is the headless entry for one task. It
+CrystalCode is a production coding TUI. The terminal and `crystal server`
+are the operator surfaces. `crystal server` serves one session over HTTP to
+separate front ends (see [docs/server.md](docs/server.md)); those front ends
+are not part of this repository. `crystal run` is the headless entry for one task. It
 is not an operator surface: anything that would ask the operator is
 denied. Do not put secrets on its command line, and do not persist its
 flags to `config.json`. It is not a Crystal demo and not a replacement
@@ -66,11 +66,14 @@ semantics. Do not copy its Demo UI into this product.
   Do not add XAML or AXAML files. Launch logic lives in
   `CrystalCode.Engine.Launch`; a front end maps its own command line onto
   `SessionLaunchOptions` and does not copy override, trust, or resume code.
-- `CrystalCode.Server`, when added, is a front end like the terminal. It
-  holds no product logic, does not reference `CrystalCode.Display`,
-  Spectre.Console, Terminal.Gui, or the executable, and serializes only its
-  own wire DTOs. Its protocol carries no version identifier. One process
-  hosts one active session.
+- `CrystalCode.Server` is a front end like the terminal. It holds no product
+  logic, does not reference `CrystalCode.Display`, Spectre.Console,
+  Terminal.Gui, the executable, or `System.Console`, and writes every wire
+  field explicitly; it never serializes an engine record by reflection. Its
+  protocol carries no version identifier. One process hosts one active
+  session. A new `CodingSession` member, `SessionEvent`, Crystal stream
+  event, or `SessionVerb` must be mapped in the server; the parity tests in
+  `CrystalCode.Server.Tests` fail until it is.
 - Public data values are immutable. One type per file. File-scoped namespaces.
 - No top-level statements. Explicit `Program.Main`.
 
@@ -78,7 +81,8 @@ semantics. Do not copy its Demo UI into this product.
 
 - Ask before adding a project, a public architectural boundary, or a new
   provider family. `CrystalCode.Server` and `CrystalCode.Server.Tests` are
-  approved projects with the ownership in ARCHITECTURE.md.
+  projects with the ownership in ARCHITECTURE.md. Microsoft-published
+  ASP.NET Core packages are approved for `CrystalCode.Server`.
   `CrystalCode.Platform` is deferred; do not add that
   project. Extra first-party tools and protocols go through
   `IPlugin` / `PluginRegistry`. Operator plugins load from `plugins/`

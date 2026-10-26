@@ -18,8 +18,10 @@ the Crystal library they already own.
 
 ## Current product
 
-The current product is a terminal application. `crystal` opens the
-terminal, which is the only operator surface in this build. `crystal space` opens that
+The current product is a terminal application with an HTTP server for other
+front ends. `crystal` opens the terminal. `crystal server` serves the same
+session capabilities over HTTP (see below). Those two are the operator
+surfaces. `crystal space` opens that
 terminal in the operator space at `~/.crystal/space`. `crystal` and
 `crystal space` accept the same session overrides as `crystal run`, except
 the task text, `--format`, `--show-thinking`, `--space`, and
@@ -122,6 +124,26 @@ separate library with no terminal code. The product can:
   `/cd` with no path still prints the current workspace.
   `crystal run --space` runs one task there and creates it the same way.
   That flag cannot be combined with `--workspace`;
+- serve one session over HTTP with `crystal server`, so that separate front
+  ends, such as a web page or a desktop program, can drive it. An operator or
+  a wrapper program starts it in a workspace with the same session launch
+  options as `crystal`, plus `--workspace`, `--space`, and `--resume`. The
+  front ends are not part of this repository. Commands are REST-style
+  requests and events arrive as server-sent events. One process hosts one
+  active session; `/clear`, `/resume`, `/fork`, `/cd`, and `/space` behave as
+  in the terminal. Every engine capability is reachable: every slash command,
+  Plan, Work, and custom modes, quick prompts, side questions, recall,
+  interrupts, image upload and download, child inspection, export, and every
+  event, including approval and extended approval. Approval, the question
+  tool, trust, and session and child choices reach clients as interactions;
+  approval, trust, the workspace fence, and `ToolInvocationPolicy` are
+  unchanged. Clients refresh from a snapshot and reconnect by event sequence
+  number. A bearer token is required by default on every listener and never
+  appears on the command line; `--auth none` turns it off with a warning.
+  Tokens carry `observe`, `operate`, or `admin` scopes. A LAN listener without
+  TLS is allowed with a warning. Host and Origin checks always apply. The
+  protocol carries no version identifier, and its flags are not written to
+  `config.json`. See [docs/server.md](docs/server.md);
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model and its thinking gear, service tier, and speed,
@@ -416,38 +438,12 @@ implemented in the current build.
   the install path until a specific change defines otherwise.
 - The Agent Client Protocol (ACP). The working name is crystal agent. An
   editor would drive a session over stdio. That is another front end that
-  implements `SessionFrontEnd`, not an engine protocol. The terminal remains
-  the only operator surface until it exists. `crystal agent` is not a command,
+  implements `SessionFrontEnd`, not an engine protocol. It is not
+  `crystal server`. `crystal agent` is not a command,
   project, or public type in this build. Do not add it until its behavior and
   ownership are defined. ACP does not speak MCP itself. Editor-supplied MCP
   servers, when that front end exists, use the same MCP client as local
   servers. Do not bypass approval, trust, or the tool boundary.
-- An agent API server, `crystal server`. Its behavior and ownership are
-  defined in [docs/server.md](docs/server.md); it is not in this build. An
-  operator or a wrapper program starts it in a workspace with the same
-  session launch options as `crystal`. Separate front ends, such as a web
-  page or a desktop program, connect over HTTP: REST-style commands and a
-  server-sent event stream. Those front ends are not part of this
-  repository. It is the second operator surface, a front end that
-  implements `SessionFrontEnd`, not an engine protocol, and not ACP.
-  - One process hosts one active session. `/clear`, `/resume`, `/fork`,
-    `/cd`, and `/space` behave as in the terminal, including workspace
-    changes with a trust question sent to the client.
-  - Every engine capability is reachable: every slash command, every
-    session operation a front end calls (Plan, Work, custom modes, quick
-    prompts, side questions, recall, images, child inspection, export), and
-    every event, including approval and extended approval.
-  - Approval, questions, trust, and session choices reach clients as
-    interactions. Approval, trust, the workspace fence, and
-    `ToolInvocationPolicy` are unchanged.
-  - Clients refresh from a snapshot and reconnect by event sequence number.
-  - A bearer token is required by default on every listener. `--auth none`
-    turns it off with a warning. Tokens carry `observe`, `operate`, or
-    `admin` scopes. A LAN listener without TLS is allowed with a warning.
-    Host and Origin checks always apply.
-  - The protocol carries no version identifier. Secrets are never command
-    flags, and its flags are not written to `config.json`.
-  `crystal server` is not a command or project in this build.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
   one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags

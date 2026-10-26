@@ -49,6 +49,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly SemaphoreSlim _approvalQueue = new(1, 1);
     private readonly SemaphoreSlim _operatorGate = new(1, 1);
     private readonly AsyncLocal<string?> _childOrigin = new();
+    private readonly AsyncLocal<string?> _requestOrigin = new();
     private readonly AsyncLocal<Action<SessionEvent>?> _childPublish = new();
     private readonly AsyncLocal<Func<IReadOnlyList<ChatItem>>?> _childConversation = new();
     private readonly object _childGate = new();
@@ -995,8 +996,8 @@ public sealed class CodingSession : ITurnObserver
     private Dictionary<int, ImageAttachment> _images = [];
     private readonly object _imagesGate = new();
     private List<SessionImageDocument> _unavailableImages = [];
-    private readonly List<int> _pendingImages = [];
-    private readonly HashSet<int> _draftImages = [];
+    private readonly List<(int Number, string? Origin)> _pendingImages = [];
+    private readonly Dictionary<int, string?> _draftImages = [];
     private int _nextImageNumber = 1;
     private string _sessionId;
     private DateTimeOffset _sessionCreatedUtc;
@@ -1017,6 +1018,7 @@ public sealed class CodingSession : ITurnObserver
     private bool _recallPending;
     private bool _recallSpoiled;
     private string? _recallText;
+    private string? _recallOrigin;
     private int _recallBaseline;
     private readonly object _sideGate = new();
     private readonly List<SideExchange> _sideExchanges = [];
@@ -1378,6 +1380,29 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
+    /// Marks the events published on this async flow as produced by
+    /// <paramref name="origin"/>, a client id chosen by a front end that serves
+    /// several clients, until the returned scope is disposed. Draft images
+    /// attached in the scope belong to that origin, and only that origin's
+    /// draft edits can discard them. A turn, a child invocation, and a queued
+    /// follow-up never inherit the origin; their events have none.
+    /// </summary>
+    public IDisposable BeginOrigin(string? origin)
+    {
+        var previous = _requestOrigin.Value;
+        _requestOrigin.Value = string.IsNullOrWhiteSpace(origin) ? null : origin;
+        return new OriginScope(this, previous);
+    }
+
+    /// <summary>The origin of the current async flow, or null.</summary>
+    public string? CurrentOrigin => _requestOrigin.Value;
+
+    private sealed class OriginScope(CodingSession session, string? previous) : IDisposable
+    {
+        public void Dispose() => session._requestOrigin.Value = previous;
+    }
+
+    /// <summary>
     /// Cancels the running turn or compaction. Returns false when there is
     /// nothing to cancel.
     /// </summary>
@@ -1467,6 +1492,7 @@ public sealed class CodingSession : ITurnObserver
         lock (_recallGate)
         {
             _recallText = message;
+            _recallOrigin = CurrentOrigin;
             _recallBaseline = _transcript.Count;
             _recallOpen = true;
             _recallPending = false;
@@ -1511,7 +1537,8 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        Publish(new UserMessageRecalled(recalled));
+        // The message returns to the composer of the client that sent it.
+        Publish(new UserMessageRecalled(recalled) { Origin = _recallOrigin });
     }
 
     private bool TryStripRecalledMessage(string text)
@@ -1542,7 +1569,7 @@ public sealed class CodingSession : ITurnObserver
         _transcript.RemoveAt(_transcript.Count - 1);
         foreach (var number in numbers)
         {
-            _draftImages.Add(number);
+            _draftImages[number] = _recallOrigin;
         }
 
         return true;
@@ -1773,7 +1800,7 @@ public sealed class CodingSession : ITurnObserver
         CancelAndClearSide(announce: false);
         try
         {
-            PruneDraftImages(string.Empty, includeQueue: false);
+            PruneDraftImages(string.Empty, includeQueue: false, allOrigins: true);
             if (HasConversation())
             {
                 SaveSession();
@@ -4361,7 +4388,7 @@ public sealed class CodingSession : ITurnObserver
         {
             var image = ImageFile.Load(path, ReserveImageNumber());
             AddImage(image);
-            _pendingImages.Add(image.Number);
+            _pendingImages.Add((image.Number, CurrentOrigin));
             Note($"Attached  {image.Marker}  {Path.GetFileName(path)}");
         }
         catch (Exception exception) when (exception is IOException
@@ -4398,7 +4425,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         AddImage(image);
-        _draftImages.Add(image.Number);
+        _draftImages[image.Number] = CurrentOrigin;
         return image.Marker;
     }
 
@@ -4444,7 +4471,7 @@ public sealed class CodingSession : ITurnObserver
 
         image = new ImageAttachment(ReserveImageNumber(), mimeType, data);
         AddImage(image);
-        _draftImages.Add(image.Number);
+        _draftImages[image.Number] = CurrentOrigin;
         return true;
     }
 
@@ -8025,9 +8052,13 @@ public sealed class CodingSession : ITurnObserver
         _transcript.Add(user);
         CommitArchive([user]);
         var images = ImageSnapshot();
-        _draftImages.RemoveWhere(number => message.Contains(
-            images[number].TrustedMarker,
-            StringComparison.Ordinal));
+        foreach (var number in _draftImages.Keys.ToArray())
+        {
+            if (message.Contains(images[number].TrustedMarker, StringComparison.Ordinal))
+            {
+                _draftImages.Remove(number);
+            }
+        }
         var turnSource = new CancellationTokenSource();
         _turnSource = turnSource;
         _turnActive = true;
@@ -8068,7 +8099,10 @@ public sealed class CodingSession : ITurnObserver
 
         OpenRecallWindow(message);
         Publish(new TurnStarted());
-        _turnTask = ExecuteTurnAsync(turnSource.Token);
+        using (BeginOrigin(null))
+        {
+            _turnTask = ExecuteTurnAsync(turnSource.Token);
+        }
     }
 
     private string CurrentModeName() => _customMode ?? (_planMode ? "plan" : "work");
@@ -8168,7 +8202,9 @@ public sealed class CodingSession : ITurnObserver
 
     private string AttachPendingImages(string input)
     {
-        if (_pendingImages.Count == 0)
+        var origin = CurrentOrigin;
+        var mine = _pendingImages.Where(pending => pending.Origin == origin).ToArray();
+        if (mine.Length == 0)
         {
             return input;
         }
@@ -8176,8 +8212,8 @@ public sealed class CodingSession : ITurnObserver
         var images = ImageSnapshot();
         var markers = string.Join(
             ' ',
-            _pendingImages.Select(number => images[number].TrustedMarker));
-        _pendingImages.Clear();
+            mine.Select(pending => images[pending.Number].TrustedMarker));
+        _pendingImages.RemoveAll(pending => pending.Origin == origin);
         return input.Length == 0 ? markers : input + "\n\n" + markers;
     }
 
@@ -8375,7 +8411,7 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private void PruneDraftImages(string input, bool includeQueue = true)
+    private void PruneDraftImages(string input, bool includeQueue = true, bool allOrigins = false)
     {
         if (_draftImages.Count == 0)
         {
@@ -8390,8 +8426,14 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var images = ImageSnapshot();
-        foreach (var number in _draftImages.ToArray())
+        var origin = CurrentOrigin;
+        foreach (var (number, owner) in _draftImages.ToArray())
         {
+            if (!allOrigins && owner != origin)
+            {
+                continue;
+            }
+
             var image = images[number];
             if (input.Contains(image.TrustedMarker, StringComparison.Ordinal)
                 || queued.Any(text => text.Contains(image.TrustedMarker, StringComparison.Ordinal)))
@@ -8556,6 +8598,11 @@ public sealed class CodingSession : ITurnObserver
             or ToolsListed)
         {
             CloseRecallWindow();
+        }
+
+        if (sessionEvent.Origin is null && _requestOrigin.Value is { } origin)
+        {
+            sessionEvent = sessionEvent with { Origin = origin };
         }
 
         lock (_eventGate)

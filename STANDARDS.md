@@ -196,8 +196,7 @@ Authorized packages today:
   contract assembly references it.
 - xUnit and Microsoft.NET.Test.Sdk in CrystalCode.Tests,
   CrystalCode.Engine.Tests, CrystalCode.Display.Tests, and
-  CrystalCode.Providers.Tests, and in CrystalCode.Server.Tests when it is
-  added.
+  CrystalCode.Providers.Tests, and CrystalCode.Server.Tests.
 - The `Microsoft.AspNetCore.App` shared framework (`FrameworkReference`) in
   CrystalCode.Server only, and Microsoft-published ASP.NET Core packages that
   server needs. The operator approved Microsoft packages for this project.
@@ -227,7 +226,12 @@ surfaces are tested in CrystalCode.Tests. `crystal run` is tested there
 with a scripted model for a completed reply, a review allow that executes
 a tool, an operator prompt that is denied with a non-zero exit, and a
 failed request. Its JSON events, including child events and usage totals,
-are tested against the observer directly. Frame,
+are tested against the observer directly. `crystal server` is tested in CrystalCode.Server.Tests
+against a real Kestrel listener on a loopback port chosen by the OS and a
+scripted model: turns, events, reconnect, targeted replies, every interaction
+kind, recall, quick prompts, images, export, resume, shutdown, scopes,
+tickets, Host and Origin checks, the parity guards, and the secret-leak test.
+Token resolution and `crystal server --help` are tested in CrystalCode.Tests. Frame,
 composer, and paint behavior is tested in CrystalCode.Display.Tests.
 Adapters are tested in CrystalCode.Providers.Tests.
 `EngineAssemblyTests` and `DisplayAssemblyTests`

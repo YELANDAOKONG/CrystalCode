@@ -24,6 +24,8 @@ public static class Program
                 .WithDescription("Run one task without a terminal and exit.");
             config.AddCommand<SpaceCommand>("space")
                 .WithDescription("Open the operator space and start the terminal.");
+            config.AddCommand<ServerCommand>("server")
+                .WithDescription("Serve one session over HTTP for other front ends. See docs/server.md.");
             config.AddBranch<ExtensionSettings>("plugins", plugins =>
             {
                 plugins.SetDescription("List, show, enable, or disable one plugin directory.");
