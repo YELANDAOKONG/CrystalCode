@@ -94,7 +94,10 @@ public sealed class AtomicFileTests
         var path = Path.Combine(workspace.Path, "occupied");
         Directory.CreateDirectory(path);
 
-        Assert.ThrowsAny<IOException>(() => AtomicFile.WriteText(path, "{}", ownerOnly: false));
+        // Replacing a directory fails with IOException on Unix and
+        // UnauthorizedAccessException on Windows.
+        var failure = Record.Exception(() => AtomicFile.WriteText(path, "{}", ownerOnly: false));
+        Assert.True(failure is IOException or UnauthorizedAccessException, failure?.GetType().ToString());
 
         Assert.True(Directory.Exists(path));
         Assert.Equal([path], Directory.GetFileSystemEntries(workspace.Path));
