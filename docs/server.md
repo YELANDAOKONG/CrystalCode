@@ -101,7 +101,14 @@ and the `server.state` event.
   {"event":"listening","url":"http://127.0.0.1:52144","pid":4242,"workspace":"/repo","discovery":"/home/me/.crystal/server/4242.json"}
   ```
 
-  The line never carries a token.
+  The line never carries a token. It is the only line on stdout.
+- On stderr, for the operator, it then prints a summary: server URL, listen
+  address, port, workspace, auth mode, the token (only a generated token, and
+  only when stderr is a terminal; otherwise where to find it), the discovery
+  file, the pid, and `Ctrl+C stops the server.` It also prints
+  `Waiting for a client to answer a startup question`, `Session ready`,
+  `Stopping  <reason>`, `Session saved  <id>`, and `Server stopped` as they
+  happen.
 - It writes the discovery file `~/.crystal/server/<pid>.json` with owner-only
   permissions in an owner-only directory: url, pid, workspace, build
   identity, and the token when the server generated it. The session id is not
@@ -316,12 +323,23 @@ Anything that asks the operator becomes an interaction with an `id`, a
 
 ## Shutdown
 
-`/quit`, `POST /shutdown`, SIGINT, SIGTERM, SIGQUIT, or stdin closing with
-`--exit-on-stdin-close` start shutdown: interrupt the turn and collect it
-without starting queued work, cancel interactions, `CloseAsync`, publish
-`server.closing` with the session id and whether it was saved, end every
-stream, stop the listener, delete the discovery file and the socket, and
-exit with code 0.
+`/quit`, `POST /shutdown`, Ctrl+C (SIGINT), SIGTERM, SIGQUIT, or stdin
+closing with `--exit-on-stdin-close` start shutdown, also while the server
+is still waiting on a startup question:
+
+1. `server.state` with `state: closing` and a `reason` goes out at once,
+   before a running turn has unwound. Reasons are `interrupt`, `terminate`,
+   `quit_signal`, `request`, `quit`, `stdin_closed`, and `cancelled`. The
+   first reason wins.
+2. The turn is interrupted and collected without starting queued work, and
+   pending interactions get `interaction.cancelled`.
+3. `CloseAsync` runs, and `server.closing` reports the session id, whether it
+   was saved, and the same `reason`. Before the session existed there is no
+   `server.closing`.
+4. Every stream ends, the listener stops, and the discovery file and socket
+   are deleted. The exit code is 0; a failed launch exits with 1.
+
+A second Ctrl+C while the server is stopping ends the process at once.
 
 ## Parity guards
 

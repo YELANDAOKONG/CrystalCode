@@ -398,8 +398,72 @@ public sealed class ServerSessionTests
 
         Assert.Equal(0, await fixture.ExitAsync());
         Assert.True(closing.GetProperty("data").GetProperty("saved").GetBoolean());
+        Assert.Equal("request", closing.GetProperty("data").GetProperty("reason").GetString());
         await fixture.Server.DisposeAsync();
         Assert.False(File.Exists(discovery));
+    }
+
+    [Fact]
+    public async Task Interrupt_AnnouncesClosingWithTheReason()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+
+        fixture.Server.Shutdown(Hosting.ServerStopReason.Interrupt);
+        var state = await events.WaitForAsync("server.state", value =>
+            value.GetProperty("data").GetProperty("state").GetString() == "closing");
+        var closing = await events.WaitForAsync("server.closing");
+
+        Assert.Equal(0, await fixture.ExitAsync());
+        Assert.Equal("interrupt", state.GetProperty("data").GetProperty("reason").GetString());
+        Assert.Equal("interrupt", closing.GetProperty("data").GetProperty("reason").GetString());
+        Assert.Contains("turn.finished", events.Types());
+        Assert.Contains("Stopping  Ctrl+C", fixture.Error, StringComparison.Ordinal);
+        Assert.Contains("Session saved", fixture.Error, StringComparison.Ordinal);
+        Assert.Contains("Server stopped", fixture.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Interrupt_WhileAwaitingTrustStopsWithoutFailing()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), trusted: false);
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        await events.WaitForAsync("interaction.opened");
+
+        fixture.Server.Shutdown(Hosting.ServerStopReason.Interrupt);
+
+        Assert.Equal(0, await fixture.ExitAsync());
+        await events.WaitForAsync("interaction.cancelled");
+        var state = await events.WaitForAsync("server.state", value =>
+            value.GetProperty("data").GetProperty("state").GetString() == "closing");
+        Assert.Equal("interrupt", state.GetProperty("data").GetProperty("reason").GetString());
+        Assert.DoesNotContain("failed", events.Types().Where(static type => type == "server.state"));
+        Assert.Contains("Waiting for a client to answer a startup question", fixture.Error, StringComparison.Ordinal);
+        Assert.Contains("Server stopped", fixture.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Startup_SummaryListsTheAddressAfterTheListeningLine()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+        var url = new Uri(JsonDocument.Parse(fixture.Output.Trim()).RootElement.GetProperty("url").GetString()!);
+
+        var lines = fixture.Error.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Contains(lines, line => line == "Server     " + url.ToString().TrimEnd('/'));
+        Assert.Contains(lines, line => line == "Listen     127.0.0.1");
+        Assert.Contains(lines, line => line == "Port       " + url.Port);
+        Assert.Contains(lines, line => line.StartsWith("Workspace  ", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line == "Auth       token");
+        Assert.Contains(lines, line => line == "Token      supplied at launch");
+        Assert.Contains("Ctrl+C stops the server.", lines);
+        Assert.DoesNotContain(ServerFixture.Token, fixture.Error, StringComparison.Ordinal);
+        Assert.Equal(1, fixture.Output.Trim().Split('\n').Length);
     }
 
     [Fact]
@@ -408,10 +472,13 @@ public sealed class ServerSessionTests
         await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
         await fixture.WaitReadyAsync();
 
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
         var quit = await fixture.PostAsync(fixture.Http, "/input", new { text = "/quit" });
+        var closing = await events.WaitForAsync("server.closing");
 
         Assert.True(quit.GetProperty("quit").GetBoolean());
         Assert.Equal(0, await fixture.ExitAsync());
+        Assert.Equal("quit", closing.GetProperty("data").GetProperty("reason").GetString());
     }
 
     private static ChatStreamEvent[] TextRound(string text) =>

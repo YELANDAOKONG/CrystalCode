@@ -80,11 +80,11 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
 
         await using (server)
         {
-            using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            using var signals = ShutdownSignals.Register(stop);
+            using var signals = ShutdownSignals.Register(server.Shutdown);
+            using var cancel = cancellationToken.Register(() => server.Shutdown(ServerStopReason.Cancelled));
             try
             {
-                await server.StartAsync(stop.Token);
+                await server.StartAsync(cancellationToken);
             }
             catch (IOException exception)
             {
@@ -93,22 +93,23 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
             }
 
             // A wrapper that closes stdin ends the server with it.
+            using var watching = new CancellationTokenSource();
             var watch = settings.ExitOnStdinClose && !settings.TokenStdin
-                ? WatchStdinAsync(input, stop)
+                ? WatchStdinAsync(input, server, watching.Token)
                 : Task.CompletedTask;
-            var code = await server.RunAsync(stop.Token);
-            await stop.CancelAsync();
+            var code = await server.RunAsync(CancellationToken.None);
+            await watching.CancelAsync();
             await watch;
             return code;
         }
     }
 
-    private static async Task WatchStdinAsync(TextReader input, CancellationTokenSource stop)
+    private static async Task WatchStdinAsync(TextReader input, CrystalServer server, CancellationToken cancellationToken)
     {
         try
         {
             var buffer = new char[256];
-            while (!stop.IsCancellationRequested && await input.ReadAsync(buffer, stop.Token) > 0)
+            while (await input.ReadAsync(buffer, cancellationToken) > 0)
             {
             }
         }
@@ -120,6 +121,6 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
         {
         }
 
-        await stop.CancelAsync();
+        server.Shutdown(ServerStopReason.StdinClosed);
     }
 }

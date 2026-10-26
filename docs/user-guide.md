@@ -446,8 +446,11 @@ crystal server
 ```
 
 It prints one JSON line to stdout, `{"event":"listening","url":…,"pid":…,
-"workspace":…,"discovery":…}`, and writes the same details to
-`~/.crystal/server/<pid>.json` with owner-only permissions. It accepts the
+"workspace":…,"discovery":…}`, for a wrapper, and writes the same details to
+`~/.crystal/server/<pid>.json` with owner-only permissions. On stderr it
+prints a readable summary: URL, listen address, port, workspace, auth mode,
+the generated token when stderr is a terminal, the discovery file, and the
+pid, then progress lines such as `Session ready` and `Stopping  Ctrl+C`. It accepts the
 session options `crystal` accepts, plus `--workspace`, `--space`, and
 `--resume`, and none of them are written to `config.json`.
 
@@ -464,7 +467,10 @@ session options `crystal` accepts, plus `--workspace`, `--space`, and
   A key password comes from `CRYSTAL_SERVER_TLS_PASSWORD`.
 - A browser page on another origin needs `--allow-origin <origin>`.
 - `--exit-on-stdin-close` ends the server when its wrapper closes stdin.
-- `/quit`, `POST /shutdown`, Ctrl+C, and SIGTERM save the session and exit.
+- `/quit`, `POST /shutdown`, Ctrl+C, and SIGTERM save the session and exit,
+  also while the server waits on a startup question. Clients receive
+  `server.state` `closing` with the reason first. A second Ctrl+C ends the
+  process at once.
 
 The protocol, scopes, endpoints, events, and reconnect rules are in
 [server.md](server.md).

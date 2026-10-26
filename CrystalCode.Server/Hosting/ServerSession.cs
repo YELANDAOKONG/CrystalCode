@@ -3,6 +3,7 @@ using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Server.Events;
 using CrystalCode.Server.Interactions;
+using CrystalCode.Server.Wire;
 
 namespace CrystalCode.Server.Hosting;
 
@@ -18,8 +19,10 @@ public sealed class ServerSession
     private readonly ServerRuntime _runtime;
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<SessionClosure?> _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private volatile string _state = ServerState.Starting;
+    private readonly object _stateGate = new();
+    private string _state = ServerState.Starting;
     private string? _failure;
+    private string? _stopReason;
 
     public ServerSession(ServerOptions options, ServerRuntime runtime)
     {
@@ -35,9 +38,38 @@ public sealed class ServerSession
 
     public InteractionBroker Broker { get; }
 
-    public string State => _state;
+    public string State
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return _state;
+            }
+        }
+    }
 
     public string? Failure => _failure;
+
+    /// <summary>Why the server is stopping, or null while it is not.</summary>
+    public string? StopReason => Volatile.Read(ref _stopReason);
+
+    /// <summary>Raised on every state change, with the new state.</summary>
+    public event Action<string>? StateChanged;
+
+    /// <summary>
+    /// Records why the server is stopping and announces <c>closing</c> at
+    /// once, before a running turn has finished unwinding. The first reason
+    /// wins. The caller still cancels the run.
+    /// </summary>
+    public void RequestStop(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        if (Interlocked.CompareExchange(ref _stopReason, reason, null) is null)
+        {
+            SetState(ServerState.Closing);
+        }
+    }
 
     /// <summary>The live session, or null before it is ready.</summary>
     public CodingSession? Session { get; private set; }
@@ -102,13 +134,16 @@ public sealed class ServerSession
                 SetState(ServerState.Ready);
                 _ready.TrySetResult();
                 ran = true;
-                await Runner.RunAsync(cancellationToken);
+                if (await Runner.RunAsync(cancellationToken))
+                {
+                    RequestStop(ServerStopReason.Quit);
+                }
             }
             finally
             {
                 if (ran)
                 {
-                    SetState(ServerState.Closing);
+                    RequestStop(ServerStopReason.Cancelled);
                 }
 
                 Broker.CancelAll();
@@ -117,16 +152,16 @@ public sealed class ServerSession
                 {
                     writer.WriteString("sessionId", closure.SessionId);
                     writer.WriteBoolean("saved", closure.Saved);
+                    WireWriter.Optional(writer, "reason", StopReason);
                 });
                 _closed.TrySetResult(closure);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            if (_state != ServerState.Closing)
-            {
-                Fail("The server stopped before the session opened.");
-            }
+            // An operator stop while the launch waits (for example on the trust
+            // question) is an ordinary stop, not a failure.
+            RequestStop(ServerStopReason.Cancelled);
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException
             or IOException or UnauthorizedAccessException or NotSupportedException)
@@ -149,7 +184,17 @@ public sealed class ServerSession
 
     private void SetState(string state)
     {
-        _state = state;
+        lock (_stateGate)
+        {
+            // Closing and failed are final; a late setter cannot reopen the server.
+            if (_state == state || _state is ServerState.Closing or ServerState.Failed)
+            {
+                return;
+            }
+
+            _state = state;
+        }
+
         Hub.Publish("server.state", null, writer =>
         {
             writer.WriteString("state", state);
@@ -157,6 +202,12 @@ public sealed class ServerSession
             {
                 writer.WriteString("error", _failure);
             }
+
+            if (state == ServerState.Closing)
+            {
+                WireWriter.Optional(writer, "reason", StopReason);
+            }
         });
+        StateChanged?.Invoke(state);
     }
 }

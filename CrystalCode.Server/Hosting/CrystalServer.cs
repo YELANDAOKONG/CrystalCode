@@ -71,9 +71,13 @@ public sealed class CrystalServer : IAsyncDisposable
         return true;
     }
 
-    /// <summary>Stops the session and the listener.</summary>
-    public void Shutdown()
+    /// <summary>
+    /// Stops the session and the listener. The first reason is announced to
+    /// clients at once and reported on the operator's terminal.
+    /// </summary>
+    public void Shutdown(string reason)
     {
+        Session.RequestStop(reason);
         try
         {
             _shutdown.Cancel();
@@ -129,7 +133,14 @@ public sealed class CrystalServer : IAsyncDisposable
 
         clients.Disconnected += Session.Broker.Disconnected;
         Session.Broker.BindConnections(clients.IsConnected);
-        var context = new ServerContext(_options, _runtime, Session, tokens, clients, new RequestLedger(), Shutdown);
+        var context = new ServerContext(
+            _options,
+            _runtime,
+            Session,
+            tokens,
+            clients,
+            new RequestLedger(),
+            () => Shutdown(ServerStopReason.Request));
         app.Use(guard.InvokeAsync);
         ServerEndpoints.Map(app, context);
         await app.StartAsync(cancellationToken);
@@ -158,6 +169,8 @@ public sealed class CrystalServer : IAsyncDisposable
 
         await _runtime.Output.WriteLineAsync(ListeningLine(workspace));
         await _runtime.Output.FlushAsync(cancellationToken);
+        await WriteSummaryAsync(workspace);
+        Session.StateChanged += ReportState;
     }
 
     /// <summary>Runs until the session quits or shutdown is requested. Returns the exit code.</summary>
@@ -177,6 +190,12 @@ public sealed class CrystalServer : IAsyncDisposable
             return 1;
         }
 
+        if (Session.Closed.IsCompletedSuccessfully && await Session.Closed is { Saved: true } closure)
+        {
+            await _runtime.Error.WriteLineAsync("Session saved  " + closure.SessionId);
+        }
+
+        await _runtime.Error.WriteLineAsync("Server stopped");
         return 0;
     }
 
@@ -220,9 +239,68 @@ public sealed class CrystalServer : IAsyncDisposable
                 "Warning: this listener is reachable from the network without TLS. Tokens and session content travel in clear text.");
         }
 
+    }
+
+    /// <summary>
+    /// The operator-facing startup summary on stderr. stdout stays one JSON
+    /// line for wrappers. A generated token is shown only on a terminal.
+    /// </summary>
+    private async Task WriteSummaryAsync(string workspace)
+    {
+        var rows = new List<(string Label, string Value)> { ("Server", Url!) };
+        if (_options.Socket is null)
+        {
+            var bound = new Uri(Url!);
+            rows.Add(("Listen", bound.Host.Trim('[', ']') + (_listen.IsAny ? " (every interface)" : string.Empty)));
+            rows.Add(("Port", bound.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        rows.Add(("Workspace", workspace));
+        rows.Add(("Auth", _options.AuthenticationEnabled ? "token" : "none"));
         if (_options.TokenGenerated && _options.Token is { } token && _runtime.ShowGeneratedToken)
         {
-            await _runtime.Error.WriteLineAsync("Token  " + token);
+            rows.Add(("Token", token));
+        }
+        else if (_options.AuthenticationEnabled)
+        {
+            rows.Add(("Token", _options.TokenGenerated ? "in the discovery file" : "supplied at launch"));
+        }
+
+        if (_discovery is not null)
+        {
+            rows.Add(("Discovery", _discovery.Path));
+        }
+
+        rows.Add(("PID", Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        var width = rows.Max(static row => row.Label.Length);
+        foreach (var (label, value) in rows)
+        {
+            await _runtime.Error.WriteLineAsync(label.PadRight(width) + "  " + value);
+        }
+
+        await _runtime.Error.WriteLineAsync("Ctrl+C stops the server.");
+        await _runtime.Error.FlushAsync();
+    }
+
+    /// <summary>Tells the operator when the server waits on a client or starts to stop.</summary>
+    private void ReportState(string state)
+    {
+        var line = state switch
+        {
+            ServerState.AwaitingOperator => "Waiting for a client to answer a startup question",
+            ServerState.Ready => "Session ready",
+            ServerState.Closing => "Stopping  " + ServerStopReason.Describe(Session.StopReason ?? ServerStopReason.Cancelled),
+            _ => null
+        };
+        if (line is null)
+        {
+            return;
+        }
+
+        lock (_runtime.Error)
+        {
+            _runtime.Error.WriteLine(line);
+            _runtime.Error.Flush();
         }
     }
 
