@@ -28,7 +28,7 @@ public sealed record ServerHostSettings
             if (!TryNormalizeOrigin(origin, out _))
             {
                 throw new ArgumentException(
-                    "server.allowOrigins entries must be an http or https origin such as https://app.example.com.",
+                    "server.allowOrigins entries must be * or an http or https origin such as https://app.example.com.",
                     nameof(allowOrigins));
             }
         }
@@ -70,10 +70,22 @@ public sealed record ServerHostSettings
         && ExposeHeaders.Count == 0
         && !AllowPrivateNetwork;
 
-    /// <summary>Normalizes an origin the way the server compares it: no path, no trailing slash.</summary>
+    /// <summary>Allows a page from any origin.</summary>
+    public const string AnyOrigin = "*";
+
+    /// <summary>
+    /// Normalizes an origin the way the server compares it: no path, no trailing
+    /// slash. <see cref="AnyOrigin"/> is accepted as it is.
+    /// </summary>
     public static bool TryNormalizeOrigin(string? text, out string origin)
     {
         origin = string.Empty;
+        if (text?.Trim() == AnyOrigin)
+        {
+            origin = AnyOrigin;
+            return true;
+        }
+
         if (string.IsNullOrWhiteSpace(text)
             || !Uri.TryCreate(text.Trim(), UriKind.Absolute, out var uri)
             || uri.Scheme is not ("http" or "https")

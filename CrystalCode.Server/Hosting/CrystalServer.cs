@@ -274,6 +274,14 @@ public sealed class CrystalServer : IAsyncDisposable
                 "Warning: this listener is reachable from the network without TLS. Tokens and session content travel in clear text.");
         }
 
+        if (_options.AllowedOrigins.Contains(ServerHostSettings.AnyOrigin))
+        {
+            await _runtime.Error.WriteLineAsync(
+                "Warning: any web page may call this server from a browser. "
+                + (_options.AuthenticationEnabled
+                    ? "Only the bearer token protects it."
+                    : "Nothing protects it, because authentication is off."));
+        }
     }
 
     /// <summary>

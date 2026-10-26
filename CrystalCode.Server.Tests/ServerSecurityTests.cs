@@ -180,6 +180,37 @@ public sealed class ServerSecurityTests
     }
 
     [Fact]
+    public async Task WildcardOrigin_AllowsAnyPageAndWarns()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), origins: ["*"]);
+        await fixture.WaitReadyAsync();
+        var request = new HttpRequestMessage(HttpMethod.Get, "/snapshot");
+        request.Headers.Add("Origin", "https://anything.example.test");
+
+        var response = await fixture.Http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("https://anything.example.test", response.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        Assert.Contains("any web page", fixture.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WildcardOrigin_StillChecksTheHostAndTheToken()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), origins: ["*"]);
+        await fixture.WaitReadyAsync();
+        using var anonymous = fixture.Client("anon", token: null);
+        var unauthorized = new HttpRequestMessage(HttpMethod.Get, "/snapshot");
+        unauthorized.Headers.Add("Origin", "https://anything.example.test");
+        var rebound = new HttpRequestMessage(HttpMethod.Get, "/health");
+        rebound.Headers.Host = "attacker.example.test";
+        rebound.Headers.Add("Origin", "https://anything.example.test");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(unauthorized)).StatusCode);
+        Assert.Equal(HttpStatusCode.MisdirectedRequest, (await fixture.Http.SendAsync(rebound)).StatusCode);
+    }
+
+    [Fact]
     public async Task Health_StillNeedsAnAllowedHostAndOrigin()
     {
         await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), origins: ["https://app.example.test"]);

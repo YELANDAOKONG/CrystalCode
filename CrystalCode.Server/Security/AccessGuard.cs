@@ -30,6 +30,7 @@ public sealed class AccessGuard
     private readonly TokenStore? _tokens;
     private readonly HashSet<string> _hosts;
     private readonly HashSet<string> _origins;
+    private readonly bool _anyOrigin;
     private readonly string _exposedHeaders;
     private readonly bool _allowPrivateNetwork;
     private readonly ConcurrentDictionary<string, Failures> _failures = new(StringComparer.Ordinal);
@@ -52,7 +53,8 @@ public sealed class AccessGuard
             "127.0.0.1",
             "::1"
         };
-        _origins = new HashSet<string>(origins.Select(static origin => origin.TrimEnd('/')), StringComparer.OrdinalIgnoreCase);
+        _origins = new HashSet<string>(origins.Select(static origin => origin.Trim().TrimEnd('/')), StringComparer.OrdinalIgnoreCase);
+        _anyOrigin = _origins.Contains(ServerHostSettings.AnyOrigin);
         _exposedHeaders = string.Join(
             ", ",
             ServerHostSettings.DefaultExposedHeaders
@@ -70,7 +72,7 @@ public sealed class AccessGuard
         ArgumentNullException.ThrowIfNull(next);
         var request = context.Request;
         var origin = request.Headers.Origin.ToString();
-        var originAllowed = origin.Length > 0 && _origins.Contains(origin.TrimEnd('/'));
+        var originAllowed = origin.Length > 0 && (_anyOrigin || _origins.Contains(origin.TrimEnd('/')));
         if (origin.Length > 0)
         {
             context.Response.Headers.Vary = "Origin";
