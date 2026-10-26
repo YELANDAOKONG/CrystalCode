@@ -165,6 +165,11 @@ public sealed class ServerSessionTests
 
         Assert.Equal(1, await fixture.ExitAsync());
         Assert.Contains("declined", fixture.Error, StringComparison.Ordinal);
+        var stopped = StoppedLine(fixture);
+        Assert.Equal(1, stopped.GetProperty("exitCode").GetInt32());
+        Assert.Equal("failed", stopped.GetProperty("reason").GetString());
+        Assert.Contains("declined", stopped.GetProperty("error").GetString(), StringComparison.Ordinal);
+        Assert.Equal(JsonValueKind.Null, stopped.GetProperty("sessionId").ValueKind);
     }
 
     [Fact]
@@ -399,6 +404,11 @@ public sealed class ServerSessionTests
         Assert.Equal(0, await fixture.ExitAsync());
         Assert.True(closing.GetProperty("data").GetProperty("saved").GetBoolean());
         Assert.Equal("request", closing.GetProperty("data").GetProperty("reason").GetString());
+        var stopped = StoppedLine(fixture);
+        Assert.Equal(0, stopped.GetProperty("exitCode").GetInt32());
+        Assert.Equal("request", stopped.GetProperty("reason").GetString());
+        Assert.True(stopped.GetProperty("saved").GetBoolean());
+        Assert.Equal(closing.GetProperty("data").GetProperty("sessionId").GetString(), stopped.GetProperty("sessionId").GetString());
         await fixture.Server.DisposeAsync();
         Assert.False(File.Exists(discovery));
     }
@@ -437,6 +447,8 @@ public sealed class ServerSessionTests
         fixture.Server.Shutdown(Hosting.ServerStopReason.Interrupt);
 
         Assert.Equal(0, await fixture.ExitAsync());
+        Assert.Equal("interrupt", StoppedLine(fixture).GetProperty("reason").GetString());
+        Assert.False(StoppedLine(fixture).GetProperty("saved").GetBoolean());
         await events.WaitForAsync("interaction.cancelled");
         var state = await events.WaitForAsync("server.state", value =>
             value.GetProperty("data").GetProperty("state").GetString() == "closing");
@@ -479,6 +491,17 @@ public sealed class ServerSessionTests
         Assert.True(quit.GetProperty("quit").GetBoolean());
         Assert.Equal(0, await fixture.ExitAsync());
         Assert.Equal("quit", closing.GetProperty("data").GetProperty("reason").GetString());
+    }
+
+    /// <summary>stdout is the listening line, then the stopped line.</summary>
+    private static JsonElement StoppedLine(ServerFixture fixture)
+    {
+        var lines = fixture.Output.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(2, lines.Length);
+        Assert.Equal("listening", JsonDocument.Parse(lines[0]).RootElement.GetProperty("event").GetString());
+        var stopped = JsonDocument.Parse(lines[1]).RootElement.Clone();
+        Assert.Equal("stopped", stopped.GetProperty("event").GetString());
+        return stopped;
     }
 
     private static ChatStreamEvent[] TextRound(string text) =>

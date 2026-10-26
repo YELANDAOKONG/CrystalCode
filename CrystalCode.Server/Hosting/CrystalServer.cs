@@ -11,8 +11,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions;
 using CrystalCode.Server.Endpoints;
 using CrystalCode.Server.Security;
+using CrystalCode.Server.Wire;
 
 namespace CrystalCode.Server.Hosting;
 
@@ -184,19 +186,26 @@ public sealed class CrystalServer : IAsyncDisposable
 
         await Session.RunAsync(linked.Token);
         Session.Hub.CompleteAll();
+        var closure = Session.Closed.IsCompletedSuccessfully ? await Session.Closed : null;
+        var code = Session.Failure is null ? 0 : 1;
         if (Session.Failure is { } failure)
         {
             await _runtime.Error.WriteLineAsync(failure);
-            return 1;
         }
-
-        if (Session.Closed.IsCompletedSuccessfully && await Session.Closed is { Saved: true } closure)
+        else
         {
-            await _runtime.Error.WriteLineAsync("Session saved  " + closure.SessionId);
+            if (closure is { Saved: true })
+            {
+                await _runtime.Error.WriteLineAsync("Session saved  " + closure.SessionId);
+            }
+
+            await _runtime.Error.WriteLineAsync("Server stopped");
         }
 
-        await _runtime.Error.WriteLineAsync("Server stopped");
-        return 0;
+        // The last stdout line, so a wrapper that read "listening" also sees the end.
+        await _runtime.Output.WriteLineAsync(StoppedLine(closure, code));
+        await _runtime.Output.FlushAsync(CancellationToken.None);
+        return code;
     }
 
     public async ValueTask DisposeAsync()
@@ -302,6 +311,29 @@ public sealed class CrystalServer : IAsyncDisposable
             _runtime.Error.WriteLine(line);
             _runtime.Error.Flush();
         }
+    }
+
+    private string StoppedLine(SessionClosure? closure, int code)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("event", "stopped");
+            writer.WriteNumber("pid", Environment.ProcessId);
+            writer.WriteNumber("exitCode", code);
+            WireWriter.Optional(writer, "reason", Session.Failure is null ? Session.StopReason : ServerState.Failed);
+            WireWriter.Optional(writer, "sessionId", closure?.SessionId);
+            writer.WriteBoolean("saved", closure?.Saved ?? false);
+            if (Session.Failure is { } failure)
+            {
+                writer.WriteString("error", failure);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
     }
 
     private string ListeningLine(string workspace)

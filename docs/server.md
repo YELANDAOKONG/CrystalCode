@@ -101,7 +101,8 @@ and the `server.state` event.
   {"event":"listening","url":"http://127.0.0.1:52144","pid":4242,"workspace":"/repo","discovery":"/home/me/.crystal/server/4242.json"}
   ```
 
-  The line never carries a token. It is the only line on stdout.
+  The line never carries a token. While the server runs it is the only line
+  on stdout; the `stopped` line (see Shutdown) is the other.
 - On stderr, for the operator, it then prints a summary: server URL, listen
   address, port, workspace, auth mode, the token (only a generated token, and
   only when stderr is a terminal; otherwise where to find it), the discovery
@@ -336,7 +337,15 @@ is still waiting on a startup question:
 3. `CloseAsync` runs, and `server.closing` reports the session id, whether it
    was saved, and the same `reason`. Before the session existed there is no
    `server.closing`.
-4. Every stream ends, the listener stops, and the discovery file and socket
+4. The last stdout line is written for a wrapper:
+
+   ```json
+   {"event":"stopped","pid":4242,"exitCode":0,"reason":"interrupt","sessionId":"…","saved":true}
+   ```
+
+   `reason` is the stop reason, or `failed` with an `error` field when the
+   launch failed. `sessionId` is null when no session was opened.
+5. Every stream ends, the listener stops, and the discovery file and socket
    are deleted. The exit code is 0; a failed launch exits with 1.
 
 A second Ctrl+C while the server is stopping ends the process at once.

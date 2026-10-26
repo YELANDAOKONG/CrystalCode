@@ -469,8 +469,9 @@ session options `crystal` accepts, plus `--workspace`, `--space`, and
 - `--exit-on-stdin-close` ends the server when its wrapper closes stdin.
 - `/quit`, `POST /shutdown`, Ctrl+C, and SIGTERM save the session and exit,
   also while the server waits on a startup question. Clients receive
-  `server.state` `closing` with the reason first. A second Ctrl+C ends the
-  process at once.
+  `server.state` `closing` with the reason first. The last stdout line is
+  `{"event":"stopped","exitCode":…,"reason":…,"sessionId":…,"saved":…}`. A
+  second Ctrl+C ends the process at once.
 
 The protocol, scopes, endpoints, events, and reconnect rules are in
 [server.md](server.md).
