@@ -21,7 +21,14 @@ public static partial class ThemeCatalog
     /// </summary>
     public static IReadOnlyList<string> BuiltInNames { get; } = [DefaultName, "dark", "light"];
 
-    public static bool IsBuiltIn(string name) => BuiltInNames.Contains(name);
+    public static bool IsBuiltIn(string name) => BuiltInNames.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Returns the built-in spelling when <paramref name="name"/> matches a built-in theme
+    /// ignoring case, otherwise the name unchanged.
+    /// </summary>
+    public static string Canonical(string name) =>
+        BuiltInNames.FirstOrDefault(built => built.Equals(name, StringComparison.OrdinalIgnoreCase)) ?? name;
 
     public const string InvalidNameText =
         "A theme name uses letters, digits, dot, dash, or underscore.";

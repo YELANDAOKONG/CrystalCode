@@ -70,12 +70,12 @@ public static class Theme
     private static IReadOnlyDictionary<string, string> _current = DefaultPalette;
 
     /// <summary>
-    /// Selects a built-in palette: <c>default</c> and <c>dark</c> are separate palettes with the same colors, <c>light</c> suits a light terminal.
+    /// Selects a built-in palette: <c>default</c> and <c>dark</c> (any case) are separate palettes with the same colors, <c>light</c> suits a light terminal.
     /// </summary>
     public static bool TryUseBuiltIn(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
-        switch (name)
+        switch (name.ToLowerInvariant())
         {
             case "default":
                 _current = DefaultPalette;

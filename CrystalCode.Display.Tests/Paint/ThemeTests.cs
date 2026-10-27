@@ -54,6 +54,7 @@ public sealed class ThemeTests : IDisposable
 
         Assert.Equal(dark, Theme.Accent);
         Assert.NotEqual(light, dark);
+        Assert.True(Theme.TryUseBuiltIn("LIGHT"));
         Assert.False(Theme.TryUseBuiltIn("night"));
     }
 

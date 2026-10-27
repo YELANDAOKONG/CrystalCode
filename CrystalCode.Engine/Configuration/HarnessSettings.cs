@@ -216,7 +216,7 @@ public sealed record HarnessSettings
         OperatorNotify = operatorNotify ?? OperatorNotifySettings.Off;
         Server = server ?? ServerHostSettings.Default;
         Bridge = bridge ?? BridgeHostSettings.Default;
-        Theme = theme;
+        Theme = ThemeCatalog.Canonical(theme);
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;

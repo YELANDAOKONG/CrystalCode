@@ -19,6 +19,18 @@ public sealed class ThemeCatalogTests : IDisposable
     }
 
     [Fact]
+    public void BuiltInNames_IgnoreCaseAndCanonicalize()
+    {
+        var home = new CrystalHome(_root);
+
+        Assert.True(ThemeCatalog.IsBuiltIn("Light"));
+        Assert.True(ThemeCatalog.Exists(home, "DARK"));
+        Assert.Equal("light", ThemeCatalog.Canonical("LIGHT"));
+        Assert.Equal("night", ThemeCatalog.Canonical("night"));
+        Assert.Equal("light", HarnessSettings.CreateDefault().WithTheme("Light").Theme);
+    }
+
+    [Fact]
     public void Names_ListDefaultFirstThenFiles()
     {
         var home = new CrystalHome(_root);
