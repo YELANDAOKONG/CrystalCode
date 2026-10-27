@@ -33,6 +33,17 @@ public sealed class ThemeTests : IDisposable
         Assert.Equal("lightsteelblue", Theme.Accent);
     }
 
+    [Theory]
+    [InlineData("code", "red on blue")]
+    [InlineData("codeBg", "red on blue")]
+    public void TryApply_RejectsCodeColorsThatBreakTheCodeBlockMarkup(string token, string value)
+    {
+        Assert.False(Theme.TryApply(new Dictionary<string, string> { [token] = value }, out var error));
+
+        Assert.Contains("codeBg", error, StringComparison.Ordinal);
+        Assert.Equal("grey23", Theme.CodeBg);
+    }
+
     [Fact]
     public void Reset_RestoresDefaults()
     {

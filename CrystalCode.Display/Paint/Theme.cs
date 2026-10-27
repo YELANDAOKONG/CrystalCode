@@ -165,6 +165,14 @@ public static class Theme
             next[name] = value.Trim();
         }
 
+        // Code blocks are drawn as "[code on codeBg]". A second background in either token
+        // would make that markup throw at render time.
+        if (!Style.TryParse(next["code"] + " on " + next["codeBg"], out _))
+        {
+            error = "Invalid theme color  code and codeBg must combine as a foreground on a background";
+            return false;
+        }
+
         _current = next;
         return true;
     }
