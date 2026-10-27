@@ -155,6 +155,11 @@ behavior stands until a specific change defines otherwise.
   new tool, not operator configuration of tool limits (that question is under
   Pending evaluation), and not a change to approval, trust, or the workspace
   fence. Do not reserve a configuration field, command, or public type.
+- Bridge model choices in editors that flatten groups. Model names from
+  different providers can look identical in an editor that ignores ACP
+  select groups. Whether and how the label names the provider is not
+  defined. It is a Bridge wire change only. Do not reserve a configuration
+  field or public type.
 
 ## Low priority
 

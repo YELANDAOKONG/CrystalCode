@@ -532,6 +532,21 @@ implemented in the current build.
   workspace fence. Current tool behavior stands until a specific change
   defines otherwise. Do not reserve a configuration field, command, or public
   type.
+- Bridge model choices in editors that flatten groups. `crystal bridge`
+  sends the `model` config option (and the two approval model options) as
+  ACP select groups, one per provider, with `provider/model` as the value
+  and the bare model name as the label. An editor that does not show group
+  headers, as JetBrains was observed not to, lists models from different
+  providers together, and the same model name can appear once per provider
+  with nothing to tell the entries apart. The direction is a label that
+  names the provider when more than one provider is configured, while
+  keeping the groups for editors that render them. Whether the label is
+  `provider / model`, how an editor that renders groups avoids showing the
+  provider twice, and which options it applies to are not defined. Current
+  behavior stands until a specific change defines otherwise. It is a change
+  to the Bridge wire only: values, slash commands, and the engine option
+  catalog stay as they are. Do not reserve a configuration field or public
+  type.
 
 ### Deferred
 
