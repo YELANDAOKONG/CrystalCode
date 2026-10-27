@@ -18,6 +18,7 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
 
     private readonly Stream _input;
     private readonly Stream _output;
+    private readonly ProtocolLog? _log;
     private readonly Channel<byte[]> _outgoing = Channel.CreateUnbounded<byte[]>(
         new UnboundedChannelOptions { SingleReader = true });
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _incoming = new(StringComparer.Ordinal);
@@ -28,12 +29,13 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
     private long _nextId;
     private int _closed;
 
-    public JsonRpcConnection(Stream input, Stream output)
+    public JsonRpcConnection(Stream input, Stream output, ProtocolLog? log = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
         _input = input;
         _output = output;
+        _log = log;
     }
 
     /// <summary>
@@ -137,6 +139,7 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
     private void Send(Action<Utf8JsonWriter> write)
     {
         var bytes = JsonText.Write(write);
+        _log?.Outgoing(bytes);
         if (!_outgoing.Writer.TryWrite(bytes))
         {
             // The connection already closed; the peer is gone.
@@ -189,6 +192,7 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
 
             if (line.Length > 0 && !string.IsNullOrWhiteSpace(line))
             {
+                _log?.Incoming(line);
                 Dispatch(line);
             }
         }

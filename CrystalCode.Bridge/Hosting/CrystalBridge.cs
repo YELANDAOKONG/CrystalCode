@@ -18,7 +18,10 @@ public static class CrystalBridge
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(output);
-        await using var connection = new JsonRpcConnection(input, output);
+        await using var connection = new JsonRpcConnection(
+            input,
+            output,
+            options.Debug is null ? null : new ProtocolLog(options.Debug));
         var agent = new BridgeAgent(options, connection);
         await connection.RunAsync(agent, cancellationToken);
     }

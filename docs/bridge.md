@@ -57,7 +57,7 @@ never opts in sees plain ACP.
 
 | Project | Owns |
 | :--- | :--- |
-| `CrystalCode.Bridge` | `Transport` (newline-delimited JSON-RPC 2.0 over streams, request ids, `$/cancel_request`, error codes), `Wire` (every field written explicitly with `Utf8JsonWriter`: `SessionUpdates` maps `SessionEvent` and Crystal stream events to `session/update` and `_crystal/*` notifications and replays the archive; `ChildUpdates` for children; `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` for config options and legacy modes, `FormWire` for elicitation forms, `McpServerWire` for client MCP servers, `SessionList`, `CrystalWire` for extension values with the server's field names), `Prompts` (content blocks to submitted text), and `Hosting` (`CrystalBridge` entry, `BridgeAgent` methods, `BridgeSession` with the live `CodingSession`, `SessionRunner`, front-end contracts, and turn tracking; `LaunchTrustPrompt` for trust before a session exists; `Extensions` for `_crystal/*` methods and `ReportCapture` for their report results). References `CrystalCode.Engine` only. |
+| `CrystalCode.Bridge` | `Transport` (newline-delimited JSON-RPC 2.0 over streams, request ids, `$/cancel_request`, error codes, `ProtocolLog` for the `--debug` traffic log), `Wire` (every field written explicitly with `Utf8JsonWriter`: `SessionUpdates` maps `SessionEvent` and Crystal stream events to `session/update` and `_crystal/*` notifications and replays the archive; `ChildUpdates` for children; `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` for config options and legacy modes, `FormWire` for elicitation forms, `McpServerWire` for client MCP servers, `SessionList`, `CrystalWire` for extension values with the server's field names), `Prompts` (content blocks to submitted text), and `Hosting` (`CrystalBridge` entry, `BridgeAgent` methods, `BridgeSession` with the live `CodingSession`, `SessionRunner`, front-end contracts, and turn tracking; `LaunchTrustPrompt` for trust before a session exists; `Extensions` for `_crystal/*` methods and `ReportCapture` for their report results). References `CrystalCode.Engine` only. |
 | `CrystalCode.Bridge.Tests` | An in-memory duplex stream driven by a scripted model, the parity guards, the secret-leak test, and the dependency guard. |
 | `CrystalCode` | `Commands/BridgeCommand` parses the command line, rebinds console output, maps signals, and hands the raw stdin and stdout streams to `CrystalCode.Bridge`. |
 
@@ -73,6 +73,7 @@ reflection.
 ```text
 crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
                [--config-options <IDS> | --default-config-options | --all-config-options]
+               [--debug [FILE]]
 ```
 
 - Session launch options are the set `crystal` accepts. They shape this
@@ -87,6 +88,20 @@ crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
   Configuration). They are mutually exclusive, apply to this process only,
   and are never written to `config.json`. A conflict or an unknown option id
   stops startup with a message on stderr.
+- `--debug [FILE]` logs every JSON-RPC message in both directions, one line
+  each with a UTC timestamp and the direction (`client -> bridge`,
+  `bridge -> client`). A bare `--debug` writes to stderr, which editors
+  usually collect in their agent log. With `FILE`, the log is appended to that
+  file (a relative path is resolved against the process directory) and stderr
+  stays quiet; a file that cannot be opened stops startup with a message on
+  stderr. It applies to this process only and is never written to
+  `config.json`. The log is a diagnostic aid, not a transcript: the values of
+  `mcpServers`, `env`, `headers`, and credential-like fields (`apiKey`,
+  `token`, `authorization`, `password`, `secret`, `credentials`) are replaced
+  with `[redacted]` at any depth, strings longer than 256 characters (image
+  data, file text, tool output) are cut with their length, and a line that is
+  not valid JSON is logged as a length only. Prompt text and tool arguments
+  that fit are logged as sent, so treat the file like the conversation.
 - No secret is a flag. Provider keys come from Home and the environment.
 - Editors configure it as `{"command": "crystal", "args": ["bridge"]}`.
 
@@ -748,7 +763,12 @@ a scripted model:
 - dependency guard: no Display, Server, Spectre.Console, Terminal.Gui, the
   executable, or `System.Console`.
 
-`CrystalCode.Tests` covers `crystal bridge --help` and console rebinding.
+- debug log: both directions are logged with `--debug`, nothing without it,
+  editor MCP values never appear, sensitive fields are replaced at any depth,
+  long strings are cut, and invalid JSON is not echoed.
+
+`CrystalCode.Tests` covers `crystal bridge --help`, console rebinding, and the
+`--debug` sink (none, stderr, appended file, unwritable path).
 Manual checks: the ACP Test Compatibility Kit and Zed.
 
 ## Phases

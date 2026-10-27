@@ -67,7 +67,8 @@ internal sealed class BridgeFixture : IAsyncDisposable
         bool trusted = true,
         Func<SessionLaunchOptions, SessionLaunchOptions>? options = null,
         Action<CrystalHome, string>? prepare = null,
-        IReadOnlyList<string>? configOptions = null)
+        IReadOnlyList<string>? configOptions = null,
+        TextWriter? debug = null)
     {
         var fixture = new BridgeFixture(Directory.CreateTempSubdirectory("crystal-bridge-").FullName);
         var home = new CrystalHome(fixture.Home);
@@ -97,7 +98,8 @@ internal sealed class BridgeFixture : IAsyncDisposable
             plugins,
             "test",
             fixture._error,
-            ConfigOptions: configOptions);
+            ConfigOptions: configOptions,
+            Debug: debug);
         fixture._run = Task.Run(() => CrystalBridge.RunAsync(
             bridgeOptions,
             fixture._bridgeInput,

@@ -68,6 +68,13 @@ public sealed class BridgeCommand : AsyncCommand<BridgeSettings>
             return 1;
         }
 
+        if (!TryOpenDebug(settings, error, out var debug, out var debugError))
+        {
+            await error.WriteLineAsync(debugError);
+            return 1;
+        }
+
+        await using var debugFile = debug is null || ReferenceEquals(debug, error) ? null : debug;
         var options = new BridgeOptions(
             settings.ToOptions(),
             Environment.CurrentDirectory,
@@ -76,11 +83,49 @@ public sealed class BridgeCommand : AsyncCommand<BridgeSettings>
             error,
             settings.Workspace,
             settings.Space,
-            configOptions);
+            configOptions,
+            debug);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var signals = ShutdownSignals.Register(StopSignals, stop.Cancel);
         await CrystalBridge.RunAsync(options, input, output, stop.Token);
         return 0;
+    }
+
+    /// <summary>
+    /// The protocol debug sink: none without <c>--debug</c>, stderr for a bare
+    /// <c>--debug</c>, otherwise the named file, appended to and created if it
+    /// is missing.
+    /// </summary>
+    internal static bool TryOpenDebug(
+        BridgeSettings settings,
+        TextWriter error,
+        out TextWriter? debug,
+        out string message)
+    {
+        debug = null;
+        message = string.Empty;
+        if (settings.Debug is not { IsSet: true } flag)
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(flag.Value))
+        {
+            debug = error;
+            return true;
+        }
+
+        try
+        {
+            var path = Path.GetFullPath(flag.Value, Environment.CurrentDirectory);
+            debug = new StreamWriter(new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read));
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            message = "Could not open the debug log. " + exception.Message;
+            return false;
+        }
     }
 
     /// <summary>

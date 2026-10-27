@@ -7,7 +7,8 @@ namespace CrystalCode.Commands;
 /// <c>crystal</c> and are not written to <c>config.json</c>. The workspace
 /// options only apply to a <c>session/new</c> without <c>cwd</c>. The config
 /// option flags choose which session options the editor sees for this process
-/// and are not written to <c>config.json</c>. No option carries a secret.
+/// and are not written to <c>config.json</c>. <c>--debug</c> logs protocol
+/// traffic to stderr, or to a file when one is named. No option carries a secret.
 /// </summary>
 public sealed class BridgeSettings : SessionLaunchSettings
 {
@@ -25,4 +26,7 @@ public sealed class BridgeSettings : SessionLaunchSettings
 
     [CommandOption("--all-config-options")]
     public bool AllConfigOptions { get; init; }
+
+    [CommandOption("--debug [FILE]")]
+    public FlagValue<string?>? Debug { get; init; }
 }
