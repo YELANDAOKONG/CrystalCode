@@ -86,6 +86,7 @@ public static class ServerScopes
             SessionVerb.Space => ServerScope.Admin,
             SessionVerb.Trust => ServerScope.Admin,
             SessionVerb.Rules => ServerScope.Admin,
+            SessionVerb.Theme => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             // on and off write config.json; test runs the operator's command on the server host.
             SessionVerb.Notify => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Access => ServerScope.Admin,

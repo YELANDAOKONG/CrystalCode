@@ -43,6 +43,7 @@ public static class SlashCatalog
             ["on", "off", "global", "project"]),
         new(SessionVerb.Notify, "notify", [], "Show operator notification, turn it on or off, or run a test",
             ["on", "off", "test"]),
+        new(SessionVerb.Theme, "theme", [], "Show or select the color theme"),
         new(SessionVerb.Resume, "resume", ["continue"], "Choose a session, workspace, or all", ["all"]),
         new(SessionVerb.Fork, "fork", [], "Branch current conversation or ID"),
         new(SessionVerb.Agents, "agents", [], "List or configure child Agents", ["on", "off", "concurrency", "model", "thinking", "context", "tier", "speed"]),

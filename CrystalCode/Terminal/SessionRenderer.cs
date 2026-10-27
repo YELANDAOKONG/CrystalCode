@@ -163,6 +163,18 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Redraws everything after the palette changed; cached transcript rows hold old colors.
+    /// </summary>
+    public void RepaintTheme()
+    {
+        lock (_gate)
+        {
+            _log.InvalidateCache();
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void SetTodoBar(bool visible, int rows)
     {
         lock (_gate)

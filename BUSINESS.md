@@ -96,6 +96,13 @@ separate library with no terminal code. The product can:
   validation, OS permissions, cancellation, and configured budgets still apply;
 - ask one or more operator questions in one request, with described choices,
   single or multiple selection, optional custom answers, and confirmation;
+- select a color theme for the terminal. `config.json` `theme` is a built-in
+  (`default`, which equals `dark`, `dark`, or `light`) or the name of a file in `~/.crystal/themes/<name>.json`, which maps color names
+  to Spectre styles and overrides the built-in palette. `/theme` lists and
+  selects it and writes `config.json`; `--theme <name>` on `crystal`,
+  `crystal space`, and `crystal run` affects that process only. Themes are
+  Home-only so a repository cannot change the interface. `crystal run`, plain
+  text output, and other front ends do not use it;
 - run an operator-authored command when the session waits for the operator,
   such as a desktop notification or a webhook. `operatorNotify` in
   `config.json` holds the command, an `enabled` switch, the events

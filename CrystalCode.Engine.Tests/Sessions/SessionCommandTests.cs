@@ -44,6 +44,8 @@ public sealed class SessionCommandTests
     [InlineData("/todos", SessionVerb.Todos)]
     [InlineData("/todo", SessionVerb.Todos)]
     [InlineData("/rules project off", SessionVerb.Rules)]
+    [InlineData("/theme", SessionVerb.Theme)]
+    [InlineData("/theme night", SessionVerb.Theme)]
     [InlineData("/notify", SessionVerb.Notify)]
     [InlineData("/notify test", SessionVerb.Notify)]
     public void TryParse_RecognizesSlashVerbs(string input, SessionVerb verb)

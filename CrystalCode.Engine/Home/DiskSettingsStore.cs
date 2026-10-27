@@ -121,7 +121,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             extendedApproval: ReadExtendedApproval(document.ExtendedApproval),
             operatorNotify: ReadOperatorNotify(document.OperatorNotify),
             server: ReadServer(document.Server),
-            bridge: ReadBridge(document.Bridge));
+            bridge: ReadBridge(document.Bridge),
+            theme: string.IsNullOrWhiteSpace(document.Theme) ? ThemeCatalog.DefaultName : document.Theme.Trim());
     }
 
     public void Save(HarnessSettings settings)
@@ -162,6 +163,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             Mcp = settings.Mcp ? null : false,
             Plugins = settings.Plugins ? null : false,
             WorkspaceTrust = settings.WorkspaceTrust ? null : false,
+            Theme = settings.Theme == ThemeCatalog.DefaultName ? null : settings.Theme,
             ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
             McpToolApproval = WriteMcpToolApproval(settings.McpToolApproval),
             EstimatedTokens = settings.EstimatedTokens ? true : null,

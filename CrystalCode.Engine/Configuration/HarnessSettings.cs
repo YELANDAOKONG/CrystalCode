@@ -110,13 +110,18 @@ public sealed record HarnessSettings
         ExtendedApprovalSettings? extendedApproval = null,
         OperatorNotifySettings? operatorNotify = null,
         ServerHostSettings? server = null,
-        BridgeHostSettings? bridge = null)
+        BridgeHostSettings? bridge = null,
+        string theme = ThemeCatalog.DefaultName)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         ArgumentNullException.ThrowIfNull(approval);
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentException.ThrowIfNullOrWhiteSpace(promptSet);
+        if (!ThemeCatalog.IsValidName(theme))
+        {
+            throw new ArgumentException(ThemeCatalog.InvalidNameText, nameof(theme));
+        }
 
         if (compactionThreshold is <= 0 or > 1)
         {
@@ -211,6 +216,7 @@ public sealed record HarnessSettings
         OperatorNotify = operatorNotify ?? OperatorNotifySettings.Off;
         Server = server ?? ServerHostSettings.Default;
         Bridge = bridge ?? BridgeHostSettings.Default;
+        Theme = theme;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
@@ -383,6 +389,11 @@ public sealed record HarnessSettings
     public bool Plugins { get; }
 
     public bool WorkspaceTrust { get; }
+
+    /// <summary>
+    /// Name of the color theme: <c>default</c> or a file under <c>~/.crystal/themes</c>.
+    /// </summary>
+    public string Theme { get; }
 
     public RuleFileSettings RuleFiles { get; }
 
@@ -562,6 +573,8 @@ public sealed record HarnessSettings
 
     public HarnessSettings WithWorkspaceTrust(bool workspaceTrust) =>
         Copy(workspaceTrust: workspaceTrust);
+
+    public HarnessSettings WithTheme(string theme) => Copy(theme: theme);
 
     public HarnessSettings WithRuleFiles(RuleFileSettings ruleFiles)
     {
@@ -845,7 +858,8 @@ public sealed record HarnessSettings
         ExtendedApprovalSettings? extendedApproval = null,
         OperatorNotifySettings? operatorNotify = null,
         ServerHostSettings? server = null,
-        BridgeHostSettings? bridge = null) =>
+        BridgeHostSettings? bridge = null,
+        string? theme = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -900,7 +914,8 @@ public sealed record HarnessSettings
             extendedApproval ?? ExtendedApproval,
             operatorNotify ?? OperatorNotify,
             server ?? Server,
-            bridge ?? Bridge);
+            bridge ?? Bridge,
+            theme ?? Theme);
 
     public override string ToString() => nameof(HarnessSettings);
 

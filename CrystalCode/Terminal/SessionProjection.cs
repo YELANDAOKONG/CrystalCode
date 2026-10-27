@@ -1,4 +1,6 @@
 using CrystalCode.Display.Cards;
+using CrystalCode.Display.Paint;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
@@ -15,6 +17,8 @@ namespace CrystalCode.Terminal;
 internal sealed class SessionProjection : ISessionObserver
 {
     private readonly SessionRenderer _renderer;
+    private readonly CrystalHome? _home;
+    private string? _theme;
     private readonly object _projectionGate = new();
     private readonly List<SessionEvent> _parentEvents = [];
     private readonly Dictionary<string, ChildSessionDocument> _children = new(StringComparer.Ordinal);
@@ -22,10 +26,11 @@ internal sealed class SessionProjection : ISessionObserver
     private string? _childFocus;
     private SessionChrome? _parentChrome;
 
-    public SessionProjection(SessionRenderer renderer)
+    public SessionProjection(SessionRenderer renderer, CrystalHome? home = null)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         _renderer = renderer;
+        _home = home;
     }
 
     private void Project(SessionEvent sessionEvent, bool replay = false)
@@ -209,6 +214,31 @@ internal sealed class SessionProjection : ISessionObserver
         _renderer.VerboseReview = preferences.VerboseReview;
         _renderer.VerboseThinking = preferences.VerboseThinking;
         _renderer.SetStatusLine(preferences.StatusLineEnabled, preferences.StatusLineFields);
+        ApplyTheme(preferences.Theme);
+    }
+
+    private void ApplyTheme(string name)
+    {
+        if (_home is null || name == _theme)
+        {
+            return;
+        }
+
+        _theme = name;
+        if (Theme.TryUseBuiltIn(name))
+        {
+            _renderer.RepaintTheme();
+            return;
+        }
+
+        if (!ThemeCatalog.TryRead(_home, name, out var colors, out var error)
+            || !Theme.TryApply(colors, out error))
+        {
+            _renderer.WriteError("Theme not applied  " + error);
+            return;
+        }
+
+        _renderer.RepaintTheme();
     }
 
     private static bool TryCompactionSummary(string text, out string body)

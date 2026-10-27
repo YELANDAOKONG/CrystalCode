@@ -28,6 +28,7 @@ public enum SessionVerb
     Trust,
     Rules,
     Notify,
+    Theme,
     Access,
     Resume,
     Fork,

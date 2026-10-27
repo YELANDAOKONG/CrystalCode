@@ -134,6 +134,9 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--rules <VALUE>")]
     public string? Rules { get; init; }
 
+    [CommandOption("--theme <NAME>")]
+    public string? Theme { get; init; }
+
     [CommandOption("--model-calls <COUNT>")]
     public string? ModelCalls { get; init; }
 
@@ -193,6 +196,7 @@ public class SessionLaunchSettings : CommandSettings
             Mcp = Mcp,
             Plugins = Plugins,
             Rules = Rules,
+            Theme = Theme,
             ModelCalls = ModelCalls,
             ToolCalls = ToolCalls,
             Duration = Duration,

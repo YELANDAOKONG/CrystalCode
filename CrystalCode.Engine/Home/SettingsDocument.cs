@@ -28,6 +28,8 @@ internal sealed class SettingsDocument
 
     public bool? WorkspaceTrust { get; set; }
 
+    public string? Theme { get; set; }
+
     public RuleFilesDocument? RuleFiles { get; set; }
 
     public ExternalToolApprovalDocument? ExternalToolApproval { get; set; }

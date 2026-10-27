@@ -2575,7 +2575,14 @@ the list is longer; `/todos` (alias `/todo`) publishes `TodosListed` and the
 terminal draws the full untruncated list in a rounded `Todos` card.
 `/todos bar [on|off]` and `/todos rows [3-10]` write `todoBar` and `todoBarRows`
 to `config.json` (defaults on and 4; each omitted when default) and publish
-`PreferencesChanged`. A `todoBarRows` outside 3 to 10 refuses startup. The transcript Result card uses the same colors for
+`PreferencesChanged`. A `todoBarRows` outside 3 to 10 refuses startup.
+Themes: `config.json` `theme` names a built-in (`default` = `dark`, `dark`, `light`; palettes live in `Theme`) or `~/.crystal/themes/<name>.json`
+(Home only; a workspace file is never read). `ThemeCatalog` in the engine lists
+and reads names and files and touches no console. `SessionPreferences.Theme`
+carries the name; the terminal `SessionProjection` loads the file and calls
+`Theme.TryApply` in `CrystalCode.Display`, which validates every token as a
+Spectre style and changes nothing on failure. `/theme` and `--theme` (process only,
+not saved) select it. Server and Bridge only forward the name. The transcript Result card uses the same colors for
 `- [ ]` / `- [~]` / `- [x]` / `- [-]` lines so they are not painted as
 diff removals. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode (Plan, Work, or a custom mode name) is on the

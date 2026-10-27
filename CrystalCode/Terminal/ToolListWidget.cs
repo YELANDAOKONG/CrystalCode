@@ -148,8 +148,8 @@ internal static class ToolListWidget
         return grid;
     }
 
-    private static Rule SectionRule(string title, string color = Theme.Accent) =>
-        new($"[{color}]{MarkupText.Escape(title)}[/]")
+    private static Rule SectionRule(string title, string? color = null) =>
+        new($"[{color ?? Theme.Accent}]{MarkupText.Escape(title)}[/]")
         {
             Style = Style.Parse(Theme.Rule),
             Justification = Justify.Left

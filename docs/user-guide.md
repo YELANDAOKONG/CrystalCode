@@ -207,6 +207,7 @@ CLI options:
 | `--agents <on\|off>` | Enable or disable child Agents for this process. Does not write `config.json` |
 | `--agents-concurrency <count>` | Active child invocations for this process, from 1 to 8. Does not write the file |
 | `--rules <value>` | `on` or `off` for both rule-file sides, or `global=on\|off` and `project=on\|off`. Does not affect `instructions.md` or `.crystal.md` |
+| `--theme <name>` | Color theme for this process: `default`, `dark`, `light`, or a file in `~/.crystal/themes`. Not written to `config.json` |
 | `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
 | `--tool-calls <count>` | Tool calls for each turn. `0` allows none. `unlimited` removes that cap |
 | `--duration <seconds>` | Wall-clock cap for each turn. `unlimited` removes that cap |
@@ -633,6 +634,7 @@ Top-level fields:
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `todoBar` | Show the pinned `Todos` bar above the status bar (default `true`; omitted when on) |
+| `theme` | Color theme name: built-in `default` (same as `dark`), `dark`, `light`, or a file `~/.crystal/themes/<name>.json` (omitted when `default`). Set with `/theme`. A missing or invalid file is reported and the built-in colors stay |
 | `todoBarRows` | Items the pinned `Todos` bar shows before `+N more`, from 3 to 10 (default `4`; omitted when 4). Other values refuse startup |
 | `estimatedTokens` | Show a live four-characters-per-token estimate on the progress row during Thinking and Writing (default `false`) |
 | `verboseResults` | Parent switch for success result panels (default `true`; omitted when on). Off hides every success result already on screen, including read, search, skill, edit, write, bash, and background bash. Does not hide Tool cards; those follow `verboseCalls`. Failures stay. `verboseTools` and `verboseCommands` do not draw results while this is off. `crystal run` does not read it |
@@ -1555,6 +1557,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/space` | | Switch to the operator space. Creates `{home}/space` when it is missing. Takes no path. Refused while a turn is running |
 | `/trust` | | Show workspace trust, or `on` / `off` / `forget`. `on` asks immediately when this root is not trusted; No exits. `forget` drops this root and takes effect on the next entry. `forget` leaves the operator space trusted |
 | `/rules` | | Show global and project rule files, set both with `on` / `off`, or set one side with `global` or `project` and `on` / `off`. Writes `config.json`. Does not change `instructions.md` or `.crystal.md`. Refused during a turn or compaction |
+| `/theme` | | Show the theme and the available names. `/theme <name>` writes `theme` to `config.json` and repaints. Built-in themes are `default`, `dark` (identical to `default`), and `light`. Other themes live only in `~/.crystal/themes/<name>.json`, never in a workspace, and a file named like a built-in is ignored. A file overrides the `dark` palette. Each file is an object of color names to Spectre styles, such as `{"accent": "#7aa2f7", "fail": "red"}`. Names: `chrome`, `rule`, `user`, `image`, `thinking`, `tool`, `ok`, `fail`, `work`, `plan`, `custom`, `review`, `selected`, `heading`, `code`, `codeBg`, `diffAdded`, `diffRemoved`, `warning`, `muted`, `accent`. Unlisted colors keep the built-in value; an unknown name or bad style rejects the file |
 | `/notify` | | Show operator notification. `on` / `off` writes `operatorNotify.enabled` to `config.json`; `on` needs a configured command. `test` runs the command once, even while off, with `CRYSTAL_NOTIFY_EVENT=test`, and reports its exit |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |

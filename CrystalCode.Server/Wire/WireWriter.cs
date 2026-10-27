@@ -86,6 +86,7 @@ public static class WireWriter
         writer.WriteBoolean("verboseThinking", preferences.VerboseThinking);
         writer.WriteBoolean("statusLineEnabled", preferences.StatusLineEnabled);
         Strings(writer, "statusLineFields", preferences.StatusLineFields);
+        writer.WriteString("theme", preferences.Theme);
         writer.WriteEndObject();
     }
 

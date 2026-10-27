@@ -49,7 +49,7 @@ internal sealed class TerminalHost
         ArgumentNullException.ThrowIfNull(launch);
         ArgumentNullException.ThrowIfNull(plugins);
         var renderer = new SessionRenderer();
-        var projection = new SessionProjection(renderer);
+        var projection = new SessionProjection(renderer, launch.Home);
         var frontEnd = new SessionFrontEnd(
             projection,
             new ApprovalPrompt(renderer),

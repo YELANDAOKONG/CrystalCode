@@ -144,6 +144,11 @@ public static class SessionLaunchOverrides
                     RuleFileSettings.ParseLaunch(request.Rules, next.RuleFiles));
             }
 
+            if (request.Theme is not null)
+            {
+                next = next.WithTheme(Required(request.Theme, "Theme"));
+            }
+
             if (request.PromptSet is not null)
             {
                 next = next.WithPromptSetOverride(Required(request.PromptSet, "Prompt set"));

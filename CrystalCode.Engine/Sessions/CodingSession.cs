@@ -2172,6 +2172,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Rules:
                 ChangeRules(command.Argument);
                 return (true, false);
+            case SessionVerb.Theme:
+                ChangeTheme(command.Argument);
+                return (true, false);
             case SessionVerb.Notify:
                 await ChangeNotifyAsync(command.Argument, cancellationToken);
                 return (true, false);
@@ -5563,6 +5566,26 @@ public sealed class CodingSession : ITurnObserver
         Note(RuleFileArguments.Format(_settings.RuleFiles));
     }
 
+    private void ChangeTheme(string argument)
+    {
+        var name = argument.Trim();
+        if (name.Length == 0)
+        {
+            Note("Theme  " + _settings.Theme + "\nAvailable  " + string.Join(", ", ThemeCatalog.Names(_home)));
+            return;
+        }
+
+        if (!ThemeCatalog.Exists(_home, name))
+        {
+            Error("Theme not found  " + name + ". Use /theme to list the available themes.");
+            return;
+        }
+
+        SaveSettings(current => current.WithTheme(name));
+        PublishPreferences();
+        Note("Theme  " + _settings.Theme);
+    }
+
     private PromptContext CurrentPromptContext()
     {
         var directories = DirectoryAccessText.Render(_workspace.Access.Snapshot());
@@ -7979,7 +8002,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.VerboseReview,
             _settings.VerboseThinking,
             _settings.StatusLine.Enabled,
-            _settings.StatusLine.Fields);
+            _settings.StatusLine.Fields,
+            _settings.Theme);
 
     private void PublishPreferences()
     {

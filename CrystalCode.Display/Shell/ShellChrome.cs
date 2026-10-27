@@ -267,12 +267,12 @@ public sealed class ShellChrome
         int width)
     {
         const string SepPlain = "  ·  ";
-        const string SepMarkup = $"[{Theme.Rule}]  ·  [/]";
+        var sepMarkup = $"[{Theme.Rule}]  ·  [/]";
 
         var fullPlain = "  " + string.Join(SepPlain, items.Select(x => x.Plain));
         if (TextWidth.Measure(fullPlain) <= width)
         {
-            var fullMarkup = "  " + string.Join(SepMarkup, items.Select(x => x.Markup));
+            var fullMarkup = "  " + string.Join(sepMarkup, items.Select(x => x.Markup));
             return new PaintLine(fullMarkup, fullPlain);
         }
 
@@ -294,7 +294,7 @@ public sealed class ShellChrome
             return PaintLine.Colored(Theme.Chrome, fittedPlain);
         }
 
-        var fittedMarkup = "  " + string.Join(SepMarkup, items.Select(x => x.Markup));
+        var fittedMarkup = "  " + string.Join(sepMarkup, items.Select(x => x.Markup));
         return new PaintLine(fittedMarkup, fittedPlain);
     }
 

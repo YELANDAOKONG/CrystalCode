@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Modes;
 using CrystalCode.Engine.Sessions;
@@ -85,6 +86,11 @@ public static class SessionLauncher
         if (!SessionLaunchOverrides.TryAcceptPromptSet(home, options.PromptSet, out var promptError))
         {
             return Invalid(promptError);
+        }
+
+        if (options.Theme is not null && !ThemeCatalog.Exists(home, applied.Theme))
+        {
+            return Invalid("Theme not found  " + applied.Theme);
         }
 
         var credentials = new CredentialStore(home);
