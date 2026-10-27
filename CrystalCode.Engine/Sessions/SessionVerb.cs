@@ -40,6 +40,7 @@ public enum SessionVerb
     Plugins,
     Mcp,
     Attach,
+    Quick,
     Export,
     Verbose,
     Quit,

@@ -319,7 +319,8 @@ CrystalCode.Display:
 Quick prompts keep the same dependency direction: Engine Home owns
 `QuickPromptStore`, bounded UTF-8 file reads, validation, and immutable catalog
 values; Display Composer owns the isolated quick-prompt picker and preview.
-The terminal maps catalog values, routes F6 only outside modal prompts, and
+The terminal maps catalog values, routes F6 and a bare `/quick` only outside
+modal prompts (other front ends only get a note from `SessionVerb.Quick`), and
 inserts Fill at the current composer cursor. Send uses
 `CodingSession.SubmitQuickPromptAsync`, bypasses slash parsing, and never
 consumes pending or composer draft images. Ordinary queued submissions bind

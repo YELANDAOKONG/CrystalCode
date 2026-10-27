@@ -1875,6 +1875,15 @@ public sealed class SessionRenderer : IDisposable
         {
             case ComposerAction.Submit:
                 var text = _composer.SubmissionText;
+                if (IsQuickCommand(text))
+                {
+                    _composer.Clear();
+                    _picker = null;
+                    OnComposerEdited?.Invoke(_composer.SubmissionText);
+                    _quickOpenRequested = true;
+                    return null;
+                }
+
                 _composer.RememberAndClear();
                 _picker = null;
                 _scrollBack = 0;
@@ -1905,6 +1914,11 @@ public sealed class SessionRenderer : IDisposable
 
         return null;
     }
+
+    private static bool IsQuickCommand(string text) =>
+        SessionCommand.TryParse(text.Trim(), out var command)
+        && command.Verb == SessionVerb.Quick
+        && command.Argument.Length == 0;
 
     private void WriteHelpUnlocked()
     {

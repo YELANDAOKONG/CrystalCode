@@ -2184,6 +2184,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Child:
                 await ShowChildAsync(command.Argument, cancellationToken);
                 return (true, false);
+            case SessionVerb.Quick:
+                Note("Quick prompts open from the terminal with /quick or F6.");
+                return (true, false);
             case SessionVerb.Sessions:
                 ShowSessions(command.Argument);
                 return (true, false);

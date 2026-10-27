@@ -60,6 +60,7 @@ public static class SlashCatalog
         new(SessionVerb.Mcp, "mcp", [], "List, show, or configure MCP servers",
             ["list", "show", "on", "off", "reload", "enable", "disable", "approval", "home", "project"]),
         new(SessionVerb.Attach, "attach", ["image"], "Attach a workspace image"),
+        new(SessionVerb.Quick, "quick", ["shortcuts"], "Open quick prompts (F6 in the terminal)"),
         new(SessionVerb.Export, "export", [], "Export markdown, json, or show usage"),
         new(SessionVerb.Quit, "quit", ["exit", "q"], "Exit")
     ];
