@@ -340,7 +340,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
     {
         var directory = Path.GetFullPath(cwd ?? _options.Workspace ?? _options.WorkingDirectory);
         return "The directory " + directory + " is not trusted. Run crystal in that directory once and trust it, "
-            + "or set workspaceTrust to false in config.json.";
+            + "or leave bridge workspace trust off (the default).";
     }
 
     private JsonRpcReply List(JsonElement parameters)

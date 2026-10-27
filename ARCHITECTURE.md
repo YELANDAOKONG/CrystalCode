@@ -201,7 +201,13 @@ resolves a flag, then the saved list while the switch is on, then the built-in
 default, into the expanded id list on `BridgeOptions`. Bridge filters by id
 at the wire (`SessionUpdates`, `BridgeAgent`) and never edits the catalog.
 A hidden option is refused as `-32602` over ACP and stays a slash command.
-Like `server`, the section is never written by a command line.
+The same section holds `workspaceTrust` (default off): whether Bridge asks
+before entering an untrusted directory. `BridgeCommand` resolves
+`--workspace-trust`, then that value, and hands the result to the launcher
+as `SessionLaunchOptions.WorkspaceTrust`, so the engine's trust checks, also
+inside the session, follow it. The terminal's top-level `workspaceTrust` is
+not read for Bridge. Like `server`, the section is never written by a
+command line.
 
 | Folder | Owns |
 | :--- | :--- |

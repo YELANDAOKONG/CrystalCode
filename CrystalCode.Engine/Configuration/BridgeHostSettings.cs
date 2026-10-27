@@ -4,8 +4,9 @@ namespace CrystalCode.Engine.Configuration;
 /// Operator choice for which session options <c>crystal bridge</c> offers to
 /// an editor as ACP config options. A custom list applies only while
 /// <see cref="Custom"/> is on; otherwise <see cref="DefaultOptions"/> apply.
-/// Hidden options stay available as slash commands. A command line never
-/// writes this.
+/// Hidden options stay available as slash commands. <see cref="WorkspaceTrust"/>
+/// is the trust check for sessions an editor opens, and it is off by default
+/// because the editor chooses the directory. A command line never writes this.
 /// </summary>
 public sealed record BridgeHostSettings
 {
@@ -37,9 +38,13 @@ public sealed record BridgeHostSettings
 
     public static BridgeHostSettings Default { get; } = new();
 
-    public BridgeHostSettings(bool custom = false, IReadOnlyList<string>? options = null)
+    public BridgeHostSettings(
+        bool custom = false,
+        IReadOnlyList<string>? options = null,
+        bool workspaceTrust = false)
     {
         Custom = custom;
+        WorkspaceTrust = workspaceTrust;
         Options = options is null ? DefaultOptions : Normalize(options);
     }
 
@@ -52,7 +57,13 @@ public sealed record BridgeHostSettings
     /// </summary>
     public IReadOnlyList<string> Options { get; }
 
-    public bool IsDefault => !Custom && Options.SequenceEqual(DefaultOptions, StringComparer.Ordinal);
+    /// <summary>
+    /// Whether <c>crystal bridge</c> asks before entering an untrusted
+    /// directory. Independent of the terminal's <c>workspaceTrust</c>.
+    /// </summary>
+    public bool WorkspaceTrust { get; }
+
+    public bool IsDefault => !Custom && !WorkspaceTrust && Options.SequenceEqual(DefaultOptions, StringComparer.Ordinal);
 
     /// <summary>The ids a front end offers: the list while custom, else the built-in default.</summary>
     public IReadOnlyList<string> Effective => Custom ? Expand(Options) : DefaultOptions;

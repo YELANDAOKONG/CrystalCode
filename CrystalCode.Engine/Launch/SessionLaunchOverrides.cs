@@ -133,6 +133,11 @@ public static class SessionLaunchOverrides
                 next = next.WithPlugins(ParseSwitch(request.Plugins, "--plugins"));
             }
 
+            if (request.WorkspaceTrust is not null)
+            {
+                next = next.WithWorkspaceTrust(ParseSwitch(request.WorkspaceTrust, "--workspace-trust"));
+            }
+
             if (request.Rules is not null)
             {
                 next = next.WithRuleFiles(

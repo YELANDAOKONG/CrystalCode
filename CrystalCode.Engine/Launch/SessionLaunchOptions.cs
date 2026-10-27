@@ -90,6 +90,13 @@ public sealed record SessionLaunchOptions
 
     public string? Rules { get; init; }
 
+    /// <summary>
+    /// <c>on</c> or <c>off</c> for the <c>workspaceTrust</c> preference in
+    /// this process, including a later move to another directory. Null keeps
+    /// the saved value.
+    /// </summary>
+    public string? WorkspaceTrust { get; init; }
+
     public string? ModelCalls { get; init; }
 
     public string? ToolCalls { get; init; }

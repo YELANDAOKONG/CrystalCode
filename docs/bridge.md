@@ -73,7 +73,7 @@ reflection.
 ```text
 crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
                [--config-options <IDS> | --default-config-options | --all-config-options]
-               [--debug [FILE]]
+               [--workspace-trust <on|off>] [--debug [FILE]]
 ```
 
 - Session launch options are the set `crystal` accepts. They shape this
@@ -88,6 +88,9 @@ crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
   Configuration). They are mutually exclusive, apply to this process only,
   and are never written to `config.json`. A conflict or an unknown option id
   stops startup with a message on stderr.
+- `--workspace-trust <on|off>` sets the trust check for this process,
+  ahead of `bridge.workspaceTrust` in `config.json` (see Sessions). It is not
+  written to `config.json`.
 - `--debug [FILE]` logs every JSON-RPC message in both directions, one line
   each with a UTC timestamp and the direction (`client -> bridge`,
   `bridge -> client`). A bare `--debug` writes to stderr, which editors
@@ -227,8 +230,16 @@ Client capabilities Bridge reads:
 - `cwd` must be absolute. A `cwd` on load or resume that differs from the
   saved workspace is a deviation from ACP (see Deviations): the session
   enters `cwd`, as `/resume <path>` does after trust.
-- Trust uses `SessionTrustCheck.Prompt` and the `workspaceTrust` switch. The
-  question goes to the client as a form (see Interactions). A client without
+- Workspace trust is off by default for `crystal bridge`, because the editor
+  chooses the directory and has already opened it. The `bridge` section of
+  `config.json` turns it on with `"workspaceTrust": true`, and
+  `--workspace-trust on|off` overrides that for one process. The terminal's
+  top-level `workspaceTrust` does not apply to Bridge. While it is off, no
+  trust question is asked, nothing is recorded in `trusted.json`, and
+  `/cd`, `/space`, and `/resume <path>` skip the check too. Project tool
+  sets and project MCP servers then start without it (see
+  [mcp.md](mcp.md)). The rest of this item applies while it is on: trust uses
+  `SessionTrustCheck.Prompt`. The question goes to the client as a form (see Interactions). A client without
   forms gets `-32603`, `kind` `trust_refused`, naming the directory and
   saying to run `crystal` there once, or to turn the switch off. The
   operator space is trusted as elsewhere.

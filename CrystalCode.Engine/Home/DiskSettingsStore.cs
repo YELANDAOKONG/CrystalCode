@@ -633,7 +633,8 @@ public sealed class DiskSettingsStore : ISettingsStore
         {
             return new BridgeHostSettings(
                 document.CustomConfigOptions ?? false,
-                document.ConfigOptions);
+                document.ConfigOptions,
+                document.WorkspaceTrust ?? false);
         }
         catch (ArgumentException exception)
         {
@@ -651,6 +652,7 @@ public sealed class DiskSettingsStore : ISettingsStore
         return new BridgeHostDocument
         {
             CustomConfigOptions = settings.Custom ? true : null,
+            WorkspaceTrust = settings.WorkspaceTrust ? true : null,
             ConfigOptions = settings.Options.SequenceEqual(BridgeHostSettings.DefaultOptions, StringComparer.Ordinal)
                 ? null
                 : [.. settings.Options]

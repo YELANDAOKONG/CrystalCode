@@ -87,6 +87,23 @@ public sealed class BridgeSettingsStoreTests
         Assert.Equal(["mode", "model", "thinking", "approval", "agents"], store.Load().Bridge.Effective);
     }
 
+    [Fact]
+    public void WorkspaceTrust_IsOffByDefaultAndRoundTripsWhenOn()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        Assert.False(store.Load().Bridge.WorkspaceTrust);
+        Insert(root, """
+            "bridge": { "workspaceTrust": true },
+            """);
+
+        store.Save(store.Load());
+
+        Assert.True(store.Load().Bridge.WorkspaceTrust);
+        Assert.False(store.Load().Bridge.IsDefault);
+    }
+
     [Theory]
     [InlineData("""{ "customConfigOptions": true, "configOptions": ["nope"] }""", "nope")]
     [InlineData("""{ "customConfigOptions": true, "configOptions": [] }""", "at least one")]

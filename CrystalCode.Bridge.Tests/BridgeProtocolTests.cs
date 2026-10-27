@@ -44,6 +44,21 @@ public sealed class BridgeProtocolTests
     }
 
     [Fact]
+    public async Task WorkspaceTrustOff_OpensAnUntrustedDirectoryWithoutAskingOrRecording()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(
+            new ScriptedModel(false),
+            trusted: false,
+            options: static launch => launch with { WorkspaceTrust = "off" });
+        await fixture.RequestAsync("initialize", new { protocolVersion = 1 });
+
+        var response = await fixture.RequestAsync("session/new", new { cwd = fixture.Workspace, mcpServers = Array.Empty<object>() });
+
+        Assert.True(response.GetProperty("result").TryGetProperty("sessionId", out _));
+        Assert.False(new WorkspaceTrustStore(new CrystalHome(fixture.Home)).Contains(fixture.Workspace));
+    }
+
+    [Fact]
     public async Task Prompt_StreamsTheReplyAndEndsTheTurn()
     {
         var model = new ScriptedModel(false, ScriptedModel.TextRound("hello there"));

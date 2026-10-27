@@ -75,8 +75,14 @@ public sealed class BridgeCommand : AsyncCommand<BridgeSettings>
         }
 
         await using var debugFile = debug is null || ReferenceEquals(debug, error) ? null : debug;
+        if (!TryWorkspaceTrust(settings, out var workspaceTrust, out var trustError))
+        {
+            await error.WriteLineAsync(trustError);
+            return 1;
+        }
+
         var options = new BridgeOptions(
-            settings.ToOptions(),
+            settings.ToOptions() with { WorkspaceTrust = workspaceTrust ? "on" : "off" },
             Environment.CurrentDirectory,
             plugins,
             Version(),
@@ -89,6 +95,33 @@ public sealed class BridgeCommand : AsyncCommand<BridgeSettings>
         using var signals = ShutdownSignals.Register(StopSignals, stop.Cancel);
         await CrystalBridge.RunAsync(options, input, output, stop.Token);
         return 0;
+    }
+
+    /// <summary>
+    /// Whether this process asks before entering an untrusted directory. A
+    /// flag wins; otherwise <c>bridge.workspaceTrust</c> in <c>config.json</c>,
+    /// which is off by default. The terminal's <c>workspaceTrust</c> does not
+    /// apply.
+    /// </summary>
+    internal static bool TryWorkspaceTrust(BridgeSettings settings, out bool enabled, out string error)
+    {
+        enabled = false;
+        error = string.Empty;
+        if (settings.WorkspaceTrust is not null)
+        {
+            return SessionLaunchOverrides.TryReadWorkspaceTrust(settings.WorkspaceTrust, out enabled, out error);
+        }
+
+        try
+        {
+            enabled = new DiskSettingsStore(CrystalHome.Resolve(settings.Home)).LoadOrCreate().Bridge.WorkspaceTrust;
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            error = "Could not read config.json  " + exception.Message;
+            return false;
+        }
     }
 
     /// <summary>
