@@ -24,6 +24,11 @@ namespace CrystalCode.Engine.Launch;
 /// workspace are kept, because they only narrow access. Never written to
 /// <c>access.json</c>.
 /// </param>
+/// <param name="Fork">
+/// With <paramref name="Resume"/>, open a new session branched from the saved
+/// one, as <c>/fork &lt;id&gt;</c> does, in the resolved workspace. The saved
+/// session is not changed.
+/// </param>
 public sealed record SessionLaunchRequest(
     SessionLaunchOptions Options,
     string WorkingDirectory,
@@ -33,4 +38,5 @@ public sealed record SessionLaunchRequest(
     string? ResumeTarget = null,
     SessionTrustCheck Trust = SessionTrustCheck.Prompt,
     bool PersistSelection = true,
-    IReadOnlyList<string>? AdditionalRoots = null);
+    IReadOnlyList<string>? AdditionalRoots = null,
+    bool Fork = false);

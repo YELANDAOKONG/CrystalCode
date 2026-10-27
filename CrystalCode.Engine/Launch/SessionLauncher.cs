@@ -238,6 +238,13 @@ public static class SessionLauncher
         var persisted = request.PersistSelection
             ? loaded.WithOverrides(options.Provider, options.Model)
             : loaded;
+        if (request.Fork && resumed is not null)
+        {
+            // A branch keeps the conversation, plans, and children, not the
+            // saved directory rules; the new session seeds them as a new one does.
+            resumed = SessionFork.Create(resumed, SessionStore.NewId(), workspace, DateTimeOffset.UtcNow);
+        }
+
         return SessionLaunchResult.Ready(new SessionLaunch(
             home,
             settingsStore,
@@ -249,7 +256,8 @@ public static class SessionLauncher
             mode,
             access,
             SessionLaunchOverrides.UnavailableThinkingNotes(applied),
-            roots));
+            roots,
+            request.Fork && resumed is not null));
     }
 
     private static async Task<SessionLaunchResult?> CheckTrustAsync(

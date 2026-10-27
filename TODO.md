@@ -82,17 +82,6 @@ behavior stands until a specific change defines otherwise.
   sampling, OAuth for remote servers, image and audio results (they are
   named, not sent), and URL-mode elicitation. Do not bypass the existing
   plugin, approval, and media boundaries.
-- The rest of the Agent Client Protocol (ACP) front end, Bridge
-  (`crystal bridge`, `CrystalCode.Bridge`). Phases 1 to 3 (transport,
-  sessions with load, resume, and list, prompts, streaming, tool calls,
-  permission, config options, usage, reports, editor MCP servers, additional
-  directories, and forms) are in this build. Phase 4 (children and subagents,
-  compaction updates, fork, and `_crystal/*` extensions) is not. It is a
-  front end that implements
-  `SessionFrontEnd`, not an engine protocol, not `crystal server`, and not
-  child Agents. Do not bypass approval, trust, or the tool boundary.
-  Editor-supplied MCP servers use the same MCP client as local servers. The
-  design and phases are in [docs/bridge.md](docs/bridge.md).
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.

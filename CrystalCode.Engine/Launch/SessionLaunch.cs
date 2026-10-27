@@ -18,6 +18,11 @@ namespace CrystalCode.Engine.Launch;
 /// Canonical write roots outside the workspace that replace every outside
 /// rule, or null to keep the saved and default rules.
 /// </param>
+/// <param name="Forked">
+/// <paramref name="Resume"/> is a new branch of a saved session. Like
+/// <c>/fork</c>, it seeds this workspace's directory defaults instead of
+/// keeping saved rules.
+/// </param>
 public sealed record SessionLaunch(
     CrystalHome Home,
     DiskSettingsStore SettingsStore,
@@ -29,7 +34,8 @@ public sealed record SessionLaunch(
     string? Mode,
     IReadOnlyList<DirectoryAccess> Access,
     IReadOnlyList<string> Notes,
-    IReadOnlyList<DirectoryAccess>? AdditionalRoots = null)
+    IReadOnlyList<DirectoryAccess>? AdditionalRoots = null,
+    bool Forked = false)
 {
     public CodingSession CreateSession(SessionFrontEnd frontEnd, PluginRegistry plugins)
     {
@@ -46,6 +52,7 @@ public sealed record SessionLaunch(
             Resume,
             Persisted,
             Access,
-            AdditionalRoots);
+            AdditionalRoots,
+            Forked);
     }
 }

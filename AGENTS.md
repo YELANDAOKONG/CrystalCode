@@ -85,7 +85,9 @@ semantics. Do not copy its Demo UI into this product.
   `_meta.crystal`, never at the root of an ACP type, and it never sends
   `-32000`. A new `CodingSession` member, `SessionEvent`, or Crystal stream
   event must be mapped or listed with a reason in Bridge; the parity tests in
-  `CrystalCode.Bridge.Tests` fail until it is.
+  `CrystalCode.Bridge.Tests` fail until it is. A non-schema update,
+  notification, or session id goes only to a client that opted in under
+  `clientCapabilities._meta.crystal`.
 - Public data values are immutable. One type per file. File-scoped namespaces.
 - No top-level statements. Explicit `Program.Main`.
 

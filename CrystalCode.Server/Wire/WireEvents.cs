@@ -40,6 +40,8 @@ public static class WireEvents
         [typeof(TodosChanged)] = "todos.changed",
         [typeof(HistoryReplayed)] = "conversation.replayed",
         [typeof(ConversationCleared)] = "conversation.cleared",
+        [typeof(CompactionStarted)] = "compaction.started",
+        [typeof(CompactionFinished)] = "compaction.finished",
         [typeof(NoteWritten)] = "note",
         [typeof(ErrorWritten)] = "error",
         [typeof(HelpRequested)] = "report.help",
@@ -204,6 +206,15 @@ public static class WireEvents
                 break;
             case HistoryReplayed replayed:
                 WireWriter.Items(writer, "items", replayed.Items);
+                break;
+            case CompactionStarted started:
+                writer.WriteString("id", started.Id);
+                writer.WriteBoolean("manual", started.Manual);
+                break;
+            case CompactionFinished finished:
+                writer.WriteString("id", finished.Id);
+                writer.WriteString("status", finished.Status);
+                WireWriter.Optional(writer, "summary", finished.Summary);
                 break;
             case NoteWritten note:
                 writer.WriteString("text", note.Text);

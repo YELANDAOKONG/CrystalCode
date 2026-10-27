@@ -48,11 +48,18 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             "session/new" => await OpenAsync(id, Setup(parameters, resume: false), cancellationToken),
             "session/load" => await OpenAsync(id, Setup(parameters, resume: true) with { Replay = true }, cancellationToken),
             "session/resume" => await OpenAsync(id, Setup(parameters, resume: true), cancellationToken),
+            // The RFD method and its extension name; neither is in the stable
+            // schema. The branch is active when this answers, with its history
+            // replayed first, as /fork shows it.
+            "session/fork" or "_crystal/session/fork" =>
+                await OpenAsync(id, Setup(parameters, resume: true) with { Fork = true, Replay = true }, cancellationToken),
             "session/list" => List(parameters),
             "session/prompt" => await PromptAsync(parameters, cancellationToken),
             "session/set_mode" => await SetModeAsync(parameters),
             "session/set_config_option" => await SetOptionAsync(parameters),
             "session/close" => await CloseAsync(parameters),
+            _ when method.StartsWith("_crystal/", StringComparison.Ordinal) =>
+                await Extensions.HandleAsync(method, Active(parameters), parameters, _features, NextOrigin()),
             _ => throw new JsonRpcException(JsonRpcErrorCode.MethodNotFound, "Method not found: " + PromptContent.OneLine(method))
         };
 
@@ -128,9 +135,23 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             writer.WriteStartObject("_meta");
             writer.WriteStartObject("crystal");
             writer.WriteStartArray("extensions");
+            foreach (var extension in Extensions.Methods)
+            {
+                writer.WriteStringValue(extension);
+            }
+
             writer.WriteEndArray();
             writer.WriteBoolean("loadAcrossCwd", true);
             writer.WriteBoolean("mutableWorkspace", true);
+            writer.WriteString("fork", "rfd");
+            writer.WriteString("subagents", "rfd");
+            writer.WriteStartArray("eventKinds");
+            foreach (var kind in Extensions.Notifications)
+            {
+                writer.WriteStringValue(kind);
+            }
+
+            writer.WriteEndArray();
             writer.WriteEndObject();
             writer.WriteEndObject();
             writer.WriteEndObject();
@@ -184,7 +205,8 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             var bridge = await StartAsync(requestId, setup with { ResumeId = resumeId }, cancellationToken);
             Volatile.Write(ref _active, bridge);
             var id = bridge.Id;
-            var resumed = setup.ResumeId is not null;
+            // A fork answers like session/new: the branch has its own new id.
+            var resumed = setup.ResumeId is not null && !setup.Fork;
             return new JsonRpcReply(
                 writer =>
                 {
@@ -216,7 +238,8 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             ResumeTarget: setup.ResumeId,
             Trust: SessionTrustCheck.Prompt,
             PersistSelection: true,
-            AdditionalRoots: setup.AdditionalRoots);
+            AdditionalRoots: setup.AdditionalRoots,
+            Fork: setup.Fork);
         var trust = _features.Forms ? new LaunchTrustPrompt(_connection, requestId) : null;
         var prepared = await SessionLauncher.PrepareAsync(request, trust, chooser: null, cancellationToken);
         if (prepared.Launch is not { } launch)
@@ -243,8 +266,9 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             await _options.Diagnostics.WriteLineAsync(note);
         }
 
-        // A resumed session keeps the ACP id the client knows it by.
-        var bridge = new BridgeSession(_connection, _features, setup.ResumeId);
+        // A resumed session keeps the ACP id the client knows it by; a fork
+        // takes the new engine id.
+        var bridge = new BridgeSession(_connection, _features, setup.Fork ? null : setup.ResumeId);
         CodingSession session;
         try
         {
@@ -433,6 +457,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             throw JsonRpcException.InvalidParams("prompt has no content.");
         }
 
+        var text = PromptContent.TrustAttached(content.Text, bridge.TakeAttached);
         foreach (var warning in content.Warnings)
         {
             bridge.Updates.Warn(warning);
@@ -441,7 +466,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         // A $/cancel_request for this prompt cancels its turn like session/cancel;
         // the request still waits for the turn to end before it answers.
         using var cancel = cancellationToken.Register(bridge.Cancel);
-        var command = SessionCommand.TryParse(content.Text.Trim(), out _);
+        var command = SessionCommand.TryParse(text.Trim(), out _);
         var clears = bridge.Turns.Clears;
         var before = bridge.Turns.Started;
         var busy = bridge.Session!.TurnActive;
@@ -451,7 +476,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         SessionInputResult result;
         try
         {
-            result = await runner.SubmitAsync(content.Text, origin);
+            result = await runner.SubmitAsync(text, origin);
         }
         catch (InvalidOperationException)
         {

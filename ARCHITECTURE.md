@@ -195,9 +195,9 @@ hands off to `CrystalBridge.RunAsync`. The protocol and its phases are in
 | Folder | Owns |
 | :--- | :--- |
 | `Transport` | `JsonRpcConnection` (one reader, one ordered writer, concurrent requests, `$/cancel_request` both ways, parse and batch errors), the error codes, `JsonRpcException`, and request field readers |
-| `Hosting` | `CrystalBridge` (the public entry), `BridgeOptions`, `BridgeAgent` (`initialize`, `session/new`, `load`, `resume`, `list`, `prompt`, `cancel`, `set_mode`, `set_config_option`, `close`), `BridgeSession` (the live `CodingSession`, `SessionRunner`, the front-end contracts as forms, held updates, the ACP id that survives `/clear`), `LaunchTrustPrompt` (trust before a session exists), `SessionSetup`, and `TurnTracker` (which engine turn a prompt waits for, faults, clears) |
+| `Hosting` | `CrystalBridge` (the public entry), `BridgeOptions`, `BridgeAgent` (`initialize`, `session/new`, `load`, `resume`, `fork`, `list`, `prompt`, `cancel`, `set_mode`, `set_config_option`, `close`), `BridgeSession` (the live `CodingSession`, `SessionRunner`, the front-end contracts as forms, held updates, the ACP id that survives `/clear`, the `SessionState` behind `_crystal/snapshot`, child approval routing), `Extensions` (every `_crystal/*` method), `ReportCapture` (structured values for report requests), `ClientFeatures`, `LaunchTrustPrompt` (trust before a session exists), `SessionSetup`, and `TurnTracker` (which engine turn a prompt waits for, faults, clears) |
 | `Prompts` | `PromptContent`: content blocks to submitted text, image attachment through the engine, file image links through `TryAttachImageFile`, and mention lines |
-| `Wire` | `SessionUpdates` (events to `session/update`, archive replay, with the mapped and deliberately unmapped lists), `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` (config options and legacy modes from `SessionOptionsChanged`), `FormWire` (elicitation forms and answers), `McpServerWire` (client MCP servers as session definitions), `SessionList` |
+| `Wire` | `SessionUpdates` (events to `session/update` and `_crystal/*` notifications, compaction updates, archive replay, with the mapped, notified, and deliberately unmapped lists), `ChildUpdates` (subagent sessions for a client that opts in, the parent `task` call otherwise), `CrystalWire` (extension values with the server's field names), `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` (config options and legacy modes from `SessionOptionsChanged`), `FormWire` (elicitation forms and answers), `McpServerWire` (client MCP servers as session definitions), `SessionList` |
 
 ### CrystalCode.Bridge.Tests
 
@@ -2322,9 +2322,10 @@ contract ([docs/bridge.md](docs/bridge.md)), not an engine protocol. It uses
 prompt only for a client with forms, `SessionLaunchRequest.AdditionalRoots`,
 `SessionFrontEnd.McpServers`, `SessionRunner`, event origins per prompt,
 `ToolCallSummary` and `ToolFileChanges` for tool titles and diffs, the
-`SessionOptionsChanged` catalog for config options, and the engine's
-plain-text report renderers, and maps every event to ACP itself. Phases 1 to
-3 are in this build; phase 4 is high priority.
+`SessionOptionsChanged` catalog for config options, the engine's
+plain-text report renderers, `CompactionStarted` and `CompactionFinished`,
+`SessionLaunchRequest.Fork`, and its own `SessionState`, and maps every event
+to ACP or a `_crystal/*` notification itself.
 
 A front end may pass MCP servers for one session through
 `SessionFrontEnd.McpServers`. They use `McpServerSource.Session`, are merged

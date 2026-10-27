@@ -81,11 +81,18 @@ public sealed class BridgeParityTests
             .ToArray();
 
         var unmapped = events
-            .Where(static type => !SessionUpdates.Mapped.Contains(type) && !SessionUpdates.Unmapped.ContainsKey(type))
+            .Where(static type => !SessionUpdates.Mapped.Contains(type)
+                && !SessionUpdates.Notified.Contains(type)
+                && !SessionUpdates.Unmapped.ContainsKey(type))
             .Select(static type => type.Name)
             .ToArray();
         Assert.True(unmapped.Length == 0, "Unmapped session events: " + string.Join(", ", unmapped));
         Assert.Empty(SessionUpdates.Mapped.Intersect(SessionUpdates.Unmapped.Keys));
+        Assert.Empty(SessionUpdates.Notified.Intersect(SessionUpdates.Mapped));
+        // Only the turn boundary and the client's own prompt stay unsent.
+        Assert.Equal(
+            [typeof(TurnFinished), typeof(TurnStarted), typeof(UserMessageSent)],
+            SessionUpdates.Unmapped.Keys.OrderBy(static type => type.Name, StringComparer.Ordinal));
     }
 
     [Fact]

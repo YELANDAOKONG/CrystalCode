@@ -245,10 +245,14 @@ modes with refusal while busy, available commands, usage, session info,
 reports, the question, trust, and resume forms with and without form
 support, editor MCP servers without leaking their values, additional roots,
 error codes, launch and trust refusals, stdin closing, protocol-only stdout,
+compaction with and without `session.compaction`, fork, children and child
+approvals with and without the subagents opt-in, the `_crystal/*` methods,
+no `_crystal/*` notification without the opt-in,
 the parity guards, the secret-leak test, and the dependency guard.
 `ToolFileChanges`, session MCP servers, additional roots,
-`TryAttachImageFile`, the option catalog, and `HelpText` and `StatsText` are
-tested in CrystalCode.Engine.Tests.
+`TryAttachImageFile`, the option catalog, `HelpText` and `StatsText`, the
+compaction events, and the fork launch are tested in
+CrystalCode.Engine.Tests.
 Token resolution, `crystal server --help`, `crystal bridge --help`, and
 Bridge console rebinding are tested in CrystalCode.Tests. Frame,
 composer, and paint behavior is tested in CrystalCode.Display.Tests.

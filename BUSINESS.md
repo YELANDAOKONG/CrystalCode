@@ -177,9 +177,16 @@ separate library with no terminal code. The product can:
   it supports them. Approval, trust, the workspace fence, and
   `ToolInvocationPolicy` are unchanged; without forms an untrusted directory
   is refused with instructions, not trusted silently. Bridge never calls the
-  editor's file system or terminal. Children, compaction updates, fork, and
-  `_crystal/*` extensions are a later phase of the same front end. See
-  [docs/bridge.md](docs/bridge.md);
+  editor's file system or terminal. Child Agents appear as progress on the
+  parent `task` call, or as subagent sessions for an editor that opts in;
+  child approvals reach the editor under the parent session unless it does.
+  Compaction appears as ACP compaction updates for an editor that supports
+  them. A saved session can be forked into a new one without changing the
+  source. Every other session capability (snapshot, recall, the queue, modes,
+  verbose output, images, quick prompts, side questions, children, export,
+  compaction, and structured reports) is a `_crystal/*` request, and live
+  state that ACP has no update for is a `_crystal/*` notification sent only
+  to an editor that opts in. See [docs/bridge.md](docs/bridge.md);
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model and its thinking gear, service tier, and speed,
@@ -472,15 +479,6 @@ implemented in the current build.
   and platform coverage are not defined. Do not reserve a package name, tap,
   formula, image, or repository. Release artifacts and install scripts remain
   the install path until a specific change defines otherwise.
-- The rest of the Agent Client Protocol (ACP) front end, Bridge
-  (`crystal bridge`, `CrystalCode.Bridge`). Phases 1 to 3 are in this build;
-  children and subagents, compaction updates, fork, and `_crystal/*`
-  extensions are phase 4 in [docs/bridge.md](docs/bridge.md). It stays a
-  front end that implements
-  `SessionFrontEnd`, not an engine protocol, not `crystal server`, and not
-  child Agents. ACP does not speak MCP itself; editor-supplied MCP servers
-  use the same MCP client as local servers. Do not bypass approval, trust,
-  or the tool boundary.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
   one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags
@@ -592,11 +590,11 @@ implemented in the current build.
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
-`audioInput` or `videoInput` declaration is not that path. TODO: finish ACP
-(Bridge) only as the front end described in docs/bridge.md. Do not put that
-protocol in the engine and do not bypass approval, trust, or the tool
-boundary. ACP does not speak MCP itself. Editor-supplied MCP servers use the
-same MCP client as local servers.
+`audioInput` or `videoInput` declaration is not that path. ACP (Bridge)
+stays the front end described in docs/bridge.md. Do not put that protocol in
+the engine and do not bypass approval, trust, or the tool boundary. ACP does
+not speak MCP itself. Editor-supplied MCP servers use the same MCP client as
+local servers.
 
 TODO: add workspace-level configuration only after its field scope, precedence,
 write policy, and trust semantics are defined; a repository-controlled file

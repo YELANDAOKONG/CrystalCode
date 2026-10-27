@@ -257,6 +257,31 @@ public sealed class CodingSessionContextTests
             headless.Observer.Events.OfType<NoteWritten>(),
             note => note.Text == "Compaction cancelled");
         Assert.False(headless.Session.TurnActive);
+        var started = Assert.Single(headless.Observer.Events.OfType<CompactionStarted>());
+        var finished = Assert.Single(headless.Observer.Events.OfType<CompactionFinished>());
+        Assert.Equal(started.Id, finished.Id);
+        Assert.Equal("cancelled", finished.Status);
+        Assert.Null(finished.Summary);
+    }
+
+    [Fact]
+    public async Task Compaction_PublishesStartedAndFinishedWithOneId()
+    {
+        var client = new GatedSummaryClient();
+        using var headless = await OpenReadyToCompactAsync(client);
+        var compacting = headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        var started = Assert.Single(headless.Observer.Events.OfType<CompactionStarted>());
+        Assert.Empty(headless.Observer.Events.OfType<CompactionFinished>());
+
+        client.Release();
+        await Finish(compacting);
+
+        var finished = Assert.Single(headless.Observer.Events.OfType<CompactionFinished>());
+        Assert.True(started.Manual);
+        Assert.StartsWith("compaction-", started.Id, StringComparison.Ordinal);
+        Assert.Equal(started.Id, finished.Id);
+        Assert.Equal("completed", finished.Status);
     }
 
     [Fact]

@@ -3,6 +3,9 @@ using System.Text.Json;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Bridge.Wire;
 
@@ -42,6 +45,53 @@ internal static class PermissionWire
         writer.WriteString("status", "pending");
         ToolCallWire.Describe(writer, call, workspaceRoot);
         writer.WriteEndObject();
+        Rest(writer, classification, review, extendedReview, null);
+    }
+
+    /// <summary>
+    /// A child's approval in plain ACP, where no child session id is sent: the
+    /// parent session's <c>task</c> call, titled with the child label, with the
+    /// child's own call in <c>_meta.crystal</c>.
+    /// </summary>
+    public static void ChildRequest(
+        Utf8JsonWriter writer,
+        string sessionId,
+        ChildSessionDocument child,
+        ToolCall call,
+        ToolClassification classification,
+        ApprovalReviewVerdict? review,
+        ApprovalReviewVerdict? extendedReview)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(child);
+        ArgumentNullException.ThrowIfNull(call);
+        ArgumentNullException.ThrowIfNull(classification);
+        writer.WriteStartObject();
+        writer.WriteString("sessionId", sessionId);
+        writer.WriteStartObject("toolCall");
+        writer.WriteString("toolCallId", child.ParentCallId.Length > 0 ? child.ParentCallId : child.Id + "/" + call.CallId);
+        writer.WriteString("title", "Child " + child.Label + ": " + ToolCallSummary.Text(call.Name, call.Arguments));
+        writer.WriteString("kind", ToolCallWire.Kind(call));
+        writer.WriteEndObject();
+        Rest(writer, classification, review, extendedReview, writer =>
+        {
+            writer.WriteStartObject("child");
+            writer.WriteString("childSessionId", child.Id);
+            writer.WriteString("agent", child.Agent);
+            writer.WriteString("label", child.Label);
+            writer.WriteString("toolCallId", call.CallId);
+            writer.WriteString("name", call.Name);
+            writer.WriteEndObject();
+        });
+    }
+
+    private static void Rest(
+        Utf8JsonWriter writer,
+        ToolClassification classification,
+        ApprovalReviewVerdict? review,
+        ApprovalReviewVerdict? extendedReview,
+        Action<Utf8JsonWriter>? crystal)
+    {
         writer.WriteStartArray("options");
         Option(writer, Once, "Allow once", "allow_once");
         if (classification.AllowsReusableGrant)
@@ -60,6 +110,7 @@ internal static class PermissionWire
         writer.WriteBoolean("requirePrompt", classification.RequirePrompt);
         Verdict(writer, "review", review);
         Verdict(writer, "extendedReview", extendedReview);
+        crystal?.Invoke(writer);
         writer.WriteEndObject();
         writer.WriteEndObject();
         writer.WriteEndObject();

@@ -1,10 +1,9 @@
 # crystal bridge
 
-Status: phases 1, 2, and 3 are in this build (see Phases and Scope in this
+Status: all four phases are in this build (see Phases and Scope in this
 build). `crystal bridge`, `CrystalCode.Bridge`, and `CrystalCode.Bridge.Tests`
-exist. Phase 4 is high-priority product work and is not in this build; the
-rest of this document defines the behavior and ownership it must follow.
-The item leaves High priority in TODO.md when phase 4 lands.
+exist. Manual checks against Zed and the ACP Test Compatibility Kit are still
+open.
 
 Bridge is the Agent Client Protocol (ACP) front end. An editor such as Zed,
 or any other ACP client, starts `crystal bridge` as a subprocess and drives
@@ -52,12 +51,13 @@ never opts in sees plain ACP.
 | `/cd <path>`, `/space`, and `/access` inside a session | `cwd` is immutable and additional roots have no mid-session mutation | The slash commands still work. The change is reported in `session_info_update._meta.crystal` (`workspace`, `additionalDirectories`). A client that relies on a fixed `cwd` can avoid them; `session/list` reports the current values. | `crystal.mutableWorkspace: true` |
 | Session fork | Not in the stable schema: no `session/fork` method and no `sessionCapabilities.fork`; only the session fork RFD | `_crystal/session/fork` is the extension method. `session/fork` is also answered with the RFD's request and result shape for clients that implement the RFD. `sessionCapabilities.fork` is not sent. | `crystal.fork: "rfd"` |
 | Subagent sessions | Not in the stable schema: `ClientSessionCapabilities` has only `compaction`, `configOptions`, and `notices`, and there is no `subagent_update` variant; only the subagent sessions RFD | Read from `clientCapabilities._meta.crystal.subagents: {}`. Only then does Bridge send `subagent_update` on the parent and child traffic (`session/update`, `session/request_permission`, `elicitation/create`) under child session ids, in the RFD's shapes. A root `clientCapabilities.subagents` is not read, because the RFD may still change. | `crystal.subagents: "rfd"` |
+| `_crystal/*` notifications | ACP allows extension notifications; a client may ignore them | Sent only after `clientCapabilities._meta.crystal.extensions: {}`. `_crystal/*` requests are answered without it, because only a client that knows them sends them. | `crystal.eventKinds` |
 
 ## Projects and ownership
 
 | Project | Owns |
 | :--- | :--- |
-| `CrystalCode.Bridge` | `Transport` (newline-delimited JSON-RPC 2.0 over streams, request ids, `$/cancel_request`, error codes), `Wire` (every field written explicitly with `Utf8JsonWriter`: `SessionUpdates` maps `SessionEvent` and Crystal stream events to `session/update` and replays the archive; `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` for config options and legacy modes, `FormWire` for elicitation forms, `McpServerWire` for client MCP servers, `SessionList`), `Prompts` (content blocks to submitted text), and `Hosting` (`CrystalBridge` entry, `BridgeAgent` methods, `BridgeSession` with the live `CodingSession`, `SessionRunner`, front-end contracts, and turn tracking; `LaunchTrustPrompt` for trust before a session exists). Phase 4 adds `Extensions` (`_crystal/*` methods). References `CrystalCode.Engine` only. |
+| `CrystalCode.Bridge` | `Transport` (newline-delimited JSON-RPC 2.0 over streams, request ids, `$/cancel_request`, error codes), `Wire` (every field written explicitly with `Utf8JsonWriter`: `SessionUpdates` maps `SessionEvent` and Crystal stream events to `session/update` and `_crystal/*` notifications and replays the archive; `ChildUpdates` for children; `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` for config options and legacy modes, `FormWire` for elicitation forms, `McpServerWire` for client MCP servers, `SessionList`, `CrystalWire` for extension values with the server's field names), `Prompts` (content blocks to submitted text), and `Hosting` (`CrystalBridge` entry, `BridgeAgent` methods, `BridgeSession` with the live `CodingSession`, `SessionRunner`, front-end contracts, and turn tracking; `LaunchTrustPrompt` for trust before a session exists; `Extensions` for `_crystal/*` methods and `ReportCapture` for their report results). References `CrystalCode.Engine` only. |
 | `CrystalCode.Bridge.Tests` | An in-memory duplex stream driven by a scripted model, the parity guards, the secret-leak test, and the dependency guard. |
 | `CrystalCode` | `Commands/BridgeCommand` parses the command line, rebinds console output, maps signals, and hands the raw stdin and stdout streams to `CrystalCode.Bridge`. |
 
@@ -130,8 +130,7 @@ crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
 
 ## Initialization
 
-`initialize` returns, once every phase is in (phase 4 adds the
-`extensions`, `eventKinds`, `fork`, and `subagents` entries):
+`initialize` returns:
 
 ```json
 {
@@ -154,9 +153,7 @@ crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
 }
 ```
 
-This build sends everything above except the phase 4 entries:
-`_meta.crystal` holds `extensions: []`, `loadAcrossCwd`, and
-`mutableWorkspace`. `agentInfo.version` is the first 12 characters of the
+`agentInfo.version` is the first 12 characters of the
 product commit, or `dev` for a build without one. `protocolVersion` is
 always 1, whatever the client sent.
 
@@ -169,7 +166,8 @@ always 1, whatever the client sent.
   the change that adopts it moves it to the spec field and updates this
   document.
 - `_meta.crystal.extensions` lists every `_crystal/*` method this build
-  answers. It follows the build and carries no version.
+  answers, and `eventKinds` every `_crystal/*` notification. Both follow the
+  build and carry no version.
 - `authenticate` and `logout` are not advertised. Credentials stay in
   `credentials.json` and the environment. A session request with no usable
   credential fails with `-32603`, `kind` `launch_refused`, and the launcher's
@@ -184,6 +182,7 @@ Client capabilities Bridge reads:
 | `session.compaction` | Compaction becomes `compaction_update` and `compaction_summary_chunk`. Without it, a displayed summary becomes agent text. |
 | `session.configOptions.boolean` | Switches are sent as boolean options. Without it they are two-value selects. |
 | `_meta.crystal.subagents` (not ACP) | Child sessions are exposed as restricted sessions in the subagent RFD shapes. Without it, child progress goes into the parent `task` tool call and child prompts use the parent session id. See Deviations. |
+| `_meta.crystal.extensions` (not ACP) | `_crystal/*` notifications are sent. Without it none are. See Deviations. |
 | `fs`, `terminal`, `auth.terminal` | Read and ignored. |
 
 ## Sessions
@@ -255,15 +254,15 @@ keeps CrystalCode's narrowing rules, because a narrowing rule is not a root:
 `session/load` streams the archive in order before it responds:
 `user_message_chunk` for user text and images, `agent_thought_chunk` for
 readable reasoning, `agent_message_chunk` for assistant text, `tool_call` and
-`tool_call_update` (final status and content) for each call and result, a
-completed `compaction_update` with its summary for each archived
-`## Earlier context` block, and a final `plan`, `usage_update`,
+`tool_call_update` (final status and content) for each call and result, for
+each archived `## Earlier context` block a completed `compaction_update`
+with its summary when the client has `session.compaction` and otherwise
+`agent_message_chunk` with `_meta.crystal.replay = "compaction"`, and a final
+`plan`, `usage_update`,
 `available_commands_update`, and `config_option_update`. Opaque reasoning
 state is never sent. Notices are not replayed.
 
-Until compaction updates land (phase 4), an archived summary is replayed as
-`agent_message_chunk` with `_meta.crystal.replay = "compaction"`. A replayed
-image block carries the bytes from `TryGetImage`; an image the session no
+A replayed image block carries the bytes from `TryGetImage`; an image the session no
 longer holds is replayed as its plain `[Image #N]` text. `session/resume`
 sends none of this, and a `/resume` inside a session replays as `load` does.
 
@@ -358,28 +357,31 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `SlashCommandsChanged` | `available_commands_update` |
 | `SessionOptionsChanged` | `config_option_update` with the complete list, and `current_mode_update` when the mode changed |
 | `SessionStarted`, `ChromeChanged`, `PreferencesChanged` | nothing of their own: the engine publishes `SessionOptionsChanged` for every value they change |
-| `StatusFieldsChanged` | `_crystal/chrome` with the full plain values (phase 4) |
+| `SessionStarted`, `ChromeChanged` | also `_crystal/chrome` with the full plain chrome |
+| `PreferencesChanged` | also `_crystal/preferences` |
+| `StatusFieldsChanged` | `_crystal/statusFields` |
 | `ActivityChanged` | `_crystal/activity` (loading tools, loading plugins, compacting, waiting for model) |
 | `QueueChanged` | `_crystal/queue` |
 | `NoteWritten`, `ErrorWritten` | `notice` info or error |
-| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`). Structured values follow in phase 4 |
+| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`), and `_crystal/report` with the kind and the structured values |
 | `SideQuestionSnapshot` | `_crystal/side` notification; never conversation content |
 | `HistoryReplayed` | the replay sequence above |
 | `ConversationCleared` | `session_info_update` with the new `_meta.crystal.engineSessionId` |
 | `TurnFinished` (in the prompt response) | `session_info_update` with the saved `title` and `updatedAt` |
 | `PromptHistoryLoaded`, `ImageHistoryInvalidated` | `_crystal/promptHistory`, `_crystal/imagesInvalidated` |
 | `ChildSessionChanged`, `ChildEventReceived` | see Children |
-| `ChildViewRequested` | `_crystal/childView` to the requester |
-| compaction start, summary, end | `compaction_update` `in_progress`, `compaction_summary_chunk` or `summary`, `completed` or `failed` |
+| `ChildViewRequested` | `_crystal/childView` |
+| `CompactionStarted`, `CompactionFinished` | with `session.compaction`: `compaction_update` `in_progress`, then `compaction_summary_chunk` when a summary is shown, then `compaction_update` `completed`, `failed`, or `cancelled` (`unchanged` is sent as `completed` with `_meta.crystal.status`). Without it, a shown summary is `agent_message_chunk` whose `messageId` is the compaction id; the engine notes still arrive as notices |
 | `TurnStarted`, `TurnFinished` | `_meta` on the first and last update; the prompt response |
 
 `_crystal/*` notifications use the `params.sessionId` envelope of
-`session/update` and are ignored by clients that do not know them.
+`session/update` and are sent only to a client with
+`_meta.crystal.extensions`.
 
 ## Tool calls
 
-- `toolCallId` is the model's call id. Child calls are prefixed with the
-  child id so ids stay unique on the connection.
+- `toolCallId` is the model's call id. Child calls appear only under their
+  child session id, so ids stay unique per session (see Children).
 - `name` is the model-facing tool name.
 - `title` is the same one-line summary the terminal shows (moved into the
   engine; see Engine changes).
@@ -427,7 +429,8 @@ tool call (title, kind, locations, diff content, `rawInput`) and options:
 - `session` and `always` are offered only when
   `ToolClassification.AllowsReusableGrant` is true, as on the server.
 - `_meta.crystal` carries risk, authority, the host summary, `requirePrompt`,
-  the primary and extended review verdicts, and the child label.
+  the primary and extended review verdicts, and for a child call without
+  subagent sessions `child` (see Children).
 - `cancelled`, an unknown option, or a closed connection is Deny.
 - Classification, forced prompts, Full, review, and extended review are
   unchanged. Bridge never answers a permission itself.
@@ -490,8 +493,8 @@ a slash command.
 `available_commands_update` lists every completable verb from
 `SlashCommandsChanged`, including plugin and MCP prompt commands, with the
 engine help text. Verbs that take arguments get `input.hint` built from the
-first argument keys. `_meta.crystal.arguments` with the full
-`SlashCompletion` tree is phase 4. Every
+first argument keys, and `_meta.crystal.arguments` carries the full
+`SlashCompletion` tree. Every
 `SessionVerb` is reachable by typing it. `/quit` closes the session as
 `session/close` does. `/cd <path>` and `/space` move the session and are
 reported through `session_info_update._meta.crystal.workspace`.
@@ -517,37 +520,50 @@ any of its traffic. `ChildEventReceived` events are sent under the child
 session id with the same mapping. `state` follows the child status. No
 child capability is advertised: the engine does not accept input for a
 child, and parent cancellation stops all children. Child approvals and
-forms are sent under the child session id and keep their child label.
+forms are sent under the child session id and keep their child label; the
+child's call is announced in the child session before its permission.
 
 Without it, which is plain ACP: no `subagent_update` and no child session id
 is ever sent. The parent `task` tool call carries the child's status, model
 calls, tool calls, and its latest text as `tool_call_update` content. Child
 approvals and forms use the parent session id and the parent `task` call's
 `toolCallId`, with the child label in the title and
-`_meta.crystal.child`. `_crystal/children` returns the full records either
-way.
+`_meta.crystal.child` (`childSessionId`, `agent`, `label`, and the child's
+own `toolCallId` and `name`). `_crystal/children/*` returns the full records
+either way.
+
+Approval prompts carry no child id, so Bridge records which child issued
+each call from that child's `ToolCallsIssued` and forgets it on the result.
+Children cannot use the `question` tool, so child forms are only MCP
+elicitation.
 
 ## Extensions
 
 All are requests on the active session unless noted. Results are explicit
-JSON.
+JSON with the server's field names. An unknown `_crystal/*` method is
+`-32601`; an engine refusal is `-32603` with `command_refused`.
 
 | Method | Engine |
 | :--- | :--- |
-| `_crystal/snapshot` | `SessionState` snapshot (the same fields as `GET /snapshot`) |
+| `_crystal/snapshot` | `SessionState` snapshot (the same fields as `GET /snapshot`, without pending interactions) |
 | `_crystal/session/fork` | Fork a saved session (see Sessions) |
-| `_crystal/recall` | `TryRecall`; returns the draft or `recalled: false` |
+| `_crystal/recall` | `TryRecall`; returns `recalled`, and the draft follows as `_crystal/recalled` |
 | `_crystal/queue/release` | empty input release |
-| `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode`, `TogglePlan` |
-| `_crystal/verbose` | `SetVerbose` |
-| `_crystal/draft` | `NotifyDraftChanged` |
-| `_crystal/image/attach`, `_crystal/image/get` | `TryAttachImage`, `TryGetImage` |
-| `_crystal/quickPrompts/list`, `_crystal/quickPrompts/send` | the F6 catalog, `SubmitQuickPromptAsync` |
-| `_crystal/side/ask`, `_crystal/side/cancel`, `_crystal/side/clear` | `/btw`, `TryCancelSideQuestion`, `ClearSideQuestions` |
-| `_crystal/children/list`, `_crystal/children/get` | child summaries, archive, usage, todos |
-| `_crystal/export` | `TryExport` markdown or json, with `system` |
-| `_crystal/compact` | `/compact` or `/compact full` |
-| `_crystal/status`, `_crystal/stats`, `_crystal/tools` | structured report values |
+| `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode`, `TogglePlan`; returns `mode` and `planMode` |
+| `_crystal/verbose {target, enabled}` | `SetVerbose` |
+| `_crystal/draft {text}` | `NotifyDraftChanged` |
+| `_crystal/image/attach {data}`, `_crystal/image/get {number}` | `TryAttachImage`, `TryGetImage` |
+| `_crystal/quickPrompts/list`, `_crystal/quickPrompts/send {name}` | the F6 catalog, `SubmitQuickPromptAsync` |
+| `_crystal/side/ask {question}`, `_crystal/side/cancel`, `_crystal/side/clear` | `/btw`, `TryCancelSideQuestion`, `ClearSideQuestions` |
+| `_crystal/children/list`, `_crystal/children/get {childSessionId}` | child summaries; one record with archive, usage, and todos |
+| `_crystal/export {format, system}` | `TryExport` markdown or json; returns `fileName`, `mediaType`, `text` |
+| `_crystal/compact {full}` | `/compact` or `/compact full` |
+| `_crystal/status {full}`, `_crystal/stats {scope}`, `_crystal/tools` | the command, answered with the structured report values |
+
+A client cannot type the invisible marker prefix, so a prompt names an image
+from `_crystal/image/attach` as its plain `[Image #N]`. Bridge turns that
+text into the trusted marker once, and only for a number attached that way
+and not yet used. Any other `[Image #N]` stays plain text.
 
 Every new public `CodingSession` member must be mapped here or in a standard
 method, or listed as an exclusion; the parity tests enforce it.
@@ -597,11 +613,15 @@ Each is front-end neutral, public, plain data, and usable by
 3. Saved sessions: `SessionStore.List` is reachable from a front end with a
    workspace filter, `SessionStore.TrySummarize(id)` reads one summary, and
    resume-by-id uses `SessionLaunchRequest.ResumeTarget` without a chooser
-   (done). `TryForkSaved(id)` is phase 4.
-4. Compaction events: a `CompactionStarted` and `CompactionFinished` pair
-   with id, manual or automatic, status, and the displayable summary when the
-   operator settings show it. Today the summary reaches front ends only as a
-   note (`CodingSession.cs:5685` writes `Compacted context`).
+   (done). Fork (done): `SessionLaunchRequest.Fork` with a `ResumeTarget`
+   opens a `SessionFork` copy under a new id; `SessionLaunch.Forked` makes
+   the new session seed directory rules as a new session does and save at
+   once. The source file is not changed.
+4. Compaction events (done): `CompactionStarted(Id, Manual)` and
+   `CompactionFinished(Id, Status, Summary)`, with ids `compaction-N`,
+   status `completed`, `unchanged`, `failed`, or `cancelled`, and the summary
+   only when the operator settings show it. `crystal server` sends them as
+   `compaction.started` and `compaction.finished`.
 5. Option catalogs (done): `SessionOptionsChanged` carries `SessionOption`
    records (id, name, category, current value, switch flag) with
    `SessionOptionValue` entries that each name the slash command selecting
@@ -655,14 +675,16 @@ a scripted model:
   their `kind`; unknown session ids are `-32002`;
 - every config option, refusal while busy, and the complete list in the
   response;
-- slash commands, reports, notices, compaction, plans, usage, queue,
-  follow-up prompts;
+- slash commands, reports, notices, compaction with and without
+  `session.compaction`, plans, usage, queue, follow-up prompts;
 - children with and without `_meta.crystal.subagents`: without it no
   `subagent_update` and no child session id appears on the wire, and child
-  approvals use the parent session id; a root `clientCapabilities.subagents`
+  approvals use the parent session id and `task` call; with it child
+  approvals use the child session id; a root `clientCapabilities.subagents`
   alone does not enable it; `initialize` never sends
   `sessionCapabilities.fork` or any other non-schema field outside `_meta`;
-- every `_crystal/*` method;
+- `_crystal/*` methods, and no `_crystal/*` notification without
+  `_meta.crystal.extensions`;
 - stdout carries only protocol lines even when a plugin writes to the
   console;
 - parity: every public `CodingSession` member, `SessionFrontEnd` contract,
@@ -679,16 +701,18 @@ Manual checks: the ACP Test Compatibility Kit and Zed.
 
 ## Phases
 
-1. In this build. Transport, initialize, new, prompt, cancel, close,
+1. Transport, initialize, new, prompt, cancel, close,
    `/clear` id handling, message and thought chunks, tool call lifecycle
    with titles, kinds, locations, and diffs, permission, plans, stop
    reasons, stdout discipline, parity skeleton.
-2. In this build. Load with replay, resume, list, config
+2. Load with replay, resume, list, config
    options and modes, available commands, plans, usage, notices, reports.
-3. In this build. Session MCP servers, additional directories, `file://` image links,
+3. Session MCP servers, additional directories, `file://` image links,
    forms for question, MCP elicitation, trust, and choices.
 4. Children and subagents, compaction updates, fork, every `_crystal/*`
-   method, and the documentation move out of High priority.
+   method and notification.
+
+All four are in this build.
 
 ### Scope in this build
 
@@ -707,7 +731,9 @@ Manual checks: the ACP Test Compatibility Kit and Zed.
 - `session/load` and `session/resume` keep the requested id as the ACP id.
 - Notes and retries are notices only for a client with `session.notices`;
   an error without notices is agent message text.
-- Phase 4 events (`StatusFieldsChanged`, `ActivityChanged`, `QueueChanged`,
-  side questions, children, prompt history, recall, image invalidation) are
-  listed in `SessionUpdates.Unmapped` with their phase, and the parity test
-  keeps that list complete.
+- Every `SessionEvent` is in `SessionUpdates.Mapped` (a `session/update`)
+  or `SessionUpdates.Notified` (a `_crystal/*` notification). Only
+  `UserMessageSent`, `TurnStarted`, and `TurnFinished` are in
+  `SessionUpdates.Unmapped`, with their reason; the parity test keeps the
+  lists complete and disjoint.
+- Fork answers with the new `sessionId`, and that id is the ACP id.

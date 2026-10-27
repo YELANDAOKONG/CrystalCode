@@ -166,7 +166,8 @@ public sealed class BridgeSessionTests
         var replay = lines
             .Select(static line => JsonDocument.Parse(line).RootElement)
             .TakeWhile(static message => message.TryGetProperty("method", out _))
-            .Where(static message => message.GetProperty("params").GetProperty("update").TryGetProperty("_meta", out var meta)
+            .Where(static message => message.GetProperty("params").TryGetProperty("update", out var update)
+                && update.TryGetProperty("_meta", out var meta)
                 && meta.GetProperty("crystal").GetProperty("event").GetString() == "HistoryReplayed")
             .Select(static message => message.GetProperty("params").GetProperty("update"))
             .ToArray();

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 using CrystalCode.Bridge.Transport;
 using CrystalCode.Engine.Sessions;
@@ -15,7 +16,7 @@ namespace CrystalCode.Bridge.Prompts;
 /// The invisible image marker prefix is removed from client text, so only an
 /// image attached here can produce a trusted marker.
 /// </summary>
-internal static class PromptContent
+internal static partial class PromptContent
 {
     private const int MaximumValueCharacters = 512;
 
@@ -223,6 +224,27 @@ internal static class PromptContent
 
     private static string Untrusted(string text) =>
         text.Replace(ImageMarkerText.Prefix.ToString(), string.Empty, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Clients cannot type the invisible marker prefix, so an image attached
+    /// by <c>_crystal/image/attach</c> is referenced as its plain
+    /// <c>[Image #N]</c>. That plain text becomes the trusted marker only for
+    /// a number <paramref name="take"/> accepts, which is a number attached
+    /// that way and not yet used, so typed text cannot name another image.
+    /// </summary>
+    public static string TrustAttached(string text, Func<int, bool> take)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(take);
+        return PlainMarker().Replace(text, match =>
+            int.TryParse(match.Groups[1].ValueSpan, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number)
+            && take(number)
+                ? ImageMarkerText.Tag(number)
+                : match.Value);
+    }
+
+    [GeneratedRegex(@"(?<!\u2063)\[Image #([0-9]{1,9})\]")]
+    private static partial Regex PlainMarker();
 
     /// <summary>A <c>file://</c> URI with no remote host and an absolute local path.</summary>
     private static bool TryLocalPath(string uri, out string path)

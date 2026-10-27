@@ -59,8 +59,12 @@ internal sealed class ScriptedModel : IStreamingChatClient, IPlugin, IChatClient
             : EnumerateAsync([new ChatTextDelta(0, 0, ChatRole.Assistant, "ok"), new ChatCandidateCompleted(0, Crystal.FinishReason.Stop)], cancellationToken);
     }
 
+    /// <summary>Compaction and side questions complete without streaming; they answer with <see cref="Summary"/>.</summary>
     public Task<ChatResponse> CompleteAsync(ChatRequest request, CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("The session streams.");
+        Task.FromResult(new ChatResponse(
+            [new ChatCandidate([new ChatMessage(ChatRole.Assistant, Summary)], Crystal.FinishReason.Stop)]));
+
+    public string Summary { get; init; } = "Summary of earlier work.";
 
     /// <summary>The text of the last user message the model was sent.</summary>
     public string LastUserText()

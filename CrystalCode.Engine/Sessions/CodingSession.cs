@@ -974,6 +974,7 @@ public sealed class CodingSession : ITurnObserver
     private ExternalCatalog _external = ExternalCatalog.Empty;
     private McpCatalog _mcp = McpCatalog.Empty;
     private IReadOnlyList<SessionOption>? _publishedOptions;
+    private int _compactions;
     private readonly object _mcpGate = new();
     private readonly HashSet<string> _mcpChanged = new(StringComparer.Ordinal);
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
@@ -1049,7 +1050,8 @@ public sealed class CodingSession : ITurnObserver
         SessionDocument? resume,
         HarnessSettings? persistedSettings,
         IReadOnlyList<DirectoryAccess>? launchAccess,
-        IReadOnlyList<DirectoryAccess>? additionalRoots)
+        IReadOnlyList<DirectoryAccess>? additionalRoots,
+        bool forked)
     {
         ArgumentNullException.ThrowIfNull(frontEnd);
         ArgumentNullException.ThrowIfNull(frontEnd.Trust);
@@ -1118,14 +1120,20 @@ public sealed class CodingSession : ITurnObserver
         {
             ApplyLaunchAccess(launchAccess);
         }
-        else if (resume is null && additionalRoots is null)
+        else if ((resume is null || forked) && additionalRoots is null)
         {
             SeedWorkspaceDefaults();
         }
 
         if (additionalRoots is not null)
         {
-            ReplaceOutsideRoots(additionalRoots, seedDefaults: resume is null && launchAccess is not { Count: > 0 });
+            ReplaceOutsideRoots(additionalRoots, seedDefaults: (resume is null || forked) && launchAccess is not { Count: > 0 });
+        }
+
+        if (forked)
+        {
+            // The branch exists on disk at once, as /fork saves it.
+            SaveSession();
         }
     }
 
@@ -1140,7 +1148,8 @@ public sealed class CodingSession : ITurnObserver
         SessionDocument? resume = null,
         HarnessSettings? persistedSettings = null,
         IReadOnlyList<DirectoryAccess>? launchAccess = null,
-        IReadOnlyList<DirectoryAccess>? additionalRoots = null)
+        IReadOnlyList<DirectoryAccess>? additionalRoots = null,
+        bool forked = false)
     {
         if (resume is not null && !DirectoryAccessPolicy.TryValidateSaved(resume.Access, out var error))
         {
@@ -1158,7 +1167,8 @@ public sealed class CodingSession : ITurnObserver
             resume,
             persistedSettings,
             launchAccess,
-            additionalRoots);
+            additionalRoots,
+            forked);
     }
 
     /// <summary>
@@ -5723,6 +5733,8 @@ public sealed class CodingSession : ITurnObserver
         _compactSource = compactSource;
         _compacting = true;
         CloseRecallWindow();
+        var compactionId = "compaction-" + Interlocked.Increment(ref _compactions).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Publish(new CompactionStarted(compactionId, manual));
         try
         {
             Note("Compacting context...");
@@ -5734,6 +5746,16 @@ public sealed class CodingSession : ITurnObserver
                 CurrentLimits(),
                 compactSource.Token,
                 scope);
+        }
+        catch (OperationCanceledException)
+        {
+            Publish(new CompactionFinished(compactionId, "cancelled", null));
+            throw;
+        }
+        catch
+        {
+            Publish(new CompactionFinished(compactionId, "failed", null));
+            throw;
         }
         finally
         {
@@ -5777,6 +5799,7 @@ public sealed class CodingSession : ITurnObserver
             }
 
             Note("Compacted context");
+            Publish(new CompactionFinished(compactionId, "completed", printSummary ? outcome.Summary : null));
             if (printSummary)
             {
                 Note(outcome.Summary!);
@@ -5787,10 +5810,12 @@ public sealed class CodingSession : ITurnObserver
 
         if (outcome.Kind == CompactionKind.Exhausted)
         {
+            Publish(new CompactionFinished(compactionId, "failed", null));
             Error("Session is too large to compact.");
             return outcome;
         }
 
+        Publish(new CompactionFinished(compactionId, "unchanged", null));
         if (!silentSkip)
         {
             Note("Nothing earlier to compact");

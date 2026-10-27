@@ -194,7 +194,7 @@ public sealed class BridgeProtocolTests
 
         await fixture.WriteLineAsync("{not json");
         await fixture.WriteLineAsync("""[{"jsonrpc":"2.0","id":99,"method":"initialize"}]""");
-        var unknown = await fixture.RequestAsync("session/fork", new { sessionId = id });
+        var unknown = await fixture.RequestAsync("session/delete", new { sessionId = id });
         var other = await fixture.RequestAsync("session/prompt", new { sessionId = "nope", prompt = new[] { new { type = "text", text = "hi" } } });
         var audio = await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new object[] { new { type = "audio", data = "AA==", mimeType = "audio/wav" } } });
         var empty = await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = Array.Empty<object>() });

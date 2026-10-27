@@ -116,6 +116,29 @@ public sealed class SessionLauncherTests
     }
 
     [Fact]
+    public async Task Fork_OpensABranchUnderANewIdAndLeavesTheSourceAlone()
+    {
+        using var fixture = new LaunchFixture();
+        fixture.Trust();
+        var id = fixture.SaveSession();
+        var store = new SessionStore(fixture.Home.Home);
+        var before = File.ReadAllBytes(Path.Combine(fixture.Home.Home.SessionsDirectory, id + ".json"));
+
+        var result = await SessionLauncher.PrepareAsync(
+            fixture.Request() with { Resume = true, ResumeTarget = id, Fork = true },
+            null,
+            null,
+            CancellationToken.None);
+
+        var launch = Assert.IsType<SessionLaunch>(result.Launch);
+        Assert.True(launch.Forked);
+        Assert.NotEqual(id, launch.Resume?.Id);
+        Assert.Equal("hello", Assert.Single(launch.Resume!.Items).Text);
+        Assert.Equal(before, File.ReadAllBytes(Path.Combine(fixture.Home.Home.SessionsDirectory, id + ".json")));
+        Assert.True(store.TryLoad(id, out _));
+    }
+
+    [Fact]
     public async Task Resume_DeclinedChoiceStopsTheLaunch()
     {
         using var fixture = new LaunchFixture();

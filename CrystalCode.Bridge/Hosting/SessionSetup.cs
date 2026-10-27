@@ -9,9 +9,14 @@ namespace CrystalCode.Bridge.Hosting;
 /// <param name="AdditionalRoots">The complete additional-root list; empty means none.</param>
 /// <param name="ResumeId">The saved session to restore, or null for a new one.</param>
 /// <param name="Replay">Stream the archive before the response, as <c>session/load</c> does.</param>
+/// <param name="Fork">
+/// Branch a new session from <paramref name="ResumeId"/>, as
+/// <c>session/fork</c> does; the saved session is not changed.
+/// </param>
 internal sealed record SessionSetup(
     string? Cwd,
     IReadOnlyList<Engine.Mcp.McpServerDefinition> McpServers,
     IReadOnlyList<string> AdditionalRoots,
     string? ResumeId = null,
-    bool Replay = false);
+    bool Replay = false,
+    bool Fork = false);

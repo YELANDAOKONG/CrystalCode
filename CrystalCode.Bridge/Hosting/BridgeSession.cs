@@ -25,12 +25,16 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     private readonly JsonRpcConnection _connection;
     private readonly ClientFeatures _features;
     private readonly object _gate = new();
-    private readonly List<Action<Utf8JsonWriter>> _held = [];
+    private readonly List<Action> _held = [];
+    private readonly SessionState _state = new();
     private readonly Dictionary<int, int> _waiting = [];
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
+    private readonly HashSet<int> _attached = [];
     private readonly CancellationTokenSource _stop = new();
     private string? _workspace;
     private SessionStore? _store;
+    private QuickPromptStore? _quickPrompts;
+    private ReportCapture? _capture;
     private bool _ready;
     private int _cancelThrough;
     private int _queued;
@@ -49,7 +53,19 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             () => Volatile.Read(ref _workspace),
             features.Notices,
             features.BooleanOptions,
-            Image);
+            Image,
+            features.Compaction,
+            SendCrystal);
+        Children = new ChildUpdates(
+            SendTo,
+            child => new SessionUpdates(
+                update => SendTo(child, update),
+                () => Volatile.Read(ref _workspace),
+                features.Notices,
+                features.BooleanOptions,
+                Image,
+                features.Compaction),
+            features.Subagents);
     }
 
     /// <summary>
@@ -66,6 +82,17 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
 
     public SessionUpdates Updates { get; }
 
+    public ChildUpdates Children { get; }
+
+    /// <summary>The reducer behind <c>_crystal/snapshot</c>, fed every event.</summary>
+    public SessionSnapshot Snapshot()
+    {
+        lock (_state)
+        {
+            return _state.Snapshot();
+        }
+    }
+
     public Task Running { get; private set; } = Task.CompletedTask;
 
     /// <summary>The live workspace root, from the launch and then from chrome.</summary>
@@ -81,6 +108,7 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         ArgumentNullException.ThrowIfNull(home);
         Session = session;
         _store = new SessionStore(home);
+        _quickPrompts = new QuickPromptStore(home);
         if (Id.Length == 0)
         {
             Id = session.SessionId;
@@ -100,6 +128,35 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         {
             Updates.Saved(summary.Preview);
         }
+    }
+
+    /// <summary>The F6 catalog in Home, for <c>_crystal/quickPrompts/*</c>.</summary>
+    public QuickPromptStore QuickPrompts => _quickPrompts!;
+
+    /// <summary>Records an image from <c>_crystal/image/attach</c> that a prompt may name as plain text.</summary>
+    public void Attached(int number)
+    {
+        lock (_gate)
+        {
+            _attached.Add(number);
+        }
+    }
+
+    /// <summary>Takes an attached number once; see <see cref="PromptContent.TrustAttached"/>.</summary>
+    public bool TakeAttached(int number)
+    {
+        lock (_gate)
+        {
+            return _attached.Remove(number);
+        }
+    }
+
+    /// <summary>Captures the structured values of the next report of <paramref name="kind"/>.</summary>
+    public ReportCapture CaptureReport(string kind)
+    {
+        var capture = new ReportCapture(kind, done => Interlocked.CompareExchange(ref _capture, null, done));
+        Volatile.Write(ref _capture, capture);
+        return capture;
     }
 
     /// <summary>True for the ACP id or the current engine id.</summary>
@@ -130,7 +187,7 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     /// <summary>The client has the session id; send what was held.</summary>
     public void Release()
     {
-        Action<Utf8JsonWriter>[] held;
+        Action[] held;
         lock (_gate)
         {
             _ready = true;
@@ -138,9 +195,9 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             _held.Clear();
         }
 
-        foreach (var update in held)
+        foreach (var notify in held)
         {
-            Notify(update);
+            notify();
         }
     }
 
@@ -266,6 +323,12 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             case ConversationCleared or HistoryReplayed:
                 // /clear and /resume discard queued follow-ups.
                 Turns.OnCleared();
+                lock (_gate)
+                {
+                    // The engine drops its images with the conversation.
+                    _attached.Clear();
+                }
+
                 if (Session is { } current)
                 {
                     Updates.EngineSessionId = current.SessionId;
@@ -282,8 +345,20 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
                 break;
         }
 
+        Volatile.Read(ref _capture)?.Accept(sessionEvent);
         if (sessionEvent is HistoryReplayed && Volatile.Read(ref _dropReplay))
         {
+            return;
+        }
+
+        lock (_state)
+        {
+            _state.Apply(sessionEvent);
+        }
+
+        if (sessionEvent is ChildSessionChanged or ChildEventReceived)
+        {
+            Children.Apply(sessionEvent, Id);
             return;
         }
 
@@ -299,16 +374,35 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     {
         ArgumentNullException.ThrowIfNull(call);
         ArgumentNullException.ThrowIfNull(classification);
-        Updates.EnsureAnnounced(call);
         var reusable = classification.AllowsReusableGrant;
         var workspace = Workspace;
+        Action<Utf8JsonWriter> request;
+        if (Children.TryFind(call, out var child, out var childUpdates))
+        {
+            if (childUpdates is not null)
+            {
+                // Subagent sessions: the child's own call, under the child session id.
+                childUpdates.EnsureAnnounced(call);
+                request = writer => PermissionWire.Request(writer, child.Id, call, classification, review, extendedReview, workspace);
+            }
+            else
+            {
+                // Plain ACP: the parent session and its task call.
+                var parent = Id;
+                request = writer => PermissionWire.ChildRequest(writer, parent, child, call, classification, review, extendedReview);
+            }
+        }
+        else
+        {
+            Updates.EnsureAnnounced(call);
+            var parent = Id;
+            request = writer => PermissionWire.Request(writer, parent, call, classification, review, extendedReview, workspace);
+        }
+
         JsonElement response;
         try
         {
-            response = await _connection.RequestAsync(
-                "session/request_permission",
-                writer => PermissionWire.Request(writer, Id, call, classification, review, extendedReview, workspace),
-                cancellationToken);
+            response = await _connection.RequestAsync("session/request_permission", request, cancellationToken);
         }
         catch (JsonRpcException)
         {
@@ -441,28 +535,53 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             : null;
 
     private void Send(Action<Utf8JsonWriter> update)
+        => SendTo(null, update);
+
+    /// <summary>
+    /// Sends one update under <paramref name="sessionId"/>, or the ACP id when
+    /// null. Updates are held, in order, until the client has the session id.
+    /// </summary>
+    private void SendTo(string? sessionId, Action<Utf8JsonWriter> update) =>
+        Enqueue(() => _connection.Notify("session/update", writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteString("sessionId", sessionId ?? Id);
+            writer.WritePropertyName("update");
+            update(writer);
+            writer.WriteEndObject();
+        }));
+
+    /// <summary>A <c>_crystal/*</c> notification in the <c>session/update</c> envelope.</summary>
+    private void SendCrystal(string method, Action<Utf8JsonWriter> fields)
+    {
+        if (!_features.Extensions)
+        {
+            // A client that never opted in sees plain ACP.
+            return;
+        }
+
+        Enqueue(() => _connection.Notify(method, writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteString("sessionId", Id);
+            fields(writer);
+            writer.WriteEndObject();
+        }));
+    }
+
+    private void Enqueue(Action notify)
     {
         lock (_gate)
         {
             if (!_ready)
             {
-                _held.Add(update);
+                _held.Add(notify);
                 return;
             }
         }
 
-        Notify(update);
+        notify();
     }
-
-    private void Notify(Action<Utf8JsonWriter> update) =>
-        _connection.Notify("session/update", writer =>
-        {
-            writer.WriteStartObject();
-            writer.WriteString("sessionId", Id);
-            writer.WritePropertyName("update");
-            update(writer);
-            writer.WriteEndObject();
-        });
 
     private void Release(int number)
     {

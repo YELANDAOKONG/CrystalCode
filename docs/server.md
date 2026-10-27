@@ -271,6 +271,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `RetryScheduled`, `UsageChanged`, `ContextEstimated` | `retry.scheduled`, `usage.changed`, `context.estimated` |
 | `QueueChanged`, `TodosChanged` | `queue.changed`, `todos.changed` |
 | `HistoryReplayed`, `ConversationCleared` | `conversation.replayed`, `conversation.cleared` |
+| `CompactionStarted`, `CompactionFinished` | `compaction.started` (`id`, `manual`), `compaction.finished` (`id`, `status`: `completed`, `unchanged`, `failed`, or `cancelled`; `summary` when the summary display setting shows it) |
 | `NoteWritten`, `ErrorWritten` | `note`, `error` |
 | `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | `report.help`, `report.status`, `report.stats`, `report.tools`, `report.todos` |
 | `SideQuestionSnapshot` | `side.changed` |

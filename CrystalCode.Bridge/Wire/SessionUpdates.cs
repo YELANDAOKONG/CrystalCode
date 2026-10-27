@@ -15,9 +15,10 @@ namespace CrystalCode.Bridge.Wire;
 /// <summary>
 /// Maps engine events onto ACP <c>session/update</c> notifications. Every
 /// update carries <c>_meta.crystal.event</c> with the engine event name.
-/// Events with no ACP shape yet are listed in <see cref="Unmapped"/> with the
-/// phase that adds them, so the parity test can tell a deliberate gap from a
-/// forgotten one.
+/// Engine state with no ACP shape goes out as a <c>_crystal/*</c>
+/// notification; <see cref="Unmapped"/> lists the events that are neither,
+/// with the reason, so the parity test can tell a deliberate gap from a
+/// forgotten one. Child events go to <see cref="ChildUpdates"/>.
 /// </summary>
 internal sealed class SessionUpdates
 {
@@ -25,18 +26,8 @@ internal sealed class SessionUpdates
     public static IReadOnlyDictionary<Type, string> Unmapped { get; } = new Dictionary<Type, string>
     {
         [typeof(UserMessageSent)] = "The client shows the prompt it sent; session/load replays it from the archive",
-        [typeof(StatusFieldsChanged)] = "Phase 4: _crystal/chrome",
-        [typeof(PromptHistoryLoaded)] = "Phase 4: _crystal/promptHistory",
-        [typeof(ImageHistoryInvalidated)] = "Phase 4: _crystal/imagesInvalidated",
-        [typeof(ActivityChanged)] = "Phase 4: _crystal/activity",
-        [typeof(UserMessageRecalled)] = "Phase 4: _crystal/recalled",
         [typeof(TurnStarted)] = "Ends in the session/prompt response, not an update",
-        [typeof(TurnFinished)] = "Ends in the session/prompt response, not an update",
-        [typeof(QueueChanged)] = "Phase 4: _crystal/queue",
-        [typeof(SideQuestionSnapshot)] = "Phase 4: _crystal/side",
-        [typeof(ChildSessionChanged)] = "Phase 4: children",
-        [typeof(ChildEventReceived)] = "Phase 4: children",
-        [typeof(ChildViewRequested)] = "Phase 4: _crystal/childView"
+        [typeof(TurnFinished)] = "Ends in the session/prompt response, not an update"
     };
 
     /// <summary>Engine events Bridge sends as session updates.</summary>
@@ -65,7 +56,24 @@ internal sealed class SessionUpdates
         typeof(ToolsListed),
         typeof(TodosListed),
         typeof(NoteWritten),
-        typeof(ErrorWritten)
+        typeof(ErrorWritten),
+        typeof(CompactionStarted),
+        typeof(CompactionFinished),
+        typeof(ChildSessionChanged),
+        typeof(ChildEventReceived)
+    ];
+
+    /// <summary>Engine events Bridge sends only as <c>_crystal/*</c> notifications.</summary>
+    public static IReadOnlyList<Type> Notified { get; } =
+    [
+        typeof(StatusFieldsChanged),
+        typeof(PromptHistoryLoaded),
+        typeof(ImageHistoryInvalidated),
+        typeof(ActivityChanged),
+        typeof(UserMessageRecalled),
+        typeof(QueueChanged),
+        typeof(SideQuestionSnapshot),
+        typeof(ChildViewRequested)
     ];
 
     /// <summary>Every Crystal stream event, and what Bridge does with it.</summary>
@@ -83,6 +91,8 @@ internal sealed class SessionUpdates
     private readonly Func<string?> _workspace;
     private readonly bool _notices;
     private readonly bool _booleans;
+    private readonly bool _compaction;
+    private readonly Action<string, Action<Utf8JsonWriter>> _crystal;
     private readonly Func<int, (string MimeType, byte[] Data)?> _image;
     private readonly object _gate = new();
     private readonly HashSet<string> _announced = new(StringComparer.Ordinal);
@@ -100,12 +110,16 @@ internal sealed class SessionUpdates
     /// <param name="notices">The client advertised <c>session.notices</c>.</param>
     /// <param name="booleans">The client advertised boolean config options.</param>
     /// <param name="image">The MIME type and bytes of a session image, for replay.</param>
+    /// <param name="compaction">The client advertised <c>session.compaction</c>.</param>
+    /// <param name="crystal">Sends one <c>_crystal/*</c> notification: method, then its fields after <c>sessionId</c>.</param>
     public SessionUpdates(
         Action<Action<Utf8JsonWriter>> send,
         Func<string?> workspace,
         bool notices,
         bool booleans = false,
-        Func<int, (string MimeType, byte[] Data)?>? image = null)
+        Func<int, (string MimeType, byte[] Data)?>? image = null,
+        bool compaction = false,
+        Action<string, Action<Utf8JsonWriter>>? crystal = null)
     {
         ArgumentNullException.ThrowIfNull(send);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -113,6 +127,8 @@ internal sealed class SessionUpdates
         _workspace = workspace;
         _notices = notices;
         _booleans = booleans;
+        _compaction = compaction;
+        _crystal = crystal ?? (static (_, _) => { });
         _image = image ?? (static _ => null);
     }
 
@@ -162,14 +178,55 @@ internal sealed class SessionUpdates
                     break;
                 case SessionStarted started:
                     _reportedWorkspace = started.Chrome.WorkspaceRoot;
+                    Chrome(started.Chrome);
                     break;
                 case ChromeChanged changed when changed.Chrome.WorkspaceRoot != _reportedWorkspace:
                     // /cd and /space move the session; ACP's cwd is otherwise fixed.
                     _reportedWorkspace = changed.Chrome.WorkspaceRoot;
                     SessionInfo("ChromeChanged", title: null);
+                    Chrome(changed.Chrome);
                     break;
-                case ChromeChanged or PreferencesChanged:
-                    // The option catalog carries every other value these change.
+                case ChromeChanged changed:
+                    // The option catalog carries the values; this keeps the plain chrome.
+                    Chrome(changed.Chrome);
+                    break;
+                case PreferencesChanged preferences:
+                    _crystal("_crystal/preferences", writer => CrystalWire.Preferences(writer, "preferences", preferences.Preferences));
+                    break;
+                case StatusFieldsChanged fields:
+                    _crystal("_crystal/statusFields", writer => CrystalWire.StatusFields(writer, "fields", fields.Fields));
+                    break;
+                case PromptHistoryLoaded history:
+                    _crystal("_crystal/promptHistory", writer => CrystalWire.Strings(writer, "entries", history.Entries));
+                    break;
+                case ImageHistoryInvalidated:
+                    _crystal("_crystal/imagesInvalidated", static _ => { });
+                    break;
+                case ActivityChanged activity:
+                    _crystal("_crystal/activity", writer => writer.WriteString("activity", CrystalWire.ActivityName(activity.Activity)));
+                    break;
+                case UserMessageRecalled recalled:
+                    // The draft keeps trusted markers so the client can submit it again as is.
+                    _crystal("_crystal/recalled", writer =>
+                    {
+                        CrystalWire.Text(writer, "text", recalled.Text);
+                        writer.WriteString("draft", recalled.Text);
+                    });
+                    break;
+                case QueueChanged queue:
+                    _crystal("_crystal/queue", writer => CrystalWire.Strings(writer, "items", queue.Items.Select(ImageMarkerText.Display)));
+                    break;
+                case SideQuestionSnapshot side:
+                    _crystal("_crystal/side", writer => CrystalWire.Side(writer, "side", side));
+                    break;
+                case ChildViewRequested view:
+                    _crystal("_crystal/childView", writer => CrystalWire.Optional(writer, "childSessionId", view.ChildSessionId));
+                    break;
+                case CompactionStarted started:
+                    CompactionStart(started);
+                    break;
+                case CompactionFinished finished:
+                    CompactionEnd(finished);
                     break;
                 case StreamReceived stream:
                     Stream(stream.StreamEvent);
@@ -236,19 +293,27 @@ internal sealed class SessionUpdates
                     SessionInfo("ConversationCleared", title: null);
                     break;
                 case HelpRequested help:
-                    Report("help", "HelpRequested", HelpText.Format(help.PluginCommands));
+                    Report("help", "HelpRequested", HelpText.Format(help.PluginCommands),
+                        writer => CrystalWire.Commands(writer, "plugins", help.PluginCommands));
                     break;
                 case StatusReported status:
-                    Report("status", "StatusReported", StatusText.Format(status.Status, status.Full));
+                    Report("status", "StatusReported", StatusText.Format(status.Status, status.Full), writer =>
+                    {
+                        writer.WriteBoolean("full", status.Full);
+                        CrystalWire.Status(writer, "status", status.Status);
+                    });
                     break;
                 case StatsReported stats:
-                    Report("stats", "StatsReported", StatsText.Format(stats.Report, stats.AllWorkspaces));
+                    Report("stats", "StatsReported", StatsText.Format(stats.Report, stats.AllWorkspaces),
+                        writer => CrystalWire.Stats(writer, "report", stats.Report, stats.AllWorkspaces));
                     break;
                 case ToolsListed tools:
-                    Report("tools", "ToolsListed", ToolListText.Format(tools.Report));
+                    Report("tools", "ToolsListed", ToolListText.Format(tools.Report),
+                        writer => CrystalWire.ToolCatalog(writer, "report", tools.Report));
                     break;
                 case TodosListed todos:
-                    Report("todos", "TodosListed", TodoList.Format(todos.Items));
+                    Report("todos", "TodosListed", TodoList.Format(todos.Items),
+                        writer => CrystalWire.Todos(writer, "items", todos.Items));
                     break;
                 case NoteWritten note:
                     Notice("info", note.Text, null, "NoteWritten");
@@ -356,7 +421,7 @@ internal sealed class SessionUpdates
             }
 
             writer.WriteEndArray();
-        });
+        }, crystal => CrystalWire.Commands(crystal, "arguments", commands));
     }
 
     private void Usage(UsageChanged usage)
@@ -405,8 +470,12 @@ internal sealed class SessionUpdates
         });
     }
 
-    /// <summary>A report is agent message text from the engine's plain-text renderer.</summary>
-    private void Report(string kind, string eventName, string text)
+    /// <summary>
+    /// A report is agent message text from the engine's plain-text renderer,
+    /// with the kind under <c>_meta.crystal.report</c>; <c>_crystal/report</c>
+    /// carries the structured values.
+    /// </summary>
+    private void Report(string kind, string eventName, string text, Action<Utf8JsonWriter>? values = null)
     {
         var id = "report-" + (++_reports).ToString(CultureInfo.InvariantCulture);
         Update("agent_message_chunk", eventName, writer =>
@@ -414,6 +483,68 @@ internal sealed class SessionUpdates
             TextContent(writer, text);
             writer.WriteString("messageId", id);
         }, crystal => crystal.WriteString("report", kind));
+        if (values is not null)
+        {
+            _crystal("_crystal/report", writer =>
+            {
+                writer.WriteString("kind", kind);
+                values(writer);
+            });
+        }
+    }
+
+    private void Chrome(SessionChrome chrome) =>
+        _crystal("_crystal/chrome", writer => CrystalWire.Chrome(writer, "chrome", chrome));
+
+    /// <summary>
+    /// With <c>session.compaction</c>, ACP's compaction entity. Without it a
+    /// shown summary becomes agent text, as the terminal prints it.
+    /// </summary>
+    private void CompactionStart(CompactionStarted started)
+    {
+        if (!_compaction)
+        {
+            return;
+        }
+
+        Update("compaction_update", "CompactionStarted", writer =>
+        {
+            writer.WriteString("compactionId", started.Id);
+            writer.WriteString("status", "in_progress");
+        }, crystal => crystal.WriteBoolean("manual", started.Manual));
+    }
+
+    private void CompactionEnd(CompactionFinished finished)
+    {
+        if (!_compaction)
+        {
+            if (finished.Summary is { Length: > 0 } shown)
+            {
+                Update("agent_message_chunk", "CompactionFinished", writer =>
+                {
+                    TextContent(writer, shown);
+                    writer.WriteString("messageId", finished.Id);
+                });
+            }
+
+            return;
+        }
+
+        if (finished.Summary is { Length: > 0 } summary)
+        {
+            Update("compaction_summary_chunk", "CompactionFinished", writer =>
+            {
+                writer.WriteString("compactionId", finished.Id);
+                TextContent(writer, summary);
+            });
+        }
+
+        // "unchanged" found nothing to fold: ACP's nearest status is completed.
+        Update("compaction_update", "CompactionFinished", writer =>
+        {
+            writer.WriteString("compactionId", finished.Id);
+            writer.WriteString("status", finished.Status == "unchanged" ? "completed" : finished.Status);
+        }, crystal => crystal.WriteString("status", finished.Status));
     }
 
     /// <summary>
@@ -433,6 +564,22 @@ internal sealed class SessionUpdates
             switch (item)
             {
                 case ChatMessage summary when CompactionSelection.IsSummary(summary):
+                    if (_compaction)
+                    {
+                        Update("compaction_update", "HistoryReplayed", writer =>
+                        {
+                            writer.WriteString("compactionId", id);
+                            writer.WriteString("status", "completed");
+                            writer.WriteStartArray("summary");
+                            writer.WriteStartObject();
+                            writer.WriteString("type", "text");
+                            writer.WriteString("text", summary.Text);
+                            writer.WriteEndObject();
+                            writer.WriteEndArray();
+                        });
+                        break;
+                    }
+
                     Update("agent_message_chunk", "HistoryReplayed", writer =>
                     {
                         TextContent(writer, summary.Text);
