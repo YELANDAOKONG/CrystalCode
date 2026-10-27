@@ -81,8 +81,7 @@ The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
 High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
 (MCP tools are in this build); the Agent Client Protocol (ACP), named Bridge (`crystal bridge`); and a refactor
 of `crystal run`. Medium priority, and not in this build: automatically
-fetching model-list information from a provider, a second additional review
-of the current product, a full code review, child Agent configuration, and provider-specific
+fetching model-list information from a provider, a full code review, child Agent configuration, and provider-specific
 custom-format tools such as OpenAI's `apply_patch`. An operating-system
 sandbox, audio and video input, non-text model output, editing provider
 definitions in the TUI,
