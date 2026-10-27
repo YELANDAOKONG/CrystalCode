@@ -15,6 +15,57 @@ Pending evaluation is not a priority. Whether to do those items is not
 decided. Do not fold one into a deferred, high-priority, or
 medium-priority item.
 
+Issues are separate from the buckets. An issue is a defect in current behavior
+that is tracked here until it is fixed. It is not a scope change and has no
+priority. A fix is not decided by being listed. Remove the entry in the change
+that fixes it.
+
+## Issues
+
+- Waiting .NET 11: a `bash` or `bash_start` command that asks for a password
+  breaks the terminal UI. Examples are `git push` over HTTPS or SSH, `ssh`,
+  and `sudo`. Stdin is already redirected and closed (ARCHITECTURE.md,
+  Background Bash tasks), but these programs open `/dev/tty` directly instead
+  of reading stdin. The child inherits the controlling terminal of the TUI
+  process, so its prompt and the operator's keystrokes bypass the TUI and
+  corrupt the screen. Confirmed on Unix only with a pty experiment: a child
+  can write to `/dev/tty`, and a child in a new session cannot. Not yet
+  checked: Windows behavior, such as Git Bash, Git Credential Manager, and
+  console-attached prompts.
+
+  The intended fix waits for .NET 11, where `ProcessStartInfo.StartDetached`
+  detaches the child without an external command. The project targets net10.0
+  today. Whether to ship an interim fix is not decided. Candidates are
+  environment variables for git and ssh (`GIT_TERMINAL_PROMPT`,
+  `GIT_ASKPASS`, `SSH_ASKPASS_REQUIRE`, `GCM_INTERACTIVE`), which cover only
+  those programs, and a note in the `bash` tool description. Any fix must work
+  on Windows, macOS, and Linux and must not add an external command
+  dependency.
+- Loading tools freezes the terminal UI. The operator reports that the whole
+  UI stops while `Loading Tools` is shown. Cause found by reading the code,
+  not yet measured: `TerminalHost.RunLoopAsync` awaits `CodingSession.StartAsync`
+  without the key pump, so no spinner, resize, or key handling runs during
+  startup. `ReloadExternalToolsWithProgress` also runs
+  `ExternalCatalog.Load` synchronously on the calling thread (directory scan,
+  assembly load, tool construction), so even a pumped caller would not get
+  control back before the load ends. MCP connection in the same startup path
+  is asynchronous but is not pumped either. The same synchronous reload runs
+  at `/tools approval`, `/tools on|off|reload`, tool set enable and disable,
+  `/plugins`, plugin enable and disable, and every workspace change (`/cd`,
+  `/space`, resume into another workspace). The `Ctrl+C` handler in
+  `RunLoopAsync` is registered after `StartAsync`, so an interrupt during
+  startup is not handled by it.
+
+  The fix is not decided. Constraints for it: the UI must keep painting and
+  must not turn keystrokes typed during loading into errors, queued turns, or
+  lost drafts; `CrystalCode.Engine` stays front-end neutral and reports
+  progress only through `SessionEvent`; `crystal server` and `crystal bridge`
+  start their runner after `StartAsync` and must keep their behavior. Candidate
+  direction: load the catalog off the calling thread with cancellation, pump
+  the terminal during `StartAsync`, and hold prompt submission while the
+  activity is `LoadingTools` or `LoadingPlugins` with the draft kept. Whether
+  the in-session reload paths are fixed in the same change is not decided.
+
 ## Deferred
 
 These are part of the product direction and are not in the current build.
