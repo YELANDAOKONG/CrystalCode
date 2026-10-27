@@ -224,9 +224,9 @@ internal sealed class SessionProjection : ISessionObserver
             return;
         }
 
-        _theme = name;
         if (Theme.TryUseBuiltIn(name))
         {
+            _theme = name;
             _renderer.RepaintTheme();
             return;
         }
@@ -238,6 +238,7 @@ internal sealed class SessionProjection : ISessionObserver
             return;
         }
 
+        _theme = name;
         _renderer.RepaintTheme();
     }
 
