@@ -148,9 +148,24 @@ internal sealed class McpConnection : IAsyncDisposable
         {
             var output = tail.Text();
             return McpConnectionResult.Failure(
-                $"MCP server '{definition.Name}' could not connect: {exception.Message}"
+                $"MCP server '{definition.Name}' could not connect: {HideEndpoint(exception.Message, definition)}"
                 + (output.Length == 0 ? string.Empty : $" Server output: {output}"));
         }
+    }
+
+    // Socket and DNS errors quote the host they tried. A session-supplied URL
+    // is a value the operator surfaces never show.
+    private static string HideEndpoint(string message, McpServerDefinition definition)
+    {
+        if (definition.Url is null || definition.Source != McpServerSource.Session)
+        {
+            return message;
+        }
+
+        var hidden = message.Replace(definition.Url, "<url>", StringComparison.OrdinalIgnoreCase);
+        return Uri.TryCreate(definition.Url, UriKind.Absolute, out var uri) && uri.Host.Length > 0
+            ? hidden.Replace(uri.Host, "<host>", StringComparison.OrdinalIgnoreCase)
+            : hidden;
     }
 
     /// <summary>
