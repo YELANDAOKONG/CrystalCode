@@ -23,25 +23,39 @@ namespace CrystalCode.Bridge.Hosting;
 internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPrompt, ISessionChooser, IWorkspaceTrustPrompt
 {
     private readonly JsonRpcConnection _connection;
+    private readonly ClientFeatures _features;
     private readonly object _gate = new();
     private readonly List<Action<Utf8JsonWriter>> _held = [];
     private readonly Dictionary<int, int> _waiting = [];
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _stop = new();
     private string? _workspace;
+    private SessionStore? _store;
     private bool _ready;
     private int _cancelThrough;
     private int _queued;
+    private string? _questionCall;
+    private bool _dropReplay;
 
-    public BridgeSession(JsonRpcConnection connection, ClientFeatures features)
+    public BridgeSession(JsonRpcConnection connection, ClientFeatures features, string? acpId = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(features);
         _connection = connection;
-        Updates = new SessionUpdates(Send, () => Volatile.Read(ref _workspace), features.Notices);
+        _features = features;
+        Id = acpId ?? string.Empty;
+        Updates = new SessionUpdates(
+            Send,
+            () => Volatile.Read(ref _workspace),
+            features.Notices,
+            features.BooleanOptions,
+            Image);
     }
 
-    /// <summary>The ACP session id. It stays fixed for the connection.</summary>
+    /// <summary>
+    /// The ACP session id: the engine id the session opened with. It stays
+    /// fixed through <c>/clear</c>, which gives the engine a new id.
+    /// </summary>
     public string Id { get; private set; } = string.Empty;
 
     public CodingSession? Session { get; private set; }
@@ -60,14 +74,38 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     /// <summary>Follow-ups waiting for the next turn, from the last queue report.</summary>
     public int Queued => Volatile.Read(ref _queued);
 
-    public void Bind(CodingSession session, string workspace)
+    public void Bind(CodingSession session, string workspace, CrystalHome home)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspace);
+        ArgumentNullException.ThrowIfNull(home);
         Session = session;
-        Id = session.SessionId;
+        _store = new SessionStore(home);
+        if (Id.Length == 0)
+        {
+            Id = session.SessionId;
+        }
+
+        Updates.EngineSessionId = session.SessionId;
         Volatile.Write(ref _workspace, workspace);
     }
+
+    /// <summary>
+    /// After a turn: <c>session_info_update</c> with the saved title (the
+    /// first user message, as <c>session/list</c> shows it) and the time.
+    /// </summary>
+    public void Saved()
+    {
+        if (Session is { } session && _store is { } store && store.TrySummarize(session.SessionId, out var summary))
+        {
+            Updates.Saved(summary.Preview);
+        }
+    }
+
+    /// <summary>True for the ACP id or the current engine id.</summary>
+    public bool Answers(string id) =>
+        string.Equals(id, Id, StringComparison.Ordinal)
+        || (Session is { } session && string.Equals(id, session.SessionId, StringComparison.Ordinal));
 
     /// <summary>Starts the input loop. Updates stay held until <see cref="Release"/>.</summary>
     public void Run(Action stopped)
@@ -119,6 +157,15 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
 
         return new Waiting(this, number);
     }
+
+    /// <summary>
+    /// <c>session/resume</c> restores without replay, but the engine replays
+    /// a resumed archive when it starts. Drop that one replay.
+    /// </summary>
+    public void DropStartReplay() => Volatile.Write(ref _dropReplay, true);
+
+    /// <summary>The start replay is over; a later <c>/resume</c> replays as usual.</summary>
+    public void EndStartReplay() => Volatile.Write(ref _dropReplay, false);
 
     /// <summary>
     /// <c>session/cancel</c>: interrupt the running turn, and every turn a
@@ -219,9 +266,25 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             case ConversationCleared or HistoryReplayed:
                 // /clear and /resume discard queued follow-ups.
                 Turns.OnCleared();
+                if (Session is { } current)
+                {
+                    Updates.EngineSessionId = current.SessionId;
+                }
+
+                break;
+            case ToolCallsIssued calls:
+                // The question tool asks through IUserPrompt without its call id.
+                Volatile.Write(
+                    ref _questionCall,
+                    calls.Calls.LastOrDefault(static call => call.Name == QuestionTool.ToolName)?.CallId);
                 break;
             default:
                 break;
+        }
+
+        if (sessionEvent is HistoryReplayed && Volatile.Read(ref _dropReplay))
+        {
+            return;
         }
 
         Updates.Apply(sessionEvent);
@@ -277,30 +340,105 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         ArgumentNullException.ThrowIfNull(call);
     }
 
-    /// <summary>Forms arrive in a later phase; until then the question is dismissed.</summary>
-    public ValueTask<QuestionResponse> AskAsync(
+    /// <summary>
+    /// The question tool and MCP elicitation as one <c>elicitation/create</c>
+    /// form. Without form support, or on anything but a valid accept, the
+    /// questions are dismissed and the model gets the dismissed result.
+    /// </summary>
+    public async ValueTask<QuestionResponse> AskAsync(
         IReadOnlyList<UserQuestion> questions,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(questions);
-        return ValueTask.FromResult(new QuestionResponse([], true));
+        var dismissed = new QuestionResponse([], true);
+        if (!_features.Forms || questions.Count == 0)
+        {
+            return dismissed;
+        }
+
+        var call = Volatile.Read(ref _questionCall);
+        var result = await AskFormAsync(writer => FormWire.Questions(writer, Id, call, questions), cancellationToken);
+        return result is { } value ? FormWire.Answers(value, questions) : dismissed;
     }
 
-    public Task<string?> ChooseAsync(
+    /// <summary><c>/resume</c> without an id, as a form; declined without forms.</summary>
+    public async Task<string?> ChooseAsync(
         IReadOnlyList<SessionSummary> sessions,
         string? currentId,
         bool listWorkspace,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sessions);
-        return Task.FromResult<string?>(null);
+        if (!_features.Forms || sessions.Count == 0)
+        {
+            return null;
+        }
+
+        var result = await AskFormAsync(writer => FormWire.Sessions(writer, Id, sessions, listWorkspace), cancellationToken);
+        return result is { } value ? FormWire.Chosen(value, sessions.Select(static session => session.Id)) : null;
     }
 
-    public ValueTask<bool> ConfirmAsync(WorkspaceTrustRequest request, CancellationToken cancellationToken)
+    /// <summary><c>/child</c> without an id, as a form; declined without forms.</summary>
+    public async Task<string?> ChooseChildAsync(IReadOnlyList<ChildSessionDocument> children, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(children);
+        if (!_features.Forms || children.Count == 0)
+        {
+            return null;
+        }
+
+        var result = await AskFormAsync(writer => FormWire.Children(writer, Id, children), cancellationToken);
+        return result is { } value ? FormWire.Chosen(value, children.Select(static child => child.Id)) : null;
+    }
+
+    /// <summary>
+    /// Trust inside a running session (<c>/cd</c>, <c>/resume</c> of another
+    /// workspace), as a form. Refused without forms.
+    /// </summary>
+    public async ValueTask<bool> ConfirmAsync(WorkspaceTrustRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ValueTask.FromResult(false);
+        if (!_features.Forms)
+        {
+            return false;
+        }
+
+        var result = await AskFormAsync(writer => FormWire.Trust(writer, Id, null, request), cancellationToken);
+        return result is { } value && FormWire.Trusted(value);
     }
+
+    /// <summary>The form result, or null when the client failed, closed, or the turn ended.</summary>
+    private async Task<JsonElement?> AskFormAsync(Action<Utf8JsonWriter> form, CancellationToken cancellationToken)
+    {
+        return await AskFormAsync(_connection, form, cancellationToken);
+    }
+
+    /// <inheritdoc cref="AskFormAsync(Action{Utf8JsonWriter}, CancellationToken)"/>
+    internal static async Task<JsonElement?> AskFormAsync(
+        JsonRpcConnection connection,
+        Action<Utf8JsonWriter> form,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await connection.RequestAsync("elicitation/create", form, cancellationToken);
+        }
+        catch (JsonRpcException)
+        {
+            return null;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    private (string MimeType, byte[] Data)? Image(int number) =>
+        Session is { } session
+        && session.TryGetImage(number, out var image)
+        && image is { Data: { } data }
+            ? (image.MimeType, data.ToArray())
+            : null;
 
     private void Send(Action<Utf8JsonWriter> update)
     {

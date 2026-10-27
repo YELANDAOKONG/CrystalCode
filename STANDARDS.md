@@ -236,13 +236,19 @@ scripted model: turns, events, reconnect, targeted replies, every interaction
 kind, recall, quick prompts, images, export, resume, shutdown, scopes,
 tickets, Host and Origin checks, the parity guards, and the secret-leak test.
 `crystal bridge` is tested in CrystalCode.Bridge.Tests over in-process pipes
-with a scripted model: initialize, new, prompts with every content block,
-streaming, cancel during streaming, a follow-up, and a pending permission,
-`$/cancel_request`, close, `/clear`, `/quit`, permission answers, diffs,
-plans, error codes, launch and trust refusals, ignored editor MCP servers,
-stdin closing, protocol-only stdout, the parity guards, the secret-leak
-test, and the dependency guard. `ToolFileChanges` is tested in
-CrystalCode.Engine.Tests.
+with a scripted model: initialize, new, load with replay, resume without
+replay, load into another `cwd`, list paging, prompts with every content
+block and file image links, streaming, cancel during streaming, a follow-up,
+and a pending permission, `$/cancel_request`, close, `/clear` keeping the ACP
+id, `/cd`, `/quit`, permission answers, diffs, plans, config options and
+modes with refusal while busy, available commands, usage, session info,
+reports, the question, trust, and resume forms with and without form
+support, editor MCP servers without leaking their values, additional roots,
+error codes, launch and trust refusals, stdin closing, protocol-only stdout,
+the parity guards, the secret-leak test, and the dependency guard.
+`ToolFileChanges`, session MCP servers, additional roots,
+`TryAttachImageFile`, the option catalog, and `HelpText` and `StatsText` are
+tested in CrystalCode.Engine.Tests.
 Token resolution, `crystal server --help`, `crystal bridge --help`, and
 Bridge console rebinding are tested in CrystalCode.Tests. Frame,
 composer, and paint behavior is tested in CrystalCode.Display.Tests.

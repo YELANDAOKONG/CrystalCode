@@ -78,17 +78,17 @@ behavior stands until a specific change defines otherwise.
   update behavior, and platform coverage are not defined. Do not reserve a
   package name, tap, formula, image, or repository.
 - MCP gaps. MCP tools, resources, prompts, elicitation, and roots are in this
-  build. Not in it: sampling, OAuth for remote servers, image and audio
-  results (they are named, not sent), servers passed in by a front end for one
-  session, and URL-mode elicitation. Do not bypass the existing plugin,
-  approval, and media boundaries.
+  build, and so are servers a front end passes in for one session. Not in it:
+  sampling, OAuth for remote servers, image and audio results (they are
+  named, not sent), and URL-mode elicitation. Do not bypass the existing
+  plugin, approval, and media boundaries.
 - The rest of the Agent Client Protocol (ACP) front end, Bridge
-  (`crystal bridge`, `CrystalCode.Bridge`). Phase 1 (transport, new, prompt,
-  cancel, close, streaming, tool calls with diffs, permission, plans, stop
-  reasons) is in this build. Phases 2 to 4 (load, resume, list, config
-  options, usage, reports, editor MCP servers, additional directories,
-  `file://` image links, forms, children, compaction updates, fork, and
-  `_crystal/*` extensions) are not. It is a front end that implements
+  (`crystal bridge`, `CrystalCode.Bridge`). Phases 1 to 3 (transport,
+  sessions with load, resume, and list, prompts, streaming, tool calls,
+  permission, config options, usage, reports, editor MCP servers, additional
+  directories, and forms) are in this build. Phase 4 (children and subagents,
+  compaction updates, fork, and `_crystal/*` extensions) is not. It is a
+  front end that implements
   `SessionFrontEnd`, not an engine protocol, not `crystal server`, and not
   child Agents. Do not bypass approval, trust, or the tool boundary.
   Editor-supplied MCP servers use the same MCP client as local servers. The

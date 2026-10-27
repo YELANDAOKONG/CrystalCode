@@ -195,9 +195,9 @@ hands off to `CrystalBridge.RunAsync`. The protocol and its phases are in
 | Folder | Owns |
 | :--- | :--- |
 | `Transport` | `JsonRpcConnection` (one reader, one ordered writer, concurrent requests, `$/cancel_request` both ways, parse and batch errors), the error codes, `JsonRpcException`, and request field readers |
-| `Hosting` | `CrystalBridge` (the public entry), `BridgeOptions`, `BridgeAgent` (`initialize`, `session/new`, `session/prompt`, `session/cancel`, `session/close`), `BridgeSession` (the live `CodingSession`, `SessionRunner`, the five front-end contracts, held updates), and `TurnTracker` (which engine turn a prompt waits for, faults, clears) |
-| `Prompts` | `PromptContent`: content blocks to submitted text, image attachment through the engine, and mention lines |
-| `Wire` | `SessionUpdates` (events to `session/update`, with the mapped and deliberately unmapped lists), `ToolCallWire`, `PermissionWire`, `TurnWire` |
+| `Hosting` | `CrystalBridge` (the public entry), `BridgeOptions`, `BridgeAgent` (`initialize`, `session/new`, `load`, `resume`, `list`, `prompt`, `cancel`, `set_mode`, `set_config_option`, `close`), `BridgeSession` (the live `CodingSession`, `SessionRunner`, the front-end contracts as forms, held updates, the ACP id that survives `/clear`), `LaunchTrustPrompt` (trust before a session exists), `SessionSetup`, and `TurnTracker` (which engine turn a prompt waits for, faults, clears) |
+| `Prompts` | `PromptContent`: content blocks to submitted text, image attachment through the engine, file image links through `TryAttachImageFile`, and mention lines |
+| `Wire` | `SessionUpdates` (events to `session/update`, archive replay, with the mapped and deliberately unmapped lists), `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` (config options and legacy modes from `SessionOptionsChanged`), `FormWire` (elicitation forms and answers), `McpServerWire` (client MCP servers as session definitions), `SessionList` |
 
 ### CrystalCode.Bridge.Tests
 
@@ -2174,6 +2174,8 @@ A front end supplies (`SessionFrontEnd`):
   one workspace or every workspace.
 - `Trust` (`IWorkspaceTrustPrompt`) asks whether to trust a directory.
   A front end that cannot ask returns false.
+- Optionally `ChooseChildAsync` for `/child` and `McpServers`, the MCP
+  servers it passes in for this session only.
 
 `CodingSession` wraps `Approvals` and `Questions` once, at construction, in
 `NotifyingApprovalPrompt` and `NotifyingUserPrompt`. Every engine path that
@@ -2194,8 +2196,9 @@ not notify. `crystal run` replaces the setting with off in memory.
 A front end prepares a session with `SessionLauncher.PrepareAsync`. It maps
 its own command line onto `SessionLaunchOptions` and passes a
 `SessionLaunchRequest` (working directory, workspace, operator space, resume
-target, trust check, and whether the launch provider and model may be saved
-by a later preference command). The launcher applies overrides in memory,
+target, trust check, whether the launch provider and model may be saved
+by a later preference command, and optional additional roots). The launcher
+applies overrides in memory,
 checks credentials, resolves the resume target, checks trust, and validates
 prompt attachments, directory rules, and the mode. It asks the operator only
 through the `IWorkspaceTrustPrompt` and `ISessionChooser` it receives; a null
@@ -2214,8 +2217,8 @@ returns true when the operator asked to quit), `CompleteTurnAsync` once
 `TryInterrupt`, `TryRecall`, `TogglePlan`, `CycleMode`, `TrySetMode`,
 `SetVerbose`, `NotifyDraftChanged`, `Enqueue`, `EnqueueAsync`,
 `SubmitQuickPromptAsync`, `PasteClipboardImageAsync`, `TryAttachImage`,
-`TryGetImage`, `TryExport`, `TryCancelSideQuestion`, `ClearSideQuestions`,
-`TrySetDirectoryAccess`, and `CloseAsync`. `TurnActive`, `TurnTask`,
+`TryAttachImageFile`, `TryGetImage`, `TryExport`, `TryCancelSideQuestion`,
+`ClearSideQuestions`, `TrySetDirectoryAccess`, and `CloseAsync`. `TurnActive`, `TurnTask`,
 `RecallPending`, `AgentsEnabled`, `PlanMode`, `CustomMode`, and `SessionId`
 report state. The usual turn is: `SubmitAsync`, await `TurnTask`, then
 `CompleteTurnAsync`.
@@ -2268,8 +2271,8 @@ this front end.
 Events are immutable sealed records, one type per file under `Events`:
 
 - Lifecycle and chrome: `SessionStarted`, `ChromeChanged`,
-  `PreferencesChanged`, `SlashCommandsChanged`, `PromptHistoryLoaded`,
-  `ImageHistoryInvalidated`, `ActivityChanged`.
+  `PreferencesChanged`, `SessionOptionsChanged`, `SlashCommandsChanged`,
+  `PromptHistoryLoaded`, `ImageHistoryInvalidated`, `ActivityChanged`.
 - Turn: `UserMessageSent`, `TurnStarted`, `StreamReceived` (carries Crystal's
   `ChatStreamEvent`), `ToolCallsIssued`, `ToolResultsReceived`,
   `ModelRoundClosed`, `RetryScheduled`, `UsageChanged`, `TurnFinished`,
@@ -2315,10 +2318,29 @@ CrystalCode.Engine.Tests is the smallest correct driver. A later Avalonia
 desktop front end uses C# markup and does not add XAML or AXAML files.
 `crystal bridge` is the Agent Client Protocol (ACP) front end on this
 contract ([docs/bridge.md](docs/bridge.md)), not an engine protocol. It uses
-`SessionLauncher` with `SessionTrustCheck.Prompt` and no trust prompt,
-`SessionRunner`, event origins per prompt, `ToolCallSummary` and
-`ToolFileChanges` for tool titles and diffs, and maps every event to ACP
-itself. Phase 1 is in this build; the later phases are high priority.
+`SessionLauncher` with `SessionTrustCheck.Prompt` and a form-backed trust
+prompt only for a client with forms, `SessionLaunchRequest.AdditionalRoots`,
+`SessionFrontEnd.McpServers`, `SessionRunner`, event origins per prompt,
+`ToolCallSummary` and `ToolFileChanges` for tool titles and diffs, the
+`SessionOptionsChanged` catalog for config options, and the engine's
+plain-text report renderers, and maps every event to ACP itself. Phases 1 to
+3 are in this build; phase 4 is high priority.
+
+A front end may pass MCP servers for one session through
+`SessionFrontEnd.McpServers`. They use `McpServerSource.Session`, are merged
+after Home and Project by name (`McpServerDiscovery.WithSession`), follow the
+Project approval choice, are not saved in the session file, and their values
+appear in no event or text. `SessionLaunchRequest.AdditionalRoots`, when not
+null, is the complete set of write roots outside the workspace: the new
+session drops saved and default outside rules and keeps read rules on or
+inside the workspace (a new session seeds those from `access.json`). Neither
+is written to `access.json`. `SessionOptionsChanged` carries the selectable
+session settings, each value naming the slash command that selects it; the
+session publishes it at start and whenever a value or its choices change, and
+not when nothing changed. `CodingSession.TryAttachImageFile` attaches an
+image file with `/attach`'s checks and returns the marker instead of writing
+a note. `HelpText` and `StatsText` render `/help` and `/stats` as plain text
+beside `StatusText` and `ToolListText`.
 `crystal server` is the HTTP front end on this contract
 ([docs/server.md](docs/server.md)). It uses `SessionLauncher`,
 `SessionRunner`, `SessionState`, and event origins, and maps every event to

@@ -1,9 +1,9 @@
 # crystal bridge
 
-Status: phase 1 is in this build (see Phases and Phase 1 scope).
-`crystal bridge`, `CrystalCode.Bridge`, and `CrystalCode.Bridge.Tests` exist.
-Phases 2 to 4 are high-priority product work and are not in this build; the
-rest of this document defines the behavior and ownership they must follow.
+Status: phases 1, 2, and 3 are in this build (see Phases and Scope in this
+build). `crystal bridge`, `CrystalCode.Bridge`, and `CrystalCode.Bridge.Tests`
+exist. Phase 4 is high-priority product work and is not in this build; the
+rest of this document defines the behavior and ownership it must follow.
 The item leaves High priority in TODO.md when phase 4 lands.
 
 Bridge is the Agent Client Protocol (ACP) front end. An editor such as Zed,
@@ -57,7 +57,7 @@ never opts in sees plain ACP.
 
 | Project | Owns |
 | :--- | :--- |
-| `CrystalCode.Bridge` | `Transport` (newline-delimited JSON-RPC 2.0 over streams, request ids, `$/cancel_request`, error codes), `Wire` (every field written explicitly with `Utf8JsonWriter`: `SessionUpdates` maps `SessionEvent` and Crystal stream events to `session/update`, `ToolCallWire`, `PermissionWire`, `TurnWire`), `Prompts` (content blocks to submitted text), and `Hosting` (`CrystalBridge` entry, `BridgeAgent` methods, `BridgeSession` with the live `CodingSession`, `SessionRunner`, front-end contracts, and turn tracking). Later phases add `Interactions` (elicitation), `Configuration` (config options and legacy modes), and `Extensions` (`_crystal/*` methods). References `CrystalCode.Engine` only. |
+| `CrystalCode.Bridge` | `Transport` (newline-delimited JSON-RPC 2.0 over streams, request ids, `$/cancel_request`, error codes), `Wire` (every field written explicitly with `Utf8JsonWriter`: `SessionUpdates` maps `SessionEvent` and Crystal stream events to `session/update` and replays the archive; `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` for config options and legacy modes, `FormWire` for elicitation forms, `McpServerWire` for client MCP servers, `SessionList`), `Prompts` (content blocks to submitted text), and `Hosting` (`CrystalBridge` entry, `BridgeAgent` methods, `BridgeSession` with the live `CodingSession`, `SessionRunner`, front-end contracts, and turn tracking; `LaunchTrustPrompt` for trust before a session exists). Phase 4 adds `Extensions` (`_crystal/*` methods). References `CrystalCode.Engine` only. |
 | `CrystalCode.Bridge.Tests` | An in-memory duplex stream driven by a scripted model, the parity guards, the secret-leak test, and the dependency guard. |
 | `CrystalCode` | `Commands/BridgeCommand` parses the command line, rebinds console output, maps signals, and hands the raw stdin and stdout streams to `CrystalCode.Bridge`. |
 
@@ -130,7 +130,8 @@ crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
 
 ## Initialization
 
-`initialize` returns, once every phase is in:
+`initialize` returns, once every phase is in (phase 4 adds the
+`extensions`, `eventKinds`, `fork`, and `subagents` entries):
 
 ```json
 {
@@ -153,13 +154,12 @@ crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
 }
 ```
 
-Phase 1 sends only what it implements: `loadSession: false`,
-`mcpCapabilities` `http` and `sse` false, `sessionCapabilities` with `close`
-only, and `_meta.crystal.extensions: []`. `agentInfo.version` is the first
-12 characters of the product commit, or `dev` for a build without one.
-`protocolVersion` is always 1, whatever the client sent.
+This build sends everything above except the phase 4 entries:
+`_meta.crystal` holds `extensions: []`, `loadAcrossCwd`, and
+`mutableWorkspace`. `agentInfo.version` is the first 12 characters of the
+product commit, or `dev` for a build without one. `protocolVersion` is
+always 1, whatever the client sent.
 
-- `agentInfo.version` is the short product commit from the build identity.
 - `image` and `embeddedContext` are always true. Bridge accepts every block
   it advertises and never fails a prompt because the current model cannot
   use one; see Prompt content. `audio` is false because the engine has no
@@ -191,12 +191,12 @@ Client capabilities Bridge reads:
 | ACP | Engine |
 | :--- | :--- |
 | `session/new {cwd, mcpServers, additionalDirectories}` | `SessionLauncher.PrepareAsync` with `Workspace = cwd`, then `CreateSession` and `StartAsync`. Returns `sessionId`, `configOptions`, and `modes`. |
-| `session/load {sessionId, cwd, ...}` | Prepare with `Resume = true`, `ResumeTarget = sessionId`. Replays the archive (see Replay), then returns `configOptions` and `modes`. |
-| `session/resume {sessionId, cwd, ...}` | Same restore without replay. |
+| `session/load {sessionId, cwd, ...}` | Prepare with `Resume = true`, `ResumeTarget = sessionId`. Replays the archive (see Replay), then returns `configOptions` and `modes`. An unknown saved session is `-32002`. |
+| `session/resume {sessionId, cwd, ...}` | Same restore without replay: the engine's start replay is dropped. |
 | `_crystal/session/fork {sessionId, cwd, ...}`, and RFD `session/fork` (not ACP) | `/fork <id>` semantics: a new id from that saved session, in `cwd`. The source file is not changed. |
 | `session/list {cwd, cursor}` | `SessionStore.List(workspaceRoot)`, newest first. `title` is the summary preview, `updatedAt` the update time, `additionalDirectories` the saved outside-workspace roots, `_meta.crystal` carries `mode`, `planMode`, `userTurns`, and `createdAt`. Pages of 50 with an opaque cursor; an invalid cursor is `-32602`. Omitting `cwd` lists every workspace. |
 | `session/close {sessionId}` | Interrupt, collect, `CloseAsync`. The process stays up for another `session/new`. |
-| `session/set_mode` | `TrySetMode`. |
+| `session/set_mode` | The `mode` option's `/mode <id>` command. A mode not offered is `-32602`. |
 | `session/set_config_option` | See Configuration. |
 | `session/cancel` | `TryInterrupt`; pending permission and elicitation requests for that turn are cancelled and treated as deny. |
 
@@ -260,6 +260,12 @@ completed `compaction_update` with its summary for each archived
 `## Earlier context` block, and a final `plan`, `usage_update`,
 `available_commands_update`, and `config_option_update`. Opaque reasoning
 state is never sent. Notices are not replayed.
+
+Until compaction updates land (phase 4), an archived summary is replayed as
+`agent_message_chunk` with `_meta.crystal.replay = "compaction"`. A replayed
+image block carries the bytes from `TryGetImage`; an image the session no
+longer holds is replayed as its plain `[Image #N]` text. `session/resume`
+sends none of this, and a `/resume` inside a session replays as `load` does.
 
 ## Prompt turn
 
@@ -350,14 +356,17 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `ToolResultsReceived` | `tool_call_update` `completed` or `failed` with content and `rawOutput` |
 | `TodosChanged` | `plan` |
 | `SlashCommandsChanged` | `available_commands_update` |
-| `ChromeChanged`, `PreferencesChanged`, `StatusFieldsChanged` | `config_option_update` and `current_mode_update` when values changed; `_crystal/chrome` with the full plain values |
+| `SessionOptionsChanged` | `config_option_update` with the complete list, and `current_mode_update` when the mode changed |
+| `SessionStarted`, `ChromeChanged`, `PreferencesChanged` | nothing of their own: the engine publishes `SessionOptionsChanged` for every value they change |
+| `StatusFieldsChanged` | `_crystal/chrome` with the full plain values (phase 4) |
 | `ActivityChanged` | `_crystal/activity` (loading tools, loading plugins, compacting, waiting for model) |
 | `QueueChanged` | `_crystal/queue` |
 | `NoteWritten`, `ErrorWritten` | `notice` info or error |
-| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | agent message text from the engine's plain-text report renderers, `_meta.crystal.report` with the kind and structured values |
+| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`). Structured values follow in phase 4 |
 | `SideQuestionSnapshot` | `_crystal/side` notification; never conversation content |
-| `HistoryReplayed`, `ConversationCleared` | the replay sequence above, or `_crystal/cleared` |
-| `SessionStarted` | `session_info_update` |
+| `HistoryReplayed` | the replay sequence above |
+| `ConversationCleared` | `session_info_update` with the new `_meta.crystal.engineSessionId` |
+| `TurnFinished` (in the prompt response) | `session_info_update` with the saved `title` and `updatedAt` |
 | `PromptHistoryLoaded`, `ImageHistoryInvalidated` | `_crystal/promptHistory`, `_crystal/imagesInvalidated` |
 | `ChildSessionChanged`, `ChildEventReceived` | see Children |
 | `ChildViewRequested` | `_crystal/childView` to the requester |
@@ -443,25 +452,32 @@ trust is refused with an error, and choices are declined; `/resume <id>` and
 
 ## Configuration
 
-`configOptions`, in this order. Every change runs through the matching slash
-command so validation, refusal while busy, and `config.json` writes match
-the terminal exactly. The response carries the complete list.
+`configOptions` come from the engine's option catalog (`SessionOptionsChanged`),
+in this order. Each value names the slash command that selects it, and
+`session/set_config_option` and `session/set_mode` run that command, so
+validation, refusal while busy (`-32603`, `command_refused`), and
+`config.json` writes match the terminal exactly. A value or option not offered
+is `-32602`. The response carries the complete list. `thinking`, `context`,
+`tier`, and `speed` appear only when the model offers a choice. A select
+lists only values with a command plus the current value; `tier` and `speed`
+can cycle back to unset but not name it, so unset is shown only while
+current. Values grouped by provider use ACP's grouped options.
 
 | id | category | Values | Command |
 | :--- | :--- | :--- | :--- |
-| `mode` | `mode` | Plan, Work, enabled custom modes | `TrySetMode` |
+| `mode` | `mode` | Plan, Work, enabled custom modes | `/mode` |
 | `model` | `model` | grouped by provider; value `provider/model` | `/model <provider> <model>` |
 | `thinking` | `thought_level` | the model's gears plus default and off when allowed | `/thinking` |
 | `context` | `model_config` | declared budgets | `/context` |
 | `tier` | `model_config` | declared tiers plus unset | `/tier` |
 | `speed` | `model_config` | declared speeds plus unset | `/speed` |
-| `approval` | `_crystal_approval` | plan, default, edit, review, audit, full | `/approval` |
+| `approval` | `_crystal_approval` | default, edit, review, audit, full | `/approval` |
 | `approval_model` | `_crystal_approval` | off plus catalog | `/approval model` |
 | `extended_approval` | `_crystal_approval` | off plus catalog | `/approval extended` |
 | `prompt_set` | `_crystal_prompt` | default plus sets | `/promptset` |
-| `agents` | `_crystal_agents` | boolean | `/agents on\|off` |
-| `micro_compaction` | `_crystal_compaction` | boolean | `/compact micro` |
-| `estimated_tokens` | `_crystal_display` | boolean | `/tokens` |
+| `agents` | `_crystal_agents` | switch | `/agents on\|off` |
+| `micro_compaction` | `_crystal_compaction` | switch | `/compact micro on\|off` |
+| `estimated_tokens` | `_crystal_display` | switch | `/tokens on\|off` |
 
 Options a process flag locks (for example `--prompt-set`) are still listed
 with their value; setting them returns the engine refusal. The legacy
@@ -474,8 +490,8 @@ a slash command.
 `available_commands_update` lists every completable verb from
 `SlashCommandsChanged`, including plugin and MCP prompt commands, with the
 engine help text. Verbs that take arguments get `input.hint` built from the
-first argument keys. `_meta.crystal.arguments` carries the full
-`SlashCompletion` tree for a client that wants nested completion. Every
+first argument keys. `_meta.crystal.arguments` with the full
+`SlashCompletion` tree is phase 4. Every
 `SessionVerb` is reachable by typing it. `/quit` closes the session as
 `session/close` does. `/cd <path>` and `/space` move the session and are
 reported through `session_info_update._meta.crystal.workspace`.
@@ -570,6 +586,8 @@ Each is front-end neutral, public, plain data, and usable by
    with `McpServerSource.Session`; discovery merges them after Project; they
    are excluded from session files and from every text that names server
    configuration. This closes the "servers passed in by a front end" MCP gap.
+   Done: `SessionFrontEnd.McpServers`, merged by
+   `McpServerDiscovery.WithSession`.
 2. Tool call presentation (done in phase 1): `ToolCallSummary.Text` holds
    the one-line title the terminal's `ToolCallText.Summary` showed, and
    `ToolFileChanges` returns the affected paths and per-file `ToolFileChange`
@@ -577,25 +595,32 @@ Each is front-end neutral, public, plain data, and usable by
    terminal's `ApprovalDiff` stays in the terminal: it builds painted
    line-level hunks for the approval card, which Bridge does not need.
 3. Saved sessions: `SessionStore.List` is reachable from a front end with a
-   workspace filter, plus `TryForkSaved(id)` and resume-by-id without a
-   chooser.
+   workspace filter, `SessionStore.TrySummarize(id)` reads one summary, and
+   resume-by-id uses `SessionLaunchRequest.ResumeTarget` without a chooser
+   (done). `TryForkSaved(id)` is phase 4.
 4. Compaction events: a `CompactionStarted` and `CompactionFinished` pair
    with id, manual or automatic, status, and the displayable summary when the
    operator settings show it. Today the summary reaches front ends only as a
    note (`CodingSession.cs:5685` writes `Compacted context`).
-5. Option catalogs: a plain report of selectable models by provider, gears,
-   context budgets, tiers, speeds, approval modes, modes, and prompt sets,
-   published when they change, so config options do not parse help text.
-6. Report values: `StatusReported`, `StatsReported`, and `ToolsListed` keep
-   their plain data; the plain-text renderers Bridge needs live in the
-   engine (`Sessions` already owns status, usage, and tool-list text).
-7. Attach an image by path: a public `CodingSession` member with the same
-   resolution, size, and signature checks as `/attach`
-   (`CodingSession.AttachImage`, which uses
-   `_workspace.TryResolveExistingFile`), returning the trusted marker or the
-   reason it failed instead of writing an error. `/attach` and Bridge's
-   `file://` image links both use it, so Bridge never reads workspace files
-   itself.
+5. Option catalogs (done): `SessionOptionsChanged` carries `SessionOption`
+   records (id, name, category, current value, switch flag) with
+   `SessionOptionValue` entries that each name the slash command selecting
+   them. The session publishes it at start and whenever a value or its
+   choices change, and not when nothing changed. `crystal server` sends it
+   as `options.changed`.
+6. Report values (done): `StatusReported`, `StatsReported`, and `ToolsListed`
+   keep their plain data, and the plain-text renderers live in the engine:
+   `StatusText`, `ToolListText`, `TodoList.Format`, and the new `HelpText`
+   and `StatsText`.
+7. Attach an image by path (done): `CodingSession.TryAttachImageFile` with
+   the same resolution, size, and signature checks as `/attach`, returning
+   the trusted marker or the reason it failed instead of writing an error.
+   `/attach` and Bridge's `file://` image links both use it, so Bridge never
+   reads workspace files itself.
+8. Additional roots (done): `SessionLaunchRequest.AdditionalRoots`, read by
+   `SessionLaunchAccess.TryReadRoots`, replaces every rule outside the
+   workspace when the session is created and keeps read rules on or inside
+   it (see Additional roots).
 
 `SessionEventDataTests` covers every new event.
 
@@ -658,28 +683,31 @@ Manual checks: the ACP Test Compatibility Kit and Zed.
    `/clear` id handling, message and thought chunks, tool call lifecycle
    with titles, kinds, locations, and diffs, permission, plans, stop
    reasons, stdout discipline, parity skeleton.
-2. Load with replay, resume, list, config
+2. In this build. Load with replay, resume, list, config
    options and modes, available commands, plans, usage, notices, reports.
-3. Session MCP servers, additional directories, `file://` image links,
+3. In this build. Session MCP servers, additional directories, `file://` image links,
    forms for question, MCP elicitation, trust, and choices.
 4. Children and subagents, compaction updates, fork, every `_crystal/*`
    method, and the documentation move out of High priority.
 
-### Phase 1 scope
+### Scope in this build
 
-- Every prompt content block is in: text, image, resource (text and blob),
-  and `resource_link` as described under Prompt content and Links, except
-  that a `file://` image link is mentioned, not attached (engine change 7).
-  Bridge removes U+2063 from client text and resources, so only an image it
-  attached has a trusted marker.
-- `mcpServers` is accepted and ignored. Stderr notes how many were
-  ignored and never their names, commands, or values.
-- A non-empty `additionalDirectories` is `-32602`.
-- Trust has no form yet, so an untrusted `cwd` is always `trust_refused`.
-  The `question` tool is dismissed and session and child choices are
-  declined, as the no-forms fallback describes.
+- Every prompt content block is in, as Prompt content and Links describe,
+  including `file://` image links. Bridge removes U+2063 from client text
+  and resources, so only an image it attached has a trusted marker.
+- `mcpServers` are session servers. A stdio command must be absolute. A bad
+  entry is `-32602` naming the server and field, never a value.
+- Forms need `elicitation.form`: the `question` tool and MCP elicitation
+  share the question form (MCP elicitation reaches a front end as
+  questions, so its schema is the engine's question shape, not the server's
+  raw schema). Trust before a session is a form tied to the `session/new`,
+  `load`, or `resume` request id; inside a session it is session-scoped.
+  `/resume` and `/child` choices are forms. Without forms the fallbacks
+  under Forms apply.
+- `session/load` and `session/resume` keep the requested id as the ACP id.
 - Notes and retries are notices only for a client with `session.notices`;
   an error without notices is agent message text.
-- `TodosChanged` is sent as `plan`. Usage, chrome, queue, reports, and the
-  other events wait for their phase; `SessionUpdates.Unmapped` lists each
-  with its phase and the parity test keeps that list complete.
+- Phase 4 events (`StatusFieldsChanged`, `ActivityChanged`, `QueueChanged`,
+  side questions, children, prompt history, recall, image invalidation) are
+  listed in `SessionUpdates.Unmapped` with their phase, and the parity test
+  keeps that list complete.

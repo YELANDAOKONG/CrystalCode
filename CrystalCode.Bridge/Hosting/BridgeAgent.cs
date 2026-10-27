@@ -1,19 +1,22 @@
+using System.Globalization;
 using System.Text.Json;
 
 using CrystalCode.Bridge.Prompts;
 using CrystalCode.Bridge.Transport;
 using CrystalCode.Bridge.Wire;
+using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Sessions;
 
 namespace CrystalCode.Bridge.Hosting;
 
 /// <summary>
-/// The ACP Agent side of one connection. It answers <c>initialize</c>,
-/// <c>session/new</c>, <c>session/prompt</c>, <c>session/cancel</c>, and
-/// <c>session/close</c>, and holds at most one live session. Opening,
-/// replacing, and closing that session are serialized; prompts and cancels
-/// run beside them.
+/// The ACP Agent side of one connection. It answers <c>initialize</c>, the
+/// session lifecycle (<c>new</c>, <c>load</c>, <c>resume</c>, <c>list</c>,
+/// <c>close</c>), <c>session/prompt</c>, <c>session/cancel</c>, and the mode
+/// and config option setters, and holds at most one live session. Opening,
+/// replacing, and closing that session are serialized; prompts, cancels, and
+/// setters run beside them.
 /// </summary>
 internal sealed class BridgeAgent : IJsonRpcHandler
 {
@@ -34,12 +37,21 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         _connection = connection;
     }
 
-    public async Task<JsonRpcReply> HandleRequestAsync(string method, JsonElement parameters, CancellationToken cancellationToken) =>
+    public async Task<JsonRpcReply> HandleRequestAsync(
+        JsonElement id,
+        string method,
+        JsonElement parameters,
+        CancellationToken cancellationToken) =>
         method switch
         {
             "initialize" => Initialize(parameters),
-            "session/new" => await NewAsync(parameters, cancellationToken),
+            "session/new" => await OpenAsync(id, Setup(parameters, resume: false), cancellationToken),
+            "session/load" => await OpenAsync(id, Setup(parameters, resume: true) with { Replay = true }, cancellationToken),
+            "session/resume" => await OpenAsync(id, Setup(parameters, resume: true), cancellationToken),
+            "session/list" => List(parameters),
             "session/prompt" => await PromptAsync(parameters, cancellationToken),
+            "session/set_mode" => await SetModeAsync(parameters),
+            "session/set_config_option" => await SetOptionAsync(parameters),
             "session/close" => await CloseAsync(parameters),
             _ => throw new JsonRpcException(JsonRpcErrorCode.MethodNotFound, "Method not found: " + PromptContent.OneLine(method))
         };
@@ -49,7 +61,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         if (method == "session/cancel"
             && JsonParams.OptionalString(parameters, "sessionId") is { } id
             && Volatile.Read(ref _active) is { } active
-            && active.Id == id)
+            && active.Answers(id))
         {
             active.Cancel();
         }
@@ -95,24 +107,30 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             writer.WriteStartArray("authMethods");
             writer.WriteEndArray();
             writer.WriteStartObject("agentCapabilities");
-            writer.WriteBoolean("loadSession", false);
+            writer.WriteBoolean("loadSession", true);
             writer.WriteStartObject("promptCapabilities");
             writer.WriteBoolean("image", true);
             writer.WriteBoolean("audio", false);
             writer.WriteBoolean("embeddedContext", true);
             writer.WriteEndObject();
             writer.WriteStartObject("mcpCapabilities");
-            writer.WriteBoolean("http", false);
-            writer.WriteBoolean("sse", false);
+            writer.WriteBoolean("http", true);
+            writer.WriteBoolean("sse", true);
             writer.WriteEndObject();
             writer.WriteStartObject("sessionCapabilities");
-            writer.WriteStartObject("close");
-            writer.WriteEndObject();
+            foreach (var capability in new[] { "list", "resume", "close", "additionalDirectories" })
+            {
+                writer.WriteStartObject(capability);
+                writer.WriteEndObject();
+            }
+
             writer.WriteEndObject();
             writer.WriteStartObject("_meta");
             writer.WriteStartObject("crystal");
             writer.WriteStartArray("extensions");
             writer.WriteEndArray();
+            writer.WriteBoolean("loadAcrossCwd", true);
+            writer.WriteBoolean("mutableWorkspace", true);
             writer.WriteEndObject();
             writer.WriteEndObject();
             writer.WriteEndObject();
@@ -120,7 +138,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         });
     }
 
-    private async Task<JsonRpcReply> NewAsync(JsonElement parameters, CancellationToken cancellationToken)
+    private SessionSetup Setup(JsonElement parameters, bool resume)
     {
         var cwd = JsonParams.OptionalString(parameters, "cwd");
         if (cwd is not null && !Path.IsPathFullyQualified(cwd))
@@ -128,35 +146,58 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             throw JsonRpcException.InvalidParams("cwd must be an absolute path.");
         }
 
-        if (JsonParams.OptionalArray(parameters, "additionalDirectories") is { } additional
-            && additional.GetArrayLength() > 0)
+        var roots = new List<string>();
+        if (JsonParams.OptionalArray(parameters, "additionalDirectories") is { } additional)
         {
-            throw JsonRpcException.InvalidParams("additionalDirectories is not supported by this build.");
+            foreach (var entry in additional.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.String || !Path.IsPathFullyQualified(entry.GetString()!))
+                {
+                    throw JsonRpcException.InvalidParams("Each additional directory must be an absolute path.");
+                }
+
+                roots.Add(entry.GetString()!);
+            }
         }
 
-        if (JsonParams.OptionalArray(parameters, "mcpServers") is { } servers && servers.GetArrayLength() > 0)
+        var servers = McpServerWire.Read(JsonParams.OptionalArray(parameters, "mcpServers"));
+        if (!resume)
         {
-            // Names, commands, and headers can carry secrets; only the count is written.
-            await _options.Diagnostics.WriteLineAsync(
-                "Bridge ignored " + servers.GetArrayLength().ToString(System.Globalization.CultureInfo.InvariantCulture)
-                + " MCP servers from the client. Client MCP servers are not supported by this build.");
+            return new SessionSetup(cwd, servers, roots);
         }
 
+        var id = JsonParams.RequiredString(parameters, "sessionId");
+        return new SessionSetup(cwd, servers, roots, id);
+    }
+
+    private async Task<JsonRpcReply> OpenAsync(JsonElement requestId, SessionSetup setup, CancellationToken cancellationToken)
+    {
         await _lifecycle.WaitAsync(cancellationToken);
         try
         {
+            // ACP may name the session by its ACP id; the engine stores the
+            // id it has now, which /clear may have changed.
+            var resumeId = setup.ResumeId is { } named && Volatile.Read(ref _active) is { } current && current.Answers(named)
+                ? current.Session!.SessionId
+                : setup.ResumeId;
             await CloseActiveAsync();
-            var bridge = await OpenAsync(cwd, cancellationToken);
+            var bridge = await StartAsync(requestId, setup with { ResumeId = resumeId }, cancellationToken);
             Volatile.Write(ref _active, bridge);
             var id = bridge.Id;
+            var resumed = setup.ResumeId is not null;
             return new JsonRpcReply(
                 writer =>
                 {
                     writer.WriteStartObject();
-                    writer.WriteString("sessionId", id);
+                    if (!resumed)
+                    {
+                        writer.WriteString("sessionId", id);
+                    }
+
+                    bridge.Updates.WriteConfiguration(writer);
                     writer.WriteEndObject();
                 },
-                bridge.Release);
+                setup.Replay ? null : bridge.Release);
         }
         finally
         {
@@ -164,23 +205,37 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         }
     }
 
-    private async Task<BridgeSession> OpenAsync(string? cwd, CancellationToken cancellationToken)
+    private async Task<BridgeSession> StartAsync(JsonElement requestId, SessionSetup setup, CancellationToken cancellationToken)
     {
         var request = new SessionLaunchRequest(
             _options.Launch,
             _options.WorkingDirectory,
-            cwd ?? _options.Workspace,
-            cwd is null && _options.Space,
+            setup.Cwd ?? _options.Workspace,
+            setup.Cwd is null && _options.Space,
+            Resume: setup.ResumeId is not null,
+            ResumeTarget: setup.ResumeId,
             Trust: SessionTrustCheck.Prompt,
-            PersistSelection: true);
-        var prepared = await SessionLauncher.PrepareAsync(request, trust: null, chooser: null, cancellationToken);
+            PersistSelection: true,
+            AdditionalRoots: setup.AdditionalRoots);
+        var trust = _features.Forms ? new LaunchTrustPrompt(_connection, requestId) : null;
+        var prepared = await SessionLauncher.PrepareAsync(request, trust, chooser: null, cancellationToken);
         if (prepared.Launch is not { } launch)
         {
-            throw prepared.Failure == SessionLaunchFailureKind.TrustNeedsOperator
-                ? JsonRpcException.Refused("trust_refused", UntrustedText(cwd))
-                : JsonRpcException.Refused(
+            throw prepared.Failure switch
+            {
+                SessionLaunchFailureKind.TrustNeedsOperator => JsonRpcException.Refused("trust_refused", UntrustedText(setup.Cwd)),
+                SessionLaunchFailureKind.Declined => JsonRpcException.Refused(
+                    "trust_refused",
+                    "The directory was not trusted, so the session was not opened."),
+                _ when setup.ResumeId is not null && prepared.Error.StartsWith("Session not found", StringComparison.Ordinal) =>
+                    JsonRpcException.NotFound(prepared.Error),
+                // A bad additional root is the client's parameter, not an engine refusal.
+                _ when setup.AdditionalRoots.Count > 0 && IsRootError(prepared.Error) =>
+                    JsonRpcException.InvalidParams(prepared.Error),
+                _ => JsonRpcException.Refused(
                     "launch_refused",
-                    prepared.Error.Length > 0 ? prepared.Error : "The session could not be opened.");
+                    prepared.Error.Length > 0 ? prepared.Error : "The session could not be opened.")
+            };
         }
 
         foreach (var note in launch.Notes)
@@ -188,18 +243,35 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             await _options.Diagnostics.WriteLineAsync(note);
         }
 
-        var bridge = new BridgeSession(_connection, _features);
+        // A resumed session keeps the ACP id the client knows it by.
+        var bridge = new BridgeSession(_connection, _features, setup.ResumeId);
         CodingSession session;
         try
         {
-            session = launch.CreateSession(new SessionFrontEnd(bridge, bridge, bridge, bridge, bridge), _options.Plugins);
+            session = launch.CreateSession(
+                new SessionFrontEnd(bridge, bridge, bridge, bridge, bridge)
+                {
+                    ChooseChildAsync = bridge.ChooseChildAsync,
+                    McpServers = setup.McpServers
+                },
+                _options.Plugins);
         }
         catch (Exception exception) when (IsSetupFailure(exception))
         {
             throw JsonRpcException.Refused("launch_refused", exception.Message);
         }
 
-        bridge.Bind(session, launch.Workspace);
+        bridge.Bind(session, launch.Workspace, launch.Home);
+        if (setup.Replay)
+        {
+            // session/load streams the history before it answers.
+            bridge.Release();
+        }
+        else if (setup.ResumeId is not null)
+        {
+            bridge.DropStartReplay();
+        }
+
         try
         {
             await session.StartAsync(cancellationToken);
@@ -218,10 +290,20 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             await session.CloseAsync(CancellationToken.None);
             throw;
         }
+        finally
+        {
+            bridge.EndStartReplay();
+        }
 
         bridge.Run(() => _ = CloseIfActiveAsync(bridge));
         return bridge;
     }
+
+    private static bool IsRootError(string error) =>
+        error.StartsWith("Additional directory not found", StringComparison.Ordinal)
+        || error.StartsWith("An additional directory must be outside the workspace", StringComparison.Ordinal)
+        || error.StartsWith("Each additional directory", StringComparison.Ordinal)
+        || error.Equals("Credential directories cannot be granted access.", StringComparison.Ordinal);
 
     private static bool IsSetupFailure(Exception exception) =>
         exception is (ArgumentException and not ArgumentNullException)
@@ -237,6 +319,99 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             + "or set workspaceTrust to false in config.json.";
     }
 
+    private JsonRpcReply List(JsonElement parameters)
+    {
+        var cwd = JsonParams.OptionalString(parameters, "cwd");
+        if (cwd is not null && !Path.IsPathFullyQualified(cwd))
+        {
+            throw JsonRpcException.InvalidParams("cwd must be an absolute path.");
+        }
+
+        var cursor = JsonParams.OptionalString(parameters, "cursor");
+        var store = new SessionStore(CrystalHome.Resolve(_options.Launch.Home));
+        var sessions = store.List(cwd);
+        return new JsonRpcReply(writer => SessionList.Write(writer, sessions, cursor, summary => OutsideRoots(store, summary)));
+    }
+
+    /// <summary>The saved write rules outside the session's workspace.</summary>
+    private static IReadOnlyList<string> OutsideRoots(SessionStore store, SessionSummary summary)
+    {
+        if (!store.TryLoad(summary.Id, out var document))
+        {
+            return [];
+        }
+
+        var root = Path.TrimEndingDirectorySeparator(summary.Workspace) + Path.DirectorySeparatorChar;
+        return [.. document.Access
+            .Where(rule => rule.Mode == "write"
+                && !(rule.Path + Path.DirectorySeparatorChar).StartsWith(root, StringComparison.Ordinal))
+            .Select(static rule => rule.SourcePath ?? rule.Path)];
+    }
+
+    private async Task<JsonRpcReply> SetModeAsync(JsonElement parameters)
+    {
+        var bridge = Active(parameters);
+        var mode = JsonParams.RequiredString(parameters, "modeId");
+        var options = bridge.Updates.Options;
+        var command = options.FirstOrDefault(static option => option.Id == "mode") is { } modeOption
+            ? ConfigWire.Command(modeOption, JsonDocument.Parse(JsonSerializer.Serialize(mode)).RootElement)
+            : null;
+        if (command is null)
+        {
+            throw JsonRpcException.InvalidParams("modeId is not one of the available modes.");
+        }
+
+        await RunCommandAsync(bridge, command);
+        return JsonRpcReply.Empty;
+    }
+
+    /// <summary>
+    /// Runs the option's slash command, so validation, refusal while busy,
+    /// and <c>config.json</c> writes match the terminal. Returns every option.
+    /// </summary>
+    private async Task<JsonRpcReply> SetOptionAsync(JsonElement parameters)
+    {
+        var bridge = Active(parameters);
+        var id = JsonParams.RequiredString(parameters, "configId");
+        if (!parameters.TryGetProperty("value", out var value))
+        {
+            throw JsonRpcException.InvalidParams("value is required.");
+        }
+
+        var option = bridge.Updates.Options.FirstOrDefault(option => option.Id == id)
+            ?? throw JsonRpcException.InvalidParams("configId is not a config option of this session.");
+        var command = ConfigWire.Command(option, value)
+            ?? throw JsonRpcException.InvalidParams("value is not offered for " + option.Name + ".");
+        await RunCommandAsync(bridge, command);
+        return new JsonRpcReply(writer =>
+        {
+            writer.WriteStartObject();
+            ConfigWire.Options(writer, "configOptions", bridge.Updates.Options, _features.BooleanOptions);
+            writer.WriteEndObject();
+        });
+    }
+
+    private async Task RunCommandAsync(BridgeSession bridge, string command)
+    {
+        var origin = NextOrigin();
+        try
+        {
+            await bridge.Runner!.SubmitAsync(command, origin);
+        }
+        catch (InvalidOperationException)
+        {
+            throw JsonRpcException.NotFound("The session is not active.");
+        }
+
+        if (bridge.TakeError(origin) is { } refused)
+        {
+            throw JsonRpcException.Refused("command_refused", refused);
+        }
+    }
+
+    private string NextOrigin() =>
+        "prompt-" + Interlocked.Increment(ref _prompts).ToString(CultureInfo.InvariantCulture);
+
     private async Task<JsonRpcReply> PromptAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
         var bridge = Active(parameters);
@@ -248,11 +423,11 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         var runner = bridge.Runner!;
         // Each prompt is its own origin, so its images stay in its draft and a
         // refusal of its command can be told apart from other errors.
-        var origin = "prompt-" + Interlocked.Increment(ref _prompts).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        var content = await PromptContent.ReadAsync(prompt, bytes => runner.InvokeAsync(session =>
-            session.TryAttachImage(bytes, out var image, out var error)
-                ? new ImageAttachResult(image!.TrustedMarker, string.Empty)
-                : new ImageAttachResult(null, error), origin));
+        var origin = NextOrigin();
+        var content = await PromptContent.ReadAsync(
+            prompt,
+            bytes => runner.InvokeAsync(session => Attached(session.TryAttachImage(bytes, out var image, out var error), image, error), origin),
+            path => runner.InvokeAsync(session => Attached(session.TryAttachImageFile(path, out var image, out var error), image, error), origin));
         if (string.IsNullOrWhiteSpace(content.Text))
         {
             throw JsonRpcException.InvalidParams("prompt has no content.");
@@ -314,6 +489,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
                 : throw JsonRpcException.Refused("turn_failed", Failure(outcome.Error));
         }
 
+        bridge.Saved();
         var stop = cancelled ? TurnWire.Cancelled : TurnWire.StopReason(finished.Result.StopReason);
         if (stop is null)
         {
@@ -323,6 +499,9 @@ internal sealed class BridgeAgent : IJsonRpcHandler
 
         return Reply(stop, finished);
     }
+
+    private static ImageAttachResult Attached(bool attached, ImageAttachment? image, string error) =>
+        attached ? new ImageAttachResult(image!.TrustedMarker, string.Empty) : new ImageAttachResult(null, error);
 
     private static string Failure(string? error) =>
         string.IsNullOrWhiteSpace(error) ? "The turn failed." : error;
@@ -353,7 +532,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
     private BridgeSession Active(JsonElement parameters)
     {
         var id = JsonParams.RequiredString(parameters, "sessionId");
-        return Volatile.Read(ref _active) is { } active && active.Id == id
+        return Volatile.Read(ref _active) is { } active && active.Answers(id)
             ? active
             : throw JsonRpcException.NotFound("The session is not active.");
     }

@@ -14,6 +14,10 @@ namespace CrystalCode.Engine.Launch;
 /// <param name="Persisted">The disk baseline later preference saves start from.</param>
 /// <param name="Mode">The launch mode name, or null to keep a resumed mode.</param>
 /// <param name="Notes">Plain-text notes, such as an unavailable thinking gear.</param>
+/// <param name="AdditionalRoots">
+/// Canonical write roots outside the workspace that replace every outside
+/// rule, or null to keep the saved and default rules.
+/// </param>
 public sealed record SessionLaunch(
     CrystalHome Home,
     DiskSettingsStore SettingsStore,
@@ -24,7 +28,8 @@ public sealed record SessionLaunch(
     SessionDocument? Resume,
     string? Mode,
     IReadOnlyList<DirectoryAccess> Access,
-    IReadOnlyList<string> Notes)
+    IReadOnlyList<string> Notes,
+    IReadOnlyList<DirectoryAccess>? AdditionalRoots = null)
 {
     public CodingSession CreateSession(SessionFrontEnd frontEnd, PluginRegistry plugins)
     {
@@ -40,6 +45,7 @@ public sealed record SessionLaunch(
             plugins,
             Resume,
             Persisted,
-            Access);
+            Access,
+            AdditionalRoots);
     }
 }

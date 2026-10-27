@@ -19,6 +19,7 @@ public static class WireEvents
         [typeof(SessionStarted)] = "session.started",
         [typeof(ChromeChanged)] = "chrome.changed",
         [typeof(PreferencesChanged)] = "preferences.changed",
+        [typeof(SessionOptionsChanged)] = "options.changed",
         [typeof(StatusFieldsChanged)] = "status-fields.changed",
         [typeof(SlashCommandsChanged)] = "commands.changed",
         [typeof(PromptHistoryLoaded)] = "prompt-history.loaded",
@@ -114,6 +115,9 @@ public static class WireEvents
                 break;
             case PreferencesChanged preferences:
                 WireWriter.Preferences(writer, "preferences", preferences.Preferences);
+                break;
+            case SessionOptionsChanged options:
+                WireWriter.Options(writer, "options", options.Options);
                 break;
             case StatusFieldsChanged fields:
                 writer.WriteStartArray("fields");

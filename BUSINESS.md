@@ -159,17 +159,27 @@ separate library with no terminal code. The product can:
   The editor starts it as a subprocess and speaks ACP v1 on stdin and stdout;
   stdout carries protocol lines only. It accepts the same session launch
   options as `crystal`, plus `--workspace` and `--space` as the fallback when
-  a session request has no `cwd`. Prompts accept text, images, embedded
-  resources, and resource links; a block the session cannot use becomes a
-  one-line mention instead of an error. Replies and reasoning stream as
-  chunks, tool calls arrive with titles, kinds, locations, and diffs,
-  permission requests go to the editor, and todos become the plan. Approval,
-  trust, the workspace fence, and `ToolInvocationPolicy` are unchanged; an
-  untrusted directory is refused with instructions, not trusted silently.
-  Bridge never calls the editor's file system or terminal. Loading saved
-  sessions, config options, editor MCP servers, additional directories,
-  forms, children, and `_crystal/*` extensions are later phases of the same
-  front end. See [docs/bridge.md](docs/bridge.md);
+  a session request has no `cwd`. The editor can start, load (with the
+  conversation replayed), resume, list, and close saved sessions, and
+  `/clear` keeps the session id it knows. Prompts accept text, images,
+  embedded resources, and resource links, including local image files; a
+  block the session cannot use becomes a one-line mention instead of an
+  error. Replies and reasoning stream as chunks, tool calls arrive with
+  titles, kinds, locations, and diffs, permission requests go to the editor,
+  todos become the plan, and usage, slash commands, and `/help`, `/status`,
+  `/stats`, `/tools`, and `/todos` reports reach it. Mode, model, thinking,
+  context, tier, speed, approval, the approval models, prompt set, Agents,
+  microcompaction, and estimated tokens are editor config options that run
+  the same slash commands as the terminal. The editor's MCP servers join the
+  session and are never saved, its additional directories become the
+  session's outside write roots, and the `question` tool, MCP elicitation,
+  workspace trust, and `/resume` and `/child` choices are editor forms when
+  it supports them. Approval, trust, the workspace fence, and
+  `ToolInvocationPolicy` are unchanged; without forms an untrusted directory
+  is refused with instructions, not trusted silently. Bridge never calls the
+  editor's file system or terminal. Children, compaction updates, fork, and
+  `_crystal/*` extensions are a later phase of the same front end. See
+  [docs/bridge.md](docs/bridge.md);
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model and its thinking gear, service tier, and speed,
@@ -463,14 +473,14 @@ implemented in the current build.
   formula, image, or repository. Release artifacts and install scripts remain
   the install path until a specific change defines otherwise.
 - The rest of the Agent Client Protocol (ACP) front end, Bridge
-  (`crystal bridge`, `CrystalCode.Bridge`). Phase 1 is in this build; load,
-  resume, list, config options, editor MCP servers, additional directories,
-  forms, children, and `_crystal/*` extensions are phases 2 to 4 in
-  [docs/bridge.md](docs/bridge.md). It stays a front end that implements
+  (`crystal bridge`, `CrystalCode.Bridge`). Phases 1 to 3 are in this build;
+  children and subagents, compaction updates, fork, and `_crystal/*`
+  extensions are phase 4 in [docs/bridge.md](docs/bridge.md). It stays a
+  front end that implements
   `SessionFrontEnd`, not an engine protocol, not `crystal server`, and not
-  child Agents. ACP does not speak MCP itself. Editor-supplied MCP servers
-  will use the same MCP client as local servers. Do not bypass approval,
-  trust, or the tool boundary.
+  child Agents. ACP does not speak MCP itself; editor-supplied MCP servers
+  use the same MCP client as local servers. Do not bypass approval, trust,
+  or the tool boundary.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
   one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags

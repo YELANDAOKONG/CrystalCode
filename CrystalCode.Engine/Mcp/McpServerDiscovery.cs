@@ -28,6 +28,36 @@ internal sealed class McpServerDiscovery
             .Select(entry => entry.Definition!)];
 
     /// <summary>
+    /// Adds front-end session servers after Home and Project. A session
+    /// server replaces a configured one of the same name. The result stays in
+    /// name order.
+    /// </summary>
+    public static IReadOnlyList<McpServerDefinition> WithSession(
+        IReadOnlyList<McpServerDefinition> configured,
+        IReadOnlyList<McpServerDefinition> session)
+    {
+        ArgumentNullException.ThrowIfNull(configured);
+        ArgumentNullException.ThrowIfNull(session);
+        if (session.Count == 0)
+        {
+            return configured;
+        }
+
+        var merged = configured.ToDictionary(static server => server.Name, StringComparer.Ordinal);
+        foreach (var server in session)
+        {
+            if (server.Source != McpServerSource.Session)
+            {
+                throw new ArgumentException("A front-end MCP server must use the Session source.", nameof(session));
+            }
+
+            merged[server.Name] = server;
+        }
+
+        return [.. merged.Values.OrderBy(static server => server.Name, StringComparer.Ordinal)];
+    }
+
+    /// <summary>
     /// Every entry that takes effect, including invalid and disabled ones, in
     /// name order. Inventory uses it so a disabled server stays listed.
     /// </summary>

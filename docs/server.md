@@ -261,6 +261,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | :--- | :--- |
 | `SessionStarted`, `ChromeChanged` | `session.started`, `chrome.changed` |
 | `PreferencesChanged`, `StatusFieldsChanged` | `preferences.changed`, `status-fields.changed` |
+| `SessionOptionsChanged` | `options.changed`: each option's `id`, `name`, `category`, `current`, `switch`, and `values` (`value`, `name`, the slash `command` that selects it, optional `description` and `group`). An empty `command` cannot be chosen directly. Send the command through `POST /input` |
 | `SlashCommandsChanged`, `PromptHistoryLoaded` | `commands.changed`, `prompt-history.loaded` |
 | `ImageHistoryInvalidated`, `ActivityChanged` | `images.invalidated`, `activity.changed` |
 | `UserMessageSent`, `UserMessageRecalled` | `message.sent`, `message.recalled` |

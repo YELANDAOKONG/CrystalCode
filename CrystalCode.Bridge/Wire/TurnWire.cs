@@ -66,7 +66,7 @@ internal static class TurnWire
         writer.WriteEndObject();
     }
 
-    private static void Usage(Utf8JsonWriter writer, string name, TokenUsage? usage)
+    public static void Usage(Utf8JsonWriter writer, string name, TokenUsage? usage)
     {
         if (usage is null)
         {

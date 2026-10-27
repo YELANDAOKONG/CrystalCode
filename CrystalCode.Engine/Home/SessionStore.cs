@@ -114,15 +114,7 @@ public sealed class SessionStore
             }
 
             sessions.Add(
-                new SessionSummary(
-                    document.Id!,
-                    document.Workspace,
-                    document.PlanMode,
-                    document.CreatedUtc,
-                    document.UpdatedUtc,
-                    Math.Max(0, document.UserTurns),
-                    FirstUserText(document),
-                    document.Mode));
+                Summarize(document));
         }
 
         return sessions
@@ -130,6 +122,32 @@ public sealed class SessionStore
             .ThenBy(session => session.Id, StringComparer.Ordinal)
             .ToArray();
     }
+
+    /// <summary>The summary of one saved session with content, without listing the others.</summary>
+    public bool TrySummarize(string id, out SessionSummary summary)
+    {
+        summary = null!;
+        if (!TryLoad(id, out var document)
+            || string.IsNullOrWhiteSpace(document.Workspace)
+            || document.Items.Count == 0)
+        {
+            return false;
+        }
+
+        summary = Summarize(document);
+        return true;
+    }
+
+    private static SessionSummary Summarize(SessionDocument document) =>
+        new(
+            document.Id!,
+            document.Workspace!,
+            document.PlanMode,
+            document.CreatedUtc,
+            document.UpdatedUtc,
+            Math.Max(0, document.UserTurns),
+            FirstUserText(document),
+            document.Mode);
 
     private IEnumerable<string> EnumerateFiles()
     {

@@ -54,7 +54,7 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
         {
             foreach (var source in _incoming.Values)
             {
-                source.Cancel();
+                TryCancel(source);
             }
 
             await handler.ShutdownAsync();
@@ -262,13 +262,29 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
                 && parameters.TryGetProperty("requestId", out var requestId)
                 && _incoming.TryGetValue(requestId.GetRawText(), out var source))
             {
-                source.Cancel();
+                TryCancel(source);
             }
 
             return;
         }
 
         _running.Add(RunNotificationAsync(method, parameters));
+    }
+
+    /// <summary>
+    /// A request removes its source from the table and then disposes it, so a
+    /// cancel that read the table just before can find it disposed. That
+    /// request already finished; there is nothing left to cancel.
+    /// </summary>
+    private static void TryCancel(CancellationTokenSource source)
+    {
+        try
+        {
+            source.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private async Task RunNotificationAsync(string method, JsonElement parameters)
@@ -308,7 +324,7 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
         await Task.Yield();
         try
         {
-            var reply = await _handler!.HandleRequestAsync(method, parameters, source.Token);
+            var reply = await _handler!.HandleRequestAsync(id, method, parameters, source.Token);
             Send(writer =>
             {
                 writer.WriteStartObject();

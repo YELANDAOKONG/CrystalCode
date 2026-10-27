@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Text.Json;
 
 using Crystal.Chat;
 using Crystal.Tools;
 
 using CrystalCode.Bridge.Transport;
+using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
@@ -13,87 +15,136 @@ namespace CrystalCode.Bridge.Wire;
 /// <summary>
 /// Maps engine events onto ACP <c>session/update</c> notifications. Every
 /// update carries <c>_meta.crystal.event</c> with the engine event name.
-/// Events with no ACP shape in this phase are listed in
-/// <see cref="Unmapped"/> with the reason, so the parity test can tell a
-/// deliberate gap from a forgotten one.
+/// Events with no ACP shape yet are listed in <see cref="Unmapped"/> with the
+/// phase that adds them, so the parity test can tell a deliberate gap from a
+/// forgotten one.
 /// </summary>
 internal sealed class SessionUpdates
 {
-    /// <summary>Engine events this phase does not send, and why.</summary>
+    /// <summary>Engine events Bridge does not send, and why.</summary>
     public static IReadOnlyDictionary<Type, string> Unmapped { get; } = new Dictionary<Type, string>
     {
-        [typeof(UserMessageSent)] = "The client shows the prompt it sent; Phase 2 replays it on session/load",
-        [typeof(SessionStarted)] = "Phase 2: session_info_update",
-        [typeof(ChromeChanged)] = "Phase 2: config_option_update and current_mode_update",
-        [typeof(PreferencesChanged)] = "Phase 2: config options",
+        [typeof(UserMessageSent)] = "The client shows the prompt it sent; session/load replays it from the archive",
         [typeof(StatusFieldsChanged)] = "Phase 4: _crystal/chrome",
-        [typeof(SlashCommandsChanged)] = "Phase 2: available_commands_update",
         [typeof(PromptHistoryLoaded)] = "Phase 4: _crystal/promptHistory",
         [typeof(ImageHistoryInvalidated)] = "Phase 4: _crystal/imagesInvalidated",
         [typeof(ActivityChanged)] = "Phase 4: _crystal/activity",
         [typeof(UserMessageRecalled)] = "Phase 4: _crystal/recalled",
         [typeof(TurnStarted)] = "Ends in the session/prompt response, not an update",
         [typeof(TurnFinished)] = "Ends in the session/prompt response, not an update",
-        [typeof(RetryScheduled)] = "Sent as a notice when the client supports notices",
-        [typeof(UsageChanged)] = "Phase 2: usage_update",
-        [typeof(ContextEstimated)] = "Phase 2: usage_update",
         [typeof(QueueChanged)] = "Phase 4: _crystal/queue",
-        [typeof(HistoryReplayed)] = "Phase 2: session/load replay",
-        [typeof(ConversationCleared)] = "Phase 2: _crystal/cleared",
-        [typeof(HelpRequested)] = "Phase 2: report text",
-        [typeof(StatusReported)] = "Phase 2: report text",
-        [typeof(StatsReported)] = "Phase 2: report text",
-        [typeof(ToolsListed)] = "Phase 2: report text",
-        [typeof(TodosListed)] = "Phase 2: report text",
         [typeof(SideQuestionSnapshot)] = "Phase 4: _crystal/side",
         [typeof(ChildSessionChanged)] = "Phase 4: children",
         [typeof(ChildEventReceived)] = "Phase 4: children",
         [typeof(ChildViewRequested)] = "Phase 4: _crystal/childView"
     };
 
-    /// <summary>Engine events this phase sends as session updates.</summary>
+    /// <summary>Engine events Bridge sends as session updates.</summary>
     public static IReadOnlyList<Type> Mapped { get; } =
     [
+        typeof(SessionStarted),
+        typeof(ChromeChanged),
+        typeof(PreferencesChanged),
+        typeof(SessionOptionsChanged),
+        typeof(SlashCommandsChanged),
         typeof(StreamReceived),
         typeof(ModelRoundClosed),
+        typeof(RetryScheduled),
+        typeof(UsageChanged),
+        typeof(ContextEstimated),
         typeof(ToolCallsIssued),
         typeof(ToolResultsReceived),
         typeof(ApprovalReviewing),
         typeof(ApprovalPassed),
         typeof(TodosChanged),
+        typeof(HistoryReplayed),
+        typeof(ConversationCleared),
+        typeof(HelpRequested),
+        typeof(StatusReported),
+        typeof(StatsReported),
+        typeof(ToolsListed),
+        typeof(TodosListed),
         typeof(NoteWritten),
         typeof(ErrorWritten)
     ];
 
-    /// <summary>Every Crystal stream event, and what this phase does with it.</summary>
+    /// <summary>Every Crystal stream event, and what Bridge does with it.</summary>
     public static IReadOnlyDictionary<Type, string> StreamEvents { get; } = new Dictionary<Type, string>
     {
         [typeof(ChatTextDelta)] = "agent_message_chunk",
         [typeof(ChatReasoningTextDelta)] = "agent_thought_chunk",
         [typeof(ChatToolCallDelta)] = "tool_call on first sight",
         [typeof(ChatReasoningStateReceived)] = "Dropped: opaque reasoning state never leaves the process",
-        [typeof(ChatUsageReceived)] = "Phase 2: usage_update",
+        [typeof(ChatUsageReceived)] = "UsageChanged carries the totals as usage_update",
         [typeof(ChatCandidateCompleted)] = "No update; the next round gets a new messageId"
     };
 
     private readonly Action<Action<Utf8JsonWriter>> _send;
     private readonly Func<string?> _workspace;
     private readonly bool _notices;
+    private readonly bool _booleans;
+    private readonly Func<int, (string MimeType, byte[] Data)?> _image;
     private readonly object _gate = new();
     private readonly HashSet<string> _announced = new(StringComparer.Ordinal);
     private readonly Dictionary<int, string> _streamingCalls = [];
     private int _round;
+    private int _reports;
+    private int _replays;
+    private IReadOnlyList<SessionOption> _options = [];
+    private string? _mode;
+    private string? _reportedWorkspace;
+    private string _engineSessionId = string.Empty;
 
     /// <param name="send">Writes one <c>update</c> object; the caller wraps it in <c>session/update</c>.</param>
     /// <param name="workspace">The live workspace root, for locations and diffs.</param>
     /// <param name="notices">The client advertised <c>session.notices</c>.</param>
-    public SessionUpdates(Action<Action<Utf8JsonWriter>> send, Func<string?> workspace, bool notices)
+    /// <param name="booleans">The client advertised boolean config options.</param>
+    /// <param name="image">The MIME type and bytes of a session image, for replay.</param>
+    public SessionUpdates(
+        Action<Action<Utf8JsonWriter>> send,
+        Func<string?> workspace,
+        bool notices,
+        bool booleans = false,
+        Func<int, (string MimeType, byte[] Data)?>? image = null)
     {
         ArgumentNullException.ThrowIfNull(send);
         ArgumentNullException.ThrowIfNull(workspace);
         _send = send;
         _workspace = workspace;
         _notices = notices;
+        _booleans = booleans;
+        _image = image ?? (static _ => null);
+    }
+
+    /// <summary>The last option catalog the engine published.</summary>
+    public IReadOnlyList<SessionOption> Options
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _options;
+            }
+        }
+    }
+
+    /// <summary>The engine session id; it changes on <c>/clear</c>, the ACP id does not.</summary>
+    public string EngineSessionId
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _engineSessionId;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _engineSessionId = value;
+            }
+        }
     }
 
     public void Apply(SessionEvent sessionEvent)
@@ -103,6 +154,23 @@ internal sealed class SessionUpdates
         {
             switch (sessionEvent)
             {
+                case SessionOptionsChanged options:
+                    OptionsChanged(options.Options);
+                    break;
+                case SlashCommandsChanged commands:
+                    Commands(commands.Commands);
+                    break;
+                case SessionStarted started:
+                    _reportedWorkspace = started.Chrome.WorkspaceRoot;
+                    break;
+                case ChromeChanged changed when changed.Chrome.WorkspaceRoot != _reportedWorkspace:
+                    // /cd and /space move the session; ACP's cwd is otherwise fixed.
+                    _reportedWorkspace = changed.Chrome.WorkspaceRoot;
+                    SessionInfo("ChromeChanged", title: null);
+                    break;
+                case ChromeChanged or PreferencesChanged:
+                    // The option catalog carries every other value these change.
+                    break;
                 case StreamReceived stream:
                     Stream(stream.StreamEvent);
                     break;
@@ -113,6 +181,16 @@ internal sealed class SessionUpdates
                 case RetryScheduled retry:
                     Notice("warning", "Retrying the model request", $"Attempt {retry.Attempt.Attempt}: {retry.Attempt.Message}", "RetryScheduled");
                     _streamingCalls.Clear();
+                    break;
+                case UsageChanged usage:
+                    Usage(usage);
+                    break;
+                case ContextEstimated estimated:
+                    Update("usage_update", "ContextEstimated", writer =>
+                    {
+                        writer.WriteNumber("used", Math.Max(0, estimated.Tokens));
+                        writer.WriteNumber("size", Math.Max(0, CurrentContextWindow()));
+                    }, crystal => crystal.WriteBoolean("estimate", true));
                     break;
                 case ToolCallsIssued calls:
                     foreach (var call in calls.Calls)
@@ -149,6 +227,28 @@ internal sealed class SessionUpdates
                     break;
                 case TodosChanged todos:
                     Plan(todos.Items);
+                    break;
+                case HistoryReplayed replayed:
+                    Replay(replayed.Items);
+                    break;
+                case ConversationCleared:
+                    _announced.Clear();
+                    SessionInfo("ConversationCleared", title: null);
+                    break;
+                case HelpRequested help:
+                    Report("help", "HelpRequested", HelpText.Format(help.PluginCommands));
+                    break;
+                case StatusReported status:
+                    Report("status", "StatusReported", StatusText.Format(status.Status, status.Full));
+                    break;
+                case StatsReported stats:
+                    Report("stats", "StatsReported", StatsText.Format(stats.Report, stats.AllWorkspaces));
+                    break;
+                case ToolsListed tools:
+                    Report("tools", "ToolsListed", ToolListText.Format(tools.Report));
+                    break;
+                case TodosListed todos:
+                    Report("todos", "TodosListed", TodoList.Format(todos.Items));
                     break;
                 case NoteWritten note:
                     Notice("info", note.Text, null, "NoteWritten");
@@ -195,6 +295,238 @@ internal sealed class SessionUpdates
         }
     }
 
+    /// <summary>Title and time after the first user message and each turn.</summary>
+    public void Saved(string title)
+    {
+        lock (_gate)
+        {
+            SessionInfo("TurnFinished", title);
+        }
+    }
+
+    /// <summary>The <c>configOptions</c> and <c>modes</c> fields of a session response.</summary>
+    public void WriteConfiguration(Utf8JsonWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        lock (_gate)
+        {
+            ConfigWire.Options(writer, "configOptions", _options, _booleans);
+            ConfigWire.Modes(writer, _options);
+        }
+    }
+
+    private void OptionsChanged(IReadOnlyList<SessionOption> options)
+    {
+        _options = options;
+        Update("config_option_update", "SessionOptionsChanged", writer =>
+            ConfigWire.Options(writer, "configOptions", options, _booleans));
+        var mode = options.FirstOrDefault(static option => option.Id == "mode")?.Current;
+        if (mode is not null && mode != _mode)
+        {
+            _mode = mode;
+            Update("current_mode_update", "SessionOptionsChanged", writer => writer.WriteString("currentModeId", mode));
+        }
+    }
+
+    /// <summary>
+    /// The completable verbs. ACP names a command without the slash; the hint
+    /// lists the first argument keys, and the full tree rides in <c>_meta</c>.
+    /// </summary>
+    private void Commands(IReadOnlyList<SlashCompletion> commands)
+    {
+        Update("available_commands_update", "SlashCommandsChanged", writer =>
+        {
+            writer.WriteStartArray("availableCommands");
+            foreach (var command in commands)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("name", command.Name);
+                writer.WriteString("description", string.IsNullOrWhiteSpace(command.Help) ? command.Name : command.Help);
+                if (command.ArgumentOptions.Count > 0)
+                {
+                    var keys = command.ArgumentOptions.Select(static argument => argument.Name).Take(6).ToArray();
+                    writer.WriteStartObject("input");
+                    writer.WriteString(
+                        "hint",
+                        string.Join(" | ", keys) + (command.ArgumentOptions.Count > keys.Length ? " | ..." : string.Empty));
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        });
+    }
+
+    private void Usage(UsageChanged usage)
+    {
+        if (usage.Usage is null)
+        {
+            return;
+        }
+
+        Update("usage_update", "UsageChanged", writer =>
+        {
+            writer.WriteNumber("used", usage.Usage.TotalTokenCount);
+            writer.WriteNumber("size", Math.Max(0, usage.ContextWindow));
+        }, crystal =>
+        {
+            crystal.WriteBoolean("interim", usage.Interim);
+            TurnWire.Usage(crystal, "usage", usage.Usage);
+            TurnWire.Usage(crystal, "cumulativeUsage", usage.CumulativeUsage);
+        });
+    }
+
+    private int CurrentContextWindow() =>
+        int.TryParse(
+            _options.FirstOrDefault(static option => option.Id == "context")?.Current,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var window)
+            ? window
+            : 0;
+
+    private void SessionInfo(string eventName, string? title)
+    {
+        var engineId = _engineSessionId;
+        Update("session_info_update", eventName, writer =>
+        {
+            if (title is not null)
+            {
+                writer.WriteString("title", title);
+            }
+
+            writer.WriteString("updatedAt", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        }, crystal =>
+        {
+            JsonText.Optional(crystal, "engineSessionId", engineId.Length == 0 ? null : engineId);
+            JsonText.Optional(crystal, "workspace", _workspace());
+        });
+    }
+
+    /// <summary>A report is agent message text from the engine's plain-text renderer.</summary>
+    private void Report(string kind, string eventName, string text)
+    {
+        var id = "report-" + (++_reports).ToString(CultureInfo.InvariantCulture);
+        Update("agent_message_chunk", eventName, writer =>
+        {
+            TextContent(writer, text);
+            writer.WriteString("messageId", id);
+        }, crystal => crystal.WriteString("report", kind));
+    }
+
+    /// <summary>
+    /// The saved conversation in order: user and assistant text, readable
+    /// reasoning, tool calls with their results, and each compaction summary.
+    /// Opaque reasoning state is never sent.
+    /// </summary>
+    private void Replay(IReadOnlyList<ChatItem> items)
+    {
+        var replay = ++_replays;
+        var message = 0;
+        _announced.Clear();
+        foreach (var item in items)
+        {
+            message++;
+            var id = $"replay-{replay}-{message}";
+            switch (item)
+            {
+                case ChatMessage summary when CompactionSelection.IsSummary(summary):
+                    Update("agent_message_chunk", "HistoryReplayed", writer =>
+                    {
+                        TextContent(writer, summary.Text);
+                        writer.WriteString("messageId", id);
+                    }, crystal => crystal.WriteString("replay", "compaction"));
+                    break;
+                case ChatMessage { Role.Value: "user" } user:
+                    UserReplay(user.Text, id);
+                    break;
+                case ChatMessage { Role.Value: "assistant" } assistant when assistant.Text.Length > 0:
+                    Update("agent_message_chunk", "HistoryReplayed", writer =>
+                    {
+                        TextContent(writer, ImageMarkerText.Display(assistant.Text));
+                        writer.WriteString("messageId", id);
+                    });
+                    break;
+                case ChatReasoningItem reasoning:
+                    var text = string.Join("\n", reasoning.Content.TextSegments.Select(static segment => segment.Text));
+                    if (text.Length > 0)
+                    {
+                        Update("agent_thought_chunk", "HistoryReplayed", writer =>
+                        {
+                            TextContent(writer, text);
+                            writer.WriteString("messageId", id);
+                        });
+                    }
+
+                    break;
+                case ToolCall call:
+                    _announced.Remove(call.CallId);
+                    Issue(call, "HistoryReplayed");
+                    break;
+                case ToolResult result:
+                    Result(result, "HistoryReplayed");
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    /// <summary>User text with each trusted image marker as an image block in place.</summary>
+    private void UserReplay(string text, string id)
+    {
+        var position = 0;
+        foreach (System.Text.RegularExpressions.Match match in ImageMarkerText.Matches(text))
+        {
+            if (match.Index > position)
+            {
+                var before = text[position..match.Index];
+                Update("user_message_chunk", "HistoryReplayed", writer =>
+                {
+                    TextContent(writer, before);
+                    writer.WriteString("messageId", id);
+                });
+            }
+
+            var number = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            if (_image(number) is { } image)
+            {
+                Update("user_message_chunk", "HistoryReplayed", writer =>
+                {
+                    writer.WriteStartObject("content");
+                    writer.WriteString("type", "image");
+                    writer.WriteString("mimeType", image.MimeType);
+                    writer.WriteBase64String("data", image.Data);
+                    writer.WriteEndObject();
+                    writer.WriteString("messageId", id);
+                }, crystal => crystal.WriteNumber("image", number));
+            }
+            else
+            {
+                var marker = match.Value[1..];
+                Update("user_message_chunk", "HistoryReplayed", writer =>
+                {
+                    TextContent(writer, marker);
+                    writer.WriteString("messageId", id);
+                });
+            }
+
+            position = match.Index + match.Length;
+        }
+
+        if (position < text.Length)
+        {
+            var rest = text[position..];
+            Update("user_message_chunk", "HistoryReplayed", writer =>
+            {
+                TextContent(writer, rest);
+                writer.WriteString("messageId", id);
+            });
+        }
+    }
+
     private void Stream(ChatStreamEvent streamEvent)
     {
         switch (streamEvent)
@@ -217,8 +549,8 @@ internal sealed class SessionUpdates
                 StreamingCall(call);
                 break;
             default:
-                // Opaque reasoning state, usage, and completion carry nothing
-                // a client shows in this phase. Opaque state never leaves.
+                // Opaque reasoning state never leaves; usage arrives as
+                // UsageChanged; completion only closes the message id.
                 break;
         }
     }
@@ -247,11 +579,11 @@ internal sealed class SessionUpdates
         }
     }
 
-    private void Issue(ToolCall call)
+    private void Issue(ToolCall call, string eventName = "ToolCallsIssued")
     {
         var known = !_announced.Add(call.CallId);
-        var workspace = _workspace();
-        Update(known ? "tool_call_update" : "tool_call", "ToolCallsIssued", writer =>
+        var workspace = eventName == "HistoryReplayed" ? null : _workspace();
+        Update(known ? "tool_call_update" : "tool_call", eventName, writer =>
         {
             writer.WriteString("toolCallId", call.CallId);
             writer.WriteString("name", call.Name);
@@ -264,14 +596,14 @@ internal sealed class SessionUpdates
         });
     }
 
-    private void Result(ToolResult result)
+    private void Result(ToolResult result, string eventName = "ToolResultsReceived")
     {
         if (!_announced.Contains(result.CallId))
         {
             return;
         }
 
-        Update("tool_call_update", "ToolResultsReceived", writer =>
+        Update("tool_call_update", eventName, writer =>
         {
             writer.WriteString("toolCallId", result.CallId);
             ToolCallWire.Result(writer, result);

@@ -50,6 +50,7 @@ public sealed class ServerParityTests
         ["TrySetDirectoryAccess"] = "/access through POST /input",
         ["PasteClipboardImageAsync"] = "Excluded: reads the server's clipboard; POST /images instead",
         ["TryAttachImage"] = "POST /images",
+        ["TryAttachImageFile"] = "/attach <path> through POST /input",
         ["TryGetImage"] = "GET /images/{number}",
         ["TryExport"] = "GET /export",
         ["TryCancelSideQuestion"] = "POST /side/cancel",
@@ -88,7 +89,7 @@ public sealed class ServerParityTests
         var broker = typeof(InteractionBroker);
 
         Assert.All(
-            properties.Where(static type => type.IsInterface && type != typeof(ISessionObserver)),
+            properties.Where(static type => type.IsInterface && !type.IsGenericType && type != typeof(ISessionObserver)),
             contract => Assert.True(contract.IsAssignableFrom(broker), contract.Name));
         Assert.Contains(typeof(ISessionObserver), properties);
         Assert.True(typeof(ISessionObserver).IsAssignableFrom(typeof(Events.EventHub)));

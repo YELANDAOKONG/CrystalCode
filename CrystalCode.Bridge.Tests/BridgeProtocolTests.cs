@@ -12,7 +12,7 @@ namespace CrystalCode.Bridge.Tests;
 public sealed class BridgeProtocolTests
 {
     [Fact]
-    public async Task Initialize_AdvertisesOnlyWhatThisBuildImplements()
+    public async Task Initialize_AdvertisesWhatThisBuildImplements()
     {
         await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
 
@@ -24,12 +24,19 @@ public sealed class BridgeProtocolTests
         Assert.Equal("test", result.GetProperty("agentInfo").GetProperty("version").GetString());
         Assert.Equal(0, result.GetProperty("authMethods").GetArrayLength());
         var capabilities = result.GetProperty("agentCapabilities");
-        Assert.False(capabilities.GetProperty("loadSession").GetBoolean());
+        Assert.True(capabilities.GetProperty("loadSession").GetBoolean());
         Assert.True(capabilities.GetProperty("promptCapabilities").GetProperty("image").GetBoolean());
         Assert.False(capabilities.GetProperty("promptCapabilities").GetProperty("audio").GetBoolean());
         Assert.True(capabilities.GetProperty("promptCapabilities").GetProperty("embeddedContext").GetBoolean());
+        Assert.True(capabilities.GetProperty("mcpCapabilities").GetProperty("http").GetBoolean());
+        Assert.True(capabilities.GetProperty("mcpCapabilities").GetProperty("sse").GetBoolean());
         var session = capabilities.GetProperty("sessionCapabilities");
-        Assert.Equal(["close"], session.EnumerateObject().Select(static property => property.Name));
+        Assert.Equal(
+            ["additionalDirectories", "close", "list", "resume"],
+            session.EnumerateObject().Select(static property => property.Name).Order(StringComparer.Ordinal));
+        Assert.False(session.TryGetProperty("fork", out _));
+        var crystal = capabilities.GetProperty("_meta").GetProperty("crystal");
+        Assert.True(crystal.GetProperty("loadAcrossCwd").GetBoolean());
         // Nothing outside the schema at the root of a spec type.
         Assert.Equal(
             ["_meta", "loadSession", "mcpCapabilities", "promptCapabilities", "sessionCapabilities"],
@@ -187,16 +194,19 @@ public sealed class BridgeProtocolTests
 
         await fixture.WriteLineAsync("{not json");
         await fixture.WriteLineAsync("""[{"jsonrpc":"2.0","id":99,"method":"initialize"}]""");
-        var unknown = await fixture.RequestAsync("session/load", new { sessionId = id });
-        var relative = await fixture.RequestAsync("session/new", new { cwd = "relative/path", mcpServers = Array.Empty<object>() });
-        var roots = await fixture.RequestAsync("session/new", new { cwd = fixture.Workspace, additionalDirectories = new[] { fixture.Root } });
+        var unknown = await fixture.RequestAsync("session/fork", new { sessionId = id });
         var other = await fixture.RequestAsync("session/prompt", new { sessionId = "nope", prompt = new[] { new { type = "text", text = "hi" } } });
         var audio = await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new object[] { new { type = "audio", data = "AA==", mimeType = "audio/wav" } } });
         var empty = await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = Array.Empty<object>() });
+        // A failed open replaces nothing, but a later valid one would; these come last.
+        var relative = await fixture.RequestAsync("session/new", new { cwd = "relative/path", mcpServers = Array.Empty<object>() });
+        var roots = await fixture.RequestAsync("session/new", new { cwd = fixture.Workspace, additionalDirectories = new[] { "relative" } });
+        var missing = await fixture.RequestAsync("session/load", new { sessionId = "no-such-session", cwd = fixture.Workspace, mcpServers = Array.Empty<object>() });
 
         Assert.Equal(-32601, Code(unknown));
         Assert.Equal(-32602, Code(relative));
         Assert.Equal(-32602, Code(roots));
+        Assert.Equal(-32002, Code(missing));
         Assert.Equal(-32002, Code(other));
         Assert.Equal(-32602, Code(audio));
         Assert.Equal(-32602, Code(empty));
@@ -240,21 +250,23 @@ public sealed class BridgeProtocolTests
     }
 
     [Fact]
-    public async Task McpServersFromTheClient_AreIgnoredWithoutEchoingThem()
+    public async Task McpServersFromTheClient_AreRejectedWithoutEchoingTheirValues()
     {
         await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
         await fixture.RequestAsync("initialize", new { protocolVersion = 1 });
 
-        var response = await fixture.RequestAsync("session/new", new
+        var relative = await fixture.RequestAsync("session/new", new
         {
             cwd = fixture.Workspace,
             mcpServers = new[] { new { name = "editor", command = "secret-command", args = new[] { "--token", "sk-hidden-value" }, env = Array.Empty<object>() } }
         });
 
-        Assert.True(response.GetProperty("result").TryGetProperty("sessionId", out _));
-        Assert.Contains("ignored 1 MCP servers", fixture.Error, StringComparison.Ordinal);
+        Assert.Equal(-32602, Code(relative));
+        var message = relative.GetProperty("error").GetRawText();
+        Assert.Contains("editor", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("sk-hidden-value", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-command", message, StringComparison.Ordinal);
         Assert.DoesNotContain("sk-hidden-value", fixture.Error, StringComparison.Ordinal);
-        Assert.DoesNotContain("secret-command", fixture.Error, StringComparison.Ordinal);
     }
 
     [Fact]

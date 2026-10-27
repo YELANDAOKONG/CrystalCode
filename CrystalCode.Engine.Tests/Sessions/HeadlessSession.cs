@@ -30,7 +30,9 @@ internal sealed class HeadlessSession : IDisposable
         Action<CrystalHome, string>? prepare = null,
         IReadOnlyList<DirectoryAccess>? launchAccess = null,
         Crystal.Multimodal.Chat.IStreamingMultimodalChatClient? images = null,
-        Func<IReadOnlyList<ChildSessionDocument>, CancellationToken, Task<string?>>? chooseChild = null)
+        Func<IReadOnlyList<ChildSessionDocument>, CancellationToken, Task<string?>>? chooseChild = null,
+        IReadOnlyList<CrystalCode.Engine.Mcp.McpServerDefinition>? mcpServers = null,
+        IReadOnlyList<DirectoryAccess>? additionalRoots = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -69,11 +71,16 @@ internal sealed class HeadlessSession : IDisposable
                 Approvals,
                 new FixedUserPrompt("unused"),
                 new DecliningSessionChooser(),
-                new ScriptedTrustPrompt(accept: false)) { ChooseChildAsync = chooseChild },
+                new ScriptedTrustPrompt(accept: false))
+            {
+                ChooseChildAsync = chooseChild,
+                McpServers = mcpServers ?? []
+            },
             plugins,
             resume,
             persistedSettings,
-            launchAccess);
+            launchAccess,
+            additionalRoots);
     }
 
     public static HarnessSettings ScriptedSettings(bool thinking = false)

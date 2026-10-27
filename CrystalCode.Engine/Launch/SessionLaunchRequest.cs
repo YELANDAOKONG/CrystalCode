@@ -17,6 +17,13 @@ namespace CrystalCode.Engine.Launch;
 /// True when a later preference save may also write the launch provider and
 /// model. Every other launch override stays off disk either way.
 /// </param>
+/// <param name="AdditionalRoots">
+/// When not null, the complete set of directories outside the workspace the
+/// session may write, as an ACP client's additional roots. Saved and default
+/// rules outside the workspace are dropped; read rules on or inside the
+/// workspace are kept, because they only narrow access. Never written to
+/// <c>access.json</c>.
+/// </param>
 public sealed record SessionLaunchRequest(
     SessionLaunchOptions Options,
     string WorkingDirectory,
@@ -25,4 +32,5 @@ public sealed record SessionLaunchRequest(
     bool Resume = false,
     string? ResumeTarget = null,
     SessionTrustCheck Trust = SessionTrustCheck.Prompt,
-    bool PersistSelection = true);
+    bool PersistSelection = true,
+    IReadOnlyList<string>? AdditionalRoots = null);

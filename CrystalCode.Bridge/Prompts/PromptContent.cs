@@ -21,12 +21,21 @@ internal static class PromptContent
 
     private const int MaximumResourceCharacters = 1_000_000;
 
-    /// <summary>Attaches image bytes and returns the trusted marker, or the reason it failed.</summary>
+    private static readonly string[] ImageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+    /// <summary>
+    /// Reads one prompt. <paramref name="attach"/> attaches image bytes;
+    /// <paramref name="attachFile"/> attaches a local image file through the
+    /// engine's <c>/attach</c> checks. Each returns the trusted marker or the
+    /// reason it failed.
+    /// </summary>
     public static async Task<PromptText> ReadAsync(
         JsonElement prompt,
-        Func<ReadOnlyMemory<byte>, Task<ImageAttachResult>> attach)
+        Func<ReadOnlyMemory<byte>, Task<ImageAttachResult>> attach,
+        Func<string, Task<ImageAttachResult>>? attachFile = null)
     {
         ArgumentNullException.ThrowIfNull(attach);
+        attachFile ??= static _ => Task.FromResult(new ImageAttachResult(null, string.Empty));
         if (prompt.ValueKind != JsonValueKind.Array)
         {
             throw JsonRpcException.InvalidParams("prompt must be an array of content blocks.");
@@ -64,7 +73,7 @@ internal static class PromptContent
                     parts.Add(await ResourceAsync(block, attach, warnings));
                     break;
                 case "resource_link":
-                    parts.Add(Link(block));
+                    parts.Add(await LinkAsync(block, attachFile));
                     break;
                 default:
                     throw JsonRpcException.InvalidParams("Unsupported content block type.");
@@ -153,9 +162,28 @@ internal static class PromptContent
             + " bytes, binary content is not passed to the model]";
     }
 
-    private static string Link(JsonElement block)
+    /// <summary>
+    /// A local image link is attached when the engine accepts it; when it
+    /// does not (outside what <c>/attach</c> resolves, too large, not a valid
+    /// image, or no image input), the link becomes the file mention.
+    /// </summary>
+    private static async Task<string> LinkAsync(JsonElement block, Func<string, Task<ImageAttachResult>> attachFile)
     {
         var uri = JsonParams.RequiredString(block, "uri");
+        if (TryLocalPath(uri, out var imagePath)
+            && File.Exists(imagePath)
+            && (ImageExtensions.Contains(Path.GetExtension(imagePath), StringComparer.OrdinalIgnoreCase)
+                || JsonParams.OptionalString(block, "mimeType")?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true)
+            && (await attachFile(imagePath)).Marker is { } marker)
+        {
+            return marker;
+        }
+
+        return Link(block, uri);
+    }
+
+    private static string Link(JsonElement block, string uri)
+    {
         var name = JsonParams.OptionalString(block, "title") ?? JsonParams.RequiredString(block, "name");
         var size = block.TryGetProperty("size", out var sizeElement) && sizeElement.TryGetInt64(out var bytes)
             ? ", " + bytes.ToString(System.Globalization.CultureInfo.InvariantCulture) + " bytes"

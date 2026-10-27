@@ -41,6 +41,7 @@ public sealed class BridgeParityTests
         ["TrySetDirectoryAccess"] = "/access as prompt text",
         ["PasteClipboardImageAsync"] = "Excluded: reads this machine's clipboard; image blocks instead",
         ["TryAttachImage"] = "image content blocks",
+        ["TryAttachImageFile"] = "file:// image resource links",
         ["TryGetImage"] = "Phase 4: _crystal/image/get",
         ["TryExport"] = "Phase 4: _crystal/export",
         ["TryCancelSideQuestion"] = "Phase 4: _crystal/side/cancel",
@@ -102,9 +103,10 @@ public sealed class BridgeParityTests
     {
         var contracts = typeof(SessionFrontEnd).GetProperties()
             .Select(static property => property.PropertyType)
-            .Where(static type => type.IsInterface);
+            .Where(static type => type.IsInterface && !type.IsGenericType);
 
         Assert.All(contracts, contract => Assert.True(contract.IsAssignableFrom(typeof(BridgeSession)), contract.Name));
+        Assert.NotNull(typeof(BridgeSession).GetMethod(nameof(BridgeSession.ChooseChildAsync)));
     }
 
     [Fact]

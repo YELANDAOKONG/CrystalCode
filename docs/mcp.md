@@ -45,6 +45,14 @@ Project servers start under the same rule as project tool sets: when
 `workspaceTrust` is on, the workspace is trusted before a session enters it.
 With `workspaceTrust` off, project servers start without that check.
 
+A front end can also pass servers for one session, such as the editor MCP
+servers `crystal bridge` receives from an ACP client. These use the source
+`Session`, connect after Home and Project, replace a server of the same name,
+and follow the Project approval choice. They are not written to any file,
+the session file does not store them, and their command, arguments,
+environment, URL, and headers never appear in `/mcp`, events, notes, or
+errors. `/mcp` lists them with the source `Session`.
+
 ## `mcp.json`
 
 ```json

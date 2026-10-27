@@ -111,6 +111,37 @@ public static class WireWriter
         writer.WriteEndArray();
     }
 
+    public static void Options(Utf8JsonWriter writer, string name, IReadOnlyList<SessionOption> options)
+    {
+        writer.WriteStartArray(name);
+        foreach (var option in options)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("id", option.Id);
+            writer.WriteString("name", option.Name);
+            writer.WriteString("category", option.Category);
+            writer.WriteString("current", option.Current);
+            writer.WriteBoolean("switch", option.IsSwitch);
+            Optional(writer, "description", option.Description);
+            writer.WriteStartArray("values");
+            foreach (var value in option.Values)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("value", value.Value);
+                writer.WriteString("name", value.Name);
+                writer.WriteString("command", value.Command);
+                Optional(writer, "description", value.Description);
+                Optional(writer, "group", value.Group);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+    }
+
     private static void Command(Utf8JsonWriter writer, SlashCompletion command)
     {
         writer.WriteStartObject();

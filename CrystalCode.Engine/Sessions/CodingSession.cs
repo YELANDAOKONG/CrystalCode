@@ -794,6 +794,7 @@ public sealed class CodingSession : ITurnObserver
         try
         {
             ChangeAgentsCore(argument);
+            PublishOptions();
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or KeyNotFoundException
             or IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
@@ -972,6 +973,7 @@ public sealed class CodingSession : ITurnObserver
     private SkillCatalog? _skills;
     private ExternalCatalog _external = ExternalCatalog.Empty;
     private McpCatalog _mcp = McpCatalog.Empty;
+    private IReadOnlyList<SessionOption>? _publishedOptions;
     private readonly object _mcpGate = new();
     private readonly HashSet<string> _mcpChanged = new(StringComparer.Ordinal);
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
@@ -1046,7 +1048,8 @@ public sealed class CodingSession : ITurnObserver
         PluginRegistry plugins,
         SessionDocument? resume,
         HarnessSettings? persistedSettings,
-        IReadOnlyList<DirectoryAccess>? launchAccess)
+        IReadOnlyList<DirectoryAccess>? launchAccess,
+        IReadOnlyList<DirectoryAccess>? additionalRoots)
     {
         ArgumentNullException.ThrowIfNull(frontEnd);
         ArgumentNullException.ThrowIfNull(frontEnd.Trust);
@@ -1115,9 +1118,14 @@ public sealed class CodingSession : ITurnObserver
         {
             ApplyLaunchAccess(launchAccess);
         }
-        else if (resume is null)
+        else if (resume is null && additionalRoots is null)
         {
             SeedWorkspaceDefaults();
+        }
+
+        if (additionalRoots is not null)
+        {
+            ReplaceOutsideRoots(additionalRoots, seedDefaults: resume is null && launchAccess is not { Count: > 0 });
         }
     }
 
@@ -1131,7 +1139,8 @@ public sealed class CodingSession : ITurnObserver
         PluginRegistry? plugins = null,
         SessionDocument? resume = null,
         HarnessSettings? persistedSettings = null,
-        IReadOnlyList<DirectoryAccess>? launchAccess = null)
+        IReadOnlyList<DirectoryAccess>? launchAccess = null,
+        IReadOnlyList<DirectoryAccess>? additionalRoots = null)
     {
         if (resume is not null && !DirectoryAccessPolicy.TryValidateSaved(resume.Access, out var error))
         {
@@ -1148,7 +1157,8 @@ public sealed class CodingSession : ITurnObserver
             plugins ?? PluginRegistry.CreateBuiltIn(),
             resume,
             persistedSettings,
-            launchAccess);
+            launchAccess,
+            additionalRoots);
     }
 
     /// <summary>
@@ -2321,6 +2331,50 @@ public sealed class CodingSession : ITurnObserver
         ReplaceLiveSystem();
         SaveSession();
     }
+
+    /// <summary>
+    /// Makes <paramref name="roots"/> the only rules outside the workspace,
+    /// as an ACP client's additional roots require. Rules on or inside the
+    /// workspace stay: they only narrow access. A new session seeds them from
+    /// the Home defaults for this workspace; a resumed one keeps its own.
+    /// </summary>
+    private void ReplaceOutsideRoots(IReadOnlyList<DirectoryAccess> roots, bool seedDefaults)
+    {
+        var narrowing = _workspace.Access.Snapshot().Where(rule => InsideWorkspace(rule.Path)).ToList();
+        if (seedDefaults)
+        {
+            var store = new WorkspaceAccessStore(_home);
+            if (store.TrySeed(_workspace.Root, out var defaults, out var error, out var skipped))
+            {
+                foreach (var skippedError in skipped)
+                {
+                    Error(skippedError);
+                }
+
+                narrowing.AddRange(defaults.Where(rule => InsideWorkspace(rule.Path)));
+            }
+            else
+            {
+                Error(error);
+            }
+        }
+
+        _workspace.Access.Clear();
+        foreach (var rule in narrowing.Concat(roots))
+        {
+            _workspace.Access.Set(rule.Path, rule.Mode, rule.SourcePath);
+        }
+
+        ReplaceLiveSystem();
+        SaveSession();
+    }
+
+    private bool InsideWorkspace(string fullPath) =>
+        _workspace.Contains(Path.TrimEndingDirectorySeparator(fullPath))
+        || string.Equals(
+            Path.TrimEndingDirectorySeparator(fullPath),
+            Path.TrimEndingDirectorySeparator(_workspace.Root),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     private const string AccessUsage =
         "Use /access, /access add <path> read|write, /access remove <path>, /access default, /access default add <path> read|write, or /access default remove <path>.";
@@ -4423,18 +4477,57 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (!_workspace.TryResolveExistingFile(paths[0], out var path, out var error))
+        if (!TryLoadImageFile(paths[0], out var image, out var path, out var error))
         {
             Error(error);
             return;
         }
 
+        _pendingImages.Add((image.Number, CurrentOrigin));
+        Note($"Attached  {image.Marker}  {Path.GetFileName(path)}");
+    }
+
+    /// <summary>
+    /// Attaches an image file to the unsent draft with the same path
+    /// resolution and checks as <c>/attach</c>: an existing file the
+    /// workspace resolver accepts, the host size limit, and a PNG, JPEG, GIF,
+    /// or WebP signature. The draft rules match <see cref="TryAttachImage"/>:
+    /// put the returned trusted marker in the submitted text. Writes nothing
+    /// to the transcript.
+    /// </summary>
+    public bool TryAttachImageFile(string path, out ImageAttachment? image, out string error)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        image = null;
+        if (_multimodalClient is null)
+        {
+            error = "The selected model and provider do not support image input.";
+            return false;
+        }
+
+        if (!TryLoadImageFile(path, out var loaded, out _, out error))
+        {
+            return false;
+        }
+
+        _draftImages[loaded.Number] = CurrentOrigin;
+        image = loaded;
+        return true;
+    }
+
+    private bool TryLoadImageFile(string argument, out ImageAttachment image, out string path, out string error)
+    {
+        image = null!;
+        if (!_workspace.TryResolveExistingFile(argument, out path, out error))
+        {
+            return false;
+        }
+
         try
         {
-            var image = ImageFile.Load(path, ReserveImageNumber());
+            image = ImageFile.Load(path, ReserveImageNumber());
             AddImage(image);
-            _pendingImages.Add((image.Number, CurrentOrigin));
-            Note($"Attached  {image.Marker}  {Path.GetFileName(path)}");
+            return true;
         }
         catch (Exception exception) when (exception is IOException
             or UnauthorizedAccessException
@@ -4442,7 +4535,8 @@ public sealed class CodingSession : ITurnObserver
             or ArgumentException
             or NotSupportedException)
         {
-            Error("Image attachment failed  " + exception.Message);
+            error = "Image attachment failed  " + exception.Message;
+            return false;
         }
     }
 
@@ -6527,7 +6621,9 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var notes = new List<string>();
-        var definitions = new McpServerDiscovery(_home).Collect(_workspace.Root, notes);
+        var definitions = McpServerDiscovery.WithSession(
+            new McpServerDiscovery(_home).Collect(_workspace.Root, notes),
+            _frontEnd.McpServers);
         foreach (var note in notes)
         {
             Note(note);
@@ -7167,6 +7263,7 @@ public sealed class CodingSession : ITurnObserver
 
         var next = enabled ?? !_settings.MicroCompaction.Enabled;
         SaveSettings(current => current.WithMicroCompaction(current.MicroCompaction.WithEnabled(next)));
+        PublishOptions();
         Note("Microcompaction  " + (next ? "On" : "Off"));
     }
 
@@ -7643,6 +7740,7 @@ public sealed class CodingSession : ITurnObserver
         }).ToArray();
         menu = [.. menu, .. _mcp.Prompts.Select(PromptCompletion)];
         Publish(new SlashCommandsChanged(menu));
+        PublishOptions();
     }
 
     private static SlashCompletion PromptCompletion(McpPromptEntry entry)
@@ -7813,6 +7911,31 @@ public sealed class CodingSession : ITurnObserver
     private void RefreshChrome()
     {
         Publish(new ChromeChanged(CurrentChrome()));
+        PublishOptions();
+    }
+
+    /// <summary>
+    /// Publishes the option catalog when it changed. Chrome, preference, and
+    /// slash-menu refreshes all call this, so a front end never misses a
+    /// change to a value or its choices.
+    /// </summary>
+    private void PublishOptions()
+    {
+        var options = SessionOptionCatalog.Build(
+            _settings,
+            CurrentModeName(),
+            [.. _modes.Definitions.Select(static mode => (mode.Name, mode.Description))],
+            _thinkingEffort,
+            _approval,
+            _promptResolution.PromptSet,
+            [PromptSetNames.Default, .. _promptResolution.AvailableSets.Where(static name => name != PromptSetNames.Default)]);
+        if (_publishedOptions is not null && _publishedOptions.SequenceEqual(options, SessionOptionComparer.Instance))
+        {
+            return;
+        }
+
+        _publishedOptions = options;
+        Publish(new SessionOptionsChanged(options));
     }
 
     private SessionPreferences CurrentPreferences() =>
@@ -7833,6 +7956,7 @@ public sealed class CodingSession : ITurnObserver
     private void PublishPreferences()
     {
         Publish(new PreferencesChanged(CurrentPreferences()));
+        PublishOptions();
     }
 
     private void PromoteAfterTools()

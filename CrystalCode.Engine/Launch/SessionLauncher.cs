@@ -221,6 +221,13 @@ public static class SessionLauncher
             return Invalid(accessError);
         }
 
+        IReadOnlyList<DirectoryAccess>? roots = null;
+        if (request.AdditionalRoots is { } requested
+            && !SessionLaunchAccess.TryReadRoots(requested, workspace, out roots, out var rootsError))
+        {
+            return Invalid(rootsError);
+        }
+
         if (mode is not null && !ModeSelection.TryResolve(home, workspace, mode, out var modeError))
         {
             return Invalid(modeError);
@@ -241,7 +248,8 @@ public static class SessionLauncher
             resumed,
             mode,
             access,
-            SessionLaunchOverrides.UnavailableThinkingNotes(applied)));
+            SessionLaunchOverrides.UnavailableThinkingNotes(applied),
+            roots));
     }
 
     private static async Task<SessionLaunchResult?> CheckTrustAsync(
