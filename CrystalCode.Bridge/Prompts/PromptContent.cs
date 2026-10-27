@@ -258,11 +258,6 @@ internal static partial class PromptContent
         }
 
         var local = parsed.LocalPath;
-        if (!Path.IsPathFullyQualified(local))
-        {
-            return false;
-        }
-
         path = Path.GetFullPath(local);
         return true;
     }
