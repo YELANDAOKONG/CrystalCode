@@ -1,4 +1,4 @@
-﻿using Spectre.Console.Cli;
+using Spectre.Console.Cli;
 
 using CrystalCode.Commands;
 using CrystalCode.Display.Shell;
@@ -25,9 +25,9 @@ public static class Program
             config.AddCommand<SpaceCommand>("space")
                 .WithDescription("Open the operator space and start the terminal.");
             config.AddCommand<ServerCommand>("server")
-                .WithDescription("Serve one session over HTTP for other front ends. See docs/server.md.");
+                .WithDescription("Serve one session over HTTP for other front ends.");
             config.AddCommand<BridgeCommand>("bridge")
-                .WithDescription("Serve one session to an ACP editor over stdin and stdout. See docs/bridge.md.");
+                .WithDescription("Serve one session to an ACP editor over stdin and stdout.");
             config.AddBranch<ExtensionSettings>("plugins", plugins =>
             {
                 plugins.SetDescription("List, show, enable, or disable one plugin directory.");
