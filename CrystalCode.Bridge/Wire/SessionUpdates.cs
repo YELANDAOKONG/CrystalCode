@@ -103,6 +103,7 @@ internal sealed class SessionUpdates
     private readonly IReadOnlySet<string>? _offered;
     private IReadOnlyList<SessionOption> _options = [];
     private string? _mode;
+    private int _contextWindow;
     private string? _reportedWorkspace;
     private string _engineSessionId = string.Empty;
 
@@ -194,16 +195,19 @@ internal sealed class SessionUpdates
                     break;
                 case SessionStarted started:
                     _reportedWorkspace = started.Chrome.WorkspaceRoot;
+                    RememberContextWindow(started.Chrome.ContextWindow);
                     Chrome(started.Chrome);
                     break;
                 case ChromeChanged changed when changed.Chrome.WorkspaceRoot != _reportedWorkspace:
                     // /cd and /space move the session; ACP's cwd is otherwise fixed.
                     _reportedWorkspace = changed.Chrome.WorkspaceRoot;
+                    RememberContextWindow(changed.Chrome.ContextWindow);
                     SessionInfo("ChromeChanged", title: null);
                     Chrome(changed.Chrome);
                     break;
                 case ChromeChanged changed:
                     // The option catalog carries the values; this keeps the plain chrome.
+                    RememberContextWindow(changed.Chrome.ContextWindow);
                     Chrome(changed.Chrome);
                     break;
                 case PreferencesChanged preferences:
@@ -452,6 +456,7 @@ internal sealed class SessionUpdates
             return;
         }
 
+        RememberContextWindow(usage.ContextWindow);
         Update("usage_update", "UsageChanged", writer =>
         {
             writer.WriteNumber("used", usage.Usage.TotalTokenCount);
@@ -464,14 +469,17 @@ internal sealed class SessionUpdates
         });
     }
 
-    private int CurrentContextWindow() =>
-        int.TryParse(
-            _options.FirstOrDefault(static option => option.Id == "context")?.Current,
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out var window)
-            ? window
-            : 0;
+    // The "context" option exists only for models with several selectable windows,
+    // so the window is tracked from chrome and usage events instead.
+    private int CurrentContextWindow() => _contextWindow;
+
+    private void RememberContextWindow(int window)
+    {
+        if (window > 0)
+        {
+            _contextWindow = window;
+        }
+    }
 
     private void SessionInfo(string eventName, string? title)
     {
