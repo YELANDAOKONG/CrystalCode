@@ -44,27 +44,27 @@ public static class Theme
     private static readonly IReadOnlyDictionary<string, string> LightPalette =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["chrome"] = "grey46",
-            ["rule"] = "grey74",
-            ["user"] = "grey15",
-            ["image"] = "green4",
-            ["thinking"] = "grey50",
-            ["tool"] = "grey35",
-            ["ok"] = "green4",
-            ["fail"] = "red3",
-            ["work"] = "blue3",
-            ["plan"] = "darkorange3",
-            ["custom"] = "purple",
-            ["review"] = "blue3",
-            ["selected"] = "bold blue3",
-            ["heading"] = "bold blue3",
-            ["code"] = "grey23",
-            ["codeBg"] = "grey89",
-            ["diffAdded"] = "green4",
-            ["diffRemoved"] = "red3",
-            ["warning"] = "darkorange3",
-            ["muted"] = "grey54",
-            ["accent"] = "blue3"
+            ["chrome"] = "#6b7280",
+            ["rule"] = "#d1d5db",
+            ["user"] = "#1f2937",
+            ["image"] = "#4d7c5f",
+            ["thinking"] = "#8b929c",
+            ["tool"] = "#4b5563",
+            ["ok"] = "#4d7c5f",
+            ["fail"] = "#b4534f",
+            ["work"] = "#4a6a94",
+            ["plan"] = "#a9753a",
+            ["custom"] = "#8660a6",
+            ["review"] = "#4a6a94",
+            ["selected"] = "bold #4a6a94",
+            ["heading"] = "bold #4a6a94",
+            ["code"] = "#374151",
+            ["codeBg"] = "#eceef1",
+            ["diffAdded"] = "#4d7c5f",
+            ["diffRemoved"] = "#b4534f",
+            ["warning"] = "#a9753a",
+            ["muted"] = "#9ca3af",
+            ["accent"] = "#4a6a94"
         };
 
     private static IReadOnlyDictionary<string, string> _current = DefaultPalette;
