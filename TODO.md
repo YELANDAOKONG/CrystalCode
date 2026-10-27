@@ -187,3 +187,10 @@ it speculatively, and do not reserve types or configuration for it.
 - Whether plugins declare dependencies on one another, and related loading
   questions. Not decided, and not part of the deferred list until a decision
   is made.
+- A `crystal server-manager` API host and session manager that owns and
+  supervises its own child `crystal` processes. The process model, session
+  lifecycle, discovery and authentication, child-process isolation and
+  shutdown, restart behavior, resource limits, persistence, and API contract
+  are not defined. It must not be treated as permission to add a command,
+  project, public type, wire field, or server behavior until those boundaries
+  are decided.
