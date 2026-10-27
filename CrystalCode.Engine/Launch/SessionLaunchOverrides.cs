@@ -113,6 +113,32 @@ public static class SessionLaunchOverrides
                 });
             }
 
+            if (request.AgentsModelCalls is not null
+                || request.AgentsToolCalls is not null
+                || request.AgentsDuration is not null)
+            {
+                var limits = next.Agents.Limits;
+                if (request.AgentsModelCalls is not null)
+                {
+                    limits = limits.With("model-calls", ParseOptionalCount(
+                        Required(request.AgentsModelCalls, "Agent model calls"), "Agent model calls", minimum: 1));
+                }
+
+                if (request.AgentsToolCalls is not null)
+                {
+                    limits = limits.With("tool-calls", ParseOptionalCount(
+                        Required(request.AgentsToolCalls, "Agent tool calls"), "Agent tool calls", minimum: 0));
+                }
+
+                if (request.AgentsDuration is not null)
+                {
+                    limits = limits.With("duration", ParseOptionalCount(
+                        Required(request.AgentsDuration, "Agent duration"), "Agent duration", minimum: 1));
+                }
+
+                next = next.WithAgents(next.Agents with { Limits = limits });
+            }
+
             if (request.Skills is not null)
             {
                 next = next.WithSkills(ParseSwitch(request.Skills, "--skills"));

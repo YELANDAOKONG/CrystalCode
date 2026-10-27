@@ -47,6 +47,33 @@ public sealed class SessionLaunchOverridesTests
     }
 
     [Fact]
+    public void AgentLimitOverrides_ApplyOnlyInMemoryAndKeepOtherFields()
+    {
+        var current = HarnessSettings.CreateDefault().WithAgents(
+            new AgentSettings { Limits = new AgentLimits(maximumToolCalls: 40) });
+
+        var applied = AssertApplied(current, new SessionLaunchOptions
+        {
+            AgentsModelCalls = "200",
+            AgentsDuration = "3600"
+        });
+
+        Assert.Equal(new AgentLimits(200, 40, 3600), applied.Agents.Limits);
+        Assert.Equal(new AgentLimits(maximumToolCalls: 40), current.Agents.Limits);
+
+        var cleared = AssertApplied(applied, new SessionLaunchOptions { AgentsToolCalls = "unlimited" });
+        Assert.Equal(new AgentLimits(200, null, 3600), cleared.Agents.Limits);
+
+        Assert.False(SessionLaunchOverrides.TryApply(
+            current,
+            new SessionLaunchOptions { AgentsModelCalls = "0" },
+            out _,
+            out _,
+            out var error));
+        Assert.Contains("Agent model calls", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RulesOverride_ChangesOnlyTheNamedSide()
     {
         var current = HarnessSettings.CreateDefault()

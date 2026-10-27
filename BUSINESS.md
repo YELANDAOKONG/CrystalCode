@@ -418,11 +418,15 @@ conversation's stream or change its progress. Headless calls requiring an
 operator are denied by the same parent policy.
 
 `/agents` lists definitions and settings. While idle it accepts `on`, `off`,
-`concurrency <1-8>`, `model <name> [provider model]`, and
+`concurrency <1-8>`, `limit <model-calls|tool-calls|duration> [value]`,
+`model <name> [provider model]`, and
 `thinking|context|tier|speed <name> [value]`. Omitting the value clears that
 choice. Model-specific completions use the Agent's model. Built-in settings
 are saved to `config.json`; custom settings go to the corresponding manifest.
-`--agents on|off` and `--agents-concurrency <n>` affect only the process.
+`--agents on|off`, `--agents-concurrency <n>`, `--agents-model-calls <n>`,
+`--agents-tool-calls <n>`, and `--agents-duration <seconds>` affect only the
+process. `limit <model-calls|tool-calls|duration> [value]` is the idle
+`/agents` form of `agents.limits`; omitting the value clears that field.
 
 Custom definitions live in `~/.crystal/agents/<name>/` and
 `<workspace>/.crystal/agents/<name>/`, containing `agent.json` and `prompt.md`.

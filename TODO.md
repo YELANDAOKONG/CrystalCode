@@ -172,7 +172,8 @@ behavior stands until a specific change defines otherwise.
   in `BUSINESS.md` and `ARCHITECTURE.md`. It is not the Review or Audit
   approval mode, and it does not change those modes.
 - Child Agent configuration. Current `/agents` settings, the `agents` object
-  in `config.json`, process `--agents` and `--agents-concurrency`, and custom
+  in `config.json`, process `--agents`, `--agents-concurrency`, and
+  `--agents-model-calls`, `--agents-tool-calls`, `--agents-duration`, and custom
   `agent.json` manifests stand, as does `agents.limits` (per-run child
   model-call, tool-call, and duration bounds). Which other settings change,
   and at which scope, are not defined. Do not reserve a new configuration field or command. This

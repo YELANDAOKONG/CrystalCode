@@ -80,6 +80,12 @@ public sealed record SessionLaunchOptions
 
     public int? AgentsConcurrency { get; init; }
 
+    public string? AgentsModelCalls { get; init; }
+
+    public string? AgentsToolCalls { get; init; }
+
+    public string? AgentsDuration { get; init; }
+
     public string? Skills { get; init; }
 
     public string? ExternalTools { get; init; }

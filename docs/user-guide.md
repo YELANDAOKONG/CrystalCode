@@ -205,6 +205,7 @@ CLI options:
 | `--skills`, `--external-tools`, `--mcp`, `--plugins` | `on` or `off` for this process |
 | `--agents <on\|off>` | Enable or disable child Agents for this process. Does not write `config.json` |
 | `--agents-concurrency <count>` | Active child invocations for this process, from 1 to 8. Does not write the file |
+| `--agents-model-calls <count>`, `--agents-tool-calls <count>`, `--agents-duration <seconds>` | Per-run child limits for this process. `unlimited` removes one. Does not write the file |
 | `--rules <value>` | `on` or `off` for both rule-file sides, or `global=on\|off` and `project=on\|off`. Does not affect `instructions.md` or `.crystal.md` |
 | `--theme <name>` | Color theme for this process: `default`, `dark`, `light`, or a file in `~/.crystal/themes`. Not written to `config.json` |
 | `--model-calls <count>` | Model rounds for each turn. `unlimited` removes that cap |
@@ -370,6 +371,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--skills`, `--external-tools`, `--mcp`, `--plugins` | `on` or `off` for this process |
 | `--agents <on\|off>` | Enable or disable child Agents for this process. Does not write `config.json` |
 | `--agents-concurrency <count>` | Active child invocations for this process, from 1 to 8. Does not write the file |
+| `--agents-model-calls <count>`, `--agents-tool-calls <count>`, `--agents-duration <seconds>` | Per-run child limits for this process. `unlimited` removes one. Does not write the file |
 | `--rules <value>` | `on` or `off` for both rule-file sides, or comma-separated `global=on\|off` and `project=on\|off`. An assignment leaves the other side as saved. Does not write the file, and does not affect `instructions.md` or `.crystal.md` |
 | `--workspace-trust <on\|off>` | Directory trust for this process only. Omitted and `on` refuse an untrusted directory. `off` skips the check and does not record trust. This does not follow `workspaceTrust` |
 | `--model-calls <count>` | Model rounds for this turn. Default 1024 |
@@ -1220,7 +1222,9 @@ Child Agents are delegated conversations inside the current session.
 They are not a third mode. They are available in Plan and Work when
 `agents.enabled` is true. The default is false, and an omitted
 `agents` object means off. `--agents on|off` and
-`--agents-concurrency <n>` change only this process.
+`--agents-concurrency <n>`, `--agents-model-calls <n>`,
+`--agents-tool-calls <n>`, and `--agents-duration <seconds>` change only
+this process.
 
 The model uses one `task` tool. Arguments are `agent`, a short
 `label`, `prompt`, and an optional `sessionId`. A call without
@@ -1253,7 +1257,8 @@ default, for any Agent. It draws on the parent turn's shared execution
 budget, so a long-running child stops only when that budget is spent.
 `agents.limits` sets a bound for each child run: `maximumModelCalls`,
 `maximumToolCalls`, and `maximumDurationSeconds`. A null or omitted field
-is unlimited. A child that reaches its own limit stops and says so in the
+is unlimited. `/agents limit <model-calls|tool-calls|duration> [value]`
+writes one field while idle, and omitting the value clears it. A child that reaches its own limit stops and says so in the
 `task` result; the parent turn continues.
 
 `agents.maxConcurrent` defaults to 4 and accepts 1 through 8. It
@@ -1568,7 +1573,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/notify` | | Show operator notification. `on` / `off` writes `operatorNotify.enabled` to `config.json`; `on` needs a configured command. `test` runs the command once, even while off, with `CRYSTAL_NOTIFY_EVENT=test`, and reports its exit |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
-| `/agents` | | List child Agents and settings. While idle: `on`, `off`, `concurrency <1-8>`, `model <name> [provider model]`, and `thinking`, `context`, `tier`, or `speed` with `<name> [value]`. Omitting the value clears that choice. Built-in choices go to `config.json`; custom choices go to that Agent's `agent.json`. Changes are refused during a turn or compaction |
+| `/agents` | | List child Agents and settings. While idle: `on`, `off`, `concurrency <1-8>`, `limit <model-calls\|tool-calls\|duration> [value]`, `model <name> [provider model]`, and `thinking`, `context`, `tier`, or `speed` with `<name> [value]`. Omitting the value clears that choice. Built-in choices go to `config.json`; custom choices go to that Agent's `agent.json`. Changes are refused during a turn or compaction |
 | `/child` | | Open a filterable child picker, inspect `/child <unique-id-prefix>`, or `/child parent` to return. Read-only. Unavailable after Agents are disabled. `crystal run` has no `/child` |
 | `/sessions` | | List sessions for this workspace; `/sessions all` lists every workspace |
 | `/compact` | `/summarize` | Summarize earlier context now and print the summary (refused while a turn is running). `full` folds the whole conversation, including the latest turn, into the summary. `model` shows or sets the compaction model; `thinking` cycles or sets its gear. `summary` toggles the manual summary; `auto` toggles the automatic one. `micro` toggles removal of old tool results. `on` or `off` sets any of those switches |

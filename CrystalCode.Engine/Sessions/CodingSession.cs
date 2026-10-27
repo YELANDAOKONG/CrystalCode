@@ -757,6 +757,12 @@ public sealed class CodingSession : ITurnObserver
             new("concurrency", "Concurrent child sessions", ["concurrency"],
                 Enumerable.Range(1, 8).Select(value => new SlashCompletion(value.ToString(), "Child concurrency", [value.ToString()])).ToArray())
         };
+        commands.Add(new SlashCompletion("limit", "Set or clear a child run limit", ["limit"],
+        [
+            new("model-calls", "Model calls for each child run", ["model-calls"], ArgumentsOptional: true),
+            new("tool-calls", "Tool calls for each child run", ["tool-calls"], ArgumentsOptional: true),
+            new("duration", "Seconds for each child run", ["duration"], ArgumentsOptional: true)
+        ]));
         foreach (var command in new[] { "model", "thinking", "context", "tier", "speed" })
         {
             var names = new List<SlashCompletion>();
@@ -836,6 +842,20 @@ public sealed class CodingSession : ITurnObserver
             settings = settings with { MaxConcurrent = concurrency };
             SaveSettings(current => current.WithAgents(current.Agents with { MaxConcurrent = concurrency }));
         }
+        else if (parts.Count is 2 or 3 && parts[0] == "limit")
+        {
+            int? limit = null;
+            if (parts.Count == 3)
+            {
+                limit = int.TryParse(parts[2], System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                    ? parsed
+                    : throw new ArgumentException("Agent limit must be a non-negative integer.", nameof(argument));
+            }
+            var limits = settings.Limits.With(parts[1], limit);
+            settings = settings with { Limits = limits };
+            SaveSettings(current => current.WithAgents(current.Agents with { Limits = limits }));
+        }
         else if (parts.Count >= 2 && parts[0] is "model" or "thinking" or "context" or "tier" or "speed")
         {
             var definition = AgentCatalog.Load(_home, _workspace.Root, settings with { Enabled = true })
@@ -914,7 +934,7 @@ public sealed class CodingSession : ITurnObserver
         }
         else
         {
-            Error("Use /agents [on|off|concurrency <1-8>|model <name> [provider model]|thinking|context|tier|speed <name> [value]].");
+            Error("Use /agents [on|off|concurrency <1-8>|limit <model-calls|tool-calls|duration> [value]|model <name> [provider model]|thinking|context|tier|speed <name> [value]].");
             return;
         }
         RebuildExecutors();

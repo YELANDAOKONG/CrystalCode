@@ -119,6 +119,15 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--agents-concurrency <COUNT>")]
     public int? AgentsConcurrency { get; init; }
 
+    [CommandOption("--agents-model-calls <COUNT>")]
+    public string? AgentsModelCalls { get; init; }
+
+    [CommandOption("--agents-tool-calls <COUNT>")]
+    public string? AgentsToolCalls { get; init; }
+
+    [CommandOption("--agents-duration <SECONDS>")]
+    public string? AgentsDuration { get; init; }
+
     [CommandOption("--skills <on|off>")]
     public string? Skills { get; init; }
 
@@ -191,6 +200,9 @@ public class SessionLaunchSettings : CommandSettings
             PromptAttachment = PromptAttachment,
             Agents = Agents,
             AgentsConcurrency = AgentsConcurrency,
+            AgentsModelCalls = AgentsModelCalls,
+            AgentsToolCalls = AgentsToolCalls,
+            AgentsDuration = AgentsDuration,
             Skills = Skills,
             ExternalTools = ExternalTools,
             Mcp = Mcp,

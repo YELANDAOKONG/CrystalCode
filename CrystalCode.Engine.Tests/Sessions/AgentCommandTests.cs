@@ -57,6 +57,32 @@ public sealed class AgentCommandTests
     }
 
     [Fact]
+    public async Task AgentLimitCommand_SavesEachFieldAndClearsItWithoutAValue()
+    {
+        var settings = HeadlessSession.ScriptedSettings();
+        using var session = new HeadlessSession(new ScriptedStreamingClient(), settings: settings, prepare: (home, _) =>
+        {
+            home.EnsureCreated();
+            File.WriteAllText(home.ProvidersPath, JsonSerializer.Serialize(SettingsMapper.WriteProviders(settings.Catalog)));
+        });
+        await session.Session.StartAsync(CancellationToken.None);
+        foreach (var command in new[] { "/agents limit model-calls 300", "/agents limit tool-calls 2000", "/agents limit duration 7200" })
+        {
+            await session.Session.SubmitAsync(command, CancellationToken.None);
+        }
+        Assert.Empty(session.Observer.Events.OfType<ErrorWritten>());
+        Assert.Equal(new AgentLimits(300, 2000, 7200), new DiskSettingsStore(session.Home).Load().Agents.Limits);
+
+        await session.Session.SubmitAsync("/agents limit tool-calls", CancellationToken.None);
+        Assert.Equal(new AgentLimits(300, null, 7200), new DiskSettingsStore(session.Home).Load().Agents.Limits);
+
+        await session.Session.SubmitAsync("/agents limit model-calls 0", CancellationToken.None);
+        await session.Session.SubmitAsync("/agents limit bogus 5", CancellationToken.None);
+        Assert.Equal(2, session.Observer.Events.OfType<ErrorWritten>().Count());
+        Assert.Equal(new AgentLimits(300, null, 7200), new DiskSettingsStore(session.Home).Load().Agents.Limits);
+    }
+
+    [Fact]
     public async Task AgentsBusy_CanListButCannotChangeSettings()
     {
         var client = new BlockingStreamingClient();
