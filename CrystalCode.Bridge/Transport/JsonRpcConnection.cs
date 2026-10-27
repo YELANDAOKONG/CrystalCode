@@ -38,8 +38,8 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
 
     /// <summary>
     /// Reads until the input ends or <paramref name="cancellationToken"/> is
-    /// cancelled, then asks the handler to shut down and answers every request
-    /// still running with <c>-32800</c>.
+    /// cancelled, then cancels every request still running (each answers
+    /// <c>-32800</c>) and asks the handler to shut down.
     /// </summary>
     public async Task RunAsync(IJsonRpcHandler handler, CancellationToken cancellationToken)
     {
@@ -52,12 +52,12 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
         }
         finally
         {
-            await handler.ShutdownAsync();
             foreach (var source in _incoming.Values)
             {
                 source.Cancel();
             }
 
+            await handler.ShutdownAsync();
             foreach (var pending in _pending.Values)
             {
                 pending.TrySetCanceled();
@@ -169,7 +169,9 @@ internal sealed class JsonRpcConnection : IAsyncDisposable
             string? line;
             try
             {
-                line = await reader.ReadLineAsync(cancellationToken);
+                // A console or pipe read does not observe the token, so stop
+                // waiting for it instead; the process is shutting down.
+                line = await reader.ReadLineAsync(cancellationToken).AsTask().WaitAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {

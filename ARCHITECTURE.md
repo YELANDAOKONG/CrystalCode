@@ -39,6 +39,12 @@ framework only. It does not reference CrystalCode.Display, Spectre.Console,
 Terminal.Gui, the executable, or `System.Console`. The executable references
 it. `CrystalCode.Server.Tests` references CrystalCode.Server and guards that
 direction. See [docs/server.md](docs/server.md).
+`CrystalCode.Bridge` sits beside them: it references CrystalCode.Engine only
+and no package. It does not reference CrystalCode.Display,
+CrystalCode.Server, Spectre.Console, Terminal.Gui, the executable, or
+`System.Console`. The executable references it.
+`CrystalCode.Bridge.Tests` references CrystalCode.Bridge and guards that
+direction. See [docs/bridge.md](docs/bridge.md).
 If that desktop front end is built with Avalonia, write the UI in C# markup.
 Do not add XAML or AXAML files.
 `EngineAssemblyTests` and `DisplayAssemblyTests` fail the build when either
@@ -174,6 +180,30 @@ line, resolves the token, and hands off to it. The protocol is in
 Server tests against a real Kestrel listener on a loopback port and a scripted
 model, the parity guards, the secret-leak test, and the dependency guard.
 
+### CrystalCode.Bridge
+
+The ACP front end behind `crystal bridge`: newline-delimited JSON-RPC 2.0 on
+the raw stdin and stdout streams, the explicit ACP wire mapping, prompt
+content blocks, and the host that wires `SessionLauncher` and `SessionRunner`
+to one ACP session. One process hosts one active session. It holds no product
+logic and never serializes an engine record by reflection. The executable's
+`Commands/BridgeCommand` parses the command line, points `Console.Out` and the
+Spectre console at stderr, maps SIGINT, SIGTERM, and SIGHUP to shutdown, and
+hands off to `CrystalBridge.RunAsync`. The protocol and its phases are in
+[docs/bridge.md](docs/bridge.md).
+
+| Folder | Owns |
+| :--- | :--- |
+| `Transport` | `JsonRpcConnection` (one reader, one ordered writer, concurrent requests, `$/cancel_request` both ways, parse and batch errors), the error codes, `JsonRpcException`, and request field readers |
+| `Hosting` | `CrystalBridge` (the public entry), `BridgeOptions`, `BridgeAgent` (`initialize`, `session/new`, `session/prompt`, `session/cancel`, `session/close`), `BridgeSession` (the live `CodingSession`, `SessionRunner`, the five front-end contracts, held updates), and `TurnTracker` (which engine turn a prompt waits for, faults, clears) |
+| `Prompts` | `PromptContent`: content blocks to submitted text, image attachment through the engine, and mention lines |
+| `Wire` | `SessionUpdates` (events to `session/update`, with the mapped and deliberately unmapped lists), `ToolCallWire`, `PermissionWire`, `TurnWire` |
+
+### CrystalCode.Bridge.Tests
+
+Bridge tests over in-process pipes with a scripted model, the parity guards,
+the secret-leak test, and the dependency guard.
+
 ### CrystalCode.Display
 
 The terminal UI library. Owns the alternate-screen frame, input routing,
@@ -228,9 +258,9 @@ CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
-| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `version` prints the build identity |
+| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `bridge` captures the raw stdio streams, rebinds console output to stderr, registers signals, and starts `CrystalCode.Bridge`. `version` prints the build identity |
 | `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, and exit codes. Overrides and launch preparation come from `CrystalCode.Engine.Launch` |
-| `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text, transcript replay, session picker, question overlay, startup trust and resume prompts (`StartupPrompt`), slash-option mapping |
+| `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text (`ToolCallText` reveals hidden characters in the engine's `ToolCallSummary`), transcript replay, session picker, question overlay, startup trust and resume prompts (`StartupPrompt`), slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
 
 CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
@@ -2283,11 +2313,12 @@ contracts above, and projecting events onto its own surface. The terminal host
 in CrystalCode is the reference implementation. The headless test in
 CrystalCode.Engine.Tests is the smallest correct driver. A later Avalonia
 desktop front end uses C# markup and does not add XAML or AXAML files.
-The Agent Client Protocol (ACP) is high-priority product work and is not in
-this build. The name is Bridge: the command would be `crystal bridge` and the
-project `CrystalCode.Bridge`. It would be another front end
-on this contract, not an engine protocol. Do not reserve a command, project,
-or public type for it. `crystal bridge` is not a command in this build.
+`crystal bridge` is the Agent Client Protocol (ACP) front end on this
+contract ([docs/bridge.md](docs/bridge.md)), not an engine protocol. It uses
+`SessionLauncher` with `SessionTrustCheck.Prompt` and no trust prompt,
+`SessionRunner`, event origins per prompt, `ToolCallSummary` and
+`ToolFileChanges` for tool titles and diffs, and maps every event to ACP
+itself. Phase 1 is in this build; the later phases are high priority.
 `crystal server` is the HTTP front end on this contract
 ([docs/server.md](docs/server.md)). It uses `SessionLauncher`,
 `SessionRunner`, `SessionState`, and event origins, and maps every event to

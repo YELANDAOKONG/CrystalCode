@@ -18,10 +18,13 @@ between TODO.md buckets is a design decision.
 
 ## Product
 
-CrystalCode is a production coding TUI. The terminal and `crystal server`
-are the operator surfaces. `crystal server` serves one session over HTTP to
+CrystalCode is a production coding TUI. The terminal, `crystal server`, and
+`crystal bridge` are the operator surfaces. `crystal server` serves one
+session over HTTP to
 separate front ends (see [docs/server.md](docs/server.md)); those front ends
-are not part of this repository. `crystal run` is the headless entry for one task. It
+are not part of this repository. `crystal bridge` serves one session to an
+Agent Client Protocol (ACP) editor over stdio (see
+[docs/bridge.md](docs/bridge.md)). `crystal run` is the headless entry for one task. It
 is not an operator surface: anything that would ask the operator is
 denied. Do not put secrets on its command line, and do not persist its
 flags to `config.json`. It is not a Crystal demo and not a replacement
@@ -74,6 +77,15 @@ semantics. Do not copy its Demo UI into this product.
   session. A new `CodingSession` member, `SessionEvent`, Crystal stream
   event, or `SessionVerb` must be mapped in the server; the parity tests in
   `CrystalCode.Server.Tests` fail until it is.
+- `CrystalCode.Bridge` is the ACP front end. It references
+  `CrystalCode.Engine` only and no package, holds no product logic, and
+  writes every wire field explicitly. Stdout belongs to the protocol: the
+  executable hands Bridge the raw stream and points `Console.Out` at stderr
+  first. One process hosts one active session. Its own fields go under
+  `_meta.crystal`, never at the root of an ACP type, and it never sends
+  `-32000`. A new `CodingSession` member, `SessionEvent`, or Crystal stream
+  event must be mapped or listed with a reason in Bridge; the parity tests in
+  `CrystalCode.Bridge.Tests` fail until it is.
 - Public data values are immutable. One type per file. File-scoped namespaces.
 - No top-level statements. Explicit `Program.Main`.
 
@@ -81,7 +93,8 @@ semantics. Do not copy its Demo UI into this product.
 
 - Ask before adding a project, a public architectural boundary, or a new
   provider family. `CrystalCode.Server` and `CrystalCode.Server.Tests` are
-  projects with the ownership in ARCHITECTURE.md. Microsoft-published
+  projects with the ownership in ARCHITECTURE.md, and so are
+  `CrystalCode.Bridge` and `CrystalCode.Bridge.Tests`. Microsoft-published
   ASP.NET Core packages are approved for `CrystalCode.Server`.
   `CrystalCode.Platform` is deferred; do not add that
   project. Extra first-party tools and protocols go through

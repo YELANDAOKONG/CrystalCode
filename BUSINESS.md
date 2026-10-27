@@ -20,8 +20,9 @@ the Crystal library they already own.
 
 The current product is a terminal application with an HTTP server for other
 front ends. `crystal` opens the terminal. `crystal server` serves the same
-session capabilities over HTTP (see below). Those two are the operator
-surfaces. `crystal space` opens that
+session capabilities over HTTP (see below). `crystal bridge` serves one
+session to an Agent Client Protocol (ACP) editor over stdio. Those three are
+the operator surfaces. `crystal space` opens that
 terminal in the operator space at `~/.crystal/space`. `crystal` and
 `crystal space` accept the same session overrides as `crystal run`, except
 the task text, `--format`, `--show-thinking`, `--space`, and
@@ -154,6 +155,21 @@ separate library with no terminal code. The product can:
   TLS is allowed with a warning. Host and Origin checks always apply. The
   protocol carries no version identifier, and its flags are not written to
   `config.json`. See [docs/server.md](docs/server.md);
+- drive one session from an ACP editor, such as Zed, with `crystal bridge`.
+  The editor starts it as a subprocess and speaks ACP v1 on stdin and stdout;
+  stdout carries protocol lines only. It accepts the same session launch
+  options as `crystal`, plus `--workspace` and `--space` as the fallback when
+  a session request has no `cwd`. Prompts accept text, images, embedded
+  resources, and resource links; a block the session cannot use becomes a
+  one-line mention instead of an error. Replies and reasoning stream as
+  chunks, tool calls arrive with titles, kinds, locations, and diffs,
+  permission requests go to the editor, and todos become the plan. Approval,
+  trust, the workspace fence, and `ToolInvocationPolicy` are unchanged; an
+  untrusted directory is refused with instructions, not trusted silently.
+  Bridge never calls the editor's file system or terminal. Loading saved
+  sessions, config options, editor MCP servers, additional directories,
+  forms, children, and `_crystal/*` extensions are later phases of the same
+  front end. See [docs/bridge.md](docs/bridge.md);
 - run one task without a terminal through `crystal run`, then exit.
   Flags on that command override provider, model, workspace, home,
   approval, the approval model and its thinking gear, service tier, and speed,
@@ -446,17 +462,15 @@ implemented in the current build.
   and platform coverage are not defined. Do not reserve a package name, tap,
   formula, image, or repository. Release artifacts and install scripts remain
   the install path until a specific change defines otherwise.
-- The Agent Client Protocol (ACP). The name is Bridge: the command would be
-  `crystal bridge` and the project `CrystalCode.Bridge`. An
-  editor would drive a session over stdio. That is another front end that
-  implements `SessionFrontEnd`, not an engine protocol. It is not
-  `crystal server` and not child Agents. `crystal bridge` and
-  `CrystalCode.Bridge` are not a command, project, or public type in this
-  build. Do not add them until its behavior and
-  ownership are defined. The proposed design is in
-  [docs/bridge.md](docs/bridge.md). ACP does not speak MCP itself. Editor-supplied MCP
-  servers, when that front end exists, use the same MCP client as local
-  servers. Do not bypass approval, trust, or the tool boundary.
+- The rest of the Agent Client Protocol (ACP) front end, Bridge
+  (`crystal bridge`, `CrystalCode.Bridge`). Phase 1 is in this build; load,
+  resume, list, config options, editor MCP servers, additional directories,
+  forms, children, and `_crystal/*` extensions are phases 2 to 4 in
+  [docs/bridge.md](docs/bridge.md). It stays a front end that implements
+  `SessionFrontEnd`, not an engine protocol, not `crystal server`, and not
+  child Agents. ACP does not speak MCP itself. Editor-supplied MCP servers
+  will use the same MCP client as local servers. Do not bypass approval,
+  trust, or the tool boundary.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
   one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags
@@ -568,13 +582,11 @@ implemented in the current build.
 
 TODO: add audio/video input and non-text model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
-`audioInput` or `videoInput` declaration is not that path. TODO: add ACP only as a front end that implements `SessionFrontEnd`. The
-name is Bridge (`crystal bridge`, `CrystalCode.Bridge`). Do not put that
-protocol in the engine, do not add the `crystal bridge` command, the
-`CrystalCode.Bridge` project, or a public type before its behavior and
-ownership are defined, and do not bypass approval, trust, or the tool
-boundary. ACP does not speak MCP itself. Editor-supplied MCP servers, when
-that front end exists, use the same MCP client as local servers.
+`audioInput` or `videoInput` declaration is not that path. TODO: finish ACP
+(Bridge) only as the front end described in docs/bridge.md. Do not put that
+protocol in the engine and do not bypass approval, trust, or the tool
+boundary. ACP does not speak MCP itself. Editor-supplied MCP servers use the
+same MCP client as local servers.
 
 TODO: add workspace-level configuration only after its field scope, precedence,
 write policy, and trust semantics are defined; a repository-controlled file

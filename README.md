@@ -102,11 +102,12 @@ See the [complete command reference](docs/user-guide.md#slash-commands).
 
 ## 💻 Command line
 
-Run these from your shell. The interactive terminal and `crystal server` host a session; the others start, do their work, and exit without one:
+Run these from your shell. The interactive terminal, `crystal server`, and `crystal bridge` host a session; the others start, do their work, and exit without one:
 
 | Command | What it does |
 | :--- | :--- |
 | `crystal server` | Serve one session over HTTP so another front end, such as a web page or a desktop program, can drive it. Prints one JSON `listening` line and writes `~/.crystal/server/<pid>.json`. A bearer token is required by default (`CRYSTAL_SERVER_TOKEN`, `--token-file`, `--token-stdin`, or generated); `--auth none` turns it off. Accepts the same session options as `crystal`, plus `--listen`, `--socket`, `--tls-cert`/`--tls-key`, `--allow-host`, `--allow-origin`, `--expose-header`, and `--allow-private-network`. See [docs/server.md](docs/server.md) |
+| `crystal bridge` | Serve one session to an Agent Client Protocol (ACP) editor such as Zed, which starts it as a subprocess and speaks ACP on stdin and stdout. Configure the editor with `{"command": "crystal", "args": ["bridge"]}`. Accepts the same session options as `crystal`, plus `--workspace` and `--space` for a session request without `cwd`. Phase 1 of [docs/bridge.md](docs/bridge.md) |
 | `crystal run <task>` | Run one task without a terminal and exit. Anything that would ask the operator is denied. Accepts process-only overrides such as `--provider`, `--model`, `--workspace`, `--approval`, and repeatable `--prompt-attachment`; they are not written to `config.json` |
 | `crystal space` | Open the terminal in the operator space at `~/.crystal/space` |
 | `crystal version` | Print the build identity and exit |
@@ -174,6 +175,7 @@ Branch roles: `master` is the main development branch. `release` is the release 
 - 🧩 [Plugins](docs/plugins.md): plugin contract, tools, and hooks
 - 🔌 [MCP servers](docs/mcp.md): connect MCP servers and use their tools
 - 🌐 [crystal server](docs/server.md): HTTP and event-stream protocol for other front ends
+- 🌉 [crystal bridge](docs/bridge.md): Agent Client Protocol front end for editors
 - 📄 [Product definition](BUSINESS.md): scope and terminology
 - 📋 [Deferred work](TODO.md): deferred, priority, and undecided buckets
 - 🏗️ [Architecture](ARCHITECTURE.md): components and runtime behavior
@@ -182,7 +184,7 @@ Branch roles: `master` is the main development branch. `release` is the release 
 
 ## 🗺️ Roadmap
 
-The full list is in [TODO.md](TODO.md). Items still under evaluation are separate and are not scheduled. High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots (MCP tools are in this build); the Agent Client Protocol (ACP), named Bridge (`crystal bridge`); and a refactor of `crystal run`. Medium priority, and not in this build: automatically fetching model-list information from a provider, a second additional review of the current product, a full code review, child Agent configuration, provider-specific custom-format tools such as OpenAI's apply_patch, and built-in tool optimization. An operating-system sandbox, audio and video input, non-text model output, editing provider definitions in the TUI, and switchable thinking-chain compression remain deferred. ACP would be an editor-facing front end on stdio, not an engine protocol and not a `crystal bridge` command yet. `crystal server` serves one session over HTTP to other front ends; see [docs/server.md](docs/server.md). Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog. Plan and Work are built in; operators can add custom modes under `modes/`.
+The full list is in [TODO.md](TODO.md). Items still under evaluation are separate and are not scheduled. High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots (MCP tools are in this build); the later phases of the Agent Client Protocol (ACP) front end `crystal bridge` (phase 1 is in this build); and a refactor of `crystal run`. Medium priority, and not in this build: automatically fetching model-list information from a provider, a second additional review of the current product, a full code review, child Agent configuration, provider-specific custom-format tools such as OpenAI's apply_patch, and built-in tool optimization. An operating-system sandbox, audio and video input, non-text model output, editing provider definitions in the TUI, and switchable thinking-chain compression remain deferred. `crystal bridge` is the editor-facing front end on stdio, not an engine protocol; see [docs/bridge.md](docs/bridge.md). `crystal server` serves one session over HTTP to other front ends; see [docs/server.md](docs/server.md). Thinking-chain compression would, after each thinking pass, ask a model to compress and summarize that thinking according to a requirement. It is not context compaction. Image input is available for supported models and providers. A disk plugin may add fields to the custom status line; the default status bar stays adaptive. `/model` selects a configured provider and model; it does not edit the catalog. Plan and Work are built in; operators can add custom modes under `modes/`.
 
 ## 📄 License
 

@@ -12,6 +12,8 @@ namespace CrystalCode.Bridge.Prompts;
 /// fixed English authored here; client values inside it are flattened to one
 /// line and bounded. Images go through
 /// <see cref="CodingSession.TryAttachImage"/>, so the engine checks the bytes.
+/// The invisible image marker prefix is removed from client text, so only an
+/// image attached here can produce a trusted marker.
 /// </summary>
 internal static class PromptContent
 {
@@ -20,14 +22,23 @@ internal static class PromptContent
     private const int MaximumResourceCharacters = 1_000_000;
 
     /// <summary>Attaches image bytes and returns the trusted marker, or the reason it failed.</summary>
-    public delegate bool AttachImage(ReadOnlyMemory<byte> data, out string marker, out string error);
-
-    public static PromptText Read(JsonElement prompt, AttachImage attach)
+    public static async Task<PromptText> ReadAsync(
+        JsonElement prompt,
+        Func<ReadOnlyMemory<byte>, Task<ImageAttachResult>> attach)
     {
         ArgumentNullException.ThrowIfNull(attach);
         if (prompt.ValueKind != JsonValueKind.Array)
         {
             throw JsonRpcException.InvalidParams("prompt must be an array of content blocks.");
+        }
+
+        if (prompt.EnumerateArray().Any(static block => block.ValueKind == JsonValueKind.Object
+                && block.TryGetProperty("type", out var type)
+                && type.ValueKind == JsonValueKind.String
+                && type.GetString() == "audio"))
+        {
+            // Checked first, so an audio prompt attaches nothing.
+            throw JsonRpcException.InvalidParams("Audio input is not supported.");
         }
 
         var parts = new List<string>();
@@ -44,19 +55,17 @@ internal static class PromptContent
             switch (typeElement.GetString())
             {
                 case "text":
-                    parts.Add(RequiredString(block, "text"));
+                    parts.Add(Untrusted(JsonParams.RequiredString(block, "text")));
                     break;
                 case "image":
-                    parts.Add(Image(RequiredString(block, "data"), attach, warnings));
+                    parts.Add(await ImageAsync(JsonParams.RequiredString(block, "data"), attach, warnings));
                     break;
                 case "resource":
-                    parts.Add(Resource(block, attach, warnings));
+                    parts.Add(await ResourceAsync(block, attach, warnings));
                     break;
                 case "resource_link":
                     parts.Add(Link(block));
                     break;
-                case "audio":
-                    throw JsonRpcException.InvalidParams("Audio input is not supported.");
                 default:
                     throw JsonRpcException.InvalidParams("Unsupported content block type.");
             }
@@ -66,7 +75,10 @@ internal static class PromptContent
         return new PromptText(text, warnings);
     }
 
-    private static string Image(string base64, AttachImage attach, List<string> warnings)
+    private static async Task<string> ImageAsync(
+        string base64,
+        Func<ReadOnlyMemory<byte>, Task<ImageAttachResult>> attach,
+        List<string> warnings)
     {
         byte[] bytes;
         try
@@ -78,9 +90,16 @@ internal static class PromptContent
             return NotAttached("the data is not valid base64", warnings);
         }
 
-        return attach(bytes, out var marker, out var error)
-            ? marker
-            : NotAttached(error, warnings);
+        return await AttachAsync(bytes, attach, warnings);
+    }
+
+    private static async Task<string> AttachAsync(
+        byte[] bytes,
+        Func<ReadOnlyMemory<byte>, Task<ImageAttachResult>> attach,
+        List<string> warnings)
+    {
+        var result = await attach(bytes);
+        return result.Marker ?? NotAttached(result.Error, warnings);
     }
 
     private static string NotAttached(string reason, List<string> warnings)
@@ -90,22 +109,25 @@ internal static class PromptContent
         return "[Image not attached: " + line + "]";
     }
 
-    private static string Resource(JsonElement block, AttachImage attach, List<string> warnings)
+    private static async Task<string> ResourceAsync(
+        JsonElement block,
+        Func<ReadOnlyMemory<byte>, Task<ImageAttachResult>> attach,
+        List<string> warnings)
     {
         if (!block.TryGetProperty("resource", out var resource) || resource.ValueKind != JsonValueKind.Object)
         {
             throw JsonRpcException.InvalidParams("resource needs a resource object.");
         }
 
-        var uri = RequiredString(resource, "uri");
-        var mimeType = OptionalString(resource, "mimeType");
+        var uri = JsonParams.RequiredString(resource, "uri");
+        var mimeType = JsonParams.OptionalString(resource, "mimeType");
         var heading = Heading(uri);
         if (resource.TryGetProperty("text", out var textElement) && textElement.ValueKind == JsonValueKind.String)
         {
             return Fenced(heading, mimeType, textElement.GetString()!);
         }
 
-        var blob = RequiredString(resource, "blob");
+        var blob = JsonParams.RequiredString(resource, "blob");
         byte[] bytes;
         try
         {
@@ -118,7 +140,7 @@ internal static class PromptContent
 
         if (mimeType is not null && mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
-            return attach(bytes, out var marker, out var error) ? marker : NotAttached(error, warnings);
+            return await AttachAsync(bytes, attach, warnings);
         }
 
         if (IsTextMime(mimeType) && TryUtf8(bytes, out var decoded))
@@ -133,8 +155,8 @@ internal static class PromptContent
 
     private static string Link(JsonElement block)
     {
-        var uri = RequiredString(block, "uri");
-        var name = OptionalString(block, "title") ?? RequiredString(block, "name");
+        var uri = JsonParams.RequiredString(block, "uri");
+        var name = JsonParams.OptionalString(block, "title") ?? JsonParams.RequiredString(block, "name");
         var size = block.TryGetProperty("size", out var sizeElement) && sizeElement.TryGetInt64(out var bytes)
             ? ", " + bytes.ToString(System.Globalization.CultureInfo.InvariantCulture) + " bytes"
             : string.Empty;
@@ -145,7 +167,7 @@ internal static class PromptContent
             return "[" + kind + ": " + OneLine(name) + " at " + OneLine(path) + size + missing + "]";
         }
 
-        var mimeType = OptionalString(block, "mimeType");
+        var mimeType = JsonParams.OptionalString(block, "mimeType");
         var type = mimeType is null ? string.Empty : " (" + OneLine(mimeType) + ")";
         return "[Linked resource: " + OneLine(name) + " " + OneLine(uri) + type + size
             + " - Crystal Code did not open this link]";
@@ -168,8 +190,11 @@ internal static class PromptContent
 
         var type = mimeType is null ? string.Empty : " (" + OneLine(mimeType) + ")";
         return "Attached resource: " + OneLine(heading) + type + "\n" + fence + "\n"
-            + text.Replace("\r\n", "\n", StringComparison.Ordinal) + "\n" + fence;
+            + Untrusted(text.Replace("\r\n", "\n", StringComparison.Ordinal)) + "\n" + fence;
     }
+
+    private static string Untrusted(string text) =>
+        text.Replace(ImageMarkerText.Prefix.ToString(), string.Empty, StringComparison.Ordinal);
 
     /// <summary>A <c>file://</c> URI with no remote host and an absolute local path.</summary>
     private static bool TryLocalPath(string uri, out string path)
@@ -246,14 +271,4 @@ internal static class PromptContent
 
         return builder.ToString().Trim();
     }
-
-    private static string RequiredString(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()!
-            : throw JsonRpcException.InvalidParams(name + " must be a string.");
-
-    private static string? OptionalString(JsonElement element, string name) =>
-        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
 }

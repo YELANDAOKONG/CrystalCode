@@ -22,6 +22,7 @@ internal sealed class SessionUpdates
     /// <summary>Engine events this phase does not send, and why.</summary>
     public static IReadOnlyDictionary<Type, string> Unmapped { get; } = new Dictionary<Type, string>
     {
+        [typeof(UserMessageSent)] = "The client shows the prompt it sent; Phase 2 replays it on session/load",
         [typeof(SessionStarted)] = "Phase 2: session_info_update",
         [typeof(ChromeChanged)] = "Phase 2: config_option_update and current_mode_update",
         [typeof(PreferencesChanged)] = "Phase 2: config options",
@@ -53,7 +54,6 @@ internal sealed class SessionUpdates
     /// <summary>Engine events this phase sends as session updates.</summary>
     public static IReadOnlyList<Type> Mapped { get; } =
     [
-        typeof(UserMessageSent),
         typeof(StreamReceived),
         typeof(ModelRoundClosed),
         typeof(ToolCallsIssued),
@@ -65,6 +65,17 @@ internal sealed class SessionUpdates
         typeof(ErrorWritten)
     ];
 
+    /// <summary>Every Crystal stream event, and what this phase does with it.</summary>
+    public static IReadOnlyDictionary<Type, string> StreamEvents { get; } = new Dictionary<Type, string>
+    {
+        [typeof(ChatTextDelta)] = "agent_message_chunk",
+        [typeof(ChatReasoningTextDelta)] = "agent_thought_chunk",
+        [typeof(ChatToolCallDelta)] = "tool_call on first sight",
+        [typeof(ChatReasoningStateReceived)] = "Dropped: opaque reasoning state never leaves the process",
+        [typeof(ChatUsageReceived)] = "Phase 2: usage_update",
+        [typeof(ChatCandidateCompleted)] = "No update; the next round gets a new messageId"
+    };
+
     private readonly Action<Action<Utf8JsonWriter>> _send;
     private readonly Func<string?> _workspace;
     private readonly bool _notices;
@@ -72,7 +83,6 @@ internal sealed class SessionUpdates
     private readonly HashSet<string> _announced = new(StringComparer.Ordinal);
     private readonly Dictionary<int, string> _streamingCalls = [];
     private int _round;
-    private int _userMessages;
 
     /// <param name="send">Writes one <c>update</c> object; the caller wraps it in <c>session/update</c>.</param>
     /// <param name="workspace">The live workspace root, for locations and diffs.</param>
@@ -93,9 +103,6 @@ internal sealed class SessionUpdates
         {
             switch (sessionEvent)
             {
-                case UserMessageSent sent:
-                    UserMessage(sent.Text);
-                    break;
                 case StreamReceived stream:
                     Stream(stream.StreamEvent);
                     break;
@@ -179,14 +186,13 @@ internal sealed class SessionUpdates
         }
     }
 
-    private void UserMessage(string text)
+    /// <summary>A prompt block Bridge turned into a mention; sent only to a client with notices.</summary>
+    public void Warn(string text)
     {
-        var id = "user-" + (++_userMessages).ToString(System.Globalization.CultureInfo.InvariantCulture);
-        Update("user_message_chunk", "UserMessageSent", writer =>
+        lock (_gate)
         {
-            TextContent(writer, ImageMarkerText.Display(text));
-            writer.WriteString("messageId", id);
-        });
+            Notice("warning", text, null, null);
+        }
     }
 
     private void Stream(ChatStreamEvent streamEvent)
@@ -234,7 +240,7 @@ internal sealed class SessionUpdates
             {
                 writer.WriteString("toolCallId", callId);
                 writer.WriteString("title", ToolCallSummary.Text(name, string.Empty));
-                writer.WriteString("kind", "other");
+                writer.WriteString("kind", ToolCallWire.Kind(new ToolCall(callId, name, string.Empty, delta.InputKind)));
                 writer.WriteString("status", "pending");
                 writer.WriteString("name", name);
             });
@@ -326,7 +332,7 @@ internal sealed class SessionUpdates
     }
 
     /// <summary>Notes and retries are notices; a client without notices does not get them.</summary>
-    private void Notice(string severity, string title, string? description, string eventName)
+    private void Notice(string severity, string title, string? description, string? eventName)
     {
         if (!_notices || string.IsNullOrWhiteSpace(title))
         {
@@ -346,7 +352,7 @@ internal sealed class SessionUpdates
 
     private void Update(
         string kind,
-        string eventName,
+        string? eventName,
         Action<Utf8JsonWriter> fields,
         Action<Utf8JsonWriter>? crystal = null)
     {
@@ -355,9 +361,15 @@ internal sealed class SessionUpdates
             writer.WriteStartObject();
             writer.WriteString("sessionUpdate", kind);
             fields(writer);
+            if (eventName is null && crystal is null)
+            {
+                writer.WriteEndObject();
+                return;
+            }
+
             writer.WriteStartObject("_meta");
             writer.WriteStartObject("crystal");
-            writer.WriteString("event", eventName);
+            JsonText.Optional(writer, "event", eventName);
             crystal?.Invoke(writer);
             writer.WriteEndObject();
             writer.WriteEndObject();

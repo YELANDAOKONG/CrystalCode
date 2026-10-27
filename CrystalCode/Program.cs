@@ -26,6 +26,8 @@ public static class Program
                 .WithDescription("Open the operator space and start the terminal.");
             config.AddCommand<ServerCommand>("server")
                 .WithDescription("Serve one session over HTTP for other front ends. See docs/server.md.");
+            config.AddCommand<BridgeCommand>("bridge")
+                .WithDescription("Serve one session to an ACP editor over stdin and stdout. See docs/bridge.md.");
             config.AddBranch<ExtensionSettings>("plugins", plugins =>
             {
                 plugins.SetDescription("List, show, enable, or disable one plugin directory.");

@@ -196,11 +196,15 @@ Authorized packages today:
   contract assembly references it.
 - xUnit and Microsoft.NET.Test.Sdk in CrystalCode.Tests,
   CrystalCode.Engine.Tests, CrystalCode.Display.Tests, and
-  CrystalCode.Providers.Tests, and CrystalCode.Server.Tests.
+  CrystalCode.Providers.Tests, CrystalCode.Server.Tests, and
+  CrystalCode.Bridge.Tests, at the same versions in every test project.
 - The `Microsoft.AspNetCore.App` shared framework (`FrameworkReference`) in
   CrystalCode.Server only, and Microsoft-published ASP.NET Core packages that
   server needs. The operator approved Microsoft packages for this project.
   Never in CrystalCode.Engine or CrystalCode.Display.
+- No package in CrystalCode.Bridge. JSON-RPC and the ACP wire use
+  `System.Text.Json` from the shared framework; no ACP SDK or JSON-RPC
+  library is referenced.
 
 Do not add another package without asking.
 
@@ -231,7 +235,16 @@ against a real Kestrel listener on a loopback port chosen by the OS and a
 scripted model: turns, events, reconnect, targeted replies, every interaction
 kind, recall, quick prompts, images, export, resume, shutdown, scopes,
 tickets, Host and Origin checks, the parity guards, and the secret-leak test.
-Token resolution and `crystal server --help` are tested in CrystalCode.Tests. Frame,
+`crystal bridge` is tested in CrystalCode.Bridge.Tests over in-process pipes
+with a scripted model: initialize, new, prompts with every content block,
+streaming, cancel during streaming, a follow-up, and a pending permission,
+`$/cancel_request`, close, `/clear`, `/quit`, permission answers, diffs,
+plans, error codes, launch and trust refusals, ignored editor MCP servers,
+stdin closing, protocol-only stdout, the parity guards, the secret-leak
+test, and the dependency guard. `ToolFileChanges` is tested in
+CrystalCode.Engine.Tests.
+Token resolution, `crystal server --help`, `crystal bridge --help`, and
+Bridge console rebinding are tested in CrystalCode.Tests. Frame,
 composer, and paint behavior is tested in CrystalCode.Display.Tests.
 Adapters are tested in CrystalCode.Providers.Tests.
 `EngineAssemblyTests` and `DisplayAssemblyTests`

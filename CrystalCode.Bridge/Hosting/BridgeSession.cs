@@ -25,11 +25,13 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     private readonly JsonRpcConnection _connection;
     private readonly object _gate = new();
     private readonly List<Action<Utf8JsonWriter>> _held = [];
+    private readonly Dictionary<int, int> _waiting = [];
+    private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _stop = new();
     private string? _workspace;
     private bool _ready;
-    private int _awaited;
     private int _cancelThrough;
+    private int _queued;
 
     public BridgeSession(JsonRpcConnection connection, ClientFeatures features)
     {
@@ -55,6 +57,9 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     /// <summary>The live workspace root, from the launch and then from chrome.</summary>
     public string? Workspace => Volatile.Read(ref _workspace);
 
+    /// <summary>Follow-ups waiting for the next turn, from the last queue report.</summary>
+    public int Queued => Volatile.Read(ref _queued);
+
     public void Bind(CodingSession session, string workspace)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -65,23 +70,22 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     }
 
     /// <summary>Starts the input loop. Updates stay held until <see cref="Release"/>.</summary>
-    public void Run(Action<bool> stopped)
+    public void Run(Action stopped)
     {
         ArgumentNullException.ThrowIfNull(stopped);
         Runner = new SessionRunner(Session!);
         Running = RunCoreAsync(stopped);
     }
 
-    private async Task RunCoreAsync(Action<bool> stopped)
+    private async Task RunCoreAsync(Action stopped)
     {
-        var quit = false;
         try
         {
-            quit = await Runner!.RunAsync(_stop.Token);
+            await Runner!.RunAsync(_stop.Token);
         }
         finally
         {
-            stopped(quit);
+            stopped();
         }
     }
 
@@ -102,13 +106,18 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         }
     }
 
-    /// <summary>A prompt waits for turn <paramref name="number"/>.</summary>
-    public void Await(int number)
+    /// <summary>
+    /// A prompt waits for turn <paramref name="number"/> until the returned
+    /// scope is disposed, so a cancel that arrives first still reaches it.
+    /// </summary>
+    public IDisposable Await(int number)
     {
         lock (_gate)
         {
-            _awaited = Math.Max(_awaited, number);
+            _waiting[number] = _waiting.GetValueOrDefault(number) + 1;
         }
+
+        return new Waiting(this, number);
     }
 
     /// <summary>
@@ -120,7 +129,8 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     {
         lock (_gate)
         {
-            _cancelThrough = Math.Max(_cancelThrough, Math.Max(_awaited, Turns.Started));
+            var promised = _waiting.Count == 0 ? 0 : _waiting.Keys.Max();
+            _cancelThrough = Math.Max(_cancelThrough, Math.Max(promised, Turns.Started));
         }
 
         Session?.TryInterrupt();
@@ -131,6 +141,19 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         lock (_gate)
         {
             return turn <= _cancelThrough;
+        }
+    }
+
+    /// <summary>
+    /// The last error the engine wrote for input submitted under
+    /// <paramref name="origin"/>, such as a refused command. Turn errors carry
+    /// no origin and are not reported here.
+    /// </summary>
+    public string? TakeError(string origin)
+    {
+        lock (_gate)
+        {
+            return _errors.Remove(origin, out var text) ? text : null;
         }
     }
 
@@ -174,13 +197,27 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
                 break;
             case ErrorWritten error:
                 Turns.OnError(error.Text);
+                if (error.Origin is { } origin)
+                {
+                    lock (_gate)
+                    {
+                        _errors[origin] = error.Text;
+                    }
+                }
+
+                if (Session?.TurnTask is { IsFaulted: true })
+                {
+                    // FinishTurnAsync writes the fault before it clears the
+                    // task and returns without TurnFinished.
+                    Turns.OnFaulted();
+                }
+
                 break;
-            case QueueChanged when Session is { TurnActive: false }:
-                // A turn that faulted publishes no TurnFinished; collecting it
-                // republishes the queue once the session is idle again.
-                Turns.OnIdle();
+            case QueueChanged queue:
+                Volatile.Write(ref _queued, queue.Items.Count);
                 break;
-            case ConversationCleared:
+            case ConversationCleared or HistoryReplayed:
+                // /clear and /resume discard queued follow-ups.
                 Turns.OnCleared();
                 break;
             default:
@@ -288,4 +325,33 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             update(writer);
             writer.WriteEndObject();
         });
+
+    private void Release(int number)
+    {
+        lock (_gate)
+        {
+            var count = _waiting.GetValueOrDefault(number) - 1;
+            if (count <= 0)
+            {
+                _waiting.Remove(number);
+            }
+            else
+            {
+                _waiting[number] = count;
+            }
+        }
+    }
+
+    private sealed class Waiting(BridgeSession session, int number) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                session.Release(number);
+            }
+        }
+    }
 }

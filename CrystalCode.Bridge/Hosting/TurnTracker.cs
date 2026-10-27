@@ -19,18 +19,6 @@ internal sealed class TurnTracker
     private bool _closed;
     private string? _lastError;
 
-    /// <summary>The number of the running turn, or null when idle.</summary>
-    public int? Active
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _active ? _started : null;
-            }
-        }
-    }
-
     public int Started
     {
         get
@@ -77,10 +65,10 @@ internal sealed class TurnTracker
     public void OnTurnFinished(TurnFinished finished) => Complete(finished);
 
     /// <summary>
-    /// The session is idle again. A turn still marked active ended without
-    /// <see cref="TurnFinished"/>: it faulted, and the engine wrote the error.
+    /// The running turn faulted. The engine wrote the error and will not
+    /// publish <see cref="TurnFinished"/> for it.
     /// </summary>
-    public void OnIdle()
+    public void OnFaulted()
     {
         lock (_gate)
         {

@@ -15,6 +15,7 @@
         <ProjectReference Include="..\CrystalCode.Engine\CrystalCode.Engine.csproj" />
         <ProjectReference Include="..\CrystalCode.Display\CrystalCode.Display.csproj" />
         <ProjectReference Include="..\CrystalCode.Server\CrystalCode.Server.csproj" />
+        <ProjectReference Include="..\CrystalCode.Bridge\CrystalCode.Bridge.csproj" />
     </ItemGroup>
 
     <ItemGroup>
