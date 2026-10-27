@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Tools;
 
 using Xunit;
@@ -44,6 +45,7 @@ public sealed class AgentCatalogTests
     {
         using var home = new TemporaryHome();
         var agents = new AgentSettings { Enabled = true, MaxConcurrent = 3,
+            Limits = new AgentLimits(500, 4000, 36000),
             Explore = new AgentModelSettings { Provider = "local", Model = "text", Thinking = "high", Context = 100_000, Tier = "standard", Speed = "fast" } };
         var settings = HarnessSettings.CreateDefault().WithAgents(agents);
         var store = new DiskSettingsStore(home.Home);
@@ -52,6 +54,15 @@ public sealed class AgentCatalogTests
         Assert.Equal(agents, settings.WithThinkingEffort(ThinkingSelection.Off).Agents);
         Assert.Throws<ArgumentOutOfRangeException>(() => new AgentSettings { MaxConcurrent = 0 });
         Assert.Throws<ArgumentOutOfRangeException>(() => new AgentSettings { MaxConcurrent = 9 });
+    }
+
+    [Fact]
+    public void AgentLimits_DefaultToUnlimitedAndRejectInvalidValues()
+    {
+        Assert.Equal(TurnLimits.Unlimited, new AgentSettings().Limits.ToTurnLimits());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new AgentLimits(maximumModelCalls: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new AgentLimits(maximumToolCalls: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new AgentLimits(maximumDurationSeconds: 0));
     }
 
     private static void WriteAgent(string root, string name, string json, string prompt)

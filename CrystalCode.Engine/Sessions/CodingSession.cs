@@ -434,7 +434,7 @@ public sealed class CodingSession : ITurnObserver
             }, _ => usageAfterCompaction = null,
                 () => Emit(new TodosChanged(todos.Snapshot())),
                 anchor => childAnchor = anchor);
-            var limits = agent == "explore" ? new TurnLimits(32, 128, null) : TurnLimits.Unlimited;
+            var limits = _settings.Agents.Limits.ToTurnLimits();
             IReadOnlyList<ChatItem> reviewItems = items;
             async Task<CompactionOutcome> CompactAsync(IReadOnlyList<ChatItem> context, CancellationToken token)
             {

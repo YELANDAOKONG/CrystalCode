@@ -20,6 +20,8 @@ public sealed record AgentSettings
         }
     }
 
+    public AgentLimits Limits { get; init; } = new();
+
     public AgentModelSettings General { get; init; } = new();
     public AgentModelSettings Explore { get; init; } = new();
     public AgentModelSettings Work { get; init; } = new();

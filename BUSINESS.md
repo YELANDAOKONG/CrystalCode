@@ -400,6 +400,14 @@ an unavailable Agent is omitted with an English diagnostic. Per-model options
 without an explicit model are ignored. Invalid gears or slots are diagnosed
 and fall back without disabling the Agent.
 
+A child run has no model-call, tool-call, or duration limit of its own by
+default, for any Agent. It draws on the parent's shared execution budget, so a
+long-running child stops only when that budget is spent. `agents.limits` in
+`config.json` may set `maximumModelCalls`, `maximumToolCalls`, and
+`maximumDurationSeconds` for each child run. A null or omitted field is
+unlimited. A child that reaches its own limit stops and reports it in the
+`task` result; the parent turn continues.
+
 `agents.maxConcurrent` defaults to 4 and accepts 1 through 8. It limits active
 child invocations, including multiple instances of the same Agent. Adjacent
 `task` calls may overlap; other tools are serial execution barriers. Parent

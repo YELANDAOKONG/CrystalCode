@@ -204,6 +204,21 @@ public sealed class ChildSessionTests
     }
 
     [Fact]
+    public async Task Task_ConfiguredChildLimitStopsChildButNotParent()
+    {
+        var model = new ScriptedStreamingClient(
+            Tool("task", """{"agent":"explore","label":"limit","prompt":"Read"}"""),
+            Tool("read", """{"path":"missing.txt"}"""), Text("parent done"));
+        var settings = HeadlessSession.ScriptedSettings().WithAgents(
+            new AgentSettings { Enabled = true, Limits = new AgentLimits(maximumModelCalls: 1) });
+        using var session = new HeadlessSession(model, settings: settings);
+        await session.Session.StartAsync(CancellationToken.None);
+        await session.RunTurnAsync("delegate");
+        Assert.Equal("model_call_limit_reached", Assert.Single(session.ReadSaved().Children).StopReason);
+        Assert.Equal(TurnStopReason.Completed, session.Observer.Events.OfType<TurnFinished>().Last().Result.StopReason);
+    }
+
+    [Fact]
     public async Task Task_PlanCannotLaunchWork()
     {
         var model = new ScriptedStreamingClient(Tool("task", """{"agent":"work","label":"bad","prompt":"edit"}"""), Text("blocked"));

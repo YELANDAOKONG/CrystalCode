@@ -629,7 +629,7 @@ Top-level fields:
 | `plugins` | Enable operator plugin discovery (default `true`) |
 | `mcp` | Connect configured MCP servers (default `true`; omitted when on) |
 | `mcpToolApproval` | Per-source trust for an MCP server's read-only declarations: `home` and `project`, each `author` or `host` (both default `host`) |
-| `agents` | Child Agents. Omitted means off, concurrency 4, and the built-in Agents inherit the parent model. `enabled`, `maxConcurrent` (1–8), and `general`, `explore`, and `work` model choices (`provider`, `model`, `thinking`, `context`, `tier`, `speed`). `/agents` writes built-in choices here. Custom Agents are stored in their own `agent.json`, not in this object |
+| `agents` | Child Agents. Omitted means off, concurrency 4, and the built-in Agents inherit the parent model. `enabled`, `maxConcurrent` (1–8), `limits` (`maximumModelCalls`, `maximumToolCalls`, `maximumDurationSeconds`; each child run, unlimited when omitted), and `general`, `explore`, and `work` model choices (`provider`, `model`, `thinking`, `context`, `tier`, `speed`). `/agents` writes built-in choices here. Custom Agents are stored in their own `agent.json`, not in this object |
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `todoBar` | Show the pinned `Todos` bar above the status bar (default `true`; omitted when on) |
@@ -1247,6 +1247,14 @@ choices. An explicit model must exist and have credentials; an
 unavailable Agent is omitted with an English note. Model-specific
 options without an explicit model are ignored. An invalid gear or slot
 is diagnosed and falls back; the Agent stays available.
+
+A child run has no model-call, tool-call, or duration limit of its own by
+default, for any Agent. It draws on the parent turn's shared execution
+budget, so a long-running child stops only when that budget is spent.
+`agents.limits` sets a bound for each child run: `maximumModelCalls`,
+`maximumToolCalls`, and `maximumDurationSeconds`. A null or omitted field
+is unlimited. A child that reaches its own limit stops and says so in the
+`task` result; the parent turn continues.
 
 `agents.maxConcurrent` defaults to 4 and accepts 1 through 8. It
 limits active child invocations, including several instances of the
