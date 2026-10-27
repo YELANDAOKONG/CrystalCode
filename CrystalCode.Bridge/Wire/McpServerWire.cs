@@ -57,9 +57,13 @@ internal static class McpServerWire
             {
                 case null or "stdio":
                     var command = Field(server, name, "command");
-                    if (!Path.IsPathFullyQualified(command))
+                    // A bare name such as xcrun is resolved through PATH by the OS. A relative
+                    // path has no defined base directory, so it must be absolute.
+                    if (!Path.IsPathFullyQualified(command)
+                        && command.IndexOfAny(['/', '\\', Path.DirectorySeparatorChar]) >= 0)
                     {
-                        throw JsonRpcException.InvalidParams("MCP server '" + name + "' needs an absolute command path.");
+                        throw JsonRpcException.InvalidParams(
+                            "MCP server '" + name + "' needs an absolute command path or a bare command name.");
                     }
 
                     return new McpServerDefinition(

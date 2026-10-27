@@ -258,7 +258,7 @@ public sealed class BridgeProtocolTests
         var relative = await fixture.RequestAsync("session/new", new
         {
             cwd = fixture.Workspace,
-            mcpServers = new[] { new { name = "editor", command = "secret-command", args = new[] { "--token", "sk-hidden-value" }, env = Array.Empty<object>() } }
+            mcpServers = new[] { new { name = "editor", command = "./secret-command", args = new[] { "--token", "sk-hidden-value" }, env = Array.Empty<object>() } }
         });
 
         Assert.Equal(-32602, Code(relative));

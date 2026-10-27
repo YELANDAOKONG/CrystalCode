@@ -719,7 +719,8 @@ All four are in this build.
 - Every prompt content block is in, as Prompt content and Links describe,
   including `file://` image links. Bridge removes U+2063 from client text
   and resources, so only an image it attached has a trusted marker.
-- `mcpServers` are session servers. A stdio command must be absolute. A bad
+- `mcpServers` are session servers. A stdio command must be an absolute path or a bare
+  command name resolved through PATH (Xcode sends `xcrun`). A bad
   entry is `-32602` naming the server and field, never a value.
 - Forms need `elicitation.form`: the `question` tool and MCP elicitation
   share the question form (MCP elicitation reaches a front end as
