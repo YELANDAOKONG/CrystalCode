@@ -109,7 +109,8 @@ public sealed record HarnessSettings
         McpToolApprovalSettings? mcpToolApproval = null,
         ExtendedApprovalSettings? extendedApproval = null,
         OperatorNotifySettings? operatorNotify = null,
-        ServerHostSettings? server = null)
+        ServerHostSettings? server = null,
+        BridgeHostSettings? bridge = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -209,6 +210,7 @@ public sealed record HarnessSettings
         ExtendedApproval = extendedApproval ?? ExtendedApprovalSettings.Off;
         OperatorNotify = operatorNotify ?? OperatorNotifySettings.Off;
         Server = server ?? ServerHostSettings.Default;
+        Bridge = bridge ?? BridgeHostSettings.Default;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
@@ -484,6 +486,9 @@ public sealed record HarnessSettings
 
     /// <summary>Defaults for <c>crystal server</c>. The terminal ignores them.</summary>
     public ServerHostSettings Server { get; }
+
+    /// <summary>Which session options <c>crystal bridge</c> offers. The terminal ignores them.</summary>
+    public BridgeHostSettings Bridge { get; }
 
     public CompactionModelSettings CompactionModel { get; }
 
@@ -839,7 +844,8 @@ public sealed record HarnessSettings
         McpToolApprovalSettings? mcpToolApproval = null,
         ExtendedApprovalSettings? extendedApproval = null,
         OperatorNotifySettings? operatorNotify = null,
-        ServerHostSettings? server = null) =>
+        ServerHostSettings? server = null,
+        BridgeHostSettings? bridge = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -893,7 +899,8 @@ public sealed record HarnessSettings
             mcpToolApproval ?? McpToolApproval,
             extendedApproval ?? ExtendedApproval,
             operatorNotify ?? OperatorNotify,
-            server ?? Server);
+            server ?? Server,
+            bridge ?? Bridge);
 
     public override string ToString() => nameof(HarnessSettings);
 

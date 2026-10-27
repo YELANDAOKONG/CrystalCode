@@ -41,10 +41,15 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     private string? _questionCall;
     private bool _dropReplay;
 
-    public BridgeSession(JsonRpcConnection connection, ClientFeatures features, string? acpId = null)
+    public BridgeSession(
+        JsonRpcConnection connection,
+        ClientFeatures features,
+        IReadOnlySet<string> offeredOptions,
+        string? acpId = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(features);
+        ArgumentNullException.ThrowIfNull(offeredOptions);
         _connection = connection;
         _features = features;
         Id = acpId ?? string.Empty;
@@ -55,7 +60,8 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             features.BooleanOptions,
             Image,
             features.Compaction,
-            SendCrystal);
+            SendCrystal,
+            offeredOptions);
         Children = new ChildUpdates(
             SendTo,
             child => new SessionUpdates(
@@ -64,7 +70,8 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
                 features.Notices,
                 features.BooleanOptions,
                 Image,
-                features.Compaction),
+                features.Compaction,
+                offered: offeredOptions),
             features.Subagents);
     }
 

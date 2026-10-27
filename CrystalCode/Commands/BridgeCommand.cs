@@ -4,6 +4,8 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 
 using CrystalCode.Bridge.Hosting;
+using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Version;
@@ -60,6 +62,12 @@ public sealed class BridgeCommand : AsyncCommand<BridgeSettings>
             return 1;
         }
 
+        if (!TryConfigOptions(settings, out var configOptions, out var optionsError))
+        {
+            await error.WriteLineAsync(optionsError);
+            return 1;
+        }
+
         var options = new BridgeOptions(
             settings.ToOptions(),
             Environment.CurrentDirectory,
@@ -67,11 +75,66 @@ public sealed class BridgeCommand : AsyncCommand<BridgeSettings>
             Version(),
             error,
             settings.Workspace,
-            settings.Space);
+            settings.Space,
+            configOptions);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         using var signals = ShutdownSignals.Register(StopSignals, stop.Cancel);
         await CrystalBridge.RunAsync(options, input, output, stop.Token);
         return 0;
+    }
+
+    /// <summary>
+    /// The option ids a client sees. A flag wins; otherwise <c>config.json</c>
+    /// applies while its custom switch is on; otherwise the built-in default.
+    /// </summary>
+    internal static bool TryConfigOptions(
+        BridgeSettings settings,
+        out IReadOnlyList<string> options,
+        out string error)
+    {
+        options = BridgeHostSettings.DefaultOptions;
+        error = string.Empty;
+        var flags = (settings.ConfigOptions is not null ? 1 : 0)
+            + (settings.DefaultConfigOptions ? 1 : 0)
+            + (settings.AllConfigOptions ? 1 : 0);
+        if (flags > 1)
+        {
+            error = "Use only one of --config-options, --default-config-options, and --all-config-options.";
+            return false;
+        }
+
+        if (settings.DefaultConfigOptions)
+        {
+            return true;
+        }
+
+        if (settings.AllConfigOptions)
+        {
+            options = BridgeHostSettings.AvailableOptions;
+            return true;
+        }
+
+        if (settings.ConfigOptions is not null)
+        {
+            if (!BridgeHostSettings.TryParse(settings.ConfigOptions, out var parsed, out error))
+            {
+                return false;
+            }
+
+            options = BridgeHostSettings.Expand(parsed);
+            return true;
+        }
+
+        try
+        {
+            options = new DiskSettingsStore(CrystalHome.Resolve(settings.Home)).LoadOrCreate().Bridge.Effective;
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            error = "Could not read config.json  " + exception.Message;
+            return false;
+        }
     }
 
     /// <summary>The short product commit, or <c>dev</c> for a build without one.</summary>

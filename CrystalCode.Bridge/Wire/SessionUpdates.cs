@@ -100,6 +100,7 @@ internal sealed class SessionUpdates
     private int _round;
     private int _reports;
     private int _replays;
+    private readonly IReadOnlySet<string>? _offered;
     private IReadOnlyList<SessionOption> _options = [];
     private string? _mode;
     private string? _reportedWorkspace;
@@ -112,6 +113,7 @@ internal sealed class SessionUpdates
     /// <param name="image">The MIME type and bytes of a session image, for replay.</param>
     /// <param name="compaction">The client advertised <c>session.compaction</c>.</param>
     /// <param name="crystal">Sends one <c>_crystal/*</c> notification: method, then its fields after <c>sessionId</c>.</param>
+    /// <param name="offered">The option ids the client sees, or null for every option.</param>
     public SessionUpdates(
         Action<Action<Utf8JsonWriter>> send,
         Func<string?> workspace,
@@ -119,7 +121,8 @@ internal sealed class SessionUpdates
         bool booleans = false,
         Func<int, (string MimeType, byte[] Data)?>? image = null,
         bool compaction = false,
-        Action<string, Action<Utf8JsonWriter>>? crystal = null)
+        Action<string, Action<Utf8JsonWriter>>? crystal = null,
+        IReadOnlySet<string>? offered = null)
     {
         ArgumentNullException.ThrowIfNull(send);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -128,11 +131,12 @@ internal sealed class SessionUpdates
         _notices = notices;
         _booleans = booleans;
         _compaction = compaction;
+        _offered = offered;
         _crystal = crystal ?? (static (_, _) => { });
         _image = image ?? (static _ => null);
     }
 
-    /// <summary>The last option catalog the engine published.</summary>
+    /// <summary>The last option catalog the engine published, whether or not the client sees it.</summary>
     public IReadOnlyList<SessionOption> Options
     {
         get
@@ -140,6 +144,18 @@ internal sealed class SessionUpdates
             lock (_gate)
             {
                 return _options;
+            }
+        }
+    }
+
+    /// <summary>The published options the client sees; a hidden one cannot be set through ACP.</summary>
+    public IReadOnlyList<SessionOption> OfferedOptions
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return Offered(_options);
             }
         }
     }
@@ -375,17 +391,22 @@ internal sealed class SessionUpdates
         ArgumentNullException.ThrowIfNull(writer);
         lock (_gate)
         {
-            ConfigWire.Options(writer, "configOptions", _options, _booleans);
-            ConfigWire.Modes(writer, _options);
+            var offered = Offered(_options);
+            ConfigWire.Options(writer, "configOptions", offered, _booleans);
+            ConfigWire.Modes(writer, offered);
         }
     }
+
+    private IReadOnlyList<SessionOption> Offered(IReadOnlyList<SessionOption> options) =>
+        _offered is null ? options : [.. options.Where(option => _offered.Contains(option.Id))];
 
     private void OptionsChanged(IReadOnlyList<SessionOption> options)
     {
         _options = options;
+        var offered = Offered(options);
         Update("config_option_update", "SessionOptionsChanged", writer =>
-            ConfigWire.Options(writer, "configOptions", options, _booleans));
-        var mode = options.FirstOrDefault(static option => option.Id == "mode")?.Current;
+            ConfigWire.Options(writer, "configOptions", offered, _booleans));
+        var mode = offered.FirstOrDefault(static option => option.Id == "mode")?.Current;
         if (mode is not null && mode != _mode)
         {
             _mode = mode;

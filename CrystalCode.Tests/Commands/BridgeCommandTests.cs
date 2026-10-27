@@ -35,6 +35,9 @@ public sealed class BridgeCommandTests
         Assert.Contains("--workspace", help, StringComparison.Ordinal);
         Assert.Contains("--space", help, StringComparison.Ordinal);
         Assert.Contains("--prompt-set", help, StringComparison.Ordinal);
+        Assert.Contains("--config-options", help, StringComparison.Ordinal);
+        Assert.Contains("--default-config-options", help, StringComparison.Ordinal);
+        Assert.Contains("--all-config-options", help, StringComparison.Ordinal);
         Assert.DoesNotContain("--token", help, StringComparison.Ordinal);
         Assert.DoesNotContain("--api-key", help, StringComparison.Ordinal);
         Assert.DoesNotContain("--resume", help, StringComparison.Ordinal);
@@ -57,6 +60,25 @@ public sealed class BridgeCommandTests
         Assert.Equal(1, code);
         Assert.Equal(0, output.Length);
         Assert.Contains("--space", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ConflictingConfigOptionFlags_AreRefusedBeforeTheProtocolStarts()
+    {
+        var error = new StringWriter();
+        using var output = new MemoryStream();
+
+        var code = await BridgeCommand.RunAsync(
+            new BridgeSettings { DefaultConfigOptions = true, AllConfigOptions = true },
+            new MemoryStream(),
+            output,
+            error,
+            new PluginRegistry(),
+            CancellationToken.None);
+
+        Assert.Equal(1, code);
+        Assert.Equal(0, output.Length);
+        Assert.Contains("only one", error.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

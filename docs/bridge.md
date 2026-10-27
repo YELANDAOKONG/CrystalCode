@@ -72,6 +72,7 @@ reflection.
 
 ```text
 crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
+               [--config-options <IDS> | --default-config-options | --all-config-options]
 ```
 
 - Session launch options are the set `crystal` accepts. They shape this
@@ -81,6 +82,11 @@ crystal bridge [session launch options] [-w|--workspace <PATH>] [--space]
 - `--workspace` and `--space` only set the fallback for a session request
   whose `cwd` is missing. ACP always sends `cwd`, so in practice the client
   chooses the workspace.
+- `--config-options`, `--default-config-options`, and `--all-config-options`
+  choose which session options the editor sees as config options (see
+  Configuration). They are mutually exclusive, apply to this process only,
+  and are never written to `config.json`. A conflict or an unknown option id
+  stops startup with a message on stderr.
 - No secret is a flag. Provider keys come from Home and the environment.
 - Editors configure it as `{"command": "crystal", "args": ["bridge"]}`.
 
@@ -460,11 +466,52 @@ in this order. Each value names the slash command that selects it, and
 `session/set_config_option` and `session/set_mode` run that command, so
 validation, refusal while busy (`-32603`, `command_refused`), and
 `config.json` writes match the terminal exactly. A value or option not offered
-is `-32602`. The response carries the complete list. `thinking`, `context`,
-`tier`, and `speed` appear only when the model offers a choice. A select
-lists only values with a command plus the current value; `tier` and `speed`
-can cycle back to unset but not name it, so unset is shown only while
-current. Values grouped by provider use ACP's grouped options.
+is `-32602`. The response carries the complete list of offered options.
+`thinking`, `context`, `tier`, and `speed` appear only when the model offers a
+choice. A select lists only values with a command plus the current value;
+`tier` and `speed` can cycle back to unset but not name it, so unset is shown
+only while current. Values grouped by provider use ACP's grouped options.
+
+### Choosing which options are offered
+
+An editor shows every config option as a control, so Bridge offers a short
+list by default: `mode`, `model`, `thinking`, `approval`, and `agents`. The
+other options in the table below stay out of the editor and remain slash
+commands.
+
+The choice applies to everything the client sees: the `session/new`,
+`session/load`, `session/resume`, and `session/fork` responses, every
+`config_option_update`, and the `session/set_config_option` response. An
+option that is not offered is `-32602` for `session/set_config_option`, as an
+unknown id is, and its slash command still works (`/tokens on`,
+`/compact micro on`, `/approval model ...`). The offered options keep the
+catalog order of the table, whatever order a list names them in. The legacy
+`modes` field and `session/set_mode` are present only while `mode` is offered.
+
+The choice is made in this order, and the first rule that applies wins:
+
+1. A command-line flag, for this process only:
+   - `--config-options <IDS>`: a comma-separated list of ids, for example
+     `mode,model,approval`. The word `all` stands for every option.
+   - `--all-config-options`: every option in the table.
+   - `--default-config-options`: the built-in default, even when
+     `config.json` has a custom list.
+2. The `bridge` section of `config.json`, only while its switch is on:
+
+   ```json
+   { "bridge": { "customConfigOptions": true, "configOptions": ["mode", "model", "approval"] } }
+   ```
+
+   `customConfigOptions` defaults to `false`, and while it is off the saved
+   `configOptions` list is kept but not used, so a list can be switched off and
+   on again. `configOptions` takes ids from the table, or `all` for every
+   option now and later. With the switch on and no list, the built-in default
+   applies. An empty list, an empty entry, or an unknown id stops startup.
+   Nothing is written to `config.json` while the section is at its default.
+3. The built-in default.
+
+A process flag does not change `config.json`. Hiding an option does not change
+its value: a hidden option keeps whatever the terminal or `config.json` set.
 
 | id | category | Values | Command |
 | :--- | :--- | :--- | :--- |
@@ -483,7 +530,8 @@ current. Values grouped by provider use ACP's grouped options.
 | `estimated_tokens` | `_crystal_display` | switch | `/tokens on\|off` |
 
 Options a process flag locks (for example `--prompt-set`) are still listed
-with their value; setting them returns the engine refusal. The legacy
+with their value while they are offered; setting them returns the engine
+refusal. The legacy
 `modes` field mirrors `mode`. Everything else (`/rules`, `/access`, `/mcp`,
 `/tools`, `/plugins`, `/notify`, `/statusline`, `/verbose`, `/todos`) stays
 a slash command.
@@ -673,8 +721,12 @@ a scripted model:
 - error codes: no response ever carries `-32000`; a missing credential,
   a busy refusal, a failed turn, and context overflow are `-32603` with
   their `kind`; unknown session ids are `-32002`;
-- every config option, refusal while busy, and the complete list in the
-  response;
+- every config option, refusal while busy, and the complete list of offered
+  options in the response;
+- the offered set: the built-in default, a list, `all`, the config switch
+  and its precedence against the three flags, a hidden option refused over
+  ACP and still usable as a slash command, and `modes` present only with
+  `mode`;
 - slash commands, reports, notices, compaction with and without
   `session.compaction`, plans, usage, queue, follow-up prompts;
 - children with and without `_meta.crystal.subagents`: without it no

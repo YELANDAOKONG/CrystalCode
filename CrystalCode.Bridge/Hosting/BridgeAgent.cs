@@ -268,7 +268,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
 
         // A resumed session keeps the ACP id the client knows it by; a fork
         // takes the new engine id.
-        var bridge = new BridgeSession(_connection, _features, setup.Fork ? null : setup.ResumeId);
+        var bridge = new BridgeSession(_connection, _features, _options.OfferedOptions, setup.Fork ? null : setup.ResumeId);
         CodingSession session;
         try
         {
@@ -376,7 +376,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
     {
         var bridge = Active(parameters);
         var mode = JsonParams.RequiredString(parameters, "modeId");
-        var options = bridge.Updates.Options;
+        var options = bridge.Updates.OfferedOptions;
         var command = options.FirstOrDefault(static option => option.Id == "mode") is { } modeOption
             ? ConfigWire.Command(modeOption, JsonDocument.Parse(JsonSerializer.Serialize(mode)).RootElement)
             : null;
@@ -402,7 +402,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             throw JsonRpcException.InvalidParams("value is required.");
         }
 
-        var option = bridge.Updates.Options.FirstOrDefault(option => option.Id == id)
+        var option = bridge.Updates.OfferedOptions.FirstOrDefault(option => option.Id == id)
             ?? throw JsonRpcException.InvalidParams("configId is not a config option of this session.");
         var command = ConfigWire.Command(option, value)
             ?? throw JsonRpcException.InvalidParams("value is not offered for " + option.Name + ".");
@@ -410,7 +410,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         return new JsonRpcReply(writer =>
         {
             writer.WriteStartObject();
-            ConfigWire.Options(writer, "configOptions", bridge.Updates.Options, _features.BooleanOptions);
+            ConfigWire.Options(writer, "configOptions", bridge.Updates.OfferedOptions, _features.BooleanOptions);
             writer.WriteEndObject();
         });
     }

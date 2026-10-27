@@ -120,7 +120,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             mcpToolApproval: mcpToolApproval,
             extendedApproval: ReadExtendedApproval(document.ExtendedApproval),
             operatorNotify: ReadOperatorNotify(document.OperatorNotify),
-            server: ReadServer(document.Server));
+            server: ReadServer(document.Server),
+            bridge: ReadBridge(document.Bridge));
     }
 
     public void Save(HarnessSettings settings)
@@ -200,6 +201,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             ExtendedApproval = WriteExtendedApproval(settings.ExtendedApproval),
             OperatorNotify = WriteOperatorNotify(settings.OperatorNotify),
             Server = WriteServer(settings.Server),
+            Bridge = WriteBridge(settings.Bridge),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
@@ -618,6 +620,41 @@ public sealed class DiskSettingsStore : ISettingsStore
         {
             throw new InvalidOperationException(exception.Message, exception);
         }
+    }
+
+    private static BridgeHostSettings ReadBridge(BridgeHostDocument? document)
+    {
+        if (document is null)
+        {
+            return BridgeHostSettings.Default;
+        }
+
+        try
+        {
+            return new BridgeHostSettings(
+                document.CustomConfigOptions ?? false,
+                document.ConfigOptions);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+    }
+
+    private static BridgeHostDocument? WriteBridge(BridgeHostSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new BridgeHostDocument
+        {
+            CustomConfigOptions = settings.Custom ? true : null,
+            ConfigOptions = settings.Options.SequenceEqual(BridgeHostSettings.DefaultOptions, StringComparer.Ordinal)
+                ? null
+                : [.. settings.Options]
+        };
     }
 
     private static ServerHostDocument? WriteServer(ServerHostSettings settings)

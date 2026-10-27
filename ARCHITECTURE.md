@@ -192,10 +192,21 @@ Spectre console at stderr, maps SIGINT, SIGTERM, and SIGHUP to shutdown, and
 hands off to `CrystalBridge.RunAsync`. The protocol and its phases are in
 [docs/bridge.md](docs/bridge.md).
 
+Which session options a client sees as config options is operator
+configuration, not engine behavior. `BridgeHostSettings` (Engine
+`Configuration`, read and written by `DiskSettingsStore` as the `bridge`
+section of `config.json`) holds the `customConfigOptions` switch and the saved
+id list, and the engine's option catalog is unchanged. `BridgeCommand`
+resolves a flag, then the saved list while the switch is on, then the built-in
+default, into the expanded id list on `BridgeOptions`. Bridge filters by id
+at the wire (`SessionUpdates`, `BridgeAgent`) and never edits the catalog.
+A hidden option is refused as `-32602` over ACP and stays a slash command.
+Like `server`, the section is never written by a command line.
+
 | Folder | Owns |
 | :--- | :--- |
 | `Transport` | `JsonRpcConnection` (one reader, one ordered writer, concurrent requests, `$/cancel_request` both ways, parse and batch errors), the error codes, `JsonRpcException`, and request field readers |
-| `Hosting` | `CrystalBridge` (the public entry), `BridgeOptions`, `BridgeAgent` (`initialize`, `session/new`, `load`, `resume`, `fork`, `list`, `prompt`, `cancel`, `set_mode`, `set_config_option`, `close`), `BridgeSession` (the live `CodingSession`, `SessionRunner`, the front-end contracts as forms, held updates, the ACP id that survives `/clear`, the `SessionState` behind `_crystal/snapshot`, child approval routing), `Extensions` (every `_crystal/*` method), `ReportCapture` (structured values for report requests), `ClientFeatures`, `LaunchTrustPrompt` (trust before a session exists), `SessionSetup`, and `TurnTracker` (which engine turn a prompt waits for, faults, clears) |
+| `Hosting` | `CrystalBridge` (the public entry), `BridgeOptions` (with the offered option ids), `BridgeAgent` (`initialize`, `session/new`, `load`, `resume`, `fork`, `list`, `prompt`, `cancel`, `set_mode`, `set_config_option`, `close`), `BridgeSession` (the live `CodingSession`, `SessionRunner`, the front-end contracts as forms, held updates, the ACP id that survives `/clear`, the `SessionState` behind `_crystal/snapshot`, child approval routing), `Extensions` (every `_crystal/*` method), `ReportCapture` (structured values for report requests), `ClientFeatures`, `LaunchTrustPrompt` (trust before a session exists), `SessionSetup`, and `TurnTracker` (which engine turn a prompt waits for, faults, clears) |
 | `Prompts` | `PromptContent`: content blocks to submitted text, image attachment through the engine, file image links through `TryAttachImageFile`, and mention lines |
 | `Wire` | `SessionUpdates` (events to `session/update` and `_crystal/*` notifications, compaction updates, archive replay, with the mapped, notified, and deliberately unmapped lists), `ChildUpdates` (subagent sessions for a client that opts in, the parent `task` call otherwise), `CrystalWire` (extension values with the server's field names), `ToolCallWire`, `PermissionWire`, `TurnWire`, `ConfigWire` (config options and legacy modes from `SessionOptionsChanged`), `FormWire` (elicitation forms and answers), `McpServerWire` (client MCP servers as session definitions), `SessionList` |
 
