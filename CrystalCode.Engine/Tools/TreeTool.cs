@@ -19,7 +19,7 @@ public sealed class TreeTool : ITool
         + "and directories end with a slash. "
         + "Use it to see the shape of an unfamiliar directory; use list for one directory's immediate entries, "
         + "glob to find files by name, and search to find candidate files by name and content. "
-        + "Optional path defaults to the workspace root; outside Full mode, outside paths require approval unless covered by session read or write access. "
+        + "Optional path defaults to the workspace root; outside paths may require approval unless covered by session read or write access. "
         + $"Optional depth controls how many levels below path are listed (default {WorkspaceLimits.DefaultTreeDepth}, "
         + $"capped at {WorkspaceLimits.MaximumTreeDepth}). "
         + $"Set files true to include file entries; each directory lists at most "

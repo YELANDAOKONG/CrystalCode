@@ -31,5 +31,7 @@ public sealed class DirectoryAccessTextTests
         Assert.Contains("Relative paths remain workspace-relative.", text, StringComparison.Ordinal);
         Assert.Contains("Only the operator can change access with /access.", text, StringComparison.Ordinal);
         Assert.DoesNotContain("sourcePath", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Full", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("approval", text, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -18,11 +18,10 @@ public static class DirectoryAccessText
 
         return "Session directory access (most-specific directory rule wins):\n"
             + string.Join('\n', rules.Select(rule => $"- {rule.Mode}: {rule.Path}"))
-            + "\nRead permits built-in file reads and searches; write includes read and follows the approval mode."
-            + " Outside Full mode, explicit read-only directories cannot be edited or written, even after approval."
-            + " Unlisted outside paths require approval outside Full mode. Full auto-passes tool calls and bypasses directory access restrictions; credential paths remain prohibited. Relative paths remain workspace-relative."
+            + "\nRead permits built-in file reads and searches. Write also permits edits and writes."
+            + " Relative paths remain workspace-relative."
             + " Search only the requested root, not all accessible directories."
-            + " These rules do not sandbox shell or extension processes; do not use them to bypass directory access."
+            + " Do not use shell or extension processes to get around these rules."
             + " Only the operator can change access with /access.";
     }
 }

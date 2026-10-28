@@ -1162,6 +1162,15 @@ and search tool descriptions and path schemas explicitly allow workspace-relativ
 or absolute roots, default to the workspace, and explain session access versus
 approval for unlisted outside roots.
 
+Model-bound text describes only what the model should do: stay inside the
+workspace and listed directories, leave read-only directories alone, do not
+use shell or extensions to get around access, and stop retrying a denied call.
+Built-in prompts, tool descriptions, and the session directory access text do
+not name approval modes, the Review model, risk classes, or what Full bypasses.
+Approval stays a host decision. Work and the `bash` description prefer the
+built-in file tools for lookups and changes, and allow bash when those tools
+cannot do the job.
+
 Resume restores the saved absolute rules and entry paths, including rules for
 missing directories; it never resolves a saved entry to a newly retargeted root.
 Invalid saved rules fail closed rather than silently losing read-only restrictions.
@@ -1843,7 +1852,9 @@ and `<session>` blocks follow the instructions.
 
 Skills are OpenCode-compatible `SKILL.md` folders. They are loaded
 on demand through the `skill` tool. Available-skill guidance lists
-name and description only; it does not include absolute paths. When
+name and description only; it does not include absolute paths. The guidance,
+Work, and Plan tell the model to load a matching skill before starting the work
+and to follow it, ranked below the user and workspace instructions. When
 Skills is enabled, `read`, `list`, `tree`, `glob`, `grep`, and `search` of any path inside a Skills
 search directory (`skill` / `skills` trees, including files that are
 not `SKILL.md`) auto-execute as workspace reads. The comparison uses

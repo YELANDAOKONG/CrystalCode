@@ -15,7 +15,7 @@ public static class SkillGuidance
             return
                 """
                 Skills provide specialized instructions and workflows for specific tasks.
-                Use the skill tool to load a skill when a task matches its description.
+                When a task matches a skill's description, load it with the skill tool before you start the work and follow it.
                 No skills are currently available.
                 """;
         }
@@ -23,7 +23,7 @@ public static class SkillGuidance
         var lines = new List<string>
         {
             "Skills provide specialized instructions and workflows for specific tasks.",
-            "Use the skill tool to load a skill when a task matches its description.",
+            "When a task matches a skill's description, load it with the skill tool before you start the work and follow it.",
             "<available_skills>"
         };
         foreach (var skill in catalog.Items)

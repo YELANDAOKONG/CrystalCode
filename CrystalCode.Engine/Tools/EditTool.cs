@@ -15,9 +15,7 @@ public sealed class EditTool : ITool
     private const string ToolDescription =
         "Replaces one unique old_string with new_string in an existing file, or every occurrence when replace_all is true. "
         + "path may be workspace-relative or absolute. "
-        + "Paths inside the workspace follow the approval mode. "
-        + "Outside Full mode, unlisted outside paths require approval: the Review model in Review or Audit, otherwise the operator. "
-        + "Session write directories follow the approval mode; session read-only directories cannot be edited outside Full mode. "
+        + "Unlisted outside paths may require approval. Session read-only directories cannot be edited. "
         + "Read the file first. "
         + "Preserve exact indentation; do not include line-number prefixes. "
         + "The call fails if old_string is missing, or appears more than once while replace_all is not true; add surrounding lines to make it unique. "

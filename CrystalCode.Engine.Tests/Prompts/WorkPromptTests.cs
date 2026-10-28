@@ -37,12 +37,35 @@ public sealed class WorkPromptTests
     public void Text_KeepsDirectoryAccessAndApprovalRules()
     {
         Assert.DoesNotContain("Stay inside the workspace", WorkPrompt.Text, StringComparison.Ordinal);
-        Assert.Contains("An unlisted outside path needs approval", WorkPrompt.Text, StringComparison.Ordinal);
-        Assert.Contains("session-authorized directories", WorkPrompt.Text, StringComparison.Ordinal);
-        Assert.Contains("Session read-only directories cannot be modified", WorkPrompt.Text, StringComparison.Ordinal);
-        Assert.Contains("Do not use shell or extensions to bypass directory access", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("the directories listed for this session", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("Do not modify read-only directories", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("do not use shell or extensions to get around directory access", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("The host handles tool approval", WorkPrompt.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("CrystalCode/", WorkPrompt.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Text_DoesNotDescribeApprovalModes()
+    {
+        foreach (var detail in new[] { "Full", "Review model", "Audit", "Forbidden", "Privileged", "auto-pass" })
+        {
+            Assert.DoesNotContain(detail, WorkPrompt.Text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Text_LoadsMatchingSkillsAndFollowsThem()
+    {
+        Assert.Contains("load it with the skill tool before you start the work and follow it", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("skills you load with the skill tool", WorkPrompt.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Text_PrefersBuiltInFileToolsOverBashWithoutForbiddingIt()
+    {
+        Assert.Contains("Prefer these over bash", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Do not use bash for those", WorkPrompt.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Do not use it to read", WorkPrompt.Text, StringComparison.Ordinal);
     }
 
     [Fact]

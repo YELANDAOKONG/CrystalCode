@@ -166,7 +166,7 @@ public sealed class ListTool : ITool
         + "Skips .git, .vs, bin, obj, node_modules, and dist. "
         + "Use offset (1-based) and limit to page through large directories; "
         + $"limit defaults to {WorkspaceLimits.MaximumListEntries} entries and is capped there. "
-        + "Outside Full mode, paths outside the workspace require approval unless covered by session read or write access.";
+        + "Paths outside the workspace may require approval unless covered by session read or write access.";
 
     private List<string> ReadEntries(string location, bool isFile, CancellationToken cancellationToken)
     {

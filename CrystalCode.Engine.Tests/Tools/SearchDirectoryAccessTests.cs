@@ -48,7 +48,8 @@ public sealed class SearchDirectoryAccessTests
         Assert.DoesNotContain("workspace.txt", result.Text, StringComparison.Ordinal);
         Assert.Contains("workspace-relative or absolute", tool.Definition.Description, StringComparison.Ordinal);
         Assert.Contains("Session read or write access", tool.Definition.Description, StringComparison.Ordinal);
-        Assert.Contains("unlisted outside paths require approval", tool.Definition.Description, StringComparison.Ordinal);
+        Assert.Contains("unlisted outside paths may require approval", tool.Definition.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain("Full mode", tool.Definition.Description, StringComparison.Ordinal);
         Assert.Contains("only the requested root, not all authorized directories", tool.Definition.Description, StringComparison.Ordinal);
     }
 }

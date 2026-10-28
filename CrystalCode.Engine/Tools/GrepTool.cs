@@ -24,7 +24,7 @@ public sealed class GrepTool : ITool
         + "output_mode content (the default) prints path:line:text. files lists only the paths that match. count prints path:count for each matching file. "
         + $"context adds up to {WorkspaceLimits.MaximumGrepContextLines} lines before and after each match in content mode, printed as path-line-text, with -- between separate groups. "
         + $"limit caps matching lines in content mode and files in files and count modes; it defaults to {WorkspaceLimits.DefaultGrepMatches} and is capped at {WorkspaceLimits.MaximumGrepMatches}. "
-        + "Session read or write access permits searching an outside directory; unlisted outside paths require approval outside Full mode. "
+        + "Session read or write access permits searching an outside directory; unlisted outside paths may require approval. "
         + "Searches only the requested root, not all authorized directories. "
         + "Skips binary files and common build directories. "
         + "Chain glob and grep for open-ended search. Batch independent searches in parallel.";

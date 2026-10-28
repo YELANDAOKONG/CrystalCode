@@ -14,7 +14,7 @@ public sealed class GlobTool : ITool
     private static readonly string ToolDescription =
         "Lists files matching a glob in the requested directory, for example **/*.cs. "
         + "Optional path may be workspace-relative or absolute and defaults to the workspace root. "
-        + "Session read or write access permits searching an outside directory; unlisted outside paths require approval outside Full mode. "
+        + "Session read or write access permits searching an outside directory; unlisted outside paths may require approval. "
         + "Searches only the requested root, not all authorized directories. "
         + "Skips .git, .vs, bin, obj, node_modules, and dist. "
         + "Use offset (1-based) and limit to page through matches; "

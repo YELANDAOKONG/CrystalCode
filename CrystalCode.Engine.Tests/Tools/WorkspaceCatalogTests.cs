@@ -59,7 +59,7 @@ public sealed class WorkspaceCatalogTests
             catalog.Find(BashTool.ToolName)!.Definition.Description,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Do not use it to read, write, or search files",
+            "Prefer read, list, tree, glob, grep, and search for lookups",
             catalog.Find(BashTool.ToolName)!.Definition.Description,
             StringComparison.Ordinal);
         Assert.Contains(

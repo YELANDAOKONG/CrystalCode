@@ -35,6 +35,7 @@ public sealed class SkillGuidanceTests
         var text = SkillGuidance.Render(catalog);
 
         Assert.Contains("<available_skills>", text, StringComparison.Ordinal);
+        Assert.Contains("before you start the work and follow it", text, StringComparison.Ordinal);
         Assert.Contains("<name>git-release</name>", text, StringComparison.Ordinal);
         Assert.Contains("&lt;and&gt;", text, StringComparison.Ordinal);
         Assert.DoesNotContain("<location>", text, StringComparison.Ordinal);
