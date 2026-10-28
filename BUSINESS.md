@@ -495,6 +495,19 @@ implemented in the current build.
 
 ### High priority
 
+- Trimming tool-returned media resources. The direction is to let a session
+  drop the resources a tool returned, such as images now and audio or video
+  once they are supported, from what is sent to the model, so a request no
+  longer fails with HTTP 413 when many are held. The operator can trigger it
+  manually and set how much it trims, it can also respond to a 413, and it is
+  configurable. Which resources it covers, how a trimmed resource is shown to
+  the model and the operator, whether it can be undone, how it interacts with
+  compaction, resume, fork, and export, the configuration shape, and the
+  front-end surfaces are not defined. Do not reserve a configuration field,
+  command, public type, event, or wire field. This does not authorize changes
+  under `../Crystal`, and approval, trust, the workspace fence, and
+  `ToolInvocationPolicy` stay as they are. Current behavior stands: a 413
+  ends the turn with an error.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
   a library is also published are not defined. Do not reserve a package id or
   add a project. This item is not permission to add or update a package

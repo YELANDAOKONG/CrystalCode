@@ -42,6 +42,16 @@ that fixes it.
   on Windows, macOS, and Linux and must not add an external command
   dependency.
 
+- HTTP 413 when a session holds many tool-returned media resources. `view_image`
+  and other tools that return images put their bytes into every later model
+  request, so the request body grows until the provider rejects it with
+  HTTP 413. Today a 413 is not handled: it ends the turn with an error, and
+  the only relief is `/clear` or a new session. The media resource limit is
+  per file and does not bound the total. Not yet checked: which providers
+  and gateways return 413 and at what request size, and how a 413 from a
+  proxy differs from one from the provider. The fix is the first High
+  priority item (Trimming tool-returned media resources).
+
 ## Deferred
 
 These are part of the product direction and are not in the current build.
@@ -90,6 +100,18 @@ These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work. Current
 behavior stands until a specific change defines otherwise.
 
+- Trimming tool-returned media resources. Letting a session drop the
+  resources a tool returned, such as images now and audio or video once they
+  are supported, from what is sent to the model, so a request no longer fails
+  with HTTP 413 (see Issues). The operator can trigger it manually and set
+  how much it trims, it can also respond to a 413, and it is configurable.
+  Which resources it covers, how a trimmed resource is shown to the model and
+  the operator, whether it can be undone, how it interacts with compaction,
+  resume, fork, and export, the configuration shape, and the front-end
+  surfaces are not defined. Do not reserve a configuration field, command,
+  public type, event, or wire field. It does not authorize changes under
+  `../Crystal`, and approval, trust, the workspace fence, and
+  `ToolInvocationPolicy` stay as they are.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
   a library is also published are not defined. Do not reserve a package id or
   add a project. This item is not permission to add or update a package
