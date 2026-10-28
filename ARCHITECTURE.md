@@ -602,8 +602,10 @@ they do not change adapter capabilities, tool registration, attachment,
 persistence, or the outbound request. Selected service tiers and speeds are
 also published on both contracts; a custom protocol factory must apply a
 non-null slot or reject it when the client is created. Built-in adapters
-still accept only text and image input. Accepting audio or video, and
-non-text model output, remain TODO. MCP
+still accept only text and image input and emit only text, reasoning, and
+tool calls. Accepting audio or video, and audio or video model output, remain
+TODO. Image generation is high-priority product work and is not in this build;
+see BUSINESS.md. MCP
 media transport is TODO.
 
 CrystalCode does not capture screenshots, control browsers, phones, virtual
@@ -2424,7 +2426,9 @@ The directory check itself runs before the session is created and follows
 denies every call that would have asked the operator. The question prompt
 dismisses. Session choice is declined. Review and Audit still call the
 reviewing model: allow executes the tool, and deny returns the reviewer's
-reason. An enabled extended approval model runs the same way after a primary
+reason. When the reviewer request fails or returns unusable output, the
+model is told an error prevented the approval request from being processed,
+not that the user declined. The error detail stays out of model text. An enabled extended approval model runs the same way after a primary
 allow. Plan does not offer write, edit, apply_patch, or bash. The approval policy
 also rejects those side effects when a catalog still contains them.
 

@@ -500,22 +500,32 @@ implemented in the current build.
   add a project. This item is not permission to add or update a package
   reference. Current release artifacts and install scripts remain the install
   path.
-- .NET CLI tool support. The direction is to ship the executable as a
-  `dotnet tool` so that `dotnet tool install` places it on `PATH` with an
-  installed command name. Package id, target frameworks, and packed assemblies
-  are not defined. Do not reserve a package id, project, command, or package
-  reference. The installed tool remains this executable, not a second
-  assembly, and `crystal run` keeps its current entry semantics.
-- Other packaging support beyond the self-contained archives and install
-  scripts. Channels are not selected, and ownership, signing, update behavior,
-  and platform coverage are not defined. Do not reserve a package name, tap,
-  formula, image, or repository. Release artifacts and install scripts remain
-  the install path until a specific change defines otherwise.
 - Refactoring and optimizing `crystal run`. It remains the headless entry for
   one task in this executable, not an operator surface and not a second
   assembly. The work must not put secrets on the command line, persist flags
   to `config.json`, or make the run ask the operator. Current flags and exit
   behavior stand until a specific change defines otherwise.
+- Image generation. The direction is to let the session produce images,
+  whether through a tool or as native model output. Which path comes first,
+  which providers and protocols, how a model declares it, how a generated
+  image is stored, replayed, resumed, forked, and exported, and how approval
+  and cost are handled are not defined. Generated images must keep the
+  existing image boundary: signature check, size limit, owner-only media
+  store, and `[Image #N]` markers, with no bytes in logs or composer text. Do
+  not reserve a configuration field, command, public type, event, wire field,
+  or tool-set format. This does not authorize changes under `../Crystal`, and
+  approval, trust, the workspace fence, and `ToolInvocationPolicy` stay as
+  they are. Current behavior stands: the built-in adapters emit only text,
+  reasoning, and tool calls.
+- A built-in web search tool. The direction is a host-executed tool that lets
+  the model search the web and read the results. The search backend, whether
+  a separate page fetch tool exists, how approval and network access are
+  classified, result size bounds, and failure behavior are not defined. It is
+  not a provider's server-side web search, not an MCP server, and not a
+  plugin or tool set. Results are untrusted data, not instructions. Do not
+  reserve a configuration field, command, public type, or backend name, and
+  do not store a search key in source, logs, or on a command line. Approval,
+  trust, the workspace fence, and `ToolInvocationPolicy` stay as they are.
 
 ### Medium priority
 
@@ -542,15 +552,6 @@ implemented in the current build.
   defined. Do not reserve a command, public type, or tool-set format for
   them. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
-- A built-in web search tool. The direction is a host-executed tool that lets
-  the model search the web and read the results. The search backend, whether
-  a separate page fetch tool exists, how approval and network access are
-  classified, result size bounds, and failure behavior are not defined. It is
-  not a provider's server-side web search, not an MCP server, and not a
-  plugin or tool set. Results are untrusted data, not instructions. Do not
-  reserve a configuration field, command, public type, or backend name, and
-  do not store a search key in source, logs, or on a command line. Approval,
-  trust, the workspace fence, and `ToolInvocationPolicy` stay as they are.
 - Built-in tool optimization. Improving how the built-in tools behave and
   perform. Which tools and which improvements are not defined. It is not a
   new tool, not operator configuration of tool limits (that question is under
@@ -574,15 +575,29 @@ implemented in the current build.
   catalog stay as they are. Do not reserve a configuration field or public
   type.
 
+### Low priority
+
+- .NET CLI tool support. The direction is to ship the executable as a
+  `dotnet tool` so that `dotnet tool install` places it on `PATH` with an
+  installed command name. Package id, target frameworks, and packed assemblies
+  are not defined. Do not reserve a package id, project, command, or package
+  reference. The installed tool remains this executable, not a second
+  assembly, and `crystal run` keeps its current entry semantics.
+- Other packaging support beyond the self-contained archives and install
+  scripts. Channels are not selected, and ownership, signing, update behavior,
+  and platform coverage are not defined. Do not reserve a package name, tap,
+  formula, image, or repository. Release artifacts and install scripts remain
+  the install path until a specific change defines otherwise.
+
 ### Deferred
 
 - an operating-system sandbox;
 - provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
   and Ollama Chat;
-- accepting, persisting, or sending audio or video input, and image, audio,
-  or video model output. Declaring `audioInput` or `videoInput` does not
-  implement that path;
+- accepting, persisting, or sending audio or video input, and audio or video
+  model output. Declaring `audioInput` or `videoInput` does not implement that
+  path. Image model output is High priority (Image generation);
 - editing provider definitions in the TUI;
 - workspace-level configuration, read from `<workspace>/.crystal/config.json`
   once its field scope, precedence, write policy, and trust semantics are
@@ -629,7 +644,12 @@ implemented in the current build.
   in one long-lived process would only grow. Do not reserve a route, flag,
   or public type;
 
-TODO: add audio/video input and non-text model output only after their terminal
+TODO: add image generation only after its path, providers, declaration,
+storage and replay, and approval and cost behavior are defined. Do not reserve
+a configuration field, command, public type, event, wire field, or tool-set
+format.
+
+TODO: add audio/video input and audio or video model output only after their terminal
 interaction, persistence, size, and provider semantics are defined. A stored
 `audioInput` or `videoInput` declaration is not that path. ACP (Bridge)
 stays the front end described in docs/bridge.md. Do not put that protocol in

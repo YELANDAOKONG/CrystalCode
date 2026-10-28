@@ -6,7 +6,7 @@ using CrystalCode.Engine.Approvals.Interfaces;
 namespace CrystalCode.Run;
 
 /// <summary>
-/// Denies every call that would have asked the operator. Review and Audit
+/// Declines every call that would have asked the operator. Review and Audit
 /// still judge calls before this prompt is reached. Auto-pass and review
 /// notifications are recorded by the session and are not denials.
 /// </summary>
@@ -25,7 +25,7 @@ internal sealed class UnattendedApprovalPrompt : IApprovalPrompt
         ArgumentNullException.ThrowIfNull(classification);
         cancellationToken.ThrowIfCancellationRequested();
         Asked++;
-        return ValueTask.FromResult(ApprovalChoice.Deny);
+        return ValueTask.FromResult(ApprovalChoice.Unavailable);
     }
 
     public void NotifyPassed(

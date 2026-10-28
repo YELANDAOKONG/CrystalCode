@@ -16,6 +16,10 @@ public sealed class ApprovalPolicy
 
     internal const string RejectedText = "The user declined this action." + RetryGuidance;
 
+    internal const string ReviewFailedText =
+        "An error occurred and the approval request could not be processed, so this action was not run."
+        + RetryGuidance;
+
     private readonly ApprovalMode _mode;
     private readonly Workspace _workspace;
     private readonly ToolClassifier _classifier;
@@ -112,8 +116,12 @@ public sealed class ApprovalPolicy
             cancellationToken);
         if (!choice.IsAllow)
         {
+            // Only a missing operator after a failed review is an error. A person who
+            // answered deny, or an unattended run with no review failure, is a refusal.
+            var reviewFailed = choice.IsUnavailable
+                && (pendingReview?.IsFailure == true || pendingExtended?.IsFailure == true);
             return ToolInvocationDecision.Reject(
-                new ToolOutput(RejectedText, ToolResultStatus.Failure));
+                new ToolOutput(reviewFailed ? ReviewFailedText : RejectedText, ToolResultStatus.Failure));
         }
 
         var scope = classification.AllowsReusableGrant ? choice.Scope : GrantScope.Once;

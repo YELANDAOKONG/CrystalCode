@@ -78,11 +78,12 @@ or `CrystalCode` on Windows.
 ## Not yet implemented
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
-High priority, and not in this build: a NuGet package; .NET CLI tool support; other packaging support; MCP resources, prompts, elicitation, and roots
-(MCP tools are in this build); the Agent Client Protocol (ACP), named Bridge (`crystal bridge`); and a refactor
-of `crystal run`. Medium priority, and not in this build: automatically
+High priority, and not in this build: a NuGet package; MCP resources, prompts, elicitation, and roots
+(MCP tools are in this build); the Agent Client Protocol (ACP), named Bridge (`crystal bridge`); a refactor
+of `crystal run`; image generation; and a built-in web search tool. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a full code review, child Agent configuration, and provider-specific
-custom-format tools such as OpenAI's `apply_patch`. An operating-system
+custom-format tools such as OpenAI's `apply_patch`. Low priority, and not in
+this build: .NET CLI tool support and other packaging support. An operating-system
 sandbox, audio and video input, non-text model output, editing provider
 definitions in the TUI,
 and switchable thinking-chain compression remain deferred. That last one

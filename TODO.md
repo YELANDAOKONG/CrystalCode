@@ -51,8 +51,9 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Provider protocols other than DeepSeek and OpenAI-compatible Chat
   Completions, OpenAI Responses, Anthropic Messages, Gemini GenerateContent,
   and Ollama Chat.
-- Audio and video input, and image, audio, or video model output. A stored
-  `audioInput` or `videoInput` declaration is not that path.
+- Audio and video input, and audio or video model output. A stored
+  `audioInput` or `videoInput` declaration is not that path. Image model
+  output is under High priority (Image generation).
 - Editing provider definitions in the TUI.
 - Workspace-level configuration at `<workspace>/.crystal/config.json`. Field
   scope, precedence, write policy, and trust semantics are not defined. A
@@ -94,16 +95,6 @@ behavior stands until a specific change defines otherwise.
   add a project. This item is not permission to add or update a package
   reference. Current release artifacts and install scripts remain the install
   path.
-- .NET CLI tool support. Shipping the executable as a `dotnet tool` so that
-  `dotnet tool install` places it on `PATH` with an installed command name.
-  Package id, target frameworks, and which assemblies ship are not defined.
-  Do not reserve a package id, project, command, or package reference. The
-  installed tool stays this executable, not a second assembly, and
-  `crystal run` keeps its current entry semantics.
-- Other packaging support beyond the self-contained archives and install
-  scripts. Channels are not selected, and package names, ownership, signing,
-  update behavior, and platform coverage are not defined. Do not reserve a
-  package name, tap, formula, image, or repository.
 - MCP gaps. MCP tools, resources, prompts, elicitation, and roots are in this
   build, and so are servers a front end passes in for one session. Not in it:
   sampling, OAuth for remote servers, image and audio results (they are
@@ -132,6 +123,25 @@ behavior stands until a specific change defines otherwise.
   event stream or archive records. Do not reserve an event, a wire field, or a
   public type for it. When it is done, the server facts the client depends on
   are recorded in ARCHITECTURE.md.
+- Image generation. Letting the session produce images, whether through a
+  tool or as native model output. Which path comes first, which providers and
+  protocols, how a model declares it, how a generated image is stored,
+  replayed, resumed, forked, and exported, and how approval and cost are
+  handled are not defined. Generated images must keep the existing image
+  boundary: signature check, size limit, owner-only media store, and
+  `[Image #N]` markers, with no bytes in logs or composer text. Do not reserve
+  a configuration field, command, public type, event, wire field, or tool-set
+  format. It does not authorize changes under `../Crystal`, and approval,
+  trust, the workspace fence, and `ToolInvocationPolicy` stay as they are.
+- A built-in web search tool. A host-executed tool that lets the model search
+  the web and read the results. The search backend, whether a separate page
+  fetch tool exists, how approval and network access are classified, result
+  size bounds, and failure behavior are not defined. It is not a provider's
+  server-side web search, not an MCP server, and not a plugin or tool set.
+  Results are untrusted data, not instructions. Do not reserve a
+  configuration field, command, public type, or backend name, and do not
+  store a search key in source, logs, or on a command line. Approval, trust,
+  the workspace fence, and `ToolInvocationPolicy` stay as they are.
 
 ## Medium priority
 
@@ -164,15 +174,6 @@ behavior stands until a specific change defines otherwise.
   defined. Do not reserve a command, public type, or tool-set format for
   them. This item does not authorize changes under `../Crystal`. Provider
   adapters still implement only Crystal chat contracts and do not own tools.
-- A built-in web search tool. A host-executed tool that lets the model search
-  the web and read the results. The search backend, whether a separate page
-  fetch tool exists, how approval and network access are classified, result
-  size bounds, and failure behavior are not defined. It is not a provider's
-  server-side web search, not an MCP server, and not a plugin or tool set.
-  Results are untrusted data, not instructions. Do not reserve a
-  configuration field, command, public type, or backend name, and do not
-  store a search key in source, logs, or on a command line. Approval, trust,
-  the workspace fence, and `ToolInvocationPolicy` stay as they are.
 - Built-in tool optimization. Improving how the built-in tools behave and
   perform. Which tools and which improvements are not defined. It is not a
   new tool, not operator configuration of tool limits (that question is under
@@ -186,7 +187,20 @@ behavior stands until a specific change defines otherwise.
 
 ## Low priority
 
-None. Do not invent a priority.
+These are part of the product direction and are not in the current build.
+The constraints are in `BUSINESS.md` under Deferred product work. Current
+behavior stands until a specific change defines otherwise.
+
+- .NET CLI tool support. Shipping the executable as a `dotnet tool` so that
+  `dotnet tool install` places it on `PATH` with an installed command name.
+  Package id, target frameworks, and which assemblies ship are not defined.
+  Do not reserve a package id, project, command, or package reference. The
+  installed tool stays this executable, not a second assembly, and
+  `crystal run` keeps its current entry semantics.
+- Other packaging support beyond the self-contained archives and install
+  scripts. Channels are not selected, and package names, ownership, signing,
+  update behavior, and platform coverage are not defined. Do not reserve a
+  package name, tap, formula, image, or repository.
 
 ## Pending evaluation
 

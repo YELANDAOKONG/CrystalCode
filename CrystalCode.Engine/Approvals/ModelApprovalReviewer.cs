@@ -78,14 +78,14 @@ public sealed class ModelApprovalReviewer : IApprovalReviewer
         }
         catch (Exception exception)
         {
-            return ApprovalReviewVerdict.AskUser(
+            return ApprovalReviewVerdict.Failure(
                 _name + " failed: " + exception.Message);
         }
 
         var text = ReadAssistantText(response);
         if (!TryParse(text, out var verdict))
         {
-            return ApprovalReviewVerdict.AskUser(
+            return ApprovalReviewVerdict.Failure(
                 _name + " did not return a usable assessment.");
         }
 

@@ -40,7 +40,16 @@ public sealed record ApprovalReviewVerdict
     public static ApprovalReviewVerdict AskUser(string rationale) =>
         new("ask", ReviewRiskLevel.Medium, ReviewAuthorization.Unknown, rationale);
 
+    /// <summary>
+    /// An ask verdict for a reviewer that errored or returned unusable output,
+    /// so no assessment of the call exists.
+    /// </summary>
+    public static ApprovalReviewVerdict Failure(string rationale) =>
+        AskUser(rationale) with { IsFailure = true };
+
     public string Outcome { get; }
+
+    public bool IsFailure { get; init; }
 
     public ReviewRiskLevel RiskLevel { get; }
 
