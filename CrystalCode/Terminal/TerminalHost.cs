@@ -159,7 +159,11 @@ internal sealed class TerminalHost
         _renderer.OnSideCleared = _session.ClearSideQuestions;
         _renderer.OnSideCancelled = () => _session.TryCancelSideQuestion();
         _renderer.OnVerboseToggled = PersistVerboseToggle;
-        await _session.StartAsync(cancellationToken);
+        if (!await StartSessionAsync(cancellationToken))
+        {
+            return 0;
+        }
+
         _renderer.ChildSessionsEnabled = _session.AgentsEnabled;
         ApplyLaunchMode(_session, _launchMode);
 
@@ -277,6 +281,29 @@ internal sealed class TerminalHost
             {
                 return 0;
             }
+        }
+    }
+
+    /// <summary>
+    /// Starts the session behind the startup page. Ctrl+C cancels startup
+    /// and leaves; the session is still closed and saved by the caller.
+    /// Returns false when startup was cancelled.
+    /// </summary>
+    private async Task<bool> StartSessionAsync(CancellationToken cancellationToken)
+    {
+        using var startup = TerminalInterrupt.Link(cancellationToken);
+        try
+        {
+            await _renderer.PumpStartupAsync(
+                () => _session.StartAsync(startup.Token),
+                startup.CancelReads,
+                cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException) when (
+            startup.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            return false;
         }
     }
 

@@ -1,6 +1,7 @@
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 
@@ -31,6 +32,28 @@ public static class ProgressText
     public const string LoadingTools = "Loading Tools";
 
     public const string LoadingPlugins = "Loading Plugins";
+
+    /// <summary>One row of the startup page, or the live caption suffix.</summary>
+    public static string Loading(LoadingKind kind, string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        var label = kind switch
+        {
+            LoadingKind.ToolSet => "Tool Set",
+            LoadingKind.Plugin => "Plugin",
+            LoadingKind.McpServer => "MCP Server",
+            _ => "Item"
+        };
+        return label + "  " + name;
+    }
+
+    /// <summary>The progress row while one item loads in a live session.</summary>
+    public static string LoadingItem(LoadingKind kind, string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        var caption = kind == LoadingKind.Plugin ? LoadingPlugins : LoadingTools;
+        return caption + "  " + name;
+    }
 
     public static string Retrying(int attempt, TimeSpan delay)
     {

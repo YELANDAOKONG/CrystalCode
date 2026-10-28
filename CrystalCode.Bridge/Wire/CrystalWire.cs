@@ -416,6 +416,14 @@ internal static class CrystalWire
         _ => "unknown"
     };
 
+    public static string LoadingKindName(LoadingKind kind) => kind switch
+    {
+        LoadingKind.ToolSet => "tool_set",
+        LoadingKind.Plugin => "plugin",
+        LoadingKind.McpServer => "mcp_server",
+        _ => "unknown"
+    };
+
     /// <summary>The fields of the server's <c>GET /snapshot</c>, without its interactions.</summary>
     public static void Snapshot(Utf8JsonWriter writer, SessionSnapshot snapshot)
     {

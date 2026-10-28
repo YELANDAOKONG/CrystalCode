@@ -311,6 +311,19 @@ separate library with no terminal code. The product can:
   `crystal mcp` list, show, enable, and disable servers, and `/mcp` also sets
   the MCP switch and the per-source approval choice. They never print a
   server's command, arguments, environment, headers, or URL;
+- load operator tool sets and plugins without freezing the operator surface.
+  Loading runs off the front end's thread and the engine names each tool
+  set, plugin, and MCP server as it starts loading. In the terminal, session
+  start shows a separate startup page before the session frame: it lists
+  what is loading and accepts only Ctrl+C, which cancels startup and exits.
+  Keys typed there are discarded. In a live session (`/tools`, `/plugins`,
+  `/cd`, `/space`, resume into another workspace) the frame keeps drawing,
+  the progress row names the item, and the composer stays editable, but
+  Enter, F6 send, and F7 do nothing until loading ends, so nothing typed
+  becomes a queued turn or an error and the draft stays. Ctrl+C cancels a
+  plain `/tools reload` or `/plugins reload` between items and keeps the
+  previous catalog; other reloads run to the end because their settings
+  or workspace have already changed;
 - load operator plugins from `~/.crystal/plugins` and
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
   tools, protocol clients, classifiers, slash commands, hooks, raw

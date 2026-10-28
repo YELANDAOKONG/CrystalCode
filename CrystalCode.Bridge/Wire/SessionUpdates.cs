@@ -70,6 +70,7 @@ internal sealed class SessionUpdates
         typeof(PromptHistoryLoaded),
         typeof(ImageHistoryInvalidated),
         typeof(ActivityChanged),
+        typeof(LoadingProgressed),
         typeof(UserMessageRecalled),
         typeof(QueueChanged),
         typeof(SideQuestionSnapshot),
@@ -224,6 +225,13 @@ internal sealed class SessionUpdates
                     break;
                 case ActivityChanged activity:
                     _crystal("_crystal/activity", writer => writer.WriteString("activity", CrystalWire.ActivityName(activity.Activity)));
+                    break;
+                case LoadingProgressed loading:
+                    _crystal("_crystal/loading", writer =>
+                    {
+                        writer.WriteString("kind", CrystalWire.LoadingKindName(loading.Kind));
+                        writer.WriteString("name", loading.Name);
+                    });
                     break;
                 case UserMessageRecalled recalled:
                     // The draft keeps trusted markers so the client can submit it again as is.

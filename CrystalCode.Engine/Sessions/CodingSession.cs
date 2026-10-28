@@ -1032,6 +1032,7 @@ public sealed class CodingSession : ITurnObserver
     private Task<TurnResult>? _turnTask;
     private CancellationTokenSource? _turnSource;
     private CancellationTokenSource? _compactSource;
+    private CancellationTokenSource? _loadSource;
     private bool _compacting;
     private bool _turnActive;
     private string? _turnUserText;
@@ -1115,7 +1116,7 @@ public sealed class CodingSession : ITurnObserver
             CreateSideSessionClient,
             CreateSideImageClient,
             CreateSideReviewClient);
-        ReloadPlugins();
+        ApplyPlugins(PluginCatalog.Load(_home, _workspace, _settings.Plugins, _toolHost));
         _client = CreateClient(settings);
         _multimodalClient = CreateMultimodalClient(settings);
         BindCompactor();
@@ -1259,7 +1260,7 @@ public sealed class CodingSession : ITurnObserver
             Note(disabledTools);
         }
 
-        ReloadExternalToolsWithProgress();
+        await ReloadExternalToolsAsync(cancellationToken);
         await ReloadMcpAsync(cancellationToken);
         PublishPluginEnvironment();
         RebuildExecutors();
@@ -1483,8 +1484,8 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
-    /// Cancels the running turn or compaction. Returns false when there is
-    /// nothing to cancel.
+    /// Cancels the running turn, compaction, or a plain tool or plugin
+    /// reload. Returns false when there is nothing to cancel.
     /// </summary>
     public bool TryInterrupt()
     {
@@ -1498,6 +1499,19 @@ public sealed class CodingSession : ITurnObserver
         {
             _compactSource.Cancel();
             return true;
+        }
+
+        if (Volatile.Read(ref _loadSource) is { } load)
+        {
+            try
+            {
+                load.Cancel();
+                return true;
+            }
+            catch (ObjectDisposedException)
+            {
+                // The load finished between the read and the cancel.
+            }
         }
 
         return false;
@@ -2219,7 +2233,7 @@ public sealed class CodingSession : ITurnObserver
                 ChangeTodos(command.Argument);
                 return (true, false);
             case SessionVerb.Tools:
-                ChangeTools(command.Argument);
+                await ChangeToolsAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Plugins:
                 await ChangePluginsAsync(command.Argument, cancellationToken);
@@ -4182,7 +4196,7 @@ public sealed class CodingSession : ITurnObserver
         return false;
     }
 
-    private void ChangeTools(string argument)
+    private async Task ChangeToolsAsync(string argument, CancellationToken cancellationToken)
     {
         var parts = argument.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length == 0)
@@ -4208,17 +4222,17 @@ public sealed class CodingSession : ITurnObserver
         {
             if (CatalogCommand.LooksLike(parts))
             {
-                ChangeToolSet(parts);
+                await ChangeToolSetAsync(parts, cancellationToken);
                 return;
             }
 
-            ChangeToolApproval(command, parts);
+            await ChangeToolApprovalAsync(command, parts, cancellationToken);
             return;
         }
 
         if (CatalogCommand.LooksLike(parts))
         {
-            ChangeToolSet(parts);
+            await ChangeToolSetAsync(parts, cancellationToken);
             return;
         }
 
@@ -4230,7 +4244,7 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
-            ChangeToolLoading(command);
+            await ChangeToolLoadingAsync(command, cancellationToken);
             return;
         }
 
@@ -4662,7 +4676,10 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private void ChangeToolApproval(string source, IReadOnlyList<string> parts)
+    private async Task ChangeToolApprovalAsync(
+        string source,
+        IReadOnlyList<string> parts,
+        CancellationToken cancellationToken)
     {
         if (parts.Count == 1)
         {
@@ -4700,13 +4717,13 @@ public sealed class CodingSession : ITurnObserver
             ? _settings.ExternalToolApproval.WithHome(policy)
             : _settings.ExternalToolApproval.WithProject(policy);
         SaveSettings(current => current.WithExternalToolApproval(approval));
-        ReloadExternalToolsWithProgress();
+        await ReloadExternalToolsAsync(CancellationToken.None);
         PublishPluginEnvironment();
         RebuildExecutors();
         Note($"Tool approval  {Title(source)} {Title(policy.Value)}");
     }
 
-    private void ChangeToolLoading(string command)
+    private async Task ChangeToolLoadingAsync(string command, CancellationToken cancellationToken)
     {
         if (_turnActive)
         {
@@ -4719,7 +4736,13 @@ public sealed class CodingSession : ITurnObserver
             SaveSettings(current => current.WithExternalTools(command == "on"));
         }
 
-        ReloadExternalToolsWithProgress();
+        // Only a plain reload may be cancelled: after on or off the saved
+        // switch and the loaded catalog must agree.
+        if (!await ReloadExternalToolsAsync(cancellationToken, cancellable: command == "reload"))
+        {
+            return;
+        }
+
         PublishPluginEnvironment();
         RebuildExecutors();
         ReplaceLiveSystem();
@@ -5062,7 +5085,7 @@ public sealed class CodingSession : ITurnObserver
             + "/tools home author|host, or /tools project author|host.");
     }
 
-    private void ChangeToolSet(IReadOnlyList<string> parts)
+    private async Task ChangeToolSetAsync(IReadOnlyList<string> parts, CancellationToken cancellationToken)
     {
         if (!CatalogCommand.TryParse(parts, out var command, out var error) || command is null)
         {
@@ -5122,7 +5145,7 @@ public sealed class CodingSession : ITurnObserver
 
         if (changed)
         {
-            ReloadExternalToolsWithProgress();
+            await ReloadExternalToolsAsync(CancellationToken.None);
             PublishPluginEnvironment();
             RebuildExecutors();
             ReplaceLiveSystem();
@@ -5404,9 +5427,9 @@ public sealed class CodingSession : ITurnObserver
         }
 
         await RebindPluginSessionAsync(
-            () =>
+            async () =>
             {
-                ApplyWorkspace(candidate);
+                await ApplyWorkspaceAsync(candidate);
                 SeedWorkspaceDefaults();
             },
             cancellationToken);
@@ -5420,14 +5443,15 @@ public sealed class CodingSession : ITurnObserver
     /// <summary>
     /// Reloads workspace-owned catalogs after the root has changed.
     /// The caller ends the plugin session before this and starts it after.
+    /// The loads cannot be cancelled once the root has moved.
     /// </summary>
-    private void ApplyWorkspace(string candidate)
+    private async Task ApplyWorkspaceAsync(string candidate)
     {
         _workspace.Access.Clear();
         _workspace.SetRoot(candidate);
         ReloadSkills();
-        ReloadPluginsWithProgress();
-        ReloadExternalToolsWithProgress();
+        await ReloadPluginsAsync(CancellationToken.None);
+        await ReloadExternalToolsAsync(CancellationToken.None);
         PublishPluginEnvironment();
         ReloadPrompts();
         ReloadModes(announce: true);
@@ -6166,9 +6190,9 @@ public sealed class CodingSession : ITurnObserver
         }
 
         await RebindPluginSessionAsync(
-            () =>
+            async () =>
             {
-                ApplyWorkspace(candidate);
+                await ApplyWorkspaceAsync(candidate);
                 Note("Workspace  " + _workspace.Root);
                 ApplyResume(document);
             },
@@ -6665,15 +6689,85 @@ public sealed class CodingSession : ITurnObserver
             : null;
     }
 
-    private void ReloadExternalTools()
+    /// <summary>
+    /// Loads operator tool sets off the calling thread so a front end keeps
+    /// drawing, and reports each set as it starts. Returns false when a
+    /// <paramref name="cancellable"/> reload was interrupted; the previous
+    /// catalog then stays loaded.
+    /// </summary>
+    private async Task<bool> ReloadExternalToolsAsync(
+        CancellationToken cancellationToken,
+        bool cancellable = false)
     {
-        _external = ExternalCatalog.Load(
-            _home,
-            _workspace,
-            _settings.ExternalTools,
-            _settings.ExternalToolApproval,
-            _toolHost,
-            _loadedPlugins.ToolNames);
+        if (!_settings.ExternalTools)
+        {
+            _external = ExternalCatalog.Empty;
+            return true;
+        }
+
+        var approval = _settings.ExternalToolApproval;
+        var reserved = _loadedPlugins.ToolNames;
+        SetActivity(SessionActivity.LoadingTools);
+        try
+        {
+            var loaded = await LoadOffThreadAsync(
+                token => ExternalCatalog.Load(
+                    _home,
+                    _workspace,
+                    enabled: true,
+                    approval,
+                    _toolHost,
+                    reserved,
+                    name => Publish(new LoadingProgressed(LoadingKind.ToolSet, name)),
+                    token),
+                cancellable,
+                cancellationToken);
+            if (loaded is null)
+            {
+                return false;
+            }
+
+            _external = loaded;
+            return true;
+        }
+        finally
+        {
+            SetActivity(SessionActivity.Idle);
+        }
+    }
+
+    /// <summary>
+    /// Runs a catalog load on the thread pool. A cancellable load can be
+    /// stopped by <see cref="TryInterrupt"/> between items and returns null.
+    /// </summary>
+    private async Task<T?> LoadOffThreadAsync<T>(
+        Func<CancellationToken, T> load,
+        bool cancellable,
+        CancellationToken cancellationToken)
+        where T : class
+    {
+        using var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (cancellable)
+        {
+            Volatile.Write(ref _loadSource, source);
+        }
+
+        try
+        {
+            return await Task.Run(() => load(source.Token), source.Token);
+        }
+        catch (OperationCanceledException) when (cancellable && !cancellationToken.IsCancellationRequested)
+        {
+            Note("Reload cancelled. The previous catalog stays loaded.");
+            return null;
+        }
+        finally
+        {
+            if (cancellable)
+            {
+                Volatile.Write(ref _loadSource, null);
+            }
+        }
     }
 
     /// <summary>
@@ -6706,6 +6800,11 @@ public sealed class CodingSession : ITurnObserver
         }
 
         SetActivity(SessionActivity.LoadingTools);
+        foreach (var definition in definitions)
+        {
+            Publish(new LoadingProgressed(LoadingKind.McpServer, definition.Name));
+        }
+
         try
         {
             var reserved = new HashSet<string>(_loadedPlugins.ToolNames, StringComparer.Ordinal)
@@ -6737,10 +6836,10 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private void ReloadPlugins()
+    private void ApplyPlugins(PluginCatalog loaded)
     {
         _statusBoard.Retire();
-        _loadedPlugins = PluginCatalog.Load(_home, _workspace, _settings.Plugins, _toolHost);
+        _loadedPlugins = loaded;
         _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note, _loadedPlugins.RawHooks);
         _placeholders = new PluginPlaceholderTable(_loadedPlugins.Placeholders, Note);
         _placeholders.SetModels(_modelView);
@@ -6753,23 +6852,45 @@ public sealed class CodingSession : ITurnObserver
         Publish(new StatusFieldsChanged(fields));
     }
 
-    private void ReloadPluginsWithProgress()
+    /// <summary>
+    /// Loads operator plugins off the calling thread and reports each one as
+    /// it starts. Returns false when a <paramref name="cancellable"/> reload
+    /// was interrupted; the previous plugins then stay loaded.
+    /// </summary>
+    private async Task<bool> ReloadPluginsAsync(
+        CancellationToken cancellationToken,
+        bool cancellable = false)
     {
-        if (_settings.Plugins)
+        if (!_settings.Plugins)
         {
-            SetActivity(SessionActivity.LoadingPlugins);
+            ApplyPlugins(PluginCatalog.Empty);
+            return true;
         }
 
+        SetActivity(SessionActivity.LoadingPlugins);
         try
         {
-            ReloadPlugins();
+            var loaded = await LoadOffThreadAsync(
+                token => PluginCatalog.Load(
+                    _home,
+                    _workspace,
+                    enabled: true,
+                    _toolHost,
+                    name => Publish(new LoadingProgressed(LoadingKind.Plugin, name)),
+                    token),
+                cancellable,
+                cancellationToken);
+            if (loaded is null)
+            {
+                return false;
+            }
+
+            ApplyPlugins(loaded);
+            return true;
         }
         finally
         {
-            if (_settings.Plugins)
-            {
-                SetActivity(SessionActivity.Idle);
-            }
+            SetActivity(SessionActivity.Idle);
         }
     }
 
@@ -6785,7 +6906,19 @@ public sealed class CodingSession : ITurnObserver
     /// Ends the plugin session while the current snapshot is still current,
     /// applies <paramref name="change"/>, then starts it again when it was open.
     /// </summary>
-    private async Task RebindPluginSessionAsync(Action change, CancellationToken cancellationToken)
+    private Task RebindPluginSessionAsync(Action change, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        return RebindPluginSessionAsync(
+            () =>
+            {
+                change();
+                return Task.CompletedTask;
+            },
+            cancellationToken);
+    }
+
+    private async Task RebindPluginSessionAsync(Func<Task> change, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(change);
         var reopen = _pluginSessionOpen;
@@ -6796,7 +6929,7 @@ public sealed class CodingSession : ITurnObserver
 
         try
         {
-            change();
+            await change();
         }
         catch (Exception)
         {
@@ -6900,8 +7033,15 @@ public sealed class CodingSession : ITurnObserver
             SaveSettings(current => current.WithPlugins(command == "on"));
         }
 
-        ReloadPluginsWithProgress();
-        ReloadExternalToolsWithProgress();
+        // Only a plain reload may be cancelled, and only while plugins load:
+        // tool names reserve against the plugins that end up loaded.
+        if (!await ReloadPluginsAsync(cancellationToken, cancellable: command == "reload"))
+        {
+            await OpenPluginSessionAsync(cancellationToken);
+            return;
+        }
+
+        await ReloadExternalToolsAsync(CancellationToken.None);
         PublishPluginEnvironment();
         try
         {
@@ -6984,8 +7124,8 @@ public sealed class CodingSession : ITurnObserver
         if (changed)
         {
             await ClosePluginSessionAsync(cancellationToken);
-            ReloadPluginsWithProgress();
-            ReloadExternalToolsWithProgress();
+            await ReloadPluginsAsync(CancellationToken.None);
+            await ReloadExternalToolsAsync(CancellationToken.None);
             PublishPluginEnvironment();
             try
             {
@@ -7021,26 +7161,6 @@ public sealed class CodingSession : ITurnObserver
         var commands = new List<ISlashCommand>(_plugins.Commands);
         commands.AddRange(_loadedPlugins.Commands);
         return commands;
-    }
-
-    private void ReloadExternalToolsWithProgress()
-    {
-        if (_settings.ExternalTools)
-        {
-            SetActivity(SessionActivity.LoadingTools);
-        }
-
-        try
-        {
-            ReloadExternalTools();
-        }
-        finally
-        {
-            if (_settings.ExternalTools)
-            {
-                SetActivity(SessionActivity.Idle);
-            }
-        }
     }
 
     private void PublishPluginEnvironment()

@@ -25,6 +25,7 @@ public static class WireEvents
         [typeof(PromptHistoryLoaded)] = "prompt-history.loaded",
         [typeof(ImageHistoryInvalidated)] = "images.invalidated",
         [typeof(ActivityChanged)] = "activity.changed",
+        [typeof(LoadingProgressed)] = "loading.progressed",
         [typeof(UserMessageSent)] = "message.sent",
         [typeof(UserMessageRecalled)] = "message.recalled",
         [typeof(TurnStarted)] = "turn.started",
@@ -141,6 +142,10 @@ public static class WireEvents
                 break;
             case ActivityChanged activity:
                 writer.WriteString("activity", ActivityName(activity.Activity));
+                break;
+            case LoadingProgressed loading:
+                writer.WriteString("kind", LoadingKindName(loading.Kind));
+                writer.WriteString("name", loading.Name);
                 break;
             case UserMessageSent sent:
                 WireWriter.Text(writer, "text", sent.Text);
@@ -318,6 +323,14 @@ public static class WireEvents
         SessionActivity.LoadingPlugins => "loading_plugins",
         SessionActivity.Compacting => "compacting",
         SessionActivity.WaitingForModel => "waiting_for_model",
+        _ => "unknown"
+    };
+
+    public static string LoadingKindName(LoadingKind kind) => kind switch
+    {
+        LoadingKind.ToolSet => "tool_set",
+        LoadingKind.Plugin => "plugin",
+        LoadingKind.McpServer => "mcp_server",
         _ => "unknown"
     };
 

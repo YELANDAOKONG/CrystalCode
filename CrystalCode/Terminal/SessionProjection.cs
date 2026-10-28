@@ -142,6 +142,13 @@ internal sealed class SessionProjection : ISessionObserver
             case ActivityChanged activity:
                 _renderer.SetProgress(Caption(activity.Activity));
                 break;
+            case LoadingProgressed loading:
+                if (!_renderer.TryAddStartupItem(ProgressText.Loading(loading.Kind, loading.Name)))
+                {
+                    _renderer.SetProgress(ProgressText.LoadingItem(loading.Kind, loading.Name));
+                }
+
+                break;
             case ApprovalPassed passed:
                 if (!replay)
                 {
@@ -268,6 +275,13 @@ internal sealed class SessionProjection : ISessionObserver
     {
         lock (_projectionGate)
         {
+            if (sessionEvent is ActivityChanged changedActivity)
+            {
+                // Submission is held in every view, including a child view.
+                _renderer.HoldSubmission = changedActivity.Activity
+                    is SessionActivity.LoadingTools or SessionActivity.LoadingPlugins;
+            }
+
             switch (sessionEvent)
             {
                 case ChildSessionChanged changed:
@@ -323,6 +337,7 @@ internal sealed class SessionProjection : ISessionObserver
                 case PromptHistoryLoaded:
                 case ImageHistoryInvalidated:
                 case StatusFieldsChanged:
+                case LoadingProgressed:
                     // Shared surface state is applied once; replay must not restore old input or reopen panels.
                     Project(sessionEvent);
                     return;

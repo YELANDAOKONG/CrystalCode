@@ -264,6 +264,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `SessionOptionsChanged` | `options.changed`: each option's `id`, `name`, `category`, `current`, `switch`, and `values` (`value`, `name`, the slash `command` that selects it, optional `description` and `group`). An empty `command` cannot be chosen directly. Send the command through `POST /input` |
 | `SlashCommandsChanged`, `PromptHistoryLoaded` | `commands.changed`, `prompt-history.loaded` |
 | `ImageHistoryInvalidated`, `ActivityChanged` | `images.invalidated`, `activity.changed` |
+| `LoadingProgressed` | `loading.progressed`: `kind` (`tool_set`, `plugin`, or `mcp_server`) and `name`, sent while `activity.changed` reports a loading activity. Not part of the snapshot |
 | `UserMessageSent`, `UserMessageRecalled` | `message.sent`, `message.recalled` |
 | `TurnStarted`, `TurnFinished`, `ModelRoundClosed` | `turn.started`, `turn.finished`, `round.closed` |
 | `StreamReceived` | `stream.text`, `stream.reasoning`, `stream.reasoning-state`, `stream.tool-call`, `stream.usage`, `stream.completed` |

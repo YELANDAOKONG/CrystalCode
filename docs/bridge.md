@@ -393,6 +393,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `PreferencesChanged` | also `_crystal/preferences` |
 | `StatusFieldsChanged` | `_crystal/statusFields` |
 | `ActivityChanged` | `_crystal/activity` (loading tools, loading plugins, compacting, waiting for model) |
+| `LoadingProgressed` | `_crystal/loading` with `kind` (`tool_set`, `plugin`, or `mcp_server`) and `name` |
 | `QueueChanged` | `_crystal/queue` |
 | `NoteWritten`, `ErrorWritten` | `notice` info or error |
 | `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`), and `_crystal/report` with the kind and the structured values |

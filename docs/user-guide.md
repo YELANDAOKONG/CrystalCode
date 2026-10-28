@@ -1016,9 +1016,16 @@ The `~N Tokens` estimate
 appears only when `estimatedTokens` is on. When the session has todos, a
 pinned `Todos` bar sits above that progress row (first four items by default;
 `todoBar` hides it and `todoBarRows` sets 3 to 10 items; `/todos` prints the
-full list). Session start and `/cd`
-show `Loading Tools` on that row while operator tool sets load, after
-the frame is already up.
+full list).
+
+Session start shows a startup page before the session frame. It lists each
+tool set, plugin, and MCP server as it starts loading. Keys typed there are
+discarded; Ctrl+C cancels startup and exits. Later reloads (`/tools`,
+`/plugins`, `/cd`, `/space`) keep the frame drawing and show
+`Loading Tools  <name>` or `Loading Plugins  <name>` on the progress row.
+You can keep typing, but Enter, F6 send, and F7 wait until loading ends, so
+the draft is kept. Ctrl+C cancels a plain `/tools reload` or
+`/plugins reload` and keeps the tools that were already loaded.
 
 Assistant text is rendered as markdown while it streams and after it
 commits (headings, lists, fenced code, inline code and bold). User,

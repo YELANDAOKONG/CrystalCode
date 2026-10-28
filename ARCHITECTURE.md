@@ -2290,7 +2290,8 @@ Events are immutable sealed records, one type per file under `Events`:
 
 - Lifecycle and chrome: `SessionStarted`, `ChromeChanged`,
   `PreferencesChanged`, `SessionOptionsChanged`, `SlashCommandsChanged`,
-  `PromptHistoryLoaded`, `ImageHistoryInvalidated`, `ActivityChanged`.
+  `PromptHistoryLoaded`, `ImageHistoryInvalidated`, `ActivityChanged`,
+  `LoadingProgressed`.
 - Turn: `UserMessageSent`, `TurnStarted`, `StreamReceived` (carries Crystal's
   `ChatStreamEvent`), `ToolCallsIssued`, `ToolResultsReceived`,
   `ModelRoundClosed`, `RetryScheduled`, `UsageChanged`, `TurnFinished`,
@@ -2321,6 +2322,21 @@ end renders them and does not compute totals.
 Some engine calls take time (a turn collecting, `/compact`, a model switch).
 The front end awaits them without freezing its surface. The terminal host does
 this by pumping the frame while the call runs.
+
+Operator tool sets and plugins load on the thread pool, not on the caller's
+thread, so that pump keeps running. `ExternalCatalog.Load` and
+`PluginCatalog.Load` take a per-item callback and a token checked before each
+item; an item that started loading finishes. Each item publishes
+`LoadingProgressed` (tool set, plugin, or MCP server, with its name) inside the
+`ActivityChanged` loading window; MCP servers connect together, so all of them
+are named when connection starts. `SessionState` does not keep these names.
+`StartAsync` loads with its own token. In a live session only a plain
+`/tools reload` or `/plugins reload` is cancellable: `TryInterrupt` stops it
+between items, the previous catalog stays, and the note
+`Reload cancelled. The previous catalog stays loaded.` is written. Every other
+reload (`/tools on|off`, approval and tool set changes, plugin changes,
+`/cd`, `/space`, resume into another workspace) runs to the end, because its
+settings or workspace root have already changed.
 
 Image markers cross the boundary as text. `UserMessageSent` and replayed
 transcripts carry `[Image #N]` markers, and a marker is trusted only when it
@@ -2595,6 +2611,17 @@ remaining wait down. The same row shows
 `Loading Tools` while operator tool
 sets are discovered at session start and on `/cd` or `/space`, after the frame is
 up, so a slow assembly load does not leave a blank terminal. The
+caption names the item loading now (`Loading Tools  docs`). Session start
+does not use that row: `TerminalHost` opens the frame and runs
+`StartAsync` behind a full-screen startup page (`StartupPage` in
+`CrystalCode.Display`, painted by `SessionRenderer.PumpStartupAsync`). The page
+lists each `LoadingProgressed` item, discards keys, and maps Ctrl+C to
+cancelling `StartAsync`, after which the session is still closed and saved. A
+trust or question prompt during startup pauses the composer and draws the
+session frame until it is answered. While the activity is `LoadingTools` or
+`LoadingPlugins`, `SessionRenderer.HoldSubmission` keeps the composer
+editable but turns Enter, F6 send, and F7 into no-ops, so the pump never
+queues input that arrives during a reload. The
 caption is prefixed with a one-cell spinner
 that advances while the turn is live, plus the current activity
 elapsed time (`5s`, `2m18s`). When `estimatedTokens` is on, Thinking

@@ -137,11 +137,15 @@ public sealed class PluginCatalog
 
     public IReadOnlyList<PluginActivationFailure> Failures { get; }
 
+    /// <param name="loading">Receives each plugin directory name before that plugin activates.</param>
+    /// <param name="cancellationToken">Checked before each plugin; a plugin that started activating finishes.</param>
     public static PluginCatalog Load(
         CrystalHome home,
         Workspace workspace,
         bool enabled,
-        SessionToolHost? host = null)
+        SessionToolHost? host = null,
+        Action<string>? loading = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(home);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -179,6 +183,8 @@ public sealed class PluginCatalog
         var statusFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in discovered)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            loading?.Invoke(item.DirectoryName);
             if (!TryActivate(item, out var plugin, out var error) || plugin is null)
             {
                 Skip(item, error);

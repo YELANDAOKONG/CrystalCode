@@ -102,6 +102,66 @@ public sealed class SessionRenderer : IDisposable
     private bool _pluginStatusDirty;
     private int _sideSpinnerFrame;
     private DateTimeOffset _sideSpinnerAt;
+    private bool _startupPage;
+    private readonly List<string> _startupItems = [];
+    private int _startupFrame;
+    private DateTimeOffset _startupSpinnerAt;
+    private bool _holdSubmission;
+
+    /// <summary>
+    /// True while operator tools or plugins load in a live session. The
+    /// composer stays editable, but Enter, F6 sends, and F7 do nothing, so a
+    /// keystroke never becomes a queued turn or an error and the draft stays.
+    /// </summary>
+    internal bool HoldSubmission
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _holdSubmission;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                _holdSubmission = value;
+            }
+        }
+    }
+
+    /// <summary>The rows the startup page lists, oldest first.</summary>
+    internal IReadOnlyList<string> StartupItems
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _startupItems];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds one row to the startup page. Returns false when the page is not
+    /// shown, so the caller can report the item on the progress row instead.
+    /// </summary>
+    internal bool TryAddStartupItem(string item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        lock (_gate)
+        {
+            if (!_startupPage)
+            {
+                return false;
+            }
+
+            _startupItems.Add(item);
+            PaintUnlocked(force: true);
+            return true;
+        }
+    }
 
     public int ContextWindow { get; set; }
 
@@ -1200,6 +1260,94 @@ public sealed class SessionRenderer : IDisposable
         await wake;
     }
 
+    /// <summary>
+    /// Shows the startup page, then runs <paramref name="start"/> until it
+    /// completes. The page is up before the work starts, so no loading row is
+    /// missed. Keys are read and discarded so nothing typed during startup
+    /// reaches the composer. Ctrl+C calls <paramref name="cancel"/>; the page
+    /// stays up until the work unwinds. A question opened during startup
+    /// pauses the composer, so its own reader gets the keys and the session
+    /// frame shows.
+    /// </summary>
+    internal async Task PumpStartupAsync(Func<Task> start, Action cancel, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(start);
+        ArgumentNullException.ThrowIfNull(cancel);
+        lock (_gate)
+        {
+            _startupPage = true;
+            _startupItems.Clear();
+            _startupFrame = 0;
+            _startupSpinnerAt = DateTimeOffset.UtcNow;
+            PaintUnlocked(force: true);
+        }
+
+        Task wake;
+        try
+        {
+            wake = start();
+        }
+        catch (Exception)
+        {
+            CloseStartupPage();
+            throw;
+        }
+
+        try
+        {
+            while (!wake.IsCompleted)
+            {
+                var burst = await ReadAvailableKeysAsync(
+                    wake,
+                    ignorePause: false,
+                    cancellationToken);
+                if (burst is null)
+                {
+                    break;
+                }
+
+                if (burst.Any(IsInterruptKey))
+                {
+                    cancel();
+                }
+
+                lock (_gate)
+                {
+                    // The keys are dropped. Push would keep an unfinished
+                    // escape sequence and attach it to the next real key.
+                    _decoder.Reset();
+                }
+            }
+        }
+        catch (OperationCanceledException) when (!wake.IsCompleted)
+        {
+            // The same cancellation reaches the work, which is awaited below.
+        }
+        finally
+        {
+            CloseStartupPage();
+        }
+
+        await wake;
+    }
+
+    private void CloseStartupPage()
+    {
+        lock (_gate)
+        {
+            _startupPage = false;
+            _startupItems.Clear();
+            PaintUnlocked(force: true);
+        }
+    }
+
+    internal static bool IsInterruptKey(ConsoleKeyInfo key) =>
+        key.KeyChar == '\u0003'
+        || (key.Key == ConsoleKey.C
+            && key.Modifiers.HasFlag(ConsoleModifiers.Control)
+            && !key.Modifiers.HasFlag(ConsoleModifiers.Alt)
+            && !key.Modifiers.HasFlag(ConsoleModifiers.Shift));
+
     public void PauseComposer()
     {
         lock (_gate)
@@ -1725,7 +1873,7 @@ public sealed class SessionRenderer : IDisposable
                 _quickPicker = null;
                 if (quick.Chosen is { } chosen)
                 {
-                    if (quick.Send)
+                    if (quick.Send && !_holdSubmission)
                     {
                         _composer.SeedHistory([chosen.Text]);
                         _quickSubmission = true;
@@ -1741,7 +1889,7 @@ public sealed class SessionRenderer : IDisposable
         if (ChildSessionsEnabled && !_fullPageOverlay && !_sideOpen
             && item is InputKey { Key: ConsoleKey.F7, Modifiers: ConsoleModifiers.None })
         {
-            return "/child";
+            return _holdSubmission ? null : "/child";
         }
 
         if (ChildViewActive && !_fullPageOverlay && !_sideOpen)
@@ -1758,7 +1906,7 @@ public sealed class SessionRenderer : IDisposable
         if (item is InputKey { Key: ConsoleKey.F6, Modifiers: ConsoleModifiers.None }
             && !_fullPageOverlay && !_sideOpen)
         {
-            _quickOpenRequested = true;
+            _quickOpenRequested = !_holdSubmission;
             return null;
         }
 
@@ -1885,6 +2033,9 @@ public sealed class SessionRenderer : IDisposable
         var action = _composer.Handle(key);
         switch (action)
         {
+            case ComposerAction.Submit when _holdSubmission:
+                // The text stays in the composer and is sent with a later Enter.
+                break;
             case ComposerAction.Submit:
                 var text = _composer.SubmissionText;
                 if (IsQuickCommand(text))
@@ -2064,6 +2215,12 @@ public sealed class SessionRenderer : IDisposable
         _chrome.TickSpinner(now);
         TickSideSpinner(now);
         RefreshRetryCaptionUnlocked(now);
+        if (_startupPage && _overlayWidget is null && _modalOverlay.Count == 0 && !_composerPaused)
+        {
+            PaintStartupUnlocked(width, height, now);
+            return;
+        }
+
         if (_quickPicker is not null && !_composerPaused && _overlayWidget is null && _modalOverlay.Count == 0)
         {
             var quickLines = _quickPicker.Paint(width, height);
@@ -2146,6 +2303,30 @@ public sealed class SessionRenderer : IDisposable
             frame[row] = source < body.Count ? body[source].Fit(width) : PaintLine.Blank;
         }
 
+        _painter.PaintFrame(
+            frame,
+            width,
+            height,
+            resetFrame: width != _paintedWidth || height != _paintedHeight);
+        _paintedWidth = width;
+        _paintedHeight = height;
+        _lastPaint = now;
+    }
+
+    private void PaintStartupUnlocked(int width, int height, DateTimeOffset now)
+    {
+        if (now - _startupSpinnerAt >= ProgressSpinner.Interval)
+        {
+            _startupFrame++;
+            _startupSpinnerAt = now;
+        }
+
+        var frame = StartupPage.Paint(
+            width,
+            height,
+            ProgressSpinner.Frame(_startupFrame),
+            _chrome.Progress,
+            _startupItems);
         _painter.PaintFrame(
             frame,
             width,
@@ -2705,7 +2886,8 @@ public sealed class SessionRenderer : IDisposable
                 var now = DateTimeOffset.UtcNow;
                 var pluginStatusDirty = _pluginStatusDirty;
                 _pluginStatusDirty = false;
-                if (sizeChanged || _chrome.SpinnerDue(now) || SideSpinnerDue(now))
+                var startupDue = _startupPage && now - _startupSpinnerAt >= ProgressSpinner.Interval;
+                if (sizeChanged || startupDue || _chrome.SpinnerDue(now) || SideSpinnerDue(now))
                 {
                     PaintUnlocked(force: true);
                 }

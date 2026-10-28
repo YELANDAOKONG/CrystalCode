@@ -239,6 +239,18 @@ public sealed class ServerParityTests
     }
 
     [Fact]
+    public void LoadingProgressed_WritesKindAndName()
+    {
+        var text = Json.Write(writer => WireEvents.Data(writer, new LoadingProgressed(LoadingKind.McpServer, "docs")));
+        using var document = JsonDocument.Parse(text);
+        var data = document.RootElement.GetProperty("data");
+
+        Assert.Equal("loading.progressed", WireEvents.Type(new LoadingProgressed(LoadingKind.Plugin, "p")));
+        Assert.Equal("mcp_server", data.GetProperty("kind").GetString());
+        Assert.Equal("docs", data.GetProperty("name").GetString());
+    }
+
+    [Fact]
     public void Usage_WritesTotals()
     {
         var text = Json.Write(writer => WireWriter.Usage(writer, "usage", new TokenUsage(3, 4, 1)));

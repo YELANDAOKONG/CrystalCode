@@ -59,13 +59,17 @@ public sealed class ExternalCatalog
 
     public IReadOnlySet<string> AutomaticTools { get; }
 
+    /// <param name="loading">Receives each tool set directory name before that set loads.</param>
+    /// <param name="cancellationToken">Checked before each tool set; a set that started loading finishes.</param>
     public static ExternalCatalog Load(
         CrystalHome home,
         Workspace workspace,
         bool enabled,
         ExternalToolApprovalSettings? approvalSettings = null,
         SessionToolHost? host = null,
-        IReadOnlySet<string>? reservedNames = null)
+        IReadOnlySet<string>? reservedNames = null,
+        Action<string>? loading = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(home);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -102,6 +106,8 @@ public sealed class ExternalCatalog
         var attempted = new List<ExternalSetLoad>();
         foreach (var set in sets)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            loading?.Invoke(set.DirectoryName);
             var noted = notes.Count;
             var classified = classifications.Count;
             if (set.Runner == ExternalRunnerKind.Exec)

@@ -41,30 +41,6 @@ that fixes it.
   those programs, and a note in the `bash` tool description. Any fix must work
   on Windows, macOS, and Linux and must not add an external command
   dependency.
-- Loading tools freezes the terminal UI. The operator reports that the whole
-  UI stops while `Loading Tools` is shown. Cause found by reading the code,
-  not yet measured: `TerminalHost.RunLoopAsync` awaits `CodingSession.StartAsync`
-  without the key pump, so no spinner, resize, or key handling runs during
-  startup. `ReloadExternalToolsWithProgress` also runs
-  `ExternalCatalog.Load` synchronously on the calling thread (directory scan,
-  assembly load, tool construction), so even a pumped caller would not get
-  control back before the load ends. MCP connection in the same startup path
-  is asynchronous but is not pumped either. The same synchronous reload runs
-  at `/tools approval`, `/tools on|off|reload`, tool set enable and disable,
-  `/plugins`, plugin enable and disable, and every workspace change (`/cd`,
-  `/space`, resume into another workspace). The `Ctrl+C` handler in
-  `RunLoopAsync` is registered after `StartAsync`, so an interrupt during
-  startup is not handled by it.
-
-  The fix is not decided. Constraints for it: the UI must keep painting and
-  must not turn keystrokes typed during loading into errors, queued turns, or
-  lost drafts; `CrystalCode.Engine` stays front-end neutral and reports
-  progress only through `SessionEvent`; `crystal server` and `crystal bridge`
-  start their runner after `StartAsync` and must keep their behavior. Candidate
-  direction: load the catalog off the calling thread with cancellation, pump
-  the terminal during `StartAsync`, and hold prompt submission while the
-  activity is `LoadingTools` or `LoadingPlugins` with the draft kept. Whether
-  the in-session reload paths are fixed in the same change is not decided.
 
 ## Deferred
 
