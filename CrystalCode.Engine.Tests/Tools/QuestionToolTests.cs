@@ -98,6 +98,30 @@ public sealed class QuestionToolTests
         Assert.Equal("The user dismissed the question.", output.Text);
     }
 
+    [Fact]
+    public async Task InvokeAsync_UnavailableOperator_ReportsUnsupported()
+    {
+        var prompt = new FixedUserPrompt(new QuestionResponse([], IsRejected: true, IsUnavailable: true));
+        var tool = new QuestionTool(prompt);
+
+        var output = await tool.InvokeAsync(
+            JsonToolCall(
+                "1",
+                QuestionTool.ToolName,
+                """
+                {
+                  "questions": [{
+                    "header": "Choice",
+                    "question": "Pick one.",
+                    "options": [{ "label": "A", "description": "Choose A." }]
+                  }]
+                }
+                """));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+        Assert.Equal("The question tool is not supported in this run because no operator can answer.", output.Text);
+    }
+
     [Theory]
     [InlineData("{}")]
     [InlineData("{\"questions\":[]}")]

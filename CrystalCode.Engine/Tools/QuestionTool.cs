@@ -111,6 +111,13 @@ public sealed class QuestionTool : ITool
         CancellationToken cancellationToken)
     {
         var response = await _prompt.AskAsync(questions, cancellationToken);
+        if (response.IsUnavailable)
+        {
+            return new ToolOutput(
+                "The question tool is not supported in this run because no operator can answer.",
+                ToolResultStatus.Failure);
+        }
+
         if (response.IsRejected)
         {
             return new ToolOutput(

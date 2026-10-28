@@ -18,7 +18,7 @@ public sealed class ApprovalPolicy
 
     internal const string ReviewFailedText =
         "An error occurred and the approval request could not be processed, so this action was not run."
-        + RetryGuidance;
+        + " Do not retry the same call.";
 
     private readonly ApprovalMode _mode;
     private readonly Workspace _workspace;

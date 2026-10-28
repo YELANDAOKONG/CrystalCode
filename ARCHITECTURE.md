@@ -276,7 +276,7 @@ CrystalCode (executable):
 | Folder | Owns |
 | :--- | :--- |
 | `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `bridge` captures the raw stdio streams, rebinds console output to stderr, registers signals, opens the optional `--debug` sink (stderr or an appended file), and starts `CrystalCode.Bridge`. `version` prints the build identity |
-| `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, dismissed questions, and exit codes. Overrides and launch preparation come from `CrystalCode.Engine.Launch` |
+| `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, unsupported questions, and exit codes. Overrides and launch preparation come from `CrystalCode.Engine.Launch` |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text (`ToolCallText` reveals hidden characters in the engine's `ToolCallSummary`), transcript replay, session picker, question overlay, startup trust and resume prompts (`StartupPrompt`), slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
 
@@ -2424,11 +2424,11 @@ The run supplies `RunLog` or `RunJsonLog`, `UnattendedApprovalPrompt`,
 The directory check itself runs before the session is created and follows
 `--workspace-trust`, not `workspaceTrust`. The approval prompt
 denies every call that would have asked the operator. The question prompt
-dismisses. Session choice is declined. Review and Audit still call the
+dismisses, and the question tool tells the model it is not supported in the run. Session choice is declined. Review and Audit still call the
 reviewing model: allow executes the tool, and deny returns the reviewer's
 reason. When the reviewer request fails or returns unusable output, the
 model is told an error prevented the approval request from being processed,
-not that the user declined. The error detail stays out of model text. An enabled extended approval model runs the same way after a primary
+not that the user declined, and the text does not suggest asking the user. The error detail stays out of model text. An enabled extended approval model runs the same way after a primary
 allow. Plan does not offer write, edit, apply_patch, or bash. The approval policy
 also rejects those side effects when a catalog still contains them.
 

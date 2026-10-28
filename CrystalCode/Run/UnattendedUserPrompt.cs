@@ -16,6 +16,6 @@ internal sealed class UnattendedUserPrompt : IUserPrompt
         ArgumentNullException.ThrowIfNull(questions);
         cancellationToken.ThrowIfCancellationRequested();
         Dismissed++;
-        return ValueTask.FromResult(new QuestionResponse([], true));
+        return ValueTask.FromResult(new QuestionResponse([], true, IsUnavailable: true));
     }
 }
