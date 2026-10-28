@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+using System.IO.Pipelines;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -12,19 +12,27 @@ using CrystalCode.Engine.Plugins;
 namespace CrystalCode.Bridge.Tests.Support;
 
 /// <summary>
-/// Bridge on a pair of in-process pipes, played by a test ACP client, with a
+/// Bridge on a pair of in-memory pipes, played by a test ACP client, with a
 /// temporary home and workspace and a scripted model. Nothing here touches
 /// the operator's ~/.crystal. Client requests from Bridge, such as
 /// <c>session/request_permission</c>, go to <see cref="OnRequest"/>.
 /// </summary>
+/// <remarks>
+/// Anonymous OS pipes are synchronous on Windows, so each pending read holds a
+/// thread-pool thread; parallel fixtures starve the pool and time out.
+/// In-memory pipes keep every read and write truly asynchronous.
+/// </remarks>
 internal sealed class BridgeFixture : IAsyncDisposable
 {
     public static readonly TimeSpan Wait = TimeSpan.FromSeconds(15);
 
-    private readonly AnonymousPipeServerStream _toBridge = new(PipeDirection.Out);
-    private readonly AnonymousPipeServerStream _fromBridge = new(PipeDirection.In);
-    private readonly AnonymousPipeClientStream _bridgeInput;
-    private readonly AnonymousPipeClientStream _bridgeOutput;
+    // Writers never pause, so a slow reader cannot block a synchronous write.
+    private static readonly PipeOptions Unbounded = new(pauseWriterThreshold: 0, resumeWriterThreshold: 0);
+
+    private readonly Stream _toBridge;
+    private readonly Stream _fromBridge;
+    private readonly Stream _bridgeInput;
+    private readonly Stream _bridgeOutput;
     private readonly CancellationTokenSource _stop = new();
     private readonly StringWriter _error = new();
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -42,8 +50,12 @@ internal sealed class BridgeFixture : IAsyncDisposable
         Workspace = Path.Combine(root, "workspace");
         Directory.CreateDirectory(Home);
         Directory.CreateDirectory(Workspace);
-        _bridgeInput = new AnonymousPipeClientStream(PipeDirection.In, _toBridge.ClientSafePipeHandle);
-        _bridgeOutput = new AnonymousPipeClientStream(PipeDirection.Out, _fromBridge.ClientSafePipeHandle);
+        var input = new Pipe(Unbounded);
+        var output = new Pipe(Unbounded);
+        _toBridge = input.Writer.AsStream();
+        _bridgeInput = input.Reader.AsStream();
+        _bridgeOutput = output.Writer.AsStream();
+        _fromBridge = output.Reader.AsStream();
     }
 
     public string Root { get; }
@@ -284,7 +296,8 @@ internal sealed class BridgeFixture : IAsyncDisposable
                 }
             }
         }
-        catch (Exception exception) when (exception is IOException or ObjectDisposedException)
+        // A completed pipe writer throws InvalidOperationException when teardown races an answer.
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or InvalidOperationException)
         {
         }
         finally
