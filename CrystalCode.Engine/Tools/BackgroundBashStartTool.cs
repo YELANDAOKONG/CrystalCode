@@ -27,7 +27,8 @@ public sealed class BackgroundBashStartTool : ITool
                   "required": ["command"]
                 }
                 """),
-            "Starts one shell command in the workspace root and returns a session-local task ID. "
+            "Starts one long-running shell command, such as a dev server or watcher, in the workspace root and returns a session-local task ID. "
+            + "Do not use it for builds, tests, or any command that exits on its own; use bash, which waits and returns the output. Do not poll it with sleep. "
             + "Use bash_status or bash_logs to observe it, and bash_stop to end it. "
             + "The configured backgroundBashTimeoutSeconds limit still applies. Background stdin is closed, "
             + "and no more than 32 tasks may be active at once.");
