@@ -1368,31 +1368,66 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
-    public void Load_ApprovalColorsDefaultToOnAndOffIsSaved()
+    public void Load_ThemeIsANameOrAnObjectAndApprovalColorsDefaultToOn()
     {
         using var root = new TemporaryHome();
         var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
-        File.WriteAllText(
-            root.Home.ConfigPath,
-            """
-            {
-              "provider": "deepseek",
-              "model": "deepseek-v4-flash"
-            }
-            """);
 
-        var defaults = store.Load();
-        store.Save(defaults.WithApprovalColors(false));
+        var plain = LoadWithTheme(root, store, "\"night\"");
+        var grouped = LoadWithTheme(root, store, "{ \"name\": \"night\", \"approvalColors\": false }");
+        var onlyOff = LoadWithTheme(root, store, "{ \"approvalColors\": false }");
+
+        Assert.Equal(("night", true), (plain.Theme, plain.ApprovalColors));
+        Assert.Equal(("night", false), (grouped.Theme, grouped.ApprovalColors));
+        Assert.Equal(("default", false), (onlyOff.Theme, onlyOff.ApprovalColors));
+        Assert.Equal(("default", true), (LoadWithTheme(root, store, null).Theme, true));
+    }
+
+    [Fact]
+    public void Save_WritesThemeAsNameUntilApprovalColorsAreOff()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithTheme("night");
+
+        store.Save(settings);
+        Assert.Contains("\"theme\": \"night\"", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
+
+        store.Save(settings.WithApprovalColors(false));
         var saved = File.ReadAllText(root.Home.ConfigPath);
-
-        Assert.True(defaults.ApprovalColors);
         Assert.Contains("\"approvalColors\": false", saved, StringComparison.Ordinal);
+        Assert.Contains("\"name\": \"night\"", saved, StringComparison.Ordinal);
         Assert.False(store.Load().ApprovalColors);
+        Assert.Equal("night", store.Load().Theme);
+
+        store.Save(store.Load().WithTheme("default"));
+        Assert.DoesNotContain("\"name\"", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
 
         store.Save(store.Load().WithApprovalColors(true));
+        Assert.DoesNotContain("theme", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
+    }
 
-        Assert.DoesNotContain("approvalColors", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
+    [Fact]
+    public void Load_RejectsAThemeThatIsNotANameOrAnObject()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+
+        var error = Assert.Throws<InvalidOperationException>(() => LoadWithTheme(root, store, "true"));
+
+        Assert.Contains("theme", error.Message, StringComparison.Ordinal);
+    }
+
+    private static HarnessSettings LoadWithTheme(TemporaryHome root, DiskSettingsStore store, string? theme)
+    {
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            "{ \"provider\": \"deepseek\", \"model\": \"deepseek-v4-flash\""
+            + (theme is null ? string.Empty : ", \"theme\": " + theme)
+            + " }");
+        return store.Load();
     }
 
     [Fact]

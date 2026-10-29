@@ -28,9 +28,7 @@ internal sealed class SettingsDocument
 
     public bool? WorkspaceTrust { get; set; }
 
-    public string? Theme { get; set; }
-
-    public bool? ApprovalColors { get; set; }
+    public System.Text.Json.JsonElement? Theme { get; set; }
 
     public RuleFilesDocument? RuleFiles { get; set; }
 

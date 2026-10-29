@@ -61,6 +61,7 @@ public sealed class DiskSettingsStore : ISettingsStore
         var mcpToolApproval = ReadMcpToolApproval(
             document.McpToolApproval,
             defaults.McpToolApproval);
+        var theme = ReadTheme(document.Theme);
 
         return new HarnessSettings(
             provider,
@@ -122,8 +123,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             operatorNotify: ReadOperatorNotify(document.OperatorNotify),
             server: ReadServer(document.Server),
             bridge: ReadBridge(document.Bridge),
-            theme: string.IsNullOrWhiteSpace(document.Theme) ? ThemeCatalog.DefaultName : document.Theme.Trim(),
-            approvalColors: document.ApprovalColors ?? defaults.ApprovalColors);
+            theme: theme.Name,
+            approvalColors: theme.ApprovalColors);
     }
 
     public void Save(HarnessSettings settings)
@@ -164,8 +165,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             Mcp = settings.Mcp ? null : false,
             Plugins = settings.Plugins ? null : false,
             WorkspaceTrust = settings.WorkspaceTrust ? null : false,
-            Theme = settings.Theme == ThemeCatalog.DefaultName ? null : settings.Theme,
-            ApprovalColors = settings.ApprovalColors ? null : false,
+            Theme = WriteTheme(settings),
             ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
             McpToolApproval = WriteMcpToolApproval(settings.McpToolApproval),
             EstimatedTokens = settings.EstimatedTokens ? true : null,
@@ -486,6 +486,53 @@ public sealed class DiskSettingsStore : ISettingsStore
                 ? null
                 : settings.ThinkingEffort.Value
         };
+    }
+
+    /// <summary>
+    /// <c>theme</c> is the theme name, or an object with <c>name</c> and <c>approvalColors</c>.
+    /// </summary>
+    private static (string Name, bool ApprovalColors) ReadTheme(JsonElement? element)
+    {
+        if (element is null || element.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return (ThemeCatalog.DefaultName, HarnessSettings.DefaultApprovalColors);
+        }
+
+        ThemeDocument document;
+        if (element.Value.ValueKind == JsonValueKind.String)
+        {
+            document = new ThemeDocument { Name = element.Value.GetString() };
+        }
+        else if (element.Value.ValueKind == JsonValueKind.Object)
+        {
+            document = element.Value.Deserialize<ThemeDocument>(HomeJson.Options)
+                ?? throw new InvalidOperationException("theme is invalid.");
+        }
+        else
+        {
+            throw new InvalidOperationException("theme must be a name or an object with name and approvalColors.");
+        }
+
+        return (
+            string.IsNullOrWhiteSpace(document.Name) ? ThemeCatalog.DefaultName : document.Name.Trim(),
+            document.ApprovalColors ?? HarnessSettings.DefaultApprovalColors);
+    }
+
+    private static JsonElement? WriteTheme(HarnessSettings settings)
+    {
+        var named = settings.Theme != ThemeCatalog.DefaultName;
+        if (settings.ApprovalColors)
+        {
+            return named ? JsonSerializer.SerializeToElement(settings.Theme) : null;
+        }
+
+        return JsonSerializer.SerializeToElement(
+            new ThemeDocument
+            {
+                Name = named ? settings.Theme : null,
+                ApprovalColors = false
+            },
+            HomeJson.Options);
     }
 
     private static MicroCompactionSettings ReadMicroCompaction(MicroCompactionDocument? document)
