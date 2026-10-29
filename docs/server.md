@@ -43,10 +43,16 @@ front end can use too:
   It is not a public web API. It follows the build: a wrapper knows which
   executable it started, and `GET /info` reports the build identity.
 - Front ends probe `GET /info` instead of a version. These fields keep their
-  names: `product`, `build`, `state`, `scope`, `authentication`,
+  names: `product`, `build`, `state`, `startedUtc`, `scope`, `authentication`,
   `operations`, `eventTypes`, `interactionKinds`, and `slashCommands`. New
   fields and new list entries may appear; a name is not changed or removed.
   A test fixes the list.
+- `startedUtc` in `GET /health` and `GET /info` is when this server process
+  started. It does not change while the process runs, including across
+  `/clear` and `/resume`, so a client that sees a different value has reached
+  a new process and should load `GET /snapshot` again instead of continuing
+  from its last event sequence. It is not the session's creation time, which
+  `/status` reports.
 
 ## Projects
 
@@ -226,8 +232,8 @@ and the `server.state` event.
 
 | Route | Scope | Purpose |
 | :--- | :--- | :--- |
-| `GET /health` | none | State only |
-| `GET /info` | observe | Build identity, capability lists (event types, operations, slash commands, interaction kinds), session id, workspace |
+| `GET /health` | none | `state` and `startedUtc` (when this server process started, UTC) |
+| `GET /info` | observe | Build identity, `startedUtc`, capability lists (event types, operations, slash commands, interaction kinds), session id, workspace |
 | `GET /snapshot` | observe | Session state, `lastSeq`, pending interactions, server state |
 | `GET /events?after=<seq>` | observe | Event stream; honors `Last-Event-ID` |
 | `POST /input` | operate | `{"text"}`: a prompt, a slash command, a follow-up, or empty text that releases the queue. Returns `accepted` (false when the engine refused the input), `pending` (a setting was recorded for the next turn), `error` (the refusal text or null), `turnActive`, and `quit` |

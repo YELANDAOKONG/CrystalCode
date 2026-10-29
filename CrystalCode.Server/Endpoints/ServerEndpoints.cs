@@ -40,7 +40,11 @@ public static class ServerEndpoints
         ArgumentNullException.ThrowIfNull(app);
         ArgumentNullException.ThrowIfNull(server);
 
-        app.MapGet("/health", () => Json.Ok(writer => writer.WriteString("state", server.Session.State)));
+        app.MapGet("/health", () => Json.Ok(writer =>
+        {
+            writer.WriteString("state", server.Session.State);
+            writer.WriteString("startedUtc", server.Session.StartedUtc);
+        }));
 
         app.MapGet("/info", (HttpContext context) => Json.Ok(writer =>
         {
@@ -49,6 +53,7 @@ public static class ServerEndpoints
             Build(writer, server.Runtime.Build);
             writer.WriteEndObject();
             writer.WriteString("state", server.Session.State);
+            writer.WriteString("startedUtc", server.Session.StartedUtc);
             WireWriter.Optional(writer, "error", server.Session.Failure);
             WireWriter.Optional(writer, "sessionId", server.Session.Session?.SessionId);
             WireWriter.Optional(writer, "workspace", server.Session.Launch?.Workspace);

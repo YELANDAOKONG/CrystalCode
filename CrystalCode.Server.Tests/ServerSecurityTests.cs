@@ -18,7 +18,17 @@ public sealed class ServerSecurityTests
         using var anonymous = fixture.Client("anon", token: null);
         using var wrong = fixture.Client("wrong", token: "not-the-token-at-all");
 
-        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("/health")).StatusCode);
+        var health = await anonymous.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+        using (var body = JsonDocument.Parse(await health.Content.ReadAsStringAsync()))
+        {
+            var started = body.RootElement.GetProperty("startedUtc").GetDateTimeOffset();
+            Assert.Equal(TimeSpan.Zero, started.Offset);
+            Assert.InRange(started, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow);
+            var info = await fixture.GetAsync(fixture.Http, "/info");
+            Assert.Equal(started, info.GetProperty("startedUtc").GetDateTimeOffset());
+        }
+
         var denied = await anonymous.GetAsync("/snapshot");
         Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
         Assert.Equal("application/problem+json", denied.Content.Headers.ContentType?.MediaType);

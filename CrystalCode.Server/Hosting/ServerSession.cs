@@ -34,6 +34,12 @@ public sealed class ServerSession
         Broker = new InteractionBroker(Hub);
     }
 
+    /// <summary>
+    /// When this server process created its session host. A client that sees
+    /// a different value has reached a new process.
+    /// </summary>
+    public DateTimeOffset StartedUtc { get; } = DateTimeOffset.UtcNow;
+
     public EventHub Hub { get; }
 
     public InteractionBroker Broker { get; }

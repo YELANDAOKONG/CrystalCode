@@ -142,7 +142,7 @@ public sealed class ServerParityTests
 
         string[] contract =
         [
-            "product", "build", "state", "scope", "authentication",
+            "product", "build", "state", "startedUtc", "scope", "authentication",
             "operations", "eventTypes", "interactionKinds", "slashCommands"
         ];
         foreach (var name in contract)
