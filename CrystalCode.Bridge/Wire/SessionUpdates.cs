@@ -55,6 +55,7 @@ internal sealed class SessionUpdates
         typeof(StatsReported),
         typeof(ToolsListed),
         typeof(TodosListed),
+        typeof(DocumentWritten),
         typeof(NoteWritten),
         typeof(ErrorWritten),
         typeof(CompactionStarted),
@@ -342,6 +343,10 @@ internal sealed class SessionUpdates
                 case TodosListed todos:
                     Report("todos", "TodosListed", TodoList.Format(todos.Items),
                         writer => CrystalWire.Todos(writer, "items", todos.Items));
+                    break;
+                case DocumentWritten written:
+                    Report("document", "DocumentWritten", written.Document.ToText(),
+                        writer => CrystalWire.Document(writer, "document", written.Document));
                     break;
                 case NoteWritten note:
                     Notice("info", note.Text, null, "NoteWritten");

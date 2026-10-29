@@ -2894,6 +2894,15 @@ operator installs a replacing plugin knowingly; the host does not widen
 approval for it. Approval, `ToolInvocationPolicy`, the workspace fence, and
 the `crystal run` denial of operator prompts apply to every tool call.
 
+`IPluginOutput.WriteDocument` takes a `PluginDocument` (title and blocks).
+`DiskCommand` copies it into `TranscriptDocument`, which the engine owns, and
+`CodingSession` publishes `DocumentWritten`. Events never hold a type from
+`CrystalCode.Plugins`, because `SessionEventDataTests` forbids it. The
+terminal draws `PluginDocumentWidget`, a rounded card that escapes every
+string. Server maps it to `report.document` and Bridge to a report update
+with `_meta.crystal.report` set to `document`, both writing the fields
+explicitly. `TranscriptDocument.ToText` is the plain form.
+
 A disk plugin may also return `IPluginCliCommand` through
 `PluginContribution.WithCliCommands`. `PluginCatalog` admits and lists these
 as `CliCommands`, but no executable entry point runs them. Running one needs

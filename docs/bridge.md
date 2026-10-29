@@ -401,7 +401,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `LoadingProgressed` | `_crystal/loading` with `kind` (`tool_set`, `plugin`, or `mcp_server`) and `name` |
 | `QueueChanged` | `_crystal/queue` |
 | `NoteWritten`, `ErrorWritten` | `notice` info or error |
-| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`), and `_crystal/report` with the kind and the structured values |
+| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed`, `DocumentWritten` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`, `TranscriptDocument.ToText`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`, `document`), and `_crystal/report` with the kind and the structured values |
 | `SideQuestionSnapshot` | `_crystal/side` notification; never conversation content |
 | `HistoryReplayed` | the replay sequence above |
 | `ConversationCleared` | `session_info_update` with the new `_meta.crystal.engineSessionId` |

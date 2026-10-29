@@ -108,6 +108,19 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   execution mode is not the deferred host setting for serial or concurrent
   ordinary tool batches. Pending hook methods and plugin dependencies stay
   undecided.
+- Plugin full-screen pages, like the `/stats` page. `IPluginOutput` would
+  gain a `ShowPage(PluginDocument)` beside `WriteDocument`, using the same
+  document model, with the terminal's existing full-page overlay (scroll,
+  Escape or `q` to close). Open points: the overlay path is named
+  `ShowStatsPage` and must be renamed; a replayed page must not reopen, as
+  with `StatsReported`; Server and Bridge need an event or a flag on
+  `DocumentWritten` to tell a page from a transcript card; and a page needs a
+  rule for what happens when the turn ends or another command opens a page.
+- Plugin interactive overlays, where the plugin handles keys and redraws, such
+  as a picker. This needs an engine-neutral input and layout contract so a
+  plugin never touches the renderer, and an answer for Server and Bridge,
+  which have no keyboard. It conflicts the most with the engine boundary, so
+  it is undecided, not planned.
 - Switchable thinking-chain compression. After a thinking pass, a model
   summarizes that thinking. It is not context compaction, microcompaction,
   `verboseThinking`, or `thinkingDisplay`.

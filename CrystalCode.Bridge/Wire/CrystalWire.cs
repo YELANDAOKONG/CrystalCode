@@ -157,6 +157,50 @@ internal static class CrystalWire
         writer.WriteEndArray();
     }
 
+    public static void Document(Utf8JsonWriter writer, string name, TranscriptDocument document)
+    {
+        writer.WriteStartObject(name);
+        writer.WriteString("title", document.Title);
+        writer.WriteStartArray("blocks");
+        foreach (var block in document.Blocks)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("type", block.Kind);
+            writer.WriteStartArray("columns");
+            foreach (var column in block.Columns)
+            {
+                writer.WriteStringValue(column);
+            }
+
+            writer.WriteEndArray();
+            writer.WriteStartArray("rows");
+            foreach (var row in block.Rows)
+            {
+                writer.WriteStartArray();
+                foreach (var cell in row)
+                {
+                    writer.WriteStringValue(cell);
+                }
+
+                writer.WriteEndArray();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteStartArray("lines");
+            foreach (var line in block.Lines)
+            {
+                writer.WriteStringValue(line);
+            }
+
+            writer.WriteEndArray();
+            writer.WriteNumber("omitted", block.Omitted);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+    }
+
     public static void Items(Utf8JsonWriter writer, string name, IEnumerable<ChatItem> items)
     {
         writer.WriteStartArray(name);

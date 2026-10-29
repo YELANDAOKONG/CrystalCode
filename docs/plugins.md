@@ -191,6 +191,29 @@ runs instead, also while a turn is active, and the host notes the takeover.
 pattern as tool names. `IPluginOutput.Write`
 and `Fail` become session notes.
 
+#### Documents
+
+`IPluginOutput.WriteDocument(PluginDocument)` writes a titled card into the
+transcript. A `PluginDocument` is a title and up to 50 blocks, each one of:
+
+| Block | Content |
+|-------|---------|
+| `PluginParagraph` | Plain text |
+| `PluginKeyValues` | Labelled values, labels aligned |
+| `PluginTable` | 1 to 8 columns and rows of the same width |
+| `PluginList` | Items, one per line |
+
+Text is plain. The host never reads markup in it, and the plugin picks no
+color or width. The terminal draws a rounded card in the current theme. The
+server and the bridge send the structured fields, and `PluginDocument.ToText`
+is the plain form used where nothing can draw. A cell or paragraph is cut at
+500 characters, and a block keeps at most 200 rows or items. Whatever is cut
+is counted in `Omitted` and shown as `(N more omitted)`. A table row of the
+wrong width throws when the table is built. A host that cannot draw documents
+writes `ToText()` as a note, so a plugin written for this call still works
+there. Full-screen pages and interactive overlays are not available; see
+`TODO.md`.
+
 ### Placeholders
 
 `IPluginPlaceholder` adds a `{{name}}` token. The name is 1–64 characters:

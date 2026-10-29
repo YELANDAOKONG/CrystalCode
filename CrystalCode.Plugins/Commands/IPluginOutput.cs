@@ -8,4 +8,10 @@ public interface IPluginOutput
 
     /// <summary>Writes one error line.</summary>
     void Fail(string text);
+
+    /// <summary>
+    /// Writes a titled document the host draws, for example as a bordered card.
+    /// A host that cannot draw one writes <see cref="PluginDocument.ToText"/>.
+    /// </summary>
+    void WriteDocument(PluginDocument document) => Write(document.ToText());
 }

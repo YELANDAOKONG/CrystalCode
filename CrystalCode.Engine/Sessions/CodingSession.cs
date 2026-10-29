@@ -31,6 +31,7 @@ using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Skills;
+using CrystalCode.Plugins.Commands;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Models;
 using CrystalCode.Engine.Tools;
@@ -9209,7 +9210,8 @@ public sealed class CodingSession : ITurnObserver
             or StatusReported
             or StatsReported
             or TodosListed
-            or ToolsListed)
+            or ToolsListed
+            or DocumentWritten)
         {
             CloseRecallWindow();
         }
@@ -9686,6 +9688,11 @@ public sealed class CodingSession : ITurnObserver
         public void WriteError(string text)
         {
             session.Error(text);
+        }
+
+        public void WriteDocument(TranscriptDocument document)
+        {
+            session.Publish(new DocumentWritten(document));
         }
     }
 

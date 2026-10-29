@@ -277,7 +277,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `HistoryReplayed`, `ConversationCleared` | `conversation.replayed`, `conversation.cleared` |
 | `CompactionStarted`, `CompactionFinished` | `compaction.started` (`id`, `manual`), `compaction.finished` (`id`, `status`: `completed`, `unchanged`, `failed`, or `cancelled`; `summary` when the summary display setting shows it) |
 | `NoteWritten`, `ErrorWritten` | `note`, `error` |
-| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed` | `report.help`, `report.status`, `report.stats`, `report.tools`, `report.todos` |
+| `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed`, `DocumentWritten` | `report.help`, `report.status`, `report.stats`, `report.tools`, `report.todos`, `report.document` (`document`: `title` and `blocks`, each with `type` of `paragraph`, `keyValues`, `table`, or `list`, plus `columns`, `rows`, `lines`, and `omitted`) |
 | `SideQuestionSnapshot` | `side.changed` |
 | `ApprovalPassed`, `ApprovalReviewing` | `approval.passed`, `approval.reviewing` (with stage `primary` or `extended`) |
 | `ChildSessionChanged`, `ChildViewRequested` | `child.changed`, `child.view` |

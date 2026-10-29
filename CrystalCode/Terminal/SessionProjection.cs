@@ -115,6 +115,11 @@ internal sealed class SessionProjection : ISessionObserver
                     TodoListWidget.Create(listed.Items),
                     TodoList.Format(listed.Items));
                 break;
+            case DocumentWritten written:
+                _renderer.WriteNote(
+                    PluginDocumentWidget.Create(written.Document),
+                    written.Document.ToText());
+                break;
             case StatusReported status:
                 _renderer.WriteStatus(status.Status, status.Full);
                 break;

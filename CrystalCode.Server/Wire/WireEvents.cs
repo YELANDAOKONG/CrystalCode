@@ -50,6 +50,7 @@ public static class WireEvents
         [typeof(StatsReported)] = "report.stats",
         [typeof(ToolsListed)] = "report.tools",
         [typeof(TodosListed)] = "report.todos",
+        [typeof(DocumentWritten)] = "report.document",
         [typeof(SideQuestionSnapshot)] = "side.changed",
         [typeof(ApprovalPassed)] = "approval.passed",
         [typeof(ApprovalReviewing)] = "approval.reviewing",
@@ -80,6 +81,7 @@ public static class WireEvents
         or StatsReported
         or ToolsListed
         or TodosListed
+        or DocumentWritten
         or ChildViewRequested;
 
     /// <summary>The wire type, with child events unwrapped to their inner type.</summary>
@@ -208,6 +210,9 @@ public static class WireEvents
                 break;
             case TodosListed todos:
                 WireWriter.Todos(writer, "items", todos.Items);
+                break;
+            case DocumentWritten written:
+                WireWriter.Document(writer, "document", written.Document);
                 break;
             case HistoryReplayed replayed:
                 WireWriter.Items(writer, "items", replayed.Items);

@@ -40,5 +40,11 @@ internal sealed class DiskCommand : ISlashCommand
         public void Write(string text) => _output.WriteNote(text ?? string.Empty);
 
         public void Fail(string text) => _output.WriteError(text ?? string.Empty);
+
+        public void WriteDocument(PluginDocument document)
+        {
+            ArgumentNullException.ThrowIfNull(document);
+            _output.WriteDocument(PluginDocuments.Copy(document));
+        }
     }
 }
