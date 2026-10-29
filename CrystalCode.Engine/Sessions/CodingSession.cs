@@ -2308,7 +2308,7 @@ public sealed class CodingSession : ITurnObserver
                 await ChangePluginsAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Skills:
-                ShowSkills(command.Argument);
+                ChangeSkills(command.Argument);
                 return (true, false);
             case SessionVerb.Mcp:
                 await ChangeMcpAsync(command.Argument, cancellationToken);
@@ -6811,17 +6811,43 @@ public sealed class CodingSession : ITurnObserver
     private IReadOnlyList<ITool> PlanResourceTools() =>
         _mcp.Tools.Any(tool => tool.InPlan) ? _mcp.ResourceTools : [];
 
-    private void ShowSkills(string argument)
+    private void ChangeSkills(string argument)
     {
-        if (argument.Trim().Length > 0)
+        var command = argument.Trim().ToLowerInvariant();
+        if (command.Length == 0)
         {
-            Error("Skills command must be /skills.");
+            ShowSkills();
             return;
         }
 
+        if (command is not ("on" or "off" or "reload"))
+        {
+            Error("Skills command must be /skills or /skills on|off|reload.");
+            return;
+        }
+
+        if (_turnActive)
+        {
+            Error("Finish the current turn before changing skills.");
+            return;
+        }
+
+        if (command != "reload")
+        {
+            SaveSettings(current => current.WithSkills(command == "on"));
+        }
+
+        ReloadSkills();
+        RebuildExecutors();
+        ReplaceLiveSystem();
+        Note(command == "reload" ? "Skills reloaded" : "Skills  " + Title(command));
+    }
+
+    private void ShowSkills()
+    {
         if (!_settings.Skills)
         {
-            Note("Skills  off  (set \"skills\" to true in config.json or start with --skills on)");
+            Note("Skills  off. Turn them on with /skills on.");
             return;
         }
 
@@ -6831,12 +6857,18 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        Note("Skills  " + _skills.Count);
-        foreach (var skill in _skills.Items)
-        {
-            Note($"  {skill.Name}  {skill.Description}");
-            Note($"    {skill.Location}");
-        }
+        var root = _workspace.Root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var rows = _skills.Items
+            .Select(skill => (IReadOnlyList<string>)
+            [
+                skill.Name,
+                skill.Location.StartsWith(root, StringComparison.Ordinal) ? "Project" : "Home",
+                skill.Description
+            ])
+            .ToArray();
+        Publish(new DocumentWritten(new TranscriptDocument(
+            $"Skills  {_skills.Count} available",
+            [new TranscriptDocumentBlock("table", ["Name", "Source", "Description"], rows, [], 0)])));
     }
 
     private void ReloadSkills()

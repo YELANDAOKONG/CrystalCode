@@ -97,7 +97,7 @@ public static class ServerScopes
             SessionVerb.Agents => ServerScope.Admin,
             SessionVerb.Tools => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Plugins => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
-            SessionVerb.Skills => ServerScope.Operate,
+            SessionVerb.Skills => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Mcp => IsListing(argument) ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Verbose => ServerScope.Admin,
             SessionVerb.Quit => ServerScope.Admin,
