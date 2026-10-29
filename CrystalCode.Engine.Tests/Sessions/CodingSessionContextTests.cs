@@ -92,7 +92,7 @@ public sealed class CodingSessionContextTests
     }
 
     [Fact]
-    public async Task Context_RefusesChangesDuringAnActiveTurn()
+    public async Task Context_DuringAnActiveTurnAppliesWhenTheTurnEnds()
     {
         var client = new BlockingStreamingClient();
         using var headless = new HeadlessSession(client, settings: Settings());
@@ -100,10 +100,13 @@ public sealed class CodingSessionContextTests
         await headless.Session.SubmitAsync("hi", CancellationToken.None);
         await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
         await headless.Session.SubmitAsync("/context 1m", CancellationToken.None);
-        Assert.Contains(headless.Observer.Events.OfType<ErrorWritten>(), error => error.Text.Contains("Finish the current turn", StringComparison.Ordinal));
+        Assert.Equal(1000000, headless.Session.PendingSettings.ContextWindow);
+        Assert.Contains(headless.Observer.Events.OfType<NoteWritten>(), note => note.Text == "Context  1M  Applies next turn");
         headless.Session.TryInterrupt();
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
         Assert.Equal(272000, headless.Observer.Events.OfType<TurnFinished>().Single().ContextWindow);
+        Assert.Equal(1000000, headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.ContextWindow);
+        Assert.True(headless.Session.PendingSettings.IsEmpty);
     }
 
     [Fact]

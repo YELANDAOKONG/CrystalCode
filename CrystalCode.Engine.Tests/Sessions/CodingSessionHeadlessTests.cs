@@ -378,7 +378,7 @@ public sealed class CodingSessionHeadlessTests
     }
 
     [Fact]
-    public async Task Enqueue_ModelDuringTurnIsRefusedWithoutStopping()
+    public async Task Enqueue_ModelDuringTurnRunsWithoutStopping()
     {
         var client = new BlockingStreamingClient();
         using var headless = new HeadlessSession(client);
@@ -390,9 +390,7 @@ public sealed class CodingSessionHeadlessTests
 
         Assert.True(headless.Session.TurnActive);
         Assert.False(headless.Session.TurnTask!.IsCompleted);
-        Assert.Contains(
-            headless.Observer.Events.OfType<ErrorWritten>(),
-            error => error.Text == "Finish the current turn before using /model.");
+        Assert.DoesNotContain(headless.Observer.Events.OfType<ErrorWritten>(), _ => true);
         Assert.True(headless.Session.TryInterrupt());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
     }

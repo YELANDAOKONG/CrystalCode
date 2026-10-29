@@ -8,6 +8,7 @@ namespace CrystalCode.Display.Shell;
 public sealed class ShellChrome
 {
     private static readonly string[] DropSlots = ["total", "elapsed", "prompt", "model", "path"];
+    private const string PendingSlot = "pending";
     private int _spinnerFrame;
     private DateTimeOffset _lastSpinner;
     private string _progress = string.Empty;
@@ -120,6 +121,13 @@ public sealed class ShellChrome
 
     public int Queued { get; set; }
 
+    /// <summary>
+    /// Settings chosen during a turn that apply on the next turn, as one
+    /// label such as <c>Next: Plan, Approval Full</c>. Empty when none wait.
+    /// The active values stay in their own fields.
+    /// </summary>
+    public string Pending { get; set; } = string.Empty;
+
     private string ModeLabel =>
         string.IsNullOrEmpty(CustomMode) ? PlanMode ? "Plan" : "Work" : CustomMode;
 
@@ -138,6 +146,7 @@ public sealed class ShellChrome
         if (CustomStatusLine)
         {
             AddCustomItems(items, width);
+            AddPending(items);
             return FitStatusLine(items, width, IndexOfCustomDroppable);
         }
 
@@ -213,7 +222,18 @@ public sealed class ShellChrome
             items.Add((queueStr, $"[{Theme.Warning} bold]{queueStr}[/]", "keep"));
         }
 
+        AddPending(items);
         return FitStatusLine(items, width, IndexOfDroppable);
+    }
+
+    // Shown on every status line, custom or not, so the operator always sees
+    // that a choice made during the turn has not applied yet.
+    private void AddPending(List<(string Plain, string Markup, string Slot)> items)
+    {
+        if (!string.IsNullOrWhiteSpace(Pending))
+        {
+            items.Add((Pending, $"[{Theme.Warning}]{MarkupText.Escape(Pending)}[/]", PendingSlot));
+        }
     }
 
     private void AddCustomItems(List<(string Plain, string Markup, string Slot)> items, int width)
@@ -412,7 +432,7 @@ public sealed class ShellChrome
     /// </summary>
     private int IndexOfCustomDroppable(List<(string Plain, string Markup, string Slot)> items)
     {
-        bool Keeps(string field) => RuleFor(field) is { Keep: true };
+        bool Keeps(string field) => field == PendingSlot || RuleFor(field) is { Keep: true };
         foreach (var field in StatusLineDropOrder)
         {
             var index = items.FindIndex(item => item.Slot == field);

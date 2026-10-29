@@ -496,8 +496,13 @@ trust is refused with an error, and choices are declined; `/resume <id>` and
 `configOptions` come from the engine's option catalog (`SessionOptionsChanged`),
 in this order. Each value names the slash command that selects it, and
 `session/set_config_option` and `session/set_mode` run that command, so
-validation, refusal while busy (`-32603`, `command_refused`), and
-`config.json` writes match the terminal exactly. A value or option not offered
+validation and `config.json` writes match the terminal exactly. While a
+turn runs, a mode, approval, thinking, context, tier, speed, or model choice
+succeeds and applies on the next turn; options keep showing the active value,
+and `config_option_update` lists the waiting values under
+`_meta.crystal.pending` (the same keys as `pending` in `_crystal/chrome`).
+That update is sent again when only the pending list changes. A command the
+engine refuses is `-32603`, `command_refused`. A value or option not offered
 is `-32602`. The response carries the complete list of offered options.
 `thinking`, `context`, `tier`, and `speed` appear only when the model offers a
 choice. A select lists only values with a command plus the current value;
@@ -629,7 +634,7 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 | `_crystal/session/fork` | Fork a saved session (see Sessions) |
 | `_crystal/recall` | `TryRecall`; returns `recalled`, and the draft follows as `_crystal/recalled` |
 | `_crystal/queue/release` | empty input release |
-| `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode`, `TogglePlan`; returns `mode` and `planMode` |
+| `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode`, `TogglePlan`; returns the active `mode` and `planMode`, and `pending`. During a turn the change applies on the next turn |
 | `_crystal/verbose {target, enabled}` | `SetVerbose` |
 | `_crystal/draft {text}` | `NotifyDraftChanged` |
 | `_crystal/image/attach {data}`, `_crystal/image/get {number}` | `TryAttachImage`, `TryGetImage` |
@@ -753,8 +758,9 @@ a scripted model:
 - error codes: no response ever carries `-32000`; a missing credential,
   a busy refusal, a failed turn, and context overflow are `-32603` with
   their `kind`; unknown session ids are `-32002`;
-- every config option, refusal while busy, and the complete list of offered
-  options in the response;
+- every config option, a busy change that applies next turn with
+  `_meta.crystal.pending`, refusal while busy, and the complete list of
+  offered options in the response;
 - the offered set: the built-in default, a list, `all`, the config switch
   and its precedence against the three flags, a hidden option refused over
   ACP and still usable as a slash command, and `modes` present only with

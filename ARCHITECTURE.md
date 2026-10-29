@@ -733,7 +733,7 @@ is still on the stack. `/clear`, `/resume`, and `/fork` stay in the queue
 and run in the order typed. `/clear`, `/resume`, and `/fork` drop queued
 follow-up text; the panel updates and does not keep it. During compaction
 those three except `/quit` are refused, as are other commands that change
-the session, workspace, or model.
+the session, workspace, or model, except the next-turn settings below.
 `/status`, `/help`, `/todos`, and other commands that only report state or
 adjust the display run immediately. `/quit` cancels compaction and exits.
 With an empty composer and a queued follow-up, Ctrl+C takes the newest queued
@@ -741,6 +741,54 @@ message out of the queue and puts it in the composer (`TryRetractQueued`); it
 does not interrupt. With nothing queued, Ctrl+C interrupts.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
+
+### Next-turn settings
+
+Mode (`/plan`, `/mode <name>`, Tab, `CycleMode`, `TogglePlan`, and
+`TrySetMode`), the approval level (`/approval` with no argument or a level),
+`/thinking`, `/tier`, `/speed`, `/context`, and `/model <selection>` are
+accepted while a turn or compaction runs and apply on the next turn. Every
+other command that changes the session stays refused with
+`Finish the current turn before ...`, including the approval-model,
+extended-approval, and compaction-model forms.
+
+- While busy, a covered command is validated and recorded as pending. It
+  changes nothing live: no executor rebuild, no system message replacement,
+  no client, and no `config.json` write. The running turn keeps the tools,
+  approval policy, child Plan ceiling, and model it started with. The note is
+  the usual one followed by `Applies next turn`, for example
+  `Mode  Plan  Applies next turn`.
+- One pending value per setting, and the last command wins. A command that
+  names the active value drops that setting's pending value. A cycle (Tab,
+  `/plan`, `/approval`, `/thinking`, `/tier`, `/speed`, `/context` without an
+  argument) steps from the pending value when there is one.
+- Validation uses the settings the next turn will start with: `/thinking`,
+  `/tier`, `/speed`, and `/context` check the pending model. `/model` checks
+  the credential and the image capability when typed, so a refusal reaches
+  the operator then. A new pending model drops the pending context, tier, and
+  speed, and a pending thinking gear it does not offer.
+- `FinishTurnAsync` applies the pending values after the turn is collected,
+  and the manual `/compact` path applies them after compaction. That is
+  before `CompleteTurnAsync` starts a queued follow-up, and also for an
+  interrupted turn and for `/clear`, `/resume`, and `/fork`, which stop the
+  turn first. The order is model, context, tier, speed, thinking, mode,
+  approval. Each goes through the same path as an idle command and saves to
+  `config.json` then. A value that fails (for example, a credential removed
+  in the meantime) writes an error and the others still apply. These notes
+  and errors carry no origin. Pending values live in memory only; a crash
+  loses them.
+- `SessionChrome` keeps the active values. `SessionChrome.Pending`
+  (`SessionPendingSettings`) lists the waiting ones, and
+  `CodingSession.PendingSettings` returns the same value. A tier or speed
+  pending as `unset` clears that slot. `/status` adds a Next turn section.
+  The terminal status bar shows `Next: ...` after the other items on both the
+  default and the custom line and never drops it.
+- `SessionRunner` reports each input's result in `SessionInputResult`:
+  `Error` is the first error the engine wrote for that input (not errors
+  from a turn or side question it started), `Accepted` is true without one,
+  and `Pending` is true when it recorded a next-turn setting.
+- A stricter approval level does not restrict the running turn either. The
+  operator interrupts to get that effect at once.
 
 The terminal registers SIGTERM and SIGHUP through `PosixSignalRegistration`
 (on Windows these are the console shutdown and close events). SIGINT stays
@@ -1101,7 +1149,8 @@ stays the same conversation.
   is the remainder after the first space and may contain `/`.
 - Models that are not listed cannot be selected. A missing API key
   leaves the current client unchanged.
-- The command is refused while a turn is running.
+- While a turn runs the choice applies on the next turn (see Next-turn
+  settings).
 - A successful switch writes `provider` and `model` to `config.json`.
   CLI `--provider` / `--model` still override only that process start.
 - Thinking follows the existing rule: switching models never fails.
@@ -2111,8 +2160,9 @@ the model lists it. An
 unset slot is omitted from the request. `/tier` and `/speed` (alias
 `/fast`) cycle the current model's list, including the unset slot, or
 select a listed token. Each choice is stored per model in
-`tierSelections` and `speedSelections`. Switching is refused during a turn
-or compaction. An empty list means that slot is not offered.
+`tierSelections` and `speedSelections`. A switch during a turn or
+compaction applies on the next turn. An empty list means that slot is not
+offered.
 
 Chat Completions writes whichever one slot is set to `service_tier` and
 rejects both when the client is created, because that protocol has one
@@ -2132,7 +2182,8 @@ the host sorts them in ascending order. Without a nonempty array the sole
 budget is `contextWindow`. The initial budget is the lowest declared value.
 `/context` cycles the current model's budgets; `/context 272k`, `/context 1m`,
 and exact integer token counts select one explicitly. Invalid or unavailable
-values are refused. Switching is refused during a turn or compaction.
+values are refused. A switch during a turn or compaction applies on the
+next turn.
 `crystal`, `crystal space`, and `crystal run` accept `--context` for the
 model selected at launch when that model declares more than one budget.
 The text is the same as `/context`, and it must name a declared budget.

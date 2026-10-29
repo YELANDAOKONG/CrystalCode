@@ -292,6 +292,8 @@ public sealed class SessionRunner
         {
             var session = runner.Session;
             var quit = false;
+            var capture = new SessionInputCapture();
+            using var scope = session.CaptureInput(capture);
             if (!idle)
             {
                 if (Quick)
@@ -312,7 +314,7 @@ public sealed class SessionRunner
                 quit = await runner.PumpAsync(session.SubmitAsync(text, cancellationToken), cancellationToken);
             }
 
-            Completion.TrySetResult(new SessionInputResult(session.TurnActive, quit));
+            Completion.TrySetResult(new SessionInputResult(session.TurnActive, quit, capture.Error, capture.Pending));
             return quit;
         }
 

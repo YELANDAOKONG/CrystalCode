@@ -6,6 +6,8 @@ namespace CrystalCode.Engine.Events;
 /// Persistent session chrome: provider, model, workspace, mode, approval, thinking,
 /// prompt set, selected local context budget in tokens, and the session id.
 /// Thinking and prompt set are display labels; an empty prompt set means the default.
+/// Every field is the active value. <see cref="Pending"/> lists values chosen
+/// during a turn that apply on the next turn.
 /// </summary>
 public sealed record SessionChrome(
     string Model,
@@ -20,4 +22,5 @@ public sealed record SessionChrome(
     bool AgentsEnabled = false,
     string? Mode = null,
     string Provider = "",
-    string SessionId = "");
+    string SessionId = "",
+    SessionPendingSettings? Pending = null);

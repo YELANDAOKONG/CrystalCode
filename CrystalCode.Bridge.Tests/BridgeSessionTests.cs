@@ -88,7 +88,7 @@ public sealed class BridgeSessionTests
     }
 
     [Fact]
-    public async Task SetConfigOption_WhileBusy_IsTheEngineRefusal()
+    public async Task SetConfigOption_WhileBusy_AppliesNextTurn()
     {
         var model = new ScriptedModel(true);
         await using var fixture = await BridgeFixture.StartAsync(model);
@@ -97,7 +97,36 @@ public sealed class BridgeSessionTests
         var (_, prompt) = await fixture.StartRequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "long" } } });
         await held.WaitAsync(BridgeFixture.Wait);
 
-        var refused = await fixture.RequestAsync("session/set_config_option", new { sessionId = id, configId = "model", value = "ollama/qwen3:8b" });
+        var set = await fixture.RequestAsync("session/set_config_option", new { sessionId = id, configId = "approval", value = "edit" });
+        var update = await fixture.WaitForUpdateAsync("config_option_update", static update =>
+            update.TryGetProperty("_meta", out var meta)
+            && meta.GetProperty("crystal").TryGetProperty("pending", out var pending)
+            && pending.TryGetProperty("approval", out _));
+        await fixture.NotifyAsync("session/cancel", new { sessionId = id });
+        await prompt.WaitAsync(BridgeFixture.Wait);
+
+        Assert.False(set.TryGetProperty("error", out _));
+        var approval = set.GetProperty("result").GetProperty("configOptions").EnumerateArray()
+            .Single(static option => option.GetProperty("id").GetString() == "approval");
+        Assert.Equal("default", approval.GetProperty("currentValue").GetString());
+        Assert.Equal("edit", update.GetProperty("params").GetProperty("update").GetProperty("_meta").GetProperty("crystal").GetProperty("pending").GetProperty("approval").GetString());
+        await fixture.WaitForUpdateAsync("config_option_update", static update =>
+            update.TryGetProperty("configOptions", out var options)
+            && options.EnumerateArray().Any(static option =>
+                option.GetProperty("id").GetString() == "approval" && option.GetProperty("currentValue").GetString() == "edit"));
+    }
+
+    [Fact]
+    public async Task SetConfigOption_WhileBusy_KeepsTheRefusalForAnInvalidValue()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await BridgeFixture.StartAsync(model);
+        var id = await fixture.OpenAsync();
+        var held = model.Held.Task;
+        var (_, prompt) = await fixture.StartRequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "long" } } });
+        await held.WaitAsync(BridgeFixture.Wait);
+
+        var refused = await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "/cd .." } } });
         await fixture.NotifyAsync("session/cancel", new { sessionId = id });
         await prompt.WaitAsync(BridgeFixture.Wait);
 

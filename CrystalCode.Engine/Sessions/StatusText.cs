@@ -86,6 +86,12 @@ public static class StatusText
         }
 
         AddSection(lines, "Model", modelRows);
+        var pending = PendingSettingsText.Rows(status.Pending);
+        if (pending.Count > 0)
+        {
+            AddSection(lines, "Next turn", pending);
+        }
+
         AddSection(
             lines,
             "Session tokens",

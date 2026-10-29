@@ -31,6 +31,26 @@ public sealed class ShellChromeTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void StatusLine_ShowsPendingSettingsBesideTheActiveOnes(bool custom)
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = custom,
+            StatusLineFields = ["approval", "model", "workspace"],
+            Approval = "Default",
+            Model = "a-model-name-that-is-long",
+            WorkspaceRoot = "/a/long/workspace/path",
+            Pending = "Next: Plan, Approval Full"
+        };
+
+        Assert.Contains("Default", chrome.StatusLine(120).Plain, StringComparison.Ordinal);
+        Assert.Contains("Next: Plan, Approval Full", chrome.StatusLine(120).Plain, StringComparison.Ordinal);
+        Assert.Contains("Next:", chrome.StatusLine(40).Plain, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void StatusLine_PaintsApprovalWithItsModeColor(bool custom)
     {
         var chrome = new ShellChrome

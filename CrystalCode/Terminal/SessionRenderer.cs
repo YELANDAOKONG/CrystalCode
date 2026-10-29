@@ -556,6 +556,24 @@ public sealed class SessionRenderer : IDisposable
     }
 
     /// <summary>
+    /// Sets the label for settings that apply on the next turn.
+    /// </summary>
+    internal void SetPending(string pending)
+    {
+        ArgumentNullException.ThrowIfNull(pending);
+        lock (_gate)
+        {
+            if (_chrome.Pending == pending)
+            {
+                return;
+            }
+
+            _chrome.Pending = pending;
+            PaintUnlocked(force: false);
+        }
+    }
+
+    /// <summary>
     /// Sets the provider name and session id the custom status line can show.
     /// </summary>
     internal void SetIdentity(string provider, string sessionId)

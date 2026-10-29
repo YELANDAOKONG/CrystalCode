@@ -55,6 +55,7 @@ public sealed class BridgeParityTests
         ["TurnActive"] = "session/prompt follow-up handling",
         ["TurnTask"] = "SessionRunner and fault detection",
         ["PlanMode"] = "Phase 2: config options",
+        ["PendingSettings"] = "_meta.crystal.pending on config_option_update and _crystal/chrome",
         ["CustomMode"] = "Phase 2: config options",
         ["SessionId"] = "The ACP session id"
     };

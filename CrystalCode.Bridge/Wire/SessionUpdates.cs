@@ -104,6 +104,7 @@ internal sealed class SessionUpdates
     private int _replays;
     private readonly IReadOnlySet<string>? _offered;
     private IReadOnlyList<SessionOption> _options = [];
+    private SessionPendingSettings _pending = SessionPendingSettings.None;
     private string? _mode;
     private int _contextWindow;
     private string? _reportedWorkspace;
@@ -211,6 +212,7 @@ internal sealed class SessionUpdates
                     // The option catalog carries the values; this keeps the plain chrome.
                     RememberContextWindow(changed.Chrome.ContextWindow);
                     Chrome(changed.Chrome);
+                    PendingChanged(changed.Chrome.Pending);
                     break;
                 case PreferencesChanged preferences:
                     _crystal("_crystal/preferences", writer => CrystalWire.Preferences(writer, "preferences", preferences.Preferences));
@@ -422,7 +424,7 @@ internal sealed class SessionUpdates
         _options = options;
         var offered = Offered(options);
         Update("config_option_update", "SessionOptionsChanged", writer =>
-            ConfigWire.Options(writer, "configOptions", offered, _booleans));
+            ConfigWire.Options(writer, "configOptions", offered, _booleans), PendingMeta);
         var mode = offered.FirstOrDefault(static option => option.Id == "mode")?.Current;
         if (mode is not null && mode != _mode)
         {
@@ -430,6 +432,26 @@ internal sealed class SessionUpdates
             Update("current_mode_update", "SessionOptionsChanged", writer => writer.WriteString("currentModeId", mode));
         }
     }
+
+    /// <summary>
+    /// Options show the active values. A choice made during a turn is listed
+    /// under <c>_meta.crystal.pending</c> until the next turn applies it, so
+    /// the update is sent again when only that list changed.
+    /// </summary>
+    private void PendingChanged(SessionPendingSettings? pending)
+    {
+        var next = pending ?? SessionPendingSettings.None;
+        if (next == _pending)
+        {
+            return;
+        }
+
+        _pending = next;
+        Update("config_option_update", "ChromeChanged", writer =>
+            ConfigWire.Options(writer, "configOptions", Offered(_options), _booleans), PendingMeta);
+    }
+
+    private void PendingMeta(Utf8JsonWriter writer) => CrystalWire.Pending(writer, "pending", _pending);
 
     /// <summary>
     /// The completable verbs. ACP names a command without the slash; the hint

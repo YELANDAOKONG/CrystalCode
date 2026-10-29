@@ -241,7 +241,7 @@ replay, load into another `cwd`, list paging, prompts with every content
 block and file image links, streaming, cancel during streaming, a follow-up,
 and a pending permission, `$/cancel_request`, close, `/clear` keeping the ACP
 id, `/cd`, `/quit`, permission answers, diffs, plans, config options and
-modes with refusal while busy, available commands, usage, session info,
+modes with next-turn settings and refusal while busy, available commands, usage, session info,
 reports, the question, trust, and resume forms with and without form
 support, editor MCP servers without leaking their values, additional roots,
 error codes, launch and trust refusals, stdin closing, protocol-only stdout,

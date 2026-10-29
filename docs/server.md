@@ -225,10 +225,10 @@ and the `server.state` event.
 | `GET /info` | observe | Build identity, capability lists (event types, operations, slash commands, interaction kinds), session id, workspace |
 | `GET /snapshot` | observe | Session state, `lastSeq`, pending interactions, server state |
 | `GET /events?after=<seq>` | observe | Event stream; honors `Last-Event-ID` |
-| `POST /input` | operate | `{"text"}`: a prompt, a slash command, a follow-up, or empty text that releases the queue. Returns `turnActive` and `quit` |
+| `POST /input` | operate | `{"text"}`: a prompt, a slash command, a follow-up, or empty text that releases the queue. Returns `accepted` (false when the engine refused the input), `pending` (a setting was recorded for the next turn), `error` (the refusal text or null), `turnActive`, and `quit` |
 | `POST /interrupt` | operate | `TryInterrupt` |
 | `POST /recall` | operate | `TryRecall`; the client states that its composer can take the message back |
-| `POST /mode` | operate | `cycle`, `toggle-plan`, or `set` with a name |
+| `POST /mode` | operate | `cycle`, `toggle-plan`, or `set` with a name. Returns `mode`, `planMode`, and `pending`. During a turn the change applies on the next turn |
 | `POST /verbose` | operate | `{"target","enabled"}`: `SetVerbose` (Ctrl+O and Ctrl+G) |
 | `PUT /draft` | operate | `{"text"}`: `NotifyDraftChanged` for this client's draft images |
 | `POST /images` | operate | Raw image bytes: `TryAttachImage`; returns `number`, `mimeType`, `marker`, and `trustedMarker` to put in the submitted text |
@@ -284,7 +284,11 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 
 The chrome object in `session.started`, `chrome.changed`, and the snapshot
 names the active `provider` and `model` along with the `sessionId`, workspace, mode, approval,
-thinking, prompt set, context window, service tier, and speed.
+thinking, prompt set, context window, service tier, and speed. Its `pending`
+object lists settings chosen during a turn that apply on the next turn:
+`provider` and `model` together, `contextWindow`, `serviceTier`, `speed`
+(`unset` clears the slot), `thinking`, `mode`, and `approval`. A key appears
+only while that setting waits. `report.status` carries the same `pending`.
 
 Server events: `server.state`, `server.closing` (with the session id and
 whether it was saved), `interaction.opened`, `interaction.resolved`,

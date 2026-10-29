@@ -49,7 +49,7 @@ public sealed class CodingSessionSlotTests
     }
 
     [Fact]
-    public async Task Tier_RefusesChangesDuringAnActiveTurn()
+    public async Task Tier_DuringAnActiveTurnAppliesWhenTheTurnEnds()
     {
         var client = new BlockingStreamingClient();
         using var headless = new HeadlessSession(client, settings: Settings());
@@ -57,11 +57,21 @@ public sealed class CodingSessionSlotTests
         await headless.Session.SubmitAsync("hi", CancellationToken.None);
         await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
         await headless.Session.SubmitAsync("/tier flex", CancellationToken.None);
-        Assert.Contains(
-            headless.Observer.Events.OfType<ErrorWritten>(),
-            error => error.Text == "Finish the current turn before switching service tier.");
+        await headless.Session.SubmitAsync("/speed fast", CancellationToken.None);
+
+        Assert.Equal(string.Empty, headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.ServiceTier);
+        Assert.Equal("flex", headless.Session.PendingSettings.ServiceTier);
+        Assert.Equal("fast", headless.Session.PendingSettings.Speed);
+        Assert.False(File.Exists(headless.Home.ConfigPath)
+            && File.ReadAllText(headless.Home.ConfigPath).Contains("tierSelections", StringComparison.Ordinal));
         headless.Session.TryInterrupt();
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
+
+        var chrome = headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome;
+        Assert.Equal("Tier Flex", chrome.ServiceTier);
+        Assert.Equal("Speed Fast", chrome.Speed);
+        Assert.True(chrome.Pending!.IsEmpty);
+        Assert.Contains("tierSelections", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
     }
 
     [Fact]

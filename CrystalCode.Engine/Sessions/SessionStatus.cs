@@ -1,6 +1,7 @@
 using Crystal;
 
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Events;
 
 namespace CrystalCode.Engine.Sessions;
 
@@ -58,4 +59,5 @@ public sealed record SessionStatus(
     string? ExtendedApprovalModel = null,
     string? ExtendedApprovalThinking = null,
     string? ExtendedApprovalTrigger = null,
-    bool? ExtendedApprovalPrimaryReview = null);
+    bool? ExtendedApprovalPrimaryReview = null,
+    SessionPendingSettings? Pending = null);

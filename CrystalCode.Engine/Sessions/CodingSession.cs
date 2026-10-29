@@ -1019,6 +1019,18 @@ public sealed class CodingSession : ITurnObserver
     private string? _customMode;
     private ModeCatalog _modes = ModeCatalog.Empty;
     private string? _pendingModeNote;
+    // Settings chosen while a turn or compaction runs; ApplyPendingSettings
+    // applies them once that work is collected.
+    private ModelSelection? _pendingModel;
+    private int? _pendingContext;
+    private bool _pendingTierSet;
+    private string? _pendingTier;
+    private bool _pendingSpeedSet;
+    private string? _pendingSpeed;
+    private ThinkingSelection? _pendingThinking;
+    private string? _pendingMode;
+    private ApprovalMode? _pendingApproval;
+    private readonly AsyncLocal<SessionInputCapture?> _inputCapture = new();
     private List<ChatItem> _transcript;
     private readonly object _archiveGate = new();
     private List<ChatItem> _archive = [];
@@ -1232,6 +1244,12 @@ public sealed class CodingSession : ITurnObserver
     public Task? TurnTask => _turnTask;
 
     public bool PlanMode => _planMode;
+
+    /// <summary>
+    /// Settings chosen during the running turn or compaction that apply on
+    /// the next turn. Chrome carries the same value.
+    /// </summary>
+    public SessionPendingSettings PendingSettings => CurrentPending();
 
     /// <summary>
     /// The active custom mode name, or null while Plan or Work is active.
@@ -1752,9 +1770,18 @@ public sealed class CodingSession : ITurnObserver
     /// <summary>
     /// Switches between Plan and Work, replaces the live system message, and
     /// returns whether Plan is now active. From a custom mode it enters Plan.
+    /// While a turn or compaction runs, the switch is recorded for the next
+    /// turn and the active mode is returned.
     /// </summary>
     public bool TogglePlan()
     {
+        if (SettingsBusy)
+        {
+            var plan = ProspectiveModeName().Equals(ModeCatalog.Plan, StringComparison.OrdinalIgnoreCase);
+            DeferMode(plan ? ModeCatalog.Work : ModeCatalog.Plan);
+            return _planMode;
+        }
+
         _planMode = !_planMode;
         _customMode = null;
         ReplaceLiveSystem();
@@ -1764,20 +1791,30 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Moves to the next mode in the order Plan, Work, then enabled custom
-    /// modes by name, and returns whether Plan is now active.
+    /// modes by name, and returns whether Plan is now active. While a turn or
+    /// compaction runs, it moves from the pending mode and records the result
+    /// for the next turn.
     /// </summary>
     public bool CycleMode()
     {
         var order = ModeOrder();
-        var current = _customMode ?? (_planMode ? ModeCatalog.Plan : ModeCatalog.Work);
+        var current = ProspectiveModeName();
         var index = order.FindIndex(name => name.Equals(current, StringComparison.OrdinalIgnoreCase));
-        ApplyMode(order[(index + 1) % order.Count]);
+        var next = order[(index + 1) % order.Count];
+        if (SettingsBusy)
+        {
+            DeferMode(next);
+            return _planMode;
+        }
+
+        ApplyMode(next);
         return _planMode;
     }
 
     /// <summary>
     /// Selects Plan, Work, or an enabled custom mode by name. Returns false
-    /// with an operator-facing error when the name is unavailable.
+    /// with an operator-facing error when the name is unavailable. While a
+    /// turn or compaction runs, the choice applies on the next turn.
     /// </summary>
     public bool TrySetMode(string name, out string error)
     {
@@ -1788,12 +1825,209 @@ public sealed class CodingSession : ITurnObserver
             || requested.Equals(ModeCatalog.Work, StringComparison.OrdinalIgnoreCase)
             || _modes.Find(requested) is not null)
         {
+            if (SettingsBusy)
+            {
+                DeferMode(requested);
+                return true;
+            }
+
             ApplyMode(requested);
             return true;
         }
 
         error = "Mode not found or not enabled  " + requested;
         return false;
+    }
+
+    private bool SettingsBusy => _turnActive || _compacting;
+
+    private string ProspectiveModeName() => _pendingMode ?? CurrentModeName();
+
+    private string CanonicalModeName(string name) =>
+        _modes.Find(name)?.Name
+        ?? (name.Equals(ModeCatalog.Plan, StringComparison.OrdinalIgnoreCase) ? ModeCatalog.Plan : ModeCatalog.Work);
+
+    private static string ModeNameLabel(string name) =>
+        name == ModeCatalog.Plan ? "Plan" : name == ModeCatalog.Work ? "Work" : name;
+
+    private void DeferMode(string name)
+    {
+        var canonical = CanonicalModeName(name);
+        if (canonical.Equals(CurrentModeName(), StringComparison.Ordinal))
+        {
+            _pendingMode = null;
+            KeepActive("Mode  " + ModeNameLabel(canonical));
+            return;
+        }
+
+        _pendingMode = canonical;
+        Deferred("Mode  " + ModeNameLabel(canonical));
+    }
+
+    /// <summary>A command named the active value, so its pending value is dropped.</summary>
+    private void KeepActive(string note)
+    {
+        RefreshChrome();
+        Note(note);
+    }
+
+    /// <summary>Records that the input chose a setting for the next turn.</summary>
+    private void Deferred(string note)
+    {
+        _inputCapture.Value?.Defer();
+        RefreshChrome();
+        Note(note + "  Applies next turn");
+    }
+
+    /// <summary>
+    /// The settings the next turn starts with: the active ones with the
+    /// pending model, context, tier, and speed applied.
+    /// </summary>
+    private HarnessSettings ProspectiveSettings()
+    {
+        var next = _settings;
+        if (_pendingModel is { } model)
+        {
+            next = next.WithSelection(model.Provider, model.Model);
+        }
+
+        if (_pendingContext is int window)
+        {
+            next = next.WithContextWindow(next.Provider, next.Model, window);
+        }
+
+        if (_pendingTierSet)
+        {
+            next = next.WithTier(next.Provider, next.Model, _pendingTier);
+        }
+
+        if (_pendingSpeedSet)
+        {
+            next = next.WithSpeed(next.Provider, next.Model, _pendingSpeed);
+        }
+
+        return next;
+    }
+
+    private void ClearPendingModelSlots()
+    {
+        _pendingContext = null;
+        _pendingTierSet = false;
+        _pendingTier = null;
+        _pendingSpeedSet = false;
+        _pendingSpeed = null;
+    }
+
+    private SessionPendingSettings CurrentPending() =>
+        new(
+            _pendingModel?.Provider.Value,
+            _pendingModel?.Model,
+            _pendingContext,
+            _pendingTierSet ? _pendingTier ?? SessionPendingSettings.Unset : null,
+            _pendingSpeedSet ? _pendingSpeed ?? SessionPendingSettings.Unset : null,
+            _pendingThinking?.Value,
+            _pendingMode,
+            _pendingApproval?.Value);
+
+    /// <summary>
+    /// Applies the settings chosen during the turn or compaction that just
+    /// ended, in a fixed order. A value that no longer applies writes an error
+    /// and the rest still apply. The errors belong to no submitted input.
+    /// </summary>
+    private void ApplyPendingSettings()
+    {
+        if (SettingsBusy || CurrentPending().IsEmpty)
+        {
+            return;
+        }
+
+        var model = _pendingModel;
+        var context = _pendingContext;
+        var tierSet = _pendingTierSet;
+        var tier = _pendingTier;
+        var speedSet = _pendingSpeedSet;
+        var speed = _pendingSpeed;
+        var thinking = _pendingThinking;
+        var mode = _pendingMode;
+        var approval = _pendingApproval;
+        _pendingModel = null;
+        ClearPendingModelSlots();
+        _pendingThinking = null;
+        _pendingMode = null;
+        _pendingApproval = null;
+
+        // The values were chosen earlier, perhaps by another client, so what
+        // applying them writes goes to everyone and fails no current request.
+        var capture = _inputCapture.Value;
+        _inputCapture.Value = null;
+        using var origin = BeginOrigin(null);
+        try
+        {
+            if (model is not null)
+            {
+                ChangeModel(model.Provider.Value + " " + model.Model);
+            }
+
+            if (context is int window)
+            {
+                ChangeContext(window.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            if (tierSet)
+            {
+                ApplyCatalogSlot(serviceTier: true, tier);
+            }
+
+            if (speedSet)
+            {
+                ApplyCatalogSlot(serviceTier: false, speed);
+            }
+
+            if (thinking is not null)
+            {
+                ChangeThinking(thinking.Value);
+            }
+
+            if (mode is not null)
+            {
+                if (TrySetMode(mode, out var modeError))
+                {
+                    Note("Mode  " + ModeLabel.For(_planMode, _customMode));
+                }
+                else
+                {
+                    Error(modeError);
+                }
+            }
+
+            if (approval is not null)
+            {
+                ChangeApproval(approval.Value);
+            }
+
+            RefreshChrome();
+        }
+        finally
+        {
+            _inputCapture.Value = capture;
+        }
+    }
+
+    /// <summary>
+    /// Collects what one submitted input did on this async flow until the
+    /// returned scope is disposed. <see cref="SessionRunner"/> reports it.
+    /// </summary>
+    internal IDisposable CaptureInput(SessionInputCapture capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        var previous = _inputCapture.Value;
+        _inputCapture.Value = capture;
+        return new CaptureScope(this, previous);
+    }
+
+    private sealed class CaptureScope(CodingSession session, SessionInputCapture? previous) : IDisposable
+    {
+        public void Dispose() => session._inputCapture.Value = previous;
     }
 
     private List<string> ModeOrder() =>
@@ -1810,13 +2044,14 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeMode(string argument)
     {
-        if (_turnActive || _compacting)
+        // Reloading rebuilds the executors, so a running turn keeps the
+        // catalog it started with and the choice applies on the next turn.
+        var busy = SettingsBusy;
+        if (!busy)
         {
-            Error("Finish the current turn before changing mode.");
-            return;
+            ReloadModes(announce: true);
         }
 
-        ReloadModes(announce: true);
         var requested = argument.Trim();
         if (requested.Length == 0)
         {
@@ -1831,13 +2066,13 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (TrySetMode(requested, out var error))
-        {
-            Note("Mode  " + ModeLabel.For(_planMode, _customMode));
-        }
-        else
+        if (!TrySetMode(requested, out var error))
         {
             Error(error);
+        }
+        else if (!busy)
+        {
+            Note("Mode  " + ModeLabel.For(_planMode, _customMode));
         }
     }
 
@@ -2178,6 +2413,8 @@ public sealed class CodingSession : ITurnObserver
                 Note("Compaction cancelled");
             }
 
+            ApplyPendingSettings();
+
             if (ConsumeQuit())
             {
                 PruneDraftImages(string.Empty);
@@ -2211,8 +2448,13 @@ public sealed class CodingSession : ITurnObserver
                 Publish(new HelpRequested(PluginHelp()));
                 return (true, false);
             case SessionVerb.Plan:
+                var busy = SettingsBusy;
                 TogglePlan();
-                Note(ModeLabel.For(_planMode));
+                if (!busy)
+                {
+                    Note(ModeLabel.For(_planMode));
+                }
+
                 return (true, false);
             case SessionVerb.Mode:
                 ChangeMode(command.Argument);
@@ -2773,15 +3015,16 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        ApprovalMode selected;
         if (string.IsNullOrWhiteSpace(argument))
         {
-            _approval = ApprovalMode.Next(_approval);
+            selected = ApprovalMode.Next(_pendingApproval ?? _approval);
         }
         else
         {
             try
             {
-                _approval = ApprovalMode.Parse(argument);
+                selected = ApprovalMode.Parse(argument);
             }
             catch (ArgumentException exception)
             {
@@ -2790,6 +3033,21 @@ public sealed class CodingSession : ITurnObserver
             }
         }
 
+        if (SettingsBusy)
+        {
+            if (selected == _approval)
+            {
+                _pendingApproval = null;
+                KeepActive("Approval  " + ApprovalLabel.For(selected));
+                return;
+            }
+
+            _pendingApproval = selected;
+            Deferred("Approval  " + ApprovalLabel.For(selected));
+            return;
+        }
+
+        _approval = selected;
         SaveSettings(current => current.WithApproval(_approval));
         RebuildExecutors();
         ReplaceLiveSystem();
@@ -3202,23 +3460,34 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeContext(string argument)
     {
-        if (_turnActive || _compactSource is not null)
-        {
-            Error("Finish the current turn before switching context windows.");
-            return;
-        }
-
-        var windows = _settings.ActiveModel.ContextWindows;
+        var busy = SettingsBusy || _compactSource is not null;
+        var prospective = busy ? ProspectiveSettings() : _settings;
+        var windows = prospective.ActiveModel.ContextWindows;
         int selected;
         if (string.IsNullOrWhiteSpace(argument))
         {
-            var index = Array.IndexOf(windows.ToArray(), _settings.ContextWindow);
+            var index = Array.IndexOf(windows.ToArray(), prospective.ContextWindow);
             selected = windows[(index + 1) % windows.Count];
         }
         else if (!ContextWindowSelection.TryParse(argument, out selected) || !windows.Contains(selected))
         {
             Error("Context window is not available for this model. Available: "
                 + string.Join(", ", windows.Select(ContextWindowSelection.Format)));
+            return;
+        }
+
+        if (busy)
+        {
+            var label = "Context  " + ContextWindowSelection.Format(selected);
+            if (_pendingModel is null && selected == _settings.ContextWindow)
+            {
+                _pendingContext = null;
+                KeepActive(label);
+                return;
+            }
+
+            _pendingContext = selected;
+            Deferred(label);
             return;
         }
 
@@ -3250,15 +3519,9 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeCatalogSlot(string argument, bool serviceTier)
     {
-        if (_turnActive || _compactSource is not null)
-        {
-            Error(
-                "Finish the current turn before switching "
-                + (serviceTier ? "service tier." : "speed."));
-            return;
-        }
-
-        var model = _settings.ActiveModel;
+        var busy = SettingsBusy || _compactSource is not null;
+        var prospective = busy ? ProspectiveSettings() : _settings;
+        var model = prospective.ActiveModel;
         var tokens = serviceTier ? model.ServiceTiers : model.Speeds;
         var label = serviceTier ? "Service tier" : "Speed";
         if (tokens.Count == 0)
@@ -3270,7 +3533,7 @@ public sealed class CodingSession : ITurnObserver
         string? selected;
         if (string.IsNullOrWhiteSpace(argument))
         {
-            var current = serviceTier ? _settings.ServiceTier : _settings.Speed;
+            var current = serviceTier ? prospective.ServiceTier : prospective.Speed;
             selected = CatalogSlots.Next(current, tokens);
         }
         else if (!CatalogToken.TryNormalize(argument, out var token) || !CatalogSlots.Contains(tokens, token))
@@ -3282,6 +3545,103 @@ public sealed class CodingSession : ITurnObserver
         else
         {
             selected = token;
+        }
+
+        if (busy)
+        {
+            DeferCatalogSlot(serviceTier, selected);
+            return;
+        }
+
+        ApplyCatalogSlot(serviceTier, selected);
+    }
+
+    /// <summary>
+    /// Records a model for the next turn. The credential and the image check
+    /// run now, so a refusal reaches the operator when the command is typed.
+    /// The pending context, tier, and speed belonged to the previous choice
+    /// and are dropped.
+    /// </summary>
+    private void DeferModel(ModelSelection selection, bool active)
+    {
+        if (active)
+        {
+            _pendingModel = null;
+            ClearPendingModelSlots();
+            KeepActive("Model  " + selection);
+            return;
+        }
+
+        var next = _settings.WithSelection(selection.Provider, selection.Model);
+        if (!_credentials.TryResolve(next.ActiveProvider, out _, out var credentialError))
+        {
+            Error(credentialError);
+            return;
+        }
+
+        if ((_pendingImages.Count > 0 || HasReferencedImages()) && !next.ActiveModel.ImageInput)
+        {
+            Error("The selected model cannot continue a session containing images.");
+            return;
+        }
+
+        _pendingModel = selection;
+        ClearPendingModelSlots();
+        if (_pendingThinking is { } thinking && !ThinkingFits(next.ActiveModel, thinking))
+        {
+            _pendingThinking = null;
+        }
+
+        Deferred("Model  " + selection);
+    }
+
+    private static bool ThinkingFits(ModelSettings model, ThinkingSelection selection) =>
+        model.Thinking
+        && (selection == ThinkingSelection.Default
+            || (selection == ThinkingSelection.Off ? model.ThinkingCanDisable : model.AllowsEffort(selection.Value)));
+
+    private static string SlotNote(bool serviceTier, string? selected) =>
+        (serviceTier ? "Tier  " : "Speed  ")
+        + (selected is null ? "not set" : DisplayCase.Token(selected));
+
+    private void DeferCatalogSlot(bool serviceTier, string? selected)
+    {
+        var active = serviceTier ? _settings.ServiceTier : _settings.Speed;
+        var keep = _pendingModel is null && string.Equals(selected, active, StringComparison.Ordinal);
+        if (serviceTier)
+        {
+            _pendingTierSet = !keep;
+            _pendingTier = keep ? null : selected;
+        }
+        else
+        {
+            _pendingSpeedSet = !keep;
+            _pendingSpeed = keep ? null : selected;
+        }
+
+        if (keep)
+        {
+            KeepActive(SlotNote(serviceTier, selected));
+            return;
+        }
+
+        Deferred(SlotNote(serviceTier, selected));
+    }
+
+    /// <summary>
+    /// Selects a token the active model lists, or unsets the slot, rebuilds
+    /// the clients, and saves the choice. A token the model no longer lists
+    /// writes an error.
+    /// </summary>
+    private void ApplyCatalogSlot(bool serviceTier, string? selected)
+    {
+        var model = _settings.ActiveModel;
+        var tokens = serviceTier ? model.ServiceTiers : model.Speeds;
+        var label = serviceTier ? "Service tier" : "Speed";
+        if (selected is not null && !CatalogSlots.Contains(tokens, selected))
+        {
+            Error(label + " is not available for this model. Available: " + string.Join(", ", tokens));
+            return;
         }
 
         var provider = _settings.Provider;
@@ -3305,9 +3665,7 @@ public sealed class CodingSession : ITurnObserver
 
         RefreshSlashCommands();
         RefreshChrome();
-        Note(
-            (serviceTier ? "Tier  " : "Speed  ")
-            + (selected is null ? "not set" : DisplayCase.Token(selected)));
+        Note(SlotNote(serviceTier, selected));
     }
 
     private bool TryReplaceWorkClient(HarnessSettings next, out string error)
@@ -3462,16 +3820,18 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeThinking(string argument)
     {
-        var model = _settings.ActiveModel;
+        var busy = SettingsBusy;
+        var model = busy ? ProspectiveSettings().ActiveModel : _settings.ActiveModel;
         if (!model.Thinking)
         {
             Error("The selected model does not support thinking.");
             return;
         }
 
+        ThinkingSelection selected;
         if (string.IsNullOrWhiteSpace(argument))
         {
-            _thinkingEffort = ThinkingSelection.Next(_thinkingEffort, model);
+            selected = ThinkingSelection.Next(_pendingThinking ?? _thinkingEffort, model);
         }
         else
         {
@@ -3501,9 +3861,24 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
-            _thinkingEffort = selection;
+            selected = selection;
         }
 
+        if (busy)
+        {
+            if (selected == _thinkingEffort)
+            {
+                _pendingThinking = null;
+                KeepActive("Thinking  " + ThinkingLabel.For(selected));
+                return;
+            }
+
+            _pendingThinking = selected;
+            Deferred("Thinking  " + ThinkingLabel.For(selected));
+            return;
+        }
+
+        _thinkingEffort = selected;
         SaveSettings(current => current.WithThinkingEffort(_thinkingEffort));
         RebuildExecutors();
         RefreshChrome();
@@ -3682,12 +4057,6 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeModel(string argument)
     {
-        if (_turnActive)
-        {
-            Error("Finish the current turn before switching models.");
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(argument))
         {
             Note(
@@ -3710,8 +4079,15 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        if (selection.Provider == _settings.Provider
-            && string.Equals(selection.Model, _settings.Model, StringComparison.Ordinal))
+        var active = selection.Provider == _settings.Provider
+            && string.Equals(selection.Model, _settings.Model, StringComparison.Ordinal);
+        if (SettingsBusy)
+        {
+            DeferModel(selection, active);
+            return;
+        }
+
+        if (active)
         {
             Note("Model  " + selection);
             return;
@@ -5040,7 +5416,8 @@ public sealed class CodingSession : ITurnObserver
                 ExtendedApprovalPrimaryReview: _settings.ExtendedApproval.Enabled
                     ? _settings.ExtendedApproval.IncludePrimaryReview
                     : null,
-                Mode: _customMode),
+                Mode: _customMode,
+                Pending: CurrentPending()),
             full));
     }
 
@@ -8352,7 +8729,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.Agents.Enabled,
             _customMode,
             _settings.Provider.Value,
-            _sessionId);
+            _sessionId,
+            CurrentPending());
 
     private void RefreshChrome()
     {
@@ -8540,6 +8918,13 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
+            if (AppliesNextTurn(command))
+            {
+                CloseRecallWindow();
+                RunNextTurnSetting(command);
+                return;
+            }
+
             if (!_compacting && StopsBusyTurn(command.Verb))
             {
                 _deferredStops.Add(trimmed);
@@ -8582,13 +8967,72 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
-        if (command.Verb == SessionVerb.Quit || RunsWhileBusy(command.Verb))
+        if (command.Verb == SessionVerb.Quit || RunsWhileBusy(command.Verb) || AppliesNextTurn(command))
         {
             return false;
         }
 
         RefuseCommand(input);
         return true;
+    }
+
+    /// <summary>
+    /// Commands whose setting is recorded during a turn or compaction and
+    /// applied on the next turn. Approval qualifies only for the level form;
+    /// its reviewer forms keep their own busy rules.
+    /// </summary>
+    internal static bool AppliesNextTurn(SessionCommand command) =>
+        command.Verb switch
+        {
+            SessionVerb.Plan or SessionVerb.Mode or SessionVerb.Thinking or SessionVerb.Tier
+                or SessionVerb.Speed or SessionVerb.Context or SessionVerb.Model => true,
+            SessionVerb.Approval => IsApprovalLevel(command.Argument),
+            _ => false
+        };
+
+    private static bool IsApprovalLevel(string argument) =>
+        !ExtendedApprovalArguments.IsExtendedCommand(argument)
+        && !ApprovalModelArguments.IsModelCommand(argument)
+        && !ApprovalThinkingArguments.IsThinkingCommand(argument)
+        && !ApprovalSlotArguments.TryParse(argument, out _);
+
+    private void RunNextTurnSetting(SessionCommand command)
+    {
+        switch (command.Verb)
+        {
+            case SessionVerb.Plan:
+                var busy = SettingsBusy;
+                TogglePlan();
+                if (!busy)
+                {
+                    Note(ModeLabel.For(_planMode));
+                }
+
+                break;
+            case SessionVerb.Mode:
+                ChangeMode(command.Argument);
+                break;
+            case SessionVerb.Approval:
+                ChangeApproval(command.Argument);
+                break;
+            case SessionVerb.Thinking:
+                ChangeThinking(command.Argument);
+                break;
+            case SessionVerb.Tier:
+                ChangeCatalogSlot(command.Argument, serviceTier: true);
+                break;
+            case SessionVerb.Speed:
+                ChangeCatalogSlot(command.Argument, serviceTier: false);
+                break;
+            case SessionVerb.Context:
+                ChangeContext(command.Argument);
+                break;
+            case SessionVerb.Model:
+                ChangeModel(command.Argument);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(command), command.Verb, "The command does not apply next turn.");
+        }
     }
 
     private bool QuitDuringCompaction(string input) =>
@@ -8795,7 +9239,16 @@ public sealed class CodingSession : ITurnObserver
         CheckpointSession();
         using (BeginOrigin(null))
         {
-            _turnTask = ExecuteTurnAsync(turnSource.Token);
+            var capture = _inputCapture.Value;
+            _inputCapture.Value = null;
+            try
+            {
+                _turnTask = ExecuteTurnAsync(turnSource.Token);
+            }
+            finally
+            {
+                _inputCapture.Value = capture;
+            }
         }
     }
 
@@ -9183,6 +9636,7 @@ public sealed class CodingSession : ITurnObserver
     /// <summary>
     /// Collects the finished turn: records its transcript, compacts when over
     /// budget, saves the session, and publishes <see cref="TurnFinished"/>.
+    /// Settings chosen during the turn apply afterwards.
     /// </summary>
     public async Task FinishTurnAsync(CancellationToken cancellationToken = default)
     {
@@ -9191,11 +9645,17 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        await CollectTurnAsync(_turnTask, cancellationToken);
+        ApplyPendingSettings();
+    }
+
+    private async Task CollectTurnAsync(Task<TurnResult> turnTask, CancellationToken cancellationToken)
+    {
         TurnResult? result = null;
         string? failure = null;
         try
         {
-            result = await _turnTask;
+            result = await turnTask;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -9340,6 +9800,7 @@ public sealed class CodingSession : ITurnObserver
     private void Error(string text)
     {
         CloseRecallWindow();
+        _inputCapture.Value?.Fail(text);
         Publish(new ErrorWritten(text));
     }
 
@@ -9499,7 +9960,17 @@ public sealed class CodingSession : ITurnObserver
         }
 
         Publish(CaptureSide(announce: true));
-        _sideTask = RunSideAsync(sideBase, prior, question, reasoning, generation, token);
+        // The side question reports through events, not the input that asked it.
+        var capture = _inputCapture.Value;
+        _inputCapture.Value = null;
+        try
+        {
+            _sideTask = RunSideAsync(sideBase, prior, question, reasoning, generation, token);
+        }
+        finally
+        {
+            _inputCapture.Value = capture;
+        }
     }
 
     private async Task<IReadOnlyList<ChatItem>?> PrepareSideConversationAsync(

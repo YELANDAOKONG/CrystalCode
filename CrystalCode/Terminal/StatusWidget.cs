@@ -31,6 +31,12 @@ internal static class StatusWidget
             layout.AddRow(ActivityCard(status), ToolsCard(status));
         }
 
+        var pending = PendingSettingsText.Rows(status.Pending);
+        if (pending.Count > 0)
+        {
+            layout.AddRow(Card("Next turn", pending), new Text(string.Empty));
+        }
+
         return new Padder(
             new Rows(
                 new Markup($"[{Theme.Heading}]Status{(full ? " · Full" : string.Empty)}[/]"),

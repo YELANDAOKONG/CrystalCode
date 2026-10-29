@@ -44,6 +44,7 @@ public sealed class ServerParityTests
         ["TogglePlan"] = "POST /mode toggle-plan",
         ["CycleMode"] = "POST /mode cycle",
         ["TrySetMode"] = "POST /mode set",
+        ["PendingSettings"] = "chrome.pending, the snapshot, and POST /mode",
         ["SetVerbose"] = "POST /verbose",
         ["NotifyDraftChanged"] = "PUT /draft",
         ["CloseAsync"] = "ServerSession shutdown",

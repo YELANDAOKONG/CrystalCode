@@ -63,7 +63,47 @@ public static class WireWriter
         writer.WriteString("serviceTier", chrome.ServiceTier);
         writer.WriteString("speed", chrome.Speed);
         writer.WriteBoolean("agentsEnabled", chrome.AgentsEnabled);
+        Pending(writer, "pending", chrome.Pending);
         writer.WriteEndObject();
+    }
+
+    /// <summary>
+    /// Settings chosen during a turn that apply on the next turn. The object
+    /// is always present; a key appears only for a setting that waits. A
+    /// pending tier or speed of <c>unset</c> clears that slot.
+    /// </summary>
+    public static void Pending(Utf8JsonWriter writer, string name, SessionPendingSettings? pending)
+    {
+        writer.WriteStartObject(name);
+        if (pending is not null)
+        {
+            if (pending.Provider is { } provider && pending.Model is { } model)
+            {
+                writer.WriteString("provider", provider);
+                writer.WriteString("model", model);
+            }
+
+            if (pending.ContextWindow is int window)
+            {
+                writer.WriteNumber("contextWindow", window);
+            }
+
+            PendingValue(writer, "serviceTier", pending.ServiceTier);
+            PendingValue(writer, "speed", pending.Speed);
+            PendingValue(writer, "thinking", pending.Thinking);
+            PendingValue(writer, "mode", pending.Mode);
+            PendingValue(writer, "approval", pending.Approval);
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void PendingValue(Utf8JsonWriter writer, string name, string? value)
+    {
+        if (value is not null)
+        {
+            writer.WriteString(name, value);
+        }
     }
 
     public static void Preferences(Utf8JsonWriter writer, string name, SessionPreferences? preferences)
@@ -559,6 +599,7 @@ public static class WireWriter
         Optional(writer, "microCompaction", status.MicroCompaction);
         Optional(writer, "retry", status.Retry);
         Optional(writer, "approvalRetry", status.ApprovalRetry);
+        Pending(writer, "pending", status.Pending);
         writer.WriteEndObject();
     }
 

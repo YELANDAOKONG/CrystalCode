@@ -209,6 +209,40 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task Input_DuringATurnReportsPendingSettingsAndRefusals()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        var plan = await fixture.PostAsync(fixture.Http, "/input", new { text = "/approval edit" });
+        var refused = await fixture.PostAsync(fixture.Http, "/input", new { text = "/cd .." });
+        var mode = await fixture.PostAsync(fixture.Http, "/mode", new { action = "set", name = "plan" });
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+
+        Assert.True(plan.GetProperty("accepted").GetBoolean());
+        Assert.True(plan.GetProperty("pending").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, plan.GetProperty("error").ValueKind);
+        Assert.False(refused.GetProperty("accepted").GetBoolean());
+        Assert.Contains("Finish the current turn", refused.GetProperty("error").GetString(), StringComparison.Ordinal);
+        Assert.Equal("work", mode.GetProperty("mode").GetString());
+        Assert.Equal("plan", mode.GetProperty("pending").GetProperty("mode").GetString());
+        var chrome = snapshot.GetProperty("chrome");
+        Assert.Equal("default", chrome.GetProperty("approval").GetString());
+        Assert.Equal("edit", chrome.GetProperty("pending").GetProperty("approval").GetString());
+        Assert.Equal("plan", chrome.GetProperty("pending").GetProperty("mode").GetString());
+
+        await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+        await events.WaitForAsync("chrome.changed", value =>
+            value.GetProperty("data").GetProperty("chrome").GetProperty("approval").GetString() == "edit"
+            && value.GetProperty("data").GetProperty("chrome").GetProperty("mode").GetString() == "plan"
+            && !value.GetProperty("data").GetProperty("chrome").GetProperty("pending").EnumerateObject().Any());
+    }
+
+    [Fact]
     public async Task Recall_ReturnsTheMessageToItsSender()
     {
         var model = new ScriptedModel(true) { Silent = true };

@@ -215,10 +215,12 @@ internal static class Extensions
     {
         var plan = session.PlanMode;
         var custom = session.CustomMode;
+        var pending = session.PendingSettings;
         return Result(writer =>
         {
             writer.WriteString("mode", custom ?? (plan ? "plan" : "work"));
             writer.WriteBoolean("planMode", plan);
+            CrystalWire.Pending(writer, "pending", pending);
         });
     }
 

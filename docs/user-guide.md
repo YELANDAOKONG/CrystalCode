@@ -1165,8 +1165,19 @@ run in the order they were typed. Each of those three drops any follow-up
 text still waiting in the panel; the panel updates and does not keep it.
 During compaction, `/clear`, `/resume`, and `/fork` are refused
 instead, with the same kind of message as `/cd` while a turn is running.
-Other commands that change the session, workspace, or model are refused for
-that same reason. `/status`, `/help`, `/todos`, `/child`, and other commands that only
+Other commands that change the session or workspace are refused for
+that same reason.
+
+Mode (`/plan`, `/mode`, Tab), the approval level, `/thinking`, `/tier`,
+`/speed`, `/context`, and `/model` work while a turn or compaction runs, but
+the running turn keeps its current settings. The note ends with
+`Applies next turn`, and the status bar shows the waiting values, for example
+`Next: Plan, Approval Full`. They apply when the turn ends, including an
+interrupted one, before a queued follow-up is sent, and only then are they
+saved to `config.json`. The last choice wins; choosing the current value
+again cancels the waiting one. `/status` lists them under Next turn. A
+stricter approval level chosen this way does not restrict the running turn;
+interrupt it if you need that now. `/status`, `/help`, `/todos`, `/child`, and other commands that only
 report state or adjust the display run immediately. `/agents` with no
 arguments lists; its other forms are refused during a turn. `/quit` still exits.
 
@@ -1523,10 +1534,10 @@ because token estimates and large tool results can exceed the budget.
 
 ## Model
 
-`/model` lists configured models, or selects one for the next idle
+`/model` lists configured models, or selects one for the next
 turn. The conversation stays in place; only the
-status bar, context window, and chat client change. The command is
-refused while a turn is running.
+status bar, context window, and chat client change. A choice made while a
+turn is running applies when that turn ends.
 
 - `/model <model>` uses the current provider. A name that is unique in
   the catalog still works. A provider with one model can be selected
@@ -1568,9 +1579,9 @@ Submitting returns the transcript viewport to the latest output.
 | `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model; `thinking`, `tier`, and `speed` cycle or set its gear and slots; `extended` configures extended approval |
 | `/attach` | | Attach an image from the workspace |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
-| `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count; refused during a turn or compaction |
-| `/tier` | | Cycle the model's service-tier tokens, including not sending one, or select a listed token. `default` is sent when the model lists it. Refused during a turn or compaction |
-| `/speed` | `/fast` | Cycle the model's speed tokens, including not sending one, or select a listed token. Refused during a turn or compaction |
+| `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count. During a turn or compaction it applies on the next turn |
+| `/tier` | | Cycle the model's service-tier tokens, including not sending one, or select a listed token. `default` is sent when the model lists it. During a turn or compaction it applies on the next turn |
+| `/speed` | `/fast` | Cycle the model's speed tokens, including not sending one, or select a listed token. During a turn or compaction it applies on the next turn |
 | `/tokens` | | Toggle estimated progress tokens, or set `on` / `off` |
 | `/verbose` | | Show or set tool, command, result, call, approval, review, or thinking detail: `tools`, `commands`, `results`, `calls`, `approvals`, `review`, `thinking`, then `on` or `off`. `results` is the parent of `tools` and `commands`. `calls` hides Tool cards and does not change results |
 | `/model` | | List catalog models, or set `model` / `provider model` |

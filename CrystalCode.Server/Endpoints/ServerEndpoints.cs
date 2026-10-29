@@ -92,6 +92,9 @@ public static class ServerEndpoints
                 var result = await runner.SubmitAsync(text, client);
                 return RequestOutcome.Ok(Json.Write(writer =>
                 {
+                    writer.WriteBoolean("accepted", result.Accepted);
+                    writer.WriteBoolean("pending", result.Pending);
+                    WireWriter.Optional(writer, "error", result.Error);
                     writer.WriteBoolean("turnActive", result.TurnActive);
                     writer.WriteBoolean("quit", result.Quit);
                 }));
@@ -176,6 +179,7 @@ public static class ServerEndpoints
     {
         writer.WriteBoolean("planMode", session.PlanMode);
         writer.WriteString("mode", session.CustomMode ?? (session.PlanMode ? "plan" : "work"));
+        WireWriter.Pending(writer, "pending", session.PendingSettings);
     }
 
     internal static IResult Direct(
