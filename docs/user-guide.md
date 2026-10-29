@@ -1030,7 +1030,7 @@ tool set, plugin, and MCP server as it starts loading. Keys typed there are
 discarded; Ctrl+C cancels startup and exits. Later reloads (`/tools`,
 `/plugins`, `/cd`, `/space`) keep the frame drawing and show
 `Loading Tools  <name>` or `Loading Plugins  <name>` on the progress row.
-You can keep typing, but Enter, F6 send, and F7 wait until loading ends, so
+You can keep typing, but Enter, F6, and F7 wait until loading ends, so
 the draft is kept. Ctrl+C cancels a plain `/tools reload` or
 `/plugins reload` and keeps the tools that were already loaded.
 

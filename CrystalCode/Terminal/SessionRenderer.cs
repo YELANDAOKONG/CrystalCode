@@ -111,7 +111,7 @@ public sealed class SessionRenderer : IDisposable
 
     /// <summary>
     /// True while operator tools or plugins load in a live session. The
-    /// composer stays editable, but Enter, F6 sends, and F7 do nothing, so a
+    /// composer stays editable, but Enter, F6, and F7 do nothing, so a
     /// keystroke never becomes a queued turn or an error and the draft stays.
     /// </summary>
     internal bool HoldSubmission

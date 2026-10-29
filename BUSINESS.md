@@ -331,7 +331,7 @@ separate library with no terminal code. The product can:
   Keys typed there are discarded. In a live session (`/tools`, `/plugins`,
   `/cd`, `/space`, resume into another workspace) the frame keeps drawing,
   the progress row names the item, and the composer stays editable, but
-  Enter, F6 send, and F7 do nothing until loading ends, so nothing typed
+  Enter, F6, and F7 do nothing until loading ends, so nothing typed
   becomes a queued turn or an error and the draft stays. Ctrl+C cancels a
   plain `/tools reload` or `/plugins reload` between items and keeps the
   previous catalog; other reloads run to the end because their settings
