@@ -542,6 +542,19 @@ implemented in the current build.
   reserve a configuration field, command, public type, or backend name, and
   do not store a search key in source, logs, or on a command line. Approval,
   trust, the workspace fence, and `ToolInvocationPolicy` stay as they are.
+- Session topic. The direction is a short name for a session. `topic.md`
+  (`TopicNamingPrompt`) is a named prompt today, but nothing calls it, so no
+  session has a topic. Who sets it (the model after the first turn, the
+  operator, or both), which model generates it and what that costs, whether a
+  name and a topic are one thing, where it is saved, and how an older session
+  without one reads are not defined. Do not reserve a configuration field,
+  command, public type, event, wire field, or file format. Approval, trust,
+  and `ToolInvocationPolicy` stay as they are. Current behavior stands: a
+  session has an id and no topic.
+- A `topic` custom status-line field. The direction is to show the session
+  topic on the custom status line. It depends on the session topic item above
+  and is not defined before it. Do not add the field name until the topic
+  exists.
 
 ### Medium priority
 
