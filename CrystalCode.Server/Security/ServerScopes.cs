@@ -70,6 +70,7 @@ public static class ServerScopes
             SessionVerb.Todos => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Attach => ServerScope.Operate,
             SessionVerb.Quick => ServerScope.Operate,
+            SessionVerb.Edit => ServerScope.Operate,
             SessionVerb.Export => ServerScope.Operate,
             SessionVerb.Unknown => ServerScope.Operate,
             SessionVerb.Approval => ServerScope.Admin,

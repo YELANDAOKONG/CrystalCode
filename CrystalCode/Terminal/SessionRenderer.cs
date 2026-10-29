@@ -63,6 +63,7 @@ public sealed class SessionRenderer : IDisposable
     private QuickPromptPicker? _quickPicker;
     private bool _quickOpenRequested;
     private bool _quickSubmission;
+    private FullScreenEditor? _editor;
 
     public Func<CancellationToken, Task<QuickPromptCatalog>>? LoadQuickPromptsAsync { get; set; }
     public Func<string, CancellationToken, Task>? QueueQuickPromptAsync { get; set; }
@@ -1425,6 +1426,7 @@ public sealed class SessionRenderer : IDisposable
             {
                 return _composer.IsEmpty
                     && _quickPicker is null
+                    && _editor is null
                     && !_fullPageOverlay
                     && _overlayWidget is null
                     && _modalOverlay.Count == 0
@@ -1477,6 +1479,13 @@ public sealed class SessionRenderer : IDisposable
                 PaintUnlocked(force: true);
                 return true;
             }
+            if (_editor is not null)
+            {
+                _editor = null;
+                PaintUnlocked(force: true);
+                return true;
+            }
+
             if (_fullPageOverlay)
             {
                 CloseFullPageUnlocked();
@@ -1895,6 +1904,30 @@ public sealed class SessionRenderer : IDisposable
             return null;
         }
 
+        if (_editor is { } editor)
+        {
+            editor.Handle(item);
+            if (editor.Closed)
+            {
+                _editor = null;
+                if (editor.Applied)
+                {
+                    _composer.ReplaceSubmitted(editor.SubmissionText);
+                    OnComposerEdited?.Invoke(_composer.SubmissionText);
+                    RefreshPickerUnlocked();
+                }
+            }
+
+            return null;
+        }
+
+        if (!_fullPageOverlay && !_sideOpen && !ChildViewActive
+            && item is InputKey { Key: ConsoleKey.F8, Modifiers: ConsoleModifiers.None })
+        {
+            OpenEditorUnlocked(_composer.SubmissionText);
+            return null;
+        }
+
         if (ChildSessionsEnabled && !_fullPageOverlay && !_sideOpen
             && item is InputKey { Key: ConsoleKey.F7, Modifiers: ConsoleModifiers.None })
         {
@@ -2056,6 +2089,15 @@ public sealed class SessionRenderer : IDisposable
                     return null;
                 }
 
+                if (IsEditCommand(text))
+                {
+                    _composer.Clear();
+                    _picker = null;
+                    OnComposerEdited?.Invoke(_composer.SubmissionText);
+                    OpenEditorUnlocked(string.Empty);
+                    return null;
+                }
+
                 _composer.RememberAndClear();
                 _picker = null;
                 _scrollBack = 0;
@@ -2086,6 +2128,14 @@ public sealed class SessionRenderer : IDisposable
 
         return null;
     }
+
+    private void OpenEditorUnlocked(string submitted) =>
+        _editor = new FullScreenEditor(submitted, _composer.PlanMode, _composer.CustomMode);
+
+    private static bool IsEditCommand(string text) =>
+        SessionCommand.TryParse(text.Trim(), out var command)
+        && command.Verb == SessionVerb.Edit
+        && command.Argument.Length == 0;
 
     private static bool IsQuickCommand(string text) =>
         SessionCommand.TryParse(text.Trim(), out var command)
@@ -2242,6 +2292,18 @@ public sealed class SessionRenderer : IDisposable
             _lastPaint = now;
             return;
         }
+        if (_editor is not null && !_composerPaused && _overlayWidget is null && _modalOverlay.Count == 0)
+        {
+            var editorView = _editor.Paint(width, height);
+            _painter.PaintFrame(editorView.Lines, width, height,
+                resetFrame: width != _paintedWidth || height != _paintedHeight,
+                cursor: (editorView.CursorRow, editorView.CursorColumn));
+            _paintedWidth = width;
+            _paintedHeight = height;
+            _lastPaint = now;
+            return;
+        }
+
         if (_fullPageOverlay && _overlayWidget is not null)
         {
             PaintFullPageUnlocked(width, height, now);

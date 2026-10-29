@@ -253,6 +253,8 @@ separate library with no terminal code. The product can:
   exits. After the window ends, or when a follow-up is queued, Ctrl+C only
   cancels and the message stays. A message whose trusted image markers are no
   longer held is not returned. `crystal run` does not return a message this way;
+- edit a long prompt in a full-screen editor with F8 or `/edit` in the
+  terminal. The edit returns to the composer and is never sent automatically;
 - open quick prompts with F6 or `/quick` (alias `/shortcuts`) from user-level `~/.crystal/shortcuts/` (or the
   selected Home). Each open reloads direct UTF-8 `.md` files; the filename is
   the name and the full body is the prompt. Search matches names and bodies,

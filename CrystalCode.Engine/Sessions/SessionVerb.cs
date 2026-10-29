@@ -42,6 +42,7 @@ public enum SessionVerb
     Mcp,
     Attach,
     Quick,
+    Edit,
     Export,
     Verbose,
     Quit,

@@ -496,6 +496,7 @@ public sealed class InputDecoder
             5 => ConsoleKey.PageUp,
             6 => ConsoleKey.PageDown,
             17 => ConsoleKey.F6,
+            19 => ConsoleKey.F8,
             _ => default
         };
         if (key == default)

@@ -27,6 +27,8 @@ public sealed class ComposerBuffer
     /// </summary>
     public string? CustomMode { get; set; }
 
+    public string Placeholder { get; set; } = "Ask anything... (Tab: switch mode, /: commands, ?: help)";
+
     public string Text => _text.ToString();
 
     public const char ImageMarkerPrefix = '\u2063';
@@ -361,9 +363,8 @@ public sealed class ComposerBuffer
             {
                 if (string.IsNullOrEmpty(text))
                 {
-                    var placeholder = "Ask anything... (Tab: switch mode, /: commands, ?: help)";
                     var availableWidth = Math.Max(width - promptColumns, 0);
-                    var truncatedPlaceholder = TextWidth.Truncate(placeholder, availableWidth);
+                    var truncatedPlaceholder = TextWidth.Truncate(Placeholder, availableWidth);
                     var plain = promptPlain + truncatedPlaceholder;
                     var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
                         + $"[{Theme.Chrome}] > [/]"

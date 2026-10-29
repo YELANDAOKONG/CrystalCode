@@ -74,14 +74,33 @@ public sealed class ScreenPainter
         _previous = [.. frame];
     }
 
-    public void PaintFrame(IReadOnlyList<PaintLine> frame, int width, int height, bool resetFrame)
+    /// <summary>
+    /// Paints a full-screen frame. The cursor stays hidden unless a zero-based
+    /// row and column are given.
+    /// </summary>
+    public void PaintFrame(
+        IReadOnlyList<PaintLine> frame,
+        int width,
+        int height,
+        bool resetFrame,
+        (int Row, int Column)? cursor = null)
     {
         ArgumentNullException.ThrowIfNull(frame);
         AnsiConsole.Write(new ControlCode(BeginSynchronizedUpdate));
         try
         {
             WriteFrame(frame, width, height, resetFrame);
-            AnsiConsole.Cursor.Hide();
+            if (cursor is { } position)
+            {
+                AnsiConsole.Cursor.SetPosition(
+                    Math.Clamp(position.Column + 1, 1, width),
+                    Math.Clamp(position.Row + 1, 1, height));
+                AnsiConsole.Cursor.Show();
+            }
+            else
+            {
+                AnsiConsole.Cursor.Hide();
+            }
         }
         finally
         {

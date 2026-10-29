@@ -328,6 +328,14 @@ pending images at enqueue time so later quick sends cannot steal them. Quick
 queue entries do not request cancellation after tools; explicit queue release
 and ordinary follow-ups retain their existing interrupt behavior.
 
+The full-screen editor is terminal-only. Display Composer owns
+`FullScreenEditor`, which edits an isolated `ComposerBuffer` seeded from the
+composer's submission text, so trusted image markers survive. F8 and a bare
+`/edit` open it outside modal prompts, the side question, and child views.
+F8 or Ctrl+S copies the text back into the composer without sending it. Esc
+and Ctrl+C discard it. In the editor Enter, Tab, and `?` are text. The engine
+only maps `SessionVerb.Edit` to a note for other front ends.
+
 Provider types live under `CrystalCode.Providers` plus one folder per wire
 family (`DeepSeek`, `OpenAI`, `Responses`, `Anthropic`, `Gemini`, and `Ollama`). Shared
 OpenAI-compatible Chat Completions request and stream parsing lives in
