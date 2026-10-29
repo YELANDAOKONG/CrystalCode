@@ -248,6 +248,15 @@ it speculatively, and do not reserve types or configuration for it.
   unanswered questions when a turn ends, whether Plan gets it, and how Server,
   Bridge, child Agents, and `crystal run` treat it are not defined. Do not
   reserve a tool name, command, public type, event, or wire field.
+- Date and time status line fields (`date`, `time`, `datetime`). Not decided.
+  The status line repaints on events and on the progress spinner, not on a
+  timer, so a clock would stall while the session is idle. A later decision
+  must define the repaint mechanism and its cost, whether the user can set
+  the format string and the time zone (and where that setting lives), and how
+  a theme gauge colors them. It is a display-only concern: the value would
+  come from the system clock in the front end, not from `SessionChrome`.
+  Nothing is added to `StatusLineSettings.AvailableFields` for it yet. Do not
+  reserve a field name, configuration field, or gauge name.
 - A `/debug` option. Not decided, including whether it exists and what it
   covers. Do not reserve a command, configuration field, or public type for it.
 - More hook methods, added later on the existing hook interfaces. They are

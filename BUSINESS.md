@@ -799,6 +799,15 @@ Child Agents and `crystal run` would not be able to ask the operator, as
 today. No change is scheduled. Do not reserve a tool name, command, public
 type, event, or wire field.
 
+Date and time status line fields are under consideration and are not
+decided. The status line repaints on session events and the progress spinner,
+not on a timer, so a clock field would stop updating while the session is
+idle. Whether the fields exist, the repaint mechanism, whether the user sets
+the format and the time zone, and how a theme colors them are not defined.
+The custom status line has no date or time field today, and `elapsed` is the
+time spent on the current turn, not the wall clock. No change is scheduled.
+Do not reserve a field name, configuration field, or gauge name.
+
 More hook methods will be added later on the existing hook interfaces, and
 are not reserved as empty types in advance. Whether plugins declare
 dependencies on one another, and related loading questions, are under
