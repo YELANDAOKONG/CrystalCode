@@ -25,7 +25,9 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? speedArguments = null,
         IReadOnlyList<SlashCompletion>? approvalTierArguments = null,
         IReadOnlyList<SlashCompletion>? approvalSpeedArguments = null,
-        IReadOnlyList<SlashCompletion>? extendedApprovalArguments = null)
+        IReadOnlyList<SlashCompletion>? extendedApprovalArguments = null,
+        IReadOnlyList<SlashCompletion>? compactionTierArguments = null,
+        IReadOnlyList<SlashCompletion>? compactionSpeedArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -49,6 +51,8 @@ public static class SlashMenu
                 contextArguments,
                 compactionModelArguments,
                 compactionThinkingArguments,
+                compactionTierArguments,
+                compactionSpeedArguments,
                 tierArguments,
                 speedArguments);
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
@@ -79,6 +83,8 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? contextArguments,
         IReadOnlyList<SlashCompletion>? compactionModelArguments,
         IReadOnlyList<SlashCompletion>? compactionThinkingArguments,
+        IReadOnlyList<SlashCompletion>? compactionTierArguments,
+        IReadOnlyList<SlashCompletion>? compactionSpeedArguments,
         IReadOnlyList<SlashCompletion>? tierArguments,
         IReadOnlyList<SlashCompletion>? speedArguments)
     {
@@ -107,7 +113,9 @@ public static class SlashMenu
             return CompactionArguments(
                 spec.Arguments,
                 compactionModelArguments,
-                compactionThinkingArguments);
+                compactionThinkingArguments,
+                compactionTierArguments,
+                compactionSpeedArguments);
         }
 
         if (spec.Verb == SessionVerb.Thinking && thinkingArguments is not null)
@@ -207,7 +215,9 @@ public static class SlashMenu
     private static IReadOnlyList<SlashCompletion> CompactionArguments(
         IReadOnlyList<string>? arguments,
         IReadOnlyList<SlashCompletion>? modelArguments,
-        IReadOnlyList<SlashCompletion>? thinkingArguments)
+        IReadOnlyList<SlashCompletion>? thinkingArguments,
+        IReadOnlyList<SlashCompletion>? tierArguments,
+        IReadOnlyList<SlashCompletion>? speedArguments)
     {
         if (arguments is null || arguments.Count == 0)
         {
@@ -221,6 +231,8 @@ public static class SlashMenu
             {
                 "model" => modelArguments,
                 "thinking" => thinkingArguments,
+                "tier" => tierArguments,
+                "speed" => speedArguments,
                 "summary" or "auto" or "micro" => SummarySwitch,
                 _ => null
             };
@@ -229,6 +241,8 @@ public static class SlashMenu
                 "full" => "Summarize the whole conversation, including the latest turn",
                 "model" => "Show or set the compaction model; on and off switch it",
                 "thinking" => "Cycle or set the compaction thinking gear",
+                "tier" => "Cycle or set the compaction model service tier",
+                "speed" => "Cycle or set the compaction model speed",
                 "summary" => "Toggle the summary printed after /compact",
                 "auto" => "Toggle the summary printed after automatic compaction",
                 "micro" => "Toggle removal of old tool results before each model call",

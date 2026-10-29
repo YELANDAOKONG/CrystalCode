@@ -577,7 +577,9 @@ model or provider does not support image input. Declared `audioInput` or
 `imageInput`. It sends that file to a side multimodal client with the
 image-description prompt and returns the reply as text. The side
 request has no tools, is not written into the session transcript, and uses
-`imageModel.thinkingEffort` through the same gear mapping as the host.
+`imageModel.thinkingEffort` through the same gear mapping as the host. Its
+optional `imageModel.serviceTier` and `imageModel.speed` apply to that client
+only; unset follows the per-model selection, as for a reviewer.
 `view_image` is registered only for an image-capable turn. It returns the
 file as `ImageContent` so the current model sees it on the next round.
 Both follow the `read` path fence. A missing image-model credential fails
@@ -1608,15 +1610,18 @@ a turn is running. `/compact full` takes no argument. It folds the whole convers
 the latest user turn, into the summary and keeps no tail, so the model
 context becomes the live system prompt and the summary. It follows the same
 display rules as `/compact` and prints `Nothing earlier to compact` when the
-session has no conversation. `/compact model` and `/compact thinking` show or
-set the optional summarizer and its gear. `/compact summary` toggles
+session has no conversation. `/compact model`, `/compact thinking`,
+`/compact tier`, and `/compact speed` show or set the optional summarizer,
+its gear, and its own service tier and speed. `/compact summary` toggles
 `showCompactionSummary`, and `/compact auto` (alias `automatic`) toggles
 `showAutomaticCompactionSummary`. `/compact micro` toggles microcompaction.
 Any of those commands accepts `on` or `off`, writes `config.json`, and does
 not summarize. Any other argument is rejected.
 `compactionModel` in `config.json` is `enabled`, `provider`, `model`,
-and optional `thinkingEffort`. An omitted object means off, and
-`enabled: false` keeps a stored provider, model, and gear unused.
+and optional `thinkingEffort`, `serviceTier`, and `speed`. An omitted
+object means off, and `enabled: false` keeps a stored provider, model, gear,
+and slots unused. A slot applies to the summarizer only, must be listed by
+its model, and falls back to the per-model selection when unset.
 While off, the summary request uses the session model and omits
 reasoning. It does not reuse the session client, because that client
 keeps the turn output cap. The host opens a summary client with the
@@ -1635,7 +1640,8 @@ takes the existing path that does not write one. `/status` adds a
 Compaction model row only while the switch is on.
 `crystal`, `crystal space`, and `crystal run` accept
 `--compaction-model on|off`, `--compaction-provider`,
-`--compaction-model-id`, and `--compaction-thinking` for one process.
+`--compaction-model-id`, `--compaction-thinking`, `--compaction-tier`, and
+`--compaction-speed` for one process.
 Those flags are not written to `config.json`. `on` needs a saved
 selection or a provider and model id on the same command.
 User and assistant text in the folded head are replaced

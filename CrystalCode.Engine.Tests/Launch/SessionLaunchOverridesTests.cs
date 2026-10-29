@@ -236,6 +236,12 @@ public sealed class SessionLaunchOverridesTests
         Assert.False(geared.CompactionModel.Enabled);
         Assert.Equal(ThinkingSelection.Off, geared.CompactionModel.ThinkingEffort);
 
+        var slotted = AssertApplied(
+            HarnessSettings.CreateDefault(),
+            new SessionLaunchOptions { CompactionTier = "priority", CompactionSpeed = "fast" });
+        Assert.Equal("priority", slotted.CompactionModel.ServiceTier);
+        Assert.Equal("fast", slotted.CompactionModel.Speed);
+
         Assert.False(SessionLaunchOverrides.TryApply(
             HarnessSettings.CreateDefault(),
             new SessionLaunchOptions { CompactionModel = "on" },

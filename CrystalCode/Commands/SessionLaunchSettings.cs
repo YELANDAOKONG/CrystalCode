@@ -83,6 +83,12 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--compaction-thinking <EFFORT>")]
     public string? CompactionThinking { get; init; }
 
+    [CommandOption("--compaction-tier <TOKEN>")]
+    public string? CompactionTier { get; init; }
+
+    [CommandOption("--compaction-speed <TOKEN>")]
+    public string? CompactionSpeed { get; init; }
+
     [CommandOption("--plan")]
     public bool Plan { get; init; }
 
@@ -188,6 +194,8 @@ public class SessionLaunchSettings : CommandSettings
             CompactionProvider = CompactionProvider,
             CompactionModelId = CompactionModelId,
             CompactionThinking = CompactionThinking,
+            CompactionTier = CompactionTier,
+            CompactionSpeed = CompactionSpeed,
             Plan = Plan,
             Work = Work,
             Mode = Mode,

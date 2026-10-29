@@ -77,6 +77,18 @@ public static class SessionLaunchOverrides
                     next.CompactionModel.WithThinkingEffort(effort));
             }
 
+            if (request.CompactionTier is not null)
+            {
+                next = next.WithCompactionModel(next.CompactionModel.WithServiceTier(
+                    Token(request.CompactionTier, "Compaction service tier")));
+            }
+
+            if (request.CompactionSpeed is not null)
+            {
+                next = next.WithCompactionModel(next.CompactionModel.WithSpeed(
+                    Token(request.CompactionSpeed, "Compaction speed")));
+            }
+
             if (request.Thinking is not null)
             {
                 next = next.WithThinkingEffort(
@@ -541,11 +553,16 @@ public static class SessionLaunchOverrides
             throw new ArgumentException(exception.Message, exception);
         }
 
+        // A stored tier or speed belongs to the stored model only.
+        var sameModel = string.Equals(current.CompactionModel.Provider, provider.Value, StringComparison.Ordinal)
+            && string.Equals(current.CompactionModel.Model, model, StringComparison.Ordinal);
         return new CompactionModelSettings(
             true,
             provider.Value,
             model,
-            current.CompactionModel.ThinkingEffort);
+            current.CompactionModel.ThinkingEffort,
+            sameModel ? current.CompactionModel.ServiceTier : null,
+            sameModel ? current.CompactionModel.Speed : null);
     }
 
     private static TurnLimits ParseBudget(HarnessSettings current, SessionLaunchOptions request)

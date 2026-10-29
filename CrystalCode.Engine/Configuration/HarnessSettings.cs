@@ -247,9 +247,10 @@ public sealed record HarnessSettings
 
         if (CompactionModel.Enabled)
         {
+            ModelSettings compactionModelSettings;
             try
             {
-                _ = catalog.GetModel(
+                compactionModelSettings = catalog.GetModel(
                     new ProviderName(CompactionModel.Provider!),
                     CompactionModel.Model!);
             }
@@ -257,6 +258,12 @@ public sealed record HarnessSettings
             {
                 throw new InvalidOperationException(exception.Message, exception);
             }
+
+            RequireSlots(
+                compactionModelSettings,
+                CompactionModel.ServiceTier,
+                CompactionModel.Speed,
+                "Compaction model");
         }
 
         RequireImageModel(catalog, ImageModel);
@@ -781,16 +788,58 @@ public sealed record HarnessSettings
             throw new InvalidOperationException("The reviewer has no model selection.");
         }
 
-        var provider = new ProviderName(reviewer.Provider!);
-        var selected = WithSelection(provider, reviewer.Model!);
-        if (reviewer.ServiceTier is not null)
+        return ForModel(
+            new ProviderName(reviewer.Provider!),
+            reviewer.Model!,
+            reviewer.ServiceTier,
+            reviewer.Speed);
+    }
+
+    /// <summary>
+    /// Selects a side model's provider and model, then applies its own service
+    /// tier and speed. An unset slot keeps the per-model selection.
+    /// </summary>
+    public HarnessSettings ForCompaction(CompactionModelSettings compaction)
+    {
+        ArgumentNullException.ThrowIfNull(compaction);
+        if (!compaction.HasSelection)
         {
-            selected = selected.WithTier(provider, reviewer.Model!, reviewer.ServiceTier);
+            throw new InvalidOperationException("The compaction model has no model selection.");
         }
 
-        if (reviewer.Speed is not null)
+        return ForModel(
+            new ProviderName(compaction.Provider!),
+            compaction.Model!,
+            compaction.ServiceTier,
+            compaction.Speed);
+    }
+
+    public HarnessSettings ForImage(ImageModelSettings image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        if (!image.IsConfigured)
         {
-            selected = selected.WithSpeed(provider, reviewer.Model!, reviewer.Speed);
+            throw new InvalidOperationException("The image model has no model selection.");
+        }
+
+        return ForModel(
+            new ProviderName(image.Provider!),
+            image.Model!,
+            image.ServiceTier,
+            image.Speed);
+    }
+
+    private HarnessSettings ForModel(ProviderName provider, string model, string? serviceTier, string? speed)
+    {
+        var selected = WithSelection(provider, model);
+        if (serviceTier is not null)
+        {
+            selected = selected.WithTier(provider, model, serviceTier);
+        }
+
+        if (speed is not null)
+        {
+            selected = selected.WithSpeed(provider, model, speed);
         }
 
         return selected;
@@ -1064,13 +1113,18 @@ public sealed record HarnessSettings
             throw new InvalidOperationException(exception.Message, exception);
         }
 
-        if (reviewer.ServiceTier is not null && !CatalogSlots.Contains(model.ServiceTiers, reviewer.ServiceTier))
+        RequireSlots(model, reviewer.ServiceTier, reviewer.Speed, label);
+    }
+
+    private static void RequireSlots(ModelSettings model, string? serviceTier, string? speed, string label)
+    {
+        if (serviceTier is not null && !CatalogSlots.Contains(model.ServiceTiers, serviceTier))
         {
             throw new InvalidOperationException(
                 Unavailable(label + " service tier", model.ServiceTiers));
         }
 
-        if (reviewer.Speed is not null && !CatalogSlots.Contains(model.Speeds, reviewer.Speed))
+        if (speed is not null && !CatalogSlots.Contains(model.Speeds, speed))
         {
             throw new InvalidOperationException(Unavailable(label + " speed", model.Speeds));
         }
@@ -1098,6 +1152,8 @@ public sealed record HarnessSettings
             throw new InvalidOperationException(
                 $"Image model '{imageModel.Model}' does not accept image input.");
         }
+
+        RequireSlots(model, imageModel.ServiceTier, imageModel.Speed, "Image model");
     }
 
     private static IReadOnlyList<string> CopyPromptAttachments(IReadOnlyList<string>? names)

@@ -56,6 +56,10 @@ public sealed record SessionLaunchOptions
 
     public string? CompactionThinking { get; init; }
 
+    public string? CompactionTier { get; init; }
+
+    public string? CompactionSpeed { get; init; }
+
     public bool Plan { get; init; }
 
     public bool Work { get; init; }

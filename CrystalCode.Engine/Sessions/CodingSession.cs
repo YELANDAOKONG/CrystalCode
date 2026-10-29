@@ -2571,6 +2571,10 @@ public sealed class CodingSession : ITurnObserver
                 {
                     ChangeCompactionThinking(CompactionThinkingArguments.Parse(parsed.Argument));
                 }
+                else if (ApprovalSlotArguments.TryParse(parsed.Argument, out var compactionSlot))
+                {
+                    ChangeCompactionSlot(compactionSlot);
+                }
                 else if (CompactionSummaryArguments.IsSummaryCommand(parsed.Argument)
                     || CompactionSummaryArguments.IsAutomaticCommand(parsed.Argument))
                 {
@@ -5907,9 +5911,7 @@ public sealed class CodingSession : ITurnObserver
             return null;
         }
 
-        var selected = _settings.WithSelection(
-            new ProviderName(_settings.ImageModel.Provider!),
-            _settings.ImageModel.Model!);
+        var selected = _settings.ForImage(_settings.ImageModel);
         return new ImageDescriber(
             OpenImageDescriptionClient,
             ImageDescriptionSystemText(selected),
@@ -5940,10 +5942,7 @@ public sealed class CodingSession : ITurnObserver
             return _imageDescriptionClient;
         }
 
-        var selected = _settings.WithSelection(
-            new ProviderName(_settings.ImageModel.Provider!),
-            _settings.ImageModel.Model!);
-        var client = CreateMultimodalClient(selected)
+        var client = CreateMultimodalClient(_settings.ForImage(_settings.ImageModel))
             ?? throw new InvalidOperationException(
                 "The image model does not accept image input.");
         _imageDescriptionClient = client;
@@ -8213,10 +8212,10 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        // A launch gear is process-only. This command changes the switch or
-        // the selection, so the saved gear stays whatever config.json held.
-        var persistedNext = next.WithThinkingEffort(
-            _persisted.CompactionModel.ThinkingEffort);
+        // A launch gear or slot is process-only. This command changes the
+        // switch or the selection, so the saved gear and slots stay whatever
+        // config.json held.
+        var persistedNext = next.WithTuningFrom(_persisted.CompactionModel);
         HarnessSettings updated;
         try
         {
@@ -8424,6 +8423,82 @@ public sealed class CodingSession : ITurnObserver
         Note("Compaction thinking  " + ThinkingLabel.For(selection));
     }
 
+    private void ChangeCompactionSlot(ApprovalSlotArguments.Request request)
+    {
+        var label = request.ServiceTier ? "Service tier" : "Speed";
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing the compaction model " + label.ToLowerInvariant() + ".");
+            return;
+        }
+
+        var compaction = _settings.CompactionModel;
+        if (!compaction.HasSelection)
+        {
+            Error("Set a compaction model before changing its " + label.ToLowerInvariant() + ".");
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = _settings.Catalog.GetModel(
+                new ProviderName(compaction.Provider!),
+                compaction.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        var tokens = request.ServiceTier ? model.ServiceTiers : model.Speeds;
+        if (tokens.Count == 0)
+        {
+            Error(label + " is not available for the compaction model.");
+            return;
+        }
+
+        string? selected;
+        if (request.Token is null)
+        {
+            selected = CatalogSlots.Next(request.ServiceTier ? compaction.ServiceTier : compaction.Speed, tokens);
+        }
+        else if (!CatalogToken.TryNormalize(request.Token, out var token) || !CatalogSlots.Contains(tokens, token))
+        {
+            Error(label + " is not available for the compaction model. Available: " + string.Join(", ", tokens));
+            return;
+        }
+        else
+        {
+            selected = token;
+        }
+
+        CompactionModelSettings Apply(CompactionModelSettings value) => request.ServiceTier
+            ? value.WithServiceTier(selected)
+            : value.WithSpeed(selected);
+
+        _settings = _settings.WithCompactionModel(Apply(compaction));
+        // A launch selection of another model keeps this slot process-only.
+        var saved = _persisted.CompactionModel;
+        if (string.Equals(saved.Provider, compaction.Provider, StringComparison.Ordinal)
+            && string.Equals(saved.Model, compaction.Model, StringComparison.Ordinal))
+        {
+            _persisted = _persisted.WithCompactionModel(Apply(saved));
+            _settingsStore.Save(_persisted);
+        }
+
+        if (compaction.Enabled)
+        {
+            EnsureCompactionClient();
+        }
+
+        RefreshSlashCommands();
+        Note(
+            "Compaction " + (request.ServiceTier ? "tier  " : "speed  ")
+            + (selected is null ? "not set" : DisplayCase.Token(selected)));
+    }
+
     private bool TrySelectCompactionModel(
         string selectionText,
         out CompactionModelSettings settings,
@@ -8448,11 +8523,16 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
+        var current = _settings.CompactionModel;
+        var sameModel = string.Equals(current.Provider, selection.Provider.Value, StringComparison.Ordinal)
+            && string.Equals(current.Model, selection.Model, StringComparison.Ordinal);
         settings = new CompactionModelSettings(
             true,
             selection.Provider.Value,
             selection.Model,
-            _settings.CompactionModel.ThinkingEffort);
+            current.ThinkingEffort,
+            sameModel ? current.ServiceTier : null,
+            sameModel ? current.Speed : null);
         error = string.Empty;
         return true;
     }
@@ -8486,9 +8566,7 @@ public sealed class CodingSession : ITurnObserver
 
     private IStreamingChatClient CreateCompactionClient(CompactionModelSettings settings)
     {
-        var selected = _settings.WithSelection(
-            new ProviderName(settings.Provider!),
-            settings.Model!);
+        var selected = _settings.ForCompaction(settings);
         // The caller may still be on the previous compaction model. The cap
         // follows the model this client will serve. The key is stored only
         // after that choice is committed.
@@ -8677,6 +8755,19 @@ public sealed class CodingSession : ITurnObserver
             {
                 text += "  ·  " + thinking;
             }
+
+            var selected = _settings.ForCompaction(compaction);
+            var tier = CatalogSlotStatus.For("Tier", selected.ServiceTier);
+            var speed = CatalogSlotStatus.For("Speed", selected.Speed);
+            if (tier.Length > 0)
+            {
+                text += "  ·  " + tier;
+            }
+
+            if (speed.Length > 0)
+            {
+                text += "  ·  " + speed;
+            }
         }
         catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
         {
@@ -8688,11 +8779,11 @@ public sealed class CodingSession : ITurnObserver
 
     private string CompactionClientKey(CompactionModelSettings settings)
     {
-        var provider = new ProviderName(settings.Provider!);
+        var selected = _settings.ForCompaction(settings);
         return settings.Provider
             + "\n" + settings.Model
-            + "\n" + _settings.TierFor(provider, settings.Model!)
-            + "\n" + _settings.SpeedFor(provider, settings.Model!)
+            + "\n" + selected.ServiceTier
+            + "\n" + selected.Speed
             + "\n" + CurrentLimits().SummaryOutputCap();
     }
 
@@ -8767,7 +8858,9 @@ public sealed class CodingSession : ITurnObserver
             CatalogSlotCompletions.For(_settings.ActiveModel.Speeds),
             ReviewerSlotCompletions(_settings.ApprovalModel, serviceTier: true),
             ReviewerSlotCompletions(_settings.ApprovalModel, serviceTier: false),
-            ExtendedApprovalCompletions());
+            ExtendedApprovalCompletions(),
+            CompactionSlotCompletions(serviceTier: true),
+            CompactionSlotCompletions(serviceTier: false));
         menu = menu.Select(command => command.Name switch
         {
             "agents" => command with { Arguments = AgentCompletions() },
@@ -8907,6 +9000,25 @@ public sealed class CodingSession : ITurnObserver
 
         options.AddRange(ModelCompletions.For(_settings.Catalog, provider));
         return options;
+    }
+
+    private IReadOnlyList<SlashCompletion> CompactionSlotCompletions(bool serviceTier)
+    {
+        var compaction = _settings.CompactionModel;
+        if (compaction.Provider is null || compaction.Model is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            var model = _settings.Catalog.GetModel(new ProviderName(compaction.Provider), compaction.Model);
+            return CatalogSlotCompletions.For(serviceTier ? model.ServiceTiers : model.Speeds);
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return [];
+        }
     }
 
     private IReadOnlyList<SlashCompletion> CompactionThinkingCompletions()

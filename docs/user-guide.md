@@ -195,6 +195,7 @@ CLI options:
 | `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Does not change `compactionModel.thinkingEffort` on disk |
+| `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
 | `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or a custom mode. Omit all to keep Work, or the mode saved on a resumed session. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context` (`272k`, `1m`, or an exact token count). A model with one budget, or a budget it does not declare, is rejected. Does not write `contextSelections` |
@@ -366,6 +367,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--compaction-provider <provider>` | Compaction-model provider for this process. Turns the switch on |
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Same values as `/compact thinking`. An unsupported gear falls back to the provider default and a note is printed. Does not write the file |
+| `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
 | `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or an enabled custom mode. The default is Work. An unknown or disabled mode name exits 1. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context`. A model with one budget, or a budget it does not declare, exits 1. Does not write `contextSelections` |
@@ -625,8 +627,8 @@ Top-level fields:
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused. A tier or speed applies to the reviewer only and must be listed by that model |
 | `extendedApproval` | Optional extended approval model for Review and Audit. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, `trigger` (`low`, `medium`, or `high`; default `low`, which checks every review allow), and `includePrimaryReview` (default `true`). Omitted means off. It never falls back to the session or approval model |
-| `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists). Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, and gear unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
-| `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
+| `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists), `serviceTier`, and `speed`. A tier or speed applies to the summarizer only and must be listed by that model; unset follows the per-model `/tier` and `/speed` choice. Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, gear, and slots unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
+| `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. A tier or speed applies to this model only and must be listed by it; unset follows the per-model `/tier` and `/speed` choice. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or an effort token the model lists. `max` and `maximum` are different tokens. Tokens are stored in lowercase and sent unchanged |
 | `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
 | `tierSelections` | Saved service-tier tokens as a nested map, for example `{"openai": {"my-model": "flex"}}`. `/tier` writes this map. An absent choice, or a token the model no longer lists, omits the field |
@@ -1481,6 +1483,10 @@ The compaction model has its own gear. `/compact thinking` cycles it, or
 sets one by name, restricted to that model's efforts, and stores it in
 `compactionModel.thinkingEffort`. It applies while the compaction-model
 switch is on. While the switch is off, summary requests omit reasoning.
+`/compact tier` and `/compact speed` cycle or set the compaction model's own
+service tier and speed the same way as `/approval tier`, and store them in
+`compactionModel.serviceTier` and `compactionModel.speed`. Selecting another
+compaction model clears both.
 
 If the selected model does not support thinking, the command reports
 that and does nothing. The status bar shows `Think Off`, or `Think`

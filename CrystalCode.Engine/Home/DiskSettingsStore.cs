@@ -467,14 +467,18 @@ public sealed class DiskSettingsStore : ISettingsStore
             document.Enabled ?? false,
             provider,
             model,
-            thinkingEffort);
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, "compactionModel.serviceTier"),
+            ReadSlot(document.Speed, "compactionModel.speed"));
     }
 
     private static CompactionModelDocument? WriteCompactionModel(CompactionModelSettings settings)
     {
         if (!settings.Enabled
             && !settings.HasSelection
-            && settings.ThinkingEffort == ThinkingSelection.Default)
+            && settings.ThinkingEffort == ThinkingSelection.Default
+            && settings.ServiceTier is null
+            && settings.Speed is null)
         {
             return null;
         }
@@ -484,9 +488,9 @@ public sealed class DiskSettingsStore : ISettingsStore
             Enabled = settings.Enabled ? true : null,
             Provider = settings.Provider,
             Model = settings.Model,
-            ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
-                ? null
-                : settings.ThinkingEffort.Value
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed
         };
     }
 
@@ -632,7 +636,12 @@ public sealed class DiskSettingsStore : ISettingsStore
         var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
             ? ThinkingSelection.Default
             : ThinkingSelection.Parse(document.ThinkingEffort);
-        return new ImageModelSettings(provider, model, thinkingEffort);
+        return new ImageModelSettings(
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, "imageModel.serviceTier"),
+            ReadSlot(document.Speed, "imageModel.speed"));
     }
 
     /// <summary>
@@ -799,9 +808,9 @@ public sealed class DiskSettingsStore : ISettingsStore
         {
             Provider = settings.Provider,
             Model = settings.Model,
-            ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
-                ? null
-                : settings.ThinkingEffort.Value
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed
         };
     }
 
