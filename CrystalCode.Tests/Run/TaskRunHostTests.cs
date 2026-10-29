@@ -810,7 +810,14 @@ public sealed class TaskRunHostTests
         Assert.False(session.PlanMode);
         TerminalHost.ApplyLaunchMode(session, "plan");
         Assert.True(session.PlanMode);
-        Assert.Throws<ArgumentException>(() => TerminalHost.ApplyLaunchMode(session, "missing"));
+        try
+        {
+            Assert.Throws<ArgumentException>(() => TerminalHost.ApplyLaunchMode(session, "missing"));
+        }
+        finally
+        {
+            session.Close();
+        }
     }
 
     [Fact]
