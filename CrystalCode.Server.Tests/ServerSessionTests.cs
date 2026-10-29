@@ -99,6 +99,24 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task Snapshot_KeepsApprovalPassesAfterTheTurn()
+    {
+        var model = new ScriptedModel(false, ToolRound("call-1", "list", "{}"), TextRound("done"));
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "look" });
+        await events.WaitForAsync("approval.passed");
+        await events.WaitForAsync("turn.finished");
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+
+        var passed = Assert.Single(snapshot.GetProperty("approvals").EnumerateArray());
+        Assert.Equal("call-1", passed.GetProperty("call").GetProperty("callId").GetString());
+        Assert.Equal("policy", passed.GetProperty("reason").GetString());
+    }
+
+    [Fact]
     public async Task Approval_IsAnsweredByAClientAndRunsTheTool()
     {
         var model = new ScriptedModel(false, ToolRound("call-1", "bash", """{"command":"echo served"}"""), TextRound("done"));

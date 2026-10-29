@@ -17,11 +17,14 @@ namespace CrystalCode.Engine.Sessions;
 /// applies every event here and reads <see cref="Snapshot"/>. Not thread
 /// safe: the caller serializes <see cref="Apply"/> and <see cref="Snapshot"/>.
 /// Reports addressed to one client (help, status, stats, tool lists, notes,
-/// and errors) are not session state and are not kept.
+/// and errors) are not session state and are not kept. Approval passes and
+/// compaction summaries are kept whatever the operator's display settings
+/// are; those settings decide only what a front end draws.
 /// </summary>
 public sealed class SessionState
 {
     private readonly List<ChatItem> _conversation = [];
+    private readonly List<ApprovalPassed> _approvals = [];
     private readonly Dictionary<string, ChildSessionDocument> _children = new(StringComparer.Ordinal);
     private SessionChrome? _chrome;
     private SessionPreferences? _preferences;
@@ -66,6 +69,17 @@ public sealed class SessionState
                 break;
             case PromptHistoryLoaded history:
                 _history = history.Entries;
+                break;
+            case ImageHistoryInvalidated:
+                // The terminal composer drops the same entries.
+                _history = [.. _history.Where(static entry => !entry.Contains(ImageMarkerText.Prefix))];
+                break;
+            case ApprovalPassed passed:
+                _approvals.Add(passed);
+                break;
+            case CompactionFinished { Summary: { Length: > 0 } summary }:
+                // The archive keeps the summary, so resume and fork replay show it.
+                _conversation.Add(new ChatMessage(ChatRole.System, summary));
                 break;
             case StatusFieldsChanged fields:
                 _statusFields = fields.Fields;
@@ -130,6 +144,7 @@ public sealed class SessionState
                 break;
             case ConversationCleared:
                 _conversation.Clear();
+                _approvals.Clear();
                 _children.Clear();
                 _round = null;
                 _lastTurn = null;
@@ -137,6 +152,7 @@ public sealed class SessionState
             case HistoryReplayed replayed:
                 _conversation.Clear();
                 _conversation.AddRange(replayed.Items);
+                _approvals.Clear();
                 _children.Clear();
                 _round = null;
                 break;
@@ -173,7 +189,8 @@ public sealed class SessionState
             _estimate,
             _side,
             [.. _children.Values],
-            _lastTurn);
+            _lastTurn,
+            [.. _approvals]);
 
     private void CommitRound()
     {

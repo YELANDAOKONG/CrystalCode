@@ -600,6 +600,21 @@ internal static class CrystalWire
             writer.WriteNull("lastTurn");
         }
 
+        writer.WriteStartArray("approvals");
+        foreach (var passed in snapshot.Approvals)
+        {
+            writer.WriteStartObject();
+            writer.WriteStartObject("call");
+            Call(writer, passed.Call);
+            writer.WriteEndObject();
+            writer.WriteString("reason", passed.Reason.Value);
+            writer.WriteString("risk", passed.Classification.Risk.Value);
+            writer.WriteString("authority", passed.Classification.Authority.Value);
+            writer.WriteString("summary", passed.Classification.Summary);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
         writer.WriteEndObject();
     }
 

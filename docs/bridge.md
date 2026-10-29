@@ -630,7 +630,7 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 
 | Method | Engine |
 | :--- | :--- |
-| `_crystal/snapshot` | `SessionState` snapshot (the same fields as `GET /snapshot`, without pending interactions) |
+| `_crystal/snapshot` | `SessionState` snapshot (the same fields as `GET /snapshot`, without pending interactions; each `approvals` entry has `call`, `reason`, `risk`, `authority`, and `summary`, as on the `ApprovalPassed` update) |
 | `_crystal/session/fork` | Fork a saved session (see Sessions) |
 | `_crystal/recall` | `TryRecall`; returns `recalled`, and the draft follows as `_crystal/recalled` |
 | `_crystal/queue/release` | empty input release |

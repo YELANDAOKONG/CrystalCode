@@ -475,6 +475,13 @@ public sealed class CodingSession : ITurnObserver
                     }
                     usageAfterCompaction = null;
                     childAnchor = null;
+                    if (!string.IsNullOrWhiteSpace(compacted.Summary))
+                    {
+                        // The turn commits only new conversation items, so the
+                        // child's record keeps the summary the same way the parent's does.
+                        archive.Add(new ChatMessage(ChatRole.System, compacted.Summary));
+                    }
+
                     Emit(new NoteWritten("Compacted child context"));
                     return compacted;
                 }
@@ -6334,17 +6341,19 @@ public sealed class CodingSession : ITurnObserver
             // The retained tail can keep the anchored item, but the report
             // counted text that is now folded into the summary.
             _contextAnchor = null;
-            var printSummary = ShouldPrintSummary(manual) && !string.IsNullOrWhiteSpace(outcome.Summary);
+            var summary = string.IsNullOrWhiteSpace(outcome.Summary) ? null : outcome.Summary;
+            var printSummary = ShouldPrintSummary(manual) && summary is not null;
+            if (summary is not null)
+            {
+                // CommitArchive skips system messages, so the summary is
+                // recorded here for fork, resume, and export to replay it.
+                // The display setting decides only whether it is drawn.
+                RecordSummaryInArchive(summary);
+            }
+
             if (ReferenceEquals(transcript, _transcript))
             {
                 _transcript = [.. outcome.Transcript];
-                if (printSummary)
-                {
-                    // CommitArchive skips system messages, so a shown summary is
-                    // recorded here for fork, resume, and export to replay it.
-                    RecordSummaryInArchive(outcome.Summary!);
-                }
-
                 BindReviewConversation();
                 RememberCompactedUsage();
                 SaveSession();
@@ -6356,7 +6365,7 @@ public sealed class CodingSession : ITurnObserver
             }
 
             Note("Compacted context");
-            Publish(new CompactionFinished(compactionId, "completed", printSummary ? outcome.Summary : null));
+            Publish(new CompactionFinished(compactionId, "completed", summary, printSummary));
             if (printSummary)
             {
                 Note(outcome.Summary!);

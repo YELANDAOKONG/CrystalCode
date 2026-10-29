@@ -170,6 +170,30 @@ public sealed class ConversationArchiveTests
         var notes = Notes(headless);
         Assert.Contains(notes, note => note == "Compacted context");
         Assert.DoesNotContain(notes, note => note.Contains("kept the facts", StringComparison.Ordinal));
+        Assert.Contains(
+            saved.Archive!,
+            item => item.Text is not null && item.Text.Contains("kept the facts", StringComparison.Ordinal));
+        var finished = headless.Observer.Events.OfType<CompactionFinished>().Single();
+        Assert.False(finished.Shown);
+        Assert.Contains("kept the facts", finished.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Fork_ReplaysAHiddenCompactionSummary()
+    {
+        using var headless = new HeadlessSession(
+            new SummaryClient(),
+            ShortSession("older turn", "latest turn"),
+            showCompactionSummary: false);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("/compact");
+
+        await headless.RunTurnAsync("/fork");
+
+        var replayed = headless.Observer.Events.OfType<HistoryReplayed>().Last();
+        Assert.Contains(
+            replayed.Items,
+            item => item is ChatMessage message && CompactionSelection.IsSummary(message));
     }
 
     [Fact]

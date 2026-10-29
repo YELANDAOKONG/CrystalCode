@@ -582,7 +582,7 @@ internal sealed class SessionUpdates
     {
         if (!_compaction)
         {
-            if (finished.Summary is { Length: > 0 } shown)
+            if (finished.Shown && finished.Summary is { Length: > 0 } shown)
             {
                 Update("agent_message_chunk", "CompactionFinished", writer =>
                 {
@@ -594,7 +594,7 @@ internal sealed class SessionUpdates
             return;
         }
 
-        if (finished.Summary is { Length: > 0 } summary)
+        if (finished.Shown && finished.Summary is { Length: > 0 } summary)
         {
             Update("compaction_summary_chunk", "CompactionFinished", writer =>
             {

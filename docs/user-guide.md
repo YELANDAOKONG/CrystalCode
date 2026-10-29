@@ -2251,8 +2251,11 @@ earlier lines. When `showCompactionSummary` is on (the default), a manual
 `/compact` prints the summary under those lines in a rounded panel titled
 `Earlier context`. Automatic compaction prints `Compacted context` and, when
 `showAutomaticCompactionSummary` is on, the same panel. That switch defaults
-off. `/resume` restores that full conversation, while the model continues
-from the summary and tail, and refreshes only the live system prompt.
+off. Those switches change only what is printed: every summary is kept in
+the session record, so `/resume`, `/fork`, and export show it as an
+`Earlier context` block even when it was not printed. `/resume` restores that
+full conversation, while the model continues from the summary and tail, and
+refreshes only the live system prompt.
 
 ## Data directory
 

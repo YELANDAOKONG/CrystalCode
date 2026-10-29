@@ -113,16 +113,26 @@ public static class ServerEndpoints
             {
                 var action = Json.String(body, "action")?.Trim().ToLowerInvariant();
                 var name = Json.String(body, "name");
-                var (ok, error) = await runner.InvokeAsync<(bool, string)>(session => action switch
+                if (action is not ("cycle" or "toggle-plan" or "set") || (action == "set" && string.IsNullOrWhiteSpace(name)))
                 {
-                    "cycle" => (session.CycleMode() || true, string.Empty),
-                    "toggle-plan" => (session.TogglePlan() || true, string.Empty),
-                    "set" when !string.IsNullOrWhiteSpace(name) => session.TrySetMode(name, out var modeError)
-                        ? (true, string.Empty)
-                        : (false, modeError),
-                    _ => (false, "action must be cycle, toggle-plan, or set with a name.")
+                    return RequestOutcome.Error(400, "action must be cycle, toggle-plan, or set with a name.");
+                }
+
+                var error = await runner.InvokeAsync(session =>
+                {
+                    switch (action)
+                    {
+                        case "cycle":
+                            session.CycleMode();
+                            return null;
+                        case "toggle-plan":
+                            session.TogglePlan();
+                            return null;
+                        default:
+                            return session.TrySetMode(name!, out var modeError) ? null : modeError;
+                    }
                 }, client);
-                return ok
+                return error is null
                     ? RequestOutcome.Ok(Json.Write(writer => ModeFields(writer, runner.Session)))
                     : RequestOutcome.Error(400, error);
             }));

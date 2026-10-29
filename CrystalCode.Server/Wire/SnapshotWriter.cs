@@ -84,6 +84,15 @@ public static class SnapshotWriter
             writer.WriteNull("lastTurn");
         }
 
+        writer.WriteStartArray("approvals");
+        foreach (var passed in snapshot.Approvals)
+        {
+            writer.WriteStartObject();
+            WireEvents.ApprovalPassedFields(writer, passed);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
         writer.WriteStartArray("interactions");
         foreach (var interaction in interactions)
         {

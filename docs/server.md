@@ -275,7 +275,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `RetryScheduled`, `UsageChanged`, `ContextEstimated` | `retry.scheduled`, `usage.changed`, `context.estimated` |
 | `QueueChanged`, `TodosChanged` | `queue.changed`, `todos.changed` |
 | `HistoryReplayed`, `ConversationCleared` | `conversation.replayed`, `conversation.cleared` |
-| `CompactionStarted`, `CompactionFinished` | `compaction.started` (`id`, `manual`), `compaction.finished` (`id`, `status`: `completed`, `unchanged`, `failed`, or `cancelled`; `summary` when the summary display setting shows it) |
+| `CompactionStarted`, `CompactionFinished` | `compaction.started` (`id`, `manual`), `compaction.finished` (`id`, `status`: `completed`, `unchanged`, `failed`, or `cancelled`; `summary`, the stored summary of a completed compaction or null; `shown`, whether the operator's summary display setting draws it) |
 | `NoteWritten`, `ErrorWritten` | `note`, `error` |
 | `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed`, `DocumentWritten` | `report.help`, `report.status`, `report.stats`, `report.tools`, `report.todos`, `report.document` (`document`: `title` and `blocks`, each with `type` of `paragraph`, `keyValues`, `table`, or `list`, plus `columns`, `rows`, `lines`, and `omitted`) |
 | `SideQuestionSnapshot` | `side.changed` |
@@ -315,7 +315,12 @@ calls, and tool results), `live` (the in-progress model round: text,
 reasoning, tool-call arguments so far, retries), `turnActive`, activity,
 queue, todos, status fields, usage, context window and estimate, the
 side-question thread, child summaries, the last turn's stop reason and
-counts, the pending interactions this client may answer, and `lastSeq`. The
+counts, `approvals` (each call that passed approval in this conversation,
+with the same fields as `approval.passed`), the pending interactions this
+client may answer, and `lastSeq`. A compaction summary is a `system` message
+in `conversation` whether or not it was shown, and prompt history drops
+entries with image markers after `images.invalidated`. Display settings do
+not change what the snapshot holds. The
 snapshot and `lastSeq` are taken under one lock, so a client that follows
 with `GET /events?after=lastSeq` misses nothing and sees nothing twice. The
 snapshot is built by the engine's front-end-neutral session state, not by

@@ -127,19 +127,6 @@ behavior stands until a specific change defines otherwise.
   compatibility policy. Do not reserve a field, schema, or flag for them.
   The work must not put secrets on the command line, persist flags to
   `config.json`, or make the run ask the operator.
-- Session state completeness for `crystal server`. A reconnecting or second
-  client reads `SessionState`, which drops some of what the terminal shows.
-  Known gaps: a compaction summary is only a one-shot note and reaches the
-  archive only while a summary display setting is on, so the snapshot
-  conversation, resume, and fork can lack it; and `ApprovalPassed` is not kept,
-  so approval records vanish on refresh. Not yet examined: whether
-  `ImageHistoryInvalidated` leaves stale prompt-history entries in the
-  snapshot, and whether a child compaction summary is kept. Which events are
-  session state and which are replies to one client is not fully defined.
-  Display settings should decide only what a front end draws, not what the
-  event stream or archive records. Do not reserve an event, a wire field, or a
-  public type for it. When it is done, the server facts the client depends on
-  are recorded in ARCHITECTURE.md.
 - Image generation. Letting the session produce images, whether through a
   tool or as native model output. Which path comes first, which providers and
   protocols, how a model declares it, how a generated image is stored,

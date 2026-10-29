@@ -714,11 +714,14 @@ model context. Resume, fork replay, and export read the archive. `/stats`
 tool share reads the archive, and a session file with no archive counts tools
 from its saved items. A session
 file written before the archive existed loads its saved items as the archive.
-A compaction summary that the operator sees (per `showCompactionSummary` and
-`showAutomaticCompactionSummary`) is also appended to the archive as an
-`## Earlier context` system message, so fork replay, resume, and export show
-the same block again. A hidden summary is not archived. Side questions skip
-archived summaries that follow a turn.
+Every compaction summary, manual or automatic and whether or not it is
+shown, is also appended to the archive as an `## Earlier context` system
+message, so fork replay, resume, and export show the same block again. A
+child's summary goes into the child's archive the same way.
+`showCompactionSummary` and `showAutomaticCompactionSummary` decide only
+whether a front end draws the summary when it is written:
+`CompactionFinished` carries the summary and a `Shown` flag. Side questions
+skip archived summaries that follow a turn.
 Images stay when either transcript still mentions them. `/clear` drops both.
 
 The composer stays open while a turn runs. Enter with text enqueues a
@@ -2385,9 +2388,25 @@ at any time applies every event and reads `SessionSnapshot`: chrome,
 preferences, slash commands, prompt history, the committed conversation, the
 round still streaming (`LiveRound`, without opaque reasoning state), queue,
 todos, status fields, activity, usage, the side-question thread, children
-with live usage and todos folded in, and the last turn. Reports addressed to
-one client are not session state. `ChildSessionFold` holds the child folding
-the terminal's child projection also uses.
+with live usage and todos folded in, the last turn, and the parent's
+approval passes (`Approvals`). Reports addressed to one client are not
+session state. `ChildSessionFold` holds the child folding the terminal's
+child projection also uses.
+
+Server facts a reconnecting client depends on:
+
+- Session state is what `SessionState` keeps; it does not depend on display
+  settings. A completed compaction's summary is a system message in the
+  conversation at the point it was written, as the archive keeps it.
+  `ApprovalPassed` entries stay until `ConversationCleared` or
+  `HistoryReplayed`; a child's passes arrive inside `ChildEventReceived` and
+  stay with that child's events. `ImageHistoryInvalidated` drops prompt
+  history entries that hold a trusted image marker, as the terminal composer
+  does.
+- Notes, errors, and reports (help, status, stats, tools, todos, documents)
+  are replies to one client and are not kept. `LoadingProgressed`, retry
+  waits, and `ApprovalReviewing` are progress, not state.
+- Pending next-turn settings are in the chrome (`Pending`).
 
 `TryAttachImage` attaches bytes a front end received (an upload, or a paste on
 another machine) to the draft with the same signature and size checks as a

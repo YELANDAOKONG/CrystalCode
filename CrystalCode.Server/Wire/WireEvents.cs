@@ -225,6 +225,7 @@ public static class WireEvents
                 writer.WriteString("id", finished.Id);
                 writer.WriteString("status", finished.Status);
                 WireWriter.Optional(writer, "summary", finished.Summary);
+                writer.WriteBoolean("shown", finished.Shown);
                 break;
             case NoteWritten note:
                 writer.WriteString("text", note.Text);
@@ -251,13 +252,7 @@ public static class WireEvents
                 WireWriter.Side(writer, "side", side);
                 break;
             case ApprovalPassed passed:
-                writer.WriteStartObject("call");
-                WireWriter.Call(writer, passed.Call);
-                writer.WriteEndObject();
-                WireWriter.Classification(writer, "classification", passed.Classification);
-                writer.WriteString("reason", passed.Reason.Value);
-                WireWriter.Verdict(writer, "review", passed.Review);
-                WireWriter.Verdict(writer, "extendedReview", passed.ExtendedReview);
+                ApprovalPassedFields(writer, passed);
                 break;
             case ApprovalReviewing reviewing:
                 writer.WriteStartObject("call");
@@ -341,4 +336,16 @@ public static class WireEvents
 
     private static IReadOnlyList<SlashCompletion> BuiltInHelp() =>
         [.. SlashCatalog.BuiltIn.Select(static spec => new SlashCompletion(spec.Name, spec.Help, [spec.Name, .. spec.Aliases]))];
+
+    /// <summary>The fields of <c>approval.passed</c>, also used by each snapshot <c>approvals</c> entry.</summary>
+    internal static void ApprovalPassedFields(Utf8JsonWriter writer, ApprovalPassed passed)
+    {
+        writer.WriteStartObject("call");
+        WireWriter.Call(writer, passed.Call);
+        writer.WriteEndObject();
+        WireWriter.Classification(writer, "classification", passed.Classification);
+        writer.WriteString("reason", passed.Reason.Value);
+        WireWriter.Verdict(writer, "review", passed.Review);
+        WireWriter.Verdict(writer, "extendedReview", passed.ExtendedReview);
+    }
 }

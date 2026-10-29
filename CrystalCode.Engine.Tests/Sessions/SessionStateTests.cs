@@ -3,6 +3,7 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
@@ -46,6 +47,45 @@ public sealed class SessionStateTests
         Assert.NotNull(snapshot.Chrome);
         Assert.NotNull(snapshot.Preferences);
         Assert.NotEmpty(snapshot.Commands);
+    }
+
+    [Fact]
+    public void Snapshot_KeepsApprovalPassesUntilTheConversationIsCleared()
+    {
+        var state = new SessionState();
+        var classification = new ToolClassification(Risk.Write, Authority.Workspace, "run a command");
+        state.Apply(new ApprovalPassed(new ToolCall("c1", "bash", "{}", ToolInputKind.Json), classification, ApprovalPassReason.Policy));
+        state.Apply(new ChildEventReceived("child", Guid.Empty,
+            new ApprovalPassed(new ToolCall("c2", "bash", "{}", ToolInputKind.Json), classification, ApprovalPassReason.Policy)));
+
+        Assert.Equal("c1", Assert.Single(state.Snapshot().Approvals).Call.CallId);
+
+        state.Apply(new ConversationCleared());
+        Assert.Empty(state.Snapshot().Approvals);
+    }
+
+    [Fact]
+    public void Snapshot_KeepsACompactionSummaryWhetherOrNotItIsShown()
+    {
+        var state = new SessionState();
+        state.Apply(new UserMessageSent("hi"));
+        state.Apply(new CompactionFinished("compaction-1", "completed", "## Earlier context\n\nfacts", Shown: false));
+        state.Apply(new CompactionFinished("compaction-2", "unchanged", null));
+
+        var conversation = state.Snapshot().Conversation;
+        Assert.Equal(2, conversation.Count);
+        Assert.Equal(ChatRole.System, Assert.IsType<ChatMessage>(conversation[1]).Role);
+    }
+
+    [Fact]
+    public void ImageHistoryInvalidated_DropsPromptHistoryWithImageMarkers()
+    {
+        var state = new SessionState();
+        state.Apply(new PromptHistoryLoaded(["plain", "see " + ImageMarkerText.Tag(1)]));
+
+        state.Apply(new ImageHistoryInvalidated());
+
+        Assert.Equal(["plain"], state.Snapshot().PromptHistory);
     }
 
     [Fact]

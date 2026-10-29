@@ -14,6 +14,10 @@ namespace CrystalCode.Engine.Sessions;
 /// <param name="Conversation">Committed conversation items, oldest first.</param>
 /// <param name="Live">Text, reasoning, and tool calls of the model round still streaming.</param>
 /// <param name="Children">Child sessions with live usage and todos folded in.</param>
+/// <param name="Approvals">
+/// Calls that passed approval in this conversation, in order, until it is
+/// cleared or replaced. A child's passes stay in its own events.
+/// </param>
 public sealed record SessionSnapshot(
     SessionChrome? Chrome,
     SessionPreferences? Preferences,
@@ -32,4 +36,5 @@ public sealed record SessionSnapshot(
     int? EstimatedContextTokens,
     SideQuestionSnapshot Side,
     IReadOnlyList<ChildSessionDocument> Children,
-    TurnFinished? LastTurn);
+    TurnFinished? LastTurn,
+    IReadOnlyList<ApprovalPassed> Approvals);
