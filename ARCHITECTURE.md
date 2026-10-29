@@ -1471,7 +1471,7 @@ Automatic trimming fires when the trimmable images in the transcript exceed
 until the inline bytes fit, always keeping the newest. Trimmable means an
 image referenced by a tool result, plus operator-attached images when
 `includeUserImages` is set. `imageTrim` in `config.json` holds `enabled`
-(true), `keepRecent` (8, at least 1), `slack` (4), `maxBytes` (33554432), and
+(true), `keepRecent` (16, at least 1), `slack` (8), `maxBytes` (134217728), and
 `includeUserImages` (false); the object is omitted when all are default and
 invalid values refuse startup. `/trim` with no argument or a count trims to
 that many now, `all` keeps none, and `on` or `off` switches automatic

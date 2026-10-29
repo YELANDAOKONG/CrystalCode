@@ -9,11 +9,11 @@ public sealed record ImageTrimSettings
 {
     public const bool DefaultEnabled = true;
 
-    public const int DefaultKeepRecent = 8;
+    public const int DefaultKeepRecent = 16;
 
-    public const int DefaultSlack = 4;
+    public const int DefaultSlack = 8;
 
-    public const long DefaultMaxBytes = 32L * 1024 * 1024;
+    public const long DefaultMaxBytes = 128L * 1024 * 1024;
 
     public const bool DefaultIncludeUserImages = false;
 
