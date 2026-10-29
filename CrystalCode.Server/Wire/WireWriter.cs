@@ -70,6 +70,7 @@ public static class WireWriter
         SideModel(writer, "image", chrome.Image);
         SideModel(writer, "audio", chrome.Audio);
         SideModel(writer, "video", chrome.Video);
+        writer.WriteString("topic", chrome.Topic);
         writer.WriteEndObject();
     }
 
@@ -704,6 +705,7 @@ public static class WireWriter
         Date(writer, "updatedUtc", summary.UpdatedUtc);
         writer.WriteNumber("userTurns", summary.UserTurns);
         writer.WriteString("preview", summary.Preview);
+        Optional(writer, "topic", summary.Topic);
         writer.WriteEndObject();
     }
 

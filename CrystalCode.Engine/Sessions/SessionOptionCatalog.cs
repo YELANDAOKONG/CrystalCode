@@ -18,6 +18,9 @@ internal static class SessionOptionCatalog
 
     public const string Off = "off";
 
+    /// <summary>The <c>topic_model</c> value that names topics with the session model.</summary>
+    public const string SessionModel = "session";
+
     public const string Unset = "unset";
 
     public static IReadOnlyList<SessionOption> Build(
@@ -125,6 +128,41 @@ internal static class SessionOptionCatalog
             settings.CompactionModel is { Enabled: true } compactionModel
                 ? (compactionModel.Provider!, compactionModel.Model!, compactionModel.ThinkingEffort, compactionModel.ServiceTier, compactionModel.Speed, compactionModel.ContextWindow)
                 : null);
+        options.Add(Switch("topic", "Topic naming", "_crystal_topic", settings.TopicModel.Enabled, "/topic"));
+        var topic = settings.TopicModel;
+        var sessionTopicValue = new SessionOptionValue(SessionModel, "Session model", "/topic model");
+        var topicPicker = Picker(
+            "topic_model",
+            "Topic model",
+            "_crystal_topic",
+            "/topic model",
+            settings,
+            topic.UsesSessionModel ? SessionModel : topic.Provider + "/" + topic.Model);
+        // The first value is the session model, not off: the switch is the topic option.
+        options.Add(topicPicker with { Values = [sessionTopicValue, .. topicPicker.Values.Skip(1)] });
+        if (topic.Enabled)
+        {
+            if (topic.UsesSessionModel)
+            {
+                // Tier, speed, and context follow the session, so only the gear is the topic's own.
+                if (Thinking(settings.ActiveModel, topic.ThinkingEffort, "topic_thinking", "Topic thinking", "_crystal_topic", "/topic thinking") is { } gear)
+                {
+                    options.Add(gear);
+                }
+            }
+            else
+            {
+                AddTuning(
+                    options,
+                    settings,
+                    "topic",
+                    "Topic",
+                    "_crystal_topic",
+                    "/topic",
+                    (topic.Provider!, topic.Model!, topic.ThinkingEffort, topic.ServiceTier, topic.Speed, topic.ContextWindow));
+            }
+        }
+
         foreach (var kind in ResourceKinds.All)
         {
             var word = ResourceKinds.Word(kind);

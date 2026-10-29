@@ -126,14 +126,15 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     }
 
     /// <summary>
-    /// After a turn: <c>session_info_update</c> with the saved title (the
-    /// first user message, as <c>session/list</c> shows it) and the time.
+    /// After a turn or a topic change: <c>session_info_update</c> with the
+    /// saved title (the topic, else the first user message, as
+    /// <c>session/list</c> shows it) and the time.
     /// </summary>
     public void Saved()
     {
         if (Session is { } session && _store is { } store && store.TrySummarize(session.SessionId, out var summary))
         {
-            Updates.Saved(summary.Preview);
+            Updates.Saved(summary.Title);
         }
     }
 

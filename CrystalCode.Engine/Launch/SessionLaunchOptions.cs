@@ -66,6 +66,20 @@ public sealed record SessionLaunchOptions
 
     public string? CompactionContext { get; init; }
 
+    public string? Topic { get; init; }
+
+    public string? TopicProvider { get; init; }
+
+    public string? TopicModelId { get; init; }
+
+    public string? TopicThinking { get; init; }
+
+    public string? TopicTier { get; init; }
+
+    public string? TopicSpeed { get; init; }
+
+    public string? TopicContext { get; init; }
+
     public string? ImageModel { get; init; }
 
     public string? ImageProvider { get; init; }

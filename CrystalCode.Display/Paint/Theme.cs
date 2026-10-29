@@ -223,7 +223,7 @@ public static class Theme
     /// <summary>
     /// Gauge names a theme file may set ranges for.
     /// </summary>
-    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider", .. ReviewerGaugeNames];
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider", "topic", .. ReviewerGaugeNames];
 
     /// <summary>
     /// Style for a context usage percentage. A theme's <c>context</c> rules

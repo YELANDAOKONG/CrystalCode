@@ -243,7 +243,7 @@ and the `server.state` event.
 | `POST /side/cancel`, `POST /side/clear` | operate | Side question control; `/btw` itself goes through `/input` |
 | `GET /children`, `GET /children/{id}` | observe | Child list, archive, events, usage, and todos (F7 and `/child`) |
 | `GET /export?format=markdown\|json&system=true\|false` | observe | `TryExport` as a download; `/export` still writes on the server |
-| `GET /sessions?all=true\|false` | observe | `ListSavedSessions`: saved sessions with content, newest first, for this workspace or every workspace. Each has `id`, `workspace`, `mode`, `createdUtc`, `updatedUtc`, `userTurns`, `preview`, `current`, and `open` (another process, or this one, holds it). Resume one with `/resume <id>` through `POST /input` |
+| `GET /sessions?all=true\|false` | observe | `ListSavedSessions`: saved sessions with content, newest first, for this workspace or every workspace. Each has `id`, `workspace`, `mode`, `createdUtc`, `updatedUtc`, `userTurns`, `preview` (the first user message), `topic` (the session topic, or `null`), `current`, and `open` (another process, or this one, holds it). Resume one with `/resume <id>` through `POST /input` |
 | `GET /models` | observe | `ListModels`: every catalog model with `provider`, `model`, `protocol`, `current`, `credentialReady`, `contextWindows`, `thinking`, `thinkingCanDisable`, `thinkingEfforts`, `serviceTiers`, `speeds`, `imageInput`, and `maxTokens`, plus `pending`. No base address, header, or key |
 | `GET /options` | observe | `ListOptions`: the same option list as `options.changed`, plus `pending` |
 | `PUT /options/{id}` | operate, or the scope of the option's command | `{"value"}`: a listed `value` as a string, or `true`/`false` for a switch. Runs that value's slash command, so validation, next-turn rules, and `config.json` writes match the terminal. Returns `pending` (the change applies on the next turn), `options`, and `pendingSettings`. 404 for an unknown option, 400 for a value it does not offer or one with no command, 403 when the command needs `admin`, 409 with the engine's text when the engine refuses it |
@@ -310,7 +310,7 @@ Otherwise each holds the reviewer's `provider`, `model`, and display labels
 adds `trigger` and `includePrimaryReview`.
 `compaction` is `null` while the compaction model is off, and `image`,
 `audio`, and `video` while that resource description model is off; audio and
-video are configuration only. Otherwise each holds that model's `provider`, `model`,
+video are configuration only. `topic` is the session topic, or empty. Otherwise each holds that model's `provider`, `model`,
 and display labels `thinking`, `serviceTier`, `speed`, and `context` (blank
 when the model does not set its own).
 

@@ -2244,6 +2244,38 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void TopicModel_RoundTripsAndOmitsTheDefault()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.Save(store.LoadOrCreate());
+        Assert.DoesNotContain("topicModel", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
+
+        store.Save(store.Load().WithTopicModel(new TopicModelSettings(true, thinkingEffort: ThinkingSelection.Off)));
+        var sessionModel = store.Load().TopicModel;
+        Assert.True(sessionModel.Enabled);
+        Assert.True(sessionModel.UsesSessionModel);
+        Assert.Equal(ThinkingSelection.Off, sessionModel.ThinkingEffort);
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "topicModel": { "enabled": true, "provider": "openai" } }
+            """);
+        var incomplete = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Equal(
+            "topicModel requires provider and model together, or neither to use the session model.",
+            incomplete.Message);
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "topicModel": { "enabled": true, "provider": "openai", "model": "not-a-model" } }
+            """);
+        Assert.Contains("not-a-model", Assert.Throws<InvalidOperationException>(() => store.Load()).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_TreatsAResourceModelWithoutEnabledAsOff()
     {
         using var root = new TemporaryHome();

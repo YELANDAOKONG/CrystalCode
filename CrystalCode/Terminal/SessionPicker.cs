@@ -98,6 +98,7 @@ internal sealed class SessionPicker : ISessionChooser
         return sessions.Where(session =>
             session.Id.Contains(query, StringComparison.OrdinalIgnoreCase)
             || session.Preview.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || session.Topic?.Contains(query, StringComparison.OrdinalIgnoreCase) == true
             || ContainsWorkspace(session, query))
             .ToArray();
     }
@@ -152,7 +153,7 @@ internal sealed class SessionPicker : ISessionChooser
                     : string.Empty;
                 var workspace = WorkspaceLabel(session, listWorkspace);
                 var preview = TextWidth.Truncate(
-                    session.Preview,
+                    session.Title,
                     Math.Max(8, ScreenSize.Width - 48 - workspace.Length));
                 var label = $"{time}  {session.UserTurns} turns{current}{workspace}  {preview}";
                 var color = index == selected ? Theme.Selected : Theme.User;

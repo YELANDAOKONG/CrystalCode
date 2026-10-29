@@ -98,6 +98,27 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--compaction-context <BUDGET>")]
     public string? CompactionContext { get; init; }
 
+    [CommandOption("--topic <on|off>")]
+    public string? Topic { get; init; }
+
+    [CommandOption("--topic-provider <PROVIDER>")]
+    public string? TopicProvider { get; init; }
+
+    [CommandOption("--topic-model-id <MODEL>")]
+    public string? TopicModelId { get; init; }
+
+    [CommandOption("--topic-thinking <EFFORT>")]
+    public string? TopicThinking { get; init; }
+
+    [CommandOption("--topic-tier <TOKEN>")]
+    public string? TopicTier { get; init; }
+
+    [CommandOption("--topic-speed <TOKEN>")]
+    public string? TopicSpeed { get; init; }
+
+    [CommandOption("--topic-context <BUDGET>")]
+    public string? TopicContext { get; init; }
+
     [CommandOption("--image-model <on|off>")]
     public string? ImageModel { get; init; }
 
@@ -271,6 +292,13 @@ public class SessionLaunchSettings : CommandSettings
             CompactionTier = CompactionTier,
             CompactionSpeed = CompactionSpeed,
             CompactionContext = CompactionContext,
+            Topic = Topic,
+            TopicProvider = TopicProvider,
+            TopicModelId = TopicModelId,
+            TopicThinking = TopicThinking,
+            TopicTier = TopicTier,
+            TopicSpeed = TopicSpeed,
+            TopicContext = TopicContext,
             ImageModel = ImageModel,
             ImageProvider = ImageProvider,
             ImageModelId = ImageModelId,

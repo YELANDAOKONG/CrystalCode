@@ -22,6 +22,9 @@ public sealed class ShellChrome
 
     public string SessionId { get; set; } = string.Empty;
 
+    /// <summary>The session topic for the <c>topic</c> field, or empty.</summary>
+    public string Topic { get; set; } = string.Empty;
+
     public string WorkspaceRoot { get; set; } = string.Empty;
 
     public bool PlanMode { get; set; }
@@ -267,6 +270,7 @@ public sealed class ShellChrome
                 "provider" => Provider,
                 "mode" => ModeLabel,
                 "session-id" => ShortSessionId,
+                "topic" => Topic,
                 "workspace" => string.IsNullOrWhiteSpace(WorkspaceRoot)
                     ? string.Empty
                     : PathDisplay.Shorten(WorkspaceRoot),
@@ -296,6 +300,7 @@ public sealed class ShellChrome
                     "speed" => ValueColor("speed", value),
                     "context-window" => WindowColor(value),
                     "prompt-set" => ValueColor("prompt-set", value),
+                    "topic" => Theme.ForValue("topic", value),
                     "model" => Theme.ForValue("model", value),
                     "provider" => Theme.ForValue("provider", value),
                     "mode" => Theme.ForValue("mode", value, ModeColor),

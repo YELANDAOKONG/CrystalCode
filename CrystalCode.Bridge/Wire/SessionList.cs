@@ -33,7 +33,7 @@ internal static class SessionList
             writer.WriteStartObject();
             writer.WriteString("sessionId", session.Id);
             writer.WriteString("cwd", session.Workspace);
-            writer.WriteString("title", session.Preview);
+            writer.WriteString("title", session.Title);
             if (session.UpdatedUtc is { } updated)
             {
                 writer.WriteString("updatedAt", updated.ToString("O", CultureInfo.InvariantCulture));

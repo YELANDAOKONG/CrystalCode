@@ -575,14 +575,15 @@ public sealed class SessionRenderer : IDisposable
     }
 
     /// <summary>
-    /// Sets the provider name and session id the custom status line can show.
+    /// Sets the provider name, session id, and topic the custom status line can show.
     /// </summary>
-    internal void SetIdentity(string provider, string sessionId)
+    internal void SetIdentity(string provider, string sessionId, string topic = "")
     {
         lock (_gate)
         {
             _chrome.Provider = provider;
             _chrome.SessionId = sessionId;
+            _chrome.Topic = topic;
             PaintUnlocked(force: false);
         }
     }

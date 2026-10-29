@@ -204,7 +204,7 @@ internal static class FormWire
             session.Id,
             (listWorkspace ? session.Workspace + "  " : string.Empty)
                 + (session.UpdatedUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "--")
-                + "  " + Preview(session.Preview))));
+                + "  " + Preview(session.Title))));
     }
 
     public static void Children(Utf8JsonWriter writer, string sessionId, IReadOnlyList<ChildSessionDocument> children) =>

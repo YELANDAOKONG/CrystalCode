@@ -72,6 +72,8 @@ public static class ServerScopes
             SessionVerb.Todos => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Attach => ServerScope.Operate,
             // A bare command or a kind lists; every other form writes config.json.
+            // A bare /topic shows; naming the session and configuring naming write state.
+            SessionVerb.Topic => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Describe => IsResourceListing(argument) ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Quick => ServerScope.Operate,
             SessionVerb.Edit => ServerScope.Operate,

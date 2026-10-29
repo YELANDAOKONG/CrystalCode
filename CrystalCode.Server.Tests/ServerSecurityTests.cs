@@ -298,6 +298,9 @@ public sealed class ServerSecurityTests
         Assert.Equal(ServerScope.Admin, ServerScopes.ForInput("/quit"));
         Assert.Equal(ServerScope.Operate, ServerScopes.ForInput("/notify"));
         Assert.Equal(ServerScope.Admin, ServerScopes.ForInput("/notify test"));
+        Assert.Equal(ServerScope.Operate, ServerScopes.ForInput("/topic"));
+        Assert.Equal(ServerScope.Admin, ServerScopes.ForInput("/topic Rename it"));
+        Assert.Equal(ServerScope.Admin, ServerScopes.ForInput("/topic off"));
         Assert.Equal(ServerScope.Operate, ServerScopes.ForInput("/describe"));
         Assert.Equal(ServerScope.Operate, ServerScopes.ForInput("/describe audio"));
         Assert.Equal(ServerScope.Operate, ServerScopes.ForInput("/describe image model"));

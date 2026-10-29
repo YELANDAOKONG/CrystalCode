@@ -1086,6 +1086,13 @@ public sealed class CodingSession : ITurnObserver
     private string? _recallText;
     private string? _recallOrigin;
     private int _recallBaseline;
+    private readonly object _topicGate = new();
+    private string? _topic;
+    private bool _topicByOperator;
+    private bool _topicAttempted;
+    private CancellationTokenSource? _topicSource;
+    private Task? _topicTask;
+    private long _topicGeneration;
     private readonly object _sideGate = new();
     private readonly List<SideExchange> _sideExchanges = [];
     private CancellationTokenSource? _sideSource;
@@ -1304,7 +1311,8 @@ public sealed class CodingSession : ITurnObserver
                 summary.UserTurns,
                 summary.Preview,
                 current,
-                open));
+                open,
+                summary.Topic));
         }
 
         return sessions;
@@ -2386,6 +2394,7 @@ public sealed class CodingSession : ITurnObserver
     {
         _notifier.Cancel();
         CancelAndClearSide(announce: false);
+        CancelTopic();
         try
         {
             PruneDraftImages(string.Empty, includeQueue: false, allOrigins: true);
@@ -2778,6 +2787,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Describe:
                 ChangeResourceModel(command.Argument);
+                return (true, false);
+            case SessionVerb.Topic:
+                ChangeTopic(command.Argument);
                 return (true, false);
             case SessionVerb.Todos:
                 ChangeTodos(command.Argument);
@@ -6700,7 +6712,9 @@ public sealed class CodingSession : ITurnObserver
                 ? _parentTurnUsage is not null && (_ledger.ModelCalls == 0 || _ledger.CumulativeUsage is not null)
                     ? SessionLedger.Add(_ledger.CumulativeUsage, _parentTurnUsage) : null
                 : _ledger.CumulativeUsage),
-            Children = _children.Snapshot().ToList()
+            Children = _children.Snapshot().ToList(),
+            Topic = CurrentTopic(),
+            TopicSource = TopicSourceText()
         };
     }
 
@@ -6711,6 +6725,7 @@ public sealed class CodingSession : ITurnObserver
         _settings = _settings.WithSessionDisabledBuiltInTools(new BuiltInToolDisablement());
         DiscardQueue();
         CancelAndClearSide(announce: true);
+        ResetTopic(null, byOperator: false);
         Publish(new ImageHistoryInvalidated());
         _sessionId = ClaimFreshSession();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
@@ -7128,6 +7143,9 @@ public sealed class CodingSession : ITurnObserver
             SessionMapper.ReadDisabledBuiltInTools(document.DisabledBuiltInTools));
         _sessionId = document.Id!;
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
+        ResetTopic(
+            SessionTopic.Normalize(document.Topic),
+            string.Equals(document.TopicSource, "operator", StringComparison.Ordinal));
         _planMode = document.PlanMode;
         _customMode = null;
         if (!string.IsNullOrWhiteSpace(document.Mode))
@@ -8700,6 +8718,376 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
+    internal Task TopicTask
+    {
+        get
+        {
+            lock (_topicGate)
+            {
+                return _topicTask ?? Task.CompletedTask;
+            }
+        }
+    }
+
+    private string? CurrentTopic()
+    {
+        lock (_topicGate)
+        {
+            return _topic;
+        }
+    }
+
+    private string? TopicSourceText()
+    {
+        lock (_topicGate)
+        {
+            return _topic is null ? null : _topicByOperator ? "operator" : "model";
+        }
+    }
+
+    private void CancelTopic()
+    {
+        lock (_topicGate)
+        {
+            _topicGeneration++;
+            _topicSource?.Cancel();
+            _topicSource?.Dispose();
+            _topicSource = null;
+        }
+    }
+
+    private void ResetTopic(string? topic, bool byOperator)
+    {
+        CancelTopic();
+        lock (_topicGate)
+        {
+            _topic = topic;
+            _topicByOperator = topic is not null && byOperator;
+            // A resumed session that already has turns was offered naming before.
+            _topicAttempted = false;
+        }
+    }
+
+    /// <summary>
+    /// Names the session once, after the first completed turn of this process
+    /// that finds it unnamed, while topic naming is on. It runs beside the
+    /// session and never blocks a turn. An existing topic is kept, and a
+    /// failed or unclear attempt is not retried; <c>/topic regenerate</c> asks again.
+    /// </summary>
+    private void StartTopicIfNeeded()
+    {
+        if (!_settings.TopicModel.Enabled)
+        {
+            return;
+        }
+
+        lock (_topicGate)
+        {
+            if (_topic is not null || _topicAttempted || _topicSource is not null)
+            {
+                return;
+            }
+
+            _topicAttempted = true;
+        }
+
+        StartTopic(announce: false);
+    }
+
+    private void StartTopic(bool announce)
+    {
+        var conversation = CompactionText.Conversation(TranscriptExport.ConversationItems(ArchiveSnapshot()));
+        if (conversation.Length == 0)
+        {
+            if (announce)
+            {
+                Error("There is no conversation to name yet.");
+            }
+
+            return;
+        }
+
+        HarnessSettings selected;
+        try
+        {
+            selected = _settings.ForTopic();
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or KeyNotFoundException)
+        {
+            Error("Topic naming failed: " + exception.Message);
+            return;
+        }
+
+        var system = PromptBinder.Apply(_prompts.Topic, CurrentPromptContext().WithMode("topic"), _placeholders);
+        var request = new ChatRequest(
+            [new ChatMessage(ChatRole.System, system), new ChatMessage(ChatRole.User, TopicNamingPrompt.UserText(conversation))],
+            [],
+            _settings.TopicModel.ThinkingEffort.ToReasoningOptions(selected.ActiveModel));
+        CancellationTokenSource source;
+        long generation;
+        lock (_topicGate)
+        {
+            _topicSource?.Cancel();
+            _topicSource?.Dispose();
+            source = new CancellationTokenSource();
+            _topicSource = source;
+            generation = ++_topicGeneration;
+            _topicTask = Task.Run(() => RunTopicAsync(selected, request, generation, announce, source.Token));
+        }
+    }
+
+    private async Task RunTopicAsync(
+        HarnessSettings selected,
+        ChatRequest request,
+        long generation,
+        bool announce,
+        CancellationToken cancellationToken)
+    {
+        IStreamingChatClient? client = null;
+        var owned = false;
+        try
+        {
+            // A separate client, like a side question: the next turn may start
+            // on the session client while naming still runs.
+            client = CreateClient(selected.WithOutputTokenCap(TopicOutputTokens));
+            owned = !ReferenceEquals(client, _client);
+            var assembler = new ChatStreamAssembler();
+            await foreach (var streamEvent in client.StreamAsync(request, cancellationToken))
+            {
+                assembler.Apply(streamEvent);
+            }
+
+            SideQuestion.TryReadAnswer(assembler.ToResponse(), out var answer, out _);
+            var topic = SessionTopic.Normalize(answer);
+            // The prompt answers this when the intent is unclear; the session stays unnamed.
+            if (string.Equals(topic, SessionTopic.Unclear, StringComparison.OrdinalIgnoreCase))
+            {
+                topic = null;
+            }
+
+            if (topic is null)
+            {
+                FinishTopic(generation, null, announce ? "Topic naming returned no text." : null);
+                return;
+            }
+
+            FinishTopic(generation, topic, null);
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelled by a new conversation, a resume, a manual topic, or close.
+        }
+        catch (Exception exception)
+        {
+            FinishTopic(
+                generation,
+                null,
+                "Topic naming failed: " + (string.IsNullOrWhiteSpace(exception.Message) ? "the model request failed." : exception.Message));
+        }
+        finally
+        {
+            if (owned)
+            {
+                DisposeClient(client);
+            }
+        }
+    }
+
+    /// <summary>A topic is a few words; this cap keeps a misbehaving model cheap.</summary>
+    private const int TopicOutputTokens = 256;
+
+    private void FinishTopic(long generation, string? topic, string? error)
+    {
+        lock (_topicGate)
+        {
+            if (generation != _topicGeneration)
+            {
+                return;
+            }
+
+            _topicSource?.Dispose();
+            _topicSource = null;
+            if (topic is not null)
+            {
+                _topic = topic;
+                _topicByOperator = false;
+            }
+        }
+
+        if (error is not null)
+        {
+            Note(error);
+            return;
+        }
+
+        if (topic is null)
+        {
+            return;
+        }
+
+        if (HasConversation())
+        {
+            SaveSession();
+        }
+
+        RefreshChrome();
+        Note("Topic  " + topic);
+    }
+
+    /// <summary>
+    /// Shows, sets, clears, or regenerates the session topic, or configures
+    /// topic naming: <c>on</c>, <c>off</c>, <c>model</c>, <c>thinking</c>,
+    /// <c>tier</c>, <c>speed</c>, and <c>context</c>.
+    /// </summary>
+    private void ChangeTopic(string? argument)
+    {
+        if (!TopicArguments.TryParse(argument, out var request, out var parseError))
+        {
+            Error(parseError);
+            return;
+        }
+
+        switch (request.Action)
+        {
+            case TopicArguments.Action.Show:
+                Note("Topic  " + (CurrentTopic() ?? "not set"));
+                Note(_settings.TopicModel.Describe());
+                return;
+            case TopicArguments.Action.Set:
+                ResetTopic(SessionTopic.Normalize(request.Value), byOperator: true);
+                SaveTopicChange();
+                Note("Topic  " + CurrentTopic());
+                return;
+            case TopicArguments.Action.Clear:
+                ResetTopic(null, byOperator: false);
+                SaveTopicChange();
+                Note("Topic  not set");
+                return;
+            case TopicArguments.Action.Regenerate:
+                if (!_settings.TopicModel.Enabled)
+                {
+                    Error("Turn topic naming on with /topic on before regenerating.");
+                    return;
+                }
+
+                lock (_topicGate)
+                {
+                    _topicByOperator = false;
+                }
+
+                StartTopic(announce: true);
+                return;
+        }
+
+        ChangeTopicModel(request);
+    }
+
+    private void SaveTopicChange()
+    {
+        if (HasConversation())
+        {
+            SaveSession();
+        }
+
+        RefreshChrome();
+    }
+
+    private void ChangeTopicModel(TopicArguments.Request request)
+    {
+        var current = _settings.TopicModel;
+        TopicModelSettings next;
+        switch (request.Action)
+        {
+            case TopicArguments.Action.Switch:
+                next = current.WithEnabled(request.Enabled);
+                break;
+            case TopicArguments.Action.Model:
+                if (request.Value is null)
+                {
+                    next = current.WithModel(null, null);
+                    break;
+                }
+
+                if (!ModelSelection.TryResolve(
+                        _settings.Catalog,
+                        current.Provider is string stored ? new ProviderName(stored) : _settings.Provider,
+                        request.Value,
+                        out var selection,
+                        out var error)
+                    || selection is null)
+                {
+                    Error((error ?? string.Empty).Replace("/model", "/topic model", StringComparison.Ordinal));
+                    return;
+                }
+
+                next = current.WithModel(selection.Provider.Value, selection.Model);
+                break;
+            case TopicArguments.Action.Thinking:
+                if (!TrySelectThinking(TopicCatalogModel(), current.ThinkingEffort, request.Value, "topic model", out var gear))
+                {
+                    return;
+                }
+
+                next = current.WithThinkingEffort(gear);
+                break;
+            default:
+                if (current.UsesSessionModel)
+                {
+                    Error("The topic model uses the session model and its /tier, /speed, and /context choice. "
+                        + "Select its own model with /topic model <provider model> first.");
+                    return;
+                }
+
+                if (!TrySelectSlot(
+                        request.Slot,
+                        TopicCatalogModel(),
+                        current.ServiceTier,
+                        current.Speed,
+                        current.ContextWindow,
+                        "topic model",
+                        out var selected))
+                {
+                    return;
+                }
+
+                next = request.Slot.Slot switch
+                {
+                    SideModelSlot.ServiceTier => current.WithServiceTier(selected.Token),
+                    SideModelSlot.Speed => current.WithSpeed(selected.Token),
+                    _ => current.WithContextWindow(selected.Window)
+                };
+                break;
+        }
+
+        try
+        {
+            SaveSettings(settings => settings.WithTopicModel(next));
+        }
+        catch (InvalidOperationException exception)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        if (!next.Enabled)
+        {
+            CancelTopic();
+        }
+
+        RefreshSlashCommands();
+        PublishOptions();
+        Note(next.Describe());
+    }
+
+    /// <summary>The catalog entry the topic request uses: its own model, or the session model.</summary>
+    private ModelSettings TopicCatalogModel()
+    {
+        var topic = _settings.TopicModel;
+        return topic.UsesSessionModel
+            ? _settings.ActiveModel
+            : _settings.Catalog.GetModel(new ProviderName(topic.Provider!), topic.Model!);
+    }
+
     private void ChangeCompactionSlot(ApprovalSlotArguments.Request request)
     {
         var label = SlotLabel(request.Slot);
@@ -9449,7 +9837,8 @@ public sealed class CodingSession : ITurnObserver
                 : null,
             ResourceChromeOf(_settings.ResourceModels.Image),
             ResourceChromeOf(_settings.ResourceModels.Audio),
-            ResourceChromeOf(_settings.ResourceModels.Video));
+            ResourceChromeOf(_settings.ResourceModels.Video),
+            CurrentTopic() ?? string.Empty);
 
     private static SideModelChrome? ResourceChromeOf(ResourceModelSettings resource) =>
         resource.Enabled
@@ -10491,6 +10880,11 @@ public sealed class CodingSession : ITurnObserver
         }
 
         SaveSession();
+        if (result.StopReason == TurnStopReason.Completed)
+        {
+            StartTopicIfNeeded();
+        }
+
         var usage = _ledger.Usage ?? result.Usage;
         lock (_usageGate)
         {

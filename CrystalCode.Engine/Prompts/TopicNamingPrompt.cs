@@ -1,7 +1,8 @@
 namespace CrystalCode.Engine.Prompts;
 
 /// <summary>
-/// System text reserved for generating a concise coding-session topic.
+/// Topic naming: the system text (operator-replaceable as <c>topic.md</c>)
+/// and the fixed user turn that carries the conversation.
 /// </summary>
 public static class TopicNamingPrompt
 {
@@ -20,4 +21,16 @@ public static class TopicNamingPrompt
         - Do not invent a goal that is not present in the conversation.
         - If the intent is unclear, return exactly the two words New conversation
         """;
+
+    /// <summary>Characters of conversation sent; the rest is cut so naming stays cheap.</summary>
+    public const int ConversationMaxChars = 8_000;
+
+    public static string UserText(string conversation)
+    {
+        ArgumentNullException.ThrowIfNull(conversation);
+        var text = conversation.Length <= ConversationMaxChars
+            ? conversation
+            : conversation[..ConversationMaxChars] + "\n[Conversation cut]";
+        return "Name this coding session.\n\n<conversation>\n" + text + "\n</conversation>";
+    }
 }

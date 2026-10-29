@@ -92,6 +92,7 @@ public sealed record HarnessSettings
         string? promptSetOverride = null,
         bool usePromptAttachments = true,
         ResourceModels? resourceModels = null,
+        TopicModelSettings? topicModel = null,
         IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
         RetrySettings? retry = null,
         RetrySettings? approvalRetry = null,
@@ -233,6 +234,7 @@ public sealed record HarnessSettings
             BuiltInToolDisablement.Merge(PersistentDisabledBuiltInTools, ProcessDisabledBuiltInTools),
             SessionDisabledBuiltInTools);
         ResourceModels = resourceModels ?? ResourceModels.Off;
+        TopicModel = topicModel ?? TopicModelSettings.Off;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
         ShowCompactionSummary = showCompactionSummary;
@@ -271,6 +273,8 @@ public sealed record HarnessSettings
         {
             RequireResourceModel(catalog, kind, ResourceModels.For(kind));
         }
+
+        RequireTopicModel(catalog, TopicModel);
     }
 
     public ProviderName Provider { get; }
@@ -528,6 +532,9 @@ public sealed record HarnessSettings
 
     /// <summary>The image, audio, and video resource description models.</summary>
     public ResourceModels ResourceModels { get; }
+
+    /// <summary>Session topic naming: its switch, model, and tuning.</summary>
+    public TopicModelSettings TopicModel { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.GetModelProvider(Provider, Model);
 
@@ -863,6 +870,24 @@ public sealed record HarnessSettings
             contextWindow ?? selected.ActiveModel.ContextWindows[0]);
     }
 
+    public HarnessSettings WithTopicModel(TopicModelSettings topicModel)
+    {
+        ArgumentNullException.ThrowIfNull(topicModel);
+        return Copy(topicModel: topicModel);
+    }
+
+    /// <summary>
+    /// The settings the topic request uses. With no own model this is the
+    /// session model with its current tier, speed, and context selection.
+    /// </summary>
+    public HarnessSettings ForTopic()
+    {
+        var topic = TopicModel;
+        return topic.UsesSessionModel
+            ? this
+            : ForModel(new ProviderName(topic.Provider!), topic.Model!, topic.ServiceTier, topic.Speed, topic.ContextWindow);
+    }
+
     public HarnessSettings WithResourceModel(ResourceKind kind, ResourceModelSettings model)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -926,6 +951,7 @@ public sealed record HarnessSettings
         bool? usePromptAttachments = null,
         bool setUsePromptAttachments = false,
         ResourceModels? resourceModels = null,
+        TopicModelSettings? topicModel = null,
         IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
         RetrySettings? retry = null,
         RetrySettings? approvalRetry = null,
@@ -987,6 +1013,7 @@ public sealed record HarnessSettings
             setPromptSetOverride ? promptSetOverride : PromptSetOverride,
             setUsePromptAttachments ? usePromptAttachments ?? UsePromptAttachments : UsePromptAttachments,
             resourceModels ?? ResourceModels,
+            topicModel ?? TopicModel,
             contextSelections ?? ContextSelections,
             retry ?? Retry,
             approvalRetry ?? ApprovalRetry,
@@ -1157,6 +1184,31 @@ public sealed record HarnessSettings
         {
             throw new InvalidOperationException(Unavailable(label + " speed", model.Speeds));
         }
+    }
+
+    /// <summary>
+    /// An own topic model must be a catalog model whose slots it declares. The
+    /// session model needs no check, and slots without an own model are kept
+    /// but never sent.
+    /// </summary>
+    private static void RequireTopicModel(ProviderCatalog catalog, TopicModelSettings topic)
+    {
+        if (topic.UsesSessionModel || !topic.Enabled)
+        {
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = catalog.GetModel(new ProviderName(topic.Provider!), topic.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+
+        RequireSlots(model, topic.ServiceTier, topic.Speed, topic.ContextWindow, "Topic model");
     }
 
     /// <summary>

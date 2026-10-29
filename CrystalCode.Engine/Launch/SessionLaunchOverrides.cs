@@ -96,6 +96,8 @@ public static class SessionLaunchOverrides
                     Budget(request.CompactionContext, "Compaction context budget")));
             }
 
+            next = next.WithTopicModel(ParseTopicModel(next.TopicModel, request));
+
             foreach (var flags in ResourceFlags.For(request))
             {
                 next = next.WithResourceModel(flags.Kind, ParseResourceModel(next, flags));
@@ -564,6 +566,53 @@ public static class SessionLaunchOverrides
     }
 
     private sealed record ReviewerFlags(string Switch, string Provider, string Model, string Label);
+
+    /// <summary>
+    /// <c>--topic on|off</c> and its model flags. A provider and model id
+    /// together select an own model; without them the stored choice stays.
+    /// </summary>
+    private static TopicModelSettings ParseTopicModel(TopicModelSettings stored, SessionLaunchOptions request)
+    {
+        var next = stored;
+        if (request.Topic is not null)
+        {
+            next = next.WithEnabled(ParseSwitch(request.Topic, "--topic"));
+        }
+
+        if (request.TopicProvider is not null || request.TopicModelId is not null)
+        {
+            if (request.TopicProvider is null || request.TopicModelId is null)
+            {
+                throw new ArgumentException("Pass --topic-provider and --topic-model-id together.");
+            }
+
+            next = next.WithModel(
+                ProviderName.Parse(Required(request.TopicProvider, "Topic provider")).Value,
+                Required(request.TopicModelId, "Topic model"));
+        }
+
+        if (request.TopicThinking is not null)
+        {
+            next = next.WithThinkingEffort(ThinkingSelection.Parse(Required(request.TopicThinking, "Topic thinking")));
+        }
+
+        if (request.TopicTier is not null)
+        {
+            next = next.WithServiceTier(Token(request.TopicTier, "Topic service tier"));
+        }
+
+        if (request.TopicSpeed is not null)
+        {
+            next = next.WithSpeed(Token(request.TopicSpeed, "Topic speed"));
+        }
+
+        if (request.TopicContext is not null)
+        {
+            next = next.WithContextWindow(Budget(request.TopicContext, "Topic context budget"));
+        }
+
+        return next;
+    }
 
     /// <summary>The <c>--image-*</c>, <c>--audio-*</c>, or <c>--video-*</c> flags of one launch.</summary>
     private sealed record ResourceFlags(

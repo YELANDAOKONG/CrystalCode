@@ -1041,7 +1041,8 @@ literal. A resolver that throws, or returns no text, leaves the token and
 records an English note. Built-in Work, Plan, Review, compaction, and
 image-description templates declare the slots they need explicitly. Topic
 naming uses `topic.md`. It is a named prompt, so a prompt set, Home, or
-project file can replace it. The live session does not invoke it yet. Review
+project file can replace it. Its `{{mode}}` is `topic`, and its user turn is
+fixed in `TopicNamingPrompt.UserText`. Review
 system text is the named file plus any enabled review
 attachments. It does not receive the workspace instruction block. Its user
 turn is the named `review.user` template. Extended approval system text is the
@@ -1739,6 +1740,30 @@ whole session. `/clear` starts a new id.
 update order; `/sessions all` includes every workspace. The current id is
 marked and every row keeps the complete id for use with `/resume <id>` or
 `/fork <id>`. Empty and unreadable session files are omitted.
+
+Session topics. `TopicModelSettings` (`topicModel` in `config.json`) holds
+the switch, an optional own provider and model, the thinking gear, and own
+tier, speed, and context. `HarnessSettings.ForTopic` returns the session
+settings unchanged when there is no own model, so the session tier, speed,
+and context apply; with an own model it uses the same `ForModel` path as the
+side models. `CodingSession` keeps the topic and whether the operator set it
+under `_topicGate`. After a completed turn, `StartTopicIfNeeded` runs one
+background request (`Task.Run`, cancelled by `/clear`, resume, a manual
+topic, and close) on a separate client with a 256-token reply cap, the
+`topic.md` system text, and `CompactionText` of the archive cut to 8000
+characters. A generation counter drops a stale reply. The result is
+normalized by `SessionTopic` (one line, no quotes or trailing period, at most
+80 characters); `New conversation` is treated as no answer. The session is
+saved and `ChromeChanged` carries `SessionChrome.Topic`. The session file
+stores `topic` and `topicSource` (`model` or `operator`); `SessionSummary`
+and `SavedSessionInfo` carry `Topic`, and `SessionSummary.Title` falls back
+to the first user message. Bridge sends `session_info_update` with the new
+title when a `ChromeChanged` topic differs from the last one it reported.
+`/topic` is `SessionVerb.Topic`; Server treats a bare `/topic` as operate and
+every other form as admin. The option catalog offers `topic`, `topic_model`
+(`session` plus catalog models), and `topic_thinking`, plus `topic_tier`,
+`topic_speed`, and `topic_context` for an own model. A fork starts without a
+topic.
 
 `/fork` first persists the current conversation, copies its transcript,
 compaction summary, todos, mode, counters, and usage baseline to a new id, and

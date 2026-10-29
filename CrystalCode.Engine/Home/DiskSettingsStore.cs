@@ -110,6 +110,7 @@ public sealed class DiskSettingsStore : ISettingsStore
                 ReadResourceModel(document.ImageModel, "imageModel"),
                 ReadResourceModel(document.AudioModel, "audioModel"),
                 ReadResourceModel(document.VideoModel, "videoModel")),
+            topicModel: ReadTopicModel(document.TopicModel),
             contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
             tierSelections: SettingsMapper.ReadTokenSelections(document.TierSelections, "tierSelections"),
             speedSelections: SettingsMapper.ReadTokenSelections(document.SpeedSelections, "speedSelections"),
@@ -217,6 +218,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             ImageModel = WriteResourceModel(settings.ResourceModels.Image),
             AudioModel = WriteResourceModel(settings.ResourceModels.Audio),
             VideoModel = WriteResourceModel(settings.ResourceModels.Video),
+            TopicModel = WriteTopicModel(settings.TopicModel),
             Retry = WriteRetry(settings.Retry),
             ApprovalRetry = WriteRetry(settings.ApprovalRetry),
             DisabledBuiltInTools = settings.PersistentDisabledBuiltInTools.Plan.Count == 0
@@ -822,6 +824,57 @@ public sealed class DiskSettingsStore : ISettingsStore
             TimeoutSeconds = settings.TimeoutSeconds == OperatorNotifySettings.DefaultTimeoutSeconds
                 ? null
                 : settings.TimeoutSeconds
+        };
+    }
+
+    /// <summary>
+    /// Topic naming is on only with <c>enabled: true</c>. Omitted provider and
+    /// model use the session model.
+    /// </summary>
+    private static TopicModelSettings ReadTopicModel(TopicModelDocument? document)
+    {
+        if (document is null)
+        {
+            return TopicModelSettings.Off;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider) ? null : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model) ? null : document.Model.Trim();
+        if ((provider is null) != (model is null))
+        {
+            throw new InvalidOperationException(
+                "topicModel requires provider and model together, or neither to use the session model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new TopicModelSettings(
+            document.Enabled ?? false,
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, "topicModel.serviceTier"),
+            ReadSlot(document.Speed, "topicModel.speed"),
+            ReadContextWindow(document.ContextWindow, "topicModel.contextWindow"));
+    }
+
+    private static TopicModelDocument? WriteTopicModel(TopicModelSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new TopicModelDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
         };
     }
 

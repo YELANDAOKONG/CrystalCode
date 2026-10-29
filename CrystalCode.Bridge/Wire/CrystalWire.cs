@@ -69,6 +69,7 @@ internal static class CrystalWire
         SideModel(writer, "image", chrome.Image);
         SideModel(writer, "audio", chrome.Audio);
         SideModel(writer, "video", chrome.Video);
+        writer.WriteString("topic", chrome.Topic);
         writer.WriteEndObject();
     }
 

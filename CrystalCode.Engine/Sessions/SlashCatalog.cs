@@ -65,6 +65,8 @@ public static class SlashCatalog
             ["on", "off", "reload"]),
         new(SessionVerb.Mcp, "mcp", [], "List, show, or configure MCP servers",
             ["list", "show", "on", "off", "reload", "enable", "disable", "approval", "home", "project"]),
+        new(SessionVerb.Topic, "topic", [], "Show, set, clear, or regenerate the session topic, or configure topic naming",
+            ["set", "clear", "regenerate", "on", "off", "model", "thinking", "tier", "speed", "context"]),
         new(SessionVerb.Describe, "describe", [], "Show or set the image, audio, and video description models",
             ["image", "audio", "video"]),
         new(SessionVerb.Attach, "attach", ["image"], "Attach a workspace image"),

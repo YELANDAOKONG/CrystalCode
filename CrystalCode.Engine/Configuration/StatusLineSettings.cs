@@ -49,6 +49,7 @@ public sealed record StatusLineSettings
             "extended-trigger",
             "extended-primary",
             "session-id",
+            "topic",
             "workspace",
             "context-used",
             "context-left",

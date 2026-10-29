@@ -12,7 +12,7 @@ namespace CrystalCode.Engine.Events;
 /// <see cref="Compaction"/> is null while the compaction model is off, and
 /// <see cref="Image"/>, <see cref="Audio"/>, and <see cref="Video"/> while
 /// that resource description model is off. Audio and video are not connected
-/// to a tool yet.
+/// to a tool yet. <see cref="Topic"/> is the session topic, or empty.
 /// </summary>
 public sealed record SessionChrome(
     string Model,
@@ -34,4 +34,5 @@ public sealed record SessionChrome(
     SideModelChrome? Compaction = null,
     SideModelChrome? Image = null,
     SideModelChrome? Audio = null,
-    SideModelChrome? Video = null);
+    SideModelChrome? Video = null,
+    string Topic = "");

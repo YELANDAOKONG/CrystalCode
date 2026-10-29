@@ -222,7 +222,7 @@ Client capabilities Bridge reads:
 | `session/load {sessionId, cwd, ...}` | Prepare with `Resume = true`, `ResumeTarget = sessionId`. Replays the archive (see Replay), then returns `configOptions` and `modes`. An unknown saved session is `-32002`. |
 | `session/resume {sessionId, cwd, ...}` | Same restore without replay: the engine's start replay is dropped. |
 | `_crystal/session/fork {sessionId, cwd, ...}`, and RFD `session/fork` (not ACP) | `/fork <id>` semantics: a new id from that saved session, in `cwd`. The source file is not changed. |
-| `session/list {cwd, cursor}` | `SessionStore.List(workspaceRoot)`, newest first. `title` is the summary preview, `updatedAt` the update time, `additionalDirectories` the saved outside-workspace roots, `_meta.crystal` carries `mode`, `planMode`, `userTurns`, and `createdAt`. Pages of 50 with an opaque cursor; an invalid cursor is `-32602`. Omitting `cwd` lists every workspace. |
+| `session/list {cwd, cursor}` | `SessionStore.List(workspaceRoot)`, newest first. `title` is the session topic, or the first user message without one, `updatedAt` the update time, `additionalDirectories` the saved outside-workspace roots, `_meta.crystal` carries `mode`, `planMode`, `userTurns`, and `createdAt`. Pages of 50 with an opaque cursor; an invalid cursor is `-32602`. Omitting `cwd` lists every workspace. |
 | `session/close {sessionId}` | Interrupt, collect, `CloseAsync`. The process stays up for another `session/new`. |
 | `session/set_mode` | The `mode` option's `/mode <id>` command. A mode not offered is `-32602`. |
 | `session/set_config_option` | See Configuration. |
@@ -257,7 +257,9 @@ Client capabilities Bridge reads:
   `/mcp`, a log, or an error.
 - `additionalDirectories`: see Additional roots.
 - `session_info_update` is sent after the first user message and on each
-  save, with `title` from the session preview and `updatedAt`.
+  save, with `title` (the topic, or the first user message without one) and
+  `updatedAt`. Topic naming finishes after the prompt response, so a new or
+  changed topic sends another `session_info_update` with event `ChromeChanged`.
 
 ### Additional roots
 
@@ -507,7 +509,7 @@ are `null` while that reviewer is off; otherwise each holds `provider`,
 `model`, and the display labels `thinking`, `serviceTier`, `speed`, and
 `context`, and `extendedApproval` adds `trigger` and `includePrimaryReview`. `compaction` is `null` while the compaction model is off, and `image`,
 `audio`, and `video` while that resource description model is off; audio and
-video are configuration only. Otherwise each holds that model's `provider`, `model`,
+video are configuration only. `topic` is the session topic, or empty. Otherwise each holds that model's `provider`, `model`,
 and display labels `thinking`, `serviceTier`, `speed`, and `context` (blank
 when the model does not set its own). A command the
 engine refuses is `-32603`, `command_refused`. A value or option not offered
@@ -587,6 +589,9 @@ its value: a hidden option keeps whatever the terminal or `config.json` set.
 | `compaction_tier` | `_crystal_compaction` | the compaction model's tiers plus unset | `/compact tier` |
 | `compaction_speed` | `_crystal_compaction` | the compaction model's speeds plus unset | `/compact speed` |
 | `compaction_context` | `_crystal_compaction` | the compaction model's declared budgets | `/compact context` |
+| `topic` | `_crystal_topic` | switch | `/topic on\|off` |
+| `topic_model` | `_crystal_topic` | `session` plus catalog | `/topic model [provider model]` |
+| `topic_thinking`, `topic_tier`, `topic_speed`, `topic_context` | `_crystal_topic` | the topic model's gears; tier, speed, and context only for its own model | `/topic thinking\|tier\|speed\|context` |
 | `image_model`, `audio_model`, `video_model` | `_crystal_describe` | off plus catalog models that declare that input | `/describe <kind> model`, `/describe <kind> off` |
 | `image_thinking`, `image_tier`, `image_speed`, `image_context`, and the same for `audio` and `video` | `_crystal_describe` | that model's gears, tiers plus unset, speeds plus unset, and declared budgets | `/describe <kind> thinking\|tier\|speed\|context` |
 | `micro_compaction` | `_crystal_compaction` | switch | `/compact micro on\|off` |

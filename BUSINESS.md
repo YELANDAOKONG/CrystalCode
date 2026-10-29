@@ -395,6 +395,29 @@ separate library with no terminal code. The product can:
 - record `audioInput` and `videoInput` on a model entry. Those flags are
   declarations only: the host stores them and publishes them to plugins, and
   it does not attach, persist, or send audio or video;
+- Session topic. A session can have a short topic that names what it is
+  about. Topic naming is off by default. `topicModel` in `config.json`,
+  `/topic`, launch flags, and session options configure it: `enabled`, and an
+  optional `provider` and `model`. Without them the session model names the
+  topic with that model's current tier, speed, and context choice. With its own
+  model, topic naming is configured on its own like the other side models: its
+  own thinking gear, service tier, speed, and context budget, an unset tier or
+  speed not sent, an unset context the model's first declared budget. The
+  thinking gear is always `topicModel.thinkingEffort`. While naming is on, the
+  host asks that model once, in the background after the first completed turn
+  this process sees for an unnamed session, with the `topic.md` system prompt
+  and the conversation cut to 8000 characters. It never blocks a turn, sends no
+  tools, and costs one small request (reply cap 256 tokens). A failure prints a
+  note and is not retried; an answer of `New conversation` leaves the session
+  unnamed. `/topic <text>` or `/topic set <text>` names the session by hand;
+  that operator topic is never replaced automatically. `/topic clear` removes
+  it, and `/topic regenerate` asks the model again. The topic is saved in the
+  session file (`topic`, `topicSource`). A session without one, including every
+  session saved before this, lists by its first user message. `/clear` and a
+  fork start without a topic. The topic is shown in `/sessions`, the resume
+  picker, Server session lists, Bridge `session/list` and `session_info_update`
+  titles, chrome, and the optional `topic` custom status-line field. Approval,
+  trust, and `ToolInvocationPolicy` stay as they are;
 - configure an audio and a video description model (`audioModel`,
   `videoModel`) alongside the image model. That configuration is reserved
   for the deferred audio and video path and changes no behavior today;
@@ -554,20 +577,6 @@ implemented in the current build.
   reserve a configuration field, command, public type, or backend name, and
   do not store a search key in source, logs, or on a command line. Approval,
   trust, the workspace fence, and `ToolInvocationPolicy` stay as they are.
-- Session topic. The direction is a short topic for a session that names
-  what it is about. `topic.md` (`TopicNamingPrompt`) is a named prompt today,
-  but nothing calls it, so no session has a topic. Who sets it (the model
-  after the first turn, the operator, or both), which model generates it and
-  what that costs, where it is saved, and how an older session without one
-  reads are not defined. Do not reserve a configuration field, command,
-  public type, event, wire field, or file format. Approval, trust, and
-  `ToolInvocationPolicy` stay as they are. Current behavior stands: a session
-  has an id and no topic.
-- A `topic` custom status-line field. The direction is to show the session
-  topic on the custom status line. It depends on the session topic item above
-  and is not defined before it. Do not add the field name until the topic
-  exists.
-
 ### Medium priority
 
 - Automatically fetching model-list information from a provider. `/model`

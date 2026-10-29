@@ -106,6 +106,8 @@ internal sealed class SettingsDocument
 
     public ResourceModelDocument? VideoModel { get; set; }
 
+    public TopicModelDocument? TopicModel { get; set; }
+
     public RetryDocument? Retry { get; set; }
 
     public RetryDocument? ApprovalRetry { get; set; }

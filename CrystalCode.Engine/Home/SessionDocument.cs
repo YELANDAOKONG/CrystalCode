@@ -54,4 +54,16 @@ public sealed class SessionDocument
     public SessionUsageDocument? Usage { get; set; }
 
     public SessionUsageDocument? CumulativeUsage { get; set; }
+
+    /// <summary>
+    /// Short session name. Null means none yet; an older session has none and
+    /// lists by its first user message.
+    /// </summary>
+    public string? Topic { get; set; }
+
+    /// <summary>
+    /// <c>model</c> when topic naming wrote <see cref="Topic"/>, <c>operator</c>
+    /// when <c>/topic</c> set it. An operator topic is never replaced automatically.
+    /// </summary>
+    public string? TopicSource { get; set; }
 }

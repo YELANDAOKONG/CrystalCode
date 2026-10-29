@@ -167,7 +167,8 @@ public sealed class SessionStore
             document.UpdatedUtc,
             Math.Max(0, document.UserTurns),
             FirstUserText(document),
-            document.Mode);
+            document.Mode,
+            SessionTopic.Normalize(document.Topic));
 
     private IEnumerable<string> EnumerateFiles()
     {
@@ -321,6 +322,8 @@ public sealed class SessionStore
         ToolCalls = source.ToolCalls,
         Usage = source.Usage,
         CumulativeUsage = source.CumulativeUsage,
+        Topic = source.Topic,
+        TopicSource = source.TopicSource,
         Children = source.Children.Select(child => child with
         {
             Items = child.Items.ToArray(), Archive = child.Archive.ToArray(),

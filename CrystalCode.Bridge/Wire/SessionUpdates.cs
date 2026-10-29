@@ -109,6 +109,7 @@ internal sealed class SessionUpdates
     private string? _mode;
     private int _contextWindow;
     private string? _reportedWorkspace;
+    private string _reportedTopic = string.Empty;
     private string _engineSessionId = string.Empty;
 
     /// <param name="send">Writes one <c>update</c> object; the caller wraps it in <c>session/update</c>.</param>
@@ -199,6 +200,7 @@ internal sealed class SessionUpdates
                     break;
                 case SessionStarted started:
                     _reportedWorkspace = started.Chrome.WorkspaceRoot;
+                    _reportedTopic = started.Chrome.Topic;
                     RememberContextWindow(started.Chrome.ContextWindow);
                     Chrome(started.Chrome);
                     break;
@@ -209,8 +211,17 @@ internal sealed class SessionUpdates
                     SessionInfo("ChromeChanged", title: null);
                     Chrome(changed.Chrome);
                     break;
+                case ChromeChanged changed when changed.Chrome.Topic.Length > 0 && changed.Chrome.Topic != _reportedTopic:
+                    // Topic naming finishes after the prompt response, so the title follows here.
+                    _reportedTopic = changed.Chrome.Topic;
+                    RememberContextWindow(changed.Chrome.ContextWindow);
+                    SessionInfo("ChromeChanged", changed.Chrome.Topic);
+                    Chrome(changed.Chrome);
+                    PendingChanged(changed.Chrome.Pending);
+                    break;
                 case ChromeChanged changed:
                     // The option catalog carries the values; this keeps the plain chrome.
+                    _reportedTopic = changed.Chrome.Topic;
                     RememberContextWindow(changed.Chrome.ContextWindow);
                     Chrome(changed.Chrome);
                     PendingChanged(changed.Chrome.Pending);

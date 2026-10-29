@@ -317,6 +317,27 @@ public sealed class BridgeSessionTests
     }
 
     [Fact]
+    public async Task SessionInfo_CarriesTheTopicOnceNamingFinishes()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(
+            new ScriptedModel(false, ScriptedModel.TextRound("done"), ScriptedModel.TextRound("Tidy the build")),
+            options: static options => options with { Topic = "on" });
+        var id = await fixture.OpenAsync();
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "clean the build" } } });
+
+        var info = await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.TryGetProperty("title", out var title) && title.GetString() == "Tidy the build");
+        Assert.Equal(
+            "ChromeChanged",
+            info.GetProperty("params").GetProperty("update").GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString());
+        var listed = await fixture.RequestAsync("session/list", new { cwd = fixture.Workspace });
+        Assert.Equal(
+            "Tidy the build",
+            listed.GetProperty("result").GetProperty("sessions")[0].GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task Usage_IsReportedWithTheContextWindow()
     {
         var model = new ScriptedModel(false,

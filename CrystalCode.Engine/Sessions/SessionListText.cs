@@ -33,7 +33,7 @@ internal static class SessionListText
             lines.Add(
                 $"{marker} {session.Id}  {updated}  {mode}  {session.UserTurns} turns"
                 + workspace
-                + $"  {TrimPreview(session.Preview)}");
+                + $"  {TrimPreview(session.Title)}");
         }
 
         return string.Join(Environment.NewLine, lines);

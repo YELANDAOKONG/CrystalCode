@@ -40,6 +40,7 @@ internal static class QueryEndpoints
                     WireWriter.Date(writer, "updatedUtc", saved.UpdatedUtc);
                     writer.WriteNumber("userTurns", saved.UserTurns);
                     writer.WriteString("preview", saved.Preview);
+                    WireWriter.Optional(writer, "topic", saved.Topic);
                     writer.WriteBoolean("current", saved.Current);
                     writer.WriteBoolean("open", saved.Open);
                     writer.WriteEndObject();
