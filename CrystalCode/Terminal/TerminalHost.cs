@@ -186,6 +186,13 @@ internal sealed class TerminalHost
                 return;
             }
 
+            if (_renderer.CanRecallIntoComposer && _session.TryRetractQueued(out var retracted))
+            {
+                _renderer.SeedComposer(retracted);
+                _idleCancels = 0;
+                return;
+            }
+
             if (_renderer.CanRecallIntoComposer && _session.TryRecall())
             {
                 _idleCancels = 0;

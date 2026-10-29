@@ -1102,6 +1102,7 @@ its own.
 | Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open. A recalled prompt that starts with `/` stays in history until you edit it |
 | Escape | Clear the composer. While inspecting a child, and no modal owns the key, return to the parent at any draft state. Esc in the child picker dismisses the picker |
 | Mouse wheel, PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |
+| Ctrl+C during a turn with an empty composer and a queued follow-up | Take the newest queued message back into the composer. The turn keeps running. Repeat to take back more |
 | Ctrl+C before the model shows text, reasoning, a tool call, or a retry, with an empty composer and an empty follow-up queue | Cancel the turn and put that message back in the composer |
 | Ctrl+C during a turn after that | Cancel the turn. The message stays |
 | Ctrl+C at idle | Clear the composer |

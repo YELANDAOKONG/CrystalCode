@@ -53,4 +53,18 @@ public sealed class MessageQueueTests
         Assert.Equal(0, queue.Count);
         Assert.Null(queue.Drain());
     }
+
+    [Fact]
+    public void RemoveLast_TakesTheNewestMessageAndDropsItsInterrupt()
+    {
+        var queue = new MessageQueue();
+        queue.Enqueue("one", interruptAfterTools: false);
+        queue.Enqueue("two");
+
+        Assert.True(queue.InterruptAfterTools);
+        Assert.Equal("two", queue.RemoveLast());
+        Assert.False(queue.InterruptAfterTools);
+        Assert.Equal("one", queue.RemoveLast());
+        Assert.Null(queue.RemoveLast());
+    }
 }

@@ -30,6 +30,7 @@ public sealed class BridgeParityTests
         ["FinishTurnAsync"] = "SessionRunner shutdown",
         ["TryInterrupt"] = "session/cancel",
         ["TryRecall"] = "Phase 4: _crystal/recall",
+        ["TryRetractQueued"] = "Excluded: the terminal Ctrl+C returns the queued text to its composer",
         ["RecallPending"] = "Phase 4: _crystal/recall",
         ["TogglePlan"] = "Phase 4: _crystal/mode/togglePlan; /plan works as text",
         ["CycleMode"] = "Phase 4: _crystal/mode/cycle",

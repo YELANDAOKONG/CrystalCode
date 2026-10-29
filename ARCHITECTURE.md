@@ -736,7 +736,9 @@ those three except `/quit` are refused, as are other commands that change
 the session, workspace, or model.
 `/status`, `/help`, `/todos`, and other commands that only report state or
 adjust the display run immediately. `/quit` cancels compaction and exits.
-Ctrl+C interrupts and does not drop queued text.
+With an empty composer and a queued follow-up, Ctrl+C takes the newest queued
+message out of the queue and puts it in the composer (`TryRetractQueued`); it
+does not interrupt. With nothing queued, Ctrl+C interrupts.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
 

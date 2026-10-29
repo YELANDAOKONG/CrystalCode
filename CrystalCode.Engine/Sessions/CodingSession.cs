@@ -1606,6 +1606,24 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
+    /// <summary>
+    /// Takes the most recently queued follow-up back out of the queue so the
+    /// caller can return it to its composer. Returns false when nothing is
+    /// queued. Ctrl+C tries this before it interrupts.
+    /// </summary>
+    public bool TryRetractQueued(out string text)
+    {
+        var removed = _queue.RemoveLast();
+        text = removed ?? string.Empty;
+        if (removed is null)
+        {
+            return false;
+        }
+
+        ShowQueue();
+        return true;
+    }
+
     private void OpenRecallWindow(string message)
     {
         lock (_recallGate)

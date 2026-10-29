@@ -260,8 +260,10 @@ separate library with no terminal code. The product can:
   message leaves the transcript and the turn stops as interrupted. Text typed
   before the turn finishes is kept after the returned message. The next Ctrl+C
   still clears the composer, and the press after that on an empty composer
-  exits. After the window ends, or when a follow-up is queued, Ctrl+C only
-  cancels and the message stays. A message whose trusted image markers are no
+  exits. While a follow-up is queued and the composer is empty, Ctrl+C first
+  takes the newest queued message back into the composer and does not cancel;
+  once the queue is empty it cancels as above. After the window ends, Ctrl+C
+  only cancels and the message stays. A message whose trusted image markers are no
   longer held is not returned. `crystal run` does not return a message this way;
 - edit a long prompt in a full-screen editor with F8 or `/edit` in the
   terminal. The edit returns to the composer and is never sent automatically;

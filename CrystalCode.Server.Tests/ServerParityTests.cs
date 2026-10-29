@@ -39,6 +39,7 @@ public sealed class ServerParityTests
         ["FinishTurnAsync"] = "SessionRunner shutdown",
         ["TryInterrupt"] = "POST /interrupt",
         ["TryRecall"] = "POST /recall",
+        ["TryRetractQueued"] = "Excluded: the terminal Ctrl+C returns the queued text to its composer",
         ["RecallPending"] = "Recall state is part of POST /recall and message.recalled",
         ["TogglePlan"] = "POST /mode toggle-plan",
         ["CycleMode"] = "POST /mode cycle",
