@@ -2540,7 +2540,8 @@ error card keeps rows that are already wrapped. New stream text reflows
 only the open tail, and scrolling or typing reuses those rows. The shell enters the alternate
 screen when the terminal is a TTY and paints a retained frame: transcript
 viewport, optional overlay, optional pinned todos, optional progress row,
-status bar, and multiline composer. Unchanged
+status bar, and multiline composer. The composer draws a rounded border
+with the mode in the top edge once its text wraps to three rows. Unchanged
 rows are left in place; a width or height change clears the buffer. The
 frame uses one terminal-size snapshot, and the composer window is projected
 again if overlays or pinned rows leave fewer rows than it requested. Composer

@@ -373,10 +373,29 @@ public sealed class ComposerBufferTests
         var frame = FrameRows.Assemble(regions, [], [], PaintLine.Blank, [], visible);
 
         Assert.Equal(3, regions.ComposerRows);
-        Assert.Equal(["       six", "       seven", "       eight"],
-            visible.Lines.Select(line => line.Plain));
-        Assert.Equal(2, visible.CursorRow);
-        Assert.Equal("       eight", frame[regions.ComposerTop + visible.CursorRow].Plain);
+        Assert.Equal(3, visible.Lines.Count);
+        Assert.StartsWith("\u2502 eight", visible.Lines[1].Plain);
+        Assert.Equal(1, visible.CursorRow);
+        Assert.StartsWith("\u2502 eight", frame[regions.ComposerTop + visible.CursorRow].Plain);
+    }
+
+    [Fact]
+    public void Project_DrawsBorderOnceTheTextReachesThreeRows()
+    {
+        var buffer = new ComposerBuffer();
+        buffer.Insert("one\ntwo");
+        Assert.StartsWith("Work > ", buffer.Project(40, 8).Lines[0].Plain);
+
+        buffer.Insert("\nthree");
+        var view = buffer.Project(40, 8);
+
+        Assert.Equal(5, view.Lines.Count);
+        Assert.StartsWith("\u256d\u2500 Work ", view.Lines[0].Plain);
+        Assert.StartsWith("\u2502 three", view.Lines[3].Plain);
+        Assert.StartsWith("\u2570", view.Lines[4].Plain);
+        Assert.All(view.Lines, line => Assert.Equal(40, TextWidth.Measure(line.Plain)));
+        Assert.Equal(3, view.CursorRow);
+        Assert.Equal(2 + 5, view.CursorColumn);
     }
 
     [Fact]

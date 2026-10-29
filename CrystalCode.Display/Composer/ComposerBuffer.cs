@@ -10,6 +10,7 @@ namespace CrystalCode.Display.Composer;
 public sealed class ComposerBuffer
 {
     private const int MaximumHistory = 200;
+    private const int BorderedMinimumRows = 3;
     private readonly StringBuilder _text = new();
     private readonly List<string> _history = [];
     private readonly List<AtomicSpan> _atomicSpans = [];
@@ -354,6 +355,13 @@ public sealed class ComposerBuffer
             wrapped.Add(string.Empty);
         }
 
+        // The decision uses the unframed wrap only, so the frame cannot flip
+        // on and off as the narrower or wider body re-wraps.
+        if (ShowPrompt && wrapped.Count >= BorderedMinimumRows && maxRows >= BorderedMinimumRows)
+        {
+            return ProjectBordered(text, width, maxRows, mode);
+        }
+
         var (cursorRow, cursorBody) = MapCursor(text, _cursor, bodyWidth);
         var lines = new List<PaintLine>(wrapped.Count);
         var modeColor = !string.IsNullOrEmpty(CustomMode) ? Theme.Custom : PlanMode ? Theme.Plan : Theme.Work;
@@ -407,6 +415,56 @@ public sealed class ComposerBuffer
 
         return new ComposerView(lines, cursorRow, promptColumns + cursorBody);
     }
+
+    private ComposerView ProjectBordered(string text, int width, int maxRows, string mode)
+    {
+        var inner = Math.Max(width - 4, 1);
+        var bodyWidth = Math.Max(inner - 1, 8);
+        _bodyWidth = bodyWidth;
+        var wrapped = TextWidth.Wrap(text, bodyWidth);
+        var (cursorRow, cursorBody) = MapCursor(text, _cursor, bodyWidth);
+        var modeColor = !string.IsNullOrEmpty(CustomMode) ? Theme.Custom : PlanMode ? Theme.Plan : Theme.Work;
+
+        var body = new List<PaintLine>(wrapped.Count);
+        var bodyStart = 0;
+        foreach (var row in wrapped)
+        {
+            var content = new PaintLine(ColorBody(row, bodyStart), TextWidth.ExpandTabs(row)).Fit(inner);
+            var padding = new string(' ', Math.Max(0, inner - TextWidth.Measure(content.Plain)));
+            body.Add(new PaintLine(
+                BorderMarkup("\u2502 ") + content.Markup + padding + BorderMarkup(" \u2502"),
+                "\u2502 " + content.Plain + padding + " \u2502"));
+            bodyStart += row.Length;
+            if (bodyStart < text.Length && text[bodyStart] == '\n')
+            {
+                bodyStart++;
+            }
+        }
+
+        var bodyRows = Math.Max(1, maxRows - 2);
+        if (body.Count > bodyRows)
+        {
+            var start = cursorRow < bodyRows ? 0 : cursorRow - bodyRows + 1;
+            start = Math.Clamp(start, 0, body.Count - bodyRows);
+            body = body.GetRange(start, bodyRows);
+            cursorRow -= start;
+        }
+
+        var label = TextWidth.Truncate(mode, Math.Max(0, width - 6));
+        var dashes = new string('\u2500', Math.Max(0, width - 5 - TextWidth.Measure(label)));
+        var top = new PaintLine(
+            BorderMarkup("\u256d\u2500 ") + $"[{modeColor} bold]{MarkupText.Escape(label)}[/]"
+                + BorderMarkup(" " + dashes + "\u256e"),
+            "\u256d\u2500 " + label + " " + dashes + "\u256e");
+        var bottomPlain = "\u2570" + new string('\u2500', Math.Max(0, width - 2)) + "\u256f";
+        var lines = new List<PaintLine>(body.Count + 2) { top };
+        lines.AddRange(body);
+        lines.Add(new PaintLine(BorderMarkup(bottomPlain), bottomPlain));
+        return new ComposerView(lines, cursorRow + 1, cursorBody + 2);
+    }
+
+    private static string BorderMarkup(string text) =>
+        $"[{Theme.Chrome}]{MarkupText.Escape(text)}[/]";
 
     private string PromptMarkup(string mode, string modeColor) =>
         ShowPrompt
