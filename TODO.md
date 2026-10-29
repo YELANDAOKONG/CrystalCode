@@ -230,14 +230,14 @@ behavior stands until a specific change defines otherwise.
   configuration field, command, public type, or backend name, and do not
   store a search key in source, logs, or on a command line. Approval, trust,
   the workspace fence, and `ToolInvocationPolicy` stay as they are.
-- Session topic. A short name for a session, generated or set by the
-  operator. `topic.md` (`TopicNamingPrompt`) is a named prompt today, but
-  nothing calls it, so no session has a topic. Who sets it (the model after
-  the first turn, the operator, or both), which model generates it and what
-  that costs, whether a name and a topic are one thing, where it is saved,
-  and how an older session without one reads are not defined. Do not reserve
-  a configuration field, command, public type, event, wire field, or file
-  format. Approval, trust, and `ToolInvocationPolicy` stay as they are.
+- Session topic. A short topic for a session that names what it is about.
+  `topic.md` (`TopicNamingPrompt`) is a named prompt today, but nothing calls
+  it, so no session has a topic. Who sets it (the model after the first turn,
+  the operator, or both), which model generates it and what that costs, where
+  it is saved, and how an older session without one reads are not defined. Do
+  not reserve a configuration field, command, public type, event, wire field,
+  or file format. Approval, trust, and `ToolInvocationPolicy` stay as they
+  are.
 - A `topic` custom status-line field. It shows the session topic and depends
   on the session topic item above. Whether it is colored by theme gauges is
   not defined. Do not add the field name until the topic exists.
