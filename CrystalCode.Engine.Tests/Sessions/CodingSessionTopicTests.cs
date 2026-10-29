@@ -7,6 +7,7 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions;
 
 using Xunit;
 
@@ -147,6 +148,47 @@ public sealed class CodingSessionTopicTests
         Assert.Null(Read(headless).TopicModel!.Enabled);
     }
 
+    [Fact]
+    public async Task TopicAndDescribeMenus_CompleteSubcommandsAndTheirValues()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        var topic = Command(headless, "topic");
+        Assert.Equal(
+            ["set", "clear", "regenerate", "on", "off", "model"],
+            topic.ArgumentOptions.Select(static item => item.Name));
+        var models = topic.ArgumentOptions.Single(static item => item.Name == "model").ArgumentOptions;
+        Assert.Equal("session", models[0].Name);
+        Assert.Contains(models, static item => item.Name == "namer");
+
+        await headless.Session.SubmitAsync("/topic model scripted namer", CancellationToken.None);
+        topic = Command(headless, "topic");
+        Assert.Contains(
+            topic.ArgumentOptions.Single(static item => item.Name == "thinking").ArgumentOptions,
+            static item => item.Name == "high");
+        Assert.Equal(
+            ["set", "clear", "regenerate", "on", "off", "model", "thinking", "tier", "speed", "context"],
+            topic.ArgumentOptions.Select(static item => item.Name));
+        Assert.Equal(["flex"], topic.ArgumentOptions.Single(static item => item.Name == "tier").ArgumentOptions.Select(static item => item.Name));
+        Assert.Equal(["100k", "200k"], topic.ArgumentOptions.Single(static item => item.Name == "context").ArgumentOptions.Select(static item => item.Name));
+
+        var describe = Command(headless, "describe");
+        Assert.Equal(["image", "audio", "video"], describe.ArgumentOptions.Select(static item => item.Name));
+        Assert.Equal(
+            ["on", "off", "model"],
+            describe.ArgumentOptions[0].ArgumentOptions.Select(static item => item.Name));
+
+        await headless.Session.SubmitAsync("/describe image model scripted namer", CancellationToken.None);
+        describe = Command(headless, "describe");
+        Assert.Equal(
+            ["on", "off", "model", "thinking", "tier", "speed", "context"],
+            describe.ArgumentOptions[0].ArgumentOptions.Select(static item => item.Name));
+    }
+
+    private static SlashCompletion Command(HeadlessSession headless, string name) =>
+        headless.Observer.Events.OfType<SlashCommandsChanged>().Last().Commands.Single(command => command.Name == name);
+
     private static HarnessSettings Settings()
     {
         var provider = new ProviderName("scripted");
@@ -159,6 +201,7 @@ public sealed class CodingSessionTopicTests
                 ["model"] = new(200_000, serviceTiers: ["flex"]),
                 ["namer"] = new(
                     200_000,
+                    imageInput: true,
                     thinking: true,
                     thinkingEfforts: ["high"],
                     contextWindows: [100_000, 200_000],

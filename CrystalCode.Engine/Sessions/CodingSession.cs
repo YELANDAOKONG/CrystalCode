@@ -9557,7 +9557,8 @@ public sealed class CodingSession : ITurnObserver
             CompactionSlotCompletions(serviceTier: false),
             ReviewerContextCompletions(_settings.ApprovalModel),
             CompactionContextCompletions(),
-            ResourceCompletions());
+            ResourceCompletions(),
+            TopicCompletions());
         menu = menu.Select(command => command.Name switch
         {
             "agents" => command with { Arguments = AgentCompletions() },
@@ -9697,6 +9698,77 @@ public sealed class CodingSession : ITurnObserver
             arguments.Count > 0
                 ? new SlashCompletion(name, help, [name], arguments, ArgumentsOptional: name is "thinking" or "tier" or "speed" or "context")
                 : new SlashCompletion(name, help, [name]);
+    }
+
+    /// <summary>
+    /// <c>/topic</c> subcommands. <c>model</c> offers the session model and
+    /// every catalog model; <c>thinking</c> follows the topic model, and
+    /// <c>tier</c>, <c>speed</c>, and <c>context</c> appear only for an own
+    /// model that offers a choice.
+    /// </summary>
+    private IReadOnlyList<SlashCompletion> TopicCompletions()
+    {
+        var topic = _settings.TopicModel;
+        var provider = topic.Provider is string stored && ProviderName.TryParse(stored, out var parsed) && parsed is not null
+            ? parsed
+            : _settings.Provider;
+        IReadOnlyList<SlashCompletion> models;
+        try
+        {
+            models = ModelCompletions.For(_settings.Catalog, provider);
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            models = ModelCompletions.For(_settings.Catalog, _settings.Provider);
+        }
+
+        ModelSettings? model = null;
+        try
+        {
+            model = TopicCatalogModel();
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            model = null;
+        }
+
+        var options = new List<SlashCompletion>
+        {
+            new("set", "Name the session", ["set"]),
+            new("clear", "Remove the session topic", ["clear"]),
+            new("regenerate", "Ask the topic model again", ["regenerate"]),
+            new("on", "Turn topic naming on", ["on"]),
+            new("off", "Turn topic naming off", ["off"]),
+            new(
+                "model",
+                "Select the topic model, or session for the session model",
+                ["model"],
+                [new SlashCompletion("session", "Name topics with the session model", ["session"]), .. models],
+                ArgumentsOptional: true)
+        };
+        if (model is not null)
+        {
+            AddNested("thinking", "Cycle or set the topic model thinking gear", ThinkingCompletions.For(model));
+            if (!topic.UsesSessionModel)
+            {
+                AddNested("tier", "Cycle or set the topic model service tier", CatalogSlotCompletions.For(model.ServiceTiers));
+                AddNested("speed", "Cycle or set the topic model speed", CatalogSlotCompletions.For(model.Speeds));
+                AddNested(
+                    "context",
+                    "Cycle or set the topic model context budget",
+                    model.ContextWindows.Count > 1 ? ContextWindowSelection.Completions(model) : []);
+            }
+        }
+
+        return options;
+
+        void AddNested(string name, string help, IReadOnlyList<SlashCompletion> values)
+        {
+            if (values.Count > 0)
+            {
+                options.Add(new SlashCompletion(name, help, [name], values, ArgumentsOptional: true));
+            }
+        }
     }
 
     /// <summary>
