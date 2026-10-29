@@ -432,6 +432,45 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ReviewerFieldGaugeWinsOverTheSharedGauge()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["model"] = [new GaugeRule(null, null, ["judge"], null, "red")],
+            ["extended-model"] = [new GaugeRule(null, null, ["judge"], null, "gold1")],
+            ["extended-primary"] = [new GaugeRule(null, null, ["Off"], null, "yellow")],
+            ["extended-trigger"] = [new GaugeRule(null, null, ["Medium"], null, "orange1")]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+        try
+        {
+            var chrome = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["approval-model", "extended-model", "extended-trigger", "extended-primary"],
+                ReviewerFields = new Dictionary<string, string>
+                {
+                    ["approval-model"] = "Reviewer judge",
+                    ["extended-model"] = "Extended judge",
+                    ["extended-trigger"] = "Extended Trigger Medium",
+                    ["extended-primary"] = "Extended Primary Off"
+                }
+            };
+
+            var markup = chrome.StatusLine(200).Markup;
+
+            Assert.Contains("[red]Reviewer judge", markup, StringComparison.Ordinal);
+            Assert.Contains("[gold1]Extended judge", markup, StringComparison.Ordinal);
+            Assert.Contains("[orange1]Extended Trigger Medium", markup, StringComparison.Ordinal);
+            Assert.Contains("[yellow]Extended Primary Off", markup, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
+    [Fact]
     public void StatusLine_OmitsAnEmptyProviderAndSessionId()
     {
         var chrome = new ShellChrome

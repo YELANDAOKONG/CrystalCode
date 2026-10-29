@@ -193,9 +193,19 @@ public static class Theme
     }
 
     /// <summary>
+    /// One gauge per approval reviewer status field, named like the field.
+    /// </summary>
+    public static IReadOnlyList<string> ReviewerGaugeNames { get; } =
+    [
+        "approval-provider", "approval-model", "approval-thinking", "approval-tier", "approval-speed",
+        "extended-provider", "extended-model", "extended-thinking", "extended-tier", "extended-speed",
+        "extended-trigger", "extended-primary"
+    ];
+
+    /// <summary>
     /// Gauge names a theme file may set ranges for.
     /// </summary>
-    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider"];
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider", .. ReviewerGaugeNames];
 
     /// <summary>
     /// Style for a context usage percentage. A theme's <c>context</c> rules
@@ -231,6 +241,24 @@ public static class Theme
         return _gauges.TryGetValue(gauge, out var matchers)
             ? matchers.FirstOrDefault(matcher => matcher.Holds(value, number))?.Style ?? none
             : none;
+    }
+
+    /// <summary>
+    /// Style for a reviewer field value. When the theme sets rules for
+    /// <paramref name="gauge"/>, only those rules apply. Otherwise the rules of
+    /// <paramref name="sharedGauge"/> apply, which the main status line also
+    /// uses, or <see cref="Chrome"/> when there is none.
+    /// </summary>
+    public static string ForReviewerValue(string gauge, string? sharedGauge, string value)
+    {
+        ArgumentNullException.ThrowIfNull(gauge);
+        ArgumentNullException.ThrowIfNull(value);
+        if (_gauges.ContainsKey(gauge) || sharedGauge is null)
+        {
+            return ForValue(gauge, value);
+        }
+
+        return ForValue(sharedGauge, value);
     }
 
     public static string Muted => Get("muted");

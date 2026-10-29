@@ -332,18 +332,20 @@ public sealed class ShellChrome
         return Theme.ForContext(left ? 100 - percent : percent);
     }
 
-    // A reviewer field reads "Reviewer <value>" or "Extended <value>", so the
-    // theme rule sees the value without the prefix and without the label word.
+    // A reviewer field reads "Reviewer <value>", "Reviewer Think <value>", or
+    // "Extended Trigger <value>", so the theme rule sees the value alone. A
+    // field's own gauge wins; without one it follows the main status line's.
     private static string ReviewerColor(string field, string text)
     {
-        var (gauge, words) = field switch
+        var (shared, words) = field switch
         {
             "approval-provider" or "extended-provider" => ("provider", 1),
             "approval-model" or "extended-model" => ("model", 1),
             "approval-thinking" or "extended-thinking" => ("thinking", 2),
             "approval-tier" or "extended-tier" => ("tier", 2),
             "approval-speed" or "extended-speed" => ("speed", 2),
-            _ => (string.Empty, 0)
+            "extended-trigger" or "extended-primary" => (null, 2),
+            _ => (null, 0)
         };
         if (words == 0)
         {
@@ -351,7 +353,7 @@ public sealed class ShellChrome
         }
 
         var parts = text.Split(' ', words + 1);
-        return Theme.ForValue(gauge, parts.Length > words ? parts[words] : text);
+        return Theme.ForReviewerValue(field, shared, parts.Length > words ? parts[words] : text);
     }
 
     /// <summary>
