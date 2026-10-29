@@ -10,6 +10,7 @@ using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
@@ -228,6 +229,51 @@ public sealed class PluginCatalogTests
     }
 
     [Fact]
+    public async Task Load_AcceptsBuiltInReplacementsAndProcessCommands()
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var directory = Path.Combine(home.Home.PluginsDirectory, "Fixture");
+        PublishFixture(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "plugin.json"),
+            """
+            {
+              "assembly": "FixturePlugin.dll",
+              "type": "FixturePlugin.SamplePlugin"
+            }
+            """);
+
+        var root = new Workspace(workspace.Path);
+        var catalog = PluginCatalog.Load(home.Home, root, enabled: true);
+
+        Assert.Contains("Plugin 'Fixture' replaces built-in tool 'grep'.", catalog.Notes);
+        Assert.Contains("Plugin 'Fixture' takes over built-in command 'status'.", catalog.Notes);
+        Assert.DoesNotContain(catalog.WorkTools, tool => tool.Definition.Name == "grep");
+        var builtIn = new GrepTool(root);
+        var swapped = catalog.Replacements.Apply([builtIn], HostToolCatalog.Work);
+        var result = await Assert.Single(swapped).InvokeAsync(
+            JsonToolCall("1", "grep", "{}"));
+        Assert.Equal("grep-replaced", result.Text);
+        Assert.Same(builtIn, Assert.Single(catalog.Replacements.Apply([builtIn], HostToolCatalog.Plan)));
+        Assert.Empty(catalog.Replacements.Apply(Array.Empty<Crystal.Tools.ITool>(), HostToolCatalog.Work));
+
+        var command = Assert.Single(catalog.OverridingCommands);
+        var output = new RecordingOutput();
+        Assert.True(catalog.TryExecute("/status now", output));
+        Assert.Equal("custom-status:now", Assert.Single(output.Notes));
+        Assert.Equal("status", command.Name);
+
+        var cli = Assert.Single(catalog.CliCommands);
+        var writer = new StringWriter();
+        var exit = await cli.Command.RunAsync(
+            new CrystalCode.Plugins.Cli.PluginCliContext(root.Root, ["a", "b"], writer, TextWriter.Null),
+            CancellationToken.None);
+        Assert.Equal(7, exit);
+        Assert.Equal("hello a,b", writer.ToString());
+    }
+
+    [Fact]
     public void Parse_AcceptsPluginProtocolToken()
     {
         var protocol = ProviderProtocol.Parse("acme");
@@ -327,14 +373,78 @@ public sealed class PluginCatalogTests
                 }
 
                 public PluginContribution Contribute() => new PluginContribution(
-                    tools: [new SampleTool(), new HostedTool(), new DataTool(this), new PeerTool(this)],
+                    tools: [new SampleTool(), new HostedTool(), new DataTool(this), new PeerTool(this), new GrepReplacement()],
+                    clients: [new OverrideFactory()],
+                    commands: [new StatusOverride()],
                     hooks: [new SampleHook()],
                     rawHooks: [new SampleRawHook()],
                     placeholders: [new SamplePlaceholder()])
-                    .WithStatusFields([new SampleStatus()]);
+                    .WithStatusFields([new SampleStatus()])
+                    .WithCliCommands([new HelloCli()]);
 
                 public void AttachStatus(IPluginStatusUpdates updates) =>
                     updates.Set("branch", "main");
+            }
+
+            public sealed class HelloCli : CrystalCode.Plugins.Cli.IPluginCliCommand
+            {
+                public string Name => "hello";
+
+                public string Help => "Say hello.";
+
+                public async Task<int> RunAsync(
+                    CrystalCode.Plugins.Cli.PluginCliContext context,
+                    CancellationToken cancellationToken)
+                {
+                    await context.Output.WriteAsync("hello " + string.Join(",", context.Arguments));
+                    return 7;
+                }
+            }
+
+            public sealed class StatusOverride : CrystalCode.Plugins.Commands.IPluginCommand
+            {
+                public string Name => "status";
+
+                public string Help => "Custom status.";
+
+                public bool OverridesBuiltIn => true;
+
+                public void Execute(string argument, CrystalCode.Plugins.Commands.IPluginOutput output) =>
+                    output.Write("custom-status:" + argument);
+            }
+
+            public sealed class OverrideFactory : IPluginClientFactory
+            {
+                public bool OverridesBuiltIn => true;
+
+                public bool CanCreate(string protocol) => protocol == "openai";
+
+                public Crystal.Chat.IStreamingChatClient Create(PluginClientRequest request) =>
+                    throw new NotSupportedException("override-reached");
+            }
+
+            public sealed class GrepReplacement : IPluginTool
+            {
+                public string Name => "grep";
+                public PluginToolCatalogs Catalogs => PluginToolCatalogs.Work;
+                public bool ReplacesBuiltIn => true;
+                public ITool Tool { get; } = new Inner();
+
+                private sealed class Inner : ITool
+                {
+                    public Inner()
+                    {
+                        using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                        Definition = ToolDefinition.Json("grep", document.RootElement.Clone(), "Replaced.");
+                    }
+
+                    public ToolDefinition Definition { get; }
+
+                    public ValueTask<ToolOutput> InvokeAsync(
+                        ToolCall call,
+                        CancellationToken cancellationToken = default) =>
+                        ValueTask.FromResult(new ToolOutput("grep-replaced"));
+                }
             }
 
             public sealed class SampleStatus : IPluginStatusField
@@ -518,6 +628,15 @@ public sealed class PluginCatalogTests
         var stdout = process.StandardOutput.ReadToEnd();
         var stderr = process.StandardError.ReadToEnd();
         Assert.True(process.ExitCode == 0, stdout + stderr);
+    }
+
+    private sealed class RecordingOutput : ISlashOutput
+    {
+        public List<string> Notes { get; } = [];
+
+        public void WriteNote(string text) => Notes.Add(text);
+
+        public void WriteError(string text) => Notes.Add("error:" + text);
     }
 
     private sealed class IdleClients : IPluginClients

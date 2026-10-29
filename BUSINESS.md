@@ -339,7 +339,7 @@ separate library with no terminal code. The product can:
 - load operator plugins from `~/.crystal/plugins` and
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
   tools, protocol clients, classifiers, slash commands, hooks, raw
-  hooks, and prompt placeholders. After catalogs load, a plugin can read
+  hooks, prompt placeholders, and process commands (admitted by the engine; no entry point runs them yet). After catalogs load, a plugin can read
   the discovered plugins, external tool sets, loaded external tools, and
   the skills currently available to the skill tool. A loaded plugin may
   also register custom status-line fields. They stay off the adaptive
@@ -395,9 +395,13 @@ separate library with no terminal code. The product can:
   still owns approval, execution, cancellation, and budget boundaries.
   Approval classification is selected by that model-facing name, so a
   replacement is trusted not to perform effects beyond the replaced built-in's
-  classification. Disk plugins and external tool sets stay append-only: they
-  cannot replace a built-in tool or adjust its model-facing description or
-  input schema, and no such capability is planned.
+  classification. External tool sets stay append-only: they cannot replace a
+  built-in tool or adjust its model-facing description or input schema, and no
+  such capability is planned. A disk plugin is executable code the operator
+  installed, so it may also replace a built-in tool, take over a built-in
+  slash verb, and take over a built-in protocol. Each takeover is noted in
+  the session. Approval, trust, the workspace fence, and
+  `ToolInvocationPolicy` still apply to its tool calls;
 
 ## Child Agents
 
@@ -616,11 +620,10 @@ implemented in the current build.
   defined;
 - a module system below plugins and raw hooks, reached through reflection
   or another mechanism, once its behavior and ownership are defined;
-- more plugin capabilities beyond tools, protocol clients, classifiers,
-  slash commands, hooks, raw hooks, prompt placeholders, status fields,
-  catalog snapshots, model facts, model clients, and data directories.
-  Examples include extending the process command line and custom tool
-  execution modes. The set is not closed. Behavior and ownership are not
+- more plugin capabilities beyond tools, built-in replacement, protocol
+  clients, classifiers, slash commands, process commands, hooks, raw hooks,
+  prompt placeholders, status fields, catalog snapshots, model facts, model
+  clients, and data directories. An example is custom tool execution modes. The set is not closed. Behavior and ownership are not
   defined. Do not reserve a command, flag, configuration field, or public
   type;
 - switchable thinking-chain compression. After each thinking pass, a model
@@ -674,11 +677,10 @@ write policy, and trust semantics are defined; a repository-controlled file
 must not weaken approval or trust.
 
 TODO: add further plugin capabilities only after each capability's behavior
-and ownership are defined. Extending the process command line is not an
-in-session slash command and not `crystal plugins` or `crystal tools`. A
-plugin command must not put secrets on the command line, must not persist
-its flags to `config.json`, and must not make `crystal run` ask the
-operator. A custom tool execution mode is not the deferred host setting for
+and ownership are defined. A plugin process command is not an in-session
+slash command and not `crystal plugins` or `crystal tools`. It must not put
+secrets on the command line, must not persist its flags to `config.json`,
+and must not make `crystal run` ask the operator. A custom tool execution mode is not the deferred host setting for
 serial or concurrent ordinary tool batches. Ordinary Work and Plan tools
 remain serial. A plugin must not bypass approval, trust, the workspace
 fence, or `ToolInvocationPolicy`. This item is not the deferred module

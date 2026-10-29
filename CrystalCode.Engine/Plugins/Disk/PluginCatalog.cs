@@ -12,6 +12,7 @@ using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Plugins.Cli;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Clients.Interfaces;
 using CrystalCode.Plugins.Data;
@@ -44,6 +45,7 @@ public sealed class PluginCatalog
     ];
 
     private readonly List<IPluginClientFactory> _clients;
+    private readonly List<IPluginClientFactory> _overrides;
     private readonly IReadOnlyList<LoadedPlugin> _instances;
 
     private PluginCatalog(
@@ -62,7 +64,9 @@ public sealed class PluginCatalog
         IReadOnlyList<LoadedPlugin> instances,
         IReadOnlyList<PluginPlaceholderRegistration> placeholders,
         IReadOnlyList<PluginStatusFieldRegistration> statusFields,
-        IReadOnlyList<PluginActivationFailure> failures)
+        IReadOnlyList<PluginActivationFailure> failures,
+        PluginReplacements replacements,
+        IReadOnlyList<PluginCliRegistration> cliCommands)
     {
         PlanTools = planTools;
         WorkTools = workTools;
@@ -85,8 +89,11 @@ public sealed class PluginCatalog
 
         StatusFieldNames = statusNames;
         Failures = failures;
-        _clients = [.. clients];
+        _clients = [.. clients.Where(static factory => !factory.OverridesBuiltIn)];
+        _overrides = [.. clients.Where(static factory => factory.OverridesBuiltIn)];
         _instances = instances;
+        Replacements = replacements;
+        CliCommands = cliCommands;
     }
 
     public static PluginCatalog Empty { get; } = new(
@@ -105,6 +112,8 @@ public sealed class PluginCatalog
         [],
         [],
         [],
+        [],
+        PluginReplacements.Empty,
         []);
 
     public IReadOnlyList<ITool> PlanTools { get; }
@@ -137,6 +146,16 @@ public sealed class PluginCatalog
 
     public IReadOnlyList<PluginActivationFailure> Failures { get; }
 
+    /// <summary>Built-in tools that plugins replace.</summary>
+    public PluginReplacements Replacements { get; }
+
+    /// <summary>Process commands from plugins that loaded.</summary>
+    public IReadOnlyList<PluginCliRegistration> CliCommands { get; }
+
+    /// <summary>Gets the slash verbs that plugins take over from the host.</summary>
+    public IReadOnlyList<ISlashCommand> OverridingCommands =>
+        [.. Commands.Where(static command => command is DiskCommand { OverridesBuiltIn: true })];
+
     /// <param name="loading">Receives each plugin directory name before that plugin activates.</param>
     /// <param name="cancellationToken">Checked before each plugin; a plugin that started activating finishes.</param>
     public static PluginCatalog Load(
@@ -162,6 +181,8 @@ public sealed class PluginCatalog
 
         var notes = new List<string>();
         var discovered = new PluginDiscovery(home).Collect(workspace.Root, notes);
+        var replacements = new PluginReplacements();
+        var cliCommands = new List<PluginCliRegistration>();
         var plan = new List<ITool>();
         var work = new List<ITool>();
         var planMultimodal = new List<IMultimodalTool>();
@@ -217,12 +238,14 @@ public sealed class PluginCatalog
                 plan,
                 work,
                 planMultimodal,
-                workMultimodal);
+                workMultimodal,
+                replacements);
             var commandCount = AddCommands(item.DirectoryName, contribution, commandNames, notes, commands);
             var clientCount = AddClients(item.DirectoryName, contribution, notes, clients);
             var classifierCount = AddClassifiers(item.DirectoryName, contribution, notes, classifiers);
             var hookCount = AddHooks(item.DirectoryName, contribution, notes, hooks);
             var rawHookCount = AddRawHooks(item.DirectoryName, contribution, notes, rawHooks);
+            AddCliCommands(item.DirectoryName, contribution, notes, cliCommands);
             AddPlaceholders(
                 item.DirectoryName,
                 contribution,
@@ -270,7 +293,9 @@ public sealed class PluginCatalog
             instances,
             placeholders,
             statusFields,
-            failures);
+            failures,
+            replacements,
+            cliCommands);
 
         void Skip(DiscoveredPlugin item, string reason)
         {
@@ -401,6 +426,43 @@ public sealed class PluginCatalog
         }
     }
 
+    /// <summary>
+    /// Creates a client from a factory that takes over the active protocol
+    /// from the built-in adapters, or returns false when none does.
+    /// </summary>
+    public bool TryCreateOverrideClient(
+        HarnessSettings settings,
+        string apiKey,
+        out IStreamingChatClient? client)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        client = null;
+        var protocol = settings.ActiveProvider.Protocol.Value;
+        foreach (var factory in _overrides)
+        {
+            if (!factory.CanCreate(protocol))
+            {
+                continue;
+            }
+
+            client = factory.Create(PluginClientRequests.From(settings, apiKey));
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether an override factory owns the active protocol. A caller asks this
+    /// before building the image client so both clients come from one factory.
+    /// </summary>
+    public bool OverridesProtocol(HarnessSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        var protocol = settings.ActiveProvider.Protocol.Value;
+        return _overrides.Any(factory => factory.CanCreate(protocol));
+    }
+
     public bool TryCreateClient(HarnessSettings settings, string apiKey, out IStreamingChatClient? client)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -429,7 +491,7 @@ public sealed class PluginCatalog
         }
 
         var protocol = settings.ActiveProvider.Protocol.Value;
-        foreach (var factory in _clients)
+        foreach (var factory in _overrides.Concat(_clients))
         {
             if (!factory.CanCreate(protocol))
             {
@@ -546,7 +608,8 @@ public sealed class PluginCatalog
         List<ITool> plan,
         List<ITool> work,
         List<IMultimodalTool> planMultimodal,
-        List<IMultimodalTool> workMultimodal)
+        List<IMultimodalTool> workMultimodal,
+        PluginReplacements replacements)
     {
         var added = 0;
         foreach (var contributionTool in contribution.Tools)
@@ -558,6 +621,16 @@ public sealed class PluginCatalog
             }
 
             var name = contributionTool.Name?.Trim() ?? string.Empty;
+            if (contributionTool.ReplacesBuiltIn)
+            {
+                if (AddReplacement(directoryName, name, contributionTool, host, notes, replacements))
+                {
+                    added++;
+                }
+
+                continue;
+            }
+
             if (!ExternalToolNames.IsToolName(name) || !names.Add(name))
             {
                 notes.Add($"Plugin '{directoryName}' omitted tool '{contributionTool.Name}'.");
@@ -629,6 +702,83 @@ public sealed class PluginCatalog
         return added;
     }
 
+    private static bool AddReplacement(
+        string directoryName,
+        string name,
+        IPluginTool contributionTool,
+        SessionToolHost host,
+        IList<string> notes,
+        PluginReplacements replacements)
+    {
+        if (!ExternalToolNames.IsReserved(name)
+            || contributionTool.Catalogs is null
+            || contributionTool.Tool is null)
+        {
+            notes.Add($"Plugin '{directoryName}' omitted replacement '{name}' because it is not a built-in tool.");
+            return false;
+        }
+
+        var tool = contributionTool.Tool is IHostTool hosted
+            ? new PluginHostTool(hosted, host, directoryName)
+            : contributionTool.Tool;
+        var multimodal = contributionTool.Multimodal is IHostMultimodalTool hostedMultimodal
+            ? new PluginHostMultimodalTool(hostedMultimodal, host, directoryName)
+            : contributionTool.Multimodal;
+        if (!string.Equals(tool.Definition.Name, name, StringComparison.Ordinal)
+            || (multimodal is not null
+                && !string.Equals(multimodal.Definition.Name, name, StringComparison.Ordinal)))
+        {
+            notes.Add($"Plugin '{directoryName}' omitted replacement '{name}' because its definition name differs.");
+            return false;
+        }
+
+        var replaced = false;
+        foreach (var catalog in Enum.GetValues<HostToolCatalog>())
+        {
+            var member = catalog == HostToolCatalog.Plan ? PluginToolCatalog.Plan : PluginToolCatalog.Work;
+            if (!contributionTool.Catalogs.Contains(member))
+            {
+                continue;
+            }
+
+            if (replacements.TryAdd(catalog, name, tool, multimodal))
+            {
+                replaced = true;
+            }
+            else
+            {
+                notes.Add($"Plugin '{directoryName}' omitted replacement '{name}' because another plugin already replaced it.");
+            }
+        }
+
+        if (replaced)
+        {
+            notes.Add($"Plugin '{directoryName}' replaces built-in tool '{name}'.");
+        }
+
+        return replaced;
+    }
+
+    private static void AddCliCommands(
+        string directoryName,
+        DiskContribution contribution,
+        IList<string> notes,
+        List<PluginCliRegistration> commands)
+    {
+        foreach (var command in contribution.CliCommands)
+        {
+            var name = command?.Name?.Trim();
+            if (!IsCommandName(name)
+                || commands.Any(item => string.Equals(item.Command.Name, name, StringComparison.OrdinalIgnoreCase)))
+            {
+                notes.Add($"Plugin '{directoryName}' omitted process command '{command?.Name}'.");
+                continue;
+            }
+
+            commands.Add(new PluginCliRegistration(directoryName, command!));
+        }
+    }
+
     private static void AddPlaceholders(
         string directoryName,
         DiskContribution contribution,
@@ -683,7 +833,9 @@ public sealed class PluginCatalog
         var added = 0;
         foreach (var command in contribution.Commands)
         {
-            if (command is null || !IsCommandName(command.Name) || SlashCatalog.TryMatch(command.Name, out _))
+            if (command is null
+                || !IsCommandName(command.Name)
+                || (!command.OverridesBuiltIn && SlashCatalog.TryMatch(command.Name, out _)))
             {
                 notes.Add($"Plugin '{directoryName}' omitted command '{command?.Name}'.");
                 continue;
@@ -697,6 +849,10 @@ public sealed class PluginCatalog
 
             commands.Add(new DiskCommand(command));
             added++;
+            if (command.OverridesBuiltIn && SlashCatalog.TryMatch(command.Name, out _))
+            {
+                notes.Add($"Plugin '{directoryName}' takes over built-in command '{command.Name.Trim()}'.");
+            }
         }
 
         return added;
@@ -717,11 +873,16 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            if (ClaimsBuiltInProtocol(factory, out var protocol))
+            if (!factory.OverridesBuiltIn && ClaimsBuiltInProtocol(factory, out var protocol))
             {
                 notes.Add(
                     $"Plugin '{directoryName}' omitted a client factory because it claims built-in protocol '{protocol}'.");
                 continue;
+            }
+
+            if (factory.OverridesBuiltIn)
+            {
+                notes.Add($"Plugin '{directoryName}' registered a client factory that can take over built-in protocols.");
             }
 
             clients.Add(factory);

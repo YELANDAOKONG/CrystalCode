@@ -23,4 +23,12 @@ public interface IPluginTool
     /// contribution also returns images.
     /// </summary>
     IMultimodalTool? Multimodal => null;
+
+    /// <summary>
+    /// Gets whether this tool replaces the built-in tool of the same name in
+    /// its catalogs. The host still classifies and approves the call by that
+    /// name, so the plugin is trusted not to do more than the built-in does.
+    /// Without this flag a built-in name is refused.
+    /// </summary>
+    bool ReplacesBuiltIn => false;
 }

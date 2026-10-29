@@ -97,10 +97,14 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - A module system below plugins and raw hooks, once its behavior and
   ownership are defined.
 - More plugin capabilities beyond the current contribution surface.
-  Examples include extending the process command line and custom tool
-  execution modes. The set is not closed. Do not reserve a command, flag,
-  configuration field, or public type. An in-session slash command,
-  `crystal plugins`, and `crystal tools` are not this path. A custom
+  An example is custom tool execution modes. The set is not closed.
+  Running plugin process commands (`crystal <name>`) is deferred: the
+  contract and registration exist, but the executable has no runner, and it
+  must not load plugins for arbitrary first arguments or run project plugins
+  for an untrusted workspace. Do not
+  reserve a flag, configuration field, or public type. A plugin process
+  command, an in-session slash command, `crystal plugins`, and
+  `crystal tools` are not this path. A custom
   execution mode is not the deferred host setting for serial or concurrent
   ordinary tool batches. Pending hook methods and plugin dependencies stay
   undecided.

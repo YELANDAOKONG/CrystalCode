@@ -138,6 +138,11 @@ public static class WorkspaceCatalog
             tools.Add(new DescribeImageTool(workspace, imageDescriber));
         }
 
+        if (disk is not null && !disk.Replacements.IsEmpty)
+        {
+            tools = [.. disk.Replacements.Apply(tools, catalog)];
+        }
+
         if (disabledBuiltInTools is { Count: > 0 })
         {
             tools.RemoveAll(tool =>

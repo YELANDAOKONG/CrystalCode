@@ -18,6 +18,8 @@ internal sealed class DiskCommand : ISlashCommand
 
     public string Name { get; }
 
+    public bool OverridesBuiltIn => _inner.OverridesBuiltIn;
+
     public string Help { get; }
 
     public void Execute(string argument, ISlashOutput output)

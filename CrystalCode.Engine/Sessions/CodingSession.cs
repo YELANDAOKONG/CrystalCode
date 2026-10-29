@@ -273,8 +273,11 @@ public sealed class CodingSession : ITurnObserver
         tools.AddRange(EffectiveChildPlanMode ? _loadedPlugins.PlanMultimodalTools : _loadedPlugins.WorkMultimodalTools);
         tools.AddRange(EffectiveChildPlanMode ? _external.PlanMultimodalTools : _external.WorkMultimodalTools);
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
+        var replaced = _loadedPlugins.Replacements.Apply(
+            tools,
+            EffectiveChildPlanMode ? HostToolCatalog.Plan : HostToolCatalog.Work);
         var disabled = _settings.DisabledBuiltInTools.For(EffectiveChildPlanMode);
-        return tools.Where(tool => !disabled.Contains(tool.Definition.Name)).ToArray();
+        return replaced.Where(tool => !disabled.Contains(tool.Definition.Name)).ToArray();
     }
 
     private async Task<string> RunChildAsync(string agent, string label, string prompt, string? sessionId,
@@ -1352,7 +1355,7 @@ public sealed class CodingSession : ITurnObserver
         {
             if (input.Length > 0)
             {
-                if (StopsBusyTurn(input))
+                if (!OverriddenByPlugin(input) && StopsBusyTurn(input))
                 {
                     _turnSource?.Cancel();
                     await FinishTurnAsync(cancellationToken);
@@ -2023,10 +2026,46 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    private ISlashCommand? FindOverridingCommand(string input)
+    {
+        if (input.Length < 2 || input[0] != '/')
+        {
+            return null;
+        }
+
+        var space = input.IndexOf(' ');
+        var verb = space < 0 ? input[1..] : input[1..space];
+        return _loadedPlugins.OverridingCommands.FirstOrDefault(command =>
+            string.Equals(command.Name, verb, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool OverriddenByPlugin(string input) => FindOverridingCommand(input) is not null;
+
+    // A plugin command that takes over a built-in verb runs instead of it,
+    // including while a turn is active. The plugin owns that choice.
+    private bool TryRunOverridingCommand(string input)
+    {
+        var command = FindOverridingCommand(input.Trim());
+        if (command is null)
+        {
+            return false;
+        }
+
+        var trimmed = input.Trim();
+        var space = trimmed.IndexOf(' ');
+        command.Execute(space < 0 ? string.Empty : trimmed[(space + 1)..].Trim(), new SlashOutput(this));
+        return true;
+    }
+
     private async Task<(bool Handled, bool Exit)> TryHandleCommandAsync(
         string input,
         CancellationToken cancellationToken)
     {
+        if (TryRunOverridingCommand(input))
+        {
+            return (true, false);
+        }
+
         if (!SessionCommand.TryParse(input, out var parsed))
         {
             return (false, false);
@@ -3102,7 +3141,7 @@ public sealed class CodingSession : ITurnObserver
 
         try
         {
-            client = ChatClientFactory.Create(approvalSettings, apiKey, _plugins);
+            client = CreateClient(approvalSettings);
             return true;
         }
         catch (Exception exception) when (exception is ArgumentException
@@ -5305,6 +5344,12 @@ public sealed class CodingSession : ITurnObserver
             throw new InvalidOperationException(error);
         }
 
+        if (_loadedPlugins.TryCreateOverrideClient(settings, apiKey, out var overridden)
+            && overridden is not null)
+        {
+            return overridden;
+        }
+
         try
         {
             return ChatClientFactory.Create(settings, apiKey, _plugins);
@@ -5331,7 +5376,8 @@ public sealed class CodingSession : ITurnObserver
 
         var protocol = settings.ActiveProvider.Protocol;
         IStreamingMultimodalChatClient? client;
-        if (_plugins.Clients.Any(factory => factory.CanCreate(protocol)))
+        if (!_loadedPlugins.OverridesProtocol(settings)
+            && _plugins.Clients.Any(factory => factory.CanCreate(protocol)))
         {
             client = MultimodalChatClientFactory.Create(settings, apiKey, _plugins);
         }
@@ -6737,16 +6783,17 @@ public sealed class CodingSession : ITurnObserver
 
         // Text-only turns return before this, so view_image stays off that catalog.
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
+        var replaced = _loadedPlugins.Replacements.Apply(tools, catalog).ToList();
         var disabled = disabledBuiltInTools ?? _settings.DisabledBuiltInTools.For(catalog == HostToolCatalog.Plan);
         if (disabled.Count > 0)
         {
-            tools.RemoveAll(tool =>
+            replaced.RemoveAll(tool =>
                 BuiltInToolSelection.Includes(
                     disabled,
                     tool.Definition.Name));
         }
 
-        return tools;
+        return replaced;
     }
 
     private IReadOnlyList<ITool> McpPlanTools() =>

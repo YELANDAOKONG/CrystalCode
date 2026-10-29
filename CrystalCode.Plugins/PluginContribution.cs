@@ -1,4 +1,5 @@
 using CrystalCode.Plugins.Approvals;
+using CrystalCode.Plugins.Cli;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Clients.Interfaces;
 using CrystalCode.Plugins.Commands;
@@ -13,7 +14,7 @@ namespace CrystalCode.Plugins;
 
 /// <summary>
 /// Tools, protocol factories, classifiers, slash commands, hooks, raw hooks,
-/// prompt placeholders, and custom status fields from one plugin.
+/// prompt placeholders, custom status fields, and process commands from one plugin.
 /// </summary>
 public sealed record PluginContribution
 {
@@ -56,6 +57,18 @@ public sealed record PluginContribution
     /// calling that constructor.
     /// </summary>
     public IReadOnlyList<IPluginStatusField> StatusFields { get; init; } = [];
+
+    /// <summary>
+    /// Process commands added with <see cref="WithCliCommands"/>. Like
+    /// <see cref="StatusFields"/>, the original constructor leaves this empty.
+    /// </summary>
+    public IReadOnlyList<IPluginCliCommand> CliCommands { get; init; } = [];
+
+    public PluginContribution WithCliCommands(IEnumerable<IPluginCliCommand> cliCommands)
+    {
+        ArgumentNullException.ThrowIfNull(cliCommands);
+        return this with { CliCommands = cliCommands.ToArray() };
+    }
 
     public PluginContribution WithStatusFields(IEnumerable<IPluginStatusField> statusFields)
     {

@@ -2876,13 +2876,30 @@ must return a definition with that same name. A replacement is used for both
 text and multimodal creation when it supplies a multimodal tool; it does not
 inherit the original multimodal implementation. The resulting tools still
 pass through the same approval policy, executor, cancellation, and budget
-boundaries. Disk plugins and external tool sets stay append-only.
-Approval classification remains keyed by the model-facing tool name. A
+boundaries. External tool sets stay append-only. A disk plugin is
+executable code the operator installed, so it is trusted the same way: an
+`IPluginTool` with `ReplacesBuiltIn` swaps the built-in tool of that name for
+the catalogs it names, a command with `OverridesBuiltIn` runs instead of the
+built-in verb, and a client factory with `OverridesBuiltIn` is asked before
+the built-in adapters. `PluginReplacements` holds the swaps and
+`WorkspaceCatalog` and the image-tool lists apply them before the
+disabled-tool filter. The first plugin in load order wins a contested
+replacement, and the host writes one note per takeover. Approval
+classification remains keyed by the model-facing tool name. A
 replacement for `read`, `write`, `edit`, or `bash` therefore inherits that
 name's built-in classification; the host does not infer a replacement's actual
 side effects from its implementation. In-process replacement is consequently
-a trusted extension point and must not be exposed to untrusted disk or
-external sources without a separate classification contract.
+a trusted extension point. A disk replacement gets the same trust, so the
+operator installs a replacing plugin knowingly; the host does not widen
+approval for it. Approval, `ToolInvocationPolicy`, the workspace fence, and
+the `crystal run` denial of operator prompts apply to every tool call.
+
+A disk plugin may also return `IPluginCliCommand` through
+`PluginContribution.WithCliCommands`. `PluginCatalog` admits and lists these
+as `CliCommands`, but no executable entry point runs them. Running one needs
+a host in the executable that resolves the first argument against the
+registered commands before any plugin code loads, and a rule for project
+plugins. That host is not written.
 
 Disk plugins use `CrystalCode.Plugins.IPlugin` and are loaded by
 `PluginCatalog` from `plugins/`. One non-collectible load context serves

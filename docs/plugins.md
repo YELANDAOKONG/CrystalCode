@@ -3,7 +3,10 @@
 Operators add in-process extensions as **plugins**. A plugin is one
 directory, one `plugin.json`, and one assembly in its own load context.
 It can contribute tools, a protocol client, approval classifiers, slash
-commands, hooks, raw hooks, and prompt placeholders. After the host has
+commands, process commands (admitted, not yet run), hooks, raw hooks, and prompt placeholders. A
+plugin is executable code the operator chose to install, so the contract does
+not fence what it replaces: it may take over built-in tools, slash verbs,
+and protocols. After the host has
 loaded plugins, external tools, and skills, it calls `Attach` with a
 read-only snapshot of those catalogs, then `AttachSession` with the live
 session and review model. A plugin that implements `IPluginModelClient`
@@ -11,8 +14,9 @@ also receives clients for those models. A plugin with an admitted status
 field then receives `AttachStatus`.
 
 The host owns catalog registration, approval, workspace fencing, output
-truncation, and timeouts. Plugin code does not bypass
-`ToolInvocationPolicy`.
+truncation, and timeouts. Plugin tool calls do not bypass
+`ToolInvocationPolicy`. A tool that replaces a built-in is approved under the
+built-in's name and classification.
 
 ## What this is not
 
@@ -114,8 +118,21 @@ A tool must name at least one catalog. The same choice applies to its
 multimodal tool.
 
 Names match `^[A-Za-z][A-Za-z0-9_-]*$` (1–64 characters) and must not be
-a built-in name. The definition name must match `Name`. Later duplicates
-are omitted with a note.
+a built-in name unless the tool sets `ReplacesBuiltIn` (below). The
+definition name must match `Name`. Later duplicates are omitted with a note.
+
+#### Replacing a built-in tool
+
+`IPluginTool.ReplacesBuiltIn` defaults to false. When true, `Name` must be a
+built-in tool name. The tool, and its `Multimodal` tool when present, take
+the place of the built-in in each catalog `Catalogs` names. The replacement
+does not inherit the built-in image variant: a replaced tool with no
+`Multimodal` loses it. A catalog that does not hold the built-in (for
+example `bash` in Plan, or a tool the operator disabled with `/tools builtin`)
+does not gain it. The first plugin in load order wins a name; later ones are
+omitted with a note. The host notes each replacement. Approval uses the
+built-in name's classification, so keep the effect no larger than the
+built-in's.
 
 Catalog order is built-in plugin tools, disk plugin tools, external
 tools, then `skill` when enabled. A disk tool name is reserved against
@@ -129,8 +146,10 @@ receive the question prompt.
 
 `IPluginClientFactory.CanCreate` returns true only for protocols that
 factory owns. A factory that returns true for `deepseek`, `openai`,
-`responses`, `anthropic`, `gemini`, or `ollama` is omitted. Built-in
-adapters stay first. A custom protocol is a token of 1–64 characters:
+`responses`, `anthropic`, `gemini`, or `ollama` is omitted unless it sets
+`OverridesBuiltIn`. Such a factory is asked before the built-in adapters, in
+plugin load order, for text and image clients, and the host notes it. Other
+factories run after the built-in adapters. A custom protocol is a token of 1–64 characters:
 a letter, then letters, digits, `_`, or `-`. Put that token in
 `providers.json` as `protocol`.
 
@@ -145,6 +164,18 @@ and a later `/tier` or `/speed`. Those flags do not make `Create` or
 the selected model accepts image input and no built-in factory owns the
 protocol.
 
+### Process commands
+
+`IPluginCliCommand` describes `crystal <name> ...`. It is added with
+`PluginContribution.WithCliCommands`, and `PluginCatalog.CliCommands` lists
+the admitted ones (a bad or duplicate name is omitted with a note). **No
+executable entry point runs them yet.** `crystal` does not look at plugins
+before parsing its command line, so a registered process command does
+nothing today. The runner is deferred because it must decide, before any
+plugin code runs, how to avoid loading plugins for arbitrary first arguments
+and which workspaces may supply project plugins. Do not rely on this
+contract until a runner exists.
+
 ### Classifiers
 
 `IPluginClassifier` runs only after the built-in switch misses. It
@@ -154,7 +185,10 @@ assigns risk and authority for an unknown tool. It does not reclassify
 ### Slash commands
 
 `IPluginCommand` adds a `/name` verb. Built-in verbs and their aliases
-win. Names use the same pattern as tool names. `IPluginOutput.Write`
+win unless the command sets `OverridesBuiltIn`, in which case the plugin
+runs instead, also while a turn is active, and the host notes the takeover.
+`/help` and completion still list the built-in entry. Names use the same
+pattern as tool names. `IPluginOutput.Write`
 and `Fail` become session notes.
 
 ### Placeholders
@@ -438,17 +472,15 @@ or marketplace.
 - ACP. The Agent Client Protocol is a high-priority front end named Bridge
   (`crystal bridge`). It is not in this build and not a plugin.
 - Collectible unload and hot reload.
-- Replacing a built-in protocol or built-in slash verb. A disk plugin cannot
-  replace or adjust a built-in tool; only an in-process `IPlugin` can replace
-  one. Disabling a built-in tool is the operator's `/tools builtin` and
-  `--disable-tool`, not a plugin capability.
+- Adjusting a built-in tool's description or schema in place. A plugin
+  replaces the whole tool instead. Disabling a built-in tool is the
+  operator's `/tools builtin` and `--disable-tool`.
 - Hooks on external tool sets.
 - A module system below plugins and raw hooks. A later one may reach the
   host through reflection or another mechanism. Its behavior and ownership
   are not defined, and this build does not reserve types for it.
-- Further plugin capabilities, including process command-line contributions
-  and custom tool execution modes. They are deferred. The set is not closed.
-  This build does not reserve a command, flag, configuration field, or
-  public type. An in-session slash command is not a process command. A
-  custom execution mode cannot bypass approval or `ToolInvocationPolicy`,
-  and it does not change the serial execution of ordinary tools.
+- Further plugin capabilities, including custom tool execution modes. They
+  are deferred. The set is not closed. This build does not reserve a flag,
+  configuration field, or public type for them. A custom execution mode
+  cannot bypass approval or `ToolInvocationPolicy`, and it does not change
+  the serial execution of ordinary tools.
