@@ -269,6 +269,8 @@ internal static class StatusWidget
         "Thinking" or "Approval thinking" or "Extended thinking" => Theme.ForValue("thinking", value),
         "Tier" => Theme.ForValue("tier", value),
         "Speed" => Theme.ForValue("speed", value),
+        "Model" => Theme.ForValue("model", value, Theme.User),
+        "Prompt set" => Theme.ForValue("prompt-set", value, Theme.User),
         _ => Theme.User
     };
 

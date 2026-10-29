@@ -198,6 +198,57 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ColorsModelContextWindowAndPromptSetFromThemeRules()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["model"] = [new GaugeRule(null, null, [], "^gpt", "green")],
+            ["context-window"] = [new GaugeRule(null, null, ["1M"], null, "gold1")],
+            ["prompt-set"] = [new GaugeRule(null, null, ["review"], null, "red")]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+        try
+        {
+            var chrome = new ShellChrome { Model = "gpt-5", ContextWindow = "Context 1M", PromptSet = "Review" };
+            var custom = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["model", "context-window", "prompt-set"],
+                Model = "claude",
+                ContextWindow = "Context 1M",
+                PromptSet = "Review"
+            };
+
+            var markup = chrome.StatusLine(120).Markup;
+            var customMarkup = custom.StatusLine(120).Markup;
+
+            Assert.Contains("[green]gpt-5", markup, StringComparison.Ordinal);
+            Assert.Contains("[gold1]Context 1M", markup, StringComparison.Ordinal);
+            Assert.Contains("[red]Prompt Review", markup, StringComparison.Ordinal);
+            Assert.Contains($"[{Theme.Chrome}]claude", customMarkup, StringComparison.Ordinal);
+            Assert.Contains("[gold1]Context 1M", customMarkup, StringComparison.Ordinal);
+            Assert.Contains("[red]Prompt Review", customMarkup, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
+    [Fact]
+    public void StatusLine_ModelContextWindowAndPromptSetKeepDefaultColorsWithoutRules()
+    {
+        Theme.Reset();
+        var chrome = new ShellChrome { Model = "gpt-5", ContextWindow = "Context 1M", PromptSet = "Review" };
+
+        var markup = chrome.StatusLine(120).Markup;
+
+        Assert.Contains($"[{Theme.User}]gpt-5", markup, StringComparison.Ordinal);
+        Assert.Contains($"[{Theme.Chrome}]Context 1M", markup, StringComparison.Ordinal);
+        Assert.Contains($"[{Theme.Chrome}]Prompt Review", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StatusLine_ThinkingStaysChromeWithoutThemeRules()
     {
         Theme.Reset();

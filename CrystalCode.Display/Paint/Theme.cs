@@ -85,8 +85,6 @@ public static class Theme
 
     private const string ContextGauge = "context";
 
-    private static readonly string[] ValueGauges = ["thinking", "tier", "speed"];
-
     private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(100);
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<GaugeMatcher>> NoGauges =
@@ -197,7 +195,7 @@ public static class Theme
     /// <summary>
     /// Gauge names a theme file may set ranges for.
     /// </summary>
-    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed"];
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set"];
 
     /// <summary>
     /// Style for a context usage percentage. A theme's <c>context</c> rules
@@ -217,17 +215,20 @@ public static class Theme
 
     /// <summary>
     /// Style for a status-bar value such as a thinking gear. <paramref name="gauge"/>
-    /// is <c>thinking</c>, <c>tier</c>, or <c>speed</c>. The first rule of the
+    /// is <c>thinking</c>, <c>tier</c>, <c>speed</c>, <c>model</c>,
+    /// <c>context-window</c>, or <c>prompt-set</c>. The first rule of the
     /// theme's gauge that holds <paramref name="value"/> wins; otherwise, and
-    /// without rules, the style is <see cref="Chrome"/>.
+    /// without rules, the style is <paramref name="fallback"/>, or
+    /// <see cref="Chrome"/> when that is null.
     /// </summary>
-    public static string ForValue(string gauge, string value)
+    public static string ForValue(string gauge, string value, string? fallback = null)
     {
         ArgumentNullException.ThrowIfNull(gauge);
         ArgumentNullException.ThrowIfNull(value);
+        var none = fallback ?? Chrome;
         return _gauges.TryGetValue(gauge, out var matchers)
-            ? matchers.FirstOrDefault(matcher => matcher.Holds(value))?.Style ?? Chrome
-            : Chrome;
+            ? matchers.FirstOrDefault(matcher => matcher.Holds(value))?.Style ?? none
+            : none;
     }
 
     public static string Muted => Get("muted");

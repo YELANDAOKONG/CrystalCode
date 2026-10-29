@@ -76,6 +76,36 @@ public sealed class ThemeTests : IDisposable
     }
 
     [Fact]
+    public void ForValue_UsesTheFallbackWhenNoRuleHoldsTheValue()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["model"] = [Value(["gpt-5"], null, "green")]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out _));
+
+        Assert.Equal("green", Theme.ForValue("model", "gpt-5", Theme.User));
+        Assert.Equal(Theme.User, Theme.ForValue("model", "other", Theme.User));
+        Assert.Equal(Theme.User, Theme.ForValue("prompt-set", "x", Theme.User));
+        Assert.Equal(Theme.Chrome, Theme.ForValue("prompt-set", "x"));
+        Theme.Reset();
+    }
+
+    [Theory]
+    [InlineData("model")]
+    [InlineData("context-window")]
+    [InlineData("prompt-set")]
+    public void TryApply_AcceptsValueRulesForEachValueGauge(string gauge)
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>> { [gauge] = [Value(["a"], null, "red")] };
+
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+
+        Assert.Equal("red", Theme.ForValue(gauge, "A"));
+        Theme.Reset();
+    }
+
+    [Fact]
     public void ForValue_FirstRuleWinsAcrossPlainRegexAndWildcard()
     {
         var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>

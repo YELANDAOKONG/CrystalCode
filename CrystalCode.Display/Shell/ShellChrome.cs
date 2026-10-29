@@ -145,13 +145,13 @@ public sealed class ShellChrome
 
         if (!string.IsNullOrWhiteSpace(ContextWindow))
         {
-            items.Add((ContextWindow, $"[{Theme.Chrome}]{MarkupText.Escape(ContextWindow)}[/]", "keep"));
+            items.Add((ContextWindow, $"[{ValueColor("context-window", ContextWindow)}]{MarkupText.Escape(ContextWindow)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(PromptSet))
         {
             var prompt = "Prompt " + PromptSet;
-            items.Add((prompt, $"[{Theme.Chrome}]{MarkupText.Escape(prompt)}[/]", "prompt"));
+            items.Add((prompt, $"[{Theme.ForValue("prompt-set", PromptSet)}]{MarkupText.Escape(prompt)}[/]", "prompt"));
         }
 
         if (!string.IsNullOrWhiteSpace(Activity))
@@ -162,7 +162,7 @@ public sealed class ShellChrome
 
         if (!string.IsNullOrWhiteSpace(Model))
         {
-            items.Add((Model, $"[{Theme.User}]{MarkupText.Escape(Model)}[/]", "model"));
+            items.Add((Model, $"[{Theme.ForValue("model", Model, Theme.User)}]{MarkupText.Escape(Model)}[/]", "model"));
         }
 
         if (!string.IsNullOrWhiteSpace(WorkspaceRoot))
@@ -241,6 +241,9 @@ public sealed class ShellChrome
                     "thinking" => ValueColor("thinking", value),
                     "tier" => ValueColor("tier", value),
                     "speed" => ValueColor("speed", value),
+                    "context-window" => ValueColor("context-window", value),
+                    "prompt-set" => ValueColor("prompt-set", value),
+                    "model" => Theme.ForValue("model", value),
                     _ => Theme.Chrome
                 };
                 items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", "custom"));
@@ -276,8 +279,8 @@ public sealed class ShellChrome
 
     /// <summary>
     /// Style for a status text such as <c>Think High</c>, <c>Tier Priority</c>,
-    /// or <c>Speed Fast</c>. A theme rule sees the value alone, so the label
-    /// word is removed first.
+    /// <c>Speed Fast</c>, <c>Context 200K</c>, or <c>Prompt Review</c>. A theme
+    /// rule sees the value alone, so the label word is removed first.
     /// </summary>
     private static string ValueColor(string gauge, string text)
     {
