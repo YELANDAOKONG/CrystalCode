@@ -407,8 +407,11 @@ separate library with no terminal code. The product can:
   host asks that model once, in the background after the first completed turn
   this process sees for an unnamed session, with the `topic.md` system prompt
   and the conversation cut to 8000 characters. It never blocks a turn, sends no
-  tools, and costs one small request (reply cap 256 tokens). A failure prints a
-  note and is not retried; an answer of `New conversation` leaves the session
+  tools, and costs one small request. It keeps the topic model's own output
+  limit, because reasoning tokens count against it. The progress row shows
+  `Naming Topic` while it runs. A failure prints a note that says why (a reply
+  cut at the output limit before any text, a tool call, or an empty reply)
+  and is not retried; an answer of `New conversation` leaves the session
   unnamed. `/topic <text>` or `/topic set <text>` names the session by hand;
   that operator topic is never replaced automatically. `/topic clear` removes
   it, and `/topic regenerate` asks the model again. The topic is saved in the

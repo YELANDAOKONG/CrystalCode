@@ -294,6 +294,7 @@ internal sealed class SessionProjection : ISessionObserver
             SessionActivity.LoadingTools => ProgressText.LoadingTools,
             SessionActivity.LoadingPlugins => ProgressText.LoadingPlugins,
             SessionActivity.Compacting => ProgressText.Compacting,
+            SessionActivity.NamingTopic => ProgressText.NamingTopic,
             SessionActivity.WaitingForModel => ProgressText.WaitingForModel,
             _ => string.Empty
         };

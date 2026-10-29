@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Crystal;
 using Crystal.Chat;
+using Crystal.Reasoning;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
@@ -146,6 +147,62 @@ public sealed class CodingSessionTopicTests
 
         await headless.Session.SubmitAsync("/topic off", CancellationToken.None);
         Assert.Null(Read(headless).TopicModel!.Enabled);
+    }
+
+    [Fact]
+    public async Task ReplyCutBeforeAnyText_SaysSoAndNamingCanBeTriedAgain()
+    {
+        IReadOnlyList<ChatStreamEvent> reasoningOnly =
+        [
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Summary, "thinking about it"),
+            new ChatUsageReceived(new TokenUsage(10, 4096, 1)),
+            new ChatCandidateCompleted(0, FinishReason.Length)
+        ];
+        var model = new ScriptedStreamingClient(Text("Done."), reasoningOnly, Text("Fix the build"));
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("hi");
+        await headless.Session.TopicTask;
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            static note => note.Text.StartsWith("Topic naming failed: the reply was cut at the model's output limit", StringComparison.Ordinal));
+        Assert.Null(headless.ReadSaved().Topic);
+
+        await headless.Session.SubmitAsync("/topic regenerate", CancellationToken.None);
+        await headless.Session.TopicTask;
+        Assert.Equal("Fix the build", headless.ReadSaved().Topic);
+    }
+
+    [Fact]
+    public async Task Naming_ShowsAProgressActivityOnlyWhileTheRequestRuns()
+    {
+        var model = new ScriptedStreamingClient(Text("Done."), Text("Fix the build"));
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("hi");
+        await headless.Session.TopicTask;
+
+        var activities = headless.Observer.Events.OfType<ActivityChanged>().Select(static changed => changed.Activity).ToArray();
+        var started = Array.IndexOf(activities, SessionActivity.NamingTopic);
+        Assert.True(started >= 0);
+        Assert.Equal(SessionActivity.Idle, activities[^1]);
+        Assert.True(Array.LastIndexOf(activities, SessionActivity.Idle) > started);
+    }
+
+    [Fact]
+    public async Task TopicRequest_KeepsTheModelsOwnOutputLimit()
+    {
+        var model = new ScriptedStreamingClient(Text("Done."), Text("Fix the build"));
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("hi");
+        await headless.Session.TopicTask;
+
+        Assert.Equal(headless.ChatPlugin.OutputCaps[0], headless.ChatPlugin.OutputCaps[^1]);
+        Assert.NotEqual(256, headless.ChatPlugin.OutputCaps[^1]);
     }
 
     [Fact]

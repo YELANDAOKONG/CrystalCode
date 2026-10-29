@@ -29,6 +29,8 @@ public static class ProgressText
 
     public const string Compacting = "Compacting";
 
+    public const string NamingTopic = "Naming Topic";
+
     public const string LoadingTools = "Loading Tools";
 
     public const string LoadingPlugins = "Loading Plugins";

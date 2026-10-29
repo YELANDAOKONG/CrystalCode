@@ -1749,9 +1749,14 @@ and context apply; with an own model it uses the same `ForModel` path as the
 side models. `CodingSession` keeps the topic and whether the operator set it
 under `_topicGate`. After a completed turn, `StartTopicIfNeeded` runs one
 background request (`Task.Run`, cancelled by `/clear`, resume, a manual
-topic, and close) on a separate client with a 256-token reply cap, the
+topic, and close) on a separate client that keeps the model's own output
+cap, because reasoning tokens count against it, the
 `topic.md` system text, and `CompactionText` of the archive cut to 8000
-characters. A generation counter drops a stale reply. The result is
+characters. `SessionActivity.NamingTopic` (`naming_topic` on the wire,
+`Naming Topic` in the progress row) is set while the request runs and only
+when no turn or compaction owns the row. A generation counter drops a stale
+reply. A reply with no text says why: cut at the output limit, a tool call,
+or empty. The result is
 normalized by `SessionTopic` (one line, no quotes or trailing period, at most
 80 characters); `New conversation` is treated as no answer. The session is
 saved and `ChromeChanged` carries `SessionChrome.Topic`. The session file

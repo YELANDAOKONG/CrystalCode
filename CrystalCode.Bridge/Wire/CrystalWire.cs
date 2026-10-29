@@ -582,6 +582,7 @@ internal static class CrystalWire
         SessionActivity.LoadingTools => "loading_tools",
         SessionActivity.LoadingPlugins => "loading_plugins",
         SessionActivity.Compacting => "compacting",
+        SessionActivity.NamingTopic => "naming_topic",
         SessionActivity.WaitingForModel => "waiting_for_model",
         _ => "unknown"
     };

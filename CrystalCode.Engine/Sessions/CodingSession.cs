@@ -8781,12 +8781,19 @@ public sealed class CodingSession : ITurnObserver
 
     private void CancelTopic()
     {
+        bool running;
         lock (_topicGate)
         {
+            running = _topicSource is not null;
             _topicGeneration++;
             _topicSource?.Cancel();
             _topicSource?.Dispose();
             _topicSource = null;
+        }
+
+        if (running)
+        {
+            SetTopicActivity(naming: false);
         }
     }
 
@@ -8868,6 +8875,8 @@ public sealed class CodingSession : ITurnObserver
             generation = ++_topicGeneration;
             _topicTask = Task.Run(() => RunTopicAsync(selected, request, generation, announce, source.Token));
         }
+
+        SetTopicActivity(naming: true);
     }
 
     private async Task RunTopicAsync(
@@ -8882,8 +8891,9 @@ public sealed class CodingSession : ITurnObserver
         try
         {
             // A separate client, like a side question: the next turn may start
-            // on the session client while naming still runs.
-            client = CreateClient(selected.WithOutputTokenCap(TopicOutputTokens));
+            // on the session client while naming still runs. It keeps the
+            // model's own output cap, because reasoning tokens count against it.
+            client = CreateClient(selected);
             owned = !ReferenceEquals(client, _client);
             var assembler = new ChatStreamAssembler();
             await foreach (var streamEvent in client.StreamAsync(request, cancellationToken))
@@ -8891,17 +8901,19 @@ public sealed class CodingSession : ITurnObserver
                 assembler.Apply(streamEvent);
             }
 
-            SideQuestion.TryReadAnswer(assembler.ToResponse(), out var answer, out _);
+            var response = assembler.ToResponse();
+            var read = SideQuestion.TryReadAnswer(response, out var answer, out var ignoredToolCall);
             var topic = SessionTopic.Normalize(answer);
             // The prompt answers this when the intent is unclear; the session stays unnamed.
             if (string.Equals(topic, SessionTopic.Unclear, StringComparison.OrdinalIgnoreCase))
             {
-                topic = null;
+                FinishTopic(generation, null, announce ? "The topic model could not tell what the session is about." : null);
+                return;
             }
 
             if (topic is null)
             {
-                FinishTopic(generation, null, announce ? "Topic naming returned no text." : null);
+                FinishTopic(generation, null, TopicFailure(response, read, ignoredToolCall));
                 return;
             }
 
@@ -8927,8 +8939,41 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    /// <summary>A topic is a few words; this cap keeps a misbehaving model cheap.</summary>
-    private const int TopicOutputTokens = 256;
+    /// <summary>
+    /// Says why a topic reply had no usable text, so a retry can change
+    /// something: a reply cut at the output cap, a tool call, or an empty reply.
+    /// </summary>
+    private static string TopicFailure(ChatResponse response, bool read, bool ignoredToolCall)
+    {
+        if (ignoredToolCall)
+        {
+            return "Topic naming failed: the topic model asked for a tool instead of naming the session.";
+        }
+
+        var cut = response.Candidates.Count > 0
+            && response.Candidates[0].FinishReason == FinishReason.Length;
+        if (cut && !read)
+        {
+            return "Topic naming failed: the reply was cut at the model's output limit before any text. "
+                + "Lower /topic thinking or choose another /topic model.";
+        }
+
+        return "Topic naming failed: the topic model returned no text.";
+    }
+
+    /// <summary>
+    /// Shows <c>Naming Topic</c> while the request runs. A turn has its own
+    /// caption, so naming only owns the row while no turn or compaction does.
+    /// </summary>
+    private void SetTopicActivity(bool naming)
+    {
+        if (_turnActive || _compacting)
+        {
+            return;
+        }
+
+        SetActivity(naming ? SessionActivity.NamingTopic : SessionActivity.Idle);
+    }
 
     private void FinishTopic(long generation, string? topic, string? error)
     {
@@ -8948,6 +8993,7 @@ public sealed class CodingSession : ITurnObserver
             }
         }
 
+        SetTopicActivity(naming: false);
         if (error is not null)
         {
             Note(error);

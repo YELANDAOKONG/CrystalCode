@@ -9,5 +9,6 @@ public enum SessionActivity
     LoadingTools,
     LoadingPlugins,
     Compacting,
+    NamingTopic,
     WaitingForModel
 }
