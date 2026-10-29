@@ -52,6 +52,42 @@ that fixes it.
   proxy differs from one from the provider. The fix is the first High
   priority item (Trimming tool-returned media resources).
 
+- Session settings changed during a turn take effect inconsistently, and
+  front ends do not say so. Checked with a headless session while a turn ran
+  (`SessionRunner`, blocking model):
+  - `/plan`, `/approval`, `/approval <level>`, and Tab (`CycleMode`,
+    `TogglePlan`) succeed at once. The turn keeps the tool executor, approval
+    policy, and child Plan ceiling it started with. Only the system message is
+    replaced in place, so a Plan switch can show Plan while the running turn
+    still has Work tools. The new approval level is written to `config.json`
+    at once.
+  - `/mode <name>`, `/tier`, `/speed`, `/context`, `/model`, `/cd`, and
+    `/agents` changes are refused with `Finish the current turn before ...`.
+  - `/thinking` has no turn check in `ChangeThinking`. The reasoning options
+    are read when the turn starts, so it applies next turn, but the command
+    still saves and rebuilds executors mid-turn. Not exercised with a
+    thinking-capable model.
+  - `crystal bridge`: a refused command returns `-32603` with
+    `command_refused`, but a change that succeeds mid-turn also returns
+    success, so an editor cannot tell it applies later or only partly. The
+    `approval` option, `_crystal/mode/cycle`, and `_crystal/mode/togglePlan`
+    do this. Only `model` has a busy-refusal test; `tier`, `speed`, and
+    `context` use the same path and were not checked one by one.
+  - `crystal server`: `POST /input` answers 200 with `turnActive` and `quit`
+    even when the engine refused the command. The refusal reaches the client
+    only as an `error` event on `/events`. `POST /mode` with `set` calls
+    `TrySetMode`, which has no turn check, so it succeeds where the terminal
+    and Bridge refuse. Approval, thinking, tier, and speed have no route of
+    their own and go through `/input`.
+  - Not decided: whether mode, approval, thinking, tier, speed, context, and
+    model all become "applies next turn" (recorded during a turn, applied when
+    it ends, before a queued follow-up starts), when `config.json` is
+    written, whether chrome and Bridge `config_option_update` show the old or
+    the pending value, and whether `POST /input` reports the refusal in its
+    response. Do not reserve an event, wire field, or `_meta.crystal` key for
+    it. A decision updates ARCHITECTURE.md and the busy-command text in
+    `docs/user-guide.md`.
+
 ## Deferred
 
 These are part of the product direction and are not in the current build.
