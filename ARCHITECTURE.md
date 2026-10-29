@@ -2613,7 +2613,7 @@ and reads names and files and touches no console. `SessionPreferences.Theme`
 carries the name; the terminal `SessionProjection` loads the file and calls
 `Theme.TryApply` in `CrystalCode.Display`, which validates every token as a
 Spectre style and changes nothing on failure. `config.json` `theme` may be an object `{"name", "approvalColors"}` (written only while `approvalColors` is false); `approvalColors` (default on) rides on `SessionPreferences.ApprovalColors`; when off, `ShellChrome` paints the approval mode with `chrome` instead of `Theme.ForApproval`. `/theme` and `--theme` (process only,
-not saved) select it. Server and Bridge only forward the name. The transcript Result card uses the same colors for
+not saved) select it. Server and Bridge only forward the name and the `approvalColors` flag. The transcript Result card uses the same colors for
 `- [ ]` / `- [~]` / `- [x]` / `- [-]` lines so they are not painted as
 diff removals. Named chrome labels are Title Case. Short status
 abbreviations are uppercase. Mode (Plan, Work, or a custom mode name) is on the

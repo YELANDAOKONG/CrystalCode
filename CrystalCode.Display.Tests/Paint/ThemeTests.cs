@@ -33,6 +33,15 @@ public sealed class ThemeTests : IDisposable
         Assert.Equal("lightsteelblue", Theme.Accent);
     }
 
+    [Fact]
+    public void TryApply_RejectsAnApprovalColorThatIsNotGrouped()
+    {
+        Assert.False(Theme.TryApply(new Dictionary<string, string> { ["approval"] = "red" }, out var error));
+
+        Assert.Contains("approval", error, StringComparison.Ordinal);
+        Assert.Equal("darkorange", Theme.ApprovalFull);
+    }
+
     [Theory]
     [InlineData("code", "red on blue")]
     [InlineData("codeBg", "red on blue")]
