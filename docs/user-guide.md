@@ -1092,7 +1092,7 @@ its own.
 | Shift+Tab | Cycle modes |
 | `?` on an empty composer | Show shortcuts and commands |
 | F7 | Open the child picker when child Agents are enabled. F7 in the picker dismisses it |
-| F8 or `/edit` | Open the full-screen editor with the current draft. Enter inserts a newline and Tab inserts a tab. F8 or Ctrl+S puts the text back in the composer without sending it. Esc discards the edit. Unavailable while a dialog, the side question, or a child view is open |
+| F8 or `/edit` | Open the full-screen editor with the current draft. Enter inserts a newline and Tab inserts a tab. The mouse wheel and PageUp / PageDown scroll the text. F8 or Ctrl+S puts the text back in the composer without sending it. Esc discards the edit. Unavailable while a dialog, the side question, or a child view is open |
 | Up / Down | Move through the composer; at the first or last row, browse prompt history. Slash-picker navigation while the picker is open. A recalled prompt that starts with `/` stays in history until you edit it |
 | Escape | Clear the composer. While inspecting a child, and no modal owns the key, return to the parent at any draft state. Esc in the child picker dismisses the picker |
 | Mouse wheel, PageUp / PageDown, Ctrl+Up/Down | Scroll the transcript |

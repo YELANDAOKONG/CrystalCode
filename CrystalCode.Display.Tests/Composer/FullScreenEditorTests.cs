@@ -129,6 +129,67 @@ public sealed class FullScreenEditorTests
     }
 
     [Fact]
+    public void Wheel_ScrollsTheTextAndKeepsTheBorder()
+    {
+        var text = string.Join('\n', Enumerable.Range(1, 60).Select(number => "line " + number));
+        var editor = new FullScreenEditor(text, planMode: false, customMode: null);
+        editor.Paint(30, 8);
+
+        editor.Handle(new InputWheel(30));
+        var view = editor.Paint(30, 8);
+
+        Assert.DoesNotContain(view.Lines, line => line.Plain.Contains("line 60"));
+        Assert.Contains(view.Lines, line => line.Plain.Contains("line 30"));
+        Assert.Contains("Line 30/60", view.Lines[0].Plain);
+        AssertBordered(view, 30);
+
+        editor.Handle(new InputWheel(-1000));
+        view = editor.Paint(30, 8);
+
+        Assert.Contains(view.Lines, line => line.Plain.Contains("line 60"));
+        AssertBordered(view, 30);
+
+        editor.Handle(new InputWheel(1000));
+        view = editor.Paint(30, 8);
+
+        Assert.Contains(view.Lines, line => line.Plain.Contains("line 1 "));
+        AssertBordered(view, 30);
+    }
+
+    [Fact]
+    public void PageKeys_MoveByOneWindow()
+    {
+        var text = string.Join('\n', Enumerable.Range(1, 60).Select(number => "line " + number));
+        var editor = new FullScreenEditor(text, planMode: false, customMode: null);
+        editor.Paint(30, 8);
+
+        editor.Handle(Key(ConsoleKey.PageUp, '\0'));
+        var view = editor.Paint(30, 8);
+
+        Assert.Contains("Line 55/60", view.Lines[0].Plain);
+        editor.Handle(Key(ConsoleKey.PageDown, '\0'));
+        view = editor.Paint(30, 8);
+        Assert.Contains("Line 60/60", view.Lines[0].Plain);
+        AssertBordered(view, 30);
+    }
+
+    private static void AssertBordered(ComposerView view, int width)
+    {
+        Assert.StartsWith("\u256d", view.Lines[0].Plain);
+        Assert.StartsWith("\u2570", view.Lines[^1].Plain);
+        foreach (var line in view.Lines)
+        {
+            Assert.Equal(width, TextWidth.Measure(line.Plain));
+        }
+
+        for (var row = 1; row < view.Lines.Count - 1; row++)
+        {
+            Assert.StartsWith("\u2502", view.Lines[row].Plain);
+            Assert.EndsWith("\u2502", view.Lines[row].Plain);
+        }
+    }
+
+    [Fact]
     public void Paste_InsertsText()
     {
         var editor = new FullScreenEditor(string.Empty, planMode: false, customMode: null);

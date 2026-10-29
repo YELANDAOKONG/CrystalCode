@@ -333,7 +333,7 @@ The full-screen editor is terminal-only. Display Composer owns
 composer's submission text, so trusted image markers survive. F8 and a bare
 `/edit` open it outside modal prompts, the side question, and child views.
 F8 or Ctrl+S copies the text back into the composer without sending it. Esc
-and Ctrl+C discard it. In the editor Enter, Tab, and `?` are text. The engine
+and Ctrl+C discard it. In the editor Enter, Tab, and `?` are text. The wheel and PageUp/PageDown move the cursor by visual rows and the window follows it; the border is rebuilt to the full width on every paint, so scrolling never changes it. The engine
 only maps `SessionVerb.Edit` to a note for other front ends.
 
 Provider types live under `CrystalCode.Providers` plus one folder per wire

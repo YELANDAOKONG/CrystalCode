@@ -19,6 +19,8 @@ public sealed class FullScreenEditor
         Placeholder = "Type or paste your prompt here."
     };
 
+    private int _bodyRows = 1;
+
     public FullScreenEditor(string submitted, bool planMode, string? customMode)
     {
         ArgumentNullException.ThrowIfNull(submitted);
@@ -50,6 +52,16 @@ public sealed class FullScreenEditor
             case InputPaste paste:
                 _buffer.Insert(paste.Text);
                 break;
+            case InputWheel wheel:
+                // Positive delta is toward the start of the text.
+                MoveRows(wheel.Delta);
+                break;
+            case InputKey { Key: ConsoleKey.PageUp }:
+                MoveRows(PageRows());
+                break;
+            case InputKey { Key: ConsoleKey.PageDown }:
+                MoveRows(-PageRows());
+                break;
             case InputKey key:
                 HandleKey(key);
                 break;
@@ -67,6 +79,7 @@ public sealed class FullScreenEditor
     {
         var inner = Math.Max(1, width - BorderColumns);
         var bodyRows = Math.Max(1, height - 2);
+        _bodyRows = bodyRows;
         // Project reserves one column for the cursor at the right edge.
         var body = _buffer.Project(inner + 1, bodyRows);
         var lines = new List<PaintLine>(height)
@@ -114,6 +127,28 @@ public sealed class FullScreenEditor
 
     private static string Border(string text) =>
         $"[{Theme.Chrome}]{MarkupText.Escape(text)}[/]";
+
+    private int PageRows() => Math.Max(1, _bodyRows - 1);
+
+    /// <summary>
+    /// Moves the cursor by visual rows; the window follows the cursor. A
+    /// positive count moves toward the start. The buffer has no history here,
+    /// so reaching either end stops.
+    /// </summary>
+    private void MoveRows(int towardStart)
+    {
+        var key = towardStart > 0 ? ConsoleKey.UpArrow : ConsoleKey.DownArrow;
+        var input = new InputKey(key, '\0', ConsoleModifiers.None);
+        for (var step = Math.Abs(towardStart); step > 0; step--)
+        {
+            var before = _buffer.Cursor;
+            _buffer.Handle(input);
+            if (_buffer.Cursor == before)
+            {
+                break;
+            }
+        }
+    }
 
     private void HandleKey(InputKey key)
     {
