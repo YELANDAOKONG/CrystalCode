@@ -712,6 +712,7 @@ public sealed class SessionRenderer : IDisposable
             CommitLiveUnlocked();
             AddHelpUnlocked(
                 "f7           Inspect child sessions; Esc returns to parent",
+                "f8           Full-screen editor; F8 or ctrl+s applies, Esc cancels",
                 "enter        Submit; queue while working",
                 "empty enter  Send the queue now",
                 "queue        Stays above the composer; sends after this tool or turn",
@@ -2150,6 +2151,7 @@ public sealed class SessionRenderer : IDisposable
             "enter        Submit; queue while working",
             "f6           Quick prompts; Tab: Fill / Send",
             "f7           Inspect child sessions; Esc returns to parent",
+            "f8           Full-screen editor; F8 or ctrl+s applies, Esc cancels",
             "empty enter  Send the queue now",
             "queue        Stays above the composer; sends after this tool or turn",
             "ctrl+j       Newline",
