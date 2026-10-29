@@ -98,6 +98,60 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsProviderResourceTrimOverGlobalAndRejectsInvalidValues()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ProvidersPath,
+            """
+            {
+              "gateway": {
+                "protocol": "openai",
+                "baseUri": "https://example.test/openai/",
+                "resourceTrim": { "keepRecent": 4, "maxBytes": 1000 },
+                "models": { "gpt": { "contextWindow": 128000, "imageInput": true } }
+              }
+            }
+            """);
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "gateway",
+              "model": "gpt",
+              "resourceTrim": { "slack": 2, "keepRecent": 9 }
+            }
+            """);
+
+        var effective = store.Load().EffectiveResourceTrim;
+
+        Assert.Equal(4, effective.KeepRecent);
+        Assert.Equal(2, effective.Slack);
+        Assert.Equal(1000, effective.MaxBytes);
+        Assert.True(effective.Enabled);
+
+        File.WriteAllText(
+            root.Home.ProvidersPath,
+            """
+            {
+              "gateway": {
+                "protocol": "openai",
+                "baseUri": "https://example.test/openai/",
+                "resourceTrim": { "keepRecent": 0 },
+                "models": { "gpt": { "contextWindow": 128000 } }
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(() => store.Load());
+
+        Assert.Contains("providers.json", error.Message, StringComparison.Ordinal);
+        Assert.Contains("keep recent", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Server_RoundTripsAndSurvivesAnotherSave()
     {
         using var root = new TemporaryHome();
@@ -1655,51 +1709,51 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
-    public void Load_ReadsImageTrimAndOmitsTheDefault()
+    public void Load_ReadsResourceTrimAndOmitsTheDefault()
     {
         using var root = new TemporaryHome();
         var store = new DiskSettingsStore(root.Home);
         store.LoadOrCreate();
         Assert.DoesNotContain(
-            "imageTrim",
+            "resourceTrim",
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
-        Assert.True(store.Load().ImageTrim.Enabled);
+        Assert.True(store.Load().ResourceTrim.Enabled);
         File.WriteAllText(
             root.Home.ConfigPath,
             """
             {
               "provider": "deepseek",
               "model": "deepseek-v4-flash",
-              "imageTrim": {
+              "resourceTrim": {
                 "enabled": false,
                 "keepRecent": 3,
                 "slack": 0,
                 "maxBytes": 0,
-                "includeUserImages": true
+                "includeUserResources": true
               }
             }
             """);
 
         var settings = store.Load();
 
-        Assert.False(settings.ImageTrim.Enabled);
-        Assert.Equal(3, settings.ImageTrim.KeepRecent);
-        Assert.Equal(0, settings.ImageTrim.Slack);
-        Assert.Equal(0, settings.ImageTrim.MaxBytes);
-        Assert.True(settings.ImageTrim.IncludeUserImages);
+        Assert.False(settings.ResourceTrim.Enabled);
+        Assert.Equal(3, settings.ResourceTrim.KeepRecent);
+        Assert.Equal(0, settings.ResourceTrim.Slack);
+        Assert.Equal(0, settings.ResourceTrim.MaxBytes);
+        Assert.True(settings.ResourceTrim.IncludeUserResources);
         store.Save(settings);
         var saved = File.ReadAllText(root.Home.ConfigPath);
         Assert.Contains("\"keepRecent\": 3", saved, StringComparison.Ordinal);
-        store.Save(settings.WithImageTrim(ImageTrimSettings.Default));
+        store.Save(settings.WithResourceTrim(ResourceTrimSettings.Default));
         Assert.DoesNotContain(
-            "imageTrim",
+            "resourceTrim",
             File.ReadAllText(root.Home.ConfigPath),
             StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Load_RejectsInvalidImageTrim()
+    public void Load_RejectsInvalidResourceTrim()
     {
         using var root = new TemporaryHome();
         var store = new DiskSettingsStore(root.Home);
@@ -1710,7 +1764,7 @@ public sealed class DiskSettingsStoreTests
             {
               "provider": "deepseek",
               "model": "deepseek-v4-flash",
-              "imageTrim": { "keepRecent": 0 }
+              "resourceTrim": { "keepRecent": 0 }
             }
             """);
 

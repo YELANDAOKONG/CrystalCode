@@ -8,12 +8,12 @@ using Xunit;
 
 namespace CrystalCode.Engine.Tests.Sessions;
 
-public sealed class ImageTrimmerTests
+public sealed class ResourceTrimmerTests
 {
     private static readonly byte[] PngSignature =
         [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-    private static ImageTrimSettings Settings(
+    private static ResourceTrimSettings Settings(
         int keep = 2,
         int slack = 1,
         long maxBytes = 0,
@@ -42,7 +42,7 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Apply_WithinKeepPlusSlack_KeepsEveryImage()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
 
         var visible = trimmer.Apply(ToolTranscript(3), Images(3), Settings());
 
@@ -52,7 +52,7 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Apply_BeyondSlack_KeepsOnlyTheNewestAndStaysTrimmed()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
         var images = Images(4);
         var transcript = ToolTranscript(4);
 
@@ -67,7 +67,7 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Apply_DoesNotTrimUserImagesByDefault()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
         var transcript = UserThenTools();
 
         var visible = trimmer.Apply(transcript, Images(5), Settings());
@@ -76,9 +76,9 @@ public sealed class ImageTrimmerTests
     }
 
     [Fact]
-    public void Apply_IncludeUserImages_TrimsThemToo()
+    public void Apply_IncludeUserResources_TrimsThemToo()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
         var transcript = UserThenTools();
 
         var visible = trimmer.Apply(transcript, Images(5), Settings(includeUser: true));
@@ -89,7 +89,7 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Apply_ByteBudget_TrimsOldestFirstWithoutWaitingForSlack()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
 
         var visible = trimmer.Apply(
             ToolTranscript(3),
@@ -102,7 +102,7 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Apply_ByteBudget_KeepsTheNewestImageEvenWhenItAloneExceedsTheBudget()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
 
         var visible = trimmer.Apply(
             ToolTranscript(2),
@@ -115,15 +115,15 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Apply_Disabled_KeepsEverythingUntilATrim()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
         var transcript = ToolTranscript(6);
         var images = Images(6);
 
         Assert.Equal(6, trimmer.Apply(transcript, images, Settings(enabled: false)).Count);
 
-        var result = trimmer.Trim(transcript, images, keep: 1, includeUserImages: false);
+        var result = trimmer.Trim(transcript, images, keep: 1, includeUserResources: false);
 
-        Assert.Equal(5, result.Images);
+        Assert.Equal(5, result.Resources);
         Assert.Equal(40, result.Bytes);
         Assert.Equal([6], trimmer.Apply(transcript, images, Settings(enabled: false)).Keys.Order());
     }
@@ -131,9 +131,9 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Trim_AllLeavesNoTrimmableImage()
     {
-        var trimmer = new ImageTrimmer();
+        var trimmer = new ResourceTrimmer();
 
-        trimmer.Trim(ToolTranscript(2), Images(2), keep: 0, includeUserImages: false);
+        trimmer.Trim(ToolTranscript(2), Images(2), keep: 0, includeUserResources: false);
 
         Assert.Empty(trimmer.Apply(ToolTranscript(2), Images(2), Settings(enabled: false)));
     }
@@ -141,8 +141,8 @@ public sealed class ImageTrimmerTests
     [Fact]
     public void Reset_ForgetsEarlierOmissions()
     {
-        var trimmer = new ImageTrimmer();
-        trimmer.Trim(ToolTranscript(2), Images(2), keep: 0, includeUserImages: false);
+        var trimmer = new ResourceTrimmer();
+        trimmer.Trim(ToolTranscript(2), Images(2), keep: 0, includeUserResources: false);
 
         trimmer.Reset();
 
@@ -157,7 +157,7 @@ public sealed class ImageTrimmerTests
     [InlineData("OFF", null, false)]
     public void Arguments_Parse(string argument, int? keep, bool? enabled)
     {
-        Assert.True(ImageTrimArguments.TryParse(argument, out var request, out _));
+        Assert.True(ResourceTrimArguments.TryParse(argument, out var request, out _));
         Assert.Equal(keep, request.Keep);
         Assert.Equal(enabled, request.Enabled);
     }
@@ -168,7 +168,7 @@ public sealed class ImageTrimmerTests
     [InlineData("some")]
     public void Arguments_RejectOtherText(string argument)
     {
-        Assert.False(ImageTrimArguments.TryParse(argument, out _, out var error));
+        Assert.False(ResourceTrimArguments.TryParse(argument, out _, out var error));
         Assert.NotEmpty(error);
     }
 }

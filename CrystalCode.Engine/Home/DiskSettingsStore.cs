@@ -113,7 +113,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             approvalRetry: ReadRetry(document.ApprovalRetry),
             compactionModel: ReadCompactionModel(document.CompactionModel),
             microCompaction: ReadMicroCompaction(document.MicroCompaction),
-            imageTrim: ReadImageTrim(document.ImageTrim),
+            resourceTrim: ReadResourceTrim(document.ResourceTrim),
             ruleFiles: ReadRuleFiles(document.RuleFiles),
             reservedOutputTokens: document.ReservedOutputTokens,
             agents: document.Agents,
@@ -209,7 +209,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             Bridge = WriteBridge(settings.Bridge),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
-            ImageTrim = WriteImageTrim(settings.ImageTrim),
+            ResourceTrim = WriteResourceTrim(settings.ResourceTrim),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
             ImageModel = WriteImageModel(settings.ImageModel),
             Retry = WriteRetry(settings.Retry),
@@ -573,41 +573,41 @@ public sealed class DiskSettingsStore : ISettingsStore
         };
     }
 
-    private static ImageTrimSettings ReadImageTrim(ImageTrimDocument? document)
+    private static ResourceTrimSettings ReadResourceTrim(ResourceTrimDocument? document)
     {
         if (document is null)
         {
-            return ImageTrimSettings.Default;
+            return ResourceTrimSettings.Default;
         }
 
-        return new ImageTrimSettings(
-            document.Enabled ?? ImageTrimSettings.DefaultEnabled,
-            document.KeepRecent ?? ImageTrimSettings.DefaultKeepRecent,
-            document.Slack ?? ImageTrimSettings.DefaultSlack,
-            document.MaxBytes ?? ImageTrimSettings.DefaultMaxBytes,
-            document.IncludeUserImages ?? ImageTrimSettings.DefaultIncludeUserImages);
+        return new ResourceTrimSettings(
+            document.Enabled ?? ResourceTrimSettings.DefaultEnabled,
+            document.KeepRecent ?? ResourceTrimSettings.DefaultKeepRecent,
+            document.Slack ?? ResourceTrimSettings.DefaultSlack,
+            document.MaxBytes ?? ResourceTrimSettings.DefaultMaxBytes,
+            document.IncludeUserResources ?? ResourceTrimSettings.DefaultIncludeUserResources);
     }
 
-    private static ImageTrimDocument? WriteImageTrim(ImageTrimSettings settings)
+    private static ResourceTrimDocument? WriteResourceTrim(ResourceTrimSettings settings)
     {
         if (settings.IsDefault)
         {
             return null;
         }
 
-        return new ImageTrimDocument
+        return new ResourceTrimDocument
         {
-            Enabled = settings.Enabled == ImageTrimSettings.DefaultEnabled ? null : settings.Enabled,
-            KeepRecent = settings.KeepRecent == ImageTrimSettings.DefaultKeepRecent
+            Enabled = settings.Enabled == ResourceTrimSettings.DefaultEnabled ? null : settings.Enabled,
+            KeepRecent = settings.KeepRecent == ResourceTrimSettings.DefaultKeepRecent
                 ? null
                 : settings.KeepRecent,
-            Slack = settings.Slack == ImageTrimSettings.DefaultSlack ? null : settings.Slack,
-            MaxBytes = settings.MaxBytes == ImageTrimSettings.DefaultMaxBytes
+            Slack = settings.Slack == ResourceTrimSettings.DefaultSlack ? null : settings.Slack,
+            MaxBytes = settings.MaxBytes == ResourceTrimSettings.DefaultMaxBytes
                 ? null
                 : settings.MaxBytes,
-            IncludeUserImages = settings.IncludeUserImages == ImageTrimSettings.DefaultIncludeUserImages
+            IncludeUserResources = settings.IncludeUserResources == ResourceTrimSettings.DefaultIncludeUserResources
                 ? null
-                : settings.IncludeUserImages
+                : settings.IncludeUserResources
         };
     }
 

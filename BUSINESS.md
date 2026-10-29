@@ -125,13 +125,15 @@ separate library with no terminal code. The product can:
   Optional microcompaction, off unless `microCompaction` is set, clears old
   successful tool results before each model call. `/compact micro` toggles it
   or sets `on` / `off` and writes `config.json`. It does not summarize.
-  Image trimming, on by default, bounds the images a model request carries
-  so a session that holds many tool-returned images does not exceed the
-  provider's request size. It only changes what is sent: the transcript, the
+  Resource trimming, on by default, bounds the resources a model request
+  carries (images today) so a session that holds many tool-returned images
+  does not exceed the provider's request size. A provider definition may set
+  its own `resourceTrim` limits, because request size limits differ by
+  endpoint. It only changes what is sent: the transcript, the
   saved session, resume, fork, and export keep every image, and the model
-  sees an omitted image as its `[Image #N]` marker text. `imageTrim` in
-  `config.json` sets the limits, and `/trim` leaves older images out on
-  demand. Images the operator attached are kept unless `includeUserImages`
+  sees an omitted image as its `[Image #N]` marker text. `resourceTrim` in
+  `config.json` sets the limits, and `/trim` leaves older resources out on
+  demand. Images the operator attached are kept unless `includeUserResources`
   is set. Audio and video are not covered because they are not supported yet;
 - ask before the first interactive session in a directory, when workspace
   trust is on (the default). Trust is the git root when the workspace is

@@ -654,7 +654,7 @@ Top-level fields:
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). `/compact summary` toggles it; `on` or `off` sets it |
 | `showAutomaticCompactionSummary` | Print the same summary after automatic compaction (default `false`; omitted when off). `/compact auto` toggles it (`automatic` is the same); `on` or `off` sets it. Does not change `/compact` |
 | `microCompaction` | Optional removal of old successful tool results before each model call. Omitted means off. Object with `enabled` (default `false`), `protectTurns` (at least 1, default `2`), `protectTokens` (non-negative, default `40000`), and `minimumTokens` (non-negative, default `20000`). Invalid values stop startup. `/compact micro` toggles it; `on` or `off` sets it. Does not summarize |
-| `imageTrim` | Limits the images each model request carries, so many `view_image` results do not make a request too large. Omitted means the defaults. Object with `enabled` (default `true`), `keepRecent` (at least 1, default `16`), `slack` (non-negative, default `8`), `maxBytes` (non-negative, default `134217728`, `0` for no budget), and `includeUserImages` (default `false`). Trimming starts when more than `keepRecent` plus `slack` trimmable images are held and keeps the newest `keepRecent`. The byte budget drops the oldest first. Invalid values stop startup. `/trim on` or `/trim off` sets `enabled` |
+| `resourceTrim` | Limits the resources, today images, each model request carries, so many `view_image` results do not make a request too large. Omitted means the defaults. Object with `enabled` (default `true`), `keepRecent` (at least 1, default `16`), `slack` (non-negative, default `8`), `maxBytes` (non-negative, default `134217728`, `0` for no budget), and `includeUserResources` (default `false`). Trimming starts when more than `keepRecent` plus `slack` trimmable resources are held and keeps the newest `keepRecent`. The byte budget drops the oldest first. Invalid values stop startup. `/trim on` or `/trim off` sets `enabled`. A provider entry in `providers.json` may carry its own `resourceTrim` with `keepRecent`, `slack`, `maxBytes`, and `includeUserResources`; each value set there replaces the global one for that provider's models |
 | `bashTimeoutSeconds` | Built-in `bash` per-command timeout. Omitted keeps 600 seconds. A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; cancelling the turn still stops the command |
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
@@ -2112,10 +2112,12 @@ or `off`, writes `config.json`, and does not summarize. It is refused
 while a turn or compaction is running. `/status` shows a Microcompaction
 row only while it is on.
 
-Image trimming limits how many images a model request carries. An image it
-leaves out is shown to the model only as its `[Image #N]` marker; the
-session, resume, fork, and export keep it. By default only images returned by
-tools are trimmed, not images you attached. `/trim` trims to the configured
+Resource trimming limits how many resources, today images, a model request
+carries. A resource it leaves out is shown to the model only as its marker,
+such as `[Image #N]`; the session, resume, fork, and export keep it. By
+default only resources returned by tools are trimmed, not ones you attached.
+Set `resourceTrim` on a provider in `providers.json` to use different limits
+for that provider. `/trim` trims to the configured
 count now, `/trim 3` keeps the newest 3, `/trim all` keeps none, and
 `/trim on` or `/trim off` switches automatic trimming and writes
 `config.json`. It is refused while a turn or compaction is running.

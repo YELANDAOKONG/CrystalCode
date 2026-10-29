@@ -294,8 +294,29 @@ internal static class SettingsMapper
             entry.ApiKeyEnvironment,
             entry.ApiKey,
             entry.RequiresApiKey,
-            EndpointOptionsReader.Read(name, protocol, entry.Options));
+            EndpointOptionsReader.Read(name, protocol, entry.Options),
+            ReadResourceTrim(entry.ResourceTrim));
     }
+
+    private static ResourceTrimOverride? ReadResourceTrim(ProviderResourceTrimDocument? document) =>
+        document is null
+            ? null
+            : new ResourceTrimOverride(
+                document.KeepRecent,
+                document.Slack,
+                document.MaxBytes,
+                document.IncludeUserResources);
+
+    private static ProviderResourceTrimDocument? WriteResourceTrim(ResourceTrimOverride? resourceTrim) =>
+        resourceTrim is null
+            ? null
+            : new ProviderResourceTrimDocument
+            {
+                KeepRecent = resourceTrim.KeepRecent,
+                Slack = resourceTrim.Slack,
+                MaxBytes = resourceTrim.MaxBytes,
+                IncludeUserResources = resourceTrim.IncludeUserResources
+            };
 
     private static ProviderDocument WriteProvider(ProviderDefinition provider)
     {
@@ -344,6 +365,7 @@ internal static class SettingsMapper
                     ? null
                     : provider.RequiresApiKey,
             Options = EndpointOptionsReader.Write(provider.ThinkingDisplay),
+            ResourceTrim = WriteResourceTrim(provider.ResourceTrim),
             Models = models
         };
     }

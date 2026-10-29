@@ -1,6 +1,6 @@
 namespace CrystalCode.Engine.Home;
 
-internal sealed class ImageTrimDocument
+internal sealed class ResourceTrimDocument
 {
     public bool? Enabled { get; set; }
 
@@ -10,5 +10,5 @@ internal sealed class ImageTrimDocument
 
     public long? MaxBytes { get; set; }
 
-    public bool? IncludeUserImages { get; set; }
+    public bool? IncludeUserResources { get; set; }
 }

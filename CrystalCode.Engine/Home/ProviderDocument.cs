@@ -22,6 +22,8 @@ internal sealed class ProviderDocument
 
     public bool? RequiresApiKey { get; set; }
 
+    public ProviderResourceTrimDocument? ResourceTrim { get; set; }
+
     /// <summary>
     /// Raw endpoint options. Names are interpreted by protocol and are not
     /// properties of this document.

@@ -19,7 +19,8 @@ public sealed record ProviderDefinition
         string? apiKeyEnvironment = null,
         string? apiKey = null,
         bool? requiresApiKey = null,
-        ThinkingDisplay? thinkingDisplay = null)
+        ThinkingDisplay? thinkingDisplay = null,
+        ResourceTrimOverride? resourceTrim = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(protocol);
@@ -60,6 +61,7 @@ public sealed record ProviderDefinition
         ApiKeyEnvironment = apiKeyEnvironment;
         ApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey.Trim();
         RequiresApiKey = requiresApiKey ?? protocol != ProviderProtocol.Ollama;
+        ResourceTrim = resourceTrim;
         ThinkingDisplay = thinkingDisplay == ThinkingDisplay.Omitted
             ? ThinkingDisplay.Omitted
             : null;
@@ -96,6 +98,11 @@ public sealed record ProviderDefinition
     /// and is not written to a provider file.
     /// </summary>
     public ThinkingDisplay? ThinkingDisplay { get; }
+
+    /// <summary>
+    /// Gets the resource trim limits this endpoint sets, or null to use the global ones.
+    /// </summary>
+    public ResourceTrimOverride? ResourceTrim { get; }
 
     public bool TryGetModel(string model, out ModelSettings settings)
     {

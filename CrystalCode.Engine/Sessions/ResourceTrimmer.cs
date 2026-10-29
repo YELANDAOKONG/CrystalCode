@@ -9,13 +9,14 @@ using CrystalCode.Engine.Configuration;
 namespace CrystalCode.Engine.Sessions;
 
 /// <summary>
-/// Chooses which session images a model request carries. An omitted image is
-/// never deleted: the transcript and the session keep it, and the request
-/// shows only its marker text. Omission is one-way for the life of the
-/// trimmer, so a trimmed image does not come back when new images arrive and
-/// the request prefix changes only when a trim triggers.
+/// Chooses which session resources a model request carries. Only images
+/// exist today. An omitted resource is never deleted: the transcript and the
+/// session keep it, and the request shows only its marker text. Omission is
+/// one-way for the life of the trimmer, so a trimmed resource does not come
+/// back when new ones arrive and the request prefix changes only when a trim
+/// triggers.
 /// </summary>
-public sealed class ImageTrimmer
+public sealed class ResourceTrimmer
 {
     private readonly HashSet<int> _omitted = [];
 
@@ -26,14 +27,14 @@ public sealed class ImageTrimmer
     public IDictionary<int, ImageAttachment> Apply(
         IReadOnlyList<ChatItem> transcript,
         IDictionary<int, ImageAttachment> images,
-        ImageTrimSettings settings)
+        ResourceTrimSettings settings)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(images);
         ArgumentNullException.ThrowIfNull(settings);
         if (settings.Enabled)
         {
-            TrimAutomatically(Referenced(transcript, images, settings.IncludeUserImages), settings);
+            TrimAutomatically(Referenced(transcript, images, settings.IncludeUserResources), settings);
         }
 
         var visible = new Dictionary<int, ImageAttachment>(images);
@@ -49,16 +50,16 @@ public sealed class ImageTrimmer
     /// Leaves all but the newest <paramref name="keep"/> trimmable images out
     /// of later requests, whether or not automatic trimming is enabled.
     /// </summary>
-    public ImageTrimResult Trim(
+    public ResourceTrimResult Trim(
         IReadOnlyList<ChatItem> transcript,
         IDictionary<int, ImageAttachment> images,
         int keep,
-        bool includeUserImages)
+        bool includeUserResources)
     {
         ArgumentNullException.ThrowIfNull(transcript);
         ArgumentNullException.ThrowIfNull(images);
         ArgumentOutOfRangeException.ThrowIfNegative(keep);
-        var trimmable = Referenced(transcript, images, includeUserImages)
+        var trimmable = Referenced(transcript, images, includeUserResources)
             .Where(static entry => entry.Trimmable)
             .ToList();
         return Omit(trimmable.Take(Math.Max(0, trimmable.Count - keep)));
@@ -66,7 +67,7 @@ public sealed class ImageTrimmer
 
     public void Reset() => _omitted.Clear();
 
-    private void TrimAutomatically(List<Reference> referenced, ImageTrimSettings settings)
+    private void TrimAutomatically(List<Reference> referenced, ResourceTrimSettings settings)
     {
         var trimmable = referenced.Where(static entry => entry.Trimmable).ToList();
         if (trimmable.Count > settings.KeepRecent + settings.Slack)
@@ -96,7 +97,7 @@ public sealed class ImageTrimmer
         }
     }
 
-    private ImageTrimResult Omit(IEnumerable<Reference> entries)
+    private ResourceTrimResult Omit(IEnumerable<Reference> entries)
     {
         var count = 0;
         long bytes = 0;
@@ -109,7 +110,7 @@ public sealed class ImageTrimmer
             }
         }
 
-        return new ImageTrimResult(count, bytes);
+        return new ResourceTrimResult(count, bytes);
     }
 
     /// <summary>
@@ -119,7 +120,7 @@ public sealed class ImageTrimmer
     private List<Reference> Referenced(
         IReadOnlyList<ChatItem> transcript,
         IDictionary<int, ImageAttachment> images,
-        bool includeUserImages)
+        bool includeUserResources)
     {
         var references = new List<Reference>();
         var seen = new HashSet<int>();
@@ -129,7 +130,7 @@ public sealed class ImageTrimmer
             {
                 ToolResult result => (result.Text, true),
                 ChatMessage { Role: var role } message when role == ChatRole.User =>
-                    (message.Text, includeUserImages),
+                    (message.Text, includeUserResources),
                 _ => (null, false)
             };
             if (text is null)

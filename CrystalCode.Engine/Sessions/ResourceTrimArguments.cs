@@ -7,7 +7,7 @@ namespace CrystalCode.Engine.Sessions;
 /// keeps that many images, <c>all</c> keeps none, and <c>on</c> and <c>off</c>
 /// switch automatic trimming.
 /// </summary>
-internal static class ImageTrimArguments
+internal static class ResourceTrimArguments
 {
     public static bool TryParse(string? argument, out Request request, out string error)
     {
@@ -44,11 +44,11 @@ internal static class ImageTrimArguments
             return true;
         }
 
-        error = "Trim takes no argument, a positive number of images to keep, all, on, or off.";
+        error = "Trim takes no argument, a positive number of resources to keep, all, on, or off.";
         return false;
     }
 
-    /// <param name="Keep">Images to keep for a manual trim, or null when the command only switches the setting.</param>
+    /// <param name="Keep">Resources to keep for a manual trim, or null when the command only switches the setting.</param>
     /// <param name="Enabled">The new automatic trimming state, or null when the command is a manual trim.</param>
     public sealed record Request(int? Keep, bool? Enabled);
 }

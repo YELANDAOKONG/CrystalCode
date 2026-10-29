@@ -213,6 +213,7 @@ public sealed class ProviderCatalog
             replacement.ApiKeyEnvironment ?? existing.ApiKeyEnvironment,
             replacement.ApiKey ?? existing.ApiKey,
             replacement.RequiresApiKey,
-            replacement.ThinkingDisplay ?? existing.ThinkingDisplay);
+            replacement.ThinkingDisplay ?? existing.ThinkingDisplay,
+            replacement.ResourceTrim ?? existing.ResourceTrim);
     }
 }

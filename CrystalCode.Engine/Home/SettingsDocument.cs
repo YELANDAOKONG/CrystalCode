@@ -96,7 +96,7 @@ internal sealed class SettingsDocument
 
     public MicroCompactionDocument? MicroCompaction { get; set; }
 
-    public ImageTrimDocument? ImageTrim { get; set; }
+    public ResourceTrimDocument? ResourceTrim { get; set; }
 
     public ImageModelDocument? ImageModel { get; set; }
 

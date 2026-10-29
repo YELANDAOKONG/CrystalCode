@@ -187,17 +187,17 @@ public sealed class CodingSessionCompactionModelTests
 
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/trim off", CancellationToken.None);
-        Assert.Equal("Image trim  Off", LastNote(headless));
-        Assert.False(Read(headless).ImageTrim!.Enabled);
+        Assert.Equal("Resource trim  Off", LastNote(headless));
+        Assert.False(Read(headless).ResourceTrim!.Enabled);
 
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/trim on", CancellationToken.None);
-        Assert.Equal("Image trim  On", LastNote(headless));
-        Assert.Null(Read(headless).ImageTrim);
+        Assert.Equal("Resource trim  On", LastNote(headless));
+        Assert.Null(Read(headless).ResourceTrim);
 
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/trim 2", CancellationToken.None);
-        Assert.Equal("No images to trim", LastNote(headless));
+        Assert.Equal("No resources to trim", LastNote(headless));
 
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/trim later", CancellationToken.None);

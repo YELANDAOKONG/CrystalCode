@@ -53,7 +53,7 @@ public static class SlashCatalog
             "Summarize earlier context, fold all of it with full, or set the model, thinking gear, summary display, and microcompaction",
             ["full", "model", "thinking", "summary", "auto", "micro"]),
         new(SessionVerb.Trim, "trim", [],
-            "Leave old images out of model requests: a count to keep, all, or on and off for automatic trimming",
+            "Leave old resources, such as images, out of model requests: a count to keep, all, or on and off for automatic trimming",
             ["all", "on", "off"]),
         new(SessionVerb.Todos, "todos", ["todo"], "Show the full session todo list, toggle the todo bar, or set its rows",
             ["bar", "rows"]),
