@@ -143,3 +143,27 @@ jobs:
           name: CrystalCode-${{ matrix.artifact }}
           path: CrystalCode/publish
           if-no-files-found: error
+
+  checksum:
+    name: checksum.txt
+    needs: publish
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Download release archives
+        run: >
+          gh release download "$TAG"
+          --repo "$GITHUB_REPOSITORY"
+          --pattern 'CrystalCode-*.zip'
+          --dir assets
+
+      - name: Write checksum.txt
+        working-directory: assets
+        run: sha256sum CrystalCode-*.zip > checksum.txt
+
+      - name: Upload checksum.txt
+        working-directory: assets
+        run: gh release upload "$TAG" checksum.txt --repo "$GITHUB_REPOSITORY" --clobber
