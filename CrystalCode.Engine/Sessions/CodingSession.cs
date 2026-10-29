@@ -760,6 +760,14 @@ public sealed class CodingSession : ITurnObserver
         .. _modes.Definitions.Select(mode => new SlashCompletion(mode.Name, mode.Description, [mode.Name]))
     ];
 
+    private IReadOnlyList<SlashCompletion> ThemeCompletions() =>
+    [
+        .. ThemeCatalog.Names(_home).Select(name => new SlashCompletion(
+            name,
+            ThemeCatalog.IsBuiltIn(name) ? "Built-in theme" : "Theme from ~/.crystal/themes",
+            [name]))
+    ];
+
     private IReadOnlyList<SlashCompletion> AgentCompletions()
     {
         var catalog = AgentCatalog.Load(_home, _workspace.Root, _settings.Agents with { Enabled = true });
@@ -8764,6 +8772,7 @@ public sealed class CodingSession : ITurnObserver
         {
             "agents" => command with { Arguments = AgentCompletions() },
             "mode" => command with { Arguments = ModeCompletions() },
+            "theme" => command with { Arguments = ThemeCompletions() },
             _ => command
         }).ToArray();
         menu = [.. menu, .. _mcp.Prompts.Select(PromptCompletion)];
