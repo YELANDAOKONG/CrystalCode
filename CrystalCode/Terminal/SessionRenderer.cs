@@ -68,6 +68,7 @@ public sealed class SessionRenderer : IDisposable
     public Func<CancellationToken, Task<QuickPromptCatalog>>? LoadQuickPromptsAsync { get; set; }
     public Func<string, CancellationToken, Task>? QueueQuickPromptAsync { get; set; }
     private string? _streamKind;
+    private readonly ReasoningStreamText _reasoningText = new();
     private readonly StreamToolNames _toolNames = new();
     private readonly Dictionary<string, string> _toolCallNames = new(StringComparer.Ordinal);
     private Stopwatch? _turnClock;
@@ -1026,7 +1027,7 @@ public sealed class SessionRenderer : IDisposable
             {
                 case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
                     OpenLiveUnlocked(TranscriptKind.Thinking);
-                    var reasoningText = _log.AppendLive(TranscriptKind.Thinking, reasoning.Text);
+                    var reasoningText = _log.AppendLive(TranscriptKind.Thinking, _reasoningText.Next(reasoning));
                     _streamedCharacters += reasoning.Text.Length;
                     SetTurnActivityUnlocked("Thinking", ProgressText.Thinking);
                     if (_log.VerboseThinking && reasoningText.Length > 0)
@@ -2276,6 +2277,7 @@ public sealed class SessionRenderer : IDisposable
         }
 
         _log.CommitLive();
+        _reasoningText.Reset();
         _streamKind = null;
         _toolNames.Clear();
     }
@@ -2283,6 +2285,7 @@ public sealed class SessionRenderer : IDisposable
     private void DiscardLiveUnlocked()
     {
         _log.DiscardLive();
+        _reasoningText.Reset();
         _streamKind = null;
         _toolNames.Clear();
     }

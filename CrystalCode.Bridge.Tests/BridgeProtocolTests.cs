@@ -97,6 +97,32 @@ public sealed class BridgeProtocolTests
     }
 
     [Fact]
+    public async Task Prompt_SeparatesReasoningSummaryParts()
+    {
+        var model = new ScriptedModel(false,
+        [
+            new Crystal.Chat.ChatReasoningTextDelta(0, 0, 0, Crystal.Reasoning.ReasoningTextKind.Summary, "**One**"),
+            new Crystal.Chat.ChatReasoningTextDelta(0, 0, 1, Crystal.Reasoning.ReasoningTextKind.Summary, "**Two**"),
+            new Crystal.Chat.ChatTextDelta(0, 1, Crystal.Chat.ChatRole.Assistant, "done"),
+            new Crystal.Chat.ChatCandidateCompleted(0, Crystal.FinishReason.Stop)
+        ]);
+        await using var fixture = await BridgeFixture.StartAsync(model);
+        var id = await fixture.OpenAsync();
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "think" } } });
+
+        var first = await fixture.WaitForUpdateAsync("agent_thought_chunk");
+        var second = await fixture.WaitForUpdateAsync(
+            "agent_thought_chunk",
+            update => update.GetProperty("content").GetProperty("text").GetString() != "**One**");
+        Assert.Equal("**One**", ThoughtText(first));
+        Assert.Equal("\n\n**Two**", ThoughtText(second));
+    }
+
+    private static string? ThoughtText(JsonElement update) =>
+        update.GetProperty("params").GetProperty("update").GetProperty("content").GetProperty("text").GetString();
+
+    [Fact]
     public async Task Cancel_DuringStreaming_AnswersCancelled()
     {
         var model = new ScriptedModel(true);

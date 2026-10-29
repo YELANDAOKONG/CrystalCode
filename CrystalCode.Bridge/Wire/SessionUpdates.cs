@@ -99,6 +99,7 @@ internal sealed class SessionUpdates
     private readonly object _gate = new();
     private readonly HashSet<string> _announced = new(StringComparer.Ordinal);
     private readonly Dictionary<int, string> _streamingCalls = [];
+    private readonly ReasoningStreamText _thoughtText = new();
     private int _round;
     private int _reports;
     private int _replays;
@@ -265,10 +266,12 @@ internal sealed class SessionUpdates
                 case ModelRoundClosed:
                     _round++;
                     _streamingCalls.Clear();
+                    _thoughtText.Reset();
                     break;
                 case RetryScheduled retry:
                     Notice("warning", "Retrying the model request", $"Attempt {retry.Attempt.Attempt}: {retry.Attempt.Message}", "RetryScheduled");
                     _streamingCalls.Clear();
+                    _thoughtText.Reset();
                     break;
                 case UsageChanged usage:
                     Usage(usage);
@@ -661,7 +664,7 @@ internal sealed class SessionUpdates
                     });
                     break;
                 case ChatReasoningItem reasoning:
-                    var text = string.Join("\n", reasoning.Content.TextSegments.Select(static segment => segment.Text));
+                    var text = ReasoningStreamText.Join(reasoning.Content);
                     if (text.Length > 0)
                     {
                         Update("agent_thought_chunk", "HistoryReplayed", writer =>
@@ -750,9 +753,10 @@ internal sealed class SessionUpdates
                 });
                 break;
             case ChatReasoningTextDelta reasoning when reasoning.Text.Length > 0:
+                var thought = _thoughtText.Next(reasoning);
                 Update("agent_thought_chunk", "StreamReceived", writer =>
                 {
-                    TextContent(writer, reasoning.Text);
+                    TextContent(writer, thought);
                     writer.WriteString("messageId", MessageId("thought", reasoning.CandidateIndex));
                 });
                 break;

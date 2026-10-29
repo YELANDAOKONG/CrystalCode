@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using Crystal.Reasoning;
 using Crystal.Tools;
 
 using CrystalCode.Display.Transcript;
@@ -74,5 +75,23 @@ public sealed class TranscriptReplayTests
         Assert.Equal(TranscriptKind.Summary, lines[0].Kind);
         Assert.Equal("Read a.txt.", lines[0].Text);
         Assert.Equal(TranscriptKind.User, lines[1].Kind);
+    }
+
+    [Fact]
+    public void Lines_SeparatesReasoningSegments()
+    {
+        var items = new List<ChatItem>
+        {
+            new ChatReasoningItem(new ReasoningContent(
+            [
+                new ReasoningText("**One**", ReasoningTextKind.Summary),
+                new ReasoningText("**Two**", ReasoningTextKind.Summary)
+            ]))
+        };
+
+        var line = Assert.Single(TranscriptReplay.Lines(items));
+
+        Assert.Equal(TranscriptKind.Thinking, line.Kind);
+        Assert.Equal("**One**\n\n**Two**", line.Text);
     }
 }

@@ -95,6 +95,21 @@ public sealed class RunLogTests
     }
 
     [Fact]
+    public void OnEvent_SeparatesStreamedReasoningSummaries()
+    {
+        var output = new StringWriter();
+        var log = new RunLog(output, showThinking: true);
+        log.OnEvent(new StreamReceived(
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Summary, "**One**")));
+        log.OnEvent(new StreamReceived(
+            new ChatReasoningTextDelta(0, 0, 1, ReasoningTextKind.Summary, "**Two**")));
+        log.OnEvent(new ToolCallsIssued([]));
+
+        var text = output.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Equal("[Thinking]\n**One**\n\n**Two**\n", text);
+    }
+
+    [Fact]
     public void OnEvent_LabelsAReplyWhenThinkingIsShownButAbsent()
     {
         var output = new StringWriter();

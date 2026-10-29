@@ -230,6 +230,7 @@ public sealed class SessionState
     {
         private readonly StringBuilder _text = new();
         private readonly StringBuilder _reasoning = new();
+        private readonly ReasoningStreamText _reasoningText = new();
         private readonly SortedDictionary<int, CallBuffer> _calls = [];
         private int _retries;
 
@@ -241,7 +242,7 @@ public sealed class SessionState
                     _text.Append(text.Text);
                     break;
                 case ChatReasoningTextDelta reasoning when reasoning.CandidateIndex == 0:
-                    _reasoning.Append(reasoning.Text);
+                    _reasoning.Append(_reasoningText.Next(reasoning));
                     break;
                 case ChatToolCallDelta call when call.CandidateIndex == 0:
                     if (!_calls.TryGetValue(call.ItemIndex, out var buffer))

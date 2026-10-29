@@ -22,6 +22,7 @@ internal sealed class RunLog : IRunLog
     private readonly object _gate = new();
     private readonly StringBuilder _reply = new();
     private readonly StringBuilder _thinking = new();
+    private readonly ReasoningStreamText _thinkingText = new();
     private readonly List<ToolCall> _calls = [];
     private bool _wrote;
 
@@ -118,7 +119,7 @@ internal sealed class RunLog : IRunLog
                 _reply.Append(text.Text);
                 break;
             case ChatReasoningTextDelta reasoning when _showThinking && reasoning.Text.Length > 0:
-                _thinking.Append(reasoning.Text);
+                _thinking.Append(_thinkingText.Next(reasoning));
                 break;
             default:
                 break;
@@ -127,6 +128,7 @@ internal sealed class RunLog : IRunLog
 
     private void Flush()
     {
+        _thinkingText.Reset();
         if (_thinking.Length > 0)
         {
             var thinking = _thinking.ToString();

@@ -21,6 +21,7 @@ internal sealed class RunJsonStream
     private readonly bool _showThinking;
     private readonly StringBuilder _reply = new();
     private readonly StringBuilder _thinking = new();
+    private readonly ReasoningStreamText _thinkingText = new();
     private readonly Dictionary<string, ToolCall> _calls = new(StringComparer.Ordinal);
 
     public RunJsonStream(Action<string, Action<Utf8JsonWriter>> emit, bool showThinking)
@@ -69,6 +70,7 @@ internal sealed class RunJsonStream
                 // The failed attempt's partial output is replaced by the retry.
                 _reply.Clear();
                 _thinking.Clear();
+                _thinkingText.Reset();
                 _emit(
                     "retry",
                     writer =>
@@ -86,6 +88,7 @@ internal sealed class RunJsonStream
     public void Flush()
     {
         var thinking = Take(_thinking);
+        _thinkingText.Reset();
         if (thinking.Length > 0)
         {
             _emit("reasoning", writer => writer.WriteString("text", thinking));
@@ -106,7 +109,7 @@ internal sealed class RunJsonStream
                 _reply.Append(text.Text);
                 break;
             case ChatReasoningTextDelta reasoning when _showThinking:
-                _thinking.Append(reasoning.Text);
+                _thinking.Append(_thinkingText.Next(reasoning));
                 break;
             default:
                 break;

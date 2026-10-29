@@ -129,7 +129,7 @@ public static class TranscriptExport
                 lines.Add(string.Empty);
                 break;
             case ChatReasoningItem reasoning:
-                var thinking = ReadableReasoning(reasoning);
+                var thinking = ReasoningStreamText.Join(reasoning.Content);
                 if (thinking.Length == 0)
                 {
                     break;
@@ -143,19 +143,5 @@ public static class TranscriptExport
             default:
                 break;
         }
-    }
-
-    private static string ReadableReasoning(ChatReasoningItem item)
-    {
-        var parts = new List<string>();
-        foreach (var segment in item.Content.TextSegments)
-        {
-            if (segment.Text.Length > 0)
-            {
-                parts.Add(segment.Text);
-            }
-        }
-
-        return string.Join("\n", parts);
     }
 }

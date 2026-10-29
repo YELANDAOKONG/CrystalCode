@@ -48,7 +48,7 @@ public static class TranscriptReplay
 
                     break;
                 case ChatReasoningItem reasoning:
-                    var thinking = ReadableReasoning(reasoning);
+                    var thinking = ReasoningStreamText.Join(reasoning.Content);
                     if (thinking.Length > 0)
                     {
                         lines.Add(new TranscriptLine(TranscriptKind.Thinking, thinking));
@@ -61,20 +61,6 @@ public static class TranscriptReplay
         }
 
         return lines;
-    }
-
-    private static string ReadableReasoning(ChatReasoningItem item)
-    {
-        var parts = new List<string>();
-        foreach (var segment in item.Content.TextSegments)
-        {
-            if (segment.Text.Length > 0)
-            {
-                parts.Add(segment.Text);
-            }
-        }
-
-        return string.Join("\n", parts);
     }
 
     private static bool TryMapMessage(

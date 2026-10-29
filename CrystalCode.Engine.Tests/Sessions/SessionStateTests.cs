@@ -107,6 +107,17 @@ public sealed class SessionStateTests
     }
 
     [Fact]
+    public void Snapshot_SeparatesStreamedReasoningSummaries()
+    {
+        var state = new SessionState();
+        state.Apply(new TurnStarted());
+        state.Apply(new StreamReceived(new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Summary, "**One**")));
+        state.Apply(new StreamReceived(new ChatReasoningTextDelta(0, 0, 1, ReasoningTextKind.Summary, "**Two**")));
+
+        Assert.Equal("**One**\n\n**Two**", state.Snapshot().Live!.Reasoning);
+    }
+
+    [Fact]
     public void Retry_DiscardsTheFailedAttempt()
     {
         var state = new SessionState();
