@@ -150,6 +150,66 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task PutOption_RunsTheOptionCommandAndAppliesNextTurnWhileBusy()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+
+        var idle = await PutAsync(fixture, fixture.Http, "/options/approval", new { value = "edit" });
+        var unknown = await fixture.Http.PutAsync("/options/nope", ServerFixture.Body(new { value = "x" }));
+        var unoffered = await fixture.Http.PutAsync("/options/approval", ServerFixture.Body(new { value = "sometimes" }));
+        var switched = await PutAsync(fixture, fixture.Http, "/options/estimated_tokens", new { value = true });
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        var busy = await PutAsync(fixture, fixture.Http, "/options/mode", new { value = "plan" });
+
+        Assert.False(idle.GetProperty("pending").GetBoolean());
+        Assert.Equal("edit", Option(idle, "approval").GetProperty("current").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, unoffered.StatusCode);
+        Assert.Equal("on", Option(switched, "estimated_tokens").GetProperty("current").GetString());
+        Assert.True(busy.GetProperty("pending").GetBoolean());
+        Assert.Equal("work", Option(busy, "mode").GetProperty("current").GetString());
+        Assert.Equal("plan", busy.GetProperty("pendingSettings").GetProperty("mode").GetString());
+        await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+    }
+
+    [Fact]
+    public async Task PutOption_KeepsTheCommandScopeAndReportsARefusal()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        var issued = await fixture.PostAsync(fixture.Http, "/auth/tokens", new { scope = "operate" });
+        using var work = fixture.Client("work", issued.GetProperty("token").GetString());
+
+        var approval = await work.PutAsync("/options/approval", ServerFixture.Body(new { value = "full" }));
+        var mode = await work.PutAsync("/options/mode", ServerFixture.Body(new { value = "plan" }));
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        var refused = await fixture.Http.PutAsync("/options/prompt_set", ServerFixture.Body(new { value = "default" }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, approval.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, mode.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Contains("Finish the current turn", await refused.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+    }
+
+    private static async Task<JsonElement> PutAsync(ServerFixture fixture, HttpClient http, string path, object body)
+    {
+        var response = await http.PutAsync(path, ServerFixture.Body(body));
+        var text = await response.Content.ReadAsStringAsync();
+        Assert.True(response.IsSuccessStatusCode, (int)response.StatusCode + ": " + text);
+        using var document = JsonDocument.Parse(text);
+        return document.RootElement.Clone();
+    }
+
+    private static JsonElement Option(JsonElement result, string id) =>
+        result.GetProperty("options").EnumerateArray().Single(option => option.GetProperty("id").GetString() == id);
+
+    [Fact]
     public async Task Queries_NeedTheObserveScope()
     {
         await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));

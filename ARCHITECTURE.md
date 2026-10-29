@@ -2523,7 +2523,11 @@ content the matching slash command prints: `ListSavedSessions`
 (`McpCatalogReport`, without commands, environment, headers, or URLs),
 `ListPlugins` (`PluginCatalogReport`), `ListBackgroundTasks`, and
 `TryReadBackgroundTaskLog`. A front end calls them through
-`SessionRunner.InvokeAsync`. They change nothing.
+`SessionRunner.InvokeAsync`. They change nothing. A front end changes an
+option by submitting the command its value names (`SessionOptionValue.Command`)
+through `SessionRunner.SubmitAsync` and reads `SessionInputResult`; the
+server's `PUT /options/{id}` does exactly that and checks the command's scope
+with `ServerScopes.ForInput`.
 
 `crystal run` is the headless front end in this executable, not a second
 assembly. Refactoring and optimizing it is high-priority product work and

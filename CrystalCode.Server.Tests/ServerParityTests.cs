@@ -159,7 +159,7 @@ public sealed class ServerParityTests
     [Fact]
     public void Info_ListsEveryRoute()
     {
-        Assert.Equal(35, ServerEndpoints.Operations.Count);
+        Assert.Equal(36, ServerEndpoints.Operations.Count);
         Assert.Contains("POST /recall", ServerEndpoints.Operations);
     }
 

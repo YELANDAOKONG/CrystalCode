@@ -149,7 +149,8 @@ and the `server.state` event.
   - `observe`: snapshot, events, images, export, children, quick prompt list,
     and the read-only queries (`/sessions`, `/models`, `/options`, `/agents`,
     `/skills`, `/mcp`, `/plugins`, `/tasks`, and task logs).
-  - `operate`: input, interrupt, recall, mode, verbose, draft, image upload,
+  - `operate`: input, interrupt, recall, mode, options (an option whose
+    command needs `admin` still needs it), verbose, draft, image upload,
     quick prompt send, side question control, interaction answers, and the
     slash commands that only report or act inside the session: `/help`,
     `/status`, `/stats`, `/btw`, `/clear`, `/fork`, `/child`, `/sessions`,
@@ -245,6 +246,7 @@ and the `server.state` event.
 | `GET /sessions?all=true\|false` | observe | `ListSavedSessions`: saved sessions with content, newest first, for this workspace or every workspace. Each has `id`, `workspace`, `mode`, `createdUtc`, `updatedUtc`, `userTurns`, `preview`, `current`, and `open` (another process, or this one, holds it). Resume one with `/resume <id>` through `POST /input` |
 | `GET /models` | observe | `ListModels`: every catalog model with `provider`, `model`, `protocol`, `current`, `credentialReady`, `contextWindows`, `thinking`, `thinkingCanDisable`, `thinkingEfforts`, `serviceTiers`, `speeds`, `imageInput`, and `maxTokens`, plus `pending`. No base address, header, or key |
 | `GET /options` | observe | `ListOptions`: the same option list as `options.changed`, plus `pending` |
+| `PUT /options/{id}` | operate, or the scope of the option's command | `{"value"}`: a listed `value` as a string, or `true`/`false` for a switch. Runs that value's slash command, so validation, next-turn rules, and `config.json` writes match the terminal. Returns `pending` (the change applies on the next turn), `options`, and `pendingSettings`. 404 for an unknown option, 400 for a value it does not offer or one with no command, 403 when the command needs `admin`, 409 with the engine's text when the engine refuses it |
 | `GET /agents` | observe | `ListAgents`: `enabled`, `concurrency`, `limits` (`modelCalls`, `toolCalls`, `durationSeconds`; null is unlimited), `agents` (`name`, `description`, `custom`, `model` with null for inherit, `tools` or null for the default set), and `notes` |
 | `GET /skills` | observe | `ListSkills`: `enabled` and `skills` (`name`, `description`, `source` `home` or `project`, `location`), without bodies |
 | `GET /mcp` | observe | `ListMcp`: `enabled`, `servers` (`name`, `source`, `transport`, `status`, `tools`, `error`), and `notes`. No command, argument, environment, header, or URL |

@@ -4,17 +4,20 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Server.Hosting;
 using CrystalCode.Server.Security;
 using CrystalCode.Server.Wire;
 
 namespace CrystalCode.Server.Endpoints;
 
 /// <summary>
-/// Structured read-only views of what the session lists as text through
-/// slash commands: saved sessions, models, options, Agents, skills, MCP
-/// servers, plugins, and background tasks. Each reads through
+/// Structured views of what the session lists as text through slash
+/// commands: saved sessions, models, options, Agents, skills, MCP servers,
+/// plugins, and background tasks, plus <c>PUT /options/{id}</c>, which runs
+/// the option's own slash command. Each goes through
 /// <see cref="SessionRunner"/>, so it sees a consistent session.
 /// </summary>
 internal static class QueryEndpoints
@@ -84,6 +87,51 @@ internal static class QueryEndpoints
             {
                 WireWriter.Options(writer, "options", value.Options);
                 WireWriter.Pending(writer, "pending", value.Pending);
+            }));
+
+        app.MapPut("/options/{id}", (HttpContext context, string id, CancellationToken token) =>
+            ServerEndpoints.Mutate(context, server, ServerScope.Operate, token, async (body, runner, client) =>
+            {
+                if (!body.TryGetProperty("value", out var value))
+                {
+                    return RequestOutcome.Error(400, "value is required.");
+                }
+
+                var option = (await runner.InvokeAsync(static session => session.ListOptions(), client))
+                    .FirstOrDefault(item => string.Equals(item.Id, id, StringComparison.Ordinal));
+                if (option is null)
+                {
+                    return RequestOutcome.Error(404, "No such option  " + id);
+                }
+
+                var command = OptionCommand(option, value);
+                if (command is null)
+                {
+                    return RequestOutcome.Error(400, "value is not offered for " + option.Name + ".");
+                }
+
+                var needed = ServerScopes.ForInput(command);
+                if (needed > AccessGuard.Scope(context))
+                {
+                    return RequestOutcome.Error(403, $"This option needs the {ServerScopes.Name(needed)} scope.");
+                }
+
+                // The option's own command, so validation, next-turn rules, and
+                // config.json writes match the terminal.
+                var result = await runner.SubmitAsync(command, client);
+                if (!result.Accepted)
+                {
+                    return RequestOutcome.Error(409, result.Error!);
+                }
+
+                var (options, pending) = await runner.InvokeAsync(
+                    static session => (session.ListOptions(), session.PendingSettings), client);
+                return RequestOutcome.Ok(Json.Write(writer =>
+                {
+                    writer.WriteBoolean("pending", result.Pending);
+                    WireWriter.Options(writer, "options", options);
+                    WireWriter.Pending(writer, "pendingSettings", pending);
+                }));
             }));
 
         app.MapGet("/agents", async Task<IResult> (HttpContext context) =>
@@ -250,6 +298,24 @@ internal static class QueryEndpoints
                 writer.WriteBoolean("hasMore", log.HasMore);
             });
         });
+    }
+
+    /// <summary>
+    /// The slash command an option offers for <paramref name="value"/>: a
+    /// listed value as a string, or true and false for a switch. Null when
+    /// the option does not offer it, including a value with no command.
+    /// </summary>
+    private static string? OptionCommand(SessionOption option, JsonElement value)
+    {
+        var text = value.ValueKind switch
+        {
+            JsonValueKind.True when option.IsSwitch => "on",
+            JsonValueKind.False when option.IsSwitch => "off",
+            JsonValueKind.String => value.GetString(),
+            _ => null
+        };
+        var match = option.Values.FirstOrDefault(entry => string.Equals(entry.Value, text, StringComparison.Ordinal));
+        return match is null || match.Command.Length == 0 ? null : match.Command;
     }
 
     private static void Task(Utf8JsonWriter writer, BackgroundTaskSnapshot task)
