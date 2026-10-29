@@ -78,6 +78,25 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task Mcp_KeepsADisabledServerListedSoItCanBeEnabledAgain()
+    {
+        await using var fixture = await ServerFixture.StartAsync(
+            new ScriptedModel(false),
+            prepare: static (home, _) => File.WriteAllText(
+                Path.Combine(home.Root, "mcp.json"),
+                """{"mcpServers":{"tools":{"command":"crystal-no-such-command-for-tests","enabled":false}}}"""));
+        await fixture.WaitReadyAsync();
+
+        var listed = await fixture.GetAsync(fixture.Http, "/mcp");
+        var server = Assert.Single(listed.GetProperty("servers").EnumerateArray());
+        Assert.Equal("tools", server.GetProperty("name").GetString());
+        Assert.Equal("disabled", server.GetProperty("status").GetString());
+        Assert.False(server.GetProperty("enabled").GetBoolean());
+        Assert.True(server.GetProperty("effective").GetBoolean());
+        Assert.False(server.TryGetProperty("command", out _));
+    }
+
+    [Fact]
     public async Task SideModelTuning_IsAnOptionAndPartOfChrome()
     {
         await using var fixture = await ServerFixture.StartAsync(

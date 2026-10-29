@@ -2577,7 +2577,10 @@ content the matching slash command prints: `ListSavedSessions`
 `CredentialReady` from the credential store), `ListOptions` (the
 `SessionOptionsChanged` catalog), `ListAgents` (`AgentCatalogReport`),
 `ListSkills` (`SkillCatalogReport`, without bodies), `ListMcp`
-(`McpCatalogReport`, without commands, environment, headers, or URLs),
+(`McpCatalogReport`, without commands, environment, headers, or URLs; every
+configured server from `McpInventory.List` merged with the live catalog, so a
+disabled, replaced, or invalid server stays listed with that `Status`, then
+front-end session servers),
 `ListPlugins` (`PluginCatalogReport`), `ListBackgroundTasks`, and
 `TryReadBackgroundTaskLog`. A front end calls them through
 `SessionRunner.InvokeAsync`. They change nothing. A front end changes an

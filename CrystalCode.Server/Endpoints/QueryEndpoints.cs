@@ -208,6 +208,8 @@ internal static class QueryEndpoints
                     writer.WriteString("status", mcp.Status);
                     WireWriter.Strings(writer, "tools", mcp.Tools);
                     writer.WriteString("error", mcp.Error);
+                    writer.WriteBoolean("enabled", mcp.Enabled);
+                    writer.WriteBoolean("effective", mcp.Effective);
                     writer.WriteEndObject();
                 }
 

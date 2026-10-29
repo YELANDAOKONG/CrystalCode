@@ -640,6 +640,47 @@ public sealed class McpSessionTests
     }
 
     [Fact]
+    public async Task ListMcp_KeepsDisabledReplacedAndInvalidServersListed()
+    {
+        using var headless = Open(configure: (home, workspace) =>
+        {
+            Directory.CreateDirectory(home.Root);
+            File.WriteAllText(
+                Path.Combine(home.Root, "mcp.json"),
+                """
+                {"mcpServers":{
+                  "off":{"command":"crystal-no-such-command-for-tests","enabled":false},
+                  "shared":{"command":"crystal-no-such-command-for-tests","enabled":false},
+                  "bad":{"enabled":true}
+                }}
+                """);
+            var project = Path.Combine(workspace, ".crystal");
+            Directory.CreateDirectory(project);
+            File.WriteAllText(
+                Path.Combine(project, "mcp.json"),
+                """{"mcpServers":{"shared":{"command":"crystal-no-such-command-for-tests","enabled":false}}}""");
+        });
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        var servers = headless.Session.ListMcp().Servers;
+
+        var off = Assert.Single(servers, static server => server.Name == "off");
+        Assert.Equal("disabled", off.Status);
+        Assert.False(off.Enabled);
+        Assert.True(off.Effective);
+        Assert.Equal("stdio", off.Transport);
+        var replaced = Assert.Single(servers, static server => server.Name == "shared" && server.Source == "home");
+        Assert.Equal("replaced", replaced.Status);
+        Assert.False(replaced.Effective);
+        Assert.Equal("disabled", Assert.Single(servers, static server => server.Name == "shared" && server.Source == "project").Status);
+        var bad = Assert.Single(servers, static server => server.Name == "bad");
+        Assert.Equal("invalid", bad.Status);
+        Assert.Equal(string.Empty, bad.Transport);
+        Assert.NotEmpty(bad.Error);
+        Assert.All(servers, static server => Assert.Empty(server.Tools));
+    }
+
+    [Fact]
     public async Task LaunchOverride_Off_ConnectsNothing()
     {
         if (!HasPython())

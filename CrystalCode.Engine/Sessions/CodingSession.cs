@@ -1409,26 +1409,60 @@ public sealed class CodingSession : ITurnObserver
                 skill.Location))]);
     }
 
-    /// <summary>The MCP servers <c>/mcp</c> lists, and each server's tool names.</summary>
+    /// <summary>
+    /// Every configured MCP server, as <c>/mcp list</c> shows them, merged
+    /// with the connection state and tool names of the ones connected. A
+    /// disabled, replaced, or invalid server stays listed so a front end can
+    /// turn it back on. Front-end session servers follow the configured ones.
+    /// </summary>
     public McpCatalogReport ListMcp()
     {
         var tools = _mcp.Tools.ToLookup(static tool => tool.ServerName, StringComparer.Ordinal);
-        return new McpCatalogReport(
-            _settings.Mcp,
-            [.. _mcp.Servers.Select(server => new McpServerReport(
+        var connected = _mcp.Servers;
+        var sessionNames = connected
+            .Where(static server => server.Source == McpServerSource.Session)
+            .Select(static server => server.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var servers = new List<McpServerReport>();
+        foreach (var entry in McpInventory.List(_home, _workspace.Root))
+        {
+            var effective = entry.Effective && !sessionNames.Contains(entry.Name);
+            var live = effective
+                ? connected.FirstOrDefault(server => server.Source == entry.Source
+                    && string.Equals(server.Name, entry.Name, StringComparison.Ordinal))
+                : null;
+            var status = live is not null ? StatusWord(live.Status)
+                : entry.Transport is null ? "invalid"
+                : !effective ? "replaced"
+                : entry.Enabled == false ? "disabled"
+                : StatusWord(McpConnectionStatus.Disconnected);
+            servers.Add(new McpServerReport(
+                entry.Name,
+                SourceWord(entry.Source),
+                entry.Transport is null ? string.Empty : McpInventory.Transport(entry.Transport),
+                status,
+                live is null ? [] : [.. tools[live.Name].Select(static tool => tool.ModelName)],
+                live?.Error ?? entry.Error,
+                entry.Enabled == true,
+                effective));
+        }
+
+        foreach (var server in connected.Where(static server => server.Source == McpServerSource.Session))
+        {
+            servers.Add(new McpServerReport(
                 server.Name,
-                server.Source.ToString().ToLowerInvariant(),
-                server.Transport switch
-                {
-                    McpTransportKind.Stdio => "stdio",
-                    McpTransportKind.StreamableHttp => "http",
-                    McpTransportKind.Sse => "sse",
-                    _ => throw new InvalidOperationException("Unknown MCP transport.")
-                },
-                server.Status.ToString().ToLowerInvariant(),
+                SourceWord(server.Source),
+                McpInventory.Transport(server.Transport),
+                StatusWord(server.Status),
                 [.. tools[server.Name].Select(static tool => tool.ModelName)],
-                server.Error))],
-            _mcp.Notes);
+                server.Error));
+        }
+
+        return new McpCatalogReport(_settings.Mcp, servers, _mcp.Notes);
+
+        static string SourceWord(McpServerSource source) => source.ToString().ToLowerInvariant();
+
+        static string StatusWord(McpConnectionStatus status) => status.ToString().ToLowerInvariant();
     }
 
     /// <summary>

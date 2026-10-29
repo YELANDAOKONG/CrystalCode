@@ -116,6 +116,8 @@ internal static class CatalogWire
             writer.WriteString("status", server.Status);
             CrystalWire.Strings(writer, "tools", server.Tools);
             writer.WriteString("error", server.Error);
+            writer.WriteBoolean("enabled", server.Enabled);
+            writer.WriteBoolean("effective", server.Effective);
             writer.WriteEndObject();
         }
 
