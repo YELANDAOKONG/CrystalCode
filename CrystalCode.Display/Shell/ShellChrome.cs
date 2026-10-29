@@ -176,7 +176,13 @@ public sealed class ShellChrome
         {
             var pctIndex = Usage.IndexOf('%', StringComparison.Ordinal);
             var spaceBefore = Usage.LastIndexOf(' ', pctIndex);
-            if (spaceBefore >= 0 && int.TryParse(Usage[(spaceBefore + 1)..pctIndex], out var pct))
+            // The value has a decimal and may carry a leading "~", for example "CTX ~7.6%".
+            if (spaceBefore >= 0
+                && double.TryParse(
+                    Usage[(spaceBefore + 1)..pctIndex].TrimStart('~'),
+                    System.Globalization.NumberStyles.AllowDecimalPoint,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var pct))
             {
                 if (pct >= 80)
                 {

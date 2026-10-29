@@ -124,6 +124,25 @@ public sealed class ShellChromeTests
         Assert.True(TextWidth.Measure(line.Plain) <= 120);
     }
 
+    [Theory]
+    [InlineData("CTX 7.6%", "Chrome")]
+    [InlineData("CTX 65.2%  ·  1k IN / 2 OUT", "Warning")]
+    [InlineData("CTX 85.0%", "Fail")]
+    public void StatusLine_ColorsDecimalContextPercent(string usage, string color)
+    {
+        var chrome = new ShellChrome { Usage = usage };
+        var expected = color switch
+        {
+            "Warning" => Theme.Warning,
+            "Fail" => Theme.Fail,
+            _ => Theme.Chrome
+        };
+
+        var markup = chrome.StatusLine(120).Markup;
+
+        Assert.Contains($"[{expected}]{usage}", markup, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void StatusLine_FitsNarrowWidth()
     {
