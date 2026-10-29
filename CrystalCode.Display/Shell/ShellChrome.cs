@@ -171,30 +171,7 @@ public sealed class ShellChrome
             items.Add((shortPath, $"[{Theme.Muted}]{MarkupText.Escape(shortPath)}[/]", "path"));
         }
 
-        var usageColor = Theme.Chrome;
-        if (Usage.Contains('%', StringComparison.Ordinal))
-        {
-            var pctIndex = Usage.IndexOf('%', StringComparison.Ordinal);
-            var spaceBefore = Usage.LastIndexOf(' ', pctIndex);
-            // The value has a decimal and may carry a leading "~", for example "CTX ~7.6%".
-            if (spaceBefore >= 0
-                && double.TryParse(
-                    Usage[(spaceBefore + 1)..pctIndex].TrimStart('~'),
-                    System.Globalization.NumberStyles.AllowDecimalPoint,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out var pct))
-            {
-                if (pct >= 80)
-                {
-                    usageColor = Theme.Fail;
-                }
-                else if (pct >= 60)
-                {
-                    usageColor = Theme.Warning;
-                }
-            }
-        }
-
+        var usageColor = ContextColor(Usage, left: false);
         items.Add((Usage, $"[{usageColor}]{MarkupText.Escape(Usage)}[/]", "keep"));
         if (!string.IsNullOrWhiteSpace(UsageTotal))
         {
@@ -256,10 +233,42 @@ public sealed class ShellChrome
             };
             if (!string.IsNullOrWhiteSpace(value))
             {
-                var color = field == "approval" ? ApprovalColor : Theme.Chrome;
+                var color = field switch
+                {
+                    "approval" => ApprovalColor,
+                    "context-used" => ContextColor(value, left: false),
+                    "context-left" => ContextColor(value, left: true),
+                    _ => Theme.Chrome
+                };
                 items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", "custom"));
             }
         }
+    }
+
+    /// <summary>
+    /// Style for a context text such as <c>CTX ~7.6%</c> or <c>CTX 92.4% Left</c>.
+    /// A "left" text is turned into used percent first, so one theme range
+    /// colors both. Text without a percentage uses chrome.
+    /// </summary>
+    private static string ContextColor(string text, bool left)
+    {
+        var percentIndex = text.IndexOf('%', StringComparison.Ordinal);
+        if (percentIndex < 0)
+        {
+            return Theme.Chrome;
+        }
+
+        var start = text.LastIndexOf(' ', percentIndex) + 1;
+        if (!double.TryParse(
+                text[start..percentIndex].TrimStart('~'),
+                System.Globalization.NumberStyles.AllowDecimalPoint,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var percent))
+        {
+            return Theme.Chrome;
+        }
+
+        return Theme.ForContext(left ? 100 - percent : percent);
     }
 
     private string PluginField(string name)

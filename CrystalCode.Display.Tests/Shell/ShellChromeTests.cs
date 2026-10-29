@@ -144,6 +144,23 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ColorsCustomContextFieldsFromUsedPercent()
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = true,
+            StatusLineFields = ["context-used", "context-left"],
+            ContextUsed = "CTX 85.0%",
+            ContextLeft = "CTX 15.0% Left"
+        };
+
+        var markup = chrome.StatusLine(120).Markup;
+
+        Assert.Contains($"[{Theme.Fail}]CTX 85.0%", markup, StringComparison.Ordinal);
+        Assert.Contains($"[{Theme.Fail}]CTX 15.0% Left", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StatusLine_FitsNarrowWidth()
     {
         var chrome = new ShellChrome

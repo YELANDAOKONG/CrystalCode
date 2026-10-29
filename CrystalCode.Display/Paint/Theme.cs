@@ -79,7 +79,16 @@ public static class Theme
             ["accent"] = "#4a6a94"
         };
 
+    private const int MaximumGaugeBands = 16;
+
+    private const string ContextGauge = "context";
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> NoGauges =
+        new Dictionary<string, IReadOnlyList<GaugeBand>>(StringComparer.OrdinalIgnoreCase);
+
     private static IReadOnlyDictionary<string, string> _current = DefaultPalette;
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> _gauges = NoGauges;
 
     /// <summary>
     /// Selects a built-in palette: <c>default</c> and <c>dark</c> (any case) are separate palettes with the same colors, <c>light</c> suits a light terminal.
@@ -91,12 +100,15 @@ public static class Theme
         {
             case "default":
                 _current = DefaultPalette;
+                _gauges = NoGauges;
                 return true;
             case "dark":
                 _current = DarkPalette;
+                _gauges = NoGauges;
                 return true;
             case "light":
                 _current = LightPalette;
+                _gauges = NoGauges;
                 return true;
             default:
                 return false;
@@ -176,6 +188,35 @@ public static class Theme
         };
     }
 
+    /// <summary>
+    /// Gauge names a theme file may set ranges for.
+    /// </summary>
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge];
+
+    /// <summary>
+    /// Style for a context usage percentage. A theme's <c>context</c> ranges
+    /// are tried in order and the first one holding the value wins; a value
+    /// that no range holds uses <see cref="Chrome"/>. Without ranges, 60 and
+    /// above is <see cref="Warning"/> and 80 and above is <see cref="Fail"/>.
+    /// </summary>
+    public static string ForContext(double percent)
+    {
+        if (_gauges.TryGetValue(ContextGauge, out var bands))
+        {
+            foreach (var band in bands)
+            {
+                if (percent >= band.From && percent <= band.To)
+                {
+                    return band.Style;
+                }
+            }
+
+            return Chrome;
+        }
+
+        return percent >= 80 ? Fail : percent >= 60 ? Warning : Chrome;
+    }
+
     public static string Muted => Get("muted");
 
     public static string Accent => Get("accent");
@@ -185,9 +226,20 @@ public static class Theme
     /// Nothing changes when any entry is unknown or is not a Spectre style,
     /// so markup built from a token cannot be broken by a theme file.
     /// </summary>
-    public static bool TryApply(IReadOnlyDictionary<string, string> colors, out string error)
+    public static bool TryApply(IReadOnlyDictionary<string, string> colors, out string error) =>
+        TryApply(colors, NoGauges, out error);
+
+    /// <summary>
+    /// Like <see cref="TryApply(IReadOnlyDictionary{string, string}, out string)"/>, and also
+    /// sets gauge ranges. Nothing changes when a gauge or range is invalid.
+    /// </summary>
+    public static bool TryApply(
+        IReadOnlyDictionary<string, string> colors,
+        IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> gauges,
+        out string error)
     {
         ArgumentNullException.ThrowIfNull(colors);
+        ArgumentNullException.ThrowIfNull(gauges);
         error = string.Empty;
         var next = new Dictionary<string, string>(DarkPalette, StringComparer.OrdinalIgnoreCase);
         foreach (var (name, value) in colors)
@@ -215,11 +267,65 @@ public static class Theme
             return false;
         }
 
+        if (!TryReadGauges(gauges, out var nextGauges, out error))
+        {
+            return false;
+        }
+
         _current = next;
+        _gauges = nextGauges;
         return true;
     }
 
-    public static void Reset() => _current = DefaultPalette;
+    public static void Reset()
+    {
+        _current = DefaultPalette;
+        _gauges = NoGauges;
+    }
+
+    private static bool TryReadGauges(
+        IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> gauges,
+        out IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> next,
+        out string error)
+    {
+        error = string.Empty;
+        next = NoGauges;
+        var read = new Dictionary<string, IReadOnlyList<GaugeBand>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, bands) in gauges)
+        {
+            if (!GaugeNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+            {
+                error = "Unknown theme gauge  " + name;
+                return false;
+            }
+
+            if (bands.Count > MaximumGaugeBands)
+            {
+                error = "Invalid theme gauge  " + name + " has more than " + MaximumGaugeBands + " ranges";
+                return false;
+            }
+
+            foreach (var band in bands)
+            {
+                if (!(band.From >= 0 && band.To <= 100 && band.From <= band.To))
+                {
+                    error = "Invalid theme gauge  " + name + " ranges need 0 <= from <= to <= 100";
+                    return false;
+                }
+
+                if (!IsStyle(band.Style))
+                {
+                    error = "Invalid theme gauge  " + name + " color " + band.Style;
+                    return false;
+                }
+            }
+
+            read[name] = [.. bands.Select(static band => band with { Style = band.Style.Trim() })];
+        }
+
+        next = read;
+        return true;
+    }
 
     private static string Get(string name) => _current[name];
 

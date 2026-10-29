@@ -33,6 +33,57 @@ public sealed class ThemeTests : IDisposable
         Assert.Equal("lightsteelblue", Theme.Accent);
     }
 
+    [Theory]
+    [InlineData(0, "grey50")]
+    [InlineData(59.9, "grey50")]
+    [InlineData(60, "tan")]
+    [InlineData(79.9, "tan")]
+    [InlineData(80, "indianred")]
+    [InlineData(100, "indianred")]
+    public void ForContext_DefaultsToWarningAndFailThresholds(double percent, string expected)
+    {
+        Theme.Reset();
+
+        Assert.Equal(expected, Theme.ForContext(percent));
+    }
+
+    [Fact]
+    public void ForContext_FirstMatchingRangeWinsAndGapsUseChrome()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeBand>>
+        {
+            ["context"] = [new GaugeBand(90, 100, "red"), new GaugeBand(50, 100, "yellow"), new GaugeBand(0, 10, "green")]
+        };
+
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+
+        Assert.Equal("red", Theme.ForContext(95));
+        Assert.Equal("yellow", Theme.ForContext(70));
+        Assert.Equal("green", Theme.ForContext(5));
+        Assert.Equal("grey50", Theme.ForContext(30));
+        Theme.Reset();
+        Assert.Equal("indianred", Theme.ForContext(95));
+    }
+
+    [Theory]
+    [InlineData("other", 0, 100, "red")]
+    [InlineData("context", -1, 100, "red")]
+    [InlineData("context", 0, 101, "red")]
+    [InlineData("context", 60, 50, "red")]
+    [InlineData("context", 0, 100, "not-a-color")]
+    public void TryApply_RejectsBadGauges(string gauge, double from, double to, string style)
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeBand>>
+        {
+            [gauge] = [new GaugeBand(from, to, style)]
+        };
+
+        Assert.False(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error));
+
+        Assert.Contains(gauge == "other" ? "gauge" : "context", error, StringComparison.Ordinal);
+        Assert.Equal("grey50", Theme.ForContext(10));
+    }
+
     [Fact]
     public void TryApply_RejectsAnApprovalColorThatIsNotGrouped()
     {

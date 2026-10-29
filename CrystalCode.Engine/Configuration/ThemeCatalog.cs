@@ -17,6 +17,13 @@ public static partial class ThemeCatalog
     public const string DefaultName = "default";
 
     /// <summary>
+    /// The one theme file member that holds ranges instead of colors.
+    /// </summary>
+    public const string GaugesKey = "gauges";
+
+    private const int MaximumBands = 16;
+
+    /// <summary>
     /// Palettes the front end ships. <c>default</c> is the same as <c>dark</c>. A file with one of
     /// these names is ignored.
     /// </summary>
@@ -96,6 +103,11 @@ public static partial class ThemeCatalog
             var read = new Dictionary<string, string>();
             foreach (var property in document.RootElement.EnumerateObject())
             {
+                if (property.Name.Equals(GaugesKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 if (property.Value.ValueKind == JsonValueKind.Object)
                 {
                     // One level of grouping, such as "approval": { "full": "red" }, reads as "approval.full".
@@ -131,6 +143,141 @@ public static partial class ThemeCatalog
             error = "Theme " + name + " cannot be read  " + exception.Message;
             return false;
         }
+    }
+
+    /// <summary>
+    /// Reads the gauge ranges of one theme file, such as
+    /// <c>{"gauges": {"context": [{"from": 80, "color": "red"}]}}</c>. Each
+    /// gauge is a list in priority order: the first range that holds a value
+    /// wins. <c>from</c> defaults to 0 and <c>to</c> to 100. A built-in theme
+    /// has none.
+    /// </summary>
+    public static bool TryReadGauges(
+        CrystalHome home,
+        string name,
+        out IReadOnlyDictionary<string, IReadOnlyList<ThemeGaugeBand>> gauges,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(home);
+        var read = new Dictionary<string, IReadOnlyList<ThemeGaugeBand>>(StringComparer.OrdinalIgnoreCase);
+        gauges = read;
+        error = string.Empty;
+        if (IsBuiltIn(name))
+        {
+            return true;
+        }
+
+        if (!Exists(home, name))
+        {
+            error = "Theme not found  " + name;
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(
+                File.ReadAllText(PathFor(home, name)),
+                HomeJson.ProviderCatalogReadOptions);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                error = "Theme " + name + " must be a JSON object.";
+                return false;
+            }
+
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (!property.Name.Equals(GaugesKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (property.Value.ValueKind != JsonValueKind.Object)
+                {
+                    error = "Theme " + name + " " + GaugesKey + " must be an object.";
+                    return false;
+                }
+
+                foreach (var gauge in property.Value.EnumerateObject())
+                {
+                    if (!TryReadBands(name, gauge, out var bands, out error))
+                    {
+                        return false;
+                    }
+
+                    read[gauge.Name] = bands;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        {
+            error = "Theme " + name + " cannot be read  " + exception.Message;
+            return false;
+        }
+    }
+
+    private static bool TryReadBands(
+        string theme,
+        JsonProperty gauge,
+        out IReadOnlyList<ThemeGaugeBand> bands,
+        out string error)
+    {
+        var read = new List<ThemeGaugeBand>();
+        bands = read;
+        error = string.Empty;
+        var label = "Theme " + theme + " gauge " + gauge.Name;
+        if (gauge.Value.ValueKind != JsonValueKind.Array)
+        {
+            error = label + " must be a list of ranges.";
+            return false;
+        }
+
+        if (gauge.Value.GetArrayLength() > MaximumBands)
+        {
+            error = label + " has more than " + MaximumBands + " ranges.";
+            return false;
+        }
+
+        foreach (var item in gauge.Value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object)
+            {
+                error = label + " ranges must be objects.";
+                return false;
+            }
+
+            double from = 0;
+            double to = 100;
+            string? color = null;
+            foreach (var member in item.EnumerateObject())
+            {
+                switch (member.Name)
+                {
+                    case "from" when member.Value.ValueKind == JsonValueKind.Number
+                        && member.Value.TryGetDouble(out from):
+                    case "to" when member.Value.ValueKind == JsonValueKind.Number
+                        && member.Value.TryGetDouble(out to):
+                        break;
+                    case "color" when member.Value.ValueKind == JsonValueKind.String:
+                        color = member.Value.GetString();
+                        break;
+                    default:
+                        error = label + " range member " + member.Name + " is not valid. Use from, to, and color.";
+                        return false;
+                }
+            }
+
+            if (color is null)
+            {
+                error = label + " ranges need a color.";
+                return false;
+            }
+
+            read.Add(new ThemeGaugeBand(from, to, color));
+        }
+
+        return true;
     }
 
     private static string PathFor(CrystalHome home, string name) =>

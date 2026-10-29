@@ -75,6 +75,49 @@ public sealed class ThemeCatalogTests : IDisposable
     }
 
     [Fact]
+    public void TryReadGauges_ReadsRangesInOrderWithDefaults()
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(
+            Path.Combine(home.ThemesDirectory, "night.json"),
+            """
+            { "accent": "red", "gauges": { "context": [
+              { "from": 90, "color": "red bold" },
+              { "from": 50, "to": 89.9, "color": "yellow" },
+              { "to": 10, "color": "green" } ] } }
+            """);
+
+        Assert.True(ThemeCatalog.TryRead(home, "night", out var colors, out _));
+        Assert.True(ThemeCatalog.TryReadGauges(home, "night", out var gauges, out var error), error);
+
+        Assert.Equal(["accent"], colors.Keys);
+        Assert.Equal(
+            [new ThemeGaugeBand(90, 100, "red bold"), new ThemeGaugeBand(50, 89.9, "yellow"), new ThemeGaugeBand(0, 10, "green")],
+            gauges["context"]);
+        Assert.True(ThemeCatalog.TryReadGauges(home, "light", out var none, out _));
+        Assert.Empty(none);
+    }
+
+    [Theory]
+    [InlineData("""{ "gauges": [] }""", "object")]
+    [InlineData("""{ "gauges": { "context": {} } }""", "list")]
+    [InlineData("""{ "gauges": { "context": [1] } }""", "objects")]
+    [InlineData("""{ "gauges": { "context": [{ "from": 1 }] } }""", "color")]
+    [InlineData("""{ "gauges": { "context": [{ "from": "1", "color": "red" }] } }""", "from")]
+    [InlineData("""{ "gauges": { "context": [{ "color": "red", "extra": 1 }] } }""", "extra")]
+    public void TryReadGauges_ReportsBadShapes(string json, string expected)
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(Path.Combine(home.ThemesDirectory, "bad.json"), json);
+
+        Assert.False(ThemeCatalog.TryReadGauges(home, "bad", out _, out var error));
+
+        Assert.Contains(expected, error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryRead_ReportsBadFiles()
     {
         var home = new CrystalHome(_root);
