@@ -87,6 +87,26 @@ public static class WireWriter
         writer.WriteBoolean("verboseThinking", preferences.VerboseThinking);
         writer.WriteBoolean("statusLineEnabled", preferences.StatusLineEnabled);
         Strings(writer, "statusLineFields", preferences.StatusLineFields);
+        writer.WriteStartArray("statusLineRules");
+        foreach (var rule in preferences.StatusLineRules)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("field", rule.Field);
+            writer.WriteBoolean("keep", rule.Keep);
+            if (rule.HideBelow is { } hideBelow)
+            {
+                writer.WriteNumber("hideBelow", hideBelow);
+            }
+            else
+            {
+                writer.WriteNull("hideBelow");
+            }
+
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        Strings(writer, "statusLineDrop", preferences.StatusLineDrop);
         writer.WriteString("theme", preferences.Theme);
         writer.WriteBoolean("approvalColors", preferences.ApprovalColors);
         writer.WriteEndObject();

@@ -64,7 +64,9 @@ internal sealed class SettingsDocument
 
     public bool? CustomStatusLine { get; set; }
 
-    public List<string>? StatusLine { get; set; }
+    public System.Text.Json.JsonElement? StatusLine { get; set; }
+
+    public List<string>? StatusLineDrop { get; set; }
 
     public double? CompactionThreshold { get; set; }
 

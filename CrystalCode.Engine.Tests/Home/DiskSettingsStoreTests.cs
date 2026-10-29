@@ -1924,6 +1924,63 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsStatusLineRulesAndDropOrderFromHandEditedConfig()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.Save(store.LoadOrCreate());
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "customStatusLine": true,
+              "statusLine": [
+                "approval",
+                { "field": "context-used", "keep": true },
+                { "field": "model", "hideBelow": 100 },
+                "elapsed"
+              ],
+              "statusLineDrop": ["elapsed"]
+            }
+            """);
+
+        var loaded = store.Load().StatusLine;
+
+        Assert.Equal(["approval", "context-used", "model", "elapsed"], loaded.Fields);
+        Assert.Equal(
+            [new StatusLineRule("context-used", true), new StatusLineRule("model", false, 100)],
+            loaded.Rules);
+        Assert.Equal(["elapsed"], loaded.DropOrder);
+    }
+
+    [Fact]
+    public void Save_RoundTripsStatusLineRulesAndDropOrder()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        var settings = store.LoadOrCreate().WithStatusLine(new StatusLineSettings(
+            true, ["model", "elapsed"], [new("model", Keep: true)], ["elapsed"]));
+
+        store.Save(settings);
+        var loaded = store.Load().StatusLine;
+
+        Assert.Equal([new StatusLineRule("model", true)], loaded.Rules);
+        Assert.Equal(["elapsed"], loaded.DropOrder);
+    }
+
+    [Fact]
+    public void Save_OmitsStatusLineEntriesThatAreDefault()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.Save(store.LoadOrCreate());
+
+        var json = File.ReadAllText(root.Home.ConfigPath);
+
+        Assert.DoesNotContain("statusLine", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Save_RoundTripsCustomStatusLine()
     {
         using var root = new TemporaryHome();

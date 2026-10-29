@@ -87,9 +87,10 @@ public sealed class DiskSettingsStore : ISettingsStore
             string.IsNullOrWhiteSpace(document.ExportDirectory)
                 ? null
                 : document.ExportDirectory.Trim(),
-            new StatusLineSettings(
+            StatusLineDocument.Read(
                 document.CustomStatusLine ?? false,
-                document.StatusLine),
+                document.StatusLine,
+                document.StatusLineDrop),
             ExecutionBudgetMapper.Read(document.ExecutionBudget),
             BashTimeoutMapper.Read(
                 parsed.RootElement,
@@ -185,11 +186,10 @@ public sealed class DiskSettingsStore : ISettingsStore
             PromptAttachments = null,
             ExportDirectory = settings.ExportDirectory,
             CustomStatusLine = settings.StatusLine.Enabled ? true : null,
-            StatusLine = settings.StatusLine.Fields.SequenceEqual(
-                StatusLineSettings.DefaultFields,
-                StringComparer.Ordinal)
-                    ? null
-                    : [.. settings.StatusLine.Fields],
+            StatusLine = StatusLineDocument.WriteFields(settings.StatusLine),
+            StatusLineDrop = settings.StatusLine.DropOrder.Count == 0
+                ? null
+                : [.. settings.StatusLine.DropOrder],
             CompactionThreshold = settings.CompactionThreshold,
             ReservedOutputTokens = settings.ReservedOutputTokens,
             ShowCompactionSummary = settings.ShowCompactionSummary ? null : false,

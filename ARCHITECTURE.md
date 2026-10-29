@@ -2651,7 +2651,18 @@ latest plain text as `StatusFieldsChanged`, in the order the changes were
 taken. The terminal stores that text and paints it on the next input poll.
 The host does not poll the plugin and does not run a status timer. Empty
 text occupies no cell. A narrow
-custom line still drops `custom` slots from the right.
+custom line hides fields in this order: fields whose `hideBelow` is wider than
+the terminal go first; then the fields in `statusLineDrop`, in that order;
+then the remaining fields from the right. A `keep` field is never hidden, and
+a line that still does not fit is truncated. Each entry of `statusLine` is a
+field name or `{"field", "keep", "hideBelow"}`; `StatusLineSettings` validates
+the rules and `StatusLineDocument` reads and writes both shapes. A rule or a
+drop-order entry for a field that is not on the line, `keep` with `hideBelow`,
+`hideBelow` below 1, and a `keep` field in `statusLineDrop` are rejected.
+`SessionPreferences` carries `StatusLineRules` and `StatusLineDrop`; Server and
+Bridge write them as `statusLineRules` and `statusLineDrop` next to
+`statusLineFields`. `/statusline` shows the rules but does not edit them.
+The adaptive bar keeps its fixed slot order.
 Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled
 muted. The bar shows the first `todoBarRows` items (3 to 10, default 4) and a `+N more` line when

@@ -653,7 +653,8 @@ Top-level fields:
 | `verboseThinking` | Show Thinking panels in the interactive transcript (default `true`; omitted when on). Off hides live and restored cards. The gear, progress row, and export stay. `crystal run --show-thinking` is separate |
 | `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
-| `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled. Built-in names are checked on load. An extra name is kept when it matches a plugin field name, even if that plugin is not loaded yet |
+| `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled. Built-in names are checked on load. An extra name is kept when it matches a plugin field name, even if that plugin is not loaded yet. An entry is a field name, or an object `{"field": "model", "keep": true, "hideBelow": 100}` (see [Narrow terminals](#custom-status-line-on-narrow-terminals)) |
+| `statusLineDrop` | Optional list of `statusLine` fields to hide first when the line does not fit, in this order |
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |
 | `reservedOutputTokens` | Optional positive tokens held back for the reply. Omitted derives the reservation from the window and the model `maxTokens`: the smallest of 20000, `maxTokens`, and a quarter of the window. The ceiling is the lesser of the threshold fraction and the budget minus this reservation. Raising it changes the ceiling and the reply cap only when the reservation is already the tighter of those two |
 | `showCompactionSummary` | Print the summary after a manual `/compact` (default `true`; omitted when on). `/compact summary` toggles it; `on` or `off` sets it |
@@ -1630,7 +1631,44 @@ that is not loaded. `/statusline` rejects a name that is not built in and
 not currently loaded.
 Setting an ordered field list enables the custom line. `/statusline off`
 restores the existing adaptive line; `/statusline reset` enables the built-in
-custom field order.
+custom field order and clears all rules and the hide order below.
+
+### Custom status line on narrow terminals
+
+When the custom line is wider than the terminal, fields are hidden in this
+order until it fits:
+
+1. Fields with `hideBelow` set, when the terminal is narrower than that many
+   columns.
+2. Fields listed in `statusLineDrop`, first entry first.
+3. All other fields, last field first.
+
+A field with `"keep": true` is never hidden. If the `keep` fields alone are
+still too wide, the line is cut at the edge. These settings live in
+`config.json` only. `/statusline` shows them but does not change them, and
+setting a new field list with `/statusline` keeps the rules and hide order of
+fields that stay on the list.
+
+```json
+{
+  "customStatusLine": true,
+  "statusLine": [
+    "approval",
+    { "field": "context-used", "keep": true },
+    { "field": "model", "hideBelow": 100 },
+    "workspace",
+    "elapsed"
+  ],
+  "statusLineDrop": ["elapsed", "workspace"]
+}
+```
+
+Here the model is hidden below 100 columns. On a narrower line `elapsed` goes
+first, then `workspace`, and `context-used` stays. `keep` and `hideBelow`
+cannot be used on the same field, and a `keep` field cannot be in
+`statusLineDrop`. A name in `statusLineDrop` or a rule must also be in
+`statusLine`. An invalid entry stops startup with an error. The adaptive line
+is unchanged.
 
 ## Built-in tools
 

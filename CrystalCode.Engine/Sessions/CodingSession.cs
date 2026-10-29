@@ -5127,6 +5127,19 @@ public sealed class CodingSession : ITurnObserver
         text.Append(_settings.StatusLine.Enabled ? "On" : "Off");
         text.Append("\nFields  ");
         text.Append(string.Join(' ', _settings.StatusLine.Fields));
+        if (_settings.StatusLine.Rules.Count > 0)
+        {
+            text.Append("\nRules  ");
+            text.Append(string.Join(' ', _settings.StatusLine.Rules.Select(rule =>
+                rule.Keep ? rule.Field + " keep" : $"{rule.Field} hideBelow {rule.HideBelow}")));
+        }
+
+        if (_settings.StatusLine.DropOrder.Count > 0)
+        {
+            text.Append("\nHide first  ");
+            text.Append(string.Join(' ', _settings.StatusLine.DropOrder));
+        }
+
         text.Append("\nAvailable  ");
         text.Append(string.Join(' ', StatusLineSettings.AvailableFields));
         if (_loadedPlugins.StatusFields.Count > 0)
@@ -8385,6 +8398,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.VerboseThinking,
             _settings.StatusLine.Enabled,
             _settings.StatusLine.Fields,
+            _settings.StatusLine.Rules,
+            _settings.StatusLine.DropOrder,
             _settings.Theme,
             _settings.ApprovalColors);
 

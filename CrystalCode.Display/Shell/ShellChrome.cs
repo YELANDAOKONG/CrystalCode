@@ -7,7 +7,7 @@ namespace CrystalCode.Display.Shell;
 /// </summary>
 public sealed class ShellChrome
 {
-    private static readonly string[] DropSlots = ["total", "elapsed", "prompt", "model", "path", "custom"];
+    private static readonly string[] DropSlots = ["total", "elapsed", "prompt", "model", "path"];
     private int _spinnerFrame;
     private DateTimeOffset _lastSpinner;
     private string _progress = string.Empty;
@@ -51,6 +51,11 @@ public sealed class ShellChrome
     public bool CustomStatusLine { get; set; }
 
     public IReadOnlyList<string> StatusLineFields { get; set; } = [];
+
+    public IReadOnlyList<StatusFieldRule> StatusLineRules { get; set; } = [];
+
+    /// <summary>Custom fields to hide first, in this order, when the line does not fit.</summary>
+    public IReadOnlyList<string> StatusLineDropOrder { get; set; } = [];
 
     public IReadOnlyDictionary<string, string> PluginFields { get; set; } =
         new Dictionary<string, string>(StringComparer.Ordinal);
@@ -132,8 +137,8 @@ public sealed class ShellChrome
 
         if (CustomStatusLine)
         {
-            AddCustomItems(items);
-            return FitStatusLine(items, width);
+            AddCustomItems(items, width);
+            return FitStatusLine(items, width, IndexOfCustomDroppable);
         }
 
         if (!string.IsNullOrWhiteSpace(Approval))
@@ -208,13 +213,18 @@ public sealed class ShellChrome
             items.Add((queueStr, $"[{Theme.Warning} bold]{queueStr}[/]", "keep"));
         }
 
-        return FitStatusLine(items, width);
+        return FitStatusLine(items, width, IndexOfDroppable);
     }
 
-    private void AddCustomItems(List<(string Plain, string Markup, string Slot)> items)
+    private void AddCustomItems(List<(string Plain, string Markup, string Slot)> items, int width)
     {
         foreach (var field in StatusLineFields)
         {
+            if (RuleFor(field) is { HideBelow: { } hideBelow } && width < hideBelow)
+            {
+                continue;
+            }
+
             var value = field switch
             {
                 "approval" => Approval,
@@ -264,7 +274,7 @@ public sealed class ShellChrome
                     "mode" => Theme.ForValue("mode", value, ModeColor),
                     _ => Theme.Chrome
                 };
-                items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", "custom"));
+                items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", field));
             }
         }
     }
@@ -356,9 +366,13 @@ public sealed class ShellChrome
         return TextWidth.Truncate(line, 64);
     }
 
+    private StatusFieldRule? RuleFor(string field) =>
+        StatusLineRules.FirstOrDefault(rule => rule.Field == field);
+
     private static PaintLine FitStatusLine(
         List<(string Plain, string Markup, string Slot)> items,
-        int width)
+        int width,
+        Func<List<(string Plain, string Markup, string Slot)>, int> indexOfDroppable)
     {
         const string SepPlain = "  ·  ";
         var sepMarkup = $"[{Theme.Rule}]  ·  [/]";
@@ -372,7 +386,7 @@ public sealed class ShellChrome
 
         while (TextWidth.Measure("  " + string.Join(SepPlain, items.Select(x => x.Plain))) > width)
         {
-            var dropIndex = IndexOfDroppable(items);
+            var dropIndex = indexOfDroppable(items);
             if (dropIndex < 0)
             {
                 break;
@@ -390,6 +404,25 @@ public sealed class ShellChrome
 
         var fittedMarkup = "  " + string.Join(sepMarkup, items.Select(x => x.Markup));
         return new PaintLine(fittedMarkup, fittedPlain);
+    }
+
+    /// <summary>
+    /// Custom line order: fields in the drop order go first, then the rest from
+    /// the end of the line. A keep field never goes.
+    /// </summary>
+    private int IndexOfCustomDroppable(List<(string Plain, string Markup, string Slot)> items)
+    {
+        bool Keeps(string field) => RuleFor(field) is { Keep: true };
+        foreach (var field in StatusLineDropOrder)
+        {
+            var index = items.FindIndex(item => item.Slot == field);
+            if (index >= 0)
+            {
+                return index;
+            }
+        }
+
+        return items.FindLastIndex(item => !Keeps(item.Slot));
     }
 
     private static int IndexOfDroppable(List<(string Plain, string Markup, string Slot)> items)

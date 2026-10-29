@@ -1,3 +1,5 @@
+using CrystalCode.Engine.Configuration;
+
 namespace CrystalCode.Engine.Events;
 
 /// <summary>
@@ -16,5 +18,7 @@ public sealed record SessionPreferences(
     bool VerboseThinking,
     bool StatusLineEnabled,
     IReadOnlyList<string> StatusLineFields,
+    IReadOnlyList<StatusLineRule> StatusLineRules,
+    IReadOnlyList<string> StatusLineDrop,
     string Theme,
     bool ApprovalColors);

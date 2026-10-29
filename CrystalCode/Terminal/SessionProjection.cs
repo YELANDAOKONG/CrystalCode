@@ -1,5 +1,6 @@
 using CrystalCode.Display.Cards;
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
@@ -227,7 +228,11 @@ internal sealed class SessionProjection : ISessionObserver
         _renderer.VerboseApprovals = preferences.VerboseApprovals;
         _renderer.VerboseReview = preferences.VerboseReview;
         _renderer.VerboseThinking = preferences.VerboseThinking;
-        _renderer.SetStatusLine(preferences.StatusLineEnabled, preferences.StatusLineFields);
+        _renderer.SetStatusLine(
+            preferences.StatusLineEnabled,
+            preferences.StatusLineFields,
+            [.. preferences.StatusLineRules.Select(rule => new StatusFieldRule(rule.Field, rule.Keep, rule.HideBelow))],
+            preferences.StatusLineDrop);
         _renderer.SetApprovalColors(preferences.ApprovalColors);
         ApplyTheme(preferences.Theme);
     }

@@ -622,13 +622,21 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
-    public void SetStatusLine(bool enabled, IReadOnlyList<string> fields)
+    public void SetStatusLine(
+        bool enabled,
+        IReadOnlyList<string> fields,
+        IReadOnlyList<StatusFieldRule> rules,
+        IReadOnlyList<string> dropOrder)
     {
         ArgumentNullException.ThrowIfNull(fields);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(dropOrder);
         lock (_gate)
         {
             _chrome.CustomStatusLine = enabled;
             _chrome.StatusLineFields = [.. fields];
+            _chrome.StatusLineRules = [.. rules];
+            _chrome.StatusLineDropOrder = [.. dropOrder];
             PaintUnlocked(force: true);
         }
     }

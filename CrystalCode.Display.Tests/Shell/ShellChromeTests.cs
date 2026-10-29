@@ -84,6 +84,56 @@ public sealed class ShellChromeTests
         Assert.DoesNotContain("legacy usage", line.Plain, StringComparison.Ordinal);
     }
 
+    private static ShellChrome Squeezable() => new()
+    {
+        CustomStatusLine = true,
+        StatusLineFields = ["approval", "model", "elapsed", "session-total"],
+        Approval = "Review",
+        Model = "gpt-5.6-sol",
+        Elapsed = "12s",
+        SessionTotal = "801k Session"
+    };
+
+    [Fact]
+    public void StatusLine_CustomModeHidesFromTheEndByDefault()
+    {
+        var line = Squeezable().StatusLine(34);
+
+        Assert.Equal("  Review  ·  gpt-5.6-sol  ·  12s", line.Plain);
+    }
+
+    [Fact]
+    public void StatusLine_CustomDropOrderHidesListedFieldsFirst()
+    {
+        var chrome = Squeezable();
+        chrome.StatusLineDropOrder = ["model", "elapsed"];
+
+        Assert.Equal("  Review  ·  12s  ·  801k Session", chrome.StatusLine(36).Plain);
+        Assert.Equal("  Review  ·  801k Session", chrome.StatusLine(26).Plain);
+    }
+
+    [Fact]
+    public void StatusLine_CustomKeepFieldIsNeverHidden()
+    {
+        var chrome = Squeezable();
+        chrome.StatusLineRules = [new("session-total", Keep: true)];
+
+        var line = chrome.StatusLine(18);
+
+        Assert.Contains("801k Session", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("Review", line.Plain, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_CustomHideBelowRemovesTheFieldOnNarrowTerminals()
+    {
+        var chrome = Squeezable();
+        chrome.StatusLineRules = [new("elapsed", HideBelow: 100)];
+
+        Assert.DoesNotContain("12s", chrome.StatusLine(99).Plain, StringComparison.Ordinal);
+        Assert.Contains("12s", chrome.StatusLine(100).Plain, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void StatusLine_ShowsAdmittedPluginTextAndSkipsEmptyFields()
     {
