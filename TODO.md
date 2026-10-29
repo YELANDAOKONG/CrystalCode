@@ -260,6 +260,14 @@ behavior stands until a specific change defines otherwise.
   update behavior, and platform coverage are not defined. Do not reserve a
   package name, tap, formula, image, or repository.
 
+  Known input to that work: the release archives have different layouts.
+  `.github/workflows/release.yml` zips the `publish` directory itself on
+  macOS and Linux (entries are `publish/CrystalCode`), while on Windows
+  `Compress-Archive -Path .\publish\*` puts files at the archive root. The
+  install scripts tolerate both because they search for the binary
+  recursively. A package manager manifest that names a fixed path inside the
+  archive would not. Whether to unify the layout is not decided.
+
 ## Pending evaluation
 
 These are under consideration or not decided. They are not a priority and
