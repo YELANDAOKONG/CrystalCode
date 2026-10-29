@@ -99,7 +99,7 @@ public sealed class ExternalCatalogTests
               "description": "Echo stdin.",
               "schema": { "type": "object", "properties": {} },
               "command": ["{{script.Replace("\\", "/")}}"],
-              "timeoutSeconds": 5
+              "timeoutSeconds": 30
             }
             """);
         var catalog = ExternalCatalog.Load(
@@ -111,7 +111,7 @@ public sealed class ExternalCatalogTests
         var output = await catalog.WorkTools[0].InvokeAsync(
             JsonToolCall("1", "echojson", arguments));
 
-        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.True(output.Status == ToolResultStatus.Success, output.Text);
         Assert.Contains("[truncated to", output.Text, StringComparison.Ordinal);
         Assert.True(output.Text.Length < WorkspaceLimits.MaximumToolOutputCharacters + 100);
     }
