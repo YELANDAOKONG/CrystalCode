@@ -21,7 +21,11 @@ public static partial class ThemeCatalog
     /// </summary>
     public const string GaugesKey = "gauges";
 
-    private const int MaximumBands = 16;
+    private const int MaximumRules = 16;
+
+    private const int MaximumMatches = 32;
+
+    private const int MaximumPatternLength = 200;
 
     /// <summary>
     /// Palettes the front end ships. <c>default</c> is the same as <c>dark</c>. A file with one of
@@ -146,20 +150,22 @@ public static partial class ThemeCatalog
     }
 
     /// <summary>
-    /// Reads the gauge ranges of one theme file, such as
-    /// <c>{"gauges": {"context": [{"from": 80, "color": "red"}]}}</c>. Each
-    /// gauge is a list in priority order: the first range that holds a value
-    /// wins. <c>from</c> defaults to 0 and <c>to</c> to 100. A built-in theme
-    /// has none.
+    /// Reads the gauge rules of one theme file, such as
+    /// <c>{"gauges": {"context": [{"from": 80, "color": "red"}],
+    /// "thinking": [{"match": "high", "color": "orange1"}]}}</c>. Each gauge
+    /// is a list in priority order: the first rule that holds a value wins. A
+    /// rule has <c>from</c> and <c>to</c> (default 0 and 100), or <c>match</c>
+    /// (text or a list of texts, <c>*</c> for all), or <c>regex</c>. A built-in
+    /// theme has none.
     /// </summary>
     public static bool TryReadGauges(
         CrystalHome home,
         string name,
-        out IReadOnlyDictionary<string, IReadOnlyList<ThemeGaugeBand>> gauges,
+        out IReadOnlyDictionary<string, IReadOnlyList<ThemeGaugeRule>> gauges,
         out string error)
     {
         ArgumentNullException.ThrowIfNull(home);
-        var read = new Dictionary<string, IReadOnlyList<ThemeGaugeBand>>(StringComparer.OrdinalIgnoreCase);
+        var read = new Dictionary<string, IReadOnlyList<ThemeGaugeRule>>(StringComparer.OrdinalIgnoreCase);
         gauges = read;
         error = string.Empty;
         if (IsBuiltIn(name))
@@ -199,12 +205,12 @@ public static partial class ThemeCatalog
 
                 foreach (var gauge in property.Value.EnumerateObject())
                 {
-                    if (!TryReadBands(name, gauge, out var bands, out error))
+                    if (!TryReadRules(name, gauge, out var rules, out error))
                     {
                         return false;
                     }
 
-                    read[gauge.Name] = bands;
+                    read[gauge.Name] = rules;
                 }
             }
 
@@ -217,25 +223,25 @@ public static partial class ThemeCatalog
         }
     }
 
-    private static bool TryReadBands(
+    private static bool TryReadRules(
         string theme,
         JsonProperty gauge,
-        out IReadOnlyList<ThemeGaugeBand> bands,
+        out IReadOnlyList<ThemeGaugeRule> rules,
         out string error)
     {
-        var read = new List<ThemeGaugeBand>();
-        bands = read;
+        var read = new List<ThemeGaugeRule>();
+        rules = read;
         error = string.Empty;
         var label = "Theme " + theme + " gauge " + gauge.Name;
         if (gauge.Value.ValueKind != JsonValueKind.Array)
         {
-            error = label + " must be a list of ranges.";
+            error = label + " must be a list of rules.";
             return false;
         }
 
-        if (gauge.Value.GetArrayLength() > MaximumBands)
+        if (gauge.Value.GetArrayLength() > MaximumRules)
         {
-            error = label + " has more than " + MaximumBands + " ranges.";
+            error = label + " has more than " + MaximumRules + " rules.";
             return false;
         }
 
@@ -243,40 +249,141 @@ public static partial class ThemeCatalog
         {
             if (item.ValueKind != JsonValueKind.Object)
             {
-                error = label + " ranges must be objects.";
+                error = label + " rules must be objects.";
                 return false;
             }
 
-            double from = 0;
-            double to = 100;
-            string? color = null;
-            foreach (var member in item.EnumerateObject())
+            if (!TryReadRule(label, item, out var rule, out error))
             {
-                switch (member.Name)
-                {
-                    case "from" when member.Value.ValueKind == JsonValueKind.Number
-                        && member.Value.TryGetDouble(out from):
-                    case "to" when member.Value.ValueKind == JsonValueKind.Number
-                        && member.Value.TryGetDouble(out to):
-                        break;
-                    case "color" when member.Value.ValueKind == JsonValueKind.String:
-                        color = member.Value.GetString();
-                        break;
-                    default:
-                        error = label + " range member " + member.Name + " is not valid. Use from, to, and color.";
-                        return false;
-                }
-            }
-
-            if (color is null)
-            {
-                error = label + " ranges need a color.";
                 return false;
             }
 
-            read.Add(new ThemeGaugeBand(from, to, color));
+            read.Add(rule!);
         }
 
+        return true;
+    }
+
+    private static bool TryReadRule(string label, JsonElement item, out ThemeGaugeRule? rule, out string error)
+    {
+        rule = null;
+        error = string.Empty;
+        double? from = null;
+        double? to = null;
+        var match = new List<string>();
+        string? pattern = null;
+        string? color = null;
+        foreach (var member in item.EnumerateObject())
+        {
+            switch (member.Name)
+            {
+                case "from" or "to":
+                    if (member.Value.ValueKind != JsonValueKind.Number
+                        || !member.Value.TryGetDouble(out var number)
+                        || !double.IsFinite(number))
+                    {
+                        error = label + " " + member.Name + " must be a number.";
+                        return false;
+                    }
+
+                    if (member.Name == "from")
+                    {
+                        from = number;
+                    }
+                    else
+                    {
+                        to = number;
+                    }
+
+                    break;
+                case "match":
+                    if (!TryReadMatch(member.Value, match))
+                    {
+                        error = label + " match must be text or a list of 1 to " + MaximumMatches + " texts.";
+                        return false;
+                    }
+
+                    break;
+                case "regex":
+                    if (member.Value.ValueKind != JsonValueKind.String
+                        || string.IsNullOrWhiteSpace(member.Value.GetString())
+                        || member.Value.GetString()!.Length > MaximumPatternLength)
+                    {
+                        error = label + " regex must be text of 1 to " + MaximumPatternLength + " characters.";
+                        return false;
+                    }
+
+                    pattern = member.Value.GetString();
+                    break;
+                case "color":
+                    if (member.Value.ValueKind != JsonValueKind.String)
+                    {
+                        error = label + " color must be text.";
+                        return false;
+                    }
+
+                    color = member.Value.GetString();
+                    break;
+                default:
+                    error = label + " rule member " + member.Name
+                        + " is not valid. Use from, to, match, regex, and color.";
+                    return false;
+            }
+        }
+
+        if (color is null)
+        {
+            error = label + " rules need a color.";
+            return false;
+        }
+
+        var isValue = match.Count > 0 || pattern is not null;
+        if (match.Count > 0 && pattern is not null)
+        {
+            error = label + " rules use match or regex, not both.";
+            return false;
+        }
+
+        if (isValue && (from is not null || to is not null))
+        {
+            error = label + " rules use from and to, or match or regex, not both.";
+            return false;
+        }
+
+        if (!isValue)
+        {
+            from ??= 0;
+            to ??= 100;
+        }
+
+        rule = new ThemeGaugeRule(from, to, match, pattern, color);
+        return true;
+    }
+
+    private static bool TryReadMatch(JsonElement value, List<string> match)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            return AddMatch(value, match);
+        }
+
+        if (value.ValueKind != JsonValueKind.Array
+            || value.GetArrayLength() is 0 or > MaximumMatches)
+        {
+            return false;
+        }
+
+        return value.EnumerateArray().All(item => AddMatch(item, match));
+    }
+
+    private static bool AddMatch(JsonElement item, List<string> match)
+    {
+        if (item.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(item.GetString()))
+        {
+            return false;
+        }
+
+        match.Add(item.GetString()!.Trim());
         return true;
     }
 

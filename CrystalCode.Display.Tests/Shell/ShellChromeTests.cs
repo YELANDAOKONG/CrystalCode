@@ -161,6 +161,56 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ColorsThinkingTierAndSpeedFromThemeRules()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["thinking"] = [new GaugeRule(null, null, ["high"], null, "orange1")],
+            ["tier"] = [new GaugeRule(null, null, [], "^pri", "gold1")],
+            ["speed"] = [new GaugeRule(null, null, ["*"], null, "green")]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+        try
+        {
+            var chrome = new ShellChrome { Thinking = "Think High", ServiceTier = "Tier Priority", Speed = "Speed Fast" };
+            var custom = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["thinking", "tier", "speed"],
+                Thinking = "Think Low",
+                ServiceTier = "Tier Priority",
+                Speed = "Speed Fast"
+            };
+
+            var markup = chrome.StatusLine(120).Markup;
+            var customMarkup = custom.StatusLine(120).Markup;
+
+            Assert.Contains("[orange1]Think High", markup, StringComparison.Ordinal);
+            Assert.Contains("[gold1]Tier Priority", markup, StringComparison.Ordinal);
+            Assert.Contains("[green]Speed Fast", markup, StringComparison.Ordinal);
+            Assert.Contains($"[{Theme.Chrome}]Think Low", customMarkup, StringComparison.Ordinal);
+            Assert.Contains("[gold1]Tier Priority", customMarkup, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
+    [Fact]
+    public void StatusLine_ThinkingStaysChromeWithoutThemeRules()
+    {
+        Theme.Reset();
+        var chrome = new ShellChrome { Thinking = "Think High", ServiceTier = "Tier Priority", Speed = "Speed Fast" };
+
+        var markup = chrome.StatusLine(120).Markup;
+
+        Assert.Contains($"[{Theme.Chrome}]Think High", markup, StringComparison.Ordinal);
+        Assert.Contains($"[{Theme.Chrome}]Tier Priority", markup, StringComparison.Ordinal);
+        Assert.Contains($"[{Theme.Chrome}]Speed Fast", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StatusLine_FitsNarrowWidth()
     {
         var chrome = new ShellChrome

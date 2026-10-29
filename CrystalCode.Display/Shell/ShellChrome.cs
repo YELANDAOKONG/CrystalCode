@@ -130,17 +130,17 @@ public sealed class ShellChrome
 
         if (!string.IsNullOrWhiteSpace(Thinking))
         {
-            items.Add((Thinking, $"[{Theme.Chrome}]{MarkupText.Escape(Thinking)}[/]", "keep"));
+            items.Add((Thinking, $"[{ValueColor("thinking", Thinking)}]{MarkupText.Escape(Thinking)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(ServiceTier))
         {
-            items.Add((ServiceTier, $"[{Theme.Chrome}]{MarkupText.Escape(ServiceTier)}[/]", "keep"));
+            items.Add((ServiceTier, $"[{ValueColor("tier", ServiceTier)}]{MarkupText.Escape(ServiceTier)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(Speed))
         {
-            items.Add((Speed, $"[{Theme.Chrome}]{MarkupText.Escape(Speed)}[/]", "keep"));
+            items.Add((Speed, $"[{ValueColor("speed", Speed)}]{MarkupText.Escape(Speed)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(ContextWindow))
@@ -238,6 +238,9 @@ public sealed class ShellChrome
                     "approval" => ApprovalColor,
                     "context-used" => ContextColor(value, left: false),
                     "context-left" => ContextColor(value, left: true),
+                    "thinking" => ValueColor("thinking", value),
+                    "tier" => ValueColor("tier", value),
+                    "speed" => ValueColor("speed", value),
                     _ => Theme.Chrome
                 };
                 items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", "custom"));
@@ -269,6 +272,17 @@ public sealed class ShellChrome
         }
 
         return Theme.ForContext(left ? 100 - percent : percent);
+    }
+
+    /// <summary>
+    /// Style for a status text such as <c>Think High</c>, <c>Tier Priority</c>,
+    /// or <c>Speed Fast</c>. A theme rule sees the value alone, so the label
+    /// word is removed first.
+    /// </summary>
+    private static string ValueColor(string gauge, string text)
+    {
+        var space = text.IndexOf(' ', StringComparison.Ordinal);
+        return Theme.ForValue(gauge, space < 0 ? text : text[(space + 1)..]);
     }
 
     private string PluginField(string name)

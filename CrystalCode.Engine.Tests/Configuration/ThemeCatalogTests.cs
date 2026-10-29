@@ -93,10 +93,56 @@ public sealed class ThemeCatalogTests : IDisposable
 
         Assert.Equal(["accent"], colors.Keys);
         Assert.Equal(
-            [new ThemeGaugeBand(90, 100, "red bold"), new ThemeGaugeBand(50, 89.9, "yellow"), new ThemeGaugeBand(0, 10, "green")],
-            gauges["context"]);
+            [Range(90, 100, "red bold"), Range(50, 89.9, "yellow"), Range(0, 10, "green")],
+            gauges["context"],
+            new RuleComparer());
         Assert.True(ThemeCatalog.TryReadGauges(home, "light", out var none, out _));
         Assert.Empty(none);
+    }
+
+    [Fact]
+    public void TryReadGauges_ReadsValueRules()
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(
+            Path.Combine(home.ThemesDirectory, "night.json"),
+            """
+            { "gauges": { "thinking": [
+              { "match": "off", "color": "dim" },
+              { "match": ["high", "xhigh"], "color": "orange1" },
+              { "regex": "^m", "color": "red" },
+              { "match": "*", "color": "yellow" } ] } }
+            """);
+
+        Assert.True(ThemeCatalog.TryReadGauges(home, "night", out var gauges, out var error), error);
+
+        Assert.Equal(
+            [
+                new ThemeGaugeRule(null, null, ["off"], null, "dim"),
+                new ThemeGaugeRule(null, null, ["high", "xhigh"], null, "orange1"),
+                new ThemeGaugeRule(null, null, [], "^m", "red"),
+                new ThemeGaugeRule(null, null, ["*"], null, "yellow")
+            ],
+            gauges["thinking"],
+            new RuleComparer());
+    }
+
+    [Theory]
+    [InlineData("""{ "gauges": { "t": [{ "match": "a", "regex": "b", "color": "red" }] } }""", "not both")]
+    [InlineData("""{ "gauges": { "t": [{ "match": "a", "from": 1, "color": "red" }] } }""", "not both")]
+    [InlineData("""{ "gauges": { "t": [{ "match": [], "color": "red" }] } }""", "match")]
+    [InlineData("""{ "gauges": { "t": [{ "match": [1], "color": "red" }] } }""", "match")]
+    [InlineData("""{ "gauges": { "t": [{ "regex": "", "color": "red" }] } }""", "regex")]
+    public void TryReadGauges_ReportsBadValueRules(string json, string expected)
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(Path.Combine(home.ThemesDirectory, "bad.json"), json);
+
+        Assert.False(ThemeCatalog.TryReadGauges(home, "bad", out _, out var error));
+
+        Assert.Contains(expected, error, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -105,6 +151,9 @@ public sealed class ThemeCatalogTests : IDisposable
     [InlineData("""{ "gauges": { "context": [1] } }""", "objects")]
     [InlineData("""{ "gauges": { "context": [{ "from": 1 }] } }""", "color")]
     [InlineData("""{ "gauges": { "context": [{ "from": "1", "color": "red" }] } }""", "from")]
+    [InlineData("""{ "gauges": { "context": [{ "to": "9", "color": "red" }] } }""", "to")]
+    [InlineData("""{ "gauges": { "context": [{ "to": null, "color": "red" }] } }""", "to")]
+    [InlineData("""{ "gauges": { "context": [{ "from": 1e999, "color": "red" }] } }""", "from")]
     [InlineData("""{ "gauges": { "context": [{ "color": "red", "extra": 1 }] } }""", "extra")]
     public void TryReadGauges_ReportsBadShapes(string json, string expected)
     {
@@ -156,5 +205,18 @@ public sealed class ThemeCatalogTests : IDisposable
         var settings = new DiskSettingsStore(new CrystalHome(_root)).LoadOrCreate();
 
         Assert.Throws<ArgumentException>(() => settings.WithTheme("../x"));
+    }
+
+    private static ThemeGaugeRule Range(double from, double to, string color) =>
+        new(from, to, [], null, color);
+
+    private sealed class RuleComparer : IEqualityComparer<ThemeGaugeRule>
+    {
+        public bool Equals(ThemeGaugeRule? x, ThemeGaugeRule? y) =>
+            x is not null && y is not null
+            && x.From == y.From && x.To == y.To && x.Pattern == y.Pattern && x.Color == y.Color
+            && x.Match.SequenceEqual(y.Match);
+
+        public int GetHashCode(ThemeGaugeRule obj) => obj.Color.GetHashCode(StringComparison.Ordinal);
     }
 }

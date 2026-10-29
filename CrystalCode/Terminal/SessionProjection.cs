@@ -256,12 +256,13 @@ internal sealed class SessionProjection : ISessionObserver
         _renderer.RepaintTheme();
     }
 
-    private static Dictionary<string, IReadOnlyList<GaugeBand>> ToGauges(
-        IReadOnlyDictionary<string, IReadOnlyList<ThemeGaugeBand>> gauges) =>
+    private static Dictionary<string, IReadOnlyList<GaugeRule>> ToGauges(
+        IReadOnlyDictionary<string, IReadOnlyList<ThemeGaugeRule>> gauges) =>
         gauges.ToDictionary(
             static gauge => gauge.Key,
-            static gauge => (IReadOnlyList<GaugeBand>)
-                [.. gauge.Value.Select(static band => new GaugeBand(band.From, band.To, band.Color))],
+            static gauge => (IReadOnlyList<GaugeRule>)
+                [.. gauge.Value.Select(static rule =>
+                    new GaugeRule(rule.From, rule.To, rule.Match, rule.Pattern, rule.Color))],
             StringComparer.OrdinalIgnoreCase);
 
     private static bool TryCompactionSummary(string text, out string body)

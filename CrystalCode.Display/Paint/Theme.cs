@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Spectre.Console;
 
 namespace CrystalCode.Display.Paint;
@@ -79,16 +81,20 @@ public static class Theme
             ["accent"] = "#4a6a94"
         };
 
-    private const int MaximumGaugeBands = 16;
+    private const int MaximumGaugeRules = 16;
 
     private const string ContextGauge = "context";
 
-    private static readonly IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> NoGauges =
-        new Dictionary<string, IReadOnlyList<GaugeBand>>(StringComparer.OrdinalIgnoreCase);
+    private static readonly string[] ValueGauges = ["thinking", "tier", "speed"];
+
+    private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(100);
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<GaugeMatcher>> NoGauges =
+        new Dictionary<string, IReadOnlyList<GaugeMatcher>>(StringComparer.OrdinalIgnoreCase);
 
     private static IReadOnlyDictionary<string, string> _current = DefaultPalette;
 
-    private static IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> _gauges = NoGauges;
+    private static IReadOnlyDictionary<string, IReadOnlyList<GaugeMatcher>> _gauges = NoGauges;
 
     /// <summary>
     /// Selects a built-in palette: <c>default</c> and <c>dark</c> (any case) are separate palettes with the same colors, <c>light</c> suits a light terminal.
@@ -191,30 +197,37 @@ public static class Theme
     /// <summary>
     /// Gauge names a theme file may set ranges for.
     /// </summary>
-    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge];
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed"];
 
     /// <summary>
-    /// Style for a context usage percentage. A theme's <c>context</c> ranges
+    /// Style for a context usage percentage. A theme's <c>context</c> rules
     /// are tried in order and the first one holding the value wins; a value
-    /// that no range holds uses <see cref="Chrome"/>. Without ranges, 60 and
+    /// that no rule holds uses <see cref="Chrome"/>. Without rules, 60 and
     /// above is <see cref="Warning"/> and 80 and above is <see cref="Fail"/>.
     /// </summary>
     public static string ForContext(double percent)
     {
-        if (_gauges.TryGetValue(ContextGauge, out var bands))
+        if (_gauges.TryGetValue(ContextGauge, out var matchers))
         {
-            foreach (var band in bands)
-            {
-                if (percent >= band.From && percent <= band.To)
-                {
-                    return band.Style;
-                }
-            }
-
-            return Chrome;
+            return matchers.FirstOrDefault(matcher => matcher.Holds(percent))?.Style ?? Chrome;
         }
 
         return percent >= 80 ? Fail : percent >= 60 ? Warning : Chrome;
+    }
+
+    /// <summary>
+    /// Style for a status-bar value such as a thinking gear. <paramref name="gauge"/>
+    /// is <c>thinking</c>, <c>tier</c>, or <c>speed</c>. The first rule of the
+    /// theme's gauge that holds <paramref name="value"/> wins; otherwise, and
+    /// without rules, the style is <see cref="Chrome"/>.
+    /// </summary>
+    public static string ForValue(string gauge, string value)
+    {
+        ArgumentNullException.ThrowIfNull(gauge);
+        ArgumentNullException.ThrowIfNull(value);
+        return _gauges.TryGetValue(gauge, out var matchers)
+            ? matchers.FirstOrDefault(matcher => matcher.Holds(value))?.Style ?? Chrome
+            : Chrome;
     }
 
     public static string Muted => Get("muted");
@@ -227,7 +240,7 @@ public static class Theme
     /// so markup built from a token cannot be broken by a theme file.
     /// </summary>
     public static bool TryApply(IReadOnlyDictionary<string, string> colors, out string error) =>
-        TryApply(colors, NoGauges, out error);
+        TryApply(colors, new Dictionary<string, IReadOnlyList<GaugeRule>>(), out error);
 
     /// <summary>
     /// Like <see cref="TryApply(IReadOnlyDictionary{string, string}, out string)"/>, and also
@@ -235,7 +248,7 @@ public static class Theme
     /// </summary>
     public static bool TryApply(
         IReadOnlyDictionary<string, string> colors,
-        IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> gauges,
+        IReadOnlyDictionary<string, IReadOnlyList<GaugeRule>> gauges,
         out string error)
     {
         ArgumentNullException.ThrowIfNull(colors);
@@ -284,14 +297,14 @@ public static class Theme
     }
 
     private static bool TryReadGauges(
-        IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> gauges,
-        out IReadOnlyDictionary<string, IReadOnlyList<GaugeBand>> next,
+        IReadOnlyDictionary<string, IReadOnlyList<GaugeRule>> gauges,
+        out IReadOnlyDictionary<string, IReadOnlyList<GaugeMatcher>> next,
         out string error)
     {
         error = string.Empty;
         next = NoGauges;
-        var read = new Dictionary<string, IReadOnlyList<GaugeBand>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (name, bands) in gauges)
+        var read = new Dictionary<string, IReadOnlyList<GaugeMatcher>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, rules) in gauges)
         {
             if (!GaugeNames.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
@@ -299,31 +312,85 @@ public static class Theme
                 return false;
             }
 
-            if (bands.Count > MaximumGaugeBands)
+            if (rules.Count > MaximumGaugeRules)
             {
-                error = "Invalid theme gauge  " + name + " has more than " + MaximumGaugeBands + " ranges";
+                error = "Invalid theme gauge  " + name + " has more than " + MaximumGaugeRules + " rules";
                 return false;
             }
 
-            foreach (var band in bands)
+            var numeric = name.Equals(ContextGauge, StringComparison.OrdinalIgnoreCase);
+            var matchers = new List<GaugeMatcher>();
+            foreach (var rule in rules)
             {
-                if (!(band.From >= 0 && band.To <= 100 && band.From <= band.To))
+                if (!TryMatcher(name, numeric, rule, out var matcher, out error))
                 {
-                    error = "Invalid theme gauge  " + name + " ranges need 0 <= from <= to <= 100";
                     return false;
                 }
 
-                if (!IsStyle(band.Style))
-                {
-                    error = "Invalid theme gauge  " + name + " color " + band.Style;
-                    return false;
-                }
+                matchers.Add(matcher!);
             }
 
-            read[name] = [.. bands.Select(static band => band with { Style = band.Style.Trim() })];
+            read[name] = matchers;
         }
 
         next = read;
+        return true;
+    }
+
+    private static bool TryMatcher(
+        string gauge,
+        bool numeric,
+        GaugeRule rule,
+        out GaugeMatcher? matcher,
+        out string error)
+    {
+        matcher = null;
+        error = string.Empty;
+        var label = "Invalid theme gauge  " + gauge;
+        if (!IsStyle(rule.Style))
+        {
+            error = label + " color " + rule.Style;
+            return false;
+        }
+
+        var hasRange = rule.From is not null || rule.To is not null;
+        var hasValue = rule.Match.Count > 0 || rule.Pattern is not null;
+        if (numeric)
+        {
+            if (hasValue
+                || rule.From is not { } from
+                || rule.To is not { } to
+                || !(from >= 0 && to <= 100 && from <= to))
+            {
+                error = label + " rules need 0 <= from <= to <= 100";
+                return false;
+            }
+
+            matcher = new GaugeMatcher(rule, null);
+            return true;
+        }
+
+        if (hasRange || hasValue == false || (rule.Match.Count > 0 && rule.Pattern is not null))
+        {
+            error = label + " rules need match or regex";
+            return false;
+        }
+
+        Regex? pattern = null;
+        if (rule.Pattern is not null)
+        {
+            try
+            {
+                pattern = new Regex(rule.Pattern, RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, PatternTimeout);
+            }
+            catch (ArgumentException)
+            {
+                error = label + " regex " + rule.Pattern + " is not valid";
+                return false;
+            }
+        }
+
+        matcher = new GaugeMatcher(rule, pattern);
         return true;
     }
 

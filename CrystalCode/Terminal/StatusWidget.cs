@@ -246,7 +246,7 @@ internal static class StatusWidget
         {
             grid.AddRow(
                 new Markup($"[{Theme.Chrome}]{MarkupText.Escape(field)}[/]"),
-                new Markup($"[{Theme.User}]{MarkupText.Escape(value)}[/]"));
+                new Markup($"[{ValueStyle(field, value)}]{MarkupText.Escape(value)}[/]"));
         }
 
         return grid;
@@ -262,6 +262,15 @@ internal static class StatusWidget
         var split = value.IndexOf(' ');
         rows.Add((label, split < 0 ? value : value[(split + 1)..]));
     }
+
+    // Only the thinking, tier, and speed rows follow theme gauges; the rest keep the user color.
+    private static string ValueStyle(string field, string value) => field switch
+    {
+        "Thinking" or "Approval thinking" or "Extended thinking" => Theme.ForValue("thinking", value),
+        "Tier" => Theme.ForValue("tier", value),
+        "Speed" => Theme.ForValue("speed", value),
+        _ => Theme.User
+    };
 
     private static string ThinkingValue(string thinking)
     {
