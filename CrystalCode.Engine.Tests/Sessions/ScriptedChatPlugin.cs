@@ -30,6 +30,11 @@ internal sealed class ScriptedChatPlugin : IPlugin
 
     public IReadOnlyList<int?> OutputCaps => _factory.OutputCaps;
 
+    public IReadOnlyList<(string Model, string? ServiceTier, string? Speed)> Slots => _factory.Slots;
+
+    public IReadOnlyList<(string Model, string? ServiceTier, string? Speed)> MultimodalSlots =>
+        _factory.MultimodalSlots;
+
     public string Name => "scripted";
 
     public PluginContribution Contribute() =>

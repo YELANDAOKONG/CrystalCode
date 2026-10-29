@@ -308,6 +308,10 @@ only while that setting waits. `report.status` carries the same `pending`.
 Otherwise each holds the reviewer's `provider`, `model`, and display labels
 `thinking`, `serviceTier`, and `speed` (blank when unset); `extendedApproval`
 adds `trigger` and `includePrimaryReview`.
+`compaction` is `null` while the compaction model is off, and `image` while
+no `imageModel` is set. Otherwise each holds that model's `provider`, `model`,
+and display labels `thinking`, `serviceTier`, and `speed` (blank when the
+model does not set its own).
 
 Server events: `server.state`, `server.closing` (with the session id and
 whether it was saved), `interaction.opened`, `interaction.resolved`,

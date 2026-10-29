@@ -22,15 +22,27 @@ internal sealed class ScriptedChatClientFactory : IChatClientFactory
 
     public List<int?> OutputCaps { get; } = [];
 
+    /// <summary>
+    /// Model, service tier, and speed of each created client, in order.
+    /// </summary>
+    public List<(string Model, string? ServiceTier, string? Speed)> Slots { get; } = [];
+
+    public List<(string Model, string? ServiceTier, string? Speed)> MultimodalSlots { get; } = [];
+
     public bool CanCreate(ProviderProtocol protocol) =>
         protocol == ScriptedChatPlugin.Protocol;
 
-    public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, string apiKey) => _images;
+    public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, string apiKey)
+    {
+        MultimodalSlots.Add((settings.Model, settings.ServiceTier, settings.Speed));
+        return _images;
+    }
 
     public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
     {
         Creates++;
         OutputCaps.Add(settings.MaxOutputTokens);
+        Slots.Add((settings.Model, settings.ServiceTier, settings.Speed));
         return _client;
     }
 }

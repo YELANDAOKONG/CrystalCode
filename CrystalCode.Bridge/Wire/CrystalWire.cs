@@ -65,6 +65,25 @@ internal static class CrystalWire
         Pending(writer, "pending", chrome.Pending);
         Reviewer(writer, "reviewer", chrome.Reviewer);
         ExtendedApproval(writer, "extendedApproval", chrome.ExtendedApproval);
+        SideModel(writer, "compaction", chrome.Compaction);
+        SideModel(writer, "image", chrome.Image);
+        writer.WriteEndObject();
+    }
+
+    private static void SideModel(Utf8JsonWriter writer, string name, SideModelChrome? model)
+    {
+        if (model is null)
+        {
+            writer.WriteNull(name);
+            return;
+        }
+
+        writer.WriteStartObject(name);
+        writer.WriteString("provider", model.Provider);
+        writer.WriteString("model", model.Model);
+        writer.WriteString("thinking", model.Thinking);
+        writer.WriteString("serviceTier", model.ServiceTier);
+        writer.WriteString("speed", model.Speed);
         writer.WriteEndObject();
     }
 

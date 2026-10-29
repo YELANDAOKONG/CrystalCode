@@ -39,7 +39,7 @@ public sealed class BridgeHostSettingsTests
         var settings = new BridgeHostSettings(true, ["all"]);
 
         Assert.Equal(BridgeHostSettings.AvailableOptions, settings.Effective);
-        Assert.Equal(13, settings.Effective.Count);
+        Assert.Equal(23, settings.Effective.Count);
     }
 
     [Fact]
@@ -47,7 +47,10 @@ public sealed class BridgeHostSettingsTests
     {
         Assert.Equal(
             ["mode", "model", "thinking", "context", "tier", "speed", "approval", "approval_model",
-                "extended_approval", "prompt_set", "agents", "micro_compaction", "estimated_tokens"],
+                "approval_thinking", "approval_tier", "approval_speed", "extended_approval",
+                "extended_thinking", "extended_tier", "extended_speed", "prompt_set", "agents",
+                "compaction_model", "compaction_thinking", "compaction_tier", "compaction_speed",
+                "micro_compaction", "estimated_tokens"],
             BridgeHostSettings.AvailableOptions);
         Assert.All(BridgeHostSettings.DefaultOptions, id => Assert.Contains(id, BridgeHostSettings.AvailableOptions));
     }

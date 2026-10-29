@@ -244,6 +244,16 @@ public sealed class SessionLaunchOverridesTests
 
         Assert.False(SessionLaunchOverrides.TryApply(
             HarnessSettings.CreateDefault(),
+            new SessionLaunchOptions { CompactionTier = "9bad" },
+            out _,
+            out _,
+            out var badTier));
+        Assert.Equal(
+            "Compaction service tier must start with a letter and then use only letters, digits, underscores, and hyphens.",
+            badTier);
+
+        Assert.False(SessionLaunchOverrides.TryApply(
+            HarnessSettings.CreateDefault(),
             new SessionLaunchOptions { CompactionModel = "on" },
             out _,
             out _,

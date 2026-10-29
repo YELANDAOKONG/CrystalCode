@@ -78,6 +78,38 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task SideModelTuning_IsAnOptionAndPartOfChrome()
+    {
+        await using var fixture = await ServerFixture.StartAsync(
+            new ScriptedModel(false),
+            prepare: (home, _) => File.WriteAllText(
+                Path.Combine(home.Root, "providers.json"),
+                """
+                {
+                  "side": {
+                    "protocol": "ollama",
+                    "baseUri": "http://127.0.0.1:9/",
+                    "models": { "tuned": { "contextWindow": 8192, "serviceTiers": ["flex"], "speeds": ["fast"] } }
+                  }
+                }
+                """));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await PutAsync(fixture, fixture.Http, "/options/approval_model", new { value = "side/tuned" });
+        var speed = await PutAsync(fixture, fixture.Http, "/options/approval_speed", new { value = "fast" });
+        var changed = await events.WaitForAsync(
+            "chrome.changed",
+            static value => value.GetProperty("data").GetProperty("chrome").GetProperty("reviewer") is { ValueKind: JsonValueKind.Object } reviewer
+                && reviewer.GetProperty("speed").GetString() == "Speed Fast");
+
+        Assert.Equal("fast", Option(speed, "approval_speed").GetProperty("current").GetString());
+        var chrome = changed.GetProperty("data").GetProperty("chrome");
+        Assert.Equal(JsonValueKind.Null, chrome.GetProperty("compaction").ValueKind);
+        Assert.Equal(JsonValueKind.Null, chrome.GetProperty("image").ValueKind);
+    }
+
+    [Fact]
     public async Task Reports_GoOnlyToTheRequestingClient()
     {
         await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));

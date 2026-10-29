@@ -505,11 +505,16 @@ That update is sent again when only the pending list changes. The
 `_crystal/chrome` object also carries `reviewer` and `extendedApproval`, which
 are `null` while that reviewer is off; otherwise each holds `provider`,
 `model`, and the display labels `thinking`, `serviceTier`, and `speed`, and
-`extendedApproval` adds `trigger` and `includePrimaryReview`. A command the
+`extendedApproval` adds `trigger` and `includePrimaryReview`. `compaction` is `null` while the compaction model is off, and `image` while
+no `imageModel` is set. Otherwise each holds that model's `provider`, `model`,
+and display labels `thinking`, `serviceTier`, and `speed` (blank when the
+model does not set its own). A command the
 engine refuses is `-32603`, `command_refused`. A value or option not offered
 is `-32602`. The response carries the complete list of offered options.
 `thinking`, `context`, `tier`, and `speed` appear only when the model offers a
-choice. A select lists only values with a command plus the current value;
+choice. The `*_thinking`, `*_tier`, and `*_speed` options of the approval,
+extended approval, and compaction models appear only while that model is on
+and offers a choice; their unset value follows the per-model selection. A select lists only values with a command plus the current value;
 `tier` and `speed` can cycle back to unset but not name it, so unset is shown
 only while current. Values grouped by provider use ACP's grouped options.
 
@@ -564,9 +569,19 @@ its value: a hidden option keeps whatever the terminal or `config.json` set.
 | `speed` | `model_config` | declared speeds plus unset | `/speed` |
 | `approval` | `_crystal_approval` | default, edit, review, audit, full | `/approval` |
 | `approval_model` | `_crystal_approval` | off plus catalog | `/approval model` |
+| `approval_thinking` | `_crystal_approval` | the approval model's gears plus default and off when allowed | `/approval thinking` |
+| `approval_tier` | `_crystal_approval` | the approval model's tiers plus unset | `/approval tier` |
+| `approval_speed` | `_crystal_approval` | the approval model's speeds plus unset | `/approval speed` |
 | `extended_approval` | `_crystal_approval` | off plus catalog | `/approval extended` |
+| `extended_thinking` | `_crystal_approval` | the extended reviewer's gears plus default and off when allowed | `/approval extended thinking` |
+| `extended_tier` | `_crystal_approval` | the extended reviewer's tiers plus unset | `/approval extended tier` |
+| `extended_speed` | `_crystal_approval` | the extended reviewer's speeds plus unset | `/approval extended speed` |
 | `prompt_set` | `_crystal_prompt` | default plus sets | `/promptset` |
 | `agents` | `_crystal_agents` | switch | `/agents on\|off` |
+| `compaction_model` | `_crystal_compaction` | off plus catalog | `/compact model` |
+| `compaction_thinking` | `_crystal_compaction` | the compaction model's gears plus default and off when allowed | `/compact thinking` |
+| `compaction_tier` | `_crystal_compaction` | the compaction model's tiers plus unset | `/compact tier` |
+| `compaction_speed` | `_crystal_compaction` | the compaction model's speeds plus unset | `/compact speed` |
 | `micro_compaction` | `_crystal_compaction` | switch | `/compact micro on\|off` |
 | `estimated_tokens` | `_crystal_display` | switch | `/tokens on\|off` |
 

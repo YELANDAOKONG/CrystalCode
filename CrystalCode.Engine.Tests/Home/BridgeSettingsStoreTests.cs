@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 
 using Xunit;
@@ -68,7 +69,7 @@ public sealed class BridgeSettingsStoreTests
         var loaded = store.Load();
         store.Save(loaded);
 
-        Assert.Equal(13, store.Load().Bridge.Effective.Count);
+        Assert.Equal(BridgeHostSettings.AvailableOptions.Count, store.Load().Bridge.Effective.Count);
     }
 
     [Fact]

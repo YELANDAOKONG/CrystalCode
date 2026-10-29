@@ -145,6 +145,49 @@ public sealed class BridgeConfigOptionsTests
             Ids(update.GetProperty("params").GetProperty("update").GetProperty("configOptions")));
     }
 
+    [Fact]
+    public async Task SideModelTuning_IsOfferedAndSetThroughAcpAndShownInChrome()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(
+            new ScriptedModel(false),
+            prepare: static (home, _) => File.WriteAllText(
+                Path.Combine(home.Root, "providers.json"),
+                """{"side":{"protocol":"ollama","baseUri":"http://127.0.0.1:9/","models":{"tuned":{"contextWindow":8192,"imageInput":true,"serviceTiers":["flex","priority"],"speeds":["fast"]}}}}"""),
+            configOptions: ["compaction_model", "compaction_tier", "compaction_speed"]);
+        var id = await fixture.OpenAsync();
+
+        var model = await fixture.RequestAsync(
+            "session/set_config_option",
+            new { sessionId = id, configId = "compaction_model", value = "side/tuned" });
+        Assert.Equal(
+            ["compaction_model", "compaction_tier", "compaction_speed"],
+            Ids(model.GetProperty("result").GetProperty("configOptions")));
+
+        var tier = await fixture.RequestAsync(
+            "session/set_config_option",
+            new { sessionId = id, configId = "compaction_tier", value = "priority" });
+        var tierOption = tier.GetProperty("result").GetProperty("configOptions").EnumerateArray()
+            .Single(static option => option.GetProperty("id").GetString() == "compaction_tier");
+        Assert.Equal("priority", tierOption.GetProperty("currentValue").GetString());
+        Assert.Equal("_crystal_compaction", tierOption.GetProperty("category").GetString());
+
+        var unset = await fixture.RequestAsync(
+            "session/set_config_option",
+            new { sessionId = id, configId = "compaction_tier", value = "unset" });
+        Assert.Equal(-32602, unset.GetProperty("error").GetProperty("code").GetInt32());
+
+        var snapshot = (await fixture.RequestAsync("_crystal/snapshot", new { sessionId = id })).GetProperty("result");
+        var compaction = snapshot.GetProperty("chrome").GetProperty("compaction");
+        Assert.Equal("side", compaction.GetProperty("provider").GetString());
+        Assert.Equal("tuned", compaction.GetProperty("model").GetString());
+        Assert.Equal("Tier Priority", compaction.GetProperty("serviceTier").GetString());
+        Assert.Equal(string.Empty, compaction.GetProperty("speed").GetString());
+        Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("image").ValueKind);
+
+        var config = File.ReadAllText(Path.Combine(fixture.Home, "config.json")).Replace(" ", string.Empty);
+        Assert.Contains("\"serviceTier\":\"priority\"", config, StringComparison.Ordinal);
+    }
+
     private static object New(BridgeFixture fixture) =>
         new { cwd = fixture.Workspace, mcpServers = Array.Empty<object>() };
 

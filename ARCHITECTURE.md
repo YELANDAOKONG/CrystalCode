@@ -2746,6 +2746,15 @@ reviewer sees the primary review (`extended-primary`, always `On` or `Off`
 while extended approval is on). Server and Bridge write both objects as
 `reviewer` and `extendedApproval` in the chrome object. The terminal keeps
 their text in `ShellChrome.ReviewerFields`, apart from plugin fields.
+`SessionChrome.Compaction` and `SessionChrome.Image` (`SideModelChrome`) carry
+the compaction model while it is on and the image model while it is set, with
+display labels for thinking, tier, and speed. `CodingSession` refreshes the
+chrome after every compaction model command. Server and Bridge write them as
+`compaction` and `image`; the terminal does not draw them.
+The engine option catalog adds `approval_*`, `extended_*`, and `compaction_*`
+thinking, tier, and speed options for an enabled side model that offers that
+choice, and a `compaction_model` picker. Each value names the same slash
+command the terminal uses.
 A disk plugin may register extra field names. Those names stay off the
 adaptive bar, the progress row, `/status`, and `/stats`. They appear on the
 custom line only when the operator lists them. The engine publishes the

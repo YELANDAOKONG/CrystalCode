@@ -9,6 +9,8 @@ namespace CrystalCode.Engine.Events;
 /// Every field is the active value. <see cref="Pending"/> lists values chosen
 /// during a turn that apply on the next turn. <see cref="Reviewer"/> and
 /// <see cref="ExtendedApproval"/> are null while that reviewer is off.
+/// <see cref="Compaction"/> is null while the compaction model is off, and
+/// <see cref="Image"/> while no image model is configured.
 /// </summary>
 public sealed record SessionChrome(
     string Model,
@@ -26,4 +28,6 @@ public sealed record SessionChrome(
     string SessionId = "",
     SessionPendingSettings? Pending = null,
     ReviewerChrome? Reviewer = null,
-    ExtendedApprovalChrome? ExtendedApproval = null);
+    ExtendedApprovalChrome? ExtendedApproval = null,
+    SideModelChrome? Compaction = null,
+    SideModelChrome? Image = null);

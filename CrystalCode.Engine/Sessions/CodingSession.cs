@@ -2608,7 +2608,7 @@ public sealed class CodingSession : ITurnObserver
                 }
                 else
                 {
-                    Error("Compact accepts no argument, or full, model, thinking, summary, auto, and micro.");
+                    Error("Compact accepts no argument, or full, model, thinking, tier, speed, summary, auto, and micro.");
                 }
 
                 PruneDraftImages(string.Empty);
@@ -8213,9 +8213,14 @@ public sealed class CodingSession : ITurnObserver
         }
 
         // A launch gear or slot is process-only. This command changes the
-        // switch or the selection, so the saved gear and slots stay whatever
-        // config.json held.
-        var persistedNext = next.WithTuningFrom(_persisted.CompactionModel);
+        // switch or the selection, so the saved gear stays whatever
+        // config.json held, and so do the saved slots while the model is the same.
+        var saved = _persisted.CompactionModel;
+        var sameModel = string.Equals(next.Provider, saved.Provider, StringComparison.Ordinal)
+            && string.Equals(next.Model, saved.Model, StringComparison.Ordinal);
+        var persistedNext = sameModel
+            ? next.WithTuningFrom(saved)
+            : next.WithThinkingEffort(saved.ThinkingEffort);
         HarnessSettings updated;
         try
         {
@@ -8238,6 +8243,7 @@ public sealed class CodingSession : ITurnObserver
         _settingsStore.Save(_persisted);
         ReplaceCompactionClient(next, client);
         RefreshSlashCommands();
+        RefreshChrome();
         Note(next.Describe());
     }
 
@@ -8420,6 +8426,7 @@ public sealed class CodingSession : ITurnObserver
             current.CompactionModel.WithThinkingEffort(selection)));
         _compactor = CreateCompactor(CompactionReasoning());
         RefreshSlashCommands();
+        RefreshChrome();
         Note("Compaction thinking  " + ThinkingLabel.For(selection));
     }
 
@@ -8494,6 +8501,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         RefreshSlashCommands();
+        RefreshChrome();
         Note(
             "Compaction " + (request.ServiceTier ? "tier  " : "speed  ")
             + (selected is null ? "not set" : DisplayCase.Token(selected)));
@@ -9064,7 +9072,36 @@ public sealed class CodingSession : ITurnObserver
                     ReviewerChromeOf(_settings.ExtendedApproval.Reviewer)!,
                     DisplayCase.Token(_settings.ExtendedApproval.Trigger.Value),
                     _settings.ExtendedApproval.IncludePrimaryReview)
+                : null,
+            _settings.CompactionModel.Enabled
+                ? SideModelChromeOf(
+                    _settings.CompactionModel.Provider!,
+                    _settings.CompactionModel.Model!,
+                    _settings.CompactionModel.ThinkingEffort,
+                    _settings.CompactionModel.ServiceTier,
+                    _settings.CompactionModel.Speed)
+                : null,
+            _settings.ImageModel.IsConfigured
+                ? SideModelChromeOf(
+                    _settings.ImageModel.Provider!,
+                    _settings.ImageModel.Model!,
+                    _settings.ImageModel.ThinkingEffort,
+                    _settings.ImageModel.ServiceTier,
+                    _settings.ImageModel.Speed)
                 : null);
+
+    private static SideModelChrome SideModelChromeOf(
+        string provider,
+        string model,
+        ThinkingSelection thinking,
+        string? serviceTier,
+        string? speed) =>
+        new(
+            provider,
+            model,
+            thinking == ThinkingSelection.Default ? string.Empty : "Think " + ThinkingLabel.For(thinking),
+            CatalogSlotStatus.For("Tier", serviceTier),
+            CatalogSlotStatus.For("Speed", speed));
 
     private static ReviewerChrome? ReviewerChromeOf(ApprovalModelSettings reviewer) =>
         reviewer.Enabled

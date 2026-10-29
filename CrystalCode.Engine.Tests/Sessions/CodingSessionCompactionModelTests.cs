@@ -75,7 +75,7 @@ public sealed class CodingSessionCompactionModelTests
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact later", CancellationToken.None);
         Assert.Equal(
-            "Compact accepts no argument, or full, model, thinking, summary, auto, and micro.",
+            "Compact accepts no argument, or full, model, thinking, tier, speed, summary, auto, and micro.",
             LastError(headless));
     }
 

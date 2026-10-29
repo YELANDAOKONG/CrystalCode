@@ -52,6 +52,11 @@ public sealed class SideModelSlotStoreTests
         Assert.Equal("flex", selected.ServiceTier);
         Assert.Equal("fast", selected.Speed);
 
+        var image = loaded.ForImage(loaded.ImageModel);
+        Assert.Equal("judge", image.Model);
+        Assert.Equal("priority", image.ServiceTier);
+        Assert.Equal("fast", image.Speed);
+
         store.Save(loaded
             .WithImageModel(loaded.ImageModel.WithServiceTier(null).WithSpeed(null))
             .WithCompactionModel(loaded.CompactionModel.WithServiceTier(null).WithSpeed(null)));
@@ -75,6 +80,25 @@ public sealed class SideModelSlotStoreTests
 
         Assert.Contains("Image model service tier", image.Message, StringComparison.Ordinal);
         Assert.Contains("Compaction model speed", compaction.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ForImageAndForCompaction_FollowThePerModelSelectionWhenUnset()
+    {
+        using var root = new TemporaryHome();
+        var store = SlotStore(root);
+        var settings = store.Load()
+            .WithTier(new ProviderName("gateway"), "judge", "flex")
+            .WithSpeed(new ProviderName("gateway"), "judge", "fast");
+
+        var image = settings.ForImage(new ImageModelSettings("gateway", "judge"));
+        var compaction = settings.ForCompaction(
+            new CompactionModelSettings(true, "gateway", "judge").WithServiceTier("priority"));
+
+        Assert.Equal("flex", image.ServiceTier);
+        Assert.Equal("fast", image.Speed);
+        Assert.Equal("priority", compaction.ServiceTier);
+        Assert.Equal("fast", compaction.Speed);
     }
 
     private static DiskSettingsStore SlotStore(TemporaryHome root)

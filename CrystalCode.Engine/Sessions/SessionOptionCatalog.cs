@@ -37,7 +37,7 @@ internal static class SessionOptionCatalog
             Model(settings),
         };
 
-        if (Thinking(model, thinking) is { } thinkingOption)
+        if (Thinking(model, thinking, "thinking", "Thinking", "thought_level", "/thinking") is { } thinkingOption)
         {
             options.Add(thinkingOption);
         }
@@ -73,12 +73,32 @@ internal static class SessionOptionCatalog
             [.. new[] { ApprovalMode.Default, ApprovalMode.Edit, ApprovalMode.Review, ApprovalMode.Audit, ApprovalMode.Full }
                 .Select(mode => new SessionOptionValue(mode.Value, ApprovalLabel.For(mode), "/approval " + mode.Value))]));
         options.Add(Reviewer("approval_model", "Approval model", "/approval model", settings, settings.ApprovalModel));
+        AddTuning(
+            options,
+            settings,
+            "approval",
+            "Approval",
+            "_crystal_approval",
+            "/approval",
+            settings.ApprovalModel is { Enabled: true } approvalModel
+                ? (approvalModel.Provider!, approvalModel.Model!, approvalModel.ThinkingEffort, approvalModel.ServiceTier, approvalModel.Speed)
+                : null);
         options.Add(Reviewer(
             "extended_approval",
             "Extended approval",
             "/approval extended",
             settings,
             settings.ExtendedApproval.Reviewer));
+        AddTuning(
+            options,
+            settings,
+            "extended",
+            "Extended approval",
+            "_crystal_approval",
+            "/approval extended",
+            settings.ExtendedApproval.Reviewer is { Enabled: true } extended
+                ? (extended.Provider!, extended.Model!, extended.ThinkingEffort, extended.ServiceTier, extended.Speed)
+                : null);
         options.Add(new SessionOption(
             "prompt_set",
             "Prompt set",
@@ -86,6 +106,25 @@ internal static class SessionOptionCatalog
             promptSet,
             [.. promptSets.Select(name => new SessionOptionValue(name, DisplayCase.Token(name), "/promptset " + name))]));
         options.Add(Switch("agents", "Agents", "_crystal_agents", settings.Agents.Enabled, "/agents"));
+        options.Add(Picker(
+            "compaction_model",
+            "Compaction model",
+            "_crystal_compaction",
+            "/compact model",
+            settings,
+            settings.CompactionModel is { Enabled: true, HasSelection: true } compaction
+                ? compaction.Provider + "/" + compaction.Model
+                : Off));
+        AddTuning(
+            options,
+            settings,
+            "compaction",
+            "Compaction",
+            "_crystal_compaction",
+            "/compact",
+            settings.CompactionModel is { Enabled: true } compactionModel
+                ? (compactionModel.Provider!, compactionModel.Model!, compactionModel.ThinkingEffort, compactionModel.ServiceTier, compactionModel.Speed)
+                : null);
         options.Add(Switch(
             "micro_compaction",
             "Microcompaction",
@@ -126,7 +165,59 @@ internal static class SessionOptionCatalog
         return new SessionOption("model", "Model", "model", settings.Provider.Value + "/" + settings.Model, values);
     }
 
-    private static SessionOption? Thinking(ModelSettings model, ThinkingSelection selection)
+    /// <summary>
+    /// Thinking, tier, and speed of an enabled side model, each offered only
+    /// when that model has a choice. Ids are <paramref name="prefix"/> plus
+    /// <c>_thinking</c>, <c>_tier</c>, and <c>_speed</c>. A side model's own
+    /// unset slot follows the per-model selection.
+    /// </summary>
+    private static void AddTuning(
+        List<SessionOption> options,
+        HarnessSettings settings,
+        string prefix,
+        string label,
+        string category,
+        string command,
+        (string Provider, string Model, ThinkingSelection Thinking, string? ServiceTier, string? Speed)? side)
+    {
+        if (side is not { } selected)
+        {
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = settings.Catalog.GetModel(new ProviderName(selected.Provider), selected.Model);
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return;
+        }
+
+        if (Thinking(model, selected.Thinking, prefix + "_thinking", label + " thinking", category, command + " thinking") is { } thinking)
+        {
+            options.Add(thinking);
+        }
+
+        if (model.ServiceTiers.Count > 0)
+        {
+            options.Add(Slot(prefix + "_tier", label + " tier", command + " tier", selected.ServiceTier, model.ServiceTiers, category));
+        }
+
+        if (model.Speeds.Count > 0)
+        {
+            options.Add(Slot(prefix + "_speed", label + " speed", command + " speed", selected.Speed, model.Speeds, category));
+        }
+    }
+
+    private static SessionOption? Thinking(
+        ModelSettings model,
+        ThinkingSelection selection,
+        string id,
+        string name,
+        string category,
+        string command)
     {
         if (!model.Thinking)
         {
@@ -136,19 +227,19 @@ internal static class SessionOptionCatalog
         var values = new List<SessionOptionValue>();
         if (model.ThinkingCanDisable)
         {
-            values.Add(new SessionOptionValue(ThinkingSelection.Off.Value, "Off", "/thinking off"));
+            values.Add(new SessionOptionValue(ThinkingSelection.Off.Value, "Off", command + " off"));
         }
 
-        values.Add(new SessionOptionValue(ThinkingSelection.Default.Value, "Default", "/thinking default"));
+        values.Add(new SessionOptionValue(ThinkingSelection.Default.Value, "Default", command + " default"));
         foreach (var effort in model.ThinkingEfforts)
         {
-            values.Add(new SessionOptionValue(effort, ThinkingLabel.For(new ThinkingSelection(effort)), "/thinking " + effort));
+            values.Add(new SessionOptionValue(effort, ThinkingLabel.For(new ThinkingSelection(effort)), command + " " + effort));
         }
 
         var current = selection == ThinkingSelection.Off
             ? model.ThinkingCanDisable ? ThinkingSelection.Off.Value : ThinkingSelection.Default.Value
             : model.AllowsEffort(selection.Value) ? selection.Value : ThinkingSelection.Default.Value;
-        return new SessionOption("thinking", "Thinking", "thought_level", current, values);
+        return new SessionOption(id, name, category, current, values);
     }
 
     /// <summary>
@@ -156,11 +247,17 @@ internal static class SessionOptionCatalog
     /// one of the values; the command can cycle back to it but not name it,
     /// so its <see cref="SessionOptionValue.Command"/> is empty.
     /// </summary>
-    private static SessionOption Slot(string id, string name, string command, string? current, IReadOnlyList<string> tokens) =>
+    private static SessionOption Slot(
+        string id,
+        string name,
+        string command,
+        string? current,
+        IReadOnlyList<string> tokens,
+        string category = "model_config") =>
         new(
             id,
             name,
-            "model_config",
+            category,
             current ?? Unset,
             [
                 new SessionOptionValue(Unset, "Unset", string.Empty),
@@ -172,7 +269,25 @@ internal static class SessionOptionCatalog
         string name,
         string command,
         HarnessSettings settings,
-        ApprovalModelSettings reviewer)
+        ApprovalModelSettings reviewer) =>
+        Picker(
+            id,
+            name,
+            "_crystal_approval",
+            command,
+            settings,
+            reviewer is { Enabled: true, HasSelection: true }
+                ? reviewer.Provider + "/" + reviewer.Model
+                : Off);
+
+    /// <summary>Off plus every catalog model, grouped by provider.</summary>
+    private static SessionOption Picker(
+        string id,
+        string name,
+        string category,
+        string command,
+        HarnessSettings settings,
+        string current)
     {
         var values = new List<SessionOptionValue> { new(Off, "Off", command + " " + Off) };
         foreach (var provider in settings.Catalog.Providers.Keys)
@@ -187,10 +302,7 @@ internal static class SessionOptionCatalog
             }
         }
 
-        var current = reviewer is { Enabled: true, HasSelection: true }
-            ? reviewer.Provider + "/" + reviewer.Model
-            : Off;
-        return new SessionOption(id, name, "_crystal_approval", current, values);
+        return new SessionOption(id, name, category, current, values);
     }
 
     private static SessionOption Switch(string id, string name, string category, bool enabled, string command) =>
