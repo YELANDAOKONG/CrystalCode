@@ -318,7 +318,7 @@ CrystalCode.Display:
 
 Quick prompts keep the same dependency direction: Engine Home owns
 `QuickPromptStore`, bounded UTF-8 file reads, validation, and immutable catalog
-values; Display Composer owns the isolated quick-prompt picker and preview.
+values; Display Composer owns the isolated quick-prompt picker and preview, drawn as a Spectre panel through `WidgetPaint`.
 The terminal maps catalog values, routes F6 and a bare `/quick` only outside
 modal prompts (other front ends only get a note from `SessionVerb.Quick`), and
 inserts Fill at the current composer cursor. Send uses
@@ -2686,7 +2686,7 @@ cancelling `StartAsync`, after which the session is still closed and saved. A
 trust or question prompt during startup pauses the composer and draws the
 session frame until it is answered. While the activity is `LoadingTools` or
 `LoadingPlugins`, `SessionRenderer.HoldSubmission` keeps the composer
-editable but turns Enter, F6 send, and F7 into no-ops, so the pump never
+editable but turns Enter, F6, and F7 into no-ops, so the pump never
 queues input that arrives during a reload. The
 caption is prefixed with a one-cell spinner
 that advances while the turn is live, plus the current activity
