@@ -61,6 +61,7 @@ public static class SlashCatalog
             ["on", "off", "reload", "builtin", "enable", "disable", "show", "home", "project"]),
         new(SessionVerb.Plugins, "plugins", [], "List plugins or turn one directory on or off",
             ["on", "off", "reload", "enable", "disable", "show", "home", "project"]),
+        new(SessionVerb.Skills, "skills", [], "List the skills available to the skill tool"),
         new(SessionVerb.Mcp, "mcp", [], "List, show, or configure MCP servers",
             ["list", "show", "on", "off", "reload", "enable", "disable", "approval", "home", "project"]),
         new(SessionVerb.Attach, "attach", ["image"], "Attach a workspace image"),

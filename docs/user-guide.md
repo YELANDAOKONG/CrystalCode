@@ -1996,7 +1996,9 @@ trees, including scripts and other files that are not `SKILL.md`)
 auto-passes; it does not ask you. Set `"skills": false` in
 `config.json` to disable the tool, the guidance, and that auto-pass.
 Other files outside the workspace still need approval (you, or the
-Review model in Review or Audit).
+Review model in Review or Audit). `/skills` lists the skills the model can
+load, with their descriptions and locations, or says that Skills is off.
+`--skills on|off` overrides the setting for one process.
 
 Each skill is a directory with a `SKILL.md` that starts with YAML
 frontmatter (`name` and `description` required). The skill id is the

@@ -2307,6 +2307,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Plugins:
                 await ChangePluginsAsync(command.Argument, cancellationToken);
                 return (true, false);
+            case SessionVerb.Skills:
+                ShowSkills(command.Argument);
+                return (true, false);
             case SessionVerb.Mcp:
                 await ChangeMcpAsync(command.Argument, cancellationToken);
                 return (true, false);
@@ -6807,6 +6810,34 @@ public sealed class CodingSession : ITurnObserver
     // resource pair appears in Plan only when some server did.
     private IReadOnlyList<ITool> PlanResourceTools() =>
         _mcp.Tools.Any(tool => tool.InPlan) ? _mcp.ResourceTools : [];
+
+    private void ShowSkills(string argument)
+    {
+        if (argument.Trim().Length > 0)
+        {
+            Error("Skills command must be /skills.");
+            return;
+        }
+
+        if (!_settings.Skills)
+        {
+            Note("Skills  off  (set \"skills\" to true in config.json or start with --skills on)");
+            return;
+        }
+
+        if (_skills is null || _skills.Count == 0)
+        {
+            Note("Skills  none found");
+            return;
+        }
+
+        Note("Skills  " + _skills.Count);
+        foreach (var skill in _skills.Items)
+        {
+            Note($"  {skill.Name}  {skill.Description}");
+            Note($"    {skill.Location}");
+        }
+    }
 
     private void ReloadSkills()
     {

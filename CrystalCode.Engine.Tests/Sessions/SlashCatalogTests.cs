@@ -38,6 +38,7 @@ public sealed class SlashCatalogTests
     [InlineData("/todos", SessionVerb.Todos)]
     [InlineData("/todo", SessionVerb.Todos)]
     [InlineData("/tools", SessionVerb.Tools)]
+    [InlineData("/skills", SessionVerb.Skills)]
     [InlineData("/tier", SessionVerb.Tier)]
     [InlineData("/speed", SessionVerb.Speed)]
     [InlineData("/fast", SessionVerb.Speed)]

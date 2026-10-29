@@ -40,6 +40,7 @@ public enum SessionVerb
     Todos,
     Tools,
     Plugins,
+    Skills,
     Mcp,
     Attach,
     Quick,

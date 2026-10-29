@@ -150,7 +150,7 @@ and the `server.state` event.
     slash commands that only report or act inside the session: `/help`,
     `/status`, `/stats`, `/btw`, `/clear`, `/fork`, `/child`, `/sessions`,
     `/compact` and `/compact full`, `/todos`, `/attach`, `/export`, `/tools`,
-    `/plugins`, `/notify`, and `/mcp` without arguments, `/mcp list|show`,
+    `/skills`, `/plugins`, `/notify`, and `/mcp` without arguments, `/mcp list|show`,
     `/cd` without a path, `/plan`, `/mode`, and plugin or MCP prompt commands.
   - `admin`: shutdown, token management, answering a `trust` interaction,
     and slash commands that change trust, directory access, approval, the
