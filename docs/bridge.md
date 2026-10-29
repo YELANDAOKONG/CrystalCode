@@ -505,16 +505,17 @@ That update is sent again when only the pending list changes. The
 `_crystal/chrome` object also carries `reviewer` and `extendedApproval`, which
 are `null` while that reviewer is off; otherwise each holds `provider`,
 `model`, and the display labels `thinking`, `serviceTier`, `speed`, and
-`context`, and `extendedApproval` adds `trigger` and `includePrimaryReview`. `compaction` is `null` while the compaction model is off, and `image` while
-no `imageModel` is set. Otherwise each holds that model's `provider`, `model`,
+`context`, and `extendedApproval` adds `trigger` and `includePrimaryReview`. `compaction` is `null` while the compaction model is off, and `image`,
+`audio`, and `video` while that resource description model is off; audio and
+video are configuration only. Otherwise each holds that model's `provider`, `model`,
 and display labels `thinking`, `serviceTier`, `speed`, and `context` (blank
 when the model does not set its own). A command the
 engine refuses is `-32603`, `command_refused`. A value or option not offered
 is `-32602`. The response carries the complete list of offered options.
 `thinking`, `context`, `tier`, and `speed` appear only when the model offers a
 choice. The `*_thinking`, `*_tier`, `*_speed`, and `*_context` options of the
-approval, extended approval, and compaction models appear only while that
-model is on and offers a choice; their unset value sends no tier or speed,
+approval, extended approval, compaction, and resource description models
+appear only while that model is on and offers a choice; their unset value sends no tier or speed,
 and an unset context is shown as the model's first declared budget. A select lists only values with a command plus the current value;
 `tier` and `speed` can cycle back to unset but not name it, so unset is shown
 only while current. Values grouped by provider use ACP's grouped options.
@@ -586,6 +587,8 @@ its value: a hidden option keeps whatever the terminal or `config.json` set.
 | `compaction_tier` | `_crystal_compaction` | the compaction model's tiers plus unset | `/compact tier` |
 | `compaction_speed` | `_crystal_compaction` | the compaction model's speeds plus unset | `/compact speed` |
 | `compaction_context` | `_crystal_compaction` | the compaction model's declared budgets | `/compact context` |
+| `image_model`, `audio_model`, `video_model` | `_crystal_describe` | off plus catalog models that declare that input | `/describe <kind> model`, `/describe <kind> off` |
+| `image_thinking`, `image_tier`, `image_speed`, `image_context`, and the same for `audio` and `video` | `_crystal_describe` | that model's gears, tiers plus unset, speeds plus unset, and declared budgets | `/describe <kind> thinking\|tier\|speed\|context` |
 | `micro_compaction` | `_crystal_compaction` | switch | `/compact micro on\|off` |
 | `estimated_tokens` | `_crystal_display` | switch | `/tokens on\|off` |
 

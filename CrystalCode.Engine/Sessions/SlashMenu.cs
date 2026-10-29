@@ -29,7 +29,8 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? compactionTierArguments = null,
         IReadOnlyList<SlashCompletion>? compactionSpeedArguments = null,
         IReadOnlyList<SlashCompletion>? approvalContextArguments = null,
-        IReadOnlyList<SlashCompletion>? compactionContextArguments = null)
+        IReadOnlyList<SlashCompletion>? compactionContextArguments = null,
+        IReadOnlyList<SlashCompletion>? describeArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -59,6 +60,11 @@ public static class SlashMenu
                 compactionContextArguments,
                 tierArguments,
                 speedArguments);
+            if (spec.Verb == SessionVerb.Describe && describeArguments is { Count: > 0 })
+            {
+                arguments = describeArguments;
+            }
+
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
         }
 

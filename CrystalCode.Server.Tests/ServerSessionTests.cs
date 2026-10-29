@@ -107,6 +107,8 @@ public sealed class ServerSessionTests
         var chrome = changed.GetProperty("data").GetProperty("chrome");
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("compaction").ValueKind);
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("image").ValueKind);
+        Assert.Equal(JsonValueKind.Null, chrome.GetProperty("audio").ValueKind);
+        Assert.Equal(JsonValueKind.Null, chrome.GetProperty("video").ValueKind);
     }
 
     [Fact]

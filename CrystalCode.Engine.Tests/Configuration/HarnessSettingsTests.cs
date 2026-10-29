@@ -348,21 +348,26 @@ public sealed class HarnessSettingsTests
     public void ImageModel_MapsThinkingAndRejectsAModelThatCannotSeeImages()
     {
         var settings = HarnessSettings.CreateDefault();
-        Assert.False(settings.ImageModel.IsConfigured);
+        Assert.False(settings.ResourceModels.Image.Enabled);
 
-        var geared = settings.WithImageModel(
-            new ImageModelSettings("deepseek", "deepseek-flash", ThinkingSelection.Parse("high")));
+        var geared = settings.WithResourceModel(
+            ResourceKind.Image,
+            new ResourceModelSettings(true, "deepseek", "deepseek-flash", ThinkingSelection.Parse("high")));
         var model = geared.Catalog.GetModel(new ProviderName("deepseek"), "deepseek-flash");
-        var reasoning = geared.ImageModel.ThinkingEffort.ToReasoningOptions(model);
+        var reasoning = geared.ResourceModels.Image.ThinkingEffort.ToReasoningOptions(model);
 
         Assert.NotNull(reasoning);
         Assert.Equal(ReasoningMode.Enabled, reasoning.Mode);
         Assert.Equal("high", reasoning.Effort!.Value);
 
         var textOnly = Assert.Throws<InvalidOperationException>(() =>
-            settings.WithImageModel(new ImageModelSettings("deepseek", "deepseek-v4-pro")));
+            settings.WithResourceModel(ResourceKind.Image, new ResourceModelSettings(true, "deepseek", "deepseek-v4-pro")));
         Assert.Contains("does not accept image input", textOnly.Message, StringComparison.Ordinal);
-        Assert.False(settings.ImageModel.IsConfigured);
+        Assert.False(settings.ResourceModels.Image.Enabled);
+
+        // A disabled entry keeps its selection unchecked, like a reviewer.
+        var stored = settings.WithResourceModel(ResourceKind.Image, new ResourceModelSettings(false, "deepseek", "deepseek-v4-pro"));
+        Assert.Equal("deepseek-v4-pro", stored.ResourceModels.Image.Model);
     }
 
     [Fact]

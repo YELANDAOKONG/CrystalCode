@@ -1,7 +1,12 @@
 namespace CrystalCode.Engine.Home;
 
-internal sealed class ImageModelDocument
+/// <summary>
+/// The <c>imageModel</c>, <c>audioModel</c>, or <c>videoModel</c> object in <c>config.json</c>.
+/// </summary>
+internal sealed class ResourceModelDocument
 {
+    public bool? Enabled { get; set; }
+
     public string? Provider { get; set; }
 
     public string? Model { get; set; }

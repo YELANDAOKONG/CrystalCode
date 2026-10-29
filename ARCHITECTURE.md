@@ -572,15 +572,31 @@ before a following Enter submits the prompt.
 Dotnet multimodal tools are omitted from active catalogs when the selected
 model or provider does not support image input. Declared `audioInput` or
 `videoInput` does not keep them.
-`describe_image` is a text tool on Plan and Work when `config.json`
-`imageModel` names a provider and model whose catalog entry has
-`imageInput`. It sends that file to a side multimodal client with the
-image-description prompt and returns the reply as text. The side
-request has no tools, is not written into the session transcript, and uses
-`imageModel.thinkingEffort` through the same gear mapping as the host. Its
-optional `imageModel.serviceTier`, `imageModel.speed`, and
-`imageModel.contextWindow` apply to that client only; unset sends no tier or
-speed and uses the model's first declared budget, as for a reviewer.
+Resource description models are `imageModel`, `audioModel`, and
+`videoModel` in `config.json`, held by `ResourceModels` (one
+`ResourceModelSettings` each, keyed by `ResourceKind`). Each has the same
+fields as `approvalModel`: `enabled`, `provider`, `model`, `thinkingEffort`,
+`serviceTier`, `speed`, and `contextWindow`. A model is on only with
+`enabled: true`; a stored entry without it is off and unchecked. An enabled
+model must name a catalog model that declares `imageInput`, `audioInput`, or
+`videoInput`, and its slots must be declared by that model. Slots apply to
+that model's client only: unset tier or speed is not sent, unset context is
+the model's first declared budget, and the session `/tier`, `/speed`, and
+`/context` choice does not apply. `/describe` (`SessionVerb.Describe`) and the
+`--image-*`, `--audio-*`, and `--video-*` launch flags set them; the option
+catalog offers `image_*`, `audio_*`, and `video_*` model, thinking, tier,
+speed, and context options under `_crystal_describe`, and chrome carries
+`Image`, `Audio`, and `Video` (`SideModelChrome`, null while off). Server
+classifies a bare `/describe`, a kind, or `<kind> model` as operate and every
+other form as admin.
+Only the image model is connected. `describe_image` is a text tool on Plan
+and Work while `imageModel` is on. It sends that file to a side multimodal
+client with the image-description prompt and returns the reply as text. The
+side request has no tools, is not written into the session transcript, and
+uses `imageModel.thinkingEffort` through the same gear mapping as the host.
+No tool, prompt, or client uses `audioModel` or `videoModel` yet; they are
+stored, validated, and shown so a later audio or video path has its
+configuration in place. `ResourceKinds.IsConnected` marks that difference.
 `view_image` is registered only for an image-capable turn. It returns the
 file as `ImageContent` so the current model sees it on the next round.
 Both follow the `read` path fence. A missing image-model credential fails

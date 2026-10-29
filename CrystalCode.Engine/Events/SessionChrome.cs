@@ -10,7 +10,9 @@ namespace CrystalCode.Engine.Events;
 /// during a turn that apply on the next turn. <see cref="Reviewer"/> and
 /// <see cref="ExtendedApproval"/> are null while that reviewer is off.
 /// <see cref="Compaction"/> is null while the compaction model is off, and
-/// <see cref="Image"/> while no image model is configured.
+/// <see cref="Image"/>, <see cref="Audio"/>, and <see cref="Video"/> while
+/// that resource description model is off. Audio and video are not connected
+/// to a tool yet.
 /// </summary>
 public sealed record SessionChrome(
     string Model,
@@ -30,4 +32,6 @@ public sealed record SessionChrome(
     ReviewerChrome? Reviewer = null,
     ExtendedApprovalChrome? ExtendedApproval = null,
     SideModelChrome? Compaction = null,
-    SideModelChrome? Image = null);
+    SideModelChrome? Image = null,
+    SideModelChrome? Audio = null,
+    SideModelChrome? Video = null);

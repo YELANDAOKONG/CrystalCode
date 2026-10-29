@@ -98,6 +98,69 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--compaction-context <BUDGET>")]
     public string? CompactionContext { get; init; }
 
+    [CommandOption("--image-model <on|off>")]
+    public string? ImageModel { get; init; }
+
+    [CommandOption("--image-provider <PROVIDER>")]
+    public string? ImageProvider { get; init; }
+
+    [CommandOption("--image-model-id <MODEL>")]
+    public string? ImageModelId { get; init; }
+
+    [CommandOption("--image-thinking <EFFORT>")]
+    public string? ImageThinking { get; init; }
+
+    [CommandOption("--image-tier <TOKEN>")]
+    public string? ImageTier { get; init; }
+
+    [CommandOption("--image-speed <TOKEN>")]
+    public string? ImageSpeed { get; init; }
+
+    [CommandOption("--image-context <BUDGET>")]
+    public string? ImageContext { get; init; }
+
+    [CommandOption("--audio-model <on|off>")]
+    public string? AudioModel { get; init; }
+
+    [CommandOption("--audio-provider <PROVIDER>")]
+    public string? AudioProvider { get; init; }
+
+    [CommandOption("--audio-model-id <MODEL>")]
+    public string? AudioModelId { get; init; }
+
+    [CommandOption("--audio-thinking <EFFORT>")]
+    public string? AudioThinking { get; init; }
+
+    [CommandOption("--audio-tier <TOKEN>")]
+    public string? AudioTier { get; init; }
+
+    [CommandOption("--audio-speed <TOKEN>")]
+    public string? AudioSpeed { get; init; }
+
+    [CommandOption("--audio-context <BUDGET>")]
+    public string? AudioContext { get; init; }
+
+    [CommandOption("--video-model <on|off>")]
+    public string? VideoModel { get; init; }
+
+    [CommandOption("--video-provider <PROVIDER>")]
+    public string? VideoProvider { get; init; }
+
+    [CommandOption("--video-model-id <MODEL>")]
+    public string? VideoModelId { get; init; }
+
+    [CommandOption("--video-thinking <EFFORT>")]
+    public string? VideoThinking { get; init; }
+
+    [CommandOption("--video-tier <TOKEN>")]
+    public string? VideoTier { get; init; }
+
+    [CommandOption("--video-speed <TOKEN>")]
+    public string? VideoSpeed { get; init; }
+
+    [CommandOption("--video-context <BUDGET>")]
+    public string? VideoContext { get; init; }
+
     [CommandOption("--plan")]
     public bool Plan { get; init; }
 
@@ -208,6 +271,27 @@ public class SessionLaunchSettings : CommandSettings
             CompactionTier = CompactionTier,
             CompactionSpeed = CompactionSpeed,
             CompactionContext = CompactionContext,
+            ImageModel = ImageModel,
+            ImageProvider = ImageProvider,
+            ImageModelId = ImageModelId,
+            ImageThinking = ImageThinking,
+            ImageTier = ImageTier,
+            ImageSpeed = ImageSpeed,
+            ImageContext = ImageContext,
+            AudioModel = AudioModel,
+            AudioProvider = AudioProvider,
+            AudioModelId = AudioModelId,
+            AudioThinking = AudioThinking,
+            AudioTier = AudioTier,
+            AudioSpeed = AudioSpeed,
+            AudioContext = AudioContext,
+            VideoModel = VideoModel,
+            VideoProvider = VideoProvider,
+            VideoModelId = VideoModelId,
+            VideoThinking = VideoThinking,
+            VideoTier = VideoTier,
+            VideoSpeed = VideoSpeed,
+            VideoContext = VideoContext,
             Plan = Plan,
             Work = Work,
             Mode = Mode,

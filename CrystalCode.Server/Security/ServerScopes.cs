@@ -71,6 +71,8 @@ public static class ServerScopes
             SessionVerb.Trim => IsSwitch(argument) ? ServerScope.Admin : ServerScope.Operate,
             SessionVerb.Todos => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Attach => ServerScope.Operate,
+            // A bare command or a kind lists; every other form writes config.json.
+            SessionVerb.Describe => IsResourceListing(argument) ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Quick => ServerScope.Operate,
             SessionVerb.Edit => ServerScope.Operate,
             SessionVerb.Export => ServerScope.Operate,
@@ -118,6 +120,14 @@ public static class ServerScopes
     {
         var text = argument.Trim();
         return text.Length == 0 || text.Equals("full", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsResourceListing(string argument)
+    {
+        var words = argument.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        return words.Length == 0
+            || words.Length == 1
+            || words.Length == 2 && words[1].Equals("model", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsListing(string argument)

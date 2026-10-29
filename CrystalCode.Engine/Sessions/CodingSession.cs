@@ -2776,6 +2776,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Compact:
                 return (true, false);
+            case SessionVerb.Describe:
+                ChangeResourceModel(command.Argument);
+                return (true, false);
             case SessionVerb.Todos:
                 ChangeTodos(command.Argument);
                 return (true, false);
@@ -5926,16 +5929,17 @@ public sealed class CodingSession : ITurnObserver
 
     private ImageDescriber? CreateImageDescriber()
     {
-        if (!_settings.ImageModel.IsConfigured)
+        var image = _settings.ResourceModels.Image;
+        if (!image.Enabled)
         {
             return null;
         }
 
-        var selected = _settings.ForImage(_settings.ImageModel);
+        var selected = _settings.ForResource(image);
         return new ImageDescriber(
             OpenImageDescriptionClient,
             ImageDescriptionSystemText(selected),
-            _settings.ImageModel.ThinkingEffort.ToReasoningOptions(selected.ActiveModel),
+            image.ThinkingEffort.ToReasoningOptions(selected.ActiveModel),
             _prompts.ImageUser,
             _placeholders);
     }
@@ -5962,7 +5966,7 @@ public sealed class CodingSession : ITurnObserver
             return _imageDescriptionClient;
         }
 
-        var client = CreateMultimodalClient(_settings.ForImage(_settings.ImageModel))
+        var client = CreateMultimodalClient(_settings.ForResource(_settings.ResourceModels.Image))
             ?? throw new InvalidOperationException(
                 "The image model does not accept image input.");
         _imageDescriptionClient = client;
@@ -8450,6 +8454,252 @@ public sealed class CodingSession : ITurnObserver
         Note("Compaction thinking  " + ThinkingLabel.For(selection));
     }
 
+    /// <summary>
+    /// Shows or changes a resource description model. The image model backs
+    /// <c>describe_image</c>; audio and video are stored and checked only,
+    /// because no tool describes them yet.
+    /// </summary>
+    private void ChangeResourceModel(string? argument)
+    {
+        if (!ResourceModelArguments.TryParse(argument, out var request, out var parseError))
+        {
+            Error(parseError);
+            return;
+        }
+
+        if (request.Action == ResourceModelArguments.Action.List)
+        {
+            foreach (var kind in ResourceKinds.All)
+            {
+                Note(_settings.ResourceModels.For(kind).Describe(kind));
+            }
+
+            return;
+        }
+
+        var current = _settings.ResourceModels.For(request.Kind);
+        if (request.Action == ResourceModelArguments.Action.Show)
+        {
+            Note(current.Describe(request.Kind));
+            return;
+        }
+
+        var noun = ResourceKinds.Word(request.Kind) + " model";
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before changing the " + noun + ".");
+            return;
+        }
+
+        ResourceModelSettings next;
+        switch (request.Action)
+        {
+            case ResourceModelArguments.Action.Switch:
+                if (request.Enabled && !current.HasSelection)
+                {
+                    Error("Set the " + noun + " before turning it on.");
+                    return;
+                }
+
+                next = request.Enabled ? current.EnabledCopy() : current.DisabledCopy();
+                break;
+            case ResourceModelArguments.Action.Model:
+                if (!TrySelectResourceModel(request.Kind, current, request.Value!, out next))
+                {
+                    return;
+                }
+
+                break;
+            case ResourceModelArguments.Action.Thinking:
+                if (!TryResourceCatalogModel(current, noun, out var thinkingModel)
+                    || !TrySelectThinking(thinkingModel, current.ThinkingEffort, request.Value, noun, out var gear))
+                {
+                    return;
+                }
+
+                next = current.WithThinkingEffort(gear);
+                break;
+            default:
+                if (!TryResourceCatalogModel(current, noun, out var slotModel)
+                    || !TrySelectSlot(
+                        request.Slot,
+                        slotModel,
+                        current.ServiceTier,
+                        current.Speed,
+                        current.ContextWindow,
+                        noun,
+                        out var selected))
+                {
+                    return;
+                }
+
+                next = request.Slot.Slot switch
+                {
+                    SideModelSlot.ServiceTier => current.WithServiceTier(selected.Token),
+                    SideModelSlot.Speed => current.WithSpeed(selected.Token),
+                    _ => current.WithContextWindow(selected.Window)
+                };
+                break;
+        }
+
+        HarnessSettings updated;
+        try
+        {
+            updated = _settings.WithResourceModel(request.Kind, next);
+        }
+        catch (InvalidOperationException exception)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        _settings = updated;
+        var saved = _persisted.ResourceModels.For(request.Kind);
+        var sameModel = string.Equals(saved.Provider, next.Provider, StringComparison.Ordinal)
+            && string.Equals(saved.Model, next.Model, StringComparison.Ordinal);
+        if (request.Action is ResourceModelArguments.Action.Switch or ResourceModelArguments.Action.Model)
+        {
+            // The switch or the selection is saved. A launch gear or slot stays
+            // process-only, so the saved tuning is kept while the model is the same.
+            _persisted = _persisted.WithResourceModel(
+                request.Kind,
+                sameModel ? next.WithTuningFrom(saved) : next.WithThinkingEffort(saved.ThinkingEffort));
+            _settingsStore.Save(_persisted);
+        }
+        else if (sameModel)
+        {
+            // A launch selection of another model keeps this tuning process-only.
+            _persisted = _persisted.WithResourceModel(request.Kind, saved.WithTuningFrom(next));
+            _settingsStore.Save(_persisted);
+        }
+
+        if (request.Kind == ResourceKind.Image)
+        {
+            // The describer and its client were built for the previous image model.
+            ReleaseImageDescriptionClient();
+            RebuildExecutors();
+        }
+
+        RefreshSlashCommands();
+        RefreshChrome();
+        Note(next.Describe(request.Kind));
+        if (!ResourceKinds.IsConnected(request.Kind))
+        {
+            Note(ResourceKinds.Title(request.Kind) + " description is not connected yet. The setting is saved for a later release.");
+        }
+    }
+
+    private bool TrySelectResourceModel(
+        ResourceKind kind,
+        ResourceModelSettings current,
+        string selectionText,
+        out ResourceModelSettings next)
+    {
+        next = current;
+        var currentProvider = current.Provider is string stored ? new ProviderName(stored) : _settings.Provider;
+        if (!ModelSelection.TryResolve(_settings.Catalog, currentProvider, selectionText, out var selection, out var error)
+            || selection is null)
+        {
+            Error((error ?? string.Empty).Replace("/model", "/describe " + ResourceKinds.Word(kind) + " model", StringComparison.Ordinal));
+            return false;
+        }
+
+        var model = _settings.Catalog.GetModel(selection.Provider, selection.Model);
+        if (!ResourceKinds.Accepts(model, kind))
+        {
+            Error($"{ResourceKinds.Title(kind)} model '{selection.Model}' does not accept {ResourceKinds.Word(kind)} input. "
+                + $"Set {ResourceKinds.InputFlag(kind)} on that model in providers.json.");
+            return false;
+        }
+
+        // A stored gear stays; a tier, speed, or context budget belongs to the stored model only.
+        var sameModel = string.Equals(current.Provider, selection.Provider.Value, StringComparison.Ordinal)
+            && string.Equals(current.Model, selection.Model, StringComparison.Ordinal);
+        next = new ResourceModelSettings(
+            true,
+            selection.Provider.Value,
+            selection.Model,
+            current.ThinkingEffort,
+            sameModel ? current.ServiceTier : null,
+            sameModel ? current.Speed : null,
+            sameModel ? current.ContextWindow : null);
+        return true;
+    }
+
+    private bool TryResourceCatalogModel(ResourceModelSettings resource, string noun, out ModelSettings model)
+    {
+        model = null!;
+        if (!resource.HasSelection)
+        {
+            Error("Set the " + noun + " before changing it.");
+            return false;
+        }
+
+        try
+        {
+            model = _settings.Catalog.GetModel(new ProviderName(resource.Provider!), resource.Model!);
+            return true;
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            Error(exception.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Resolves a side model's thinking command: a bare word cycles the gear,
+    /// a value must be one the model allows.
+    /// </summary>
+    private bool TrySelectThinking(
+        ModelSettings model,
+        ThinkingSelection current,
+        string? effort,
+        string noun,
+        out ThinkingSelection selection)
+    {
+        selection = current;
+        if (!model.Thinking)
+        {
+            Error("The " + noun + " does not support thinking.");
+            return false;
+        }
+
+        if (effort is null)
+        {
+            selection = ThinkingSelection.Next(current, model);
+            return true;
+        }
+
+        ThinkingSelection parsed;
+        try
+        {
+            parsed = ThinkingSelection.Parse(effort);
+        }
+        catch (ArgumentException exception)
+        {
+            Error(exception.Message);
+            return false;
+        }
+
+        if (parsed == ThinkingSelection.Off && !model.ThinkingCanDisable)
+        {
+            Error("The " + noun + " cannot disable thinking.");
+            return false;
+        }
+
+        if (parsed != ThinkingSelection.Default
+            && parsed != ThinkingSelection.Off
+            && !model.AllowsEffort(parsed.Value))
+        {
+            Error($"Thinking effort '{parsed.Value}' is not available for the {noun}.");
+            return false;
+        }
+
+        selection = parsed;
+        return true;
+    }
+
     private void ChangeCompactionSlot(ApprovalSlotArguments.Request request)
     {
         var label = SlotLabel(request.Slot);
@@ -8884,7 +9134,8 @@ public sealed class CodingSession : ITurnObserver
             CompactionSlotCompletions(serviceTier: true),
             CompactionSlotCompletions(serviceTier: false),
             ReviewerContextCompletions(_settings.ApprovalModel),
-            CompactionContextCompletions());
+            CompactionContextCompletions(),
+            ResourceCompletions());
         menu = menu.Select(command => command.Name switch
         {
             "agents" => command with { Arguments = AgentCompletions() },
@@ -9026,6 +9277,78 @@ public sealed class CodingSession : ITurnObserver
                 : new SlashCompletion(name, help, [name]);
     }
 
+    /// <summary>
+    /// <c>/describe image|audio|video</c> with switch, model, and that
+    /// model's own thinking, tier, speed, and context completions.
+    /// </summary>
+    private IReadOnlyList<SlashCompletion> ResourceCompletions()
+    {
+        var options = new List<SlashCompletion>();
+        foreach (var kind in ResourceKinds.All)
+        {
+            var resource = _settings.ResourceModels.For(kind);
+            var word = ResourceKinds.Word(kind);
+            ModelSettings? model = null;
+            if (resource.HasSelection)
+            {
+                try
+                {
+                    model = _settings.Catalog.GetModel(new ProviderName(resource.Provider!), resource.Model!);
+                }
+                catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+                {
+                    model = null;
+                }
+            }
+
+            var provider = resource.Provider is string stored && ProviderName.TryParse(stored, out var parsed) && parsed is not null
+                ? parsed
+                : _settings.Provider;
+            IReadOnlyList<SlashCompletion> models;
+            try
+            {
+                models = ModelCompletions.For(_settings.Catalog, provider);
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+            {
+                models = ModelCompletions.For(_settings.Catalog, _settings.Provider);
+            }
+
+            var nested = new List<SlashCompletion>
+            {
+                new("on", "Turn the " + word + " model on", ["on"]),
+                new("off", "Turn the " + word + " model off", ["off"]),
+                new("model", "Select the " + word + " model", ["model"], models)
+            };
+            if (model is not null)
+            {
+                AddNested(nested, "thinking", "Cycle or set the " + word + " model thinking gear", ThinkingCompletions.For(model));
+                AddNested(nested, "tier", "Cycle or set the " + word + " model service tier", CatalogSlotCompletions.For(model.ServiceTiers));
+                AddNested(nested, "speed", "Cycle or set the " + word + " model speed", CatalogSlotCompletions.For(model.Speeds));
+                AddNested(
+                    nested,
+                    "context",
+                    "Cycle or set the " + word + " model context budget",
+                    model.ContextWindows.Count > 1 ? ContextWindowSelection.Completions(model) : []);
+            }
+
+            var help = ResourceKinds.IsConnected(kind)
+                ? "Show or set the " + word + " description model"
+                : "Show or set the " + word + " description model (not connected yet)";
+            options.Add(new SlashCompletion(word, help, [word], nested, ArgumentsOptional: true));
+        }
+
+        return options;
+
+        static void AddNested(List<SlashCompletion> into, string name, string help, IReadOnlyList<SlashCompletion> values)
+        {
+            if (values.Count > 0)
+            {
+                into.Add(new SlashCompletion(name, help, [name], values, ArgumentsOptional: true));
+            }
+        }
+    }
+
     private IReadOnlyList<SlashCompletion> CompactionModelCompletions()
     {
         var options = new List<SlashCompletion>
@@ -9124,15 +9447,20 @@ public sealed class CodingSession : ITurnObserver
                     _settings.CompactionModel.Speed,
                     _settings.CompactionModel.ContextWindow)
                 : null,
-            _settings.ImageModel.IsConfigured
-                ? SideModelChromeOf(
-                    _settings.ImageModel.Provider!,
-                    _settings.ImageModel.Model!,
-                    _settings.ImageModel.ThinkingEffort,
-                    _settings.ImageModel.ServiceTier,
-                    _settings.ImageModel.Speed,
-                    _settings.ImageModel.ContextWindow)
-                : null);
+            ResourceChromeOf(_settings.ResourceModels.Image),
+            ResourceChromeOf(_settings.ResourceModels.Audio),
+            ResourceChromeOf(_settings.ResourceModels.Video));
+
+    private static SideModelChrome? ResourceChromeOf(ResourceModelSettings resource) =>
+        resource.Enabled
+            ? SideModelChromeOf(
+                resource.Provider!,
+                resource.Model!,
+                resource.ThinkingEffort,
+                resource.ServiceTier,
+                resource.Speed,
+                resource.ContextWindow)
+            : null;
 
     private static SideModelChrome SideModelChromeOf(
         string provider,

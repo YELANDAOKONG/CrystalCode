@@ -66,6 +66,48 @@ public sealed record SessionLaunchOptions
 
     public string? CompactionContext { get; init; }
 
+    public string? ImageModel { get; init; }
+
+    public string? ImageProvider { get; init; }
+
+    public string? ImageModelId { get; init; }
+
+    public string? ImageThinking { get; init; }
+
+    public string? ImageTier { get; init; }
+
+    public string? ImageSpeed { get; init; }
+
+    public string? ImageContext { get; init; }
+
+    public string? AudioModel { get; init; }
+
+    public string? AudioProvider { get; init; }
+
+    public string? AudioModelId { get; init; }
+
+    public string? AudioThinking { get; init; }
+
+    public string? AudioTier { get; init; }
+
+    public string? AudioSpeed { get; init; }
+
+    public string? AudioContext { get; init; }
+
+    public string? VideoModel { get; init; }
+
+    public string? VideoProvider { get; init; }
+
+    public string? VideoModelId { get; init; }
+
+    public string? VideoThinking { get; init; }
+
+    public string? VideoTier { get; init; }
+
+    public string? VideoSpeed { get; init; }
+
+    public string? VideoContext { get; init; }
+
     public bool Plan { get; init; }
 
     public bool Work { get; init; }

@@ -106,7 +106,10 @@ public sealed class DiskSettingsStore : ISettingsStore
             document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
             showAutomaticCompactionSummary: document.ShowAutomaticCompactionSummary
                 ?? defaults.ShowAutomaticCompactionSummary,
-            imageModel: ReadImageModel(document.ImageModel),
+            resourceModels: new ResourceModels(
+                ReadResourceModel(document.ImageModel, "imageModel"),
+                ReadResourceModel(document.AudioModel, "audioModel"),
+                ReadResourceModel(document.VideoModel, "videoModel")),
             contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
             tierSelections: SettingsMapper.ReadTokenSelections(document.TierSelections, "tierSelections"),
             speedSelections: SettingsMapper.ReadTokenSelections(document.SpeedSelections, "speedSelections"),
@@ -211,7 +214,9 @@ public sealed class DiskSettingsStore : ISettingsStore
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             ResourceTrim = WriteResourceTrim(settings.ResourceTrim),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
-            ImageModel = WriteImageModel(settings.ImageModel),
+            ImageModel = WriteResourceModel(settings.ResourceModels.Image),
+            AudioModel = WriteResourceModel(settings.ResourceModels.Audio),
+            VideoModel = WriteResourceModel(settings.ResourceModels.Video),
             Retry = WriteRetry(settings.Retry),
             ApprovalRetry = WriteRetry(settings.ApprovalRetry),
             DisabledBuiltInTools = settings.PersistentDisabledBuiltInTools.Plan.Count == 0
@@ -630,34 +635,41 @@ public sealed class DiskSettingsStore : ISettingsStore
         };
     }
 
-    private static ImageModelSettings ReadImageModel(ImageModelDocument? document)
+    /// <summary>
+    /// A resource description model is on only with <c>enabled: true</c>,
+    /// like <c>approvalModel</c> and <c>compactionModel</c>. An entry without
+    /// it keeps the stored selection unused.
+    /// </summary>
+    private static ResourceModelSettings ReadResourceModel(ResourceModelDocument? document, string field)
     {
         if (document is null)
         {
-            return ImageModelSettings.None;
+            return ResourceModelSettings.Off;
         }
 
-        var provider = string.IsNullOrWhiteSpace(document.Provider)
-            ? null
-            : document.Provider.Trim();
-        var model = string.IsNullOrWhiteSpace(document.Model)
-            ? null
-            : document.Model.Trim();
-        if (provider is null || model is null)
+        var provider = string.IsNullOrWhiteSpace(document.Provider) ? null : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model) ? null : document.Model.Trim();
+        if ((provider is null) != (model is null))
         {
-            throw new InvalidOperationException("imageModel requires provider and model.");
+            throw new InvalidOperationException(field + " requires provider and model together.");
+        }
+
+        if (document.Enabled == true && provider is null)
+        {
+            throw new InvalidOperationException(field + ".enabled requires provider and model.");
         }
 
         var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
             ? ThinkingSelection.Default
             : ThinkingSelection.Parse(document.ThinkingEffort);
-        return new ImageModelSettings(
+        return new ResourceModelSettings(
+            document.Enabled ?? false,
             provider,
             model,
             thinkingEffort,
-            ReadSlot(document.ServiceTier, "imageModel.serviceTier"),
-            ReadSlot(document.Speed, "imageModel.speed"),
-            ReadContextWindow(document.ContextWindow, "imageModel.contextWindow"));
+            ReadSlot(document.ServiceTier, field + ".serviceTier"),
+            ReadSlot(document.Speed, field + ".speed"),
+            ReadContextWindow(document.ContextWindow, field + ".contextWindow"));
     }
 
     /// <summary>
@@ -813,15 +825,16 @@ public sealed class DiskSettingsStore : ISettingsStore
         };
     }
 
-    private static ImageModelDocument? WriteImageModel(ImageModelSettings settings)
+    private static ResourceModelDocument? WriteResourceModel(ResourceModelSettings settings)
     {
-        if (!settings.IsConfigured)
+        if (settings.IsEmpty)
         {
             return null;
         }
 
-        return new ImageModelDocument
+        return new ResourceModelDocument
         {
+            Enabled = settings.Enabled ? true : null,
             Provider = settings.Provider,
             Model = settings.Model,
             ThinkingEffort = WriteGear(settings.ThinkingEffort),

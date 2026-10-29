@@ -395,6 +395,9 @@ separate library with no terminal code. The product can:
 - record `audioInput` and `videoInput` on a model entry. Those flags are
   declarations only: the host stores them and publishes them to plugins, and
   it does not attach, persist, or send audio or video;
+- configure an audio and a video description model (`audioModel`,
+  `videoModel`) alongside the image model. That configuration is reserved
+  for the deferred audio and video path and changes no behavior today;
 - color pasted image markers and edit them as single composer units while
   identically spelled user text remains ordinary text; discard unsent images
   whose attached markers were deleted;
@@ -635,7 +638,9 @@ implemented in the current build.
   and Ollama Chat;
 - accepting, persisting, or sending audio or video input, and audio or video
   model output. Declaring `audioInput` or `videoInput` does not implement that
-  path. Image model output is High priority (Image generation);
+  path, and neither does configuring `audioModel` or `videoModel`: those
+  fields are reserved so the description path has its settings when it
+  arrives. Image model output is High priority (Image generation);
 - editing provider definitions in the TUI;
 - workspace-level configuration, read from `<workspace>/.crystal/config.json`
   once its field scope, precedence, write policy, and trust semantics are
@@ -871,11 +876,14 @@ implement only Crystal's
 interfaces stay unchanged. Native
 multimodal entries are exposed only while the selected model and provider
 support image input. Declared `audioInput` or `videoInput` does not expose
-them. `describe_image` is available on Plan and Work when
-`config.json` `imageModel` names a model that accepts images, and returns
-a text description from that model. The image and compaction models each
-have their own optional thinking gear, service tier, speed, and context
-budget, like the approval models. Each side model, and each child Agent with
+them. The resource description models are the image, audio, and video
+models (`imageModel`, `audioModel`, `videoModel`). Each has its own switch,
+provider and model, thinking gear, service tier, speed, and context budget,
+like the approval and compaction models, and `/describe` configures them.
+`describe_image` is available on Plan and Work while `imageModel` is on, and
+returns a text description from that model. Audio and video description are
+not connected: their models can be configured and are validated against
+`audioInput` and `videoInput`, but no tool sends audio or video to them. Each side model, and each child Agent with
 its own model, is configured on its own: an unset tier or speed is not sent,
 an unset context is that model's first declared budget, and the session
 `/tier`, `/speed`, and `/context` choice never applies to it. Optional `compactionModel` writes

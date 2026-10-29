@@ -67,8 +67,9 @@ public sealed class SideModelOptionTests
     [Fact]
     public async Task Chrome_CarriesTheCompactionAndImageModels()
     {
-        var settings = Settings().WithImageModel(
-            new ImageModelSettings("scripted", "rich", ThinkingSelection.Parse("high"), "priority", "fast"));
+        var settings = Settings().WithResourceModel(
+            ResourceKind.Image,
+            new ResourceModelSettings(true, "scripted", "rich", ThinkingSelection.Parse("high"), "priority", "fast"));
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
         await headless.Session.StartAsync(CancellationToken.None);
 

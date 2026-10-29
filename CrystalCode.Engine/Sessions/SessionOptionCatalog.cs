@@ -125,6 +125,31 @@ internal static class SessionOptionCatalog
             settings.CompactionModel is { Enabled: true } compactionModel
                 ? (compactionModel.Provider!, compactionModel.Model!, compactionModel.ThinkingEffort, compactionModel.ServiceTier, compactionModel.Speed, compactionModel.ContextWindow)
                 : null);
+        foreach (var kind in ResourceKinds.All)
+        {
+            var word = ResourceKinds.Word(kind);
+            var title = ResourceKinds.Title(kind);
+            var resource = settings.ResourceModels.For(kind);
+            // Only models that accept this input are offered.
+            options.Add(new SessionOption(
+                word + "_model",
+                title + " model",
+                "_crystal_describe",
+                resource is { Enabled: true, HasSelection: true }
+                    ? resource.Provider + "/" + resource.Model
+                    : Off,
+                [.. ResourceValues(word, settings, kind)]));
+            AddTuning(
+                options,
+                settings,
+                word,
+                title,
+                "_crystal_describe",
+                "/describe " + word,
+                resource.Enabled
+                    ? (resource.Provider!, resource.Model!, resource.ThinkingEffort, resource.ServiceTier, resource.Speed, resource.ContextWindow)
+                    : null);
+        }
         options.Add(Switch(
             "micro_compaction",
             "Microcompaction",
@@ -295,6 +320,25 @@ internal static class SessionOptionCatalog
                 ? reviewer.Provider + "/" + reviewer.Model
                 : Off);
 
+    private static IEnumerable<SessionOptionValue> ResourceValues(string word, HarnessSettings settings, ResourceKind kind)
+    {
+        yield return new SessionOptionValue(Off, "Off", "/describe " + word + " off");
+        foreach (var provider in settings.Catalog.Providers.Keys)
+        {
+            foreach (var model in settings.Catalog.GetModelNames(new ProviderName(provider)))
+            {
+                if (ResourceKinds.Accepts(settings.Catalog.GetModel(new ProviderName(provider), model), kind))
+                {
+                    yield return new SessionOptionValue(
+                        provider + "/" + model,
+                        model,
+                        "/describe " + word + " model " + provider + " " + model,
+                        Group: provider);
+                }
+            }
+        }
+    }
+
     /// <summary>Off plus every catalog model, grouped by provider.</summary>
     private static SessionOption Picker(
         string id,
@@ -309,6 +353,7 @@ internal static class SessionOptionCatalog
         {
             foreach (var model in settings.Catalog.GetModelNames(new ProviderName(provider)))
             {
+
                 values.Add(new SessionOptionValue(
                     provider + "/" + model,
                     model,

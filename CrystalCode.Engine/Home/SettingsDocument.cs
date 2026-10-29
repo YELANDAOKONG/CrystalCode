@@ -100,7 +100,11 @@ internal sealed class SettingsDocument
 
     public ResourceTrimDocument? ResourceTrim { get; set; }
 
-    public ImageModelDocument? ImageModel { get; set; }
+    public ResourceModelDocument? ImageModel { get; set; }
+
+    public ResourceModelDocument? AudioModel { get; set; }
+
+    public ResourceModelDocument? VideoModel { get; set; }
 
     public RetryDocument? Retry { get; set; }
 

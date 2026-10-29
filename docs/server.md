@@ -308,8 +308,9 @@ only while that setting waits. `report.status` carries the same `pending`.
 Otherwise each holds the reviewer's `provider`, `model`, and display labels
 `thinking`, `serviceTier`, `speed`, and `context` (blank when unset); `extendedApproval`
 adds `trigger` and `includePrimaryReview`.
-`compaction` is `null` while the compaction model is off, and `image` while
-no `imageModel` is set. Otherwise each holds that model's `provider`, `model`,
+`compaction` is `null` while the compaction model is off, and `image`,
+`audio`, and `video` while that resource description model is off; audio and
+video are configuration only. Otherwise each holds that model's `provider`, `model`,
 and display labels `thinking`, `serviceTier`, `speed`, and `context` (blank
 when the model does not set its own).
 

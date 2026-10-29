@@ -91,7 +91,7 @@ public sealed record HarnessSettings
         IReadOnlyList<string>? promptAttachments = null,
         string? promptSetOverride = null,
         bool usePromptAttachments = true,
-        ImageModelSettings? imageModel = null,
+        ResourceModels? resourceModels = null,
         IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
         RetrySettings? retry = null,
         RetrySettings? approvalRetry = null,
@@ -232,7 +232,7 @@ public sealed record HarnessSettings
         DisabledBuiltInTools = BuiltInToolDisablement.Merge(
             BuiltInToolDisablement.Merge(PersistentDisabledBuiltInTools, ProcessDisabledBuiltInTools),
             SessionDisabledBuiltInTools);
-        ImageModel = imageModel ?? ImageModelSettings.None;
+        ResourceModels = resourceModels ?? ResourceModels.Off;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
         ShowCompactionSummary = showCompactionSummary;
@@ -267,7 +267,10 @@ public sealed record HarnessSettings
                 "Compaction model");
         }
 
-        RequireImageModel(catalog, ImageModel);
+        foreach (var kind in ResourceKinds.All)
+        {
+            RequireResourceModel(catalog, kind, ResourceModels.For(kind));
+        }
     }
 
     public ProviderName Provider { get; }
@@ -523,7 +526,8 @@ public sealed record HarnessSettings
 
     public ResourceTrimSettings ResourceTrim { get; }
 
-    public ImageModelSettings ImageModel { get; }
+    /// <summary>The image, audio, and video resource description models.</summary>
+    public ResourceModels ResourceModels { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.GetModelProvider(Provider, Model);
 
@@ -818,23 +822,23 @@ public sealed record HarnessSettings
     }
 
     /// <summary>
-    /// Selects the image model with its own service tier and speed. An unset
-    /// slot sends no tier or speed.
+    /// Selects a resource description model with its own service tier, speed,
+    /// and context budget. An unset tier or speed is not sent.
     /// </summary>
-    public HarnessSettings ForImage(ImageModelSettings image)
+    public HarnessSettings ForResource(ResourceModelSettings resource)
     {
-        ArgumentNullException.ThrowIfNull(image);
-        if (!image.IsConfigured)
+        ArgumentNullException.ThrowIfNull(resource);
+        if (!resource.HasSelection)
         {
-            throw new InvalidOperationException("The image model has no model selection.");
+            throw new InvalidOperationException("The resource description model has no model selection.");
         }
 
         return ForModel(
-            new ProviderName(image.Provider!),
-            image.Model!,
-            image.ServiceTier,
-            image.Speed,
-            image.ContextWindow);
+            new ProviderName(resource.Provider!),
+            resource.Model!,
+            resource.ServiceTier,
+            resource.Speed,
+            resource.ContextWindow);
     }
 
     /// <summary>
@@ -859,10 +863,10 @@ public sealed record HarnessSettings
             contextWindow ?? selected.ActiveModel.ContextWindows[0]);
     }
 
-    public HarnessSettings WithImageModel(ImageModelSettings imageModel)
+    public HarnessSettings WithResourceModel(ResourceKind kind, ResourceModelSettings model)
     {
-        ArgumentNullException.ThrowIfNull(imageModel);
-        return Copy(imageModel: imageModel, setImageModel: true);
+        ArgumentNullException.ThrowIfNull(model);
+        return Copy(resourceModels: ResourceModels.With(kind, model));
     }
 
     public HarnessSettings WithCompactionModel(CompactionModelSettings compactionModel)
@@ -921,8 +925,7 @@ public sealed record HarnessSettings
         bool setPromptSetOverride = false,
         bool? usePromptAttachments = null,
         bool setUsePromptAttachments = false,
-        ImageModelSettings? imageModel = null,
-        bool setImageModel = false,
+        ResourceModels? resourceModels = null,
         IReadOnlyDictionary<ContextSelectionKey, int>? contextSelections = null,
         RetrySettings? retry = null,
         RetrySettings? approvalRetry = null,
@@ -983,7 +986,7 @@ public sealed record HarnessSettings
             setPromptAttachments ? promptAttachments : PromptAttachments,
             setPromptSetOverride ? promptSetOverride : PromptSetOverride,
             setUsePromptAttachments ? usePromptAttachments ?? UsePromptAttachments : UsePromptAttachments,
-            setImageModel ? imageModel : ImageModel,
+            resourceModels ?? ResourceModels,
             contextSelections ?? ContextSelections,
             retry ?? Retry,
             approvalRetry ?? ApprovalRetry,
@@ -1156,9 +1159,14 @@ public sealed record HarnessSettings
         }
     }
 
-    private static void RequireImageModel(ProviderCatalog catalog, ImageModelSettings imageModel)
+    /// <summary>
+    /// An enabled resource description model must name a catalog model that
+    /// accepts its input, and its own slots must be declared by that model.
+    /// A disabled one is kept unchecked, like a reviewer.
+    /// </summary>
+    private static void RequireResourceModel(ProviderCatalog catalog, ResourceKind kind, ResourceModelSettings resource)
     {
-        if (!imageModel.IsConfigured)
+        if (!resource.Enabled)
         {
             return;
         }
@@ -1166,20 +1174,21 @@ public sealed record HarnessSettings
         ModelSettings model;
         try
         {
-            model = catalog.GetModel(new ProviderName(imageModel.Provider!), imageModel.Model!);
+            model = catalog.GetModel(new ProviderName(resource.Provider!), resource.Model!);
         }
         catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
         {
             throw new InvalidOperationException(exception.Message, exception);
         }
 
-        if (!model.ImageInput)
+        var title = ResourceKinds.Title(kind);
+        if (!ResourceKinds.Accepts(model, kind))
         {
             throw new InvalidOperationException(
-                $"Image model '{imageModel.Model}' does not accept image input.");
+                $"{title} model '{resource.Model}' does not accept {ResourceKinds.Word(kind)} input.");
         }
 
-        RequireSlots(model, imageModel.ServiceTier, imageModel.Speed, imageModel.ContextWindow, "Image model");
+        RequireSlots(model, resource.ServiceTier, resource.Speed, resource.ContextWindow, title + " model");
     }
 
     private static IReadOnlyList<string> CopyPromptAttachments(IReadOnlyList<string>? names)

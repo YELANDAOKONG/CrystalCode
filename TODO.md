@@ -54,6 +54,13 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Audio and video input, and audio or video model output. A stored
   `audioInput` or `videoInput` declaration is not that path. Image model
   output is under High priority (Image generation).
+- Audio and video description. `audioModel` and `videoModel` (the audio and
+  video resource description models) can already be configured through
+  `config.json`, `/describe`, launch flags, and session options, and are
+  validated against `audioInput` and `videoInput`. Nothing uses them yet:
+  there is no `describe_audio` or `describe_video` tool, no audio or video
+  attachment, and no description prompt. Connecting them depends on the
+  audio and video input item above.
 - Editing provider definitions in the TUI.
 - Workspace-level configuration at `<workspace>/.crystal/config.json`. Field
   scope, precedence, write policy, and trust semantics are not defined. A

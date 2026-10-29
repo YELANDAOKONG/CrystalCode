@@ -96,6 +96,11 @@ public static class SessionLaunchOverrides
                     Budget(request.CompactionContext, "Compaction context budget")));
             }
 
+            foreach (var flags in ResourceFlags.For(request))
+            {
+                next = next.WithResourceModel(flags.Kind, ParseResourceModel(next, flags));
+            }
+
             if (request.Thinking is not null)
             {
                 next = next.WithThinkingEffort(
@@ -319,6 +324,29 @@ public static class SessionLaunchOverrides
             }
         }
 
+        foreach (var kind in ResourceKinds.All)
+        {
+            var resource = settings.ResourceModels.For(kind);
+            if (!resource.Enabled)
+            {
+                continue;
+            }
+
+            try
+            {
+                var model = settings.Catalog.GetModel(ProviderName.Parse(resource.Provider!), resource.Model!);
+                AddUnavailableThinkingNote(
+                    notes,
+                    resource.ThinkingEffort,
+                    model,
+                    ResourceKinds.Title(kind) + " thinking effort");
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+            {
+                // A missing resource description model fails setup on its own.
+            }
+        }
+
         return notes;
     }
 
@@ -536,6 +564,101 @@ public static class SessionLaunchOverrides
     }
 
     private sealed record ReviewerFlags(string Switch, string Provider, string Model, string Label);
+
+    /// <summary>The <c>--image-*</c>, <c>--audio-*</c>, or <c>--video-*</c> flags of one launch.</summary>
+    private sealed record ResourceFlags(
+        ResourceKind Kind,
+        string? Switch,
+        string? Provider,
+        string? ModelId,
+        string? Thinking,
+        string? Tier,
+        string? Speed,
+        string? Context)
+    {
+        public static IEnumerable<ResourceFlags> For(SessionLaunchOptions request)
+        {
+            yield return new(ResourceKind.Image, request.ImageModel, request.ImageProvider, request.ImageModelId,
+                request.ImageThinking, request.ImageTier, request.ImageSpeed, request.ImageContext);
+            yield return new(ResourceKind.Audio, request.AudioModel, request.AudioProvider, request.AudioModelId,
+                request.AudioThinking, request.AudioTier, request.AudioSpeed, request.AudioContext);
+            yield return new(ResourceKind.Video, request.VideoModel, request.VideoProvider, request.VideoModelId,
+                request.VideoThinking, request.VideoTier, request.VideoSpeed, request.VideoContext);
+        }
+    }
+
+    private static ResourceModelSettings ParseResourceModel(HarnessSettings current, ResourceFlags flags)
+    {
+        var word = ResourceKinds.Word(flags.Kind);
+        var label = ResourceKinds.Title(flags.Kind);
+        var stored = current.ResourceModels.For(flags.Kind);
+        var next = stored;
+        var specified = flags.Provider is not null || flags.ModelId is not null;
+        bool? enabled = flags.Switch is null ? null : ParseSwitch(flags.Switch, "--" + word + "-model");
+        if (enabled == false)
+        {
+            if (specified)
+            {
+                throw new ArgumentException(
+                    $"Do not pass --{word}-provider or --{word}-model-id when --{word}-model is off.");
+            }
+
+            next = stored.DisabledCopy();
+        }
+        else if (enabled == true || specified)
+        {
+            var provider = flags.Provider is not null
+                ? ProviderName.Parse(Required(flags.Provider, label + " provider"))
+                : stored.Provider is string saved
+                    ? ProviderName.Parse(saved)
+                    : current.Provider;
+            var model = flags.ModelId is not null
+                ? Required(flags.ModelId, label + " model")
+                : stored.Model ?? throw new ArgumentException($"Pass --{word}-model-id.");
+            try
+            {
+                _ = current.Catalog.GetModel(provider, model);
+            }
+            catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+            {
+                throw new ArgumentException(exception.Message, exception);
+            }
+
+            // A stored tier, speed, or context budget belongs to the stored model only.
+            var sameModel = string.Equals(stored.Provider, provider.Value, StringComparison.Ordinal)
+                && string.Equals(stored.Model, model, StringComparison.Ordinal);
+            next = new ResourceModelSettings(
+                true,
+                provider.Value,
+                model,
+                stored.ThinkingEffort,
+                sameModel ? stored.ServiceTier : null,
+                sameModel ? stored.Speed : null,
+                sameModel ? stored.ContextWindow : null);
+        }
+
+        if (flags.Thinking is not null)
+        {
+            next = next.WithThinkingEffort(ThinkingSelection.Parse(Required(flags.Thinking, label + " thinking")));
+        }
+
+        if (flags.Tier is not null)
+        {
+            next = next.WithServiceTier(Token(flags.Tier, label + " service tier"));
+        }
+
+        if (flags.Speed is not null)
+        {
+            next = next.WithSpeed(Token(flags.Speed, label + " speed"));
+        }
+
+        if (flags.Context is not null)
+        {
+            next = next.WithContextWindow(Budget(flags.Context, label + " context budget"));
+        }
+
+        return next;
+    }
 
     private static CompactionModelSettings ParseCompactionModel(
         HarnessSettings current,

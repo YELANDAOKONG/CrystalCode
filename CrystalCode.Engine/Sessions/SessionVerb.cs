@@ -36,6 +36,7 @@ public enum SessionVerb
     Child,
     Sessions,
     Compact,
+    Describe,
     Trim,
     Todos,
     Tools,

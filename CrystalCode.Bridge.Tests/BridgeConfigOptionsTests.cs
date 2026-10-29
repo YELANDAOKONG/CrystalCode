@@ -183,6 +183,8 @@ public sealed class BridgeConfigOptionsTests
         Assert.Equal("Tier Priority", compaction.GetProperty("serviceTier").GetString());
         Assert.Equal(string.Empty, compaction.GetProperty("speed").GetString());
         Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("image").ValueKind);
+        Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("audio").ValueKind);
+        Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("video").ValueKind);
 
         var config = File.ReadAllText(Path.Combine(fixture.Home, "config.json")).Replace(" ", string.Empty);
         Assert.Contains("\"serviceTier\":\"priority\"", config, StringComparison.Ordinal);

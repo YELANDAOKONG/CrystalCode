@@ -67,6 +67,8 @@ internal static class CrystalWire
         ExtendedApproval(writer, "extendedApproval", chrome.ExtendedApproval);
         SideModel(writer, "compaction", chrome.Compaction);
         SideModel(writer, "image", chrome.Image);
+        SideModel(writer, "audio", chrome.Audio);
+        SideModel(writer, "video", chrome.Video);
         writer.WriteEndObject();
     }
 

@@ -2164,8 +2164,10 @@ public sealed class DiskSettingsStoreTests
     {
         using var root = new TemporaryHome();
         var store = new DiskSettingsStore(root.Home);
-        var settings = store.LoadOrCreate().WithImageModel(
-            new ImageModelSettings(
+        var settings = store.LoadOrCreate().WithResourceModel(
+            ResourceKind.Image,
+            new ResourceModelSettings(
+                true,
                 "openai",
                 "gpt-5.6-sol",
                 ThinkingSelection.Parse("high")));
@@ -2174,16 +2176,19 @@ public sealed class DiskSettingsStoreTests
         var loaded = store.Load();
         var json = File.ReadAllText(root.Home.ConfigPath);
 
-        Assert.Equal("openai", loaded.ImageModel.Provider);
-        Assert.Equal("gpt-5.6-sol", loaded.ImageModel.Model);
-        Assert.Equal("high", loaded.ImageModel.ThinkingEffort.Value);
+        Assert.True(loaded.ResourceModels.Image.Enabled);
+        Assert.Equal("openai", loaded.ResourceModels.Image.Provider);
+        Assert.Equal("gpt-5.6-sol", loaded.ResourceModels.Image.Model);
+        Assert.Equal("high", loaded.ResourceModels.Image.ThinkingEffort.Value);
+        Assert.Contains("\"enabled\": true", json, StringComparison.Ordinal);
         Assert.Contains("\"thinkingEffort\": \"high\"", json, StringComparison.Ordinal);
 
-        store.Save(loaded.WithImageModel(
-            loaded.ImageModel.WithThinkingEffort(ThinkingSelection.Default)));
+        store.Save(loaded.WithResourceModel(
+            ResourceKind.Image,
+            loaded.ResourceModels.Image.WithThinkingEffort(ThinkingSelection.Default)));
         var after = store.Load();
 
-        Assert.Equal(ThinkingSelection.Default, after.ImageModel.ThinkingEffort);
+        Assert.Equal(ThinkingSelection.Default, after.ResourceModels.Image.ThinkingEffort);
         Assert.DoesNotContain(
             "thinkingEffort",
             File.ReadAllText(root.Home.ConfigPath),
@@ -2199,7 +2204,7 @@ public sealed class DiskSettingsStoreTests
         store.Save(HarnessSettings.CreateDefault());
         var loaded = store.Load();
 
-        Assert.False(loaded.ImageModel.IsConfigured);
+        Assert.False(loaded.ResourceModels.Image.HasSelection);
         Assert.DoesNotContain(
             "imageModel",
             File.ReadAllText(root.Home.ConfigPath),
@@ -2219,12 +2224,12 @@ public sealed class DiskSettingsStoreTests
             { "imageModel": { "provider": "openai" } }
             """);
         var incomplete = Assert.Throws<InvalidOperationException>(() => store.Load());
-        Assert.Equal("imageModel requires provider and model.", incomplete.Message);
+        Assert.Equal("imageModel requires provider and model together.", incomplete.Message);
 
         File.WriteAllText(
             root.Home.ConfigPath,
             """
-            { "imageModel": { "provider": "openai", "model": "not-a-model" } }
+            { "imageModel": { "enabled": true, "provider": "openai", "model": "not-a-model" } }
             """);
         var unknown = Assert.Throws<InvalidOperationException>(() => store.Load());
         Assert.Contains("not-a-model", unknown.Message, StringComparison.Ordinal);
@@ -2232,9 +2237,61 @@ public sealed class DiskSettingsStoreTests
         File.WriteAllText(
             root.Home.ConfigPath,
             """
-            { "imageModel": { "provider": "deepseek", "model": "deepseek-v4-pro" } }
+            { "imageModel": { "enabled": true, "provider": "deepseek", "model": "deepseek-v4-pro" } }
             """);
         var textOnly = Assert.Throws<InvalidOperationException>(() => store.Load());
         Assert.Contains("does not accept image input", textOnly.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_TreatsAResourceModelWithoutEnabledAsOff()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "imageModel": { "provider": "deepseek", "model": "deepseek-v4-pro" },
+              "audioModel": { "provider": "openai", "model": "gpt-5.6-sol", "thinkingEffort": "high" }
+            }
+            """);
+
+        var loaded = store.Load();
+
+        Assert.False(loaded.ResourceModels.Image.Enabled);
+        Assert.Equal("deepseek-v4-pro", loaded.ResourceModels.Image.Model);
+        Assert.False(loaded.ResourceModels.Audio.Enabled);
+        Assert.Equal("high", loaded.ResourceModels.Audio.ThinkingEffort.Value);
+
+        store.Save(loaded);
+        var json = File.ReadAllText(root.Home.ConfigPath);
+        Assert.Contains("\"audioModel\"", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"enabled\": true", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsAnEnabledAudioOrVideoModelWithoutThatInput()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "audioModel": { "enabled": true, "provider": "deepseek", "model": "deepseek-v4-pro" } }
+            """);
+        var audio = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Equal("Audio model 'deepseek-v4-pro' does not accept audio input.", audio.Message);
+
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            { "videoModel": { "enabled": true } }
+            """);
+        var video = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Equal("videoModel.enabled requires provider and model.", video.Message);
     }
 }

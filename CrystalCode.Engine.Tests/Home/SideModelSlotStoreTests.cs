@@ -34,7 +34,7 @@ public sealed class SideModelSlotStoreTests
         using var root = new TemporaryHome();
         var store = SlotStore(root);
         var settings = store.Load()
-            .WithImageModel(new ImageModelSettings("gateway", "judge")
+            .WithResourceModel(ResourceKind.Image, new ResourceModelSettings(true, "gateway", "judge")
                 .WithServiceTier("priority")
                 .WithSpeed("fast"))
             .WithCompactionModel(new CompactionModelSettings(true, "gateway", "judge")
@@ -44,8 +44,8 @@ public sealed class SideModelSlotStoreTests
         store.Save(settings);
         var loaded = store.Load();
 
-        Assert.Equal("priority", loaded.ImageModel.ServiceTier);
-        Assert.Equal("fast", loaded.ImageModel.Speed);
+        Assert.Equal("priority", loaded.ResourceModels.Image.ServiceTier);
+        Assert.Equal("fast", loaded.ResourceModels.Image.Speed);
         Assert.Equal("flex", loaded.CompactionModel.ServiceTier);
         Assert.Equal("fast", loaded.CompactionModel.Speed);
 
@@ -53,13 +53,13 @@ public sealed class SideModelSlotStoreTests
         Assert.Equal("flex", selected.ServiceTier);
         Assert.Equal("fast", selected.Speed);
 
-        var image = loaded.ForImage(loaded.ImageModel);
+        var image = loaded.ForResource(loaded.ResourceModels.Image);
         Assert.Equal("judge", image.Model);
         Assert.Equal("priority", image.ServiceTier);
         Assert.Equal("fast", image.Speed);
 
         store.Save(loaded
-            .WithImageModel(loaded.ImageModel.WithServiceTier(null).WithSpeed(null))
+            .WithResourceModel(ResourceKind.Image, loaded.ResourceModels.Image.WithServiceTier(null).WithSpeed(null))
             .WithCompactionModel(loaded.CompactionModel.WithServiceTier(null).WithSpeed(null)));
         var json = File.ReadAllText(root.Home.ConfigPath);
 
@@ -74,8 +74,9 @@ public sealed class SideModelSlotStoreTests
         var store = SlotStore(root);
         var settings = store.Load();
 
-        var image = Assert.Throws<InvalidOperationException>(() => settings.WithImageModel(
-            new ImageModelSettings("gateway", "plain").WithServiceTier("flex")));
+        var image = Assert.Throws<InvalidOperationException>(() => settings.WithResourceModel(
+            ResourceKind.Image,
+            new ResourceModelSettings(true, "gateway", "plain").WithServiceTier("flex")));
         var compaction = Assert.Throws<InvalidOperationException>(() => settings.WithCompactionModel(
             new CompactionModelSettings(true, "gateway", "judge").WithSpeed("slow")));
 
@@ -92,7 +93,7 @@ public sealed class SideModelSlotStoreTests
             .WithTier(new ProviderName("gateway"), "judge", "flex")
             .WithSpeed(new ProviderName("gateway"), "judge", "fast");
 
-        var image = settings.ForImage(new ImageModelSettings("gateway", "judge"));
+        var image = settings.ForResource(new ResourceModelSettings(true, "gateway", "judge"));
         var compaction = settings.ForCompaction(
             new CompactionModelSettings(true, "gateway", "judge").WithServiceTier("priority"));
         var reviewer = settings.ForReviewer(new ApprovalModelSettings(true, "gateway", "judge"));
@@ -117,7 +118,7 @@ public sealed class SideModelSlotStoreTests
             .WithApprovalModel(new ApprovalModelSettings(true, "gateway", "judge", contextWindow: 200_000))
             .WithExtendedApproval(new ExtendedApprovalSettings(new ApprovalModelSettings(true, "gateway", "judge")))
             .WithCompactionModel(new CompactionModelSettings(true, "gateway", "judge").WithContextWindow(200_000))
-            .WithImageModel(new ImageModelSettings("gateway", "judge").WithContextWindow(200_000));
+            .WithResourceModel(ResourceKind.Image, new ResourceModelSettings(true, "gateway", "judge").WithContextWindow(200_000));
 
         store.Save(settings);
         var loaded = store.Load();
@@ -125,10 +126,10 @@ public sealed class SideModelSlotStoreTests
         Assert.Equal(200_000, loaded.ApprovalModel.ContextWindow);
         Assert.Null(loaded.ExtendedApproval.Reviewer.ContextWindow);
         Assert.Equal(200_000, loaded.CompactionModel.ContextWindow);
-        Assert.Equal(200_000, loaded.ImageModel.ContextWindow);
+        Assert.Equal(200_000, loaded.ResourceModels.Image.ContextWindow);
         Assert.Equal(200_000, loaded.ForReviewer(loaded.ApprovalModel).ContextWindow);
         Assert.Equal(200_000, loaded.ForCompaction(loaded.CompactionModel).ContextWindow);
-        Assert.Equal(200_000, loaded.ForImage(loaded.ImageModel).ContextWindow);
+        Assert.Equal(200_000, loaded.ForResource(loaded.ResourceModels.Image).ContextWindow);
 
         // Unset is the model's first budget, not the session's /context choice of 200K.
         var sessionWide = loaded.WithContextWindow(gateway, "judge", 200_000);
