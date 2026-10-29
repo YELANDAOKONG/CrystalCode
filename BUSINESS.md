@@ -787,6 +787,18 @@ question. No change is scheduled, and a later decision may revisit it. Such a
 decision must define which limits may vary, at which scope, and how a larger
 limit interacts with context compaction.
 
+Deferred questions are under consideration and are not decided. The idea is
+that the model can ask a low-stakes question without stopping, continue on a
+stated default, and have the operator answer later. The current behavior
+stands: the built-in `question` tool blocks until the operator answers or
+dismisses, and any such path would sit beside it, not replace it. Whether it
+exists, which tool carries it, how and when an answer reaches the model, what
+happens to unanswered questions when a turn ends, whether Plan gets it, and
+how Server, Bridge, child Agents, and `crystal run` treat it are not defined.
+Child Agents and `crystal run` would not be able to ask the operator, as
+today. No change is scheduled. Do not reserve a tool name, command, public
+type, event, or wire field.
+
 More hook methods will be added later on the existing hook interfaces, and
 are not reserved as empty types in advance. Whether plugins declare
 dependencies on one another, and related loading questions, are under

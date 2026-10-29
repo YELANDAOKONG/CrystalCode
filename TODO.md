@@ -240,6 +240,14 @@ it speculatively, and do not reserve types or configuration for it.
   configurable and are not part of this question. A later decision must
   define which limits may vary, at which scope, and how a larger limit
   interacts with context compaction.
+- Deferred questions. Not decided. A way for the model to ask a low-stakes
+  question without stopping, continue on a stated default, and have the
+  operator answer later. It would be a separate path beside the built-in
+  `question` tool, which stays blocking and is not replaced. Whether it
+  exists, the tool, how and when an answer reaches the model, what happens to
+  unanswered questions when a turn ends, whether Plan gets it, and how Server,
+  Bridge, child Agents, and `crystal run` treat it are not defined. Do not
+  reserve a tool name, command, public type, event, or wire field.
 - A `/debug` option. Not decided, including whether it exists and what it
   covers. Do not reserve a command, configuration field, or public type for it.
 - More hook methods, added later on the existing hook interfaces. They are
