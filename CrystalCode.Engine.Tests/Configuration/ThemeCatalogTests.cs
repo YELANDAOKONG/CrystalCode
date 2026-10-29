@@ -61,7 +61,7 @@ public sealed class ThemeCatalogTests : IDisposable
         Directory.CreateDirectory(home.ThemesDirectory);
         File.WriteAllText(
             Path.Combine(home.ThemesDirectory, "night.json"),
-            """{ "accent": "red", "approval": { "full": "orange1", "review": "blue" } }""");
+            """{ "accent": "red", "approval": { "full": "orange1", "review": "blue" }, "status": { "input": "teal" } }""");
         File.WriteAllText(
             Path.Combine(home.ThemesDirectory, "bad.json"),
             """{ "approval": { "full": 1 } }""");
@@ -70,6 +70,7 @@ public sealed class ThemeCatalogTests : IDisposable
         Assert.Equal("red", colors["accent"]);
         Assert.Equal("orange1", colors["approval.full"]);
         Assert.Equal("blue", colors["approval.review"]);
+        Assert.Equal("teal", colors["status.input"]);
         Assert.False(ThemeCatalog.TryRead(home, "bad", out _, out var error));
         Assert.Contains("approval.full", error, StringComparison.Ordinal);
     }

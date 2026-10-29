@@ -5,6 +5,7 @@ using Xunit;
 
 namespace CrystalCode.Display.Tests.Shell;
 
+[Collection("Theme")]
 public sealed class ShellChromeTests
 {
     [Theory]
@@ -211,6 +212,109 @@ public sealed class ShellChromeTests
         var markup = chrome.StatusLine(120).Markup;
 
         Assert.Contains($"[{expected}]{usage}", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_ColorsInputOutputTotalPathToolsAndElapsedOneByOne()
+    {
+        try
+        {
+            Theme.TryApply(
+                new Dictionary<string, string>
+                {
+                    ["status.input"] = "teal",
+                    ["status.output"] = "orchid",
+                    ["status.total"] = "gold1",
+                    ["status.path"] = "blue",
+                    ["status.tools"] = "green",
+                    ["status.elapsed"] = "red"
+                },
+                out _);
+            var chrome = new ShellChrome
+            {
+                Usage = "CTX 6.6%  ·  1.1M IN / 7917 OUT",
+                UsageTotal = "1.1M Total",
+                WorkspaceRoot = "/a/workspace",
+                ToolCount = 3,
+                Elapsed = "12s"
+            };
+
+            var markup = chrome.StatusLine(200).Markup;
+
+            Assert.Contains($"[{Theme.Chrome}]CTX 6.6%  ·  [/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[teal]1.1M IN[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[orchid]7917 OUT[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[gold1]1.1M Total[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[blue]", markup, StringComparison.Ordinal);
+            Assert.Contains("[green]3 Tools[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[red]12s[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("CTX 6.6%  ·  1.1M IN / 7917 OUT", chrome.StatusLine(200).Plain, StringComparison.Ordinal);
+    
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
+    [Fact]
+    public void StatusLine_WithoutStatusColorsKeepsOneUsageColor()
+    {
+        Theme.Reset();
+        var chrome = new ShellChrome
+        {
+            Usage = "CTX 6.6%  ·  1.1M IN / 7917 OUT",
+            UsageTotal = "1.1M Total"
+        };
+
+        var markup = chrome.StatusLine(200).Markup;
+
+        Assert.Contains($"[{Theme.Chrome}]CTX 6.6%  ·  1.1M IN / 7917 OUT[/]", markup, StringComparison.Ordinal);
+        Assert.Contains($"[{Theme.Chrome}]1.1M Total[/]", markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_ColorsCustomStatusItemsFromTheTheme()
+    {
+        try
+        {
+            Theme.TryApply(
+                new Dictionary<string, string>
+                {
+                    ["status.input"] = "teal",
+                    ["status.output"] = "orchid",
+                    ["status.total"] = "gold1",
+                    ["status.path"] = "blue",
+                    ["status.tools"] = "green",
+                    ["status.elapsed"] = "red"
+                },
+                out _);
+            var chrome = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["session-input", "request-output", "session-total", "workspace", "tools", "elapsed"],
+                SessionInput = "1.1M Session In",
+                RequestOutput = "7917 Request Out",
+                SessionTotal = "1.1M Session",
+                WorkspaceRoot = "/a/workspace",
+                ToolCount = 2,
+                Elapsed = "9s"
+            };
+
+            var markup = chrome.StatusLine(200).Markup;
+
+            Assert.Contains("[teal]1.1M Session In[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[orchid]7917 Request Out[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[gold1]1.1M Session[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[blue]", markup, StringComparison.Ordinal);
+            Assert.Contains("[green]2 Tools[/]", markup, StringComparison.Ordinal);
+            Assert.Contains("[red]9s[/]", markup, StringComparison.Ordinal);
+    
+        }
+        finally
+        {
+            Theme.Reset();
+        }
     }
 
     [Fact]

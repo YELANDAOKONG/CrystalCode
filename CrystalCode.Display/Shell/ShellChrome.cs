@@ -202,25 +202,25 @@ public sealed class ShellChrome
         if (!string.IsNullOrWhiteSpace(WorkspaceRoot))
         {
             var shortPath = PathDisplay.Shorten(WorkspaceRoot);
-            items.Add((shortPath, $"[{Theme.Muted}]{MarkupText.Escape(shortPath)}[/]", "path"));
+            items.Add((shortPath, $"[{Theme.ForStatus("path", Theme.Muted)}]{MarkupText.Escape(shortPath)}[/]", "path"));
         }
 
         var usageColor = ContextColor(Usage, left: false);
-        items.Add((Usage, $"[{usageColor}]{MarkupText.Escape(Usage)}[/]", "keep"));
+        items.Add((Usage, UsageMarkup(usageColor), "keep"));
         if (!string.IsNullOrWhiteSpace(UsageTotal))
         {
-            items.Add((UsageTotal, $"[{usageColor}]{MarkupText.Escape(UsageTotal)}[/]", "total"));
+            items.Add((UsageTotal, $"[{Theme.ForStatus("total", usageColor)}]{MarkupText.Escape(UsageTotal)}[/]", "total"));
         }
 
         if (ToolCount > 0)
         {
             var toolStr = ToolCount == 1 ? "1 Tool" : $"{ToolCount} Tools";
-            items.Add((toolStr, $"[{Theme.Chrome}]{toolStr}[/]", "keep"));
+            items.Add((toolStr, $"[{Theme.ForStatus("tools", Theme.Chrome)}]{toolStr}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(Elapsed))
         {
-            items.Add((Elapsed, $"[{Theme.Chrome}]{MarkupText.Escape(Elapsed)}[/]", "elapsed"));
+            items.Add((Elapsed, $"[{Theme.ForStatus("elapsed", Theme.Chrome)}]{MarkupText.Escape(Elapsed)}[/]", "elapsed"));
         }
 
         if (Queued > 0)
@@ -299,11 +299,39 @@ public sealed class ShellChrome
                     "model" => Theme.ForValue("model", value),
                     "provider" => Theme.ForValue("provider", value),
                     "mode" => Theme.ForValue("mode", value, ModeColor),
+                    "request-input" or "session-input" => Theme.ForStatus("input", Theme.Chrome),
+                    "request-output" or "session-output" => Theme.ForStatus("output", Theme.Chrome),
+                    "request-total" or "session-total" => Theme.ForStatus("total", Theme.Chrome),
+                    "workspace" => Theme.ForStatus("path", Theme.Chrome),
+                    "tools" => Theme.ForStatus("tools", Theme.Chrome),
+                    "elapsed" => Theme.ForStatus("elapsed", Theme.Chrome),
                     _ => ReviewerColor(field, value)
                 };
                 items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", field));
             }
         }
+    }
+
+    /// <summary>
+    /// Markup for the usage text <c>CTX 6.6%  ·  1.1M IN / 7917 OUT</c>. It is one color unless
+    /// the theme colors <c>input</c> or <c>output</c>, which then paint their own parts.
+    /// </summary>
+    private string UsageMarkup(string contextColor)
+    {
+        const string Separator = "  ·  ";
+        const string Divider = " / ";
+        var split = Usage.IndexOf(Separator, StringComparison.Ordinal);
+        var tail = split < 0 ? string.Empty : Usage[(split + Separator.Length)..];
+        var divide = tail.IndexOf(Divider, StringComparison.Ordinal);
+        if ((!Theme.HasStatusColor("input") && !Theme.HasStatusColor("output")) || divide < 0)
+        {
+            return $"[{contextColor}]{MarkupText.Escape(Usage)}[/]";
+        }
+
+        return $"[{contextColor}]{MarkupText.Escape(Usage[..split])}{Separator}[/]"
+            + $"[{Theme.ForStatus("input", contextColor)}]{MarkupText.Escape(tail[..divide])}[/]"
+            + $"[{contextColor}]{Divider}[/]"
+            + $"[{Theme.ForStatus("output", contextColor)}]{MarkupText.Escape(tail[(divide + Divider.Length)..])}[/]";
     }
 
     /// <summary>

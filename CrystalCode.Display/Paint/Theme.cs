@@ -85,6 +85,8 @@ public static class Theme
 
     private const string ContextGauge = "context";
 
+    private const string StatusPrefix = "status.";
+
     private static readonly TimeSpan PatternTimeout = TimeSpan.FromMilliseconds(100);
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<GaugeMatcher>> NoGauges =
@@ -93,6 +95,11 @@ public static class Theme
     private static IReadOnlyDictionary<string, string> _current = DefaultPalette;
 
     private static IReadOnlyDictionary<string, IReadOnlyList<GaugeMatcher>> _gauges = NoGauges;
+
+    private static readonly IReadOnlyDictionary<string, string> NoStatus =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    private static IReadOnlyDictionary<string, string> _status = NoStatus;
 
     /// <summary>
     /// Selects a built-in palette: <c>default</c> and <c>dark</c> (any case) are separate palettes with the same colors, <c>light</c> suits a light terminal.
@@ -105,14 +112,17 @@ public static class Theme
             case "default":
                 _current = DefaultPalette;
                 _gauges = NoGauges;
+                _status = NoStatus;
                 return true;
             case "dark":
                 _current = DarkPalette;
                 _gauges = NoGauges;
+                _status = NoStatus;
                 return true;
             case "light":
                 _current = LightPalette;
                 _gauges = NoGauges;
+                _status = NoStatus;
                 return true;
             default:
                 return false;
@@ -123,6 +133,12 @@ public static class Theme
     /// Token names a theme file may set.
     /// </summary>
     public static IReadOnlyCollection<string> TokenNames => DarkPalette.Keys.ToArray();
+
+    /// <summary>
+    /// Status-bar items a theme file may color one by one, as members of its <c>status</c> object.
+    /// An item the theme leaves unset keeps the color the status bar gave it before.
+    /// </summary>
+    public static IReadOnlyList<string> StatusItems { get; } = ["input", "output", "total", "path", "tools", "elapsed"];
 
     public static string Chrome => Get("chrome");
 
@@ -266,6 +282,25 @@ public static class Theme
     public static string Accent => Get("accent");
 
     /// <summary>
+    /// True when the theme colors <paramref name="item"/>, one of <see cref="StatusItems"/>.
+    /// </summary>
+    public static bool HasStatusColor(string item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return _status.ContainsKey(item);
+    }
+
+    /// <summary>
+    /// Color of a status-bar item, or <paramref name="fallback"/> when the theme does not set it.
+    /// </summary>
+    public static string ForStatus(string item, string fallback)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(fallback);
+        return _status.TryGetValue(item, out var color) ? color : fallback;
+    }
+
+    /// <summary>
     /// Replaces the palette with the defaults overlaid by <paramref name="colors"/>.
     /// Nothing changes when any entry is unknown or is not a Spectre style,
     /// so markup built from a token cannot be broken by a theme file.
@@ -286,8 +321,28 @@ public static class Theme
         ArgumentNullException.ThrowIfNull(gauges);
         error = string.Empty;
         var next = new Dictionary<string, string>(DarkPalette, StringComparer.OrdinalIgnoreCase);
+        var nextStatus = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, value) in colors)
         {
+            if (name.StartsWith(StatusPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var item = name[StatusPrefix.Length..];
+                if (!StatusItems.Contains(item, StringComparer.OrdinalIgnoreCase))
+                {
+                    error = "Unknown theme color  " + name;
+                    return false;
+                }
+
+                if (!IsStyle(value))
+                {
+                    error = "Invalid theme color  " + name;
+                    return false;
+                }
+
+                nextStatus[item] = value.Trim();
+                continue;
+            }
+
             if (!DarkPalette.ContainsKey(name))
             {
                 error = "Unknown theme color  " + name;
@@ -318,6 +373,7 @@ public static class Theme
 
         _current = next;
         _gauges = nextGauges;
+        _status = nextStatus;
         return true;
     }
 
@@ -325,6 +381,7 @@ public static class Theme
     {
         _current = DefaultPalette;
         _gauges = NoGauges;
+        _status = NoStatus;
     }
 
     private static bool TryReadGauges(

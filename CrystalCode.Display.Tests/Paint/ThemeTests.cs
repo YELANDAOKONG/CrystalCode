@@ -280,6 +280,45 @@ public sealed class ThemeTests : IDisposable
     }
 
     [Fact]
+    public void ForStatus_UsesTheFallbackUntilTheThemeSetsTheItem()
+    {
+        Assert.False(Theme.HasStatusColor("input"));
+        Assert.Equal("grey42", Theme.ForStatus("input", "grey42"));
+
+        Assert.True(Theme.TryApply(new Dictionary<string, string> { ["status.input"] = "teal" }, out _));
+
+        Assert.True(Theme.HasStatusColor("input"));
+        Assert.Equal("teal", Theme.ForStatus("input", "grey42"));
+        Assert.Equal("grey42", Theme.ForStatus("output", "grey42"));
+
+        Theme.Reset();
+
+        Assert.False(Theme.HasStatusColor("input"));
+    }
+
+    [Theory]
+    [InlineData("status.nope", "red")]
+    [InlineData("status.input", "not-a-color")]
+    [InlineData("status.input", "red][/")]
+    public void TryApply_RejectsBadStatusColorsWithoutChange(string name, string value)
+    {
+        Assert.False(Theme.TryApply(new Dictionary<string, string> { [name] = value }, out var error));
+
+        Assert.Contains(name, error, StringComparison.Ordinal);
+        Assert.False(Theme.HasStatusColor("input"));
+    }
+
+    [Fact]
+    public void TryUseBuiltIn_DropsStatusColors()
+    {
+        Theme.TryApply(new Dictionary<string, string> { ["status.path"] = "teal" }, out _);
+
+        Theme.TryUseBuiltIn("light");
+
+        Assert.False(Theme.HasStatusColor("path"));
+    }
+
+    [Fact]
     public void Reset_RestoresDefaults()
     {
         Theme.TryApply(new Dictionary<string, string> { ["accent"] = "red" }, out _);
