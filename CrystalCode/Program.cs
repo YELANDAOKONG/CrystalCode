@@ -64,6 +64,14 @@ public static class Program
                 mcp.AddCommand<McpDisableCommand>("disable")
                     .WithDescription("Disable one MCP server.");
             });
+            config.AddBranch<SkillsSettings>("skills", skills =>
+            {
+                skills.SetDescription("List or show the skills found for the workspace.");
+                skills.AddCommand<SkillsListCommand>("list")
+                    .WithDescription("List the skills found for the workspace.");
+                skills.AddCommand<SkillsShowCommand>("show")
+                    .WithDescription("Show one skill.");
+            });
             config.AddBranch<PromptSetCommandSettings>("promptsets", promptSets =>
             {
                 promptSets.SetDescription("List, show, enable, or disable one Home prompt set.");

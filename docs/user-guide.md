@@ -271,6 +271,11 @@ They do not open the terminal and do not read configuration.
 directory. They print a Spectre.Console table unless `--format text` is
 set. They do not open a session and do not write `config.json`.
 
+`crystal skills list|show` lists the skills found for the workspace or shows
+one by name, with `--home`, `--workspace`, and `--format text`. Skills have no
+enable or disable command because they are discovered from several trees
+rather than one manifest.
+
 `crystal mcp list|show|enable|disable` does the same for one MCP server. It
 changes only that server's `enabled` field and never prints its command,
 arguments, headers, or URL.

@@ -16,7 +16,9 @@ public static class PromptAttachmentInventory
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var project = Path.Combine(workspaceRoot, PromptStore.ProjectDirectoryName, "prompt-attachments");
         var homeRows = Scan(home.PromptAttachmentsDirectory, "Home");
-        var projectRows = Scan(project, "Workspace");
+        var projectRows = DirectoryIdentity.Same(home.PromptAttachmentsDirectory, project)
+            ? []
+            : Scan(project, "Workspace");
         var projectNames = new HashSet<string>(
             projectRows.Where(row => row.Error.Length == 0).Select(row => row.DirectoryName),
             StringComparer.Ordinal);

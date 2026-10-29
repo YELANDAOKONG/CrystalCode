@@ -21,7 +21,7 @@ public static class PluginInventory
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var homeEntries = Scan(home.PluginsDirectory, PluginSource.Home);
         var projectRoot = Path.Combine(workspaceRoot, PluginFiles.CrystalDirectory, PluginFiles.DirectoryName);
-        var projectEntries = SameDirectory(home.PluginsDirectory, projectRoot)
+        var projectEntries = DirectoryIdentity.Same(home.PluginsDirectory, projectRoot)
             ? []
             : Scan(projectRoot, PluginSource.Project);
         return Compose(homeEntries, projectEntries);
@@ -251,15 +251,6 @@ public static class PluginInventory
 
         return found;
     }
-
-    // A workspace at the home directory makes the project root the home root.
-    private static bool SameDirectory(string first, string second) =>
-        string.Equals(
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(first)),
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(second)),
-            OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal);
 
     private static IReadOnlyList<PluginEntry> Compose(List<Located> home, List<Located> project)
     {

@@ -22,7 +22,9 @@ public static class McpInventory
         var discovery = new McpServerDiscovery(home);
         var notes = new List<string>();
         var homeEntries = discovery.Scope(McpServerSource.Home, workspaceRoot, notes);
-        var projectEntries = discovery.Scope(McpServerSource.Project, workspaceRoot, notes);
+        var projectEntries = DirectoryIdentity.Same(home.Root, Path.Combine(workspaceRoot, McpFiles.CrystalDirectory))
+            ? []
+            : discovery.Scope(McpServerSource.Project, workspaceRoot, notes);
         var replaced = projectEntries.Select(entry => entry.Name).ToHashSet(StringComparer.Ordinal);
         return
         [

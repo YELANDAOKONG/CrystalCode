@@ -113,6 +113,7 @@ Run these from your shell. The interactive terminal, `crystal server`, and `crys
 | `crystal version` | Print the build identity and exit |
 | `crystal plugins` | List, show, enable, or disable one operator plugin outside a session |
 | `crystal tools` | List, show, enable, or disable one operator tool set outside a session |
+| `crystal skills` | List or show the skills found for the workspace outside a session. Skills have no enable or disable here |
 | `crystal promptsets` | List, show, enable, or disable one Home prompt set. Enabling one turns the others off |
 | `crystal prompt-attachments` | List, show, enable, or disable one prompt attachment in Home or the workspace |
 
