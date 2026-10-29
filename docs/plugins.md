@@ -282,7 +282,7 @@ model's thinking gear is its stored `thinkingEffort`, `default` when
 unset. Its service tier and speed are the tokens saved for that model.
 While the switch is off, review uses
 the session model, `Model` is null, and a saved provider or model name is
-omitted. The facts include no API key, endpoint, organization, or project.
+omitted. The facts include the provider's `BaseUri` with user information removed, and no API key, organization, or project.
 
 `PluginPlaceholderContext.Models` is the same live view. It is empty until
 the session publishes it.

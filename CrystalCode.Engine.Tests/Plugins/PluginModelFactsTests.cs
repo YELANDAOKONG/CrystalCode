@@ -11,6 +11,25 @@ namespace CrystalCode.Engine.Tests.Plugins;
 public sealed class PluginModelFactsTests
 {
     [Fact]
+    public void Describe_PublishesTheBaseUriAndDropsUserInfo()
+    {
+        var settings = HarnessSettings.CreateDefault();
+
+        var fact = PluginModelFacts.Describe(
+            settings.ActiveProvider,
+            settings.Model,
+            settings.ActiveModel,
+            "high");
+        var stripped = new PluginModel(
+            "acme", "openai", "m", 1, null, null, null, false, "high",
+            baseUri: new Uri("https://user:secret@api.example.test/v1"));
+
+        Assert.Equal(settings.ActiveProvider.BaseUri, fact.BaseUri);
+        Assert.Equal("https://api.example.test/v1", stripped.BaseUri!.ToString().TrimEnd('/'));
+        Assert.Null(PluginModel.Empty.BaseUri);
+    }
+
+    [Fact]
     public void DescribeReview_WhenDisabled_HidesTheStoredSelection()
     {
         var settings = HarnessSettings.CreateDefault();

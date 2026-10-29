@@ -1,8 +1,9 @@
 namespace CrystalCode.Plugins.Models;
 
 /// <summary>
-/// One model the session can name. It carries no endpoint, credential,
-/// organization, or project.
+/// One model the session can name. It carries the provider's base URI, with
+/// any user information removed. It carries no credential, organization, or
+/// project.
 /// </summary>
 public sealed record PluginModel
 {
@@ -25,7 +26,8 @@ public sealed record PluginModel
         bool audioInput = false,
         bool videoInput = false,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        Uri? baseUri = null)
         : this(
             provider,
             protocol,
@@ -40,7 +42,8 @@ public sealed record PluginModel
             audioInput,
             videoInput,
             serviceTier,
-            speed)
+            speed,
+            baseUri)
     {
     }
 
@@ -59,7 +62,8 @@ public sealed record PluginModel
             audioInput: false,
             videoInput: false,
             serviceTier: null,
-            speed: null)
+            speed: null,
+            baseUri: null)
     {
     }
 
@@ -77,7 +81,8 @@ public sealed record PluginModel
         bool audioInput,
         bool videoInput,
         string? serviceTier,
-        string? speed)
+        string? speed,
+        Uri? baseUri)
     {
         if (!unavailable)
         {
@@ -136,6 +141,17 @@ public sealed record PluginModel
         Thinking = thinking;
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
+        BaseUri = WithoutUserInfo(baseUri);
+    }
+
+    private static Uri? WithoutUserInfo(Uri? uri)
+    {
+        if (uri is null || !uri.IsAbsoluteUri || uri.UserInfo.Length == 0)
+        {
+            return uri;
+        }
+
+        return new UriBuilder(uri) { UserName = string.Empty, Password = string.Empty }.Uri;
     }
 
     public string Provider { get; }
@@ -183,6 +199,13 @@ public sealed record PluginModel
     /// The host does not interpret the token.
     /// </summary>
     public string? Speed { get; }
+
+    /// <summary>
+    /// The provider's API endpoint with user information removed, or null when
+    /// the host did not publish one. A credential in the query string is not
+    /// removed, so keep keys out of the configured URI.
+    /// </summary>
+    public Uri? BaseUri { get; }
 
     public override string ToString() =>
         Name.Length == 0 ? nameof(PluginModel) : Provider + " / " + Name;

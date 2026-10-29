@@ -2934,8 +2934,9 @@ Audio and video flags copy the model entry.
 They do not make a turn, a tool result, or a plugin multimodal client
 accept audio or video. `Review.Independent`
 is true only when review uses its own model. While it is false, review
-uses the session model and a stored selection is omitted. The view has no
-API key, endpoint, organization, or project. A plugin that implements
+uses the session model and a stored selection is omitted. The view carries
+the provider `BaseUri` with user information removed. It has no API key,
+organization, or project. A plugin that implements
 `IPluginModelClient` also receives `AttachClients`. The host names that
 plugin when it loads. Those clients are new instances on the same provider
 and model, kept apart from the instances inside a turn or a review. A plugin

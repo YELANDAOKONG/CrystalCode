@@ -36,7 +36,8 @@ internal static class PluginModelFacts
             model.AudioInput,
             model.VideoInput,
             serviceTier,
-            speed);
+            speed,
+            provider.BaseUri);
     }
 
     public static PluginReview DescribeReview(
