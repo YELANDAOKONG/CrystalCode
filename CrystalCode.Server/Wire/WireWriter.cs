@@ -64,6 +64,45 @@ public static class WireWriter
         writer.WriteString("speed", chrome.Speed);
         writer.WriteBoolean("agentsEnabled", chrome.AgentsEnabled);
         Pending(writer, "pending", chrome.Pending);
+        Reviewer(writer, "reviewer", chrome.Reviewer);
+        ExtendedApproval(writer, "extendedApproval", chrome.ExtendedApproval);
+        writer.WriteEndObject();
+    }
+
+    private static void Reviewer(Utf8JsonWriter writer, string name, ReviewerChrome? reviewer)
+    {
+        if (reviewer is null)
+        {
+            writer.WriteNull(name);
+            return;
+        }
+
+        writer.WriteStartObject(name);
+        ReviewerFields(writer, reviewer);
+        writer.WriteEndObject();
+    }
+
+    private static void ReviewerFields(Utf8JsonWriter writer, ReviewerChrome reviewer)
+    {
+        writer.WriteString("provider", reviewer.Provider);
+        writer.WriteString("model", reviewer.Model);
+        writer.WriteString("thinking", reviewer.Thinking);
+        writer.WriteString("serviceTier", reviewer.ServiceTier);
+        writer.WriteString("speed", reviewer.Speed);
+    }
+
+    private static void ExtendedApproval(Utf8JsonWriter writer, string name, ExtendedApprovalChrome? extended)
+    {
+        if (extended is null)
+        {
+            writer.WriteNull(name);
+            return;
+        }
+
+        writer.WriteStartObject(name);
+        ReviewerFields(writer, extended.Reviewer);
+        writer.WriteString("trigger", extended.Trigger);
+        writer.WriteBoolean("includePrimaryReview", extended.IncludePrimaryReview);
         writer.WriteEndObject();
     }
 

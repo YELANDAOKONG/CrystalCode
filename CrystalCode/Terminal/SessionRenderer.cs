@@ -587,6 +587,54 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Sets the text of the approval and extended approval custom fields. A
+    /// reviewer that is off contributes none.
+    /// </summary>
+    internal void SetReviewers(ReviewerChrome? reviewer, ExtendedApprovalChrome? extended)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        AddReviewer(fields, "approval", "Reviewer", reviewer);
+        if (extended is not null)
+        {
+            AddReviewer(fields, "extended", "Extended", extended.Reviewer);
+            fields["extended-trigger"] = "Extended Trigger " + extended.Trigger;
+            fields["extended-primary"] = "Extended Primary " + (extended.IncludePrimaryReview ? "On" : "Off");
+        }
+
+        lock (_gate)
+        {
+            _chrome.ReviewerFields = fields;
+            PaintUnlocked(force: false);
+        }
+    }
+
+    private static void AddReviewer(
+        Dictionary<string, string> fields,
+        string key,
+        string label,
+        ReviewerChrome? reviewer)
+    {
+        if (reviewer is null)
+        {
+            return;
+        }
+
+        fields[key + "-provider"] = label + " " + reviewer.Provider;
+        fields[key + "-model"] = label + " " + reviewer.Model;
+        AddSlot(fields, key + "-thinking", label, reviewer.Thinking);
+        AddSlot(fields, key + "-tier", label, reviewer.ServiceTier);
+        AddSlot(fields, key + "-speed", label, reviewer.Speed);
+    }
+
+    private static void AddSlot(Dictionary<string, string> fields, string name, string label, string value)
+    {
+        if (value.Length > 0)
+        {
+            fields[name] = label + " " + value;
+        }
+    }
+
     public void SetChrome(
         bool planMode,
         ApprovalMode approval,

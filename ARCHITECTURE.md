@@ -2730,6 +2730,16 @@ the custom line returns to the existing adaptive rendering path.
 `mode`, `provider`, and `session-id` (the first 8 characters of the id) are
 custom-line fields only; they come from `SessionChrome`, which carries the
 session id, and the adaptive bar does not show them.
+The `approval-*` and `extended-*` fields are custom-line only too. They come
+from `SessionChrome.Reviewer` and `SessionChrome.ExtendedApproval`
+(`ReviewerChrome`, `ExtendedApprovalChrome`), which are null while that
+reviewer is off, so its fields occupy no cell. `CodingSession` refreshes the
+chrome after every approval model and extended approval command.
+`ExtendedApprovalChrome` adds the trigger level and whether the extended
+reviewer sees the primary review (`extended-primary`, always `On` or `Off`
+while extended approval is on). Server and Bridge write both objects as
+`reviewer` and `extendedApproval` in the chrome object. The terminal keeps
+their text in `ShellChrome.ReviewerFields`, apart from plugin fields.
 A disk plugin may register extra field names. Those names stay off the
 adaptive bar, the progress row, `/status`, and `/stats`. They appear on the
 custom line only when the operator lists them. The engine publishes the

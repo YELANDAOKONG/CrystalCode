@@ -501,7 +501,11 @@ turn runs, a mode, approval, thinking, context, tier, speed, or model choice
 succeeds and applies on the next turn; options keep showing the active value,
 and `config_option_update` lists the waiting values under
 `_meta.crystal.pending` (the same keys as `pending` in `_crystal/chrome`).
-That update is sent again when only the pending list changes. A command the
+That update is sent again when only the pending list changes. The
+`_crystal/chrome` object also carries `reviewer` and `extendedApproval`, which
+are `null` while that reviewer is off; otherwise each holds `provider`,
+`model`, and the display labels `thinking`, `serviceTier`, and `speed`, and
+`extendedApproval` adds `trigger` and `includePrimaryReview`. A command the
 engine refuses is `-32603`, `command_refused`. A value or option not offered
 is `-32602`. The response carries the complete list of offered options.
 `thinking`, `context`, `tier`, and `speed` appear only when the model offers a

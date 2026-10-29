@@ -186,6 +186,39 @@ public sealed class CodingSessionExtendedApprovalTests
         Assert.Equal("Approval model  On  scripted  reviewer", harness.LastNote());
     }
 
+    [Fact]
+    public async Task Chrome_FollowsTheApprovalAndExtendedApprovalSettings()
+    {
+        using var harness = Harness.Open(
+            Settings(extended: null),
+            new() { ["work"] = new RoutedClient(Allow), ["reviewer"] = new RoutedClient(Allow), ["judge"] = new RoutedClient(Allow) });
+        await harness.Session.StartAsync(CancellationToken.None);
+        Assert.Equal(new ReviewerChrome("scripted", "reviewer", string.Empty, string.Empty, string.Empty), harness.Chrome().Reviewer);
+        Assert.Null(harness.Chrome().ExtendedApproval);
+
+        await harness.Session.SubmitAsync("/approval tier priority", CancellationToken.None);
+        Assert.Equal("Tier Priority", harness.Chrome().Reviewer!.ServiceTier);
+
+        await harness.Session.SubmitAsync("/approval extended judge", CancellationToken.None);
+        await harness.Session.SubmitAsync("/approval extended speed", CancellationToken.None);
+        await harness.Session.SubmitAsync("/approval extended trigger medium", CancellationToken.None);
+        var extended = harness.Chrome().ExtendedApproval!;
+        Assert.Equal("judge", extended.Reviewer.Model);
+        Assert.Equal("Speed Fast", extended.Reviewer.Speed);
+        Assert.Equal("Medium", extended.Trigger);
+        Assert.True(extended.IncludePrimaryReview);
+
+        await harness.Session.SubmitAsync("/approval extended primary off", CancellationToken.None);
+        Assert.False(harness.Chrome().ExtendedApproval!.IncludePrimaryReview);
+
+        await harness.Session.SubmitAsync("/approval extended off", CancellationToken.None);
+        Assert.Null(harness.Chrome().ExtendedApproval);
+        Assert.NotNull(harness.Chrome().Reviewer);
+
+        await harness.Session.SubmitAsync("/approval model off", CancellationToken.None);
+        Assert.Null(harness.Chrome().Reviewer);
+    }
+
     private static ExtendedApprovalSettings Extended() =>
         new(new ApprovalModelSettings(true, "scripted", "judge"));
 
@@ -313,6 +346,16 @@ public sealed class CodingSessionExtendedApprovalTests
 
             await Session.CompleteTurnAsync(CancellationToken.None);
         }
+
+        public SessionChrome Chrome() => Observer.Events
+            .Select(static item => item switch
+            {
+                SessionStarted started => started.Chrome,
+                ChromeChanged changed => changed.Chrome,
+                _ => null
+            })
+            .OfType<SessionChrome>()
+            .Last();
 
         public string LastNote() => Observer.Events.OfType<NoteWritten>().Last().Text;
 

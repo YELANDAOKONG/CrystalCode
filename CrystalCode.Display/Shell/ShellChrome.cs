@@ -61,6 +61,13 @@ public sealed class ShellChrome
     public IReadOnlyDictionary<string, string> PluginFields { get; set; } =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Text of the <c>approval-*</c> and <c>extended-*</c> custom fields. A
+    /// reviewer that is off has no entries, so its fields occupy no cell.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> ReviewerFields { get; set; } =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     public string ContextUsed { get; set; } = "CTX --";
 
     public string ContextLeft { get; set; } = "CTX -- Left";
@@ -275,7 +282,7 @@ public sealed class ShellChrome
                 "tools" => ToolCount switch { 0 => string.Empty, 1 => "1 Tool", _ => $"{ToolCount} Tools" },
                 "elapsed" => Elapsed,
                 "queued" => Queued > 0 ? $"Queued {Queued}" : string.Empty,
-                _ => PluginField(field)
+                _ => ReviewerFields.TryGetValue(field, out var reviewer) ? reviewer : PluginField(field)
             };
             if (!string.IsNullOrWhiteSpace(value))
             {
@@ -292,7 +299,7 @@ public sealed class ShellChrome
                     "model" => Theme.ForValue("model", value),
                     "provider" => Theme.ForValue("provider", value),
                     "mode" => Theme.ForValue("mode", value, ModeColor),
-                    _ => Theme.Chrome
+                    _ => ReviewerColor(field, value)
                 };
                 items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", field));
             }
@@ -323,6 +330,28 @@ public sealed class ShellChrome
         }
 
         return Theme.ForContext(left ? 100 - percent : percent);
+    }
+
+    // A reviewer field reads "Reviewer <value>" or "Extended <value>", so the
+    // theme rule sees the value without the prefix and without the label word.
+    private static string ReviewerColor(string field, string text)
+    {
+        var (gauge, words) = field switch
+        {
+            "approval-provider" or "extended-provider" => ("provider", 1),
+            "approval-model" or "extended-model" => ("model", 1),
+            "approval-thinking" or "extended-thinking" => ("thinking", 2),
+            "approval-tier" or "extended-tier" => ("tier", 2),
+            "approval-speed" or "extended-speed" => ("speed", 2),
+            _ => (string.Empty, 0)
+        };
+        if (words == 0)
+        {
+            return Theme.Chrome;
+        }
+
+        var parts = text.Split(' ', words + 1);
+        return Theme.ForValue(gauge, parts.Length > words ? parts[words] : text);
     }
 
     /// <summary>

@@ -304,6 +304,10 @@ object lists settings chosen during a turn that apply on the next turn:
 `provider` and `model` together, `contextWindow`, `serviceTier`, `speed`
 (`unset` clears the slot), `thinking`, `mode`, and `approval`. A key appears
 only while that setting waits. `report.status` carries the same `pending`.
+`reviewer` and `extendedApproval` are `null` while that reviewer is off.
+Otherwise each holds the reviewer's `provider`, `model`, and display labels
+`thinking`, `serviceTier`, and `speed` (blank when unset); `extendedApproval`
+adds `trigger` and `includePrimaryReview`.
 
 Server events: `server.state`, `server.closing` (with the session id and
 whether it was saved), `interaction.opened`, `interaction.resolved`,

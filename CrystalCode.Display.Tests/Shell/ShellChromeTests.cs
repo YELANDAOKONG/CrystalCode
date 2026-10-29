@@ -375,6 +375,63 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ShowsReviewerFieldsAndOmitsTheOnesThatAreOff()
+    {
+        Theme.Reset();
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = true,
+            StatusLineFields = ["approval-model", "approval-tier", "extended-model", "extended-trigger", "extended-primary"],
+            ReviewerFields = new Dictionary<string, string>
+            {
+                ["approval-model"] = "Reviewer judge",
+                ["extended-model"] = "Extended deep",
+                ["extended-trigger"] = "Extended Trigger Medium",
+                ["extended-primary"] = "Extended Primary Off"
+            }
+        };
+
+        var line = chrome.StatusLine(200);
+
+        Assert.Equal(
+            "Reviewer judge  ·  Extended deep  ·  Extended Trigger Medium  ·  Extended Primary Off",
+            line.Plain.Trim());
+    }
+
+    [Fact]
+    public void StatusLine_ColorsReviewerFieldsFromTheMatchingGaugeWithoutTheLabel()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["speed"] = [new GaugeRule(null, null, ["Fast"], null, "gold1")],
+            ["model"] = [new GaugeRule(null, null, ["judge"], null, "red")]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+        try
+        {
+            var chrome = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["extended-speed", "approval-model"],
+                ReviewerFields = new Dictionary<string, string>
+                {
+                    ["extended-speed"] = "Extended Speed Fast",
+                    ["approval-model"] = "Reviewer judge"
+                }
+            };
+
+            var line = chrome.StatusLine(200);
+
+            Assert.Contains("[gold1]Extended Speed Fast", line.Markup, StringComparison.Ordinal);
+            Assert.Contains("[red]Reviewer judge", line.Markup, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
+    [Fact]
     public void StatusLine_OmitsAnEmptyProviderAndSessionId()
     {
         var chrome = new ShellChrome

@@ -53,6 +53,7 @@ internal sealed class SessionProjection : ISessionObserver
                     started.Chrome.Mode);
                 _renderer.SetPending(PendingSettingsText.Summary(started.Chrome.Pending));
                 _renderer.SetIdentity(started.Chrome.Provider, started.Chrome.SessionId);
+                _renderer.SetReviewers(started.Chrome.Reviewer, started.Chrome.ExtendedApproval);
                 _renderer.ChildSessionsEnabled = started.Chrome.AgentsEnabled;
                 break;
             case ChromeChanged changed:
@@ -69,6 +70,7 @@ internal sealed class SessionProjection : ISessionObserver
                     changed.Chrome.Mode);
                 _renderer.SetPending(PendingSettingsText.Summary(changed.Chrome.Pending));
                 _renderer.SetIdentity(changed.Chrome.Provider, changed.Chrome.SessionId);
+                _renderer.SetReviewers(changed.Chrome.Reviewer, changed.Chrome.ExtendedApproval);
                 _renderer.ChildSessionsEnabled = changed.Chrome.AgentsEnabled;
                 break;
             case PreferencesChanged preferences:

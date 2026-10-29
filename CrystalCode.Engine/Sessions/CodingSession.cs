@@ -3282,6 +3282,7 @@ public sealed class CodingSession : ITurnObserver
 
                 SaveSettings(current => current.WithExtendedApproval(current.ExtendedApproval.WithTrigger(trigger)));
                 RebuildExecutors();
+                RefreshChrome();
                 Note("Extended approval trigger  " + DisplayCase.Token(trigger.Value));
                 return;
             case ExtendedApprovalArguments.Kind.Primary:
@@ -3289,6 +3290,7 @@ public sealed class CodingSession : ITurnObserver
                 SaveSettings(current => current.WithExtendedApproval(
                     current.ExtendedApproval.WithIncludePrimaryReview(include)));
                 RebuildExecutors();
+                RefreshChrome();
                 Note("Extended approval primary review  " + (include ? "On" : "Off"));
                 return;
             default:
@@ -3397,6 +3399,7 @@ public sealed class CodingSession : ITurnObserver
         ReplaceReviewerClient(extended, next, client);
         RebuildExecutors();
         RefreshSlashCommands();
+        RefreshChrome();
         Note(DescribeReviewer(extended));
     }
 
@@ -3481,6 +3484,7 @@ public sealed class CodingSession : ITurnObserver
             ReviewerOf(current, extended).WithThinkingEffort(selection)));
         RebuildExecutors();
         RefreshSlashCommands();
+        RefreshChrome();
         Note(ReviewerTitle(extended) + " thinking  " + ThinkingLabel.For(selection));
     }
 
@@ -3544,6 +3548,7 @@ public sealed class CodingSession : ITurnObserver
 
         RebuildExecutors();
         RefreshSlashCommands();
+        RefreshChrome();
         Note(
             ReviewerTitle(extended) + (request.ServiceTier ? " tier  " : " speed  ")
             + (selected is null ? "not set" : DisplayCase.Token(selected)));
@@ -8931,7 +8936,26 @@ public sealed class CodingSession : ITurnObserver
             _customMode,
             _settings.Provider.Value,
             _sessionId,
-            CurrentPending());
+            CurrentPending(),
+            ReviewerChromeOf(_settings.ApprovalModel),
+            _settings.ExtendedApproval.Enabled
+                ? new ExtendedApprovalChrome(
+                    ReviewerChromeOf(_settings.ExtendedApproval.Reviewer)!,
+                    DisplayCase.Token(_settings.ExtendedApproval.Trigger.Value),
+                    _settings.ExtendedApproval.IncludePrimaryReview)
+                : null);
+
+    private static ReviewerChrome? ReviewerChromeOf(ApprovalModelSettings reviewer) =>
+        reviewer.Enabled
+            ? new ReviewerChrome(
+                reviewer.Provider!,
+                reviewer.Model!,
+                reviewer.ThinkingEffort == ThinkingSelection.Default
+                    ? string.Empty
+                    : "Think " + ThinkingLabel.For(reviewer.ThinkingEffort),
+                CatalogSlotStatus.For("Tier", reviewer.ServiceTier),
+                CatalogSlotStatus.For("Speed", reviewer.Speed))
+            : null;
 
     private void RefreshChrome()
     {

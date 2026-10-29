@@ -1635,6 +1635,15 @@ custom fields are `mode`, `approval`, `thinking`, `tier`, `speed`, `context-wind
 `session-id` (the first 8 characters; `/status` has the full id), `workspace`, `context-used`, `context-left`, `context-tokens`,
 `request-input`, `request-output`, `request-total`, `session-input`,
 `session-output`, `session-total`, `tools`, `elapsed`, and `queued`.
+Approval reviewer fields show only while that reviewer is on, and occupy no
+cell otherwise: `approval-provider`, `approval-model`, `approval-thinking`,
+`approval-tier`, and `approval-speed` for the approval model, and
+`extended-provider`, `extended-model`, `extended-thinking`, `extended-tier`,
+`extended-speed`, `extended-trigger`, and `extended-primary` for extended
+approval. Thinking, tier, and speed are blank while the reviewer leaves them
+at the default. `extended-primary` shows `On` or `Off` for whether the
+extended reviewer sees the primary review. Theme gauges `provider`, `model`,
+`thinking`, `tier`, and `speed` color the matching reviewer fields by value.
 A disk plugin may add more names. They do not appear until you put them in
 this list. `/statusline` with no arguments lists built-in fields, then each
 loaded plugin field with its directory and description, then any saved name

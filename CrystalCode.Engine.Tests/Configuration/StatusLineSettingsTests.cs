@@ -15,6 +15,22 @@ public sealed class StatusLineSettingsTests
     }
 
     [Fact]
+    public void Fields_AcceptApprovalAndExtendedApprovalFields()
+    {
+        string[] fields =
+        [
+            "approval-provider", "approval-model", "approval-thinking", "approval-tier", "approval-speed",
+            "extended-provider", "extended-model", "extended-thinking", "extended-tier", "extended-speed",
+            "extended-trigger", "extended-primary"
+        ];
+
+        var settings = new StatusLineSettings(true, fields);
+
+        Assert.Equal(fields, settings.Fields);
+        Assert.All(fields, field => Assert.DoesNotContain(field, StatusLineSettings.DefaultFields));
+    }
+
+    [Fact]
     public void AvailableFields_DoesNotChangeTheDefaultFields()
     {
         Assert.DoesNotContain("mode", StatusLineSettings.DefaultFields);
