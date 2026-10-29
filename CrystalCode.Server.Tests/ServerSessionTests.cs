@@ -117,6 +117,51 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task Queries_ListModelsOptionsSessionsAndCatalogsAsData()
+    {
+        var model = new ScriptedModel(false, TextRound("saved"));
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "hi" });
+        await events.WaitForAsync("turn.finished");
+
+        var models = await fixture.GetAsync(fixture.Http, "/models");
+        var options = await fixture.GetAsync(fixture.Http, "/options");
+        var sessions = await fixture.GetAsync(fixture.Http, "/sessions");
+        var agents = await fixture.GetAsync(fixture.Http, "/agents");
+        var skills = await fixture.GetAsync(fixture.Http, "/skills");
+        var mcp = await fixture.GetAsync(fixture.Http, "/mcp");
+        var plugins = await fixture.GetAsync(fixture.Http, "/plugins");
+        var tasks = await fixture.GetAsync(fixture.Http, "/tasks");
+        var missing = await fixture.Http.GetAsync("/tasks/task_missing/logs");
+
+        var current = Assert.Single(models.GetProperty("models").EnumerateArray(), static entry => entry.GetProperty("current").GetBoolean());
+        Assert.False(current.TryGetProperty("baseUri", out _));
+        Assert.Contains(options.GetProperty("options").EnumerateArray(), static option => option.GetProperty("id").GetString() == "approval");
+        Assert.Contains(sessions.GetProperty("sessions").EnumerateArray(), static saved =>
+            saved.GetProperty("current").GetBoolean() && saved.GetProperty("open").GetBoolean());
+        Assert.Contains(agents.GetProperty("agents").EnumerateArray(), static agent => agent.GetProperty("name").GetString() == "general");
+        Assert.False(skills.GetProperty("enabled").GetBoolean());
+        Assert.False(mcp.GetProperty("enabled").GetBoolean());
+        Assert.Equal(JsonValueKind.Array, plugins.GetProperty("plugins").ValueKind);
+        Assert.Empty(tasks.GetProperty("tasks").EnumerateArray());
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Queries_NeedTheObserveScope()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false));
+        await fixture.WaitReadyAsync();
+        using var none = new HttpClient { BaseAddress = fixture.Http.BaseAddress };
+
+        var refused = await none.GetAsync("/models");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+    }
+
+    [Fact]
     public async Task Approval_IsAnsweredByAClientAndRunsTheTool()
     {
         var model = new ScriptedModel(false, ToolRound("call-1", "bash", """{"command":"echo served"}"""), TextRound("done"));

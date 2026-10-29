@@ -71,6 +71,18 @@ public sealed class BackgroundTaskRegistry : IDisposable
         }
     }
 
+    /// <summary>Every task this session started, newest first.</summary>
+    public IReadOnlyList<BackgroundTaskSnapshot> List()
+    {
+        lock (_gate)
+        {
+            return [.. _tasks.Values
+                .Select(static task => task.Snapshot())
+                .OrderByDescending(static snapshot => snapshot.StartedUtc)
+                .ThenBy(static snapshot => snapshot.TaskId, StringComparer.Ordinal)];
+        }
+    }
+
     public bool TryGetSnapshot(string taskId, out BackgroundTaskSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(taskId);

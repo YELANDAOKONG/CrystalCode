@@ -234,7 +234,8 @@ are tested against the observer directly. `crystal server` is tested in CrystalC
 against a real Kestrel listener on a loopback port chosen by the OS and a
 scripted model: turns, events, reconnect, targeted replies, every interaction
 kind, recall, quick prompts, images, export, resume, shutdown, scopes,
-tickets, Host and Origin checks, the parity guards, and the secret-leak test.
+tickets, Host and Origin checks, the read-only queries, the parity guards,
+and the secret-leak test.
 `crystal bridge` is tested in CrystalCode.Bridge.Tests over in-process pipes
 with a scripted model: initialize, new, load with replay, resume without
 replay, load into another `cwd`, list paging, prompts with every content

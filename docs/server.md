@@ -36,7 +36,9 @@ front end can use too:
   questions to a connected client.
 - Every engine capability is reachable: every slash command, every
   `CodingSession` operation a front end calls, every `SessionFrontEnd`
-  contract, and every `SessionEvent`.
+  contract, and every `SessionEvent`. What a slash command lists as text
+  (sessions, models, options, Agents, skills, MCP servers, plugins, and
+  background tasks) is also a structured `GET` route.
 - The protocol carries no version identifier in routes, headers, or fields.
   It is not a public web API. It follows the build: a wrapper knows which
   executable it started, and `GET /info` reports the build identity.
@@ -144,7 +146,9 @@ and the `server.state` event.
 - Requests send `Authorization: Bearer <token>`. `GET /health` needs no token
   and returns only the state.
 - Scopes:
-  - `observe`: snapshot, events, images, export, children, quick prompt list.
+  - `observe`: snapshot, events, images, export, children, quick prompt list,
+    and the read-only queries (`/sessions`, `/models`, `/options`, `/agents`,
+    `/skills`, `/mcp`, `/plugins`, `/tasks`, and task logs).
   - `operate`: input, interrupt, recall, mode, verbose, draft, image upload,
     quick prompt send, side question control, interaction answers, and the
     slash commands that only report or act inside the session: `/help`,
@@ -238,6 +242,15 @@ and the `server.state` event.
 | `POST /side/cancel`, `POST /side/clear` | operate | Side question control; `/btw` itself goes through `/input` |
 | `GET /children`, `GET /children/{id}` | observe | Child list, archive, events, usage, and todos (F7 and `/child`) |
 | `GET /export?format=markdown\|json&system=true\|false` | observe | `TryExport` as a download; `/export` still writes on the server |
+| `GET /sessions?all=true\|false` | observe | `ListSavedSessions`: saved sessions with content, newest first, for this workspace or every workspace. Each has `id`, `workspace`, `mode`, `createdUtc`, `updatedUtc`, `userTurns`, `preview`, `current`, and `open` (another process, or this one, holds it). Resume one with `/resume <id>` through `POST /input` |
+| `GET /models` | observe | `ListModels`: every catalog model with `provider`, `model`, `protocol`, `current`, `credentialReady`, `contextWindows`, `thinking`, `thinkingCanDisable`, `thinkingEfforts`, `serviceTiers`, `speeds`, `imageInput`, and `maxTokens`, plus `pending`. No base address, header, or key |
+| `GET /options` | observe | `ListOptions`: the same option list as `options.changed`, plus `pending` |
+| `GET /agents` | observe | `ListAgents`: `enabled`, `concurrency`, `limits` (`modelCalls`, `toolCalls`, `durationSeconds`; null is unlimited), `agents` (`name`, `description`, `custom`, `model` with null for inherit, `tools` or null for the default set), and `notes` |
+| `GET /skills` | observe | `ListSkills`: `enabled` and `skills` (`name`, `description`, `source` `home` or `project`, `location`), without bodies |
+| `GET /mcp` | observe | `ListMcp`: `enabled`, `servers` (`name`, `source`, `transport`, `status`, `tools`, `error`), and `notes`. No command, argument, environment, header, or URL |
+| `GET /plugins` | observe | `ListPlugins`: `enabled` and `plugins` (`directory`, `source`, `name` when loaded, `enabled` or null, `effective`, `loaded`, `tools`, `commands`, `hooks`, `error`), and `notes` |
+| `GET /tasks` | observe | `ListBackgroundTasks`: background Bash tasks, newest first, with `id`, `command`, `workingDirectory`, `status` (`starting`, `running`, `exited`, `failed`, `timed_out`, `stopped`), `exitCode`, `startedUtc`, `finishedUtc`, `logStartOffset`, and `logEndOffset` |
+| `GET /tasks/{id}/logs?offset=&limit=` | observe | `TryReadBackgroundTaskLog`: `text`, `nextOffset`, `hasMore`. 404 for an unknown task, 410 when the offset left the bounded log, 400 for a bad limit |
 | `GET /interactions`, `POST /interactions/{id}` | operate | Pending interactions and answers |
 | `POST /auth/ticket` | observe | Event-stream ticket |
 | `GET /auth/tokens`, `POST /auth/tokens`, `DELETE /auth/tokens/{id}` | admin | List, issue (`scope`, optional `label`), and revoke process-local tokens; the startup token cannot be revoked |

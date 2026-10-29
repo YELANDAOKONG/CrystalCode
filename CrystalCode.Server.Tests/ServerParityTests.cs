@@ -66,7 +66,16 @@ public sealed class ServerParityTests
         ["TurnTask"] = "SessionRunner",
         ["PlanMode"] = "chrome.planMode",
         ["CustomMode"] = "chrome.mode",
-        ["SessionId"] = "envelope sessionId"
+        ["SessionId"] = "envelope sessionId",
+        ["ListSavedSessions"] = "GET /sessions",
+        ["ListModels"] = "GET /models",
+        ["ListOptions"] = "GET /options",
+        ["ListAgents"] = "GET /agents",
+        ["ListSkills"] = "GET /skills",
+        ["ListMcp"] = "GET /mcp",
+        ["ListPlugins"] = "GET /plugins",
+        ["ListBackgroundTasks"] = "GET /tasks",
+        ["TryReadBackgroundTaskLog"] = "GET /tasks/{id}/logs"
     };
 
     [Fact]
@@ -150,7 +159,7 @@ public sealed class ServerParityTests
     [Fact]
     public void Info_ListsEveryRoute()
     {
-        Assert.Equal(26, ServerEndpoints.Operations.Count);
+        Assert.Equal(35, ServerEndpoints.Operations.Count);
         Assert.Contains("POST /recall", ServerEndpoints.Operations);
     }
 
@@ -183,6 +192,11 @@ public sealed class ServerParityTests
         await events.WaitForAsync("report.help");
         var snapshot = await fixture.Http.GetStringAsync("/snapshot");
         var info = await fixture.Http.GetStringAsync("/info");
+        foreach (var route in new[] { "/models", "/options", "/agents", "/skills", "/mcp", "/plugins", "/sessions", "/tasks" })
+        {
+            Assert.DoesNotContain(secret, await fixture.Http.GetStringAsync(route), StringComparison.Ordinal);
+        }
+
         lock (events.Seen)
         {
             Assert.All(events.Seen, value => Assert.DoesNotContain(secret, value.GetRawText(), StringComparison.Ordinal));

@@ -162,7 +162,11 @@ separate library with no terminal code. The product can:
   in the terminal. Every engine capability is reachable: every slash command,
   Plan, Work, and custom modes, quick prompts, side questions, recall,
   interrupts, image upload and download, child inspection, export, and every
-  event, including approval and extended approval. Approval, the question
+  event, including approval and extended approval. What a slash command
+  lists as text (saved sessions, models, options, Agents, skills, MCP
+  servers, plugins, and background tasks) is also readable as structured
+  data, with no secret in it. Mode, approval, thinking, tier, speed,
+  context, and model chosen during a turn apply on the next turn. Approval, the question
   tool, trust, and session and child choices reach clients as interactions;
   approval, trust, the workspace fence, and `ToolInvocationPolicy` are
   unchanged. Clients refresh from a snapshot and reconnect by event sequence

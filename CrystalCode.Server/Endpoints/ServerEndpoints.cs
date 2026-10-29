@@ -30,7 +30,9 @@ public static class ServerEndpoints
         "POST /images", "GET /images/{number}", "GET /quick-prompts", "POST /quick-prompts/{name}/send",
         "POST /side/cancel", "POST /side/clear", "GET /children", "GET /children/{id}", "GET /export",
         "GET /interactions", "POST /interactions/{id}", "POST /auth/ticket", "GET /auth/tokens",
-        "POST /auth/tokens", "DELETE /auth/tokens/{id}", "POST /shutdown"
+        "POST /auth/tokens", "DELETE /auth/tokens/{id}", "POST /shutdown",
+        "GET /sessions", "GET /models", "GET /options", "GET /agents", "GET /skills", "GET /mcp",
+        "GET /plugins", "GET /tasks", "GET /tasks/{id}/logs"
     ];
 
     public static void Map(WebApplication app, ServerContext server)
@@ -177,6 +179,7 @@ public static class ServerEndpoints
 
         ImageEndpoints.Map(app, server);
         SessionEndpoints.Map(app, server);
+        QueryEndpoints.Map(app, server);
         AuthEndpoints.Map(app, server);
     }
 

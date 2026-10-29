@@ -57,7 +57,16 @@ public sealed class BridgeParityTests
         ["PlanMode"] = "Phase 2: config options",
         ["PendingSettings"] = "_meta.crystal.pending on config_option_update and _crystal/chrome",
         ["CustomMode"] = "Phase 2: config options",
-        ["SessionId"] = "The ACP session id"
+        ["SessionId"] = "The ACP session id",
+        ["ListSavedSessions"] = "session/list reads the store for any cwd",
+        ["ListModels"] = "The model config option; the text forms of /model as prompt text",
+        ["ListOptions"] = "configOptions on every session response and update",
+        ["ListAgents"] = "Not mapped yet: /agents as prompt text",
+        ["ListSkills"] = "Not mapped yet: /skills as prompt text",
+        ["ListMcp"] = "Not mapped yet: /mcp as prompt text",
+        ["ListPlugins"] = "Not mapped yet: /plugins as prompt text",
+        ["ListBackgroundTasks"] = "Not mapped yet: the model reads tasks with bash_status",
+        ["TryReadBackgroundTaskLog"] = "Not mapped yet: the model reads logs with bash_logs"
     };
 
     [Fact]

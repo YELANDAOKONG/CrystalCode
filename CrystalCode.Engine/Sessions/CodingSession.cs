@@ -1259,6 +1259,198 @@ public sealed class CodingSession : ITurnObserver
     public SessionPendingSettings PendingSettings => CurrentPending();
 
     /// <summary>
+    /// Saved sessions with content, newest first: this workspace's, or every
+    /// workspace's with <paramref name="allWorkspaces"/>. The same list as
+    /// <c>/sessions</c>, as data.
+    /// </summary>
+    public IReadOnlyList<SavedSessionInfo> ListSavedSessions(bool allWorkspaces)
+    {
+        var summaries = _sessionStore.List(allWorkspaces ? null : _workspace.Root);
+        var sessions = new List<SavedSessionInfo>(summaries.Count);
+        foreach (var summary in summaries)
+        {
+            var current = string.Equals(summary.Id, _sessionId, StringComparison.Ordinal);
+            var open = current;
+            if (!current && _sessionStore.TryLock(summary.Id, out var probe))
+            {
+                probe.Dispose();
+            }
+            else
+            {
+                open = true;
+            }
+
+            sessions.Add(new SavedSessionInfo(
+                summary.Id,
+                summary.Workspace,
+                summary.Mode ?? (summary.PlanMode ? ModeCatalog.Plan : ModeCatalog.Work),
+                summary.CreatedUtc,
+                summary.UpdatedUtc,
+                summary.UserTurns,
+                summary.Preview,
+                current,
+                open));
+        }
+
+        return sessions;
+    }
+
+    /// <summary>
+    /// Every model the catalog offers, with its declared choices. The same
+    /// list <c>/model</c> selects from.
+    /// </summary>
+    public IReadOnlyList<ModelCatalogEntry> ListModels()
+    {
+        var models = new List<ModelCatalogEntry>();
+        foreach (var providerName in _settings.Catalog.Providers.Keys)
+        {
+            var name = new ProviderName(providerName);
+            foreach (var modelName in _settings.Catalog.GetModelNames(name))
+            {
+                var definition = _settings.Catalog.GetModelProvider(name, modelName);
+                var model = definition.Models[modelName];
+                models.Add(new ModelCatalogEntry(
+                    providerName,
+                    modelName,
+                    definition.Protocol.Value,
+                    name == _settings.Provider && string.Equals(modelName, _settings.Model, StringComparison.Ordinal),
+                    _credentials.TryResolve(definition, out _, out _),
+                    model.ContextWindows,
+                    model.Thinking,
+                    model.ThinkingCanDisable,
+                    model.ThinkingEfforts,
+                    model.ServiceTiers,
+                    model.Speeds,
+                    model.ImageInput,
+                    model.MaxTokens));
+            }
+        }
+
+        return models;
+    }
+
+    /// <summary>
+    /// The option catalog front ends draw as settings: each value names the
+    /// command that selects it. The same list <see cref="SessionOptionsChanged"/> carries.
+    /// </summary>
+    public IReadOnlyList<SessionOption> ListOptions() =>
+        SessionOptionCatalog.Build(
+            _settings,
+            CurrentModeName(),
+            [.. _modes.Definitions.Select(static mode => (mode.Name, mode.Description))],
+            _thinkingEffort,
+            _approval,
+            _promptResolution.PromptSet,
+            [PromptSetNames.Default, .. _promptResolution.AvailableSets.Where(static name => name != PromptSetNames.Default)]);
+
+    /// <summary>The child Agent settings and definitions <c>/agents</c> lists.</summary>
+    public AgentCatalogReport ListAgents()
+    {
+        var catalog = AgentCatalog.Load(_home, _workspace.Root, _settings.Agents with { Enabled = true });
+        var limits = _settings.Agents.Limits;
+        return new AgentCatalogReport(
+            _settings.Agents.Enabled,
+            _settings.Agents.MaxConcurrent,
+            limits.MaximumModelCalls,
+            limits.MaximumToolCalls,
+            limits.MaximumDurationSeconds,
+            [.. catalog.Definitions.Select(static agent => new AgentCatalogEntry(
+                agent.Name,
+                agent.Description,
+                agent.ManifestPath is not null,
+                agent.Model.Provider,
+                agent.Model.Model,
+                agent.Model.Thinking,
+                agent.Model.Context,
+                agent.Model.Tier,
+                agent.Model.Speed,
+                agent.Tools))],
+            catalog.Notes);
+    }
+
+    /// <summary>The skills <c>/skills</c> lists, without their bodies.</summary>
+    public SkillCatalogReport ListSkills()
+    {
+        if (!_settings.Skills || _skills is null)
+        {
+            return new SkillCatalogReport(_settings.Skills, []);
+        }
+
+        var root = _workspace.Root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return new SkillCatalogReport(
+            true,
+            [.. _skills.Items.Select(skill => new SkillCatalogEntry(
+                skill.Name,
+                skill.Description,
+                skill.Location.StartsWith(root, StringComparison.Ordinal) ? "project" : "home",
+                skill.Location))]);
+    }
+
+    /// <summary>The MCP servers <c>/mcp</c> lists, and each server's tool names.</summary>
+    public McpCatalogReport ListMcp()
+    {
+        var tools = _mcp.Tools.ToLookup(static tool => tool.ServerName, StringComparer.Ordinal);
+        return new McpCatalogReport(
+            _settings.Mcp,
+            [.. _mcp.Servers.Select(server => new McpServerReport(
+                server.Name,
+                server.Source.ToString().ToLowerInvariant(),
+                server.Transport switch
+                {
+                    McpTransportKind.Stdio => "stdio",
+                    McpTransportKind.StreamableHttp => "http",
+                    McpTransportKind.Sse => "sse",
+                    _ => throw new InvalidOperationException("Unknown MCP transport.")
+                },
+                server.Status.ToString().ToLowerInvariant(),
+                [.. tools[server.Name].Select(static tool => tool.ModelName)],
+                server.Error))],
+            _mcp.Notes);
+    }
+
+    /// <summary>
+    /// Every plugin found in the Home and Project trees, and whether it is
+    /// active in this session. The same list <c>/plugins</c> prints.
+    /// </summary>
+    public PluginCatalogReport ListPlugins()
+    {
+        var plugins = new List<PluginCatalogEntry>();
+        foreach (var entry in PluginInventory.List(_home, _workspace.Root))
+        {
+            var loaded = _loadedPlugins.Plugins.FirstOrDefault(plugin =>
+                plugin.Source == entry.Source
+                && ExternalToolNames.OverlayComparer.Equals(plugin.DirectoryName, entry.DirectoryName));
+            var failure = _loadedPlugins.Failures.FirstOrDefault(item =>
+                item.Source == entry.Source
+                && ExternalToolNames.OverlayComparer.Equals(item.DirectoryName, entry.DirectoryName));
+            plugins.Add(new PluginCatalogEntry(
+                entry.DirectoryName,
+                entry.Source == PluginSource.Home ? "home" : "project",
+                loaded?.Name,
+                entry.Enabled,
+                entry.Effective,
+                loaded is not null,
+                loaded?.Tools ?? 0,
+                loaded?.Commands ?? 0,
+                loaded?.Hooks ?? 0,
+                failure?.Error ?? entry.Error));
+        }
+
+        return new PluginCatalogReport(_settings.Plugins, plugins, _loadedPlugins.Notes);
+    }
+
+    /// <summary>The session's background Bash tasks, newest first. They are not persisted.</summary>
+    public IReadOnlyList<BackgroundTaskSnapshot> ListBackgroundTasks() => _backgroundTasks.List();
+
+    /// <summary>
+    /// Reads a background task's bounded log from <paramref name="offset"/>.
+    /// False, with the reason in the log text, for an unknown task, an
+    /// expired offset, or a limit outside the host bound.
+    /// </summary>
+    public bool TryReadBackgroundTaskLog(string taskId, int offset, int limit, out BackgroundTaskLog log) =>
+        _backgroundTasks.TryReadLogs(taskId, offset, limit, out log);
+
+    /// <summary>
     /// The active custom mode name, or null while Plan or Work is active.
     /// </summary>
     public string? CustomMode => _customMode;
@@ -8754,14 +8946,7 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     private void PublishOptions()
     {
-        var options = SessionOptionCatalog.Build(
-            _settings,
-            CurrentModeName(),
-            [.. _modes.Definitions.Select(static mode => (mode.Name, mode.Description))],
-            _thinkingEffort,
-            _approval,
-            _promptResolution.PromptSet,
-            [PromptSetNames.Default, .. _promptResolution.AvailableSets.Where(static name => name != PromptSetNames.Default)]);
+        var options = ListOptions();
         if (_publishedOptions is not null && _publishedOptions.SequenceEqual(options, SessionOptionComparer.Instance))
         {
             return;

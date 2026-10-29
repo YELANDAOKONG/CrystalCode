@@ -2513,6 +2513,18 @@ beside `StatusText` and `ToolListText`.
 `SessionRunner`, `SessionState`, and event origins, and maps every event to
 wire JSON itself.
 
+Read-only queries return plain data a front end may serialize, the same
+content the matching slash command prints: `ListSavedSessions`
+(`SavedSessionInfo`; `Open` probes the session lock), `ListModels`
+(`ModelCatalogEntry`, with no base address, header, or key, and
+`CredentialReady` from the credential store), `ListOptions` (the
+`SessionOptionsChanged` catalog), `ListAgents` (`AgentCatalogReport`),
+`ListSkills` (`SkillCatalogReport`, without bodies), `ListMcp`
+(`McpCatalogReport`, without commands, environment, headers, or URLs),
+`ListPlugins` (`PluginCatalogReport`), `ListBackgroundTasks`, and
+`TryReadBackgroundTaskLog`. A front end calls them through
+`SessionRunner.InvokeAsync`. They change nothing.
+
 `crystal run` is the headless front end in this executable, not a second
 assembly. Refactoring and optimizing it is high-priority product work and
 does not change the contract below until a specific change defines otherwise.

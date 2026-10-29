@@ -665,6 +665,10 @@ clipboard; `_crystal/image/attach` replaces it.
   authored here or by the operator's prompt files.
 - Audio input, URL-mode elicitation, MCP-over-ACP, and several concurrent
   sessions in one process.
+- Structured `_crystal/*` methods for the read-only queries `crystal server`
+  serves as `GET /models`, `/agents`, `/skills`, `/mcp`, `/plugins`, and
+  `/tasks`. The slash commands still report them as text, saved sessions
+  come from `session/list`, and options from `configOptions`.
 
 ## Security
 
