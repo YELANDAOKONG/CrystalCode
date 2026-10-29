@@ -9,8 +9,13 @@ namespace CrystalCode.Display.Composer;
 /// </summary>
 public sealed class FullScreenEditor
 {
+    // Left and right border plus one space of padding inside each.
+    private const int SideColumns = 2;
+    private const int BorderColumns = SideColumns * 2;
+
     private readonly ComposerBuffer _buffer = new()
     {
+        ShowPrompt = false,
         Placeholder = "Type or paste your prompt here."
     };
 
@@ -53,21 +58,62 @@ public sealed class FullScreenEditor
         }
     }
 
+    /// <summary>
+    /// Paints a bordered frame. Every row is built to exactly <paramref name="width"/>
+    /// columns with the side borders at fixed columns, so scrolling the text
+    /// window never moves or breaks the border.
+    /// </summary>
     public ComposerView Paint(int width, int height)
     {
-        var body = _buffer.Project(width, Math.Max(1, height - 1));
+        var inner = Math.Max(1, width - BorderColumns);
+        var bodyRows = Math.Max(1, height - 2);
+        // Project reserves one column for the cursor at the right edge.
+        var body = _buffer.Project(inner + 1, bodyRows);
         var lines = new List<PaintLine>(height)
         {
-            PaintLine.Colored(Theme.Chrome, Header()).Fit(width)
+            TopBorder(width)
         };
-        lines.AddRange(body.Lines);
-        while (lines.Count < height)
+        for (var row = 0; row < bodyRows; row++)
         {
-            lines.Add(PaintLine.Blank);
+            lines.Add(row < body.Lines.Count
+                ? Side(body.Lines[row], inner)
+                : Side(PaintLine.Blank, inner));
         }
 
-        return new ComposerView(lines, body.CursorRow + 1, body.CursorColumn);
+        lines.Add(BottomBorder(width));
+        return new ComposerView(lines, body.CursorRow + 1, body.CursorColumn + SideColumns);
     }
+
+    private static PaintLine Side(PaintLine content, int inner)
+    {
+        var fitted = content.Fit(inner);
+        var padding = new string(' ', Math.Max(0, inner - TextWidth.Measure(fitted.Plain)));
+        var markup = Border("\u2502 ") + fitted.Markup + padding + Border(" \u2502");
+        return new PaintLine(markup, "\u2502 " + fitted.Plain + padding + " \u2502");
+    }
+
+    private PaintLine TopBorder(int width)
+    {
+        var title = TextWidth.Truncate(Title(), Math.Max(0, width - 6));
+        return Rule("\u256d", "\u256e", title, width);
+    }
+
+    private static PaintLine BottomBorder(int width)
+    {
+        var hints = TextWidth.Truncate("F8 or Ctrl+S: apply   Esc: cancel", Math.Max(0, width - 6));
+        return Rule("\u2570", "\u256f", hints, width);
+    }
+
+    private static PaintLine Rule(string left, string right, string label, int width)
+    {
+        var text = label.Length == 0 ? string.Empty : " " + label + " ";
+        var dashes = Math.Max(0, width - 2 - 1 - TextWidth.Measure(text));
+        var plain = left + "\u2500" + text + new string('\u2500', dashes) + right;
+        return new PaintLine(Border(plain), plain);
+    }
+
+    private static string Border(string text) =>
+        $"[{Theme.Chrome}]{MarkupText.Escape(text)}[/]";
 
     private void HandleKey(InputKey key)
     {
@@ -98,7 +144,12 @@ public sealed class FullScreenEditor
         _buffer.Handle(key);
     }
 
-    private string Header()
+    private string ModeName() =>
+        !string.IsNullOrEmpty(_buffer.CustomMode) ? _buffer.CustomMode
+        : _buffer.PlanMode ? "Plan"
+        : "Work";
+
+    private string Title()
     {
         var text = _buffer.Text;
         var line = 1;
@@ -117,6 +168,6 @@ public sealed class FullScreenEditor
             }
         }
 
-        return $"Line {line}/{total}   F8 or Ctrl+S: apply   Esc: cancel";
+        return $"{ModeName()}   Line {line}/{total}";
     }
 }

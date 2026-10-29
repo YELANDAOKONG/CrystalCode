@@ -27,6 +27,11 @@ public sealed class ComposerBuffer
     /// </summary>
     public string? CustomMode { get; set; }
 
+    /// <summary>
+    /// False drops the mode prompt so the text uses the full row width.
+    /// </summary>
+    public bool ShowPrompt { get; set; } = true;
+
     public string Placeholder { get; set; } = "Ask anything... (Tab: switch mode, /: commands, ?: help)";
 
     public string Text => _text.ToString();
@@ -338,7 +343,7 @@ public sealed class ComposerBuffer
     public ComposerView Project(int width, int maxRows)
     {
         var mode = string.IsNullOrEmpty(CustomMode) ? PlanMode ? "Plan" : "Work" : CustomMode;
-        var promptPlain = mode + " > ";
+        var promptPlain = ShowPrompt ? mode + " > " : string.Empty;
         var promptColumns = TextWidth.Measure(promptPlain);
         var bodyWidth = Math.Max(width - promptColumns - 1, 8);
         _bodyWidth = bodyWidth;
@@ -366,16 +371,14 @@ public sealed class ComposerBuffer
                     var availableWidth = Math.Max(width - promptColumns, 0);
                     var truncatedPlaceholder = TextWidth.Truncate(Placeholder, availableWidth);
                     var plain = promptPlain + truncatedPlaceholder;
-                    var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
-                        + $"[{Theme.Chrome}] > [/]"
+                    var markup = PromptMarkup(mode, modeColor)
                         + $"[{Theme.Muted}]{MarkupText.Escape(truncatedPlaceholder)}[/]";
                     lines.Add(new PaintLine(markup, plain));
                 }
                 else
                 {
                     var plain = promptPlain + displayBody;
-                    var markup = $"[{modeColor} bold]{MarkupText.Escape(mode)}[/]"
-                        + $"[{Theme.Chrome}] > [/]{bodyMarkup}";
+                    var markup = PromptMarkup(mode, modeColor) + bodyMarkup;
                     lines.Add(new PaintLine(markup, plain));
                 }
             }
@@ -404,6 +407,11 @@ public sealed class ComposerBuffer
 
         return new ComposerView(lines, cursorRow, promptColumns + cursorBody);
     }
+
+    private string PromptMarkup(string mode, string modeColor) =>
+        ShowPrompt
+            ? $"[{modeColor} bold]{MarkupText.Escape(mode)}[/][{Theme.Chrome}] > [/]"
+            : string.Empty;
 
     private static bool IsNewline(InputKey key)
     {

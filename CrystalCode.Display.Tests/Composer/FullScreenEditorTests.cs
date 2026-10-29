@@ -1,5 +1,6 @@
 using CrystalCode.Display.Composer;
 using CrystalCode.Display.Input;
+using CrystalCode.Display.Paint;
 
 using Xunit;
 
@@ -73,6 +74,58 @@ public sealed class FullScreenEditorTests
         Assert.Equal(10, view.Lines.Count);
         Assert.Equal(1, view.CursorRow);
         Assert.Contains("Line 1/1", view.Lines[0].Plain);
+    }
+
+    [Fact]
+    public void Paint_ShowsTheTextWithoutTheModePrompt()
+    {
+        var editor = new FullScreenEditor("hello", planMode: false, customMode: null);
+
+        var view = editor.Paint(40, 10);
+
+        Assert.StartsWith("\u2502 hello ", view.Lines[1].Plain);
+        Assert.Equal(7, view.CursorColumn);
+    }
+
+    [Fact]
+    public void Paint_KeepsTheBorderIntactWhileTheTextScrolls()
+    {
+        var text = string.Join('\n', Enumerable.Range(1, 40).Select(number => "line " + number + " \u4e2d\u6587"));
+        var editor = new FullScreenEditor(text, planMode: false, customMode: null);
+
+        var view = editor.Paint(30, 8);
+
+        Assert.Equal(8, view.Lines.Count);
+        Assert.StartsWith("\u256d", view.Lines[0].Plain);
+        Assert.StartsWith("\u2570", view.Lines[7].Plain);
+        for (var row = 0; row < view.Lines.Count; row++)
+        {
+            Assert.Equal(30, TextWidth.Measure(view.Lines[row].Plain));
+        }
+
+        for (var row = 1; row < 7; row++)
+        {
+            Assert.StartsWith("\u2502", view.Lines[row].Plain);
+            Assert.EndsWith("\u2502", view.Lines[row].Plain);
+        }
+
+        Assert.Contains("line 40", view.Lines[6].Plain);
+        Assert.InRange(view.CursorRow, 1, 6);
+    }
+
+    [Fact]
+    public void Paint_WrapsLongLinesInsideTheBorder()
+    {
+        var editor = new FullScreenEditor(new string('x', 100), planMode: false, customMode: null);
+
+        var view = editor.Paint(24, 8);
+
+        foreach (var line in view.Lines)
+        {
+            Assert.Equal(24, TextWidth.Measure(line.Plain));
+        }
+
+        Assert.InRange(view.CursorColumn, 2, 22);
     }
 
     [Fact]
