@@ -19,7 +19,9 @@ public static class ToolSetInventory
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         var homeEntries = Scan(home.ToolsDirectory, ExternalToolSource.Home);
         var projectRoot = Path.Combine(workspaceRoot, ExternalFiles.CrystalDirectory, ExternalFiles.DirectoryName);
-        var projectEntries = Scan(projectRoot, ExternalToolSource.Project);
+        var projectEntries = SameDirectory(home.ToolsDirectory, projectRoot)
+            ? []
+            : Scan(projectRoot, ExternalToolSource.Project);
         return Compose(homeEntries, projectEntries);
     }
 
@@ -248,6 +250,15 @@ public static class ToolSetInventory
 
         return found;
     }
+
+    // A workspace at the home directory makes the project root the home root.
+    private static bool SameDirectory(string first, string second) =>
+        string.Equals(
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(first)),
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(second)),
+            OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal);
 
     private static IReadOnlyList<ToolSetEntry> Compose(List<Located> home, List<Located> project)
     {
