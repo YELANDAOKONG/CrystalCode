@@ -83,7 +83,7 @@ public sealed class SideModelSlotStoreTests
     }
 
     [Fact]
-    public void ForImageAndForCompaction_FollowThePerModelSelectionWhenUnset()
+    public void SideModels_SendNoTierOrSpeedWhenUnsetEvenIfTheSessionSelectsOne()
     {
         using var root = new TemporaryHome();
         var store = SlotStore(root);
@@ -94,11 +94,15 @@ public sealed class SideModelSlotStoreTests
         var image = settings.ForImage(new ImageModelSettings("gateway", "judge"));
         var compaction = settings.ForCompaction(
             new CompactionModelSettings(true, "gateway", "judge").WithServiceTier("priority"));
+        var reviewer = settings.ForReviewer(new ApprovalModelSettings(true, "gateway", "judge"));
 
-        Assert.Equal("flex", image.ServiceTier);
-        Assert.Equal("fast", image.Speed);
+        Assert.Null(image.ServiceTier);
+        Assert.Null(image.Speed);
         Assert.Equal("priority", compaction.ServiceTier);
-        Assert.Equal("fast", compaction.Speed);
+        Assert.Null(compaction.Speed);
+        Assert.Null(reviewer.ServiceTier);
+        Assert.Null(reviewer.Speed);
+        Assert.Equal("flex", settings.TierFor(new ProviderName("gateway"), "judge"));
     }
 
     private static DiskSettingsStore SlotStore(TemporaryHome root)

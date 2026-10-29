@@ -777,8 +777,8 @@ public sealed record HarnessSettings
     }
 
     /// <summary>
-    /// Selects a reviewer's provider and model, then applies its own service
-    /// tier and speed. An unset reviewer slot keeps the per-model selection.
+    /// Selects a reviewer's provider and model with its own service tier and
+    /// speed. An unset reviewer slot sends no tier or speed.
     /// </summary>
     public HarnessSettings ForReviewer(ApprovalModelSettings reviewer)
     {
@@ -796,8 +796,8 @@ public sealed record HarnessSettings
     }
 
     /// <summary>
-    /// Selects a side model's provider and model, then applies its own service
-    /// tier and speed. An unset slot keeps the per-model selection.
+    /// Selects the compaction model with its own service tier and speed. An
+    /// unset slot sends no tier or speed.
     /// </summary>
     public HarnessSettings ForCompaction(CompactionModelSettings compaction)
     {
@@ -814,6 +814,10 @@ public sealed record HarnessSettings
             compaction.Speed);
     }
 
+    /// <summary>
+    /// Selects the image model with its own service tier and speed. An unset
+    /// slot sends no tier or speed.
+    /// </summary>
     public HarnessSettings ForImage(ImageModelSettings image)
     {
         ArgumentNullException.ThrowIfNull(image);
@@ -829,21 +833,15 @@ public sealed record HarnessSettings
             image.Speed);
     }
 
-    private HarnessSettings ForModel(ProviderName provider, string model, string? serviceTier, string? speed)
-    {
-        var selected = WithSelection(provider, model);
-        if (serviceTier is not null)
-        {
-            selected = selected.WithTier(provider, model, serviceTier);
-        }
-
-        if (speed is not null)
-        {
-            selected = selected.WithSpeed(provider, model, speed);
-        }
-
-        return selected;
-    }
+    /// <summary>
+    /// A side model is configured on its own. Its slots replace the per-model
+    /// <c>/tier</c> and <c>/speed</c> selection for the same model, and an
+    /// unset slot removes it, so the request carries no tier or speed.
+    /// </summary>
+    private HarnessSettings ForModel(ProviderName provider, string model, string? serviceTier, string? speed) =>
+        WithSelection(provider, model)
+            .WithTier(provider, model, serviceTier)
+            .WithSpeed(provider, model, speed);
 
     public HarnessSettings WithImageModel(ImageModelSettings imageModel)
     {

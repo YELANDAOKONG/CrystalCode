@@ -168,8 +168,8 @@ internal static class SessionOptionCatalog
     /// <summary>
     /// Thinking, tier, and speed of an enabled side model, each offered only
     /// when that model has a choice. Ids are <paramref name="prefix"/> plus
-    /// <c>_thinking</c>, <c>_tier</c>, and <c>_speed</c>. A side model's own
-    /// unset slot follows the per-model selection.
+    /// <c>_thinking</c>, <c>_tier</c>, and <c>_speed</c>. A side model's unset
+    /// slot sends no tier or speed.
     /// </summary>
     private static void AddTuning(
         List<SessionOption> options,

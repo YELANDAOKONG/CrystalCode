@@ -42,8 +42,7 @@ internal static class PluginModelFacts
 
     public static PluginReview DescribeReview(
         ApprovalModelSettings approval,
-        ProviderCatalog catalog,
-        HarnessSettings? settings = null)
+        ProviderCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(approval);
         ArgumentNullException.ThrowIfNull(catalog);
@@ -55,7 +54,6 @@ internal static class PluginModelFacts
         var providerName = new ProviderName(approval.Provider);
         var provider = catalog.GetModelProvider(providerName, approval.Model);
         var model = catalog.GetModel(providerName, approval.Model);
-        var selected = settings?.ForReviewer(approval);
         return new PluginReview(
             true,
             Describe(
@@ -63,7 +61,7 @@ internal static class PluginModelFacts
                 approval.Model,
                 model,
                 approval.ThinkingEffort.Value,
-                selected?.ServiceTier ?? approval.ServiceTier,
-                selected?.Speed ?? approval.Speed));
+                approval.ServiceTier,
+                approval.Speed));
     }
 }

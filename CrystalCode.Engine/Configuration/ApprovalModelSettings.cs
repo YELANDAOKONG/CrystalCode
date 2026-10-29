@@ -3,8 +3,8 @@ namespace CrystalCode.Engine.Configuration;
 /// <summary>
 /// Optional reviewer model, its thinking gear, and its own service tier and
 /// speed. While disabled, a stored provider, model, gear, and slots are kept
-/// and the session model reviews instead. An unset slot follows the per-model
-/// tier or speed selection.
+/// and the session model reviews instead. An unset slot sends no tier or
+/// speed; the session's per-model selection does not apply.
 /// </summary>
 public sealed record ApprovalModelSettings
 {
@@ -40,12 +40,12 @@ public sealed record ApprovalModelSettings
     public ThinkingSelection ThinkingEffort { get; }
 
     /// <summary>
-    /// Service-tier token for this model only, or null to follow the per-model selection.
+    /// Service-tier token for this model only, or null to send none.
     /// </summary>
     public string? ServiceTier { get; }
 
     /// <summary>
-    /// Speed token for this model only, or null to follow the per-model selection.
+    /// Speed token for this model only, or null to send none.
     /// </summary>
     public string? Speed { get; }
 

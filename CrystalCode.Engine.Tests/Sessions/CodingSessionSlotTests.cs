@@ -75,7 +75,7 @@ public sealed class CodingSessionSlotTests
     }
 
     [Fact]
-    public async Task Tier_RebuildsTheCompactionClientWhenItUsesTheSameModel()
+    public async Task Tier_LeavesACompactionClientOnTheSameModelWithoutATier()
     {
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
         await headless.Session.StartAsync(CancellationToken.None);
@@ -84,11 +84,17 @@ public sealed class CodingSessionSlotTests
         await headless.Session.SubmitAsync("/compact model model", CancellationToken.None);
         var withCompaction = headless.ChatPlugin.Creates;
         Assert.True(withCompaction > started);
+        Assert.Equal(("model", (string?)null, (string?)null), headless.ChatPlugin.Slots[^1]);
 
         await headless.Session.SubmitAsync("/tier flex", CancellationToken.None);
 
-        Assert.Equal(withCompaction + 2, headless.ChatPlugin.Creates);
+        // Only the session client is rebuilt; the compaction model sets its own slots.
+        Assert.Equal(withCompaction + 1, headless.ChatPlugin.Creates);
+        Assert.Equal(("model", "flex", (string?)null), headless.ChatPlugin.Slots[^1]);
         Assert.Equal("Tier Flex", headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.ServiceTier);
+
+        await headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        Assert.Equal(withCompaction + 1, headless.ChatPlugin.Creates);
     }
 
     private static HarnessSettings Settings()

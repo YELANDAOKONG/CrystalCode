@@ -3874,11 +3874,8 @@ public sealed class CodingSession : ITurnObserver
         SaveSettings(current => serviceTier
             ? current.WithTier(provider, modelName, selected)
             : current.WithSpeed(provider, modelName, selected));
-        if (!RefreshSideClients(provider, modelName, out var sideError))
-        {
-            Error(sideError);
-        }
-
+        // Side models set their own slots, so only the session client changes.
+        _clientView.ReleaseSession(_client, _multimodalClient);
         RefreshSlashCommands();
         RefreshChrome();
         Note(SlotNote(serviceTier, selected));
@@ -3932,53 +3929,6 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
-    private bool RefreshSideClients(ProviderName provider, string model, out string error)
-    {
-        error = string.Empty;
-        _clientView.ReleaseSession(_client, _multimodalClient);
-        if (UsesModel(_settings.ImageModel.Provider, _settings.ImageModel.Model, provider, model))
-        {
-            ReleaseImageDescriptionClient();
-        }
-
-        if (_settings.ApprovalModel.Enabled
-            && UsesModel(_settings.ApprovalModel.Provider, _settings.ApprovalModel.Model, provider, model))
-        {
-            ReleaseApprovalClient();
-            _clientView.ReleaseReview();
-        }
-
-        if (_settings.ExtendedApproval.Enabled
-            && UsesModel(
-                _settings.ExtendedApproval.Reviewer.Provider,
-                _settings.ExtendedApproval.Reviewer.Model,
-                provider,
-                model))
-        {
-            // The next executor rebuild opens a client with the new slot.
-            ReleaseExtendedClient();
-            RebuildExecutors();
-        }
-
-        if (!_settings.CompactionModel.Enabled
-            || !UsesModel(_settings.CompactionModel.Provider, _settings.CompactionModel.Model, provider, model))
-        {
-            return true;
-        }
-
-        if (!TryPrepareCompactionClient(_settings.CompactionModel, out var client, out var prepareError)
-            || client is null)
-        {
-            error = string.IsNullOrWhiteSpace(prepareError)
-                ? "The compaction model could not be refreshed."
-                : "The compaction model could not be refreshed: " + prepareError;
-            return false;
-        }
-
-        ReplaceCompactionClient(_settings.CompactionModel, client);
-        return true;
-    }
-
     private bool RefreshSummaryClient(out string error)
     {
         error = string.Empty;
@@ -4015,23 +3965,6 @@ public sealed class CodingSession : ITurnObserver
         }
 
         _imageDescriptionClient = null;
-    }
-
-    private static bool UsesModel(
-        string? provider,
-        string? model,
-        ProviderName changedProvider,
-        string changedModel)
-    {
-        if (provider is null || model is null)
-        {
-            return false;
-        }
-
-        return ProviderName.TryParse(provider, out var selectedProvider)
-            && selectedProvider is not null
-            && selectedProvider == changedProvider
-            && string.Equals(model, changedModel, StringComparison.Ordinal);
     }
 
     private void ChangeThinking(string argument)
@@ -5892,8 +5825,7 @@ public sealed class CodingSession : ITurnObserver
     private PluginReview CurrentPluginReview() =>
         PluginModelFacts.DescribeReview(
             _settings.ApprovalModel,
-            _settings.Catalog,
-            _settings);
+            _settings.Catalog);
 
     /// <summary>
     /// A new client on the session model. Plugin calls stay off the instance

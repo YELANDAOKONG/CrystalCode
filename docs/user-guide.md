@@ -625,10 +625,10 @@ Top-level fields:
 | `provider` | Active provider name |
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
-| `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused. A tier or speed applies to the reviewer only and must be listed by that model |
+| `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused. A tier or speed applies to the reviewer only and must be listed by that model; unset sends none, and the session `/tier` and `/speed` choice does not apply |
 | `extendedApproval` | Optional extended approval model for Review and Audit. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, `trigger` (`low`, `medium`, or `high`; default `low`, which checks every review allow), and `includePrimaryReview` (default `true`). Omitted means off. It never falls back to the session or approval model |
-| `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists), `serviceTier`, and `speed`. A tier or speed applies to the summarizer only and must be listed by that model; unset follows the per-model `/tier` and `/speed` choice. Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, gear, and slots unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
-| `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. A tier or speed applies to this model only and must be listed by it; unset follows the per-model `/tier` and `/speed` choice. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
+| `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists), `serviceTier`, and `speed`. A tier or speed applies to the summarizer only and must be listed by that model; unset sends no tier or speed, and the session `/tier` and `/speed` choice does not apply. Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, gear, and slots unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
+| `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. A tier or speed applies to this model only and must be listed by it; unset sends no tier or speed, and the session `/tier` and `/speed` choice does not apply. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or an effort token the model lists. `max` and `maximum` are different tokens. Tokens are stored in lowercase and sent unchanged |
 | `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
 | `tierSelections` | Saved service-tier tokens as a nested map, for example `{"openai": {"my-model": "flex"}}`. `/tier` writes this map. An absent choice, or a token the model no longer lists, omits the field |
@@ -1405,8 +1405,8 @@ thinking rows only while the switch is on, and `/status full` lists the
 effective `retry` and `approvalRetry` policies. The status bar does not.
 `/approval tier` and `/approval speed` cycle the approval model's service
 tier and speed, including the unset slot, or set a token that model lists,
-and write `config.json`. An unset slot follows the per-model `/tier` and
-`/speed` choice. Selecting another approval model clears both.
+and write `config.json`. An unset slot sends no tier or speed; the session
+`/tier` and `/speed` choice does not apply to the approval model. Selecting another approval model clears both.
 
 Extended approval adds a third model in Review and Audit. When the primary
 reviewer allows a call that would then run, the extended model takes a final

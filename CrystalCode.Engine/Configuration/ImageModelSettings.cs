@@ -4,8 +4,8 @@ namespace CrystalCode.Engine.Configuration;
 /// Optional vision model used to describe images for a session model that
 /// cannot see them. Omitted provider and model leave the tool unregistered.
 /// Thinking capability stays on the model entry; this stores the gear and the
-/// model's own service tier and speed. An unset slot follows the per-model
-/// tier or speed selection.
+/// model's own service tier and speed. An unset slot sends no tier or speed;
+/// the session's per-model selection does not apply.
 /// </summary>
 public sealed record ImageModelSettings
 {
@@ -37,12 +37,12 @@ public sealed record ImageModelSettings
     public ThinkingSelection ThinkingEffort { get; }
 
     /// <summary>
-    /// Service-tier token for this model only, or null to follow the per-model selection.
+    /// Service-tier token for this model only, or null to send none.
     /// </summary>
     public string? ServiceTier { get; }
 
     /// <summary>
-    /// Speed token for this model only, or null to follow the per-model selection.
+    /// Speed token for this model only, or null to send none.
     /// </summary>
     public string? Speed { get; }
 

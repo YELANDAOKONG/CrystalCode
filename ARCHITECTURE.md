@@ -579,7 +579,7 @@ image-description prompt and returns the reply as text. The side
 request has no tools, is not written into the session transcript, and uses
 `imageModel.thinkingEffort` through the same gear mapping as the host. Its
 optional `imageModel.serviceTier` and `imageModel.speed` apply to that client
-only; unset follows the per-model selection, as for a reviewer.
+only; unset sends no tier or speed, as for a reviewer.
 `view_image` is registered only for an image-capable turn. It returns the
 file as `ImageContent` so the current model sees it on the next round.
 Both follow the `read` path fence. A missing image-model credential fails
@@ -1382,8 +1382,9 @@ enabled in `config.json`. The object is `enabled`, `provider`, `model`,
 and optional `thinkingEffort`, `serviceTier`, and `speed`. An omitted object means off.
 `serviceTier` and `speed` apply to that reviewer only and must be tokens the
 reviewer model lists; an enabled reviewer with an unlisted token fails at
-startup. An unset slot follows the per-model `tierSelections` and
-`speedSelections`. `/approval tier` and `/approval speed` cycle the reviewer
+startup. An unset slot sends no tier or speed: a reviewer is configured on
+its own, and the session's per-model `tierSelections` and `speedSelections`
+do not apply to it, even for the same model. `/approval tier` and `/approval speed` cycle the reviewer
 model's list, including the unset slot, or select a listed token, and write
 `config.json`. Selecting another reviewer model clears both slots.
 `enabled: false` keeps a stored provider, model, and gear unused, and
@@ -1621,7 +1622,9 @@ not summarize. Any other argument is rejected.
 and optional `thinkingEffort`, `serviceTier`, and `speed`. An omitted
 object means off, and `enabled: false` keeps a stored provider, model, gear,
 and slots unused. A slot applies to the summarizer only, must be listed by
-its model, and falls back to the per-model selection when unset.
+its model, and sends no tier or speed when unset. `/tier` and `/speed`
+change only the session client, never an approval, extended approval,
+compaction, or image client on the same model.
 While off, the summary request uses the session model and omits
 reasoning. It does not reuse the session client, because that client
 keeps the turn output cap. The host opens a summary client with the

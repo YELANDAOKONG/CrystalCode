@@ -514,7 +514,7 @@ is `-32602`. The response carries the complete list of offered options.
 `thinking`, `context`, `tier`, and `speed` appear only when the model offers a
 choice. The `*_thinking`, `*_tier`, and `*_speed` options of the approval,
 extended approval, and compaction models appear only while that model is on
-and offers a choice; their unset value follows the per-model selection. A select lists only values with a command plus the current value;
+and offers a choice; their unset value sends no tier or speed. A select lists only values with a command plus the current value;
 `tier` and `speed` can cycle back to unset but not name it, so unset is shown
 only while current. Values grouped by provider use ACP's grouped options.
 
