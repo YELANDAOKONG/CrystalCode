@@ -644,6 +644,9 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 | `_crystal/export {format, system}` | `TryExport` markdown or json; returns `fileName`, `mediaType`, `text` |
 | `_crystal/compact {full}` | `/compact` or `/compact full` |
 | `_crystal/status {full}`, `_crystal/stats {scope}`, `_crystal/tools` | the command, answered with the structured report values |
+| `_crystal/models` | `ListModels`; the fields of `GET /models`, with `pending`. No base address, header, or key |
+| `_crystal/agents`, `_crystal/skills`, `_crystal/mcp`, `_crystal/plugins` | `ListAgents`, `ListSkills`, `ListMcp`, `ListPlugins`; the fields of the matching `GET` route |
+| `_crystal/tasks`, `_crystal/tasks/logs {taskId, offset, limit}` | `ListBackgroundTasks`, `TryReadBackgroundTaskLog`; the fields of `GET /tasks` and its logs route. An unknown task is `-32002`; a bad offset or limit, or an offset that left the bounded log, is `-32602` |
 
 A client cannot type the invisible marker prefix, so a prompt names an image
 from `_crystal/image/attach` as its plain `[Image #N]`. Bridge turns that
@@ -665,10 +668,6 @@ clipboard; `_crystal/image/attach` replaces it.
   authored here or by the operator's prompt files.
 - Audio input, URL-mode elicitation, MCP-over-ACP, and several concurrent
   sessions in one process.
-- Structured `_crystal/*` methods for the read-only queries `crystal server`
-  serves as `GET /models`, `/agents`, `/skills`, `/mcp`, `/plugins`, and
-  `/tasks`. The slash commands still report them as text, saved sessions
-  come from `session/list`, and options from `configOptions`.
 
 ## Security
 

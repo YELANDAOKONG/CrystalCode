@@ -28,7 +28,8 @@ public sealed class BridgeExtensionTests
         var extensions = crystal.GetProperty("extensions").EnumerateArray().Select(static value => value.GetString()).ToArray();
         Assert.Contains("_crystal/snapshot", extensions);
         Assert.Contains("_crystal/session/fork", extensions);
-        Assert.Equal(22, extensions.Length);
+        Assert.Contains("_crystal/tasks/logs", extensions);
+        Assert.Equal(29, extensions.Length);
         Assert.Contains("_crystal/queue", crystal.GetProperty("eventKinds").EnumerateArray().Select(static value => value.GetString()));
         Assert.Equal("rfd", crystal.GetProperty("fork").GetString());
         Assert.Equal("rfd", crystal.GetProperty("subagents").GetString());
@@ -163,6 +164,74 @@ public sealed class BridgeExtensionTests
         Assert.Equal(-32002, missing.GetProperty("error").GetProperty("code").GetInt32());
         await fixture.WaitForUpdateAsync("agent_message_chunk", static update =>
             update.GetProperty("content").GetProperty("text").GetString() == "quick done");
+    }
+
+    [Fact]
+    public async Task Catalogs_AnswerWithStructuredValues()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var id = await fixture.OpenAsync(Notified);
+
+        var models = (await fixture.RequestAsync("_crystal/models", new { sessionId = id })).GetProperty("result");
+        var agents = (await fixture.RequestAsync("_crystal/agents", new { sessionId = id })).GetProperty("result");
+        var skills = (await fixture.RequestAsync("_crystal/skills", new { sessionId = id })).GetProperty("result");
+        var mcp = (await fixture.RequestAsync("_crystal/mcp", new { sessionId = id })).GetProperty("result");
+        var plugins = (await fixture.RequestAsync("_crystal/plugins", new { sessionId = id })).GetProperty("result");
+        var tasks = (await fixture.RequestAsync("_crystal/tasks", new { sessionId = id })).GetProperty("result");
+
+        var current = Assert.Single(models.GetProperty("models").EnumerateArray(), static model => model.GetProperty("current").GetBoolean());
+        Assert.Equal("ollama", current.GetProperty("provider").GetString());
+        Assert.False(current.TryGetProperty("baseUri", out _));
+        Assert.Equal(JsonValueKind.Object, models.GetProperty("pending").ValueKind);
+        Assert.Contains(agents.GetProperty("agents").EnumerateArray(), static agent => agent.GetProperty("name").GetString() == "general");
+        Assert.False(skills.GetProperty("enabled").GetBoolean());
+        Assert.False(mcp.GetProperty("enabled").GetBoolean());
+        Assert.Equal(JsonValueKind.Array, plugins.GetProperty("plugins").ValueKind);
+        Assert.Empty(tasks.GetProperty("tasks").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task TaskLogs_ReportAnUnknownTaskAndBadParameters()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var id = await fixture.OpenAsync(Notified);
+
+        var missing = await fixture.RequestAsync("_crystal/tasks/logs", new { sessionId = id, taskId = "task_missing" });
+        var badOffset = await fixture.RequestAsync("_crystal/tasks/logs", new { sessionId = id, taskId = "task_missing", offset = "x" });
+        var noId = await fixture.RequestAsync("_crystal/tasks/logs", new { sessionId = id });
+
+        Assert.Equal(-32002, missing.GetProperty("error").GetProperty("code").GetInt32());
+        Assert.Equal(-32602, badOffset.GetProperty("error").GetProperty("code").GetInt32());
+        Assert.Equal(-32602, noId.GetProperty("error").GetProperty("code").GetInt32());
+    }
+
+    [Fact]
+    public async Task Catalogs_NeverCarryAProviderKey()
+    {
+        const string secret = "sk-bridge-catalog-secret-1234";
+        await using var fixture = await BridgeFixture.StartAsync(
+            new ScriptedModel(false),
+            prepare: (home, _) => File.WriteAllText(
+                Path.Combine(home.Root, "providers.json"),
+                $$"""
+                {
+                  "leaky": {
+                    "protocol": "ollama",
+                    "baseUri": "http://127.0.0.1:9/",
+                    "apiKey": "{{secret}}",
+                    "models": { "m": { "contextWindow": 8192 } }
+                  }
+                }
+                """));
+        var id = await fixture.OpenAsync(Notified);
+
+        foreach (var method in new[] { "_crystal/models", "_crystal/agents", "_crystal/skills", "_crystal/mcp", "_crystal/plugins", "_crystal/tasks" })
+        {
+            var reply = await fixture.RequestAsync(method, new { sessionId = id });
+            Assert.True(reply.TryGetProperty("result", out _), method);
+        }
+
+        Assert.All(fixture.Lines, line => Assert.DoesNotContain(secret, line, StringComparison.Ordinal));
     }
 
     [Fact]

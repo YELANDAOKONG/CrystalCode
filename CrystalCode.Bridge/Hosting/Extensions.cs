@@ -5,6 +5,7 @@ using CrystalCode.Bridge.Transport;
 using CrystalCode.Bridge.Wire;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Bridge.Hosting;
 
@@ -41,7 +42,14 @@ internal static class Extensions
         "_crystal/compact",
         "_crystal/status",
         "_crystal/stats",
-        "_crystal/tools"
+        "_crystal/tools",
+        "_crystal/models",
+        "_crystal/agents",
+        "_crystal/skills",
+        "_crystal/mcp",
+        "_crystal/plugins",
+        "_crystal/tasks",
+        "_crystal/tasks/logs"
     ];
 
     /// <summary>Every <c>_crystal/*</c> notification Bridge sends, for <c>initialize</c>.</summary>
@@ -179,9 +187,78 @@ internal static class Extensions
                     : "/stats", "stats", origin);
             case "_crystal/tools":
                 return await ReportAsync(bridge, "/tools", "tools", origin);
+            case "_crystal/models":
+                var (models, pending) = await QueryAsync(runner, static value => (value.ListModels(), value.PendingSettings), origin);
+                return Result(writer => CatalogWire.Models(writer, models, pending));
+            case "_crystal/agents":
+                var agents = await QueryAsync(runner, static value => value.ListAgents(), origin);
+                return Result(writer => CatalogWire.Agents(writer, agents));
+            case "_crystal/skills":
+                var skills = await QueryAsync(runner, static value => value.ListSkills(), origin);
+                return Result(writer => CatalogWire.Skills(writer, skills));
+            case "_crystal/mcp":
+                var mcp = await QueryAsync(runner, static value => value.ListMcp(), origin);
+                return Result(writer => CatalogWire.Mcp(writer, mcp));
+            case "_crystal/plugins":
+                var plugins = await QueryAsync(runner, static value => value.ListPlugins(), origin);
+                return Result(writer => CatalogWire.Plugins(writer, plugins));
+            case "_crystal/tasks":
+                var tasks = await QueryAsync(runner, static value => value.ListBackgroundTasks(), origin);
+                return Result(writer => CatalogWire.Tasks(writer, tasks));
+            case "_crystal/tasks/logs":
+                return await TaskLogAsync(runner, parameters, origin);
             default:
                 throw new JsonRpcException(JsonRpcErrorCode.MethodNotFound, "Method not found: " + PromptContent.OneLine(method));
         }
+    }
+
+    /// <summary>Reads the session through the runner, so the read sees a consistent session.</summary>
+    private static async Task<T> QueryAsync<T>(SessionRunner runner, Func<CodingSession, T> read, string origin)
+    {
+        try
+        {
+            return await runner.InvokeAsync(read, origin);
+        }
+        catch (InvalidOperationException)
+        {
+            throw JsonRpcException.NotFound("The session is not active.");
+        }
+    }
+
+    private static async Task<JsonRpcReply> TaskLogAsync(SessionRunner runner, JsonElement parameters, string origin)
+    {
+        var taskId = JsonParams.RequiredString(parameters, "taskId");
+        var offset = OptionalInt(parameters, "offset") ?? 0;
+        var limit = OptionalInt(parameters, "limit") ?? WorkspaceLimits.MaximumBackgroundLogCharacters;
+        var (exists, read, log) = await QueryAsync(runner, value =>
+        {
+            var known = value.ListBackgroundTasks().Any(task => string.Equals(task.TaskId, taskId, StringComparison.Ordinal));
+            var ok = value.TryReadBackgroundTaskLog(taskId, offset, limit, out var text);
+            return (known, ok, text);
+        }, origin);
+        if (!exists)
+        {
+            throw JsonRpcException.NotFound(log.Text);
+        }
+
+        if (!read)
+        {
+            throw JsonRpcException.InvalidParams(log.Text);
+        }
+
+        return Result(writer => CatalogWire.Log(writer, log));
+    }
+
+    private static int? OptionalInt(JsonElement parameters, string name)
+    {
+        if (parameters.ValueKind != JsonValueKind.Object || !parameters.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number)
+            ? number
+            : throw JsonRpcException.InvalidParams(name + " must be an integer.");
     }
 
     /// <summary>Submits text as the composer does and turns an engine refusal into <c>command_refused</c>.</summary>

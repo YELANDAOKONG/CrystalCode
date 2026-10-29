@@ -59,14 +59,14 @@ public sealed class BridgeParityTests
         ["CustomMode"] = "Phase 2: config options",
         ["SessionId"] = "The ACP session id",
         ["ListSavedSessions"] = "session/list reads the store for any cwd",
-        ["ListModels"] = "The model config option; the text forms of /model as prompt text",
+        ["ListModels"] = "_crystal/models",
         ["ListOptions"] = "configOptions on every session response and update",
-        ["ListAgents"] = "Not mapped yet: /agents as prompt text",
-        ["ListSkills"] = "Not mapped yet: /skills as prompt text",
-        ["ListMcp"] = "Not mapped yet: /mcp as prompt text",
-        ["ListPlugins"] = "Not mapped yet: /plugins as prompt text",
-        ["ListBackgroundTasks"] = "Not mapped yet: the model reads tasks with bash_status",
-        ["TryReadBackgroundTaskLog"] = "Not mapped yet: the model reads logs with bash_logs"
+        ["ListAgents"] = "_crystal/agents",
+        ["ListSkills"] = "_crystal/skills",
+        ["ListMcp"] = "_crystal/mcp",
+        ["ListPlugins"] = "_crystal/plugins",
+        ["ListBackgroundTasks"] = "_crystal/tasks",
+        ["TryReadBackgroundTaskLog"] = "_crystal/tasks/logs"
     };
 
     [Fact]
