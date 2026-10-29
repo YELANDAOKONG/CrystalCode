@@ -86,6 +86,9 @@ public sealed record ImageAttachment
 
     public Uri? Uri { get; }
 
+    /// <summary>Bytes held inline. Zero for a remote image.</summary>
+    public int ByteCount => _data?.Length ?? 0;
+
     public string Marker => $"[Image #{Number}]";
 
     public string TrustedMarker => ImageMarkerText.Tag(Number);

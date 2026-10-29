@@ -113,6 +113,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             approvalRetry: ReadRetry(document.ApprovalRetry),
             compactionModel: ReadCompactionModel(document.CompactionModel),
             microCompaction: ReadMicroCompaction(document.MicroCompaction),
+            imageTrim: ReadImageTrim(document.ImageTrim),
             ruleFiles: ReadRuleFiles(document.RuleFiles),
             reservedOutputTokens: document.ReservedOutputTokens,
             agents: document.Agents,
@@ -208,6 +209,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             Bridge = WriteBridge(settings.Bridge),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
+            ImageTrim = WriteImageTrim(settings.ImageTrim),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
             ImageModel = WriteImageModel(settings.ImageModel),
             Retry = WriteRetry(settings.Retry),
@@ -568,6 +570,44 @@ public sealed class DiskSettingsStore : ISettingsStore
             MinimumTokens = settings.MinimumTokens == MicroCompactionSettings.DefaultMinimumTokens
                 ? null
                 : settings.MinimumTokens
+        };
+    }
+
+    private static ImageTrimSettings ReadImageTrim(ImageTrimDocument? document)
+    {
+        if (document is null)
+        {
+            return ImageTrimSettings.Default;
+        }
+
+        return new ImageTrimSettings(
+            document.Enabled ?? ImageTrimSettings.DefaultEnabled,
+            document.KeepRecent ?? ImageTrimSettings.DefaultKeepRecent,
+            document.Slack ?? ImageTrimSettings.DefaultSlack,
+            document.MaxBytes ?? ImageTrimSettings.DefaultMaxBytes,
+            document.IncludeUserImages ?? ImageTrimSettings.DefaultIncludeUserImages);
+    }
+
+    private static ImageTrimDocument? WriteImageTrim(ImageTrimSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new ImageTrimDocument
+        {
+            Enabled = settings.Enabled == ImageTrimSettings.DefaultEnabled ? null : settings.Enabled,
+            KeepRecent = settings.KeepRecent == ImageTrimSettings.DefaultKeepRecent
+                ? null
+                : settings.KeepRecent,
+            Slack = settings.Slack == ImageTrimSettings.DefaultSlack ? null : settings.Slack,
+            MaxBytes = settings.MaxBytes == ImageTrimSettings.DefaultMaxBytes
+                ? null
+                : settings.MaxBytes,
+            IncludeUserImages = settings.IncludeUserImages == ImageTrimSettings.DefaultIncludeUserImages
+                ? null
+                : settings.IncludeUserImages
         };
     }
 

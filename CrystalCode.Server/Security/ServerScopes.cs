@@ -67,6 +67,8 @@ public static class ServerScopes
             SessionVerb.Child => ServerScope.Operate,
             SessionVerb.Sessions => ServerScope.Operate,
             SessionVerb.Compact => IsDisplayOnly(argument) ? ServerScope.Operate : ServerScope.Admin,
+            // on and off write config.json; the other forms change only this session.
+            SessionVerb.Trim => IsSwitch(argument) ? ServerScope.Admin : ServerScope.Operate,
             SessionVerb.Todos => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Attach => ServerScope.Operate,
             SessionVerb.Quick => ServerScope.Operate,
@@ -101,6 +103,13 @@ public static class ServerScopes
             // A verb added to the engine must be classified here first.
             _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "The command has no server scope.")
         };
+    }
+
+    private static bool IsSwitch(string argument)
+    {
+        var text = argument.Trim();
+        return text.Equals("on", StringComparison.OrdinalIgnoreCase)
+            || text.Equals("off", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>A bare /compact summarizes; every argument form writes config.json.</summary>

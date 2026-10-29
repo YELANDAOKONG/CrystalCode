@@ -30,6 +30,8 @@ public sealed class MultimodalStreamingTurn
     private readonly Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>?
         _prepareModel;
     private readonly Func<ChatResponse, CancellationToken, Task>? _onModelResponse;
+    private readonly Func<IReadOnlyList<ChatItem>, IDictionary<int, ImageAttachment>, IDictionary<int, ImageAttachment>>?
+        _selectImages;
 
     public MultimodalStreamingTurn(
         IStreamingMultimodalChatClient client,
@@ -94,7 +96,9 @@ public sealed class MultimodalStreamingTurn
         Action<IReadOnlyList<ChatItem>>? commit = null,
         Func<IReadOnlyList<ChatItem>, CancellationToken, Task<IReadOnlyList<ChatItem>>>? prepareModel = null,
         Func<ChatResponse, CancellationToken, Task>? onModelResponse = null,
-        SharedTurnBudget? budget = null)
+        SharedTurnBudget? budget = null,
+        Func<IReadOnlyList<ChatItem>, IDictionary<int, ImageAttachment>, IDictionary<int, ImageAttachment>>?
+            selectImages = null)
         : this(client, executor, limits, images, observer, reasoning, compactBeforeRound, retry)
     {
         _reserveImageNumber = reserveImageNumber;
@@ -104,6 +108,7 @@ public sealed class MultimodalStreamingTurn
         _prepareModel = prepareModel;
         _budget = budget;
         _onModelResponse = onModelResponse;
+        _selectImages = selectImages;
     }
 
     public async Task<TurnResult> RunAsync(
@@ -166,8 +171,11 @@ public sealed class MultimodalStreamingTurn
 
                 modelCallCount++;
                 var outbound = await PrepareOutboundAsync(transcript, linked.Token);
+                var held = _imageSnapshot();
                 var request = new MultimodalChatRequest(
-                    MultimodalTranscript.Convert(outbound, _imageSnapshot()),
+                    MultimodalTranscript.Convert(
+                        outbound,
+                        _selectImages is null ? held : _selectImages(outbound, held)),
                     _executor.Definitions,
                     _reasoning);
                 var response = await StreamModelAsync(request, usage, linked.Token);

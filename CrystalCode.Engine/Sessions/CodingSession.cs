@@ -490,6 +490,7 @@ public sealed class CodingSession : ITurnObserver
                 images.ToDictionary(pair => pair.Key, pair => pair.Value.MimeType), token).AsTask();
             if (clients.Images is not null)
             {
+                var childTrimmer = new ImageTrimmer();
                 var imageExecutor = new PluginMultimodalExecutor(new HybridMultimodalToolExecutor(executor,
                     ChildImageTools(todos).Where(tool => allowed.Contains(tool.Definition.Name)), _childPolicy), _hooks);
                 var adapter = new MultimodalChildAgent(clients.Images.Capabilities, async token =>
@@ -498,7 +499,8 @@ public sealed class CodingSession : ITurnObserver
                         reasoning, CompactAsync, _settings.Retry.ToOptions(), ReserveImageNumber,
                         image => { images.Add(image.Number, image); AddImage(image); },
                         () => new Dictionary<int, ImageAttachment>(images), archive.AddRange,
-                        PrepareAsync, ReportAsync, _sharedBudget);
+                        PrepareAsync, ReportAsync, _sharedBudget,
+                        (context, held) => childTrimmer.Apply(context, held, _settings.ImageTrim));
                     result = await turn.RunAsync(items, token);
                     return result;
                 }, completed => MultimodalTranscript.Convert(completed.Transcript, images));
@@ -1017,6 +1019,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly object _archiveGate = new();
     private List<ChatItem> _archive = [];
     private Dictionary<int, ImageAttachment> _images = [];
+    private readonly ImageTrimmer _imageTrimmer = new();
     private readonly object _imagesGate = new();
     private List<SessionImageDocument> _unavailableImages = [];
     private readonly List<(int Number, string? Origin)> _pendingImages = [];
@@ -2164,6 +2167,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Tier:
                 ChangeCatalogSlot(command.Argument, serviceTier: true);
+                return (true, false);
+            case SessionVerb.Trim:
+                ChangeImageTrim(command.Argument);
                 return (true, false);
             case SessionVerb.Speed:
                 ChangeCatalogSlot(command.Argument, serviceTier: false);
@@ -6024,6 +6030,7 @@ public sealed class CodingSession : ITurnObserver
             _images.Clear();
             _nextImageNumber = 1;
         }
+        _imageTrimmer.Reset();
         _unavailableImages.Clear();
         _pendingImages.Clear();
         _draftImages.Clear();
@@ -6465,6 +6472,7 @@ public sealed class CodingSession : ITurnObserver
             _images = new Dictionary<int, ImageAttachment>(
                 _sessionStore.ReadImages(document.Images));
         }
+        _imageTrimmer.Reset();
         var availableImages = ImageSnapshot();
         _unavailableImages = document.Images
             .Where(image => image is not null
@@ -7570,6 +7578,40 @@ public sealed class CodingSession : ITurnObserver
 
         pruned = next;
         return true;
+    }
+
+    private void ChangeImageTrim(string? argument)
+    {
+        if (!ImageTrimArguments.TryParse(argument, out var request, out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        if (_turnActive || _compactSource is not null)
+        {
+            Error("Finish the current turn before trimming images.");
+            return;
+        }
+
+        if (request.Enabled is bool enabled)
+        {
+            SaveSettings(current => current.WithImageTrim(current.ImageTrim.WithEnabled(enabled)));
+            Note("Image trim  " + (enabled ? "On" : "Off"));
+            return;
+        }
+
+        var settings = _settings.ImageTrim;
+        var result = _imageTrimmer.Trim(
+            _transcript,
+            ImageSnapshot(),
+            request.Keep ?? settings.KeepRecent,
+            settings.IncludeUserImages);
+        Note(result.Images == 0
+            ? "No images to trim"
+            : string.Create(
+                CultureInfo.InvariantCulture,
+                $"Left {result.Images} image(s), {result.Bytes / 1024.0 / 1024.0:0.0} MiB, out of model requests"));
     }
 
     private void ChangeCompactionThinking(CompactionThinkingArguments.Request request)
@@ -8688,7 +8730,8 @@ public sealed class CodingSession : ITurnObserver
                 CommitTurnItems,
                 PrepareOutboundAsync,
                 (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token),
-                _sharedBudget);
+                _sharedBudget,
+                (context, held) => _imageTrimmer.Apply(context, held, _settings.ImageTrim));
             return multimodalTurn.RunAsync(_transcript, cancellationToken);
         }
 

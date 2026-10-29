@@ -1655,6 +1655,71 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Load_ReadsImageTrimAndOmitsTheDefault()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        Assert.DoesNotContain(
+            "imageTrim",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+        Assert.True(store.Load().ImageTrim.Enabled);
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "imageTrim": {
+                "enabled": false,
+                "keepRecent": 3,
+                "slack": 0,
+                "maxBytes": 0,
+                "includeUserImages": true
+              }
+            }
+            """);
+
+        var settings = store.Load();
+
+        Assert.False(settings.ImageTrim.Enabled);
+        Assert.Equal(3, settings.ImageTrim.KeepRecent);
+        Assert.Equal(0, settings.ImageTrim.Slack);
+        Assert.Equal(0, settings.ImageTrim.MaxBytes);
+        Assert.True(settings.ImageTrim.IncludeUserImages);
+        store.Save(settings);
+        var saved = File.ReadAllText(root.Home.ConfigPath);
+        Assert.Contains("\"keepRecent\": 3", saved, StringComparison.Ordinal);
+        store.Save(settings.WithImageTrim(ImageTrimSettings.Default));
+        Assert.DoesNotContain(
+            "imageTrim",
+            File.ReadAllText(root.Home.ConfigPath),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_RejectsInvalidImageTrim()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash",
+              "imageTrim": { "keepRecent": 0 }
+            }
+            """);
+
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => store.Load());
+
+        Assert.Contains("at least 1", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_RejectsInvalidMicroCompaction()
     {
         using var root = new TemporaryHome();

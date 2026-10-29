@@ -124,7 +124,15 @@ separate library with no terminal code. The product can:
   set `on` / `off`, and write `config.json`. They do not summarize.
   Optional microcompaction, off unless `microCompaction` is set, clears old
   successful tool results before each model call. `/compact micro` toggles it
-  or sets `on` / `off` and writes `config.json`. It does not summarize;
+  or sets `on` / `off` and writes `config.json`. It does not summarize.
+  Image trimming, on by default, bounds the images a model request carries
+  so a session that holds many tool-returned images does not exceed the
+  provider's request size. It only changes what is sent: the transcript, the
+  saved session, resume, fork, and export keep every image, and the model
+  sees an omitted image as its `[Image #N]` marker text. `imageTrim` in
+  `config.json` sets the limits, and `/trim` leaves older images out on
+  demand. Images the operator attached are kept unless `includeUserImages`
+  is set. Audio and video are not covered because they are not supported yet;
 - ask before the first interactive session in a directory, when workspace
   trust is on (the default). Trust is the git root when the workspace is
   inside a repository, and the workspace itself otherwise. A yes is
@@ -497,19 +505,6 @@ implemented in the current build.
 
 ### High priority
 
-- Trimming tool-returned media resources. The direction is to let a session
-  drop the resources a tool returned, such as images now and audio or video
-  once they are supported, from what is sent to the model, so a request no
-  longer fails with HTTP 413 when many are held. The operator can trigger it
-  manually and set how much it trims, it can also respond to a 413, and it is
-  configurable. Which resources it covers, how a trimmed resource is shown to
-  the model and the operator, whether it can be undone, how it interacts with
-  compaction, resume, fork, and export, the configuration shape, and the
-  front-end surfaces are not defined. Do not reserve a configuration field,
-  command, public type, event, or wire field. This does not authorize changes
-  under `../Crystal`, and approval, trust, the workspace fence, and
-  `ToolInvocationPolicy` stay as they are. Current behavior stands: a 413
-  ends the turn with an error.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
   a library is also published are not defined. Do not reserve a package id or
   add a project. This item is not permission to add or update a package

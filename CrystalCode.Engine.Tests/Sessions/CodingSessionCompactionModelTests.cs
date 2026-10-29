@@ -180,6 +180,31 @@ public sealed class CodingSessionCompactionModelTests
     }
 
     [Fact]
+    public async Task Trim_SwitchesAutomaticTrimmingAndRejectsBadArguments()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/trim off", CancellationToken.None);
+        Assert.Equal("Image trim  Off", LastNote(headless));
+        Assert.False(Read(headless).ImageTrim!.Enabled);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/trim on", CancellationToken.None);
+        Assert.Equal("Image trim  On", LastNote(headless));
+        Assert.Null(Read(headless).ImageTrim);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/trim 2", CancellationToken.None);
+        Assert.Equal("No images to trim", LastNote(headless));
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/trim later", CancellationToken.None);
+        Assert.StartsWith("Trim takes", LastError(headless), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Microcompaction_KeepsTheTurnTranscriptAfterPruning()
     {
         var client = new ScriptedStreamingClient(

@@ -98,6 +98,7 @@ public sealed record HarnessSettings
         CompactionModelSettings? compactionModel = null,
         bool showAutomaticCompactionSummary = DefaultShowAutomaticCompactionSummary,
         MicroCompactionSettings? microCompaction = null,
+        ImageTrimSettings? imageTrim = null,
         RuleFileSettings? ruleFiles = null,
         IReadOnlyList<string>? disabledBuiltInTools = null,
         IReadOnlyDictionary<ContextSelectionKey, string>? tierSelections = null,
@@ -223,6 +224,7 @@ public sealed record HarnessSettings
         ApprovalColors = approvalColors;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
+        ImageTrim = imageTrim ?? ImageTrimSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
         ProcessDisabledBuiltInTools = BuiltInToolDisablement.FromProcessNames(disabledBuiltInTools);
         PersistentDisabledBuiltInTools = persistentDisabledBuiltInTools ?? new BuiltInToolDisablement();
@@ -510,6 +512,8 @@ public sealed record HarnessSettings
     public CompactionModelSettings CompactionModel { get; }
 
     public MicroCompactionSettings MicroCompaction { get; }
+
+    public ImageTrimSettings ImageTrim { get; }
 
     public ImageModelSettings ImageModel { get; }
 
@@ -804,6 +808,12 @@ public sealed record HarnessSettings
         return Copy(microCompaction: microCompaction, setMicroCompaction: true);
     }
 
+    public HarnessSettings WithImageTrim(ImageTrimSettings imageTrim)
+    {
+        ArgumentNullException.ThrowIfNull(imageTrim);
+        return Copy(imageTrim: imageTrim);
+    }
+
     private HarnessSettings Copy(
         ProviderName? provider = null,
         string? model = null,
@@ -852,6 +862,7 @@ public sealed record HarnessSettings
         bool? showAutomaticCompactionSummary = null,
         MicroCompactionSettings? microCompaction = null,
         bool setMicroCompaction = false,
+        ImageTrimSettings? imageTrim = null,
         RuleFileSettings? ruleFiles = null,
         IReadOnlyList<string>? disabledBuiltInTools = null,
         BuiltInToolDisablement? persistentDisabledBuiltInTools = null,
@@ -910,6 +921,7 @@ public sealed record HarnessSettings
             setCompactionModel ? compactionModel : CompactionModel,
             showAutomaticCompactionSummary ?? ShowAutomaticCompactionSummary,
             setMicroCompaction ? microCompaction : MicroCompaction,
+            imageTrim ?? ImageTrim,
             ruleFiles ?? RuleFiles,
             disabledBuiltInTools ?? ProcessDisabledBuiltInTools.All(),
             tierSelections ?? TierSelections,

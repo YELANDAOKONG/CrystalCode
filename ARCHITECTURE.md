@@ -1456,6 +1456,29 @@ protected tokens, and 20000 minimum tokens. `protectTurns` must be at
 least 1. The token counts must be non-negative. Invalid values refuse
 startup. Full compaction's own prune does not follow this switch.
 
+Image trimming is a projection of the outbound request, not a change to the
+transcript. `ImageTrimmer` (one per session and one per image-capable child
+run) chooses which held images `MultimodalTranscript.Convert` expands into
+bytes; `MultimodalStreamingTurn` asks it before each model call. An image it
+omits is converted to its `[Image #N]` marker text, the existing behavior for
+a marker with no held image. The transcript, `_images`, the saved session,
+fork, and export are untouched. Omission is one-way for the life of the
+trimmer, so a trimmed image does not return when a newer one arrives and the
+request prefix, which a provider may cache, changes only when a trim fires.
+Automatic trimming fires when the trimmable images in the transcript exceed
+`keepRecent + slack`, and then keeps the newest `keepRecent`. A byte budget
+(`maxBytes`, 0 for none) fires at once and drops the oldest trimmable images
+until the inline bytes fit, always keeping the newest. Trimmable means an
+image referenced by a tool result, plus operator-attached images when
+`includeUserImages` is set. `imageTrim` in `config.json` holds `enabled`
+(true), `keepRecent` (8, at least 1), `slack` (4), `maxBytes` (33554432), and
+`includeUserImages` (false); the object is omitted when all are default and
+invalid values refuse startup. `/trim` with no argument or a count trims to
+that many now, `all` keeps none, and `on` or `off` switches automatic
+trimming and writes `config.json`. It is refused during a turn or
+compaction. The omissions live in memory: `/clear` and resume reset them and
+the limits apply again on the next request. A 413 is not handled separately.
+
 Reserved output is `reservedOutputTokens` when set. Otherwise it is
 the smallest of 20000, the model `maxTokens`, and a quarter of the
 window, so a small window keeps most of itself for input. The
