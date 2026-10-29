@@ -58,6 +58,7 @@ public static class SessionLaunchOverrides
                 request.ApprovalThinking,
                 request.ApprovalTier,
                 request.ApprovalSpeed,
+                request.ApprovalContext,
                 ApprovalFlags));
 
             next = next.WithExtendedApproval(ParseExtendedApproval(next, request));
@@ -87,6 +88,12 @@ public static class SessionLaunchOverrides
             {
                 next = next.WithCompactionModel(next.CompactionModel.WithSpeed(
                     Token(request.CompactionSpeed, "Compaction speed")));
+            }
+
+            if (request.CompactionContext is not null)
+            {
+                next = next.WithCompactionModel(next.CompactionModel.WithContextWindow(
+                    Budget(request.CompactionContext, "Compaction context budget")));
             }
 
             if (request.Thinking is not null)
@@ -388,6 +395,7 @@ public static class SessionLaunchOverrides
             request.ExtendedApprovalThinking,
             request.ExtendedApprovalTier,
             request.ExtendedApprovalSpeed,
+            request.ExtendedApprovalContext,
             ExtendedFlags);
         extended = extended.WithReviewer(reviewer);
         if (request.ExtendedApprovalTrigger is not null)
@@ -456,7 +464,7 @@ public static class SessionLaunchOverrides
             throw new ArgumentException(exception.Message, exception);
         }
 
-        // A stored tier or speed belongs to the stored model only.
+        // A stored tier, speed, or context budget belongs to the stored model only.
         var sameModel = string.Equals(stored.Provider, provider.Value, StringComparison.Ordinal)
             && string.Equals(stored.Model, model, StringComparison.Ordinal);
         return new ApprovalModelSettings(
@@ -465,7 +473,8 @@ public static class SessionLaunchOverrides
             model,
             stored.ThinkingEffort,
             sameModel ? stored.ServiceTier : null,
-            sameModel ? stored.Speed : null);
+            sameModel ? stored.Speed : null,
+            sameModel ? stored.ContextWindow : null);
     }
 
     private static ApprovalModelSettings TuneReviewer(
@@ -473,6 +482,7 @@ public static class SessionLaunchOverrides
         string? thinking,
         string? tier,
         string? speed,
+        string? context,
         ReviewerFlags flags)
     {
         var next = reviewer;
@@ -492,7 +502,26 @@ public static class SessionLaunchOverrides
             next = next.WithSpeed(Token(speed, flags.Label + " speed"));
         }
 
+        if (context is not null)
+        {
+            next = next.WithContextWindow(Budget(context, flags.Label + " context budget"));
+        }
+
         return next;
+    }
+
+    /// <summary>
+    /// A token count such as <c>200k</c> or <c>1m</c>. Whether the model
+    /// declares it is checked when the settings are built.
+    /// </summary>
+    private static int Budget(string text, string label)
+    {
+        if (!ContextWindowSelection.TryParse(Required(text, label), out var window))
+        {
+            throw new ArgumentException(label + " must be a token count such as 200k or 1m.");
+        }
+
+        return window;
     }
 
     private static string Token(string text, string label)
@@ -553,7 +582,7 @@ public static class SessionLaunchOverrides
             throw new ArgumentException(exception.Message, exception);
         }
 
-        // A stored tier or speed belongs to the stored model only.
+        // A stored tier, speed, or context budget belongs to the stored model only.
         var sameModel = string.Equals(current.CompactionModel.Provider, provider.Value, StringComparison.Ordinal)
             && string.Equals(current.CompactionModel.Model, model, StringComparison.Ordinal);
         return new CompactionModelSettings(
@@ -562,7 +591,8 @@ public static class SessionLaunchOverrides
             model,
             current.CompactionModel.ThinkingEffort,
             sameModel ? current.CompactionModel.ServiceTier : null,
-            sameModel ? current.CompactionModel.Speed : null);
+            sameModel ? current.CompactionModel.Speed : null,
+            sameModel ? current.CompactionModel.ContextWindow : null);
     }
 
     private static TurnLimits ParseBudget(HarnessSettings current, SessionLaunchOptions request)

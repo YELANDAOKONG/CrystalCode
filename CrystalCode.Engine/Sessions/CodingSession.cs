@@ -167,8 +167,15 @@ public sealed class CodingSession : ITurnObserver
         {
             throw new ArgumentException("Agent provider and model must be specified together.", nameof(model));
         }
-        var selected = _settings.WithSelection(new ProviderName(model.Provider), model.Model)
-            .WithThinkingEffort(ThinkingSelection.Default);
+        // An Agent with its own model is configured on its own: unset tier and
+        // speed are not sent, and unset context is the model's first budget,
+        // whatever the session chose for the same model.
+        var provider = new ProviderName(model.Provider);
+        var selected = _settings.WithSelection(provider, model.Model)
+            .WithThinkingEffort(ThinkingSelection.Default)
+            .WithTier(provider, model.Model, null)
+            .WithSpeed(provider, model.Model, null);
+        selected = selected.WithContextWindow(provider, model.Model, selected.ActiveModel.ContextWindows[0]);
         if (model.Thinking is string thinking)
         {
             try
@@ -2608,7 +2615,7 @@ public sealed class CodingSession : ITurnObserver
                 }
                 else
                 {
-                    Error("Compact accepts no argument, or full, model, thinking, tier, speed, summary, auto, and micro.");
+                    Error("Compact accepts no argument, or full, model, thinking, tier, speed, context, summary, auto, and micro.");
                 }
 
                 PruneDraftImages(string.Empty);
@@ -3504,7 +3511,7 @@ public sealed class CodingSession : ITurnObserver
     {
         var reviewer = Reviewer(extended);
         var noun = ReviewerNoun(extended);
-        var label = request.ServiceTier ? "Service tier" : "Speed";
+        var label = SlotLabel(request.Slot);
         if (!reviewer.HasSelection)
         {
             Error("Set an " + noun + " before changing its " + label.ToLowerInvariant() + ".");
@@ -3522,31 +3529,17 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var tokens = request.ServiceTier ? model.ServiceTiers : model.Speeds;
-        if (tokens.Count == 0)
+        if (!TrySelectSlot(request, model, reviewer.ServiceTier, reviewer.Speed, reviewer.ContextWindow, noun, out var selected))
         {
-            Error(label + " is not available for the " + noun + ".");
             return;
         }
 
-        string? selected;
-        if (request.Token is null)
+        ApprovalModelSettings Apply(ApprovalModelSettings value) => request.Slot switch
         {
-            selected = CatalogSlots.Next(request.ServiceTier ? reviewer.ServiceTier : reviewer.Speed, tokens);
-        }
-        else if (!CatalogToken.TryNormalize(request.Token, out var token) || !CatalogSlots.Contains(tokens, token))
-        {
-            Error(label + " is not available for the " + noun + ". Available: " + string.Join(", ", tokens));
-            return;
-        }
-        else
-        {
-            selected = token;
-        }
-
-        ApprovalModelSettings Apply(ApprovalModelSettings value) => request.ServiceTier
-            ? value.WithServiceTier(selected)
-            : value.WithSpeed(selected);
+            SideModelSlot.ServiceTier => value.WithServiceTier(selected.Token),
+            SideModelSlot.Speed => value.WithSpeed(selected.Token),
+            _ => value.WithContextWindow(selected.Window)
+        };
 
         _settings = WithReviewer(_settings, extended, Apply(reviewer));
         // A launch selection of another model keeps this slot process-only.
@@ -3561,9 +3554,103 @@ public sealed class CodingSession : ITurnObserver
         RebuildExecutors();
         RefreshSlashCommands();
         RefreshChrome();
-        Note(
-            ReviewerTitle(extended) + (request.ServiceTier ? " tier  " : " speed  ")
-            + (selected is null ? "not set" : DisplayCase.Token(selected)));
+        Note(ReviewerTitle(extended) + " " + SlotNote(request.Slot, selected));
+    }
+
+    private static string SlotLabel(SideModelSlot slot) => slot switch
+    {
+        SideModelSlot.ServiceTier => "Service tier",
+        SideModelSlot.Speed => "Speed",
+        _ => "Context window"
+    };
+
+    private static string SlotNote(SideModelSlot slot, (string? Token, int? Window) selected) => slot switch
+    {
+        SideModelSlot.ServiceTier => "tier  " + (selected.Token is null ? "not set" : DisplayCase.Token(selected.Token)),
+        SideModelSlot.Speed => "speed  " + (selected.Token is null ? "not set" : DisplayCase.Token(selected.Token)),
+        _ => "context  " + (selected.Window is int window ? ContextWindowSelection.Format(window) : "not set")
+    };
+
+    /// <summary>
+    /// Resolves a side model's tier, speed, or context command. A bare word
+    /// cycles through the model's values and back to unset; a value must be
+    /// one the model lists. Unset sends no tier or speed and uses the model's
+    /// first declared context budget.
+    /// </summary>
+    private bool TrySelectSlot(
+        ApprovalSlotArguments.Request request,
+        ModelSettings model,
+        string? serviceTier,
+        string? speed,
+        int? contextWindow,
+        string noun,
+        out (string? Token, int? Window) selected)
+    {
+        selected = default;
+        var label = SlotLabel(request.Slot);
+        if (request.Slot == SideModelSlot.Context)
+        {
+            var windows = model.ContextWindows;
+            if (windows.Count < 2)
+            {
+                Error("The " + noun + " has one context budget.");
+                return false;
+            }
+
+            if (request.Token is null)
+            {
+                // Unset is the first budget, so cycling past the last budget returns to unset.
+                var index = IndexOf(windows, contextWindow ?? windows[0]);
+                var next = windows[(index + 1) % windows.Count];
+                selected = (null, next == windows[0] ? null : next);
+                return true;
+            }
+
+            if (!ContextWindowSelection.TryParse(request.Token, out var window) || !windows.Contains(window))
+            {
+                Error(label + " is not available for the " + noun + ". Available: "
+                    + string.Join(", ", windows.Select(ContextWindowSelection.Format)));
+                return false;
+            }
+
+            selected = (null, window);
+            return true;
+        }
+
+        var tokens = request.ServiceTier ? model.ServiceTiers : model.Speeds;
+        if (tokens.Count == 0)
+        {
+            Error(label + " is not available for the " + noun + ".");
+            return false;
+        }
+
+        if (request.Token is null)
+        {
+            selected = (CatalogSlots.Next(request.ServiceTier ? serviceTier : speed, tokens), null);
+            return true;
+        }
+
+        if (!CatalogToken.TryNormalize(request.Token, out var token) || !CatalogSlots.Contains(tokens, token))
+        {
+            Error(label + " is not available for the " + noun + ". Available: " + string.Join(", ", tokens));
+            return false;
+        }
+
+        selected = (token, null);
+        return true;
+    }
+
+    private static int IndexOf(IReadOnlyList<int> windows, int window)
+    {
+        for (var index = 0; index < windows.Count; index++)
+        {
+            if (windows[index] == window)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private bool TrySelectReviewerModel(
@@ -3600,7 +3687,8 @@ public sealed class CodingSession : ITurnObserver
             selection.Model,
             current.ThinkingEffort,
             sameModel ? current.ServiceTier : null,
-            sameModel ? current.Speed : null);
+            sameModel ? current.Speed : null,
+            sameModel ? current.ContextWindow : null);
         error = string.Empty;
         return true;
     }
@@ -8364,7 +8452,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void ChangeCompactionSlot(ApprovalSlotArguments.Request request)
     {
-        var label = request.ServiceTier ? "Service tier" : "Speed";
+        var label = SlotLabel(request.Slot);
         if (_turnActive || _compactSource is not null)
         {
             Error("Finish the current turn before changing the compaction model " + label.ToLowerInvariant() + ".");
@@ -8391,31 +8479,24 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var tokens = request.ServiceTier ? model.ServiceTiers : model.Speeds;
-        if (tokens.Count == 0)
+        if (!TrySelectSlot(
+                request,
+                model,
+                compaction.ServiceTier,
+                compaction.Speed,
+                compaction.ContextWindow,
+                "compaction model",
+                out var selected))
         {
-            Error(label + " is not available for the compaction model.");
             return;
         }
 
-        string? selected;
-        if (request.Token is null)
+        CompactionModelSettings Apply(CompactionModelSettings value) => request.Slot switch
         {
-            selected = CatalogSlots.Next(request.ServiceTier ? compaction.ServiceTier : compaction.Speed, tokens);
-        }
-        else if (!CatalogToken.TryNormalize(request.Token, out var token) || !CatalogSlots.Contains(tokens, token))
-        {
-            Error(label + " is not available for the compaction model. Available: " + string.Join(", ", tokens));
-            return;
-        }
-        else
-        {
-            selected = token;
-        }
-
-        CompactionModelSettings Apply(CompactionModelSettings value) => request.ServiceTier
-            ? value.WithServiceTier(selected)
-            : value.WithSpeed(selected);
+            SideModelSlot.ServiceTier => value.WithServiceTier(selected.Token),
+            SideModelSlot.Speed => value.WithSpeed(selected.Token),
+            _ => value.WithContextWindow(selected.Window)
+        };
 
         _settings = _settings.WithCompactionModel(Apply(compaction));
         // A launch selection of another model keeps this slot process-only.
@@ -8434,9 +8515,7 @@ public sealed class CodingSession : ITurnObserver
 
         RefreshSlashCommands();
         RefreshChrome();
-        Note(
-            "Compaction " + (request.ServiceTier ? "tier  " : "speed  ")
-            + (selected is null ? "not set" : DisplayCase.Token(selected)));
+        Note("Compaction " + SlotNote(request.Slot, selected));
     }
 
     private bool TrySelectCompactionModel(
@@ -8472,7 +8551,8 @@ public sealed class CodingSession : ITurnObserver
             selection.Model,
             current.ThinkingEffort,
             sameModel ? current.ServiceTier : null,
-            sameModel ? current.Speed : null);
+            sameModel ? current.Speed : null,
+            sameModel ? current.ContextWindow : null);
         error = string.Empty;
         return true;
     }
@@ -8665,10 +8745,9 @@ public sealed class CodingSession : ITurnObserver
 
         try
         {
-            var model = settings.Catalog.GetModel(
-                new ProviderName(compaction.Provider),
-                compaction.Model);
-            return (Math.Min(model.ContextWindow, settings.ContextWindow), model.MaxTokens, true);
+            // The compaction model's own budget, not the session's /context choice.
+            var selected = settings.ForCompaction(compaction);
+            return (Math.Min(selected.ContextWindow, settings.ContextWindow), selected.ActiveModel.MaxTokens, true);
         }
         catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
         {
@@ -8697,16 +8776,17 @@ public sealed class CodingSession : ITurnObserver
             }
 
             var selected = _settings.ForCompaction(compaction);
-            var tier = CatalogSlotStatus.For("Tier", selected.ServiceTier);
-            var speed = CatalogSlotStatus.For("Speed", selected.Speed);
-            if (tier.Length > 0)
+            foreach (var slot in new[]
+                     {
+                         CatalogSlotStatus.For("Tier", selected.ServiceTier),
+                         CatalogSlotStatus.For("Speed", selected.Speed),
+                         ContextStatus(compaction.ContextWindow)
+                     })
             {
-                text += "  ·  " + tier;
-            }
-
-            if (speed.Length > 0)
-            {
-                text += "  ·  " + speed;
+                if (slot.Length > 0)
+                {
+                    text += "  ·  " + slot;
+                }
             }
         }
         catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
@@ -8724,6 +8804,7 @@ public sealed class CodingSession : ITurnObserver
             + "\n" + settings.Model
             + "\n" + selected.ServiceTier
             + "\n" + selected.Speed
+            + "\n" + selected.ContextWindow
             + "\n" + CurrentLimits().SummaryOutputCap();
     }
 
@@ -8748,16 +8829,17 @@ public sealed class CodingSession : ITurnObserver
     {
         var text = reviewer.Provider + " / " + reviewer.Model;
         var selected = _settings.ForReviewer(reviewer);
-        var tier = CatalogSlotStatus.For("Tier", selected.ServiceTier);
-        var speed = CatalogSlotStatus.For("Speed", selected.Speed);
-        if (tier.Length > 0)
+        foreach (var slot in new[]
+                 {
+                     CatalogSlotStatus.For("Tier", selected.ServiceTier),
+                     CatalogSlotStatus.For("Speed", selected.Speed),
+                     ContextStatus(reviewer.ContextWindow)
+                 })
         {
-            text += "  ·  " + tier;
-        }
-
-        if (speed.Length > 0)
-        {
-            text += "  ·  " + speed;
+            if (slot.Length > 0)
+            {
+                text += "  ·  " + slot;
+            }
         }
 
         return text;
@@ -8800,7 +8882,9 @@ public sealed class CodingSession : ITurnObserver
             ReviewerSlotCompletions(_settings.ApprovalModel, serviceTier: false),
             ExtendedApprovalCompletions(),
             CompactionSlotCompletions(serviceTier: true),
-            CompactionSlotCompletions(serviceTier: false));
+            CompactionSlotCompletions(serviceTier: false),
+            ReviewerContextCompletions(_settings.ApprovalModel),
+            CompactionContextCompletions());
         menu = menu.Select(command => command.Name switch
         {
             "agents" => command with { Arguments = AgentCompletions() },
@@ -8870,6 +8954,30 @@ public sealed class CodingSession : ITurnObserver
         return CatalogSlotCompletions.For(serviceTier ? model.ServiceTiers : model.Speeds);
     }
 
+    private IReadOnlyList<SlashCompletion> ReviewerContextCompletions(ApprovalModelSettings reviewer) =>
+        ReviewerCatalogModel(reviewer) is { ContextWindows.Count: > 1 } model
+            ? ContextWindowSelection.Completions(model)
+            : [];
+
+    private IReadOnlyList<SlashCompletion> CompactionContextCompletions()
+    {
+        var compaction = _settings.CompactionModel;
+        if (compaction.Provider is null || compaction.Model is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            var model = _settings.Catalog.GetModel(new ProviderName(compaction.Provider), compaction.Model);
+            return model.ContextWindows.Count > 1 ? ContextWindowSelection.Completions(model) : [];
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException)
+        {
+            return [];
+        }
+    }
+
     private ModelSettings? ReviewerCatalogModel(ApprovalModelSettings reviewer)
     {
         if (reviewer.Provider is null || reviewer.Model is null)
@@ -8897,6 +9005,8 @@ public sealed class CodingSession : ITurnObserver
             ReviewerSlotCompletions(reviewer, serviceTier: true)));
         options.Add(Nested("speed", "Cycle or set the extended reviewer speed",
             ReviewerSlotCompletions(reviewer, serviceTier: false)));
+        options.Add(Nested("context", "Cycle or set the extended reviewer context budget",
+            ReviewerContextCompletions(reviewer)));
         options.Add(Nested("trigger", "Lowest primary risk level that runs the extended check",
         [
             new("low", "Every review allow", ["low"]),
@@ -8912,7 +9022,7 @@ public sealed class CodingSession : ITurnObserver
 
         static SlashCompletion Nested(string name, string help, IReadOnlyList<SlashCompletion> arguments) =>
             arguments.Count > 0
-                ? new SlashCompletion(name, help, [name], arguments, ArgumentsOptional: name is "thinking" or "tier" or "speed")
+                ? new SlashCompletion(name, help, [name], arguments, ArgumentsOptional: name is "thinking" or "tier" or "speed" or "context")
                 : new SlashCompletion(name, help, [name]);
     }
 
@@ -9011,7 +9121,8 @@ public sealed class CodingSession : ITurnObserver
                     _settings.CompactionModel.Model!,
                     _settings.CompactionModel.ThinkingEffort,
                     _settings.CompactionModel.ServiceTier,
-                    _settings.CompactionModel.Speed)
+                    _settings.CompactionModel.Speed,
+                    _settings.CompactionModel.ContextWindow)
                 : null,
             _settings.ImageModel.IsConfigured
                 ? SideModelChromeOf(
@@ -9019,7 +9130,8 @@ public sealed class CodingSession : ITurnObserver
                     _settings.ImageModel.Model!,
                     _settings.ImageModel.ThinkingEffort,
                     _settings.ImageModel.ServiceTier,
-                    _settings.ImageModel.Speed)
+                    _settings.ImageModel.Speed,
+                    _settings.ImageModel.ContextWindow)
                 : null);
 
     private static SideModelChrome SideModelChromeOf(
@@ -9027,13 +9139,18 @@ public sealed class CodingSession : ITurnObserver
         string model,
         ThinkingSelection thinking,
         string? serviceTier,
-        string? speed) =>
+        string? speed,
+        int? contextWindow) =>
         new(
             provider,
             model,
             thinking == ThinkingSelection.Default ? string.Empty : "Think " + ThinkingLabel.For(thinking),
             CatalogSlotStatus.For("Tier", serviceTier),
-            CatalogSlotStatus.For("Speed", speed));
+            CatalogSlotStatus.For("Speed", speed),
+            ContextStatus(contextWindow));
+
+    private static string ContextStatus(int? contextWindow) =>
+        contextWindow is int window ? "Context " + ContextWindowSelection.Format(window) : string.Empty;
 
     private static ReviewerChrome? ReviewerChromeOf(ApprovalModelSettings reviewer) =>
         reviewer.Enabled
@@ -9044,7 +9161,8 @@ public sealed class CodingSession : ITurnObserver
                     ? string.Empty
                     : "Think " + ThinkingLabel.For(reviewer.ThinkingEffort),
                 CatalogSlotStatus.For("Tier", reviewer.ServiceTier),
-                CatalogSlotStatus.For("Speed", reviewer.Speed))
+                CatalogSlotStatus.For("Speed", reviewer.Speed),
+                ContextStatus(reviewer.ContextWindow))
             : null;
 
     private void RefreshChrome()

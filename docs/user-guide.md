@@ -184,11 +184,13 @@ CLI options:
 | `--approval-thinking <effort>` | Reviewer thinking gear for this process. Does not change `approvalModel.thinkingEffort` on disk |
 | `--approval-tier <token>` | Approval-model service tier for this process. Must be listed by that model. Does not write the file |
 | `--approval-speed <token>` | Approval-model speed for this process. Must be listed by that model. Does not write the file |
+| `--approval-context <budget>` | Approval-model context budget for this process, such as `200k`. Must be declared by that model. Does not write the file |
 | `--extended-approval <on\|off>` | Use the saved extended approval model, or turn it off for this process |
 | `--extended-approval-provider <provider>` | Extended approval provider for this process. Turns the switch on |
 | `--extended-approval-model-id <model>` | Extended approval model id for this process. Turns the switch on |
 | `--extended-approval-thinking <effort>` | Extended reviewer thinking gear for this process |
 | `--extended-approval-tier <token>`, `--extended-approval-speed <token>` | Extended reviewer service tier and speed for this process |
+| `--extended-approval-context <budget>` | Extended reviewer context budget for this process |
 | `--extended-approval-trigger <low\|medium\|high>` | Lowest primary risk level that runs the extended check, for this process |
 | `--extended-approval-primary <on\|off>` | Show the primary verdict to the extended reviewer, for this process |
 | `--compaction-model <on\|off>` | Use the saved compaction model, or turn it off for this process |
@@ -196,6 +198,7 @@ CLI options:
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Does not change `compactionModel.thinkingEffort` on disk |
 | `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
+| `--compaction-context <budget>` | Summarizer context budget for this process. Must be declared by that model. Does not write the file |
 | `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or a custom mode. Omit all to keep Work, or the mode saved on a resumed session. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context` (`272k`, `1m`, or an exact token count). A model with one budget, or a budget it does not declare, is rejected. Does not write `contextSelections` |
@@ -356,11 +359,13 @@ checks the directory. `unlimited` removes that one cap.
 | `--approval-thinking <effort>` | Reviewer thinking gear for this process. Same values as `/approval thinking`; an unsupported gear falls back to the provider default and a note is printed, and a value that is not an effort token exits 1. Does not write the file |
 | `--approval-tier <token>` | Approval-model service tier for this process. Must be listed by that model. Does not write the file |
 | `--approval-speed <token>` | Approval-model speed for this process. Must be listed by that model. Does not write the file |
+| `--approval-context <budget>` | Approval-model context budget for this process, such as `200k`. Must be declared by that model. Does not write the file |
 | `--extended-approval <on\|off>` | Use the saved extended approval model, or turn it off for this process |
 | `--extended-approval-provider <provider>` | Extended approval provider for this process. Turns the switch on |
 | `--extended-approval-model-id <model>` | Extended approval model id for this process. Turns the switch on |
 | `--extended-approval-thinking <effort>` | Extended reviewer thinking gear for this process |
 | `--extended-approval-tier <token>`, `--extended-approval-speed <token>` | Extended reviewer service tier and speed for this process |
+| `--extended-approval-context <budget>` | Extended reviewer context budget for this process |
 | `--extended-approval-trigger <low\|medium\|high>` | Lowest primary risk level that runs the extended check, for this process |
 | `--extended-approval-primary <on\|off>` | Show the primary verdict to the extended reviewer, for this process |
 | `--compaction-model <on\|off>` | Use the saved compaction model, or turn it off for this process. `on` needs a saved selection, or `--compaction-provider` and `--compaction-model-id` on the same command. Does not write the file |
@@ -368,6 +373,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--compaction-model-id <model>` | Compaction-model id for this process. Turns the switch on |
 | `--compaction-thinking <effort>` | Summarizer thinking gear for this process. Same values as `/compact thinking`. An unsupported gear falls back to the provider default and a note is printed. Does not write the file |
 | `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
+| `--compaction-context <budget>` | Summarizer context budget for this process. Must be declared by that model. Does not write the file |
 | `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or an enabled custom mode. The default is Work. An unknown or disabled mode name exits 1. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context`. A model with one budget, or a budget it does not declare, exits 1. Does not write `contextSelections` |
@@ -625,10 +631,10 @@ Top-level fields:
 | `provider` | Active provider name |
 | `model` | Active model id (must exist under that provider) |
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
-| `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused. A tier or speed applies to the reviewer only and must be listed by that model; unset sends none, and the session `/tier` and `/speed` choice does not apply |
-| `extendedApproval` | Optional extended approval model for Review and Audit. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, `trigger` (`low`, `medium`, or `high`; default `low`, which checks every review allow), and `includePrimaryReview` (default `true`). Omitted means off. It never falls back to the session or approval model |
-| `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists), `serviceTier`, and `speed`. A tier or speed applies to the summarizer only and must be listed by that model; unset sends no tier or speed, and the session `/tier` and `/speed` choice does not apply. Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, gear, and slots unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
-| `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, and `speed`. A tier or speed applies to this model only and must be listed by it; unset sends no tier or speed, and the session `/tier` and `/speed` choice does not apply. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
+| `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, and `contextWindow` (a token count the model declares in `contextWindows`). Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused. A tier or speed applies to the reviewer only and must be listed by that model; unset sends none, and the session `/tier` and `/speed` choice does not apply. An unset context is that model's first declared budget; the session `/context` choice does not apply. |
+| `extendedApproval` | Optional extended approval model for Review and Audit. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, `contextWindow`, `trigger` (`low`, `medium`, or `high`; default `low`, which checks every review allow), and `includePrimaryReview` (default `true`). Omitted means off. It never falls back to the session or approval model |
+| `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists), `serviceTier`, `speed`, and `contextWindow`. A tier or speed applies to the summarizer only and must be listed by that model; unset sends no tier or speed, and the session `/tier` and `/speed` choice does not apply. An unset context is that model's first declared budget; the session `/context` choice does not apply. Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, gear, and slots unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
+| `imageModel` | Optional vision model for `describe_image`. `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, and `contextWindow`. A tier or speed applies to this model only and must be listed by it; unset sends no tier or speed, and the session `/tier` and `/speed` choice does not apply. An unset context is that model's first declared budget; the session `/context` choice does not apply. Omitted means the tool is absent. The model must have `imageInput`. Thinking capability stays on the model entry |
 | `thinkingEffort` | Host thinking gear: `default`, `off` (`none` is the same), or an effort token the model lists. `max` and `maximum` are different tokens. Tokens are stored in lowercase and sent unchanged |
 | `contextSelections` | Saved local context budgets as a nested map, for example `{"openai": {"my-model": 272000}}`. `/context` writes this map; the older flat `{"openai/my-model": 272000}` form is still read and is rewritten nested on the next save. An absent or unsupported choice uses that model's lowest declared budget |
 | `tierSelections` | Saved service-tier tokens as a nested map, for example `{"openai": {"my-model": "flex"}}`. `/tier` writes this map. An absent choice, or a token the model no longer lists, omits the field |
@@ -639,7 +645,7 @@ Top-level fields:
 | `plugins` | Enable operator plugin discovery (default `true`) |
 | `mcp` | Connect configured MCP servers (default `true`; omitted when on) |
 | `mcpToolApproval` | Per-source trust for an MCP server's read-only declarations: `home` and `project`, each `author` or `host` (both default `host`) |
-| `agents` | Child Agents. Omitted means off, concurrency 4, and the built-in Agents inherit the parent model. `enabled`, `maxConcurrent` (1–8), `limits` (`maximumModelCalls`, `maximumToolCalls`, `maximumDurationSeconds`; each child run, unlimited when omitted), and `general`, `explore`, and `work` model choices (`provider`, `model`, `thinking`, `context`, `tier`, `speed`). `/agents` writes built-in choices here. Custom Agents are stored in their own `agent.json`, not in this object |
+| `agents` | Child Agents. Omitted means off, concurrency 4, and the built-in Agents inherit the parent model. `enabled`, `maxConcurrent` (1–8), `limits` (`maximumModelCalls`, `maximumToolCalls`, `maximumDurationSeconds`; each child run, unlimited when omitted), and `general`, `explore`, and `work` model choices (`provider`, `model`, `thinking`, `context`, `tier`, `speed`). An Agent with its own `provider` and `model` is configured on its own: an unset `tier` or `speed` is not sent and an unset `context` is that model's first declared budget, whatever the session chose for the same model. `/agents` writes built-in choices here. Custom Agents are stored in their own `agent.json`, not in this object |
 | `workspaceTrust` | Ask before the first interactive session in a directory (default `true`; omitted when on). Does not apply to `crystal run` |
 | `externalToolApproval` | Per-source trust for tool-set author declarations: `home` and `project`, each `author` or `host` (defaults Home `author`, Project `host`) |
 | `todoBar` | Show the pinned `Todos` bar above the status bar (default `true`; omitted when on) |
@@ -668,7 +674,7 @@ Top-level fields:
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
 | `approvalRetry` | The same object shape for the Review and Audit approval reviewer. Independent of `retry`. Reviewer retries are silent; exhausted retries fall back to your approval prompt |
 | `server` | Defaults for `crystal server`. `allowOrigins` (origins such as `https://app.example.test`, no path, or `*` for any origin), `allowHosts` (extra `Host` values), `exposeHeaders` (extra `Access-Control-Expose-Headers` names), and `allowPrivateNetwork` (default `false`). The matching command-line options add to these. Invalid entries stop startup |
-| `bridge` | Which session options `crystal bridge` shows an editor as config options. `customConfigOptions` (default `false`) turns the list on; while it is off the built-in default `mode`, `model`, `thinking`, `approval`, `agents` applies and a saved list is kept but unused. `configOptions` is a list of option ids (`mode`, `model`, `thinking`, `context`, `tier`, `speed`, `approval`, `approval_model`, `approval_thinking`, `approval_tier`, `approval_speed`, `extended_approval`, `extended_thinking`, `extended_tier`, `extended_speed`, `prompt_set`, `agents`, `compaction_model`, `compaction_thinking`, `compaction_tier`, `compaction_speed`, `micro_compaction`, `estimated_tokens`) or `["all"]` for every option. `workspaceTrust` (default `false`) turns on the trust question for editor-opened directories; `crystal bridge --workspace-trust on|off` overrides it for one process, and the top-level `workspaceTrust` does not apply to Bridge. Hidden options stay available as slash commands. `crystal bridge --config-options`, `--default-config-options`, and `--all-config-options` override it for one process. `crystal bridge --debug [FILE]` logs redacted protocol traffic to stderr or a file. An unknown id or an empty list stops startup. See [bridge.md](bridge.md) |
+| `bridge` | Which session options `crystal bridge` shows an editor as config options. `customConfigOptions` (default `false`) turns the list on; while it is off the built-in default `mode`, `model`, `thinking`, `approval`, `agents` applies and a saved list is kept but unused. `configOptions` is a list of option ids (`mode`, `model`, `thinking`, `context`, `tier`, `speed`, `approval`, `approval_model`, `approval_thinking`, `approval_tier`, `approval_speed`, `approval_context`, `extended_approval`, `extended_thinking`, `extended_tier`, `extended_speed`, `extended_context`, `prompt_set`, `agents`, `compaction_model`, `compaction_thinking`, `compaction_tier`, `compaction_speed`, `compaction_context`, `micro_compaction`, `estimated_tokens`) or `["all"]` for every option. `workspaceTrust` (default `false`) turns on the trust question for editor-opened directories; `crystal bridge --workspace-trust on|off` overrides it for one process, and the top-level `workspaceTrust` does not apply to Bridge. Hidden options stay available as slash commands. `crystal bridge --config-options`, `--default-config-options`, and `--all-config-options` override it for one process. `crystal bridge --debug [FILE]` logs redacted protocol traffic to stderr or a file. An unknown id or an empty list stops startup. See [bridge.md](bridge.md) |
 | `operatorNotify` | Optional command run when the session waits for you. Omitted means off. `command` (executable and arguments, no shell), `enabled` (default `true` when `command` is set), `events` (`approval`, `question`, `turn`; default `["approval", "question"]`), `delaySeconds` (0-3600, default 0), and `timeoutSeconds` (1-600, default 10). Invalid values stop startup. See [Operator notification](#operator-notification) |
 
 Add named endpoints and model tables in `providers.json`, not in new
@@ -1406,7 +1412,11 @@ effective `retry` and `approvalRetry` policies. The status bar does not.
 `/approval tier` and `/approval speed` cycle the approval model's service
 tier and speed, including the unset slot, or set a token that model lists,
 and write `config.json`. An unset slot sends no tier or speed; the session
-`/tier` and `/speed` choice does not apply to the approval model. Selecting another approval model clears both.
+`/tier` and `/speed` choice does not apply to the approval model.
+`/approval context` cycles or sets the approval model's own context budget the
+same way; unset is that model's first declared budget, and the session
+`/context` choice does not apply. Selecting another approval model clears all
+three. `/approval extended context` does the same for the extended reviewer.
 
 Extended approval adds a third model in Review and Audit. When the primary
 reviewer allows a call that would then run, the extended model takes a final
@@ -1485,8 +1495,9 @@ sets one by name, restricted to that model's efforts, and stores it in
 switch is on. While the switch is off, summary requests omit reasoning.
 `/compact tier` and `/compact speed` cycle or set the compaction model's own
 service tier and speed the same way as `/approval tier`, and store them in
-`compactionModel.serviceTier` and `compactionModel.speed`. Selecting another
-compaction model clears both.
+`compactionModel.serviceTier` and `compactionModel.speed`. `/compact context`
+sets `compactionModel.contextWindow` the same way. Selecting another
+compaction model clears all three.
 
 If the selected model does not support thinking, the command reports
 that and does nothing. The status bar shows `Think Off`, or `Think`
@@ -1643,11 +1654,11 @@ custom fields are `mode`, `approval`, `thinking`, `tier`, `speed`, `context-wind
 `session-output`, `session-total`, `tools`, `elapsed`, and `queued`.
 Approval reviewer fields show only while that reviewer is on, and occupy no
 cell otherwise: `approval-provider`, `approval-model`, `approval-thinking`,
-`approval-tier`, and `approval-speed` for the approval model, and
-`extended-provider`, `extended-model`, `extended-thinking`, `extended-tier`,
-`extended-speed`, `extended-trigger`, and `extended-primary` for extended
-approval. Thinking, tier, and speed are blank while the reviewer leaves them
-at the default. `extended-primary` shows `On` or `Off` for whether the
+`approval-tier`, `approval-speed`, and `approval-context` for the approval
+model, and `extended-provider`, `extended-model`, `extended-thinking`,
+`extended-tier`, `extended-speed`, `extended-context`, `extended-trigger`, and
+`extended-primary` for extended approval. Thinking, tier, speed, and context
+are blank while the reviewer leaves them at the default. `extended-primary` shows `On` or `Off` for whether the
 extended reviewer sees the primary review. Each reviewer field has a theme gauge of
 the same name, for example `gauges.approval-model` or `gauges.extended-primary`.
 Without rules for that gauge, the field follows the shared gauge (`provider`,

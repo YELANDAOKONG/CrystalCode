@@ -2,8 +2,8 @@ namespace CrystalCode.Engine.Sessions;
 
 /// <summary>
 /// Parses <c>/approval extended</c> arguments: show, on or off, a model
-/// selection, or one of the thinking, tier, speed, trigger, and primary
-/// subcommands.
+/// selection, or one of the thinking, tier, speed, context, trigger, and
+/// primary subcommands.
 /// </summary>
 internal static class ExtendedApprovalArguments
 {

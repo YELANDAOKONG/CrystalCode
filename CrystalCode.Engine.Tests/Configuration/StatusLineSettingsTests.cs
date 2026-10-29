@@ -20,7 +20,9 @@ public sealed class StatusLineSettingsTests
         string[] fields =
         [
             "approval-provider", "approval-model", "approval-thinking", "approval-tier", "approval-speed",
+            "approval-context",
             "extended-provider", "extended-model", "extended-thinking", "extended-tier", "extended-speed",
+            "extended-context",
             "extended-trigger", "extended-primary"
         ];
 

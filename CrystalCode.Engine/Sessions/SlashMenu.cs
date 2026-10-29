@@ -27,7 +27,9 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? approvalSpeedArguments = null,
         IReadOnlyList<SlashCompletion>? extendedApprovalArguments = null,
         IReadOnlyList<SlashCompletion>? compactionTierArguments = null,
-        IReadOnlyList<SlashCompletion>? compactionSpeedArguments = null)
+        IReadOnlyList<SlashCompletion>? compactionSpeedArguments = null,
+        IReadOnlyList<SlashCompletion>? approvalContextArguments = null,
+        IReadOnlyList<SlashCompletion>? compactionContextArguments = null)
     {
         var menu = new List<SlashCompletion>();
         foreach (var spec in SlashCatalog.BuiltIn)
@@ -47,12 +49,14 @@ public static class SlashMenu
                     approvalThinkingArguments,
                     approvalTierArguments,
                     approvalSpeedArguments,
+                    approvalContextArguments,
                     extendedApprovalArguments),
                 contextArguments,
                 compactionModelArguments,
                 compactionThinkingArguments,
                 compactionTierArguments,
                 compactionSpeedArguments,
+                compactionContextArguments,
                 tierArguments,
                 speedArguments);
             menu.Add(new SlashCompletion(spec.Name, spec.Help, keys, arguments));
@@ -85,6 +89,7 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? compactionThinkingArguments,
         IReadOnlyList<SlashCompletion>? compactionTierArguments,
         IReadOnlyList<SlashCompletion>? compactionSpeedArguments,
+        IReadOnlyList<SlashCompletion>? compactionContextArguments,
         IReadOnlyList<SlashCompletion>? tierArguments,
         IReadOnlyList<SlashCompletion>? speedArguments)
     {
@@ -115,7 +120,8 @@ public static class SlashMenu
                 compactionModelArguments,
                 compactionThinkingArguments,
                 compactionTierArguments,
-                compactionSpeedArguments);
+                compactionSpeedArguments,
+                compactionContextArguments);
         }
 
         if (spec.Verb == SessionVerb.Thinking && thinkingArguments is not null)
@@ -175,6 +181,7 @@ public static class SlashMenu
                 "thinking" => nestedArguments.Thinking,
                 "tier" => nestedArguments.Tier,
                 "speed" => nestedArguments.Speed,
+                "context" => nestedArguments.Context,
                 "extended" => nestedArguments.Extended,
                 _ => null
             };
@@ -184,6 +191,7 @@ public static class SlashMenu
                 "thinking" => "Cycle or set the reviewer thinking gear",
                 "tier" => "Cycle or set the approval model service tier",
                 "speed" => "Cycle or set the approval model speed",
+                "context" => "Cycle or set the approval model context budget",
                 "extended" => "Extended approval after a review allow",
                 _ => argument
             };
@@ -200,6 +208,7 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? Thinking,
         IReadOnlyList<SlashCompletion>? Tier,
         IReadOnlyList<SlashCompletion>? Speed,
+        IReadOnlyList<SlashCompletion>? Context,
         IReadOnlyList<SlashCompletion>? Extended);
 
     private static readonly SlashCompletion[] SummarySwitch =
@@ -217,7 +226,8 @@ public static class SlashMenu
         IReadOnlyList<SlashCompletion>? modelArguments,
         IReadOnlyList<SlashCompletion>? thinkingArguments,
         IReadOnlyList<SlashCompletion>? tierArguments,
-        IReadOnlyList<SlashCompletion>? speedArguments)
+        IReadOnlyList<SlashCompletion>? speedArguments,
+        IReadOnlyList<SlashCompletion>? contextArguments)
     {
         if (arguments is null || arguments.Count == 0)
         {
@@ -233,6 +243,7 @@ public static class SlashMenu
                 "thinking" => thinkingArguments,
                 "tier" => tierArguments,
                 "speed" => speedArguments,
+                "context" => contextArguments,
                 "summary" or "auto" or "micro" => SummarySwitch,
                 _ => null
             };
@@ -243,6 +254,7 @@ public static class SlashMenu
                 "thinking" => "Cycle or set the compaction thinking gear",
                 "tier" => "Cycle or set the compaction model service tier",
                 "speed" => "Cycle or set the compaction model speed",
+                "context" => "Cycle or set the compaction model context budget",
                 "summary" => "Toggle the summary printed after /compact",
                 "auto" => "Toggle the summary printed after automatic compaction",
                 "micro" => "Toggle removal of old tool results before each model call",

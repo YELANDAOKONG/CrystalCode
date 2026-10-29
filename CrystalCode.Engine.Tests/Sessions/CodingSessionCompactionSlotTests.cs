@@ -57,6 +57,38 @@ public sealed class CodingSessionCompactionSlotTests
     }
 
     [Fact]
+    public async Task CompactContext_CyclesSetsAndPersistsTheCompactionBudget()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("/compact model brief", CancellationToken.None);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact context", CancellationToken.None);
+        Assert.Equal("Compaction context  200K", LastNote(headless));
+        Assert.Equal(200_000, Read(headless).CompactionModel!.ContextWindow);
+
+        await headless.Session.SubmitAsync("/compact context", CancellationToken.None);
+        Assert.Equal("Compaction context  not set", LastNote(headless));
+        Assert.Null(Read(headless).CompactionModel!.ContextWindow);
+
+        await headless.Session.SubmitAsync("/compact context 200k", CancellationToken.None);
+        Assert.Equal("Compaction context  200K", LastNote(headless));
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact context 150k", CancellationToken.None);
+        Assert.Equal(
+            "Context window is not available for the compaction model. Available: 100K, 200K",
+            LastError(headless));
+
+        await headless.Session.SubmitAsync("/compact model plain", CancellationToken.None);
+        Assert.Null(Read(headless).CompactionModel!.ContextWindow);
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/compact context", CancellationToken.None);
+        Assert.Equal("The compaction model has one context budget.", LastError(headless));
+    }
+
+    [Fact]
     public async Task CompactMenu_CompletesTheCompactionModelSlots()
     {
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
@@ -70,6 +102,8 @@ public sealed class CodingSessionCompactionSlotTests
 
         Assert.Equal(["flex", "priority"], tier.Arguments!.Select(item => item.Name));
         Assert.Equal(["fast"], speed.Arguments!.Select(item => item.Name));
+        var context = compact.Arguments!.Single(argument => argument.Name == "context");
+        Assert.Equal(["100k", "200k"], context.Arguments!.Select(item => item.Name));
     }
 
     private static HarnessSettings Settings()
@@ -82,7 +116,11 @@ public sealed class CodingSessionCompactionSlotTests
             new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
             {
                 ["model"] = new(200_000),
-                ["brief"] = new(200_000, serviceTiers: ["flex", "priority"], speeds: ["fast"]),
+                ["brief"] = new(
+                    200_000,
+                    contextWindows: [100_000, 200_000],
+                    serviceTiers: ["flex", "priority"],
+                    speeds: ["fast"]),
                 ["plain"] = new(200_000)
             },
             requiresApiKey: false);

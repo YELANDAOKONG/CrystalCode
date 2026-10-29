@@ -1,12 +1,15 @@
 namespace CrystalCode.Engine.Sessions;
 
 /// <summary>
-/// Parses <c>tier</c> and <c>speed</c> reviewer subcommands. A bare word
-/// cycles the slot; a token selects it.
+/// Parses the <c>tier</c>, <c>speed</c>, and <c>context</c> subcommands of a
+/// side model. A bare word cycles the slot; a value selects it.
 /// </summary>
 internal static class ApprovalSlotArguments
 {
-    internal readonly record struct Request(bool ServiceTier, string? Token);
+    internal readonly record struct Request(SideModelSlot Slot, string? Token)
+    {
+        public bool ServiceTier => Slot == SideModelSlot.ServiceTier;
+    }
 
     public static bool TryParse(string? argument, out Request request)
     {
@@ -19,13 +22,19 @@ internal static class ApprovalSlotArguments
         var trimmed = argument.Trim();
         if (TryRest(trimmed, "tier", out var tier))
         {
-            request = new Request(ServiceTier: true, tier);
+            request = new Request(SideModelSlot.ServiceTier, tier);
             return true;
         }
 
         if (TryRest(trimmed, "speed", out var speed))
         {
-            request = new Request(ServiceTier: false, speed);
+            request = new Request(SideModelSlot.Speed, speed);
+            return true;
+        }
+
+        if (TryRest(trimmed, "context", out var context))
+        {
+            request = new Request(SideModelSlot.Context, context);
             return true;
         }
 

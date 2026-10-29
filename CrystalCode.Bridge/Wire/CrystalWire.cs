@@ -84,6 +84,7 @@ internal static class CrystalWire
         writer.WriteString("thinking", model.Thinking);
         writer.WriteString("serviceTier", model.ServiceTier);
         writer.WriteString("speed", model.Speed);
+        writer.WriteString("context", model.Context);
         writer.WriteEndObject();
     }
 
@@ -107,6 +108,7 @@ internal static class CrystalWire
         writer.WriteString("thinking", reviewer.Thinking);
         writer.WriteString("serviceTier", reviewer.ServiceTier);
         writer.WriteString("speed", reviewer.Speed);
+        writer.WriteString("context", reviewer.Context);
     }
 
     private static void ExtendedApproval(Utf8JsonWriter writer, string name, ExtendedApprovalChrome? extended)

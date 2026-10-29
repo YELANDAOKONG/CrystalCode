@@ -625,6 +625,7 @@ public sealed class SessionRenderer : IDisposable
         AddSlot(fields, key + "-thinking", label, reviewer.Thinking);
         AddSlot(fields, key + "-tier", label, reviewer.ServiceTier);
         AddSlot(fields, key + "-speed", label, reviewer.Speed);
+        AddSlot(fields, key + "-context", label, reviewer.Context);
     }
 
     private static void AddSlot(Dictionary<string, string> fields, string name, string label, string value)

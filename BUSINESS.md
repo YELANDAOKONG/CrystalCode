@@ -874,10 +874,11 @@ support image input. Declared `audioInput` or `videoInput` does not expose
 them. `describe_image` is available on Plan and Work when
 `config.json` `imageModel` names a model that accepts images, and returns
 a text description from that model. The image and compaction models each
-have their own optional thinking gear, service tier, and speed, like the
-approval models. Each side model is configured on its own: an unset tier or
-speed is not sent, and the session `/tier` and `/speed` choice never applies
-to it. Optional `compactionModel` writes
+have their own optional thinking gear, service tier, speed, and context
+budget, like the approval models. Each side model, and each child Agent with
+its own model, is configured on its own: an unset tier or speed is not sent,
+an unset context is that model's first declared budget, and the session
+`/tier`, `/speed`, and `/context` choice never applies to it. Optional `compactionModel` writes
 summaries when enabled; omitted or off, summaries use the session model. `view_image` is available only while
 the selected model and provider support image input, and returns the image
 itself. A model entry on a `responses` provider may declare `textTools`

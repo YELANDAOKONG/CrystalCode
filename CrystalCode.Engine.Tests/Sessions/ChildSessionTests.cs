@@ -138,6 +138,52 @@ public sealed class ChildSessionTests
         Assert.Empty(session.ReadSaved().Children);
     }
 
+    [Theory]
+    [InlineData(null, null, null, null, null, 100_000)]
+    [InlineData("priority", "fast", 200_000, "priority", "fast", 200_000)]
+    public async Task BuiltInAgent_WithItsOwnModel_IgnoresTheSessionTierSpeedAndContext(
+        string? tier,
+        string? speed,
+        int? context,
+        string? expectedTier,
+        string? expectedSpeed,
+        int expectedContext)
+    {
+        var provider = new ProviderDefinition(new ProviderName("scripted"), ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"), new Dictionary<string, ModelSettings>
+            {
+                ["model"] = new(200_000),
+                ["child"] = new(200_000, contextWindows: [100_000, 200_000],
+                    serviceTiers: ["flex", "priority"], speeds: ["fast", "slow"])
+            }, requiresApiKey: false);
+        var settings = new HarnessSettings(provider.Name, "model", CrystalCode.Engine.Approvals.ApprovalMode.Default, 0.8,
+                ProviderCatalog.CreateStarter().Overlay([provider]))
+            .WithTier(provider.Name, "child", "flex")
+            .WithSpeed(provider.Name, "child", "slow")
+            .WithContextWindow(provider.Name, "child", 200_000)
+            .WithAgents(new AgentSettings
+            {
+                Enabled = true,
+                Explore = new AgentModelSettings
+                {
+                    Provider = "scripted", Model = "child", Tier = tier, Speed = speed, Context = context
+                }
+            });
+        using var session = new HeadlessSession(new ScriptedStreamingClient(
+            Tool("task", """{"agent":"explore","label":"look","prompt":"inspect"}"""), Text("child"), Text("parent")),
+            settings: settings);
+        await session.Session.StartAsync(CancellationToken.None);
+
+        await session.RunTurnAsync("delegate");
+
+        Assert.Contains(("child", expectedTier, expectedSpeed), session.ChatPlugin.Slots);
+        Assert.DoesNotContain(session.ChatPlugin.Slots, slot => slot.Model == "child" && slot.ServiceTier == "flex");
+        var child = Assert.Single(session.ReadSaved().Children);
+        Assert.Equal(expectedContext, child.Model.Context);
+        Assert.Equal(expectedTier, child.Model.Tier);
+        Assert.Equal(expectedSpeed, child.Model.Speed);
+    }
+
     [Fact]
     public async Task Task_CreatesIndependentChildAndAccountsUsageOnlyOnce()
     {

@@ -81,7 +81,7 @@ internal static class SessionOptionCatalog
             "_crystal_approval",
             "/approval",
             settings.ApprovalModel is { Enabled: true } approvalModel
-                ? (approvalModel.Provider!, approvalModel.Model!, approvalModel.ThinkingEffort, approvalModel.ServiceTier, approvalModel.Speed)
+                ? (approvalModel.Provider!, approvalModel.Model!, approvalModel.ThinkingEffort, approvalModel.ServiceTier, approvalModel.Speed, approvalModel.ContextWindow)
                 : null);
         options.Add(Reviewer(
             "extended_approval",
@@ -97,7 +97,7 @@ internal static class SessionOptionCatalog
             "_crystal_approval",
             "/approval extended",
             settings.ExtendedApproval.Reviewer is { Enabled: true } extended
-                ? (extended.Provider!, extended.Model!, extended.ThinkingEffort, extended.ServiceTier, extended.Speed)
+                ? (extended.Provider!, extended.Model!, extended.ThinkingEffort, extended.ServiceTier, extended.Speed, extended.ContextWindow)
                 : null);
         options.Add(new SessionOption(
             "prompt_set",
@@ -123,7 +123,7 @@ internal static class SessionOptionCatalog
             "_crystal_compaction",
             "/compact",
             settings.CompactionModel is { Enabled: true } compactionModel
-                ? (compactionModel.Provider!, compactionModel.Model!, compactionModel.ThinkingEffort, compactionModel.ServiceTier, compactionModel.Speed)
+                ? (compactionModel.Provider!, compactionModel.Model!, compactionModel.ThinkingEffort, compactionModel.ServiceTier, compactionModel.Speed, compactionModel.ContextWindow)
                 : null);
         options.Add(Switch(
             "micro_compaction",
@@ -166,10 +166,11 @@ internal static class SessionOptionCatalog
     }
 
     /// <summary>
-    /// Thinking, tier, and speed of an enabled side model, each offered only
-    /// when that model has a choice. Ids are <paramref name="prefix"/> plus
-    /// <c>_thinking</c>, <c>_tier</c>, and <c>_speed</c>. A side model's unset
-    /// slot sends no tier or speed.
+    /// Thinking, tier, speed, and context of an enabled side model, each
+    /// offered only when that model has a choice. Ids are
+    /// <paramref name="prefix"/> plus <c>_thinking</c>, <c>_tier</c>,
+    /// <c>_speed</c>, and <c>_context</c>. A side model's unset tier or speed
+    /// is not sent, and its unset context is the model's first budget.
     /// </summary>
     private static void AddTuning(
         List<SessionOption> options,
@@ -178,7 +179,7 @@ internal static class SessionOptionCatalog
         string label,
         string category,
         string command,
-        (string Provider, string Model, ThinkingSelection Thinking, string? ServiceTier, string? Speed)? side)
+        (string Provider, string Model, ThinkingSelection Thinking, string? ServiceTier, string? Speed, int? Context)? side)
     {
         if (side is not { } selected)
         {
@@ -208,6 +209,20 @@ internal static class SessionOptionCatalog
         if (model.Speeds.Count > 0)
         {
             options.Add(Slot(prefix + "_speed", label + " speed", command + " speed", selected.Speed, model.Speeds, category));
+        }
+
+        if (model.ContextWindows.Count > 1)
+        {
+            var windows = model.ContextWindows;
+            options.Add(new SessionOption(
+                prefix + "_context",
+                label + " context",
+                category,
+                (selected.Context ?? windows[0]).ToString(CultureInfo.InvariantCulture),
+                [.. windows.Select(window => new SessionOptionValue(
+                    window.ToString(CultureInfo.InvariantCulture),
+                    ContextWindowSelection.Format(window),
+                    command + " context " + window.ToString(CultureInfo.InvariantCulture)))]));
         }
     }
 

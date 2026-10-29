@@ -263,6 +263,7 @@ public sealed record HarnessSettings
                 compactionModelSettings,
                 CompactionModel.ServiceTier,
                 CompactionModel.Speed,
+                CompactionModel.ContextWindow,
                 "Compaction model");
         }
 
@@ -792,7 +793,8 @@ public sealed record HarnessSettings
             new ProviderName(reviewer.Provider!),
             reviewer.Model!,
             reviewer.ServiceTier,
-            reviewer.Speed);
+            reviewer.Speed,
+            reviewer.ContextWindow);
     }
 
     /// <summary>
@@ -811,7 +813,8 @@ public sealed record HarnessSettings
             new ProviderName(compaction.Provider!),
             compaction.Model!,
             compaction.ServiceTier,
-            compaction.Speed);
+            compaction.Speed,
+            compaction.ContextWindow);
     }
 
     /// <summary>
@@ -830,18 +833,31 @@ public sealed record HarnessSettings
             new ProviderName(image.Provider!),
             image.Model!,
             image.ServiceTier,
-            image.Speed);
+            image.Speed,
+            image.ContextWindow);
     }
 
     /// <summary>
     /// A side model is configured on its own. Its slots replace the per-model
-    /// <c>/tier</c> and <c>/speed</c> selection for the same model, and an
-    /// unset slot removes it, so the request carries no tier or speed.
+    /// <c>/tier</c>, <c>/speed</c>, and <c>/context</c> selection for the same
+    /// model. An unset tier or speed is removed, so the request carries none,
+    /// and an unset context budget is the model's first declared budget.
     /// </summary>
-    private HarnessSettings ForModel(ProviderName provider, string model, string? serviceTier, string? speed) =>
-        WithSelection(provider, model)
+    private HarnessSettings ForModel(
+        ProviderName provider,
+        string model,
+        string? serviceTier,
+        string? speed,
+        int? contextWindow)
+    {
+        var selected = WithSelection(provider, model)
             .WithTier(provider, model, serviceTier)
             .WithSpeed(provider, model, speed);
+        return selected.WithContextWindow(
+            provider,
+            model,
+            contextWindow ?? selected.ActiveModel.ContextWindows[0]);
+    }
 
     public HarnessSettings WithImageModel(ImageModelSettings imageModel)
     {
@@ -1111,11 +1127,23 @@ public sealed record HarnessSettings
             throw new InvalidOperationException(exception.Message, exception);
         }
 
-        RequireSlots(model, reviewer.ServiceTier, reviewer.Speed, label);
+        RequireSlots(model, reviewer.ServiceTier, reviewer.Speed, reviewer.ContextWindow, label);
     }
 
-    private static void RequireSlots(ModelSettings model, string? serviceTier, string? speed, string label)
+    private static void RequireSlots(
+        ModelSettings model,
+        string? serviceTier,
+        string? speed,
+        int? contextWindow,
+        string label)
     {
+        if (contextWindow is int window && !model.ContextWindows.Contains(window))
+        {
+            throw new InvalidOperationException(Unavailable(
+                label + " context window",
+                [.. model.ContextWindows.Select(ContextWindowSelection.Format)]));
+        }
+
         if (serviceTier is not null && !CatalogSlots.Contains(model.ServiceTiers, serviceTier))
         {
             throw new InvalidOperationException(
@@ -1151,7 +1179,7 @@ public sealed record HarnessSettings
                 $"Image model '{imageModel.Model}' does not accept image input.");
         }
 
-        RequireSlots(model, imageModel.ServiceTier, imageModel.Speed, "Image model");
+        RequireSlots(model, imageModel.ServiceTier, imageModel.Speed, imageModel.ContextWindow, "Image model");
     }
 
     private static IReadOnlyList<string> CopyPromptAttachments(IReadOnlyList<string>? names)

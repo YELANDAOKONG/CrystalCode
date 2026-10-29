@@ -311,7 +311,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             document.Model,
             document.ThinkingEffort,
             document.ServiceTier,
-            document.Speed);
+            document.Speed,
+            document.ContextWindow);
     }
 
     private static ApprovalModelDocument? WriteApprovalModel(ApprovalModelSettings settings)
@@ -328,7 +329,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             Model = settings.Model,
             ThinkingEffort = WriteGear(settings.ThinkingEffort),
             ServiceTier = settings.ServiceTier,
-            Speed = settings.Speed
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
         };
     }
 
@@ -346,7 +348,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             document.Model,
             document.ThinkingEffort,
             document.ServiceTier,
-            document.Speed);
+            document.Speed,
+            document.ContextWindow);
         var trigger = ExtendedApprovalSettings.DefaultTrigger;
         if (document.Trigger is not null && !ReviewRiskLevel.TryParse(document.Trigger, out trigger))
         {
@@ -376,6 +379,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             ThinkingEffort = WriteGear(reviewer.ThinkingEffort),
             ServiceTier = reviewer.ServiceTier,
             Speed = reviewer.Speed,
+            ContextWindow = reviewer.ContextWindow,
             Trigger = settings.Trigger == ExtendedApprovalSettings.DefaultTrigger
                 ? null
                 : settings.Trigger.Value,
@@ -393,7 +397,8 @@ public sealed class DiskSettingsStore : ISettingsStore
         string? modelText,
         string? thinkingText,
         string? tierText,
-        string? speedText)
+        string? speedText,
+        int? contextWindow)
     {
         var provider = string.IsNullOrWhiteSpace(providerText) ? null : providerText.Trim();
         var model = string.IsNullOrWhiteSpace(modelText) ? null : modelText.Trim();
@@ -412,7 +417,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             model,
             thinkingEffort,
             ReadSlot(tierText, field + ".serviceTier"),
-            ReadSlot(speedText, field + ".speed"));
+            ReadSlot(speedText, field + ".speed"),
+            ReadContextWindow(contextWindow, field + ".contextWindow"));
     }
 
     private static string? ReadSlot(string? text, string field)
@@ -431,12 +437,18 @@ public sealed class DiskSettingsStore : ISettingsStore
         return token;
     }
 
+    private static int? ReadContextWindow(int? window, string field) =>
+        window is <= 0
+            ? throw new InvalidOperationException(field + " must be a positive token count.")
+            : window;
+
     private static bool IsEmptyReviewer(ApprovalModelSettings settings) =>
         !settings.Enabled
         && !settings.HasSelection
         && settings.ThinkingEffort == ThinkingSelection.Default
         && settings.ServiceTier is null
-        && settings.Speed is null;
+        && settings.Speed is null
+        && settings.ContextWindow is null;
 
     private static string? WriteGear(ThinkingSelection gear) =>
         gear == ThinkingSelection.Default ? null : gear.Value;
@@ -469,7 +481,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             model,
             thinkingEffort,
             ReadSlot(document.ServiceTier, "compactionModel.serviceTier"),
-            ReadSlot(document.Speed, "compactionModel.speed"));
+            ReadSlot(document.Speed, "compactionModel.speed"),
+            ReadContextWindow(document.ContextWindow, "compactionModel.contextWindow"));
     }
 
     private static CompactionModelDocument? WriteCompactionModel(CompactionModelSettings settings)
@@ -478,7 +491,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             && !settings.HasSelection
             && settings.ThinkingEffort == ThinkingSelection.Default
             && settings.ServiceTier is null
-            && settings.Speed is null)
+            && settings.Speed is null
+            && settings.ContextWindow is null)
         {
             return null;
         }
@@ -490,7 +504,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             Model = settings.Model,
             ThinkingEffort = WriteGear(settings.ThinkingEffort),
             ServiceTier = settings.ServiceTier,
-            Speed = settings.Speed
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
         };
     }
 
@@ -641,7 +656,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             model,
             thinkingEffort,
             ReadSlot(document.ServiceTier, "imageModel.serviceTier"),
-            ReadSlot(document.Speed, "imageModel.speed"));
+            ReadSlot(document.Speed, "imageModel.speed"),
+            ReadContextWindow(document.ContextWindow, "imageModel.contextWindow"));
     }
 
     /// <summary>
@@ -810,7 +826,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             Model = settings.Model,
             ThinkingEffort = WriteGear(settings.ThinkingEffort),
             ServiceTier = settings.ServiceTier,
-            Speed = settings.Speed
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
         };
     }
 

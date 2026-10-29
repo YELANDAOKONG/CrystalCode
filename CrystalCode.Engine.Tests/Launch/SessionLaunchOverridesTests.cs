@@ -244,6 +244,14 @@ public sealed class SessionLaunchOverridesTests
 
         Assert.False(SessionLaunchOverrides.TryApply(
             HarnessSettings.CreateDefault(),
+            new SessionLaunchOptions { CompactionContext = "lots" },
+            out _,
+            out _,
+            out var badContext));
+        Assert.Equal("Compaction context budget must be a token count such as 200k or 1m.", badContext);
+
+        Assert.False(SessionLaunchOverrides.TryApply(
+            HarnessSettings.CreateDefault(),
             new SessionLaunchOptions { CompactionTier = "9bad" },
             out _,
             out _,

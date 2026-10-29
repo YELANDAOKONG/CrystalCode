@@ -14,6 +14,8 @@ internal sealed class ExtendedApprovalDocument
 
     public string? Speed { get; set; }
 
+    public int? ContextWindow { get; set; }
+
     public string? Trigger { get; set; }
 
     public bool? IncludePrimaryReview { get; set; }

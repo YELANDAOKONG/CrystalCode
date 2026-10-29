@@ -32,6 +32,8 @@ public sealed record SessionLaunchOptions
 
     public string? ApprovalSpeed { get; init; }
 
+    public string? ApprovalContext { get; init; }
+
     public string? ExtendedApproval { get; init; }
 
     public string? ExtendedApprovalProvider { get; init; }
@@ -43,6 +45,8 @@ public sealed record SessionLaunchOptions
     public string? ExtendedApprovalTier { get; init; }
 
     public string? ExtendedApprovalSpeed { get; init; }
+
+    public string? ExtendedApprovalContext { get; init; }
 
     public string? ExtendedApprovalTrigger { get; init; }
 
@@ -59,6 +63,8 @@ public sealed record SessionLaunchOptions
     public string? CompactionTier { get; init; }
 
     public string? CompactionSpeed { get; init; }
+
+    public string? CompactionContext { get; init; }
 
     public bool Plan { get; init; }
 

@@ -578,8 +578,9 @@ model or provider does not support image input. Declared `audioInput` or
 image-description prompt and returns the reply as text. The side
 request has no tools, is not written into the session transcript, and uses
 `imageModel.thinkingEffort` through the same gear mapping as the host. Its
-optional `imageModel.serviceTier` and `imageModel.speed` apply to that client
-only; unset sends no tier or speed, as for a reviewer.
+optional `imageModel.serviceTier`, `imageModel.speed`, and
+`imageModel.contextWindow` apply to that client only; unset sends no tier or
+speed and uses the model's first declared budget, as for a reviewer.
 `view_image` is registered only for an image-capable turn. It returns the
 file as `ImageContent` so the current model sees it on the next round.
 Both follow the `read` path fence. A missing image-model credential fails
@@ -1379,14 +1380,17 @@ Modes:
 
 The reviewing model is the session model unless `approvalModel` is
 enabled in `config.json`. The object is `enabled`, `provider`, `model`,
-and optional `thinkingEffort`, `serviceTier`, and `speed`. An omitted object means off.
-`serviceTier` and `speed` apply to that reviewer only and must be tokens the
+and optional `thinkingEffort`, `serviceTier`, `speed`, and `contextWindow`. An omitted object means off.
+`serviceTier`, `speed`, and `contextWindow` apply to that reviewer only and must be tokens the
 reviewer model lists; an enabled reviewer with an unlisted token fails at
 startup. An unset slot sends no tier or speed: a reviewer is configured on
 its own, and the session's per-model `tierSelections` and `speedSelections`
-do not apply to it, even for the same model. `/approval tier` and `/approval speed` cycle the reviewer
+do not apply to it, even for the same model. An unset `contextWindow` is the
+reviewer model's first declared budget, and the session's `contextSelections`
+do not apply either; the budget fixes the review client's output cap.
+`/approval tier`, `/approval speed`, and `/approval context` cycle the reviewer
 model's list, including the unset slot, or select a listed token, and write
-`config.json`. Selecting another reviewer model clears both slots.
+`config.json`. Selecting another reviewer model clears all three slots.
 `enabled: false` keeps a stored provider, model, and gear unused, and
 Review and Audit follow `/model` and the work thinking gear. While
 enabled, review calls use a separate client and that provider's
@@ -1443,11 +1447,12 @@ Extended trigger and Extended primary review.
 
 `crystal run` can set the switch for one process with
 `--approval-model on|off`, `--approval-provider`, `--approval-model-id`,
-`--approval-thinking`, `--approval-tier`, and `--approval-speed`. Extended
+`--approval-thinking`, `--approval-tier`, `--approval-speed`, and
+`--approval-context`. Extended
 approval has `--extended-approval on|off`, `--extended-approval-provider`,
 `--extended-approval-model-id`, `--extended-approval-thinking`,
 `--extended-approval-tier`, `--extended-approval-speed`,
-`--extended-approval-trigger`, and `--extended-approval-primary on|off`.
+`--extended-approval-context`, `--extended-approval-trigger`, and `--extended-approval-primary on|off`.
 Those flags are not written to `config.json`.
 Passing a provider or model id turns the switch on for that process.
 `--approval-model off` keeps any stored names and gear unused and rejects
@@ -1612,24 +1617,26 @@ the latest user turn, into the summary and keeps no tail, so the model
 context becomes the live system prompt and the summary. It follows the same
 display rules as `/compact` and prints `Nothing earlier to compact` when the
 session has no conversation. `/compact model`, `/compact thinking`,
-`/compact tier`, and `/compact speed` show or set the optional summarizer,
-its gear, and its own service tier and speed. `/compact summary` toggles
+`/compact tier`, `/compact speed`, and `/compact context` show or set the
+optional summarizer, its gear, and its own service tier, speed, and context
+budget. `/compact summary` toggles
 `showCompactionSummary`, and `/compact auto` (alias `automatic`) toggles
 `showAutomaticCompactionSummary`. `/compact micro` toggles microcompaction.
 Any of those commands accepts `on` or `off`, writes `config.json`, and does
 not summarize. Any other argument is rejected.
 `compactionModel` in `config.json` is `enabled`, `provider`, `model`,
-and optional `thinkingEffort`, `serviceTier`, and `speed`. An omitted
-object means off, and `enabled: false` keeps a stored provider, model, gear,
+and optional `thinkingEffort`, `serviceTier`, `speed`, and `contextWindow`.
+An omitted object means off, and `enabled: false` keeps a stored provider, model, gear,
 and slots unused. A slot applies to the summarizer only, must be listed by
-its model, and sends no tier or speed when unset. `/tier` and `/speed`
-change only the session client, never an approval, extended approval,
-compaction, or image client on the same model.
+its model, and sends no tier or speed when unset; an unset context is the
+model's first declared budget. `/tier`, `/speed`, and `/context` change only
+the session client, never an approval, extended approval, compaction, or
+image client on the same model.
 While off, the summary request uses the session model and omits
 reasoning. It does not reuse the session client, because that client
 keeps the turn output cap. The host opens a summary client with the
-summary reply cap, and opens it again when the model, tier, speed, or
-cap changes. While on, the host opens a separate client and maps that
+summary reply cap, and opens it again when the model, tier, speed, context
+budget, or cap changes. While on, the host opens a separate client and maps that
 model's gear the same way as the approval model: no thinking omits
 reasoning, `off` disables it when the model allows that, and `default`
 or an unsupported gear uses the provider default without changing the
@@ -1638,13 +1645,13 @@ A side question that must summarize first opens its own summary client
 and releases it; the answer still uses the session model.
 The trigger, retained tail, and CTX percent stay on the session
 window. The summary prompt budget is the smaller of that window and
-the compaction model's declared window. A summary that cannot fit
+the compaction model's own context budget. A summary that cannot fit
 takes the existing path that does not write one. `/status` adds a
 Compaction model row only while the switch is on.
 `crystal`, `crystal space`, and `crystal run` accept
 `--compaction-model on|off`, `--compaction-provider`,
-`--compaction-model-id`, `--compaction-thinking`, `--compaction-tier`, and
-`--compaction-speed` for one process.
+`--compaction-model-id`, `--compaction-thinking`, `--compaction-tier`,
+`--compaction-speed`, and `--compaction-context` for one process.
 Those flags are not written to `config.json`. `on` needs a saved
 selection or a provider and model id on the same command.
 User and assistant text in the folded head are replaced
@@ -2553,7 +2560,8 @@ external tools, plugins, and turn quotas. Overrides are not written to
 `config.json`. That includes the
 approval-model switch
 (`--approval-model`, `--approval-provider`, `--approval-model-id`), gear
-(`--approval-thinking`), and slots (`--approval-tier`, `--approval-speed`),
+(`--approval-thinking`), and slots (`--approval-tier`, `--approval-speed`,
+`--approval-context`),
 and every `--extended-approval` flag.
 A later interactive preference command writes the field the operator changed,
 and can also write a `--provider` or `--model` passed at launch. It does not
@@ -2755,7 +2763,7 @@ display labels for thinking, tier, and speed. `CodingSession` refreshes the
 chrome after every compaction model command. Server and Bridge write them as
 `compaction` and `image`; the terminal does not draw them.
 The engine option catalog adds `approval_*`, `extended_*`, and `compaction_*`
-thinking, tier, and speed options for an enabled side model that offers that
+thinking, tier, speed, and context options for an enabled side model that offers that
 choice, and a `compaction_model` picker. Each value names the same slash
 command the terminal uses.
 A disk plugin may register extra field names. Those names stay off the

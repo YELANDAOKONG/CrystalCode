@@ -41,6 +41,11 @@ public sealed class SideModelOptionTests
         var thinking = options.Single(static option => option.Id == "compaction_thinking");
         Assert.Contains(thinking.Values, static value => value.Command == "/compact thinking high");
 
+        var compactionContext = options.Single(static option => option.Id == "compaction_context");
+        Assert.Equal("100000", compactionContext.Current);
+        Assert.Equal("/compact context 200000", compactionContext.Values[1].Command);
+        Assert.Contains("approval_context", options.Select(static option => option.Id));
+
         var approvalSpeed = options.Single(static option => option.Id == "approval_speed");
         Assert.Equal("_crystal_approval", approvalSpeed.Category);
         Assert.Equal("/approval speed fast", approvalSpeed.Values.Single(static value => value.Value == "fast").Command);
@@ -74,7 +79,11 @@ public sealed class SideModelOptionTests
         await headless.Session.SubmitAsync("/compact model scripted rich", CancellationToken.None);
         await headless.Session.SubmitAsync("/compact speed fast", CancellationToken.None);
 
-        Assert.Equal(new SideModelChrome("scripted", "rich", string.Empty, string.Empty, "Speed Fast"), LastChrome(headless).Compaction);
+        await headless.Session.SubmitAsync("/compact context 200k", CancellationToken.None);
+
+        Assert.Equal(
+            new SideModelChrome("scripted", "rich", string.Empty, string.Empty, "Speed Fast", "Context 200K"),
+            LastChrome(headless).Compaction);
 
         await headless.Session.SubmitAsync("/compact model off", CancellationToken.None);
         Assert.Null(LastChrome(headless).Compaction);
@@ -101,6 +110,7 @@ public sealed class SideModelOptionTests
                     thinking: true,
                     thinkingEfforts: ["low", "high"],
                     imageInput: true,
+                    contextWindows: [100_000, 200_000],
                     serviceTiers: ["flex", "priority"],
                     speeds: ["fast"]),
                 ["plain"] = new(200_000)

@@ -273,7 +273,7 @@ public sealed class CodingSessionApprovalModelTests
     }
 
     [Fact]
-    public async Task Context_RebuildsTheApprovalClientWhenItsBudgetChanges()
+    public async Task Context_KeepsTheApprovalModelBudgetApartFromTheSession()
     {
         var outside = Path.Combine(Path.GetTempPath(), "crystal-approval-" + Guid.NewGuid().ToString("N") + ".txt");
         await File.WriteAllTextAsync(outside, "outside-text");
@@ -307,9 +307,16 @@ public sealed class CodingSessionApprovalModelTests
 
             await session.SubmitAsync("/context", CancellationToken.None);
 
-            Assert.True(routing.OutputCaps.Count >= beforeContext + 2);
+            // Only the session client follows /context; the approval model keeps its own budget.
+            Assert.Equal(beforeContext + 1, routing.OutputCaps.Count);
             Assert.Equal(Fitted(1_000_000), routing.OutputCaps[^1]);
-            Assert.Equal(Fitted(1_000_000), routing.OutputCaps[^2]);
+
+            await session.SubmitAsync("/approval context 1m", CancellationToken.None);
+            await RunTurnAsync(session, "Read the outside file.");
+            Assert.Equal(Fitted(1_000_000), routing.OutputCaps[^1]);
+            Assert.Contains(
+                observer.Events.OfType<NoteWritten>(),
+                static note => note.Text == "Approval context  1M");
         }
         finally
         {

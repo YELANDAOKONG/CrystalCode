@@ -372,6 +372,7 @@ public sealed class ShellChrome
             "approval-thinking" or "extended-thinking" => ("thinking", 2),
             "approval-tier" or "extended-tier" => ("tier", 2),
             "approval-speed" or "extended-speed" => ("speed", 2),
+            "approval-context" or "extended-context" => ("context-window", 2),
             "extended-trigger" or "extended-primary" => (null, 2),
             _ => (null, 0)
         };

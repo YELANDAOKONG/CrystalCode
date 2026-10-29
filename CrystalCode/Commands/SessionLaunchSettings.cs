@@ -47,6 +47,9 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--approval-speed <TOKEN>")]
     public string? ApprovalSpeed { get; init; }
 
+    [CommandOption("--approval-context <BUDGET>")]
+    public string? ApprovalContext { get; init; }
+
     [CommandOption("--extended-approval <on|off>")]
     public string? ExtendedApproval { get; init; }
 
@@ -64,6 +67,9 @@ public class SessionLaunchSettings : CommandSettings
 
     [CommandOption("--extended-approval-speed <TOKEN>")]
     public string? ExtendedApprovalSpeed { get; init; }
+
+    [CommandOption("--extended-approval-context <BUDGET>")]
+    public string? ExtendedApprovalContext { get; init; }
 
     [CommandOption("--extended-approval-trigger <low|medium|high>")]
     public string? ExtendedApprovalTrigger { get; init; }
@@ -88,6 +94,9 @@ public class SessionLaunchSettings : CommandSettings
 
     [CommandOption("--compaction-speed <TOKEN>")]
     public string? CompactionSpeed { get; init; }
+
+    [CommandOption("--compaction-context <BUDGET>")]
+    public string? CompactionContext { get; init; }
 
     [CommandOption("--plan")]
     public bool Plan { get; init; }
@@ -182,12 +191,14 @@ public class SessionLaunchSettings : CommandSettings
             ApprovalThinking = ApprovalThinking,
             ApprovalTier = ApprovalTier,
             ApprovalSpeed = ApprovalSpeed,
+            ApprovalContext = ApprovalContext,
             ExtendedApproval = ExtendedApproval,
             ExtendedApprovalProvider = ExtendedApprovalProvider,
             ExtendedApprovalModelId = ExtendedApprovalModelId,
             ExtendedApprovalThinking = ExtendedApprovalThinking,
             ExtendedApprovalTier = ExtendedApprovalTier,
             ExtendedApprovalSpeed = ExtendedApprovalSpeed,
+            ExtendedApprovalContext = ExtendedApprovalContext,
             ExtendedApprovalTrigger = ExtendedApprovalTrigger,
             ExtendedApprovalPrimary = ExtendedApprovalPrimary,
             CompactionModel = CompactionModel,
@@ -196,6 +207,7 @@ public class SessionLaunchSettings : CommandSettings
             CompactionThinking = CompactionThinking,
             CompactionTier = CompactionTier,
             CompactionSpeed = CompactionSpeed,
+            CompactionContext = CompactionContext,
             Plan = Plan,
             Work = Work,
             Mode = Mode,

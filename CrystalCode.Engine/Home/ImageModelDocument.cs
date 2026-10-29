@@ -11,4 +11,6 @@ internal sealed class ImageModelDocument
     public string? ServiceTier { get; set; }
 
     public string? Speed { get; set; }
+
+    public int? ContextWindow { get; set; }
 }

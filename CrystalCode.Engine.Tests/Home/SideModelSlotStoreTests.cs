@@ -18,6 +18,7 @@ public sealed class SideModelSlotStoreTests
               "judge": {
                 "contextWindow": 200000,
                 "imageInput": true,
+                "contextWindows": [100000, 200000],
                 "serviceTiers": ["flex", "priority"],
                 "speeds": ["fast"]
               },
@@ -103,6 +104,50 @@ public sealed class SideModelSlotStoreTests
         Assert.Null(reviewer.ServiceTier);
         Assert.Null(reviewer.Speed);
         Assert.Equal("flex", settings.TierFor(new ProviderName("gateway"), "judge"));
+    }
+
+    [Fact]
+    public void Save_RoundTripsEachSideModelContextAndIgnoresTheSessionBudget()
+    {
+        using var root = new TemporaryHome();
+        var store = SlotStore(root);
+        var gateway = new ProviderName("gateway");
+        var settings = store.Load()
+            .WithContextWindow(gateway, "judge", 100_000)
+            .WithApprovalModel(new ApprovalModelSettings(true, "gateway", "judge", contextWindow: 200_000))
+            .WithExtendedApproval(new ExtendedApprovalSettings(new ApprovalModelSettings(true, "gateway", "judge")))
+            .WithCompactionModel(new CompactionModelSettings(true, "gateway", "judge").WithContextWindow(200_000))
+            .WithImageModel(new ImageModelSettings("gateway", "judge").WithContextWindow(200_000));
+
+        store.Save(settings);
+        var loaded = store.Load();
+
+        Assert.Equal(200_000, loaded.ApprovalModel.ContextWindow);
+        Assert.Null(loaded.ExtendedApproval.Reviewer.ContextWindow);
+        Assert.Equal(200_000, loaded.CompactionModel.ContextWindow);
+        Assert.Equal(200_000, loaded.ImageModel.ContextWindow);
+        Assert.Equal(200_000, loaded.ForReviewer(loaded.ApprovalModel).ContextWindow);
+        Assert.Equal(200_000, loaded.ForCompaction(loaded.CompactionModel).ContextWindow);
+        Assert.Equal(200_000, loaded.ForImage(loaded.ImageModel).ContextWindow);
+
+        // Unset is the model's first budget, not the session's /context choice of 200K.
+        var sessionWide = loaded.WithContextWindow(gateway, "judge", 200_000);
+        Assert.Equal(100_000, sessionWide.ForReviewer(sessionWide.ExtendedApproval.Reviewer).ContextWindow);
+        Assert.Contains("\"contextWindow\": 200000", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Settings_RejectAContextTheSideModelDoesNotDeclare()
+    {
+        using var root = new TemporaryHome();
+        var settings = SlotStore(root).Load();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => settings.WithCompactionModel(
+            new CompactionModelSettings(true, "gateway", "judge").WithContextWindow(150_000)));
+
+        Assert.Equal(
+            "Compaction model context window is not available for this model. Available: 100K, 200K",
+            exception.Message);
     }
 
     private static DiskSettingsStore SlotStore(TemporaryHome root)
