@@ -61,9 +61,41 @@ public sealed class CodingSessionTopicTests
     }
 
     [Fact]
-    public async Task UnclearAnswer_LeavesTheSessionUnnamedAndIsNotRetried()
+    public async Task UnclearAnswer_LeavesTheSessionUnnamedAndTheNextTurnAsksAgain()
     {
-        var model = new ScriptedStreamingClient(Text("Hi."), Text("New conversation"), Text("Again."));
+        var model = new ScriptedStreamingClient(
+            Text("Hi."),
+            Text("New conversation"),
+            Text("Sure."),
+            Text("Fix the login redirect"),
+            Text("Done."));
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("hello");
+        await headless.Session.TopicTask;
+        Assert.Null(headless.ReadSaved().Topic);
+        Assert.Equal(2, model.RequestCount);
+
+        await headless.RunTurnAsync("The login page redirects twice.");
+        await headless.Session.TopicTask;
+        Assert.Equal("Fix the login redirect", headless.ReadSaved().Topic);
+        Assert.Equal(4, model.RequestCount);
+
+        await headless.RunTurnAsync("Also check logout.");
+        await headless.Session.TopicTask;
+        Assert.Equal(5, model.RequestCount);
+    }
+
+    [Fact]
+    public async Task FailedReply_IsNotRetriedOnItsOwn()
+    {
+        IReadOnlyList<ChatStreamEvent> cut =
+        [
+            new ChatReasoningTextDelta(0, 0, 0, ReasoningTextKind.Summary, "thinking"),
+            new ChatCandidateCompleted(0, FinishReason.Length)
+        ];
+        var model = new ScriptedStreamingClient(Text("Hi."), cut, Text("Again."));
         using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
         await headless.Session.StartAsync(CancellationToken.None);
 
@@ -187,6 +219,11 @@ public sealed class CodingSessionTopicTests
         var activities = headless.Observer.Events.OfType<ActivityChanged>().Select(static changed => changed.Activity).ToArray();
         var started = Array.IndexOf(activities, SessionActivity.NamingTopic);
         Assert.True(started >= 0);
+        var events = headless.Observer.Events;
+        Assert.True(
+            events.ToList().FindIndex(static e => e is TurnFinished)
+            < events.ToList().FindIndex(static e => e is ActivityChanged { Activity: SessionActivity.NamingTopic }),
+            "Naming Topic must follow the turn footer, which clears the progress row.");
         Assert.Equal(SessionActivity.Idle, activities[^1]);
         Assert.True(Array.LastIndexOf(activities, SessionActivity.Idle) > started);
     }

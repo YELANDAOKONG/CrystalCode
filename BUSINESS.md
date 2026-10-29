@@ -411,8 +411,9 @@ separate library with no terminal code. The product can:
   limit, because reasoning tokens count against it. The progress row shows
   `Naming Topic` while it runs. A failure prints a note that says why (a reply
   cut at the output limit before any text, a tool call, or an empty reply)
-  and is not retried; an answer of `New conversation` leaves the session
-  unnamed. `/topic <text>` or `/topic set <text>` names the session by hand;
+  and is not retried on its own; an answer of `New conversation`, which the
+  prompt gives when the intent is unclear (a greeting, for example), leaves
+  the session unnamed and the next completed turn asks again. `/topic <text>` or `/topic set <text>` names the session by hand;
   that operator topic is never replaced automatically. `/topic clear` removes
   it, and `/topic regenerate` asks the model again. The topic is saved in the
   session file (`topic`, `topicSource`). A session without one, including every

@@ -8813,7 +8813,8 @@ public sealed class CodingSession : ITurnObserver
     /// Names the session once, after the first completed turn of this process
     /// that finds it unnamed, while topic naming is on. It runs beside the
     /// session and never blocks a turn. An existing topic is kept, and a
-    /// failed or unclear attempt is not retried; <c>/topic regenerate</c> asks again.
+    /// failed attempt is not retried, while an unclear one is asked again after
+    /// the next completed turn; <c>/topic regenerate</c> always asks.
     /// </summary>
     private void StartTopicIfNeeded()
     {
@@ -8907,7 +8908,11 @@ public sealed class CodingSession : ITurnObserver
             // The prompt answers this when the intent is unclear; the session stays unnamed.
             if (string.Equals(topic, SessionTopic.Unclear, StringComparison.OrdinalIgnoreCase))
             {
-                FinishTopic(generation, null, announce ? "The topic model could not tell what the session is about." : null);
+                FinishTopic(
+                    generation,
+                    null,
+                    announce ? "The topic model could not tell what the session is about." : null,
+                    retryLater: true);
                 return;
             }
 
@@ -8975,7 +8980,7 @@ public sealed class CodingSession : ITurnObserver
         SetActivity(naming ? SessionActivity.NamingTopic : SessionActivity.Idle);
     }
 
-    private void FinishTopic(long generation, string? topic, string? error)
+    private void FinishTopic(long generation, string? topic, string? error, bool retryLater = false)
     {
         lock (_topicGate)
         {
@@ -8990,6 +8995,13 @@ public sealed class CodingSession : ITurnObserver
             {
                 _topic = topic;
                 _topicByOperator = false;
+            }
+
+            // A greeting has nothing to name yet, so the next completed turn asks again.
+            // A failed or cut reply is not retried on its own.
+            if (retryLater)
+            {
+                _topicAttempted = false;
             }
         }
 
@@ -11032,11 +11044,6 @@ public sealed class CodingSession : ITurnObserver
         }
 
         SaveSession();
-        if (result.StopReason == TurnStopReason.Completed)
-        {
-            StartTopicIfNeeded();
-        }
-
         var usage = _ledger.Usage ?? result.Usage;
         lock (_usageGate)
         {
@@ -11057,6 +11064,12 @@ public sealed class CodingSession : ITurnObserver
             usage,
             _ledger.CumulativeUsage,
             _settings.ContextWindow));
+        // After TurnFinished: the turn footer clears the progress row, which
+        // would otherwise hide Naming Topic as soon as it appears.
+        if (result.StopReason == TurnStopReason.Completed)
+        {
+            StartTopicIfNeeded();
+        }
     }
 
     private void Publish(SessionEvent sessionEvent)

@@ -2157,7 +2157,8 @@ session starts one short background request that names it; the turn does
 not wait for it, and the progress row shows `Naming Topic` until it ends.
 The request keeps the topic model's own output limit. If a reply has no text,
 the note says why, for example that it was cut at the output limit; lowering
-`/topic thinking` or choosing another `/topic model` usually fixes that. The name appears in `/sessions`, the resume picker, and the
+`/topic thinking` or choosing another `/topic model` usually fixes that. A session that opens with a greeting has nothing to name yet, so the
+next completed turn asks again until it gets a name. The name appears in `/sessions`, the resume picker, and the
 `topic` status-line field. A session without a topic, including older ones,
 shows its first message instead. `/topic` names, clears, or regenerates it by
 hand, and a name you set is not replaced. `/clear` and `/fork` start without

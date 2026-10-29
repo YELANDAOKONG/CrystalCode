@@ -1754,7 +1754,10 @@ cap, because reasoning tokens count against it, the
 `topic.md` system text, and `CompactionText` of the archive cut to 8000
 characters. `SessionActivity.NamingTopic` (`naming_topic` on the wire,
 `Naming Topic` in the progress row) is set while the request runs and only
-when no turn or compaction owns the row. A generation counter drops a stale
+when no turn or compaction owns the row. It starts after `TurnFinished`
+is published, because the turn footer clears the progress row. A
+`New conversation` answer clears the attempted flag so the next completed
+turn asks again; a failed or cut reply does not. A generation counter drops a stale
 reply. A reply with no text says why: cut at the output limit, a tool call,
 or empty. The result is
 normalized by `SessionTopic` (one line, no quotes or trailing period, at most
