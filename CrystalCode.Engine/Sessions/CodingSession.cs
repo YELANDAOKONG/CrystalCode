@@ -1023,6 +1023,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly Dictionary<int, string?> _draftImages = [];
     private int _nextImageNumber = 1;
     private string _sessionId;
+    private SessionLock? _sessionLock;
     private DateTimeOffset _sessionCreatedUtc;
     private IToolExecutor _workExecutor = null!;
     private Dictionary<string, (IToolExecutor Text, IMultimodalToolExecutor Image)> _customExecutors = [];
@@ -1072,7 +1073,8 @@ public sealed class CodingSession : ITurnObserver
         HarnessSettings? persistedSettings,
         IReadOnlyList<DirectoryAccess>? launchAccess,
         IReadOnlyList<DirectoryAccess>? additionalRoots,
-        bool forked)
+        bool forked,
+        SessionLock sessionLock)
     {
         ArgumentNullException.ThrowIfNull(frontEnd);
         ArgumentNullException.ThrowIfNull(frontEnd.Trust);
@@ -1123,7 +1125,8 @@ public sealed class CodingSession : ITurnObserver
         _promptResolution = ResolvePrompts();
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
-        _sessionId = SessionStore.NewId();
+        _sessionId = sessionLock.Id;
+        _sessionLock = sessionLock;
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         _replayOnStart = resume is not null;
@@ -1177,19 +1180,34 @@ public sealed class CodingSession : ITurnObserver
             throw new ArgumentException(error, nameof(resume));
         }
 
-        return new CodingSession(
-            settings,
-            settingsStore,
-            credentials,
-            home,
-            new Workspace(workspaceRoot),
-            frontEnd,
-            plugins ?? PluginRegistry.CreateBuiltIn(),
-            resume,
-            persistedSettings,
-            launchAccess,
-            additionalRoots,
-            forked);
+        var id = resume?.Id ?? SessionStore.NewId();
+        if (!new SessionStore(home).TryLock(id, out var sessionLock))
+        {
+            throw new InvalidOperationException(SessionResume.InUseMessage(id));
+        }
+
+        try
+        {
+            return new CodingSession(
+                settings,
+                settingsStore,
+                credentials,
+                home,
+                new Workspace(workspaceRoot),
+                frontEnd,
+                plugins ?? PluginRegistry.CreateBuiltIn(),
+                resume,
+                persistedSettings,
+                launchAccess,
+                additionalRoots,
+                forked,
+                sessionLock);
+        }
+        catch
+        {
+            sessionLock.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -1907,6 +1925,8 @@ public sealed class CodingSession : ITurnObserver
         }
         finally
         {
+            _sessionLock?.Dispose();
+            _sessionLock = null;
             _backgroundTasks.Dispose();
             ReleaseChildClients();
             DisposeClient();
@@ -5988,7 +6008,7 @@ public sealed class CodingSession : ITurnObserver
         DiscardQueue();
         CancelAndClearSide(announce: true);
         Publish(new ImageHistoryInvalidated());
-        _sessionId = SessionStore.NewId();
+        _sessionId = ClaimFreshSession();
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         lock (_archiveGate)
@@ -6189,6 +6209,12 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        if (!TryClaimSession(document.Id!))
+        {
+            Error(SessionResume.InUseMessage(document.Id!));
+            return;
+        }
+
         await RebindPluginSessionAsync(
             async () =>
             {
@@ -6230,7 +6256,49 @@ public sealed class CodingSession : ITurnObserver
 
     private async Task FinishResumeAsync(SessionDocument document, CancellationToken cancellationToken)
     {
+        if (!TryClaimSession(document.Id!))
+        {
+            Error(SessionResume.InUseMessage(document.Id!));
+            return;
+        }
+
         await RebindPluginSessionAsync(() => ApplyResume(document), cancellationToken);
+    }
+
+    /// <summary>
+    /// Makes <paramref name="id"/> the session this process holds and releases
+    /// the previous claim. False leaves the current claim untouched.
+    /// </summary>
+    private bool TryClaimSession(string id)
+    {
+        if (_sessionLock is not null && string.Equals(_sessionLock.Id, id, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!_sessionStore.TryLock(id, out var claimed))
+        {
+            return false;
+        }
+
+        _sessionLock?.Dispose();
+        _sessionLock = claimed;
+        return true;
+    }
+
+    /// <summary>
+    /// Claims a new session id, retrying on the unlikely clash with a held one.
+    /// </summary>
+    private string ClaimFreshSession()
+    {
+        while (true)
+        {
+            var id = SessionStore.NewId();
+            if (TryClaimSession(id))
+            {
+                return id;
+            }
+        }
     }
 
     private void ApplyResume(SessionDocument document)
@@ -6267,16 +6335,15 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var sourceId = source.Id!;
-        var fork = SessionFork.Create(
-            source,
-            SessionStore.NewId(),
-            _workspace.Root,
-            DateTimeOffset.UtcNow);
         await RebindPluginSessionAsync(
             () =>
             {
                 CancelAndClearSide(announce: true);
-                ApplyDocument(fork);
+                ApplyDocument(SessionFork.Create(
+                    source,
+                    ClaimFreshSession(),
+                    _workspace.Root,
+                    DateTimeOffset.UtcNow));
                 SeedWorkspaceDefaults();
                 SaveSession();
                 RefreshChrome();

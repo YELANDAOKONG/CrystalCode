@@ -1559,6 +1559,16 @@ from `config.json` until enabled, and uses the same panel. It does not change
 `/compact` itself. A compaction with no summary text does not print one. A side
 question that summarizes a private copy does not print it.
 
+A session holds an exclusive operating system lock on
+`~/.crystal/sessions/<id>.lock` for the id it has open (`SessionStore.TryLock`).
+The lock ends with the process, so a crash leaves nothing to release. The
+empty lock file stays on disk after a clean exit, because deleting it would
+let two holders lock different files. Resuming a session that is already open
+fails with `Session is already open  <id>`, at launch and in `/resume`. A
+launch that loses the race fails when the session is created. `/clear`,
+`/fork`, and `--fork` take a new id and are not affected. Listing and reading
+stay unlocked.
+
 Sessions are written to `~/.crystal/sessions/<id>.json` after each
 completed turn, after a child invocation settles, after a successful `/compact`,
 and on an orderly exit
@@ -1691,6 +1701,7 @@ contents of `binaries/code/`.
   plugins/
   data/plugins/<directory>/
   sessions/<id>.json
+  sessions/<id>.lock   (locked while a session has the id open)
   media/<sha256>
   logs/
   server/<pid>.json   (crystal server discovery file, owner-only)

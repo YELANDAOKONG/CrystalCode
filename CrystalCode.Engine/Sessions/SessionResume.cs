@@ -8,6 +8,8 @@ namespace CrystalCode.Engine.Sessions;
 /// </summary>
 public static class SessionResume
 {
+    public static string InUseMessage(string id) => "Session is already open  " + id;
+
     public static bool TryLoad(
         SessionStore store,
         string workspaceRoot,

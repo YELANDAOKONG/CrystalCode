@@ -36,6 +36,22 @@ public sealed class SessionStoreTests
     }
 
     [Fact]
+    public void TryLock_RefusesASecondHolderUntilTheFirstDisposes()
+    {
+        using var home = new TemporaryHome();
+        var store = new SessionStore(home.Home);
+
+        Assert.True(store.TryLock("aaaa", out var first));
+        Assert.False(new SessionStore(home.Home).TryLock("aaaa", out _));
+        Assert.True(store.TryLock("bbbb", out var other));
+        other.Dispose();
+
+        first.Dispose();
+        Assert.True(store.TryLock("aaaa", out var again));
+        again.Dispose();
+    }
+
+    [Fact]
     public void TryLoadLatest_MatchesAWorkspaceReachedThroughAnAncestorLink()
     {
         using var home = new TemporaryHome();

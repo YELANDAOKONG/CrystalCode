@@ -101,6 +101,9 @@ and the `server.state` event.
   needs a choice, the state is `awaiting_operator` and the question is an
   interaction. A declined trust or session choice, or an invalid launch,
   sets `failed`, prints the reason on stderr, and exits with code 1.
+- A saved session that another process has open cannot be resumed. The
+  server enters the `failed` state with `Session is already open  <id>`, and
+  `/resume` of such a session reports the same text and keeps the current one.
 - Once listening, the server writes one JSON line to stdout for a wrapper:
 
   ```json

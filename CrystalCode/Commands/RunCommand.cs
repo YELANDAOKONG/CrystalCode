@@ -61,7 +61,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         {
             host = TerminalHost.Create(launch, PluginRegistry.CreateBuiltIn());
         }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or NotSupportedException)
         {
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(exception.Message)}[/]");
             return 1;

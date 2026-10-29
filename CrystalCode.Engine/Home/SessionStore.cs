@@ -38,6 +38,26 @@ public sealed class SessionStore
         AtomicFile.WriteText(path, JsonSerializer.Serialize(stored, HomeJson.Options), ownerOnly: true);
     }
 
+    /// <summary>
+    /// Claims a session for this process. False when another process or
+    /// session already holds it.
+    /// </summary>
+    public bool TryLock(string id, out SessionLock sessionLock)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        var normalized = id.Trim();
+        if (!IsValidId(normalized))
+        {
+            throw new ArgumentException("Session id is invalid.", nameof(id));
+        }
+
+        _home.EnsureCreated();
+        sessionLock = SessionLock.TryAcquire(
+            normalized,
+            Path.Combine(_home.SessionsDirectory, normalized + ".lock"))!;
+        return sessionLock is not null;
+    }
+
     internal IReadOnlyDictionary<int, ImageAttachment> ReadImages(
         IEnumerable<SessionImageDocument> images) =>
         SessionMapper.ReadImages(images, new ImageBlobStore(_home));

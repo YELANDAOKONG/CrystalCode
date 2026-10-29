@@ -196,6 +196,11 @@ always 1, whatever the client sent.
   `credentials.json` and the environment. A session request with no usable
   credential fails with `-32603`, `kind` `launch_refused`, and the launcher's
   English error.
+- `session/load`, `session/resume`, and `session/fork` of a saved session that
+  another process has open fail with `-32603`, `kind` `launch_refused`, and
+  the text `Session is already open  <id>`. `/resume` inside a session reports
+  the same text as an error and keeps the current session. A fork takes a new
+  id and is not affected.
 
 Client capabilities Bridge reads:
 
