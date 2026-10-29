@@ -14,7 +14,8 @@ internal static class ShellHeartbeat
     {
         var started = DateTimeOffset.UtcNow;
         long previous = -1;
-        while (DateTimeOffset.UtcNow - started < TimeSpan.FromSeconds(5))
+        // Git Bash cold start on a loaded Windows runner can take several seconds.
+        while (DateTimeOffset.UtcNow - started < TimeSpan.FromSeconds(30))
         {
             if (File.Exists(path))
             {
