@@ -274,6 +274,86 @@ public sealed class ShellChromeTests
         }
     }
 
+    [Theory]
+    [InlineData(false, null, "Work", "work")]
+    [InlineData(true, null, "Plan", "plan")]
+    [InlineData(false, "review", "review", "custom")]
+    public void StatusLine_ShowsModeProviderAndShortSessionIdInCustomLine(
+        bool plan,
+        string? customMode,
+        string label,
+        string token)
+    {
+        Theme.Reset();
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = true,
+            StatusLineFields = ["mode", "provider", "session-id"],
+            PlanMode = plan,
+            CustomMode = customMode,
+            Provider = "openai",
+            SessionId = "0123456789abcdef"
+        };
+        var color = token switch { "plan" => Theme.Plan, "custom" => Theme.Custom, _ => Theme.Work };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Contains($"{label}  ·  openai  ·  01234567", line.Plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("0123456789", line.Plain, StringComparison.Ordinal);
+        Assert.Contains($"[{color}]{label}", line.Markup, StringComparison.Ordinal);
+        Assert.Contains($"[{Theme.Chrome}]openai", line.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusLine_OmitsAnEmptyProviderAndSessionId()
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = true,
+            StatusLineFields = ["provider", "session-id", "approval"],
+            Approval = "Full"
+        };
+
+        var line = chrome.StatusLine(120);
+
+        Assert.Equal("Full", line.Plain.Trim());
+    }
+
+    [Fact]
+    public void StatusLine_ColorsModeAndProviderFromThemeRules()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["mode"] = [new GaugeRule(null, null, ["plan"], null, "gold1")],
+            ["provider"] = [new GaugeRule(null, null, [], "^open", "green")]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+        try
+        {
+            var chrome = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["mode", "provider"],
+                PlanMode = true,
+                Provider = "openai"
+            };
+            var work = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["mode"],
+                Provider = "openai"
+            };
+
+            Assert.Contains("[gold1]Plan", chrome.StatusLine(120).Markup, StringComparison.Ordinal);
+            Assert.Contains("[green]openai", chrome.StatusLine(120).Markup, StringComparison.Ordinal);
+            Assert.Contains($"[{Theme.Work}]Work", work.StatusLine(120).Markup, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
     [Fact]
     public void StatusLine_ModelContextWindowAndPromptSetKeepDefaultColorsWithoutRules()
     {

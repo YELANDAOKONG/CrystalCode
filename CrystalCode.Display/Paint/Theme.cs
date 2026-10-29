@@ -195,7 +195,7 @@ public static class Theme
     /// <summary>
     /// Gauge names a theme file may set ranges for.
     /// </summary>
-    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set"];
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider"];
 
     /// <summary>
     /// Style for a context usage percentage. A theme's <c>context</c> rules
@@ -216,7 +216,8 @@ public static class Theme
     /// <summary>
     /// Style for a status-bar value such as a thinking gear. <paramref name="gauge"/>
     /// is <c>thinking</c>, <c>tier</c>, <c>speed</c>, <c>model</c>,
-    /// <c>context-window</c>, or <c>prompt-set</c>. A <c>context-window</c>
+    /// <c>context-window</c>, <c>prompt-set</c>, <c>mode</c>, or
+    /// <c>provider</c>. A <c>context-window</c>
     /// from/to rule tests <paramref name="number"/>, the window in tokens. The first rule of the
     /// theme's gauge that holds <paramref name="value"/> wins; otherwise, and
     /// without rules, the style is <paramref name="fallback"/>, or

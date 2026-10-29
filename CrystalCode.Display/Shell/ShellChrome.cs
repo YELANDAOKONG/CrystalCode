@@ -17,6 +17,10 @@ public sealed class ShellChrome
 
     public string Model { get; set; } = string.Empty;
 
+    public string Provider { get; set; } = string.Empty;
+
+    public string SessionId { get; set; } = string.Empty;
+
     public string WorkspaceRoot { get; set; } = string.Empty;
 
     public bool PlanMode { get; set; }
@@ -110,6 +114,15 @@ public sealed class ShellChrome
     public string Elapsed { get; set; } = string.Empty;
 
     public int Queued { get; set; }
+
+    private string ModeLabel =>
+        string.IsNullOrEmpty(CustomMode) ? PlanMode ? "Plan" : "Work" : CustomMode;
+
+    private string ModeColor =>
+        !string.IsNullOrEmpty(CustomMode) ? Theme.Custom : PlanMode ? Theme.Plan : Theme.Work;
+
+    /// <summary>The first 8 characters of the session id; the full id is in <c>/status</c>.</summary>
+    private string ShortSessionId => SessionId.Length <= 8 ? SessionId : SessionId[..8];
 
     private string ApprovalColor => ApprovalColors ? Theme.ForApproval(Approval) : Theme.Chrome;
 
@@ -214,6 +227,9 @@ public sealed class ShellChrome
                     : "Prompt " + PromptSet,
                 "activity" => string.IsNullOrWhiteSpace(Activity) ? string.Empty : "• " + Activity,
                 "model" => Model,
+                "provider" => Provider,
+                "mode" => ModeLabel,
+                "session-id" => ShortSessionId,
                 "workspace" => string.IsNullOrWhiteSpace(WorkspaceRoot)
                     ? string.Empty
                     : PathDisplay.Shorten(WorkspaceRoot),
@@ -244,6 +260,8 @@ public sealed class ShellChrome
                     "context-window" => WindowColor(value),
                     "prompt-set" => ValueColor("prompt-set", value),
                     "model" => Theme.ForValue("model", value),
+                    "provider" => Theme.ForValue("provider", value),
+                    "mode" => Theme.ForValue("mode", value, ModeColor),
                     _ => Theme.Chrome
                 };
                 items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", "custom"));

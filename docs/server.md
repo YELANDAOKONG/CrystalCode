@@ -283,7 +283,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `ChildSessionChanged`, `ChildViewRequested` | `child.changed`, `child.view` |
 
 The chrome object in `session.started`, `chrome.changed`, and the snapshot
-names the active `provider` and `model` along with workspace, mode, approval,
+names the active `provider` and `model` along with the `sessionId`, workspace, mode, approval,
 thinking, prompt set, context window, service tier, and speed.
 
 Server events: `server.state`, `server.closing` (with the session id and

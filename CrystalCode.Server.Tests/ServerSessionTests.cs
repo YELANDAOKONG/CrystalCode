@@ -74,6 +74,7 @@ public sealed class ServerSessionTests
 
         var chrome = changed.GetProperty("data").GetProperty("chrome");
         Assert.Equal("ollama", chrome.GetProperty("provider").GetString());
+        Assert.False(string.IsNullOrEmpty(chrome.GetProperty("sessionId").GetString()));
     }
 
     [Fact]

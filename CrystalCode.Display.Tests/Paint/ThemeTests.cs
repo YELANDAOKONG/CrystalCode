@@ -95,6 +95,8 @@ public sealed class ThemeTests : IDisposable
     [InlineData("model")]
     [InlineData("context-window")]
     [InlineData("prompt-set")]
+    [InlineData("mode")]
+    [InlineData("provider")]
     public void TryApply_AcceptsValueRulesForEachValueGauge(string gauge)
     {
         var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>> { [gauge] = [Value(["a"], null, "red")] };

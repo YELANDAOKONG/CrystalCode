@@ -51,6 +51,7 @@ public static class WireWriter
 
         writer.WriteStartObject(name);
         writer.WriteString("provider", chrome.Provider);
+        writer.WriteString("sessionId", chrome.SessionId);
         writer.WriteString("model", chrome.Model);
         writer.WriteString("workspace", chrome.WorkspaceRoot);
         writer.WriteString("mode", chrome.Mode ?? (chrome.PlanMode ? "plan" : "work"));

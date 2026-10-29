@@ -24,6 +24,7 @@ public sealed record StatusLineSettings
         Array.AsReadOnly(
         new[]
         {
+            "mode",
             "approval",
             "thinking",
             "tier",
@@ -31,7 +32,9 @@ public sealed record StatusLineSettings
             "context-window",
             "prompt-set",
             "activity",
+            "provider",
             "model",
+            "session-id",
             "workspace",
             "context-used",
             "context-left",

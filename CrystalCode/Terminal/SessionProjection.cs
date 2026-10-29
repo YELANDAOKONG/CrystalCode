@@ -50,6 +50,7 @@ internal sealed class SessionProjection : ISessionObserver
                     started.Chrome.ServiceTier,
                     started.Chrome.Speed,
                     started.Chrome.Mode);
+                _renderer.SetIdentity(started.Chrome.Provider, started.Chrome.SessionId);
                 _renderer.ChildSessionsEnabled = started.Chrome.AgentsEnabled;
                 break;
             case ChromeChanged changed:
@@ -64,6 +65,7 @@ internal sealed class SessionProjection : ISessionObserver
                     changed.Chrome.ServiceTier,
                     changed.Chrome.Speed,
                     changed.Chrome.Mode);
+                _renderer.SetIdentity(changed.Chrome.Provider, changed.Chrome.SessionId);
                 _renderer.ChildSessionsEnabled = changed.Chrome.AgentsEnabled;
                 break;
             case PreferencesChanged preferences:

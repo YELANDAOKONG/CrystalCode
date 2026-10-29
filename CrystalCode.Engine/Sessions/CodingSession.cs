@@ -8320,7 +8320,8 @@ public sealed class CodingSession : ITurnObserver
             CatalogSlotStatus.For("Speed", _settings.Speed),
             _settings.Agents.Enabled,
             _customMode,
-            _settings.Provider.Value);
+            _settings.Provider.Value,
+            _sessionId);
 
     private void RefreshChrome()
     {
