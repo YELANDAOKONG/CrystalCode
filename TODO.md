@@ -69,14 +69,49 @@ that fixes it.
     `TrySetMode`, which has no turn check, so it succeeds where the terminal
     and Bridge refuse. Approval, thinking, tier, and speed have no route of
     their own and go through `/input`.
-  - Not decided: whether mode, approval, thinking, tier, speed, context, and
-    model all become "applies next turn" (recorded during a turn, applied when
-    it ends, before a queued follow-up starts), when `config.json` is
-    written, whether chrome and Bridge `config_option_update` show the old or
-    the pending value, and whether `POST /input` reports the refusal in its
-    response. Do not reserve an event, wire field, or `_meta.crystal` key for
-    it. A decision updates ARCHITECTURE.md and the busy-command text in
-    `docs/user-guide.md`.
+  - Decided direction, awaiting implementation: these settings apply on the
+    next turn. The fix updates ARCHITECTURE.md, `docs/user-guide.md`,
+    `docs/server.md`, and `docs/bridge.md`, then removes this entry.
+    - Covered: mode (Plan, Work, custom; `/plan`, `/mode`, Tab, and
+      `POST /mode`), approval level, thinking, tier, speed, context, and
+      model. Every other setting that is refused during a turn today stays
+      refused: `/cd`, `/space`, `/access`, `/rules`, `/agents`, `/promptset`,
+      `/promptattach`, `/tools`, `/skills`, `/plugins`, `/mcp`, the reviewer
+      and compaction model forms, and `/compact`.
+    - While a turn or compaction runs, a covered command is validated and
+      recorded as pending, and answers that it applies on the next turn. It
+      changes nothing live: no executor rebuild, no system message
+      replacement, and no write to `config.json`. The running turn keeps the
+      values it started with.
+    - One pending value per setting; the last command wins. A command that
+      names the active value clears that setting's pending value. Validation
+      runs against the settings as they will be after the pending values
+      apply, so `/thinking` is checked against a pending model. A refusal
+      such as a missing API key happens when the command is typed, not later.
+    - Pending values apply when the turn is collected, in `CompleteTurnAsync`
+      before a queued follow-up starts, in a fixed order: model, context,
+      tier, speed, thinking, mode, approval. Each applied value is saved to
+      `config.json` then. An interrupted turn applies them too. `/clear`,
+      `/resume`, and `/fork` stop a busy turn, so they apply them as well. If
+      applying one fails, the session keeps the old value, writes an error,
+      and goes on with the rest. A crash before then loses pending values by
+      design.
+    - Tab, `/plan`, and `/approval` with no argument cycle from the pending
+      value when one exists.
+    - Chrome and Bridge `config_option_update` keep showing the active value.
+      The pending values are reported separately: a `pending` object in the
+      chrome (setting name to value), mirrored in the Server snapshot and in
+      Bridge `_meta.crystal.pending`, so a refresh or a second client still
+      sees them. `/status` lists them, and the terminal status bar marks a
+      pending value next to the active one.
+    - `POST /input` reports the engine's answer in its response: `accepted`
+      (false when the engine refused), `pending` (true when a setting was
+      recorded), and `error` (the refusal text). Bridge returns success for a
+      recorded setting and keeps `command_refused` for a real refusal.
+    - Open risk: lowering approval during a turn (Full to Default, for
+      example) does not restrict the running turn. The operator interrupts to
+      get that effect at once. Making a stricter level apply immediately
+      would split the rule, so it is not part of this decision.
 
 ## Deferred
 
