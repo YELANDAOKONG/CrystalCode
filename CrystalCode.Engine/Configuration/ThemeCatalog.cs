@@ -154,7 +154,7 @@ public static partial class ThemeCatalog
     /// <c>{"gauges": {"context": [{"from": 80, "color": "red"}],
     /// "thinking": [{"match": "high", "color": "orange1"}]}}</c>. Each gauge
     /// is a list in priority order: the first rule that holds a value wins. A
-    /// rule has <c>from</c> and <c>to</c> (default 0 and 100), or <c>match</c>
+    /// rule has <c>from</c> and <c>to</c> (numbers; the front end fills a missing end), or <c>match</c>
     /// (text or a list of texts, <c>*</c> for all), or <c>regex</c>. A built-in
     /// theme has none.
     /// </summary>
@@ -348,12 +348,6 @@ public static partial class ThemeCatalog
         {
             error = label + " rules use from and to, or match or regex, not both.";
             return false;
-        }
-
-        if (!isValue)
-        {
-            from ??= 0;
-            to ??= 100;
         }
 
         rule = new ThemeGaugeRule(from, to, match, pattern, color);

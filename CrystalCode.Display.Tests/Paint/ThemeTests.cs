@@ -106,6 +106,57 @@ public sealed class ThemeTests : IDisposable
     }
 
     [Fact]
+    public void ForValue_ContextWindowRangeNeedsANumberAndMatchRulesStillWork()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["context-window"] =
+            [
+                Value(["1M"], null, "gold1"),
+                new GaugeRule(null, 99_999, [], null, "red"),
+                new GaugeRule(100_000, 200_000, [], null, "yellow")
+            ]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+
+        Assert.Equal("gold1", Theme.ForValue("context-window", "1M", null, 1_000_000));
+        Assert.Equal("red", Theme.ForValue("context-window", "64K", null, 64_000));
+        Assert.Equal("yellow", Theme.ForValue("context-window", "200K", null, 200_000));
+        Assert.Equal(Theme.Chrome, Theme.ForValue("context-window", "300K", null, 300_000));
+        Assert.Equal(Theme.Chrome, Theme.ForValue("context-window", "64K"));
+        Theme.Reset();
+    }
+
+    [Fact]
+    public void TryApply_RejectsATokenSizedRangeOnTheContextPercentGauge()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["context"] = [new GaugeRule(200_000, null, [], null, "red")]
+        };
+
+        Assert.False(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error));
+
+        Assert.Contains("context", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(-1, 100)]
+    [InlineData(200, 100)]
+    [InlineData(double.NaN, 100)]
+    public void TryApply_RejectsABadContextWindowRange(double from, double to)
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["context-window"] = [new GaugeRule(from, to, [], null, "red")]
+        };
+
+        Assert.False(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error));
+
+        Assert.Contains("context-window", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ForValue_FirstRuleWinsAcrossPlainRegexAndWildcard()
     {
         var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>

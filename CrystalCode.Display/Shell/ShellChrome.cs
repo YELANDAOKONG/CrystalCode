@@ -145,7 +145,7 @@ public sealed class ShellChrome
 
         if (!string.IsNullOrWhiteSpace(ContextWindow))
         {
-            items.Add((ContextWindow, $"[{ValueColor("context-window", ContextWindow)}]{MarkupText.Escape(ContextWindow)}[/]", "keep"));
+            items.Add((ContextWindow, $"[{WindowColor(ContextWindow)}]{MarkupText.Escape(ContextWindow)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(PromptSet))
@@ -241,7 +241,7 @@ public sealed class ShellChrome
                     "thinking" => ValueColor("thinking", value),
                     "tier" => ValueColor("tier", value),
                     "speed" => ValueColor("speed", value),
-                    "context-window" => ValueColor("context-window", value),
+                    "context-window" => WindowColor(value),
                     "prompt-set" => ValueColor("prompt-set", value),
                     "model" => Theme.ForValue("model", value),
                     _ => Theme.Chrome
@@ -286,6 +286,42 @@ public sealed class ShellChrome
     {
         var space = text.IndexOf(' ', StringComparison.Ordinal);
         return Theme.ForValue(gauge, space < 0 ? text : text[(space + 1)..]);
+    }
+
+    /// <summary>
+    /// Style for <c>Context 200K</c>. A from/to rule sees the window in tokens
+    /// (<c>200K</c> is 200000, <c>1.5M</c> is 1500000); a match or regex rule
+    /// sees the text <c>200K</c>.
+    /// </summary>
+    private static string WindowColor(string text)
+    {
+        var space = text.IndexOf(' ', StringComparison.Ordinal);
+        var value = space < 0 ? text : text[(space + 1)..];
+        return Theme.ForValue("context-window", value, null, WindowTokens(value));
+    }
+
+    private static double? WindowTokens(string value)
+    {
+        var scale = 1.0;
+        var digits = value;
+        if (digits.EndsWith('K') || digits.EndsWith('k'))
+        {
+            scale = 1_000;
+            digits = digits[..^1];
+        }
+        else if (digits.EndsWith('M') || digits.EndsWith('m'))
+        {
+            scale = 1_000_000;
+            digits = digits[..^1];
+        }
+
+        return double.TryParse(
+            digits,
+            System.Globalization.NumberStyles.AllowDecimalPoint,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var count)
+            ? count * scale
+            : null;
     }
 
     private string PluginField(string name)

@@ -235,6 +235,45 @@ public sealed class ShellChromeTests
         }
     }
 
+    [Theory]
+    [InlineData("Context 128K", "grey50")]
+    [InlineData("Context 200K", "yellow")]
+    [InlineData("Context 400K", "yellow")]
+    [InlineData("Context 1M", "gold1")]
+    [InlineData("Context 1500000", "gold1")]
+    [InlineData("Context 2M", "gold1")]
+    public void StatusLine_ColorsContextWindowByTokenRange(string window, string expected)
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["context-window"] =
+            [
+                new GaugeRule(1_000_000, null, [], null, "gold1"),
+                new GaugeRule(200_000, 999_999, [], null, "yellow")
+            ]
+        };
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+        try
+        {
+            var chrome = new ShellChrome { ContextWindow = window };
+            var custom = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["context-window"],
+                ContextWindow = window
+            };
+
+            var expectedStyle = expected == "grey50" ? Theme.Chrome : expected;
+
+            Assert.Contains($"[{expectedStyle}]{window}", chrome.StatusLine(120).Markup, StringComparison.Ordinal);
+            Assert.Contains($"[{expectedStyle}]{window}", custom.StatusLine(120).Markup, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
     [Fact]
     public void StatusLine_ModelContextWindowAndPromptSetKeepDefaultColorsWithoutRules()
     {

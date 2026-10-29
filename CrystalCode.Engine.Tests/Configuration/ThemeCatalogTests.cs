@@ -93,11 +93,33 @@ public sealed class ThemeCatalogTests : IDisposable
 
         Assert.Equal(["accent"], colors.Keys);
         Assert.Equal(
-            [Range(90, 100, "red bold"), Range(50, 89.9, "yellow"), Range(0, 10, "green")],
+            [Range(90, null, "red bold"), Range(50, 89.9, "yellow"), Range(null, 10, "green")],
             gauges["context"],
             new RuleComparer());
         Assert.True(ThemeCatalog.TryReadGauges(home, "light", out var none, out _));
         Assert.Empty(none);
+    }
+
+    [Fact]
+    public void TryReadGauges_ReadsTokenRangesAsNumbers()
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(
+            Path.Combine(home.ThemesDirectory, "night.json"),
+            """
+            { "gauges": { "context-window": [
+              { "from": 1000000, "color": "gold1" },
+              { "from": 200000, "to": 999999, "color": "yellow" },
+              { "to": 64000, "color": "red" } ] } }
+            """);
+
+        Assert.True(ThemeCatalog.TryReadGauges(home, "night", out var gauges, out var error), error);
+
+        Assert.Equal(
+            [Range(1_000_000, null, "gold1"), Range(200_000, 999_999, "yellow"), Range(null, 64_000, "red")],
+            gauges["context-window"],
+            new RuleComparer());
     }
 
     [Fact]
@@ -150,8 +172,8 @@ public sealed class ThemeCatalogTests : IDisposable
     [InlineData("""{ "gauges": { "context": {} } }""", "list")]
     [InlineData("""{ "gauges": { "context": [1] } }""", "objects")]
     [InlineData("""{ "gauges": { "context": [{ "from": 1 }] } }""", "color")]
-    [InlineData("""{ "gauges": { "context": [{ "from": "1", "color": "red" }] } }""", "from")]
-    [InlineData("""{ "gauges": { "context": [{ "to": "9", "color": "red" }] } }""", "to")]
+    [InlineData("""{ "gauges": { "context": [{ "from": "200K", "color": "red" }] } }""", "from")]
+    [InlineData("""{ "gauges": { "context": [{ "to": true, "color": "red" }] } }""", "to")]
     [InlineData("""{ "gauges": { "context": [{ "to": null, "color": "red" }] } }""", "to")]
     [InlineData("""{ "gauges": { "context": [{ "from": 1e999, "color": "red" }] } }""", "from")]
     [InlineData("""{ "gauges": { "context": [{ "color": "red", "extra": 1 }] } }""", "extra")]
@@ -207,7 +229,7 @@ public sealed class ThemeCatalogTests : IDisposable
         Assert.Throws<ArgumentException>(() => settings.WithTheme("../x"));
     }
 
-    private static ThemeGaugeRule Range(double from, double to, string color) =>
+    private static ThemeGaugeRule Range(double? from, double? to, string color) =>
         new(from, to, [], null, color);
 
     private sealed class RuleComparer : IEqualityComparer<ThemeGaugeRule>

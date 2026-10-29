@@ -216,18 +216,19 @@ public static class Theme
     /// <summary>
     /// Style for a status-bar value such as a thinking gear. <paramref name="gauge"/>
     /// is <c>thinking</c>, <c>tier</c>, <c>speed</c>, <c>model</c>,
-    /// <c>context-window</c>, or <c>prompt-set</c>. The first rule of the
+    /// <c>context-window</c>, or <c>prompt-set</c>. A <c>context-window</c>
+    /// from/to rule tests <paramref name="number"/>, the window in tokens. The first rule of the
     /// theme's gauge that holds <paramref name="value"/> wins; otherwise, and
     /// without rules, the style is <paramref name="fallback"/>, or
     /// <see cref="Chrome"/> when that is null.
     /// </summary>
-    public static string ForValue(string gauge, string value, string? fallback = null)
+    public static string ForValue(string gauge, string value, string? fallback = null, double? number = null)
     {
         ArgumentNullException.ThrowIfNull(gauge);
         ArgumentNullException.ThrowIfNull(value);
         var none = fallback ?? Chrome;
         return _gauges.TryGetValue(gauge, out var matchers)
-            ? matchers.FirstOrDefault(matcher => matcher.Holds(value))?.Style ?? none
+            ? matchers.FirstOrDefault(matcher => matcher.Holds(value, number))?.Style ?? none
             : none;
     }
 
@@ -319,11 +320,15 @@ public static class Theme
                 return false;
             }
 
-            var numeric = name.Equals(ContextGauge, StringComparison.OrdinalIgnoreCase);
+            var kind = name.Equals(ContextGauge, StringComparison.OrdinalIgnoreCase)
+                ? GaugeKind.Percent
+                : name.Equals("context-window", StringComparison.OrdinalIgnoreCase)
+                    ? GaugeKind.Tokens
+                    : GaugeKind.Value;
             var matchers = new List<GaugeMatcher>();
             foreach (var rule in rules)
             {
-                if (!TryMatcher(name, numeric, rule, out var matcher, out error))
+                if (!TryMatcher(name, kind, rule, out var matcher, out error))
                 {
                     return false;
                 }
@@ -338,9 +343,16 @@ public static class Theme
         return true;
     }
 
+    private enum GaugeKind
+    {
+        Percent,
+        Tokens,
+        Value
+    }
+
     private static bool TryMatcher(
         string gauge,
-        bool numeric,
+        GaugeKind kind,
         GaugeRule rule,
         out GaugeMatcher? matcher,
         out string error)
@@ -356,14 +368,16 @@ public static class Theme
 
         var hasRange = rule.From is not null || rule.To is not null;
         var hasValue = rule.Match.Count > 0 || rule.Pattern is not null;
-        if (numeric)
+        if (kind == GaugeKind.Percent || (kind == GaugeKind.Tokens && !hasValue))
         {
-            if (hasValue
-                || rule.From is not { } from
-                || rule.To is not { } to
-                || !(from >= 0 && to <= 100 && from <= to))
+            var from = rule.From ?? 0;
+            var to = rule.To ?? (kind == GaugeKind.Percent ? 100 : double.PositiveInfinity);
+            var upper = kind == GaugeKind.Percent ? 100 : double.PositiveInfinity;
+            if (hasValue || double.IsNaN(from) || double.IsNaN(to) || !(from >= 0 && to <= upper && from <= to))
             {
-                error = label + " rules need 0 <= from <= to <= 100";
+                error = kind == GaugeKind.Percent
+                    ? label + " rules need 0 <= from <= to <= 100"
+                    : label + " rules need 0 <= from <= to, in tokens";
                 return false;
             }
 
