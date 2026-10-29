@@ -28,6 +28,41 @@ public sealed class ShellChromeTests
         Assert.True(TextWidth.Measure(chrome.StatusLine(20).Plain) <= 20);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StatusLine_PaintsApprovalWithItsModeColor(bool custom)
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = custom,
+            StatusLineFields = ["approval"],
+            Approval = "Full"
+        };
+
+        Assert.Contains($"[{Theme.ApprovalFull}]Full[/]", chrome.StatusLine(120).Markup, StringComparison.Ordinal);
+
+        chrome.Approval = "Review";
+
+        Assert.Contains($"[{Theme.ApprovalReview}]Review[/]", chrome.StatusLine(120).Markup, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StatusLine_PaintsApprovalWithChromeWhenApprovalColorsAreOff(bool custom)
+    {
+        var chrome = new ShellChrome
+        {
+            CustomStatusLine = custom,
+            StatusLineFields = ["approval"],
+            Approval = "Full",
+            ApprovalColors = false
+        };
+
+        Assert.Contains($"[{Theme.Chrome}]Full[/]", chrome.StatusLine(120).Markup, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void StatusLine_CustomModeUsesConfiguredFieldsInOrder()
     {

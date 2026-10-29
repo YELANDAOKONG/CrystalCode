@@ -619,6 +619,15 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    public void SetApprovalColors(bool enabled)
+    {
+        lock (_gate)
+        {
+            _chrome.ApprovalColors = enabled;
+            PaintUnlocked(force: true);
+        }
+    }
+
     public void SetPluginStatus(IReadOnlyList<StatusFieldValue> fields)
     {
         ArgumentNullException.ThrowIfNull(fields);

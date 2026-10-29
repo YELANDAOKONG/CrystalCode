@@ -8,7 +8,8 @@ namespace CrystalCode.Engine.Configuration;
 /// <summary>
 /// Theme files under <c>~/.crystal/themes/&lt;name&gt;.json</c>. Themes are Home-only,
 /// so a repository cannot change how the interface looks. Each file is an object
-/// of color token names to Spectre style text. The engine only validates and
+/// of color token names to Spectre style text; an object value groups tokens
+/// under a prefix, so <c>{"approval": {"full": "red"}}</c> sets <c>approval.full</c>. The engine only validates and
 /// reads names; a front end decides what a color means.
 /// </summary>
 public static partial class ThemeCatalog
@@ -95,6 +96,24 @@ public static partial class ThemeCatalog
             var read = new Dictionary<string, string>();
             foreach (var property in document.RootElement.EnumerateObject())
             {
+                if (property.Value.ValueKind == JsonValueKind.Object)
+                {
+                    // One level of grouping, such as "approval": { "full": "red" }, reads as "approval.full".
+                    foreach (var member in property.Value.EnumerateObject())
+                    {
+                        var key = property.Name + "." + member.Name;
+                        if (member.Value.ValueKind != JsonValueKind.String)
+                        {
+                            error = "Theme " + name + " color " + key + " must be text.";
+                            return false;
+                        }
+
+                        read[key] = member.Value.GetString()!;
+                    }
+
+                    continue;
+                }
+
                 if (property.Value.ValueKind != JsonValueKind.String)
                 {
                     error = "Theme " + name + " color " + property.Name + " must be text.";

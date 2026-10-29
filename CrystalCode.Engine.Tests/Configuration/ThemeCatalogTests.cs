@@ -55,6 +55,26 @@ public sealed class ThemeCatalogTests : IDisposable
     }
 
     [Fact]
+    public void TryRead_FlattensOneLevelOfGroupedColors()
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(
+            Path.Combine(home.ThemesDirectory, "night.json"),
+            """{ "accent": "red", "approval": { "full": "orange1", "review": "blue" } }""");
+        File.WriteAllText(
+            Path.Combine(home.ThemesDirectory, "bad.json"),
+            """{ "approval": { "full": 1 } }""");
+
+        Assert.True(ThemeCatalog.TryRead(home, "night", out var colors, out _));
+        Assert.Equal("red", colors["accent"]);
+        Assert.Equal("orange1", colors["approval.full"]);
+        Assert.Equal("blue", colors["approval.review"]);
+        Assert.False(ThemeCatalog.TryRead(home, "bad", out _, out var error));
+        Assert.Contains("approval.full", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryRead_ReportsBadFiles()
     {
         var home = new CrystalHome(_root);

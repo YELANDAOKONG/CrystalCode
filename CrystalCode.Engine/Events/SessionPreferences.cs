@@ -16,4 +16,5 @@ public sealed record SessionPreferences(
     bool VerboseThinking,
     bool StatusLineEnabled,
     IReadOnlyList<string> StatusLineFields,
-    string Theme);
+    string Theme,
+    bool ApprovalColors);

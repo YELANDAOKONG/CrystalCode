@@ -86,6 +86,7 @@ internal static class CrystalWire
         writer.WriteBoolean("statusLineEnabled", preferences.StatusLineEnabled);
         Strings(writer, "statusLineFields", preferences.StatusLineFields);
         writer.WriteString("theme", preferences.Theme);
+        writer.WriteBoolean("approvalColors", preferences.ApprovalColors);
         writer.WriteEndObject();
     }
 

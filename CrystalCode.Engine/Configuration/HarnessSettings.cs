@@ -32,6 +32,8 @@ public sealed record HarnessSettings
 
     public const bool DefaultEstimatedTokens = false;
 
+    public const bool DefaultApprovalColors = true;
+
     public const bool DefaultTodoBar = true;
 
     public const int MinimumTodoBarRows = 3;
@@ -111,7 +113,8 @@ public sealed record HarnessSettings
         OperatorNotifySettings? operatorNotify = null,
         ServerHostSettings? server = null,
         BridgeHostSettings? bridge = null,
-        string theme = ThemeCatalog.DefaultName)
+        string theme = ThemeCatalog.DefaultName,
+        bool approvalColors = DefaultApprovalColors)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -217,6 +220,7 @@ public sealed record HarnessSettings
         Server = server ?? ServerHostSettings.Default;
         Bridge = bridge ?? BridgeHostSettings.Default;
         Theme = ThemeCatalog.Canonical(theme);
+        ApprovalColors = approvalColors;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
@@ -394,6 +398,8 @@ public sealed record HarnessSettings
     /// Name of the color theme: <c>default</c> or a file under <c>~/.crystal/themes</c>.
     /// </summary>
     public string Theme { get; }
+
+    public bool ApprovalColors { get; }
 
     public RuleFileSettings RuleFiles { get; }
 
@@ -575,6 +581,9 @@ public sealed record HarnessSettings
         Copy(workspaceTrust: workspaceTrust);
 
     public HarnessSettings WithTheme(string theme) => Copy(theme: theme);
+
+    public HarnessSettings WithApprovalColors(bool approvalColors) =>
+        Copy(approvalColors: approvalColors);
 
     public HarnessSettings WithRuleFiles(RuleFileSettings ruleFiles)
     {
@@ -859,7 +868,8 @@ public sealed record HarnessSettings
         OperatorNotifySettings? operatorNotify = null,
         ServerHostSettings? server = null,
         BridgeHostSettings? bridge = null,
-        string? theme = null) =>
+        string? theme = null,
+        bool? approvalColors = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -915,7 +925,8 @@ public sealed record HarnessSettings
             operatorNotify ?? OperatorNotify,
             server ?? Server,
             bridge ?? Bridge,
-            theme ?? Theme);
+            theme ?? Theme,
+            approvalColors ?? ApprovalColors);
 
     public override string ToString() => nameof(HarnessSettings);
 

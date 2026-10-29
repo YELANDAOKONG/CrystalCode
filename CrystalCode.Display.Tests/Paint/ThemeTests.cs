@@ -45,6 +45,18 @@ public sealed class ThemeTests : IDisposable
     }
 
     [Fact]
+    public void ForApproval_OnlyFullDiffersFromChromeByDefault()
+    {
+        Assert.Equal(Theme.Chrome, Theme.ForApproval("Review"));
+        Assert.Equal(Theme.Chrome, Theme.ForApproval("Unknown"));
+        Assert.Equal("darkorange", Theme.ForApproval("Full"));
+
+        Theme.TryApply(new Dictionary<string, string> { ["approval.audit"] = "red" }, out _);
+
+        Assert.Equal("red", Theme.ForApproval("Audit"));
+    }
+
+    [Fact]
     public void Reset_RestoresDefaults()
     {
         Theme.TryApply(new Dictionary<string, string> { ["accent"] = "red" }, out _);
@@ -75,10 +87,13 @@ public sealed class ThemeTests : IDisposable
         Theme.TryUseBuiltIn("light");
         var colors = Theme.TokenNames.ToDictionary(
             name => name,
-            name => (string)typeof(Theme).GetProperty(char.ToUpperInvariant(name[0]) + name[1..])!.GetValue(null)!);
+            name => (string)typeof(Theme).GetProperty(PropertyName(name))!.GetValue(null)!);
 
         Theme.Reset();
 
         Assert.True(Theme.TryApply(colors, out var error), error);
     }
+
+    private static string PropertyName(string token) =>
+        string.Concat(token.Split('.').Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
 }

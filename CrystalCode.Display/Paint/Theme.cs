@@ -37,6 +37,12 @@ public static class Theme
             ["diffAdded"] = "darkseagreen",
             ["diffRemoved"] = "indianred",
             ["warning"] = "tan",
+            ["approval.plan"] = "grey50",
+            ["approval.default"] = "grey50",
+            ["approval.edit"] = "grey50",
+            ["approval.review"] = "grey50",
+            ["approval.audit"] = "grey50",
+            ["approval.full"] = "darkorange",
             ["muted"] = "grey42",
             ["accent"] = "lightsteelblue"
         };
@@ -63,6 +69,12 @@ public static class Theme
             ["diffAdded"] = "#4d7c5f",
             ["diffRemoved"] = "#b4534f",
             ["warning"] = "#a9753a",
+            ["approval.plan"] = "#6b7280",
+            ["approval.default"] = "#6b7280",
+            ["approval.edit"] = "#6b7280",
+            ["approval.review"] = "#6b7280",
+            ["approval.audit"] = "#6b7280",
+            ["approval.full"] = "#c2570c",
             ["muted"] = "#9ca3af",
             ["accent"] = "#4a6a94"
         };
@@ -133,6 +145,36 @@ public static class Theme
     public static string DiffRemoved => Get("diffRemoved");
 
     public static string Warning => Get("warning");
+
+    public static string ApprovalPlan => Get("approval.plan");
+
+    public static string ApprovalDefault => Get("approval.default");
+
+    public static string ApprovalEdit => Get("approval.edit");
+
+    public static string ApprovalReview => Get("approval.review");
+
+    public static string ApprovalAudit => Get("approval.audit");
+
+    public static string ApprovalFull => Get("approval.full");
+
+    /// <summary>
+    /// Color for an approval-mode label such as <c>Full</c>. Unknown labels use <see cref="Chrome"/>.
+    /// </summary>
+    public static string ForApproval(string label)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+        return label.ToLowerInvariant() switch
+        {
+            "plan" => ApprovalPlan,
+            "default" => ApprovalDefault,
+            "edit" => ApprovalEdit,
+            "review" => ApprovalReview,
+            "audit" => ApprovalAudit,
+            "full" => ApprovalFull,
+            _ => Chrome
+        };
+    }
 
     public static string Muted => Get("muted");
 

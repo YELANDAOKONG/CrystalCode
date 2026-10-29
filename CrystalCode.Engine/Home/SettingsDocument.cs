@@ -30,6 +30,8 @@ internal sealed class SettingsDocument
 
     public string? Theme { get; set; }
 
+    public bool? ApprovalColors { get; set; }
+
     public RuleFilesDocument? RuleFiles { get; set; }
 
     public ExternalToolApprovalDocument? ExternalToolApproval { get; set; }

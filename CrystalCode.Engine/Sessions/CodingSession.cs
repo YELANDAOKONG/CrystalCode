@@ -8143,7 +8143,8 @@ public sealed class CodingSession : ITurnObserver
             _settings.VerboseThinking,
             _settings.StatusLine.Enabled,
             _settings.StatusLine.Fields,
-            _settings.Theme);
+            _settings.Theme,
+            _settings.ApprovalColors);
 
     private void PublishPreferences()
     {

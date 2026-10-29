@@ -1368,6 +1368,34 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Load_ApprovalColorsDefaultToOnAndOffIsSaved()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ConfigPath,
+            """
+            {
+              "provider": "deepseek",
+              "model": "deepseek-v4-flash"
+            }
+            """);
+
+        var defaults = store.Load();
+        store.Save(defaults.WithApprovalColors(false));
+        var saved = File.ReadAllText(root.Home.ConfigPath);
+
+        Assert.True(defaults.ApprovalColors);
+        Assert.Contains("\"approvalColors\": false", saved, StringComparison.Ordinal);
+        Assert.False(store.Load().ApprovalColors);
+
+        store.Save(store.Load().WithApprovalColors(true));
+
+        Assert.DoesNotContain("approvalColors", File.ReadAllText(root.Home.ConfigPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_ReadsEstimatedTokensEnabled()
     {
         using var root = new TemporaryHome();

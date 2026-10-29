@@ -25,6 +25,11 @@ public sealed class ShellChrome
 
     public string Approval { get; set; } = string.Empty;
 
+    /// <summary>
+    /// When off, the approval mode uses the chrome color whatever the theme sets.
+    /// </summary>
+    public bool ApprovalColors { get; set; } = true;
+
     public string Thinking { get; set; } = string.Empty;
 
     public string ServiceTier { get; set; } = string.Empty;
@@ -106,6 +111,8 @@ public sealed class ShellChrome
 
     public int Queued { get; set; }
 
+    private string ApprovalColor => ApprovalColors ? Theme.ForApproval(Approval) : Theme.Chrome;
+
     public PaintLine StatusLine(int width)
     {
         var items = new List<(string Plain, string Markup, string Slot)>();
@@ -118,7 +125,7 @@ public sealed class ShellChrome
 
         if (!string.IsNullOrWhiteSpace(Approval))
         {
-            items.Add((Approval, $"[{Theme.Chrome}]{MarkupText.Escape(Approval)}[/]", "keep"));
+            items.Add((Approval, $"[{ApprovalColor}]{MarkupText.Escape(Approval)}[/]", "keep"));
         }
 
         if (!string.IsNullOrWhiteSpace(Thinking))
@@ -243,7 +250,8 @@ public sealed class ShellChrome
             };
             if (!string.IsNullOrWhiteSpace(value))
             {
-                items.Add((value, $"[{Theme.Chrome}]{MarkupText.Escape(value)}[/]", "custom"));
+                var color = field == "approval" ? ApprovalColor : Theme.Chrome;
+                items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", "custom"));
             }
         }
     }
