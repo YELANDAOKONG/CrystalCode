@@ -7181,7 +7181,8 @@ public sealed class CodingSession : ITurnObserver
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         ResetTopic(
             SessionTopic.Normalize(document.Topic),
-            string.Equals(document.TopicSource, "operator", StringComparison.Ordinal));
+            string.Equals(document.TopicSource, "operator", StringComparison.Ordinal),
+            attempted: !_settings.TopicModel.NameOnResume);
         _planMode = document.PlanMode;
         _customMode = null;
         if (!string.IsNullOrWhiteSpace(document.Mode))
@@ -8799,15 +8800,14 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
-    private void ResetTopic(string? topic, bool byOperator)
+    private void ResetTopic(string? topic, bool byOperator, bool attempted = false)
     {
         CancelTopic();
         lock (_topicGate)
         {
             _topic = topic;
             _topicByOperator = topic is not null && byOperator;
-            // A resumed session that already has turns was offered naming before.
-            _topicAttempted = false;
+            _topicAttempted = attempted;
         }
     }
 
@@ -9091,6 +9091,12 @@ public sealed class CodingSession : ITurnObserver
                 return;
             case TopicArguments.Action.Clear:
                 ResetTopic(null, byOperator: false);
+                lock (_topicGate)
+                {
+                    // The operator removed the name on purpose; do not name it again unasked.
+                    _topicAttempted = true;
+                }
+
                 SaveTopicChange();
                 Note("Topic  not set");
                 return;

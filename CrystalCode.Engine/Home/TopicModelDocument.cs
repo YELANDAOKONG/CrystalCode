@@ -16,4 +16,6 @@ internal sealed class TopicModelDocument
     public string? Speed { get; set; }
 
     public int? ContextWindow { get; set; }
+
+    public bool? NameOnResume { get; set; }
 }

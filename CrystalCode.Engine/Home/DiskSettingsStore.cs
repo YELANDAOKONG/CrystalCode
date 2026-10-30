@@ -858,7 +858,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             thinkingEffort,
             ReadSlot(document.ServiceTier, "topicModel.serviceTier"),
             ReadSlot(document.Speed, "topicModel.speed"),
-            ReadContextWindow(document.ContextWindow, "topicModel.contextWindow"));
+            ReadContextWindow(document.ContextWindow, "topicModel.contextWindow"),
+            document.NameOnResume ?? true);
     }
 
     private static TopicModelDocument? WriteTopicModel(TopicModelSettings settings)
@@ -876,7 +877,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             ThinkingEffort = WriteGear(settings.ThinkingEffort),
             ServiceTier = settings.ServiceTier,
             Speed = settings.Speed,
-            ContextWindow = settings.ContextWindow
+            ContextWindow = settings.ContextWindow,
+            NameOnResume = settings.NameOnResume ? null : false
         };
     }
 

@@ -418,7 +418,7 @@ separate library with no terminal code. The product can:
   prompt gives when the intent is unclear (a greeting, for example), leaves
   the session unnamed and the next completed turn asks again. `/topic <text>` or `/topic set <text>` names the session by hand;
   that operator topic is never replaced automatically. `/topic clear` removes
-  it, and `/topic regenerate` asks the model again. The topic is saved in the
+  it and stops automatic naming until `/clear` or a fork. A resumed session without a topic is named after its next completed turn unless `topicModel.nameOnResume` is `false`. `/topic regenerate` always asks the model again. The topic is saved in the
   session file (`topic`, `topicSource`). A session without one, including every
   session saved before this, lists by its first user message. `/clear` and a
   fork start without a topic. The topic is shown in `/sessions`, the resume

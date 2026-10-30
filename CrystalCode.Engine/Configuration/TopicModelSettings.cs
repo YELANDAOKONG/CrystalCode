@@ -17,7 +17,8 @@ public sealed record TopicModelSettings
         ThinkingSelection? thinkingEffort = null,
         string? serviceTier = null,
         string? speed = null,
-        int? contextWindow = null)
+        int? contextWindow = null,
+        bool nameOnResume = true)
     {
         Provider = string.IsNullOrWhiteSpace(provider) ? null : provider.Trim();
         Model = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
@@ -36,6 +37,7 @@ public sealed record TopicModelSettings
         ServiceTier = serviceTier is null ? null : new CatalogToken(serviceTier).Value;
         Speed = speed is null ? null : new CatalogToken(speed).Value;
         ContextWindow = contextWindow;
+        NameOnResume = nameOnResume;
     }
 
     public static TopicModelSettings Off { get; } = new(false);
@@ -64,6 +66,11 @@ public sealed record TopicModelSettings
     /// </summary>
     public int? ContextWindow { get; }
 
+    /// <summary>
+    /// True when a resumed session without a topic is named after its next completed turn.
+    /// </summary>
+    public bool NameOnResume { get; }
+
     /// <summary>True when no own model is set, so the session model names the topic.</summary>
     public bool UsesSessionModel => Provider is null;
 
@@ -73,10 +80,11 @@ public sealed record TopicModelSettings
         && ThinkingEffort == ThinkingSelection.Default
         && ServiceTier is null
         && Speed is null
-        && ContextWindow is null;
+        && ContextWindow is null
+        && NameOnResume;
 
     public TopicModelSettings WithEnabled(bool enabled) =>
-        new(enabled, Provider, Model, ThinkingEffort, ServiceTier, Speed, ContextWindow);
+        new(enabled, Provider, Model, ThinkingEffort, ServiceTier, Speed, ContextWindow, NameOnResume);
 
     /// <summary>
     /// Selects an own model, or the session model with null. A tier, speed, or
@@ -88,23 +96,26 @@ public sealed record TopicModelSettings
             && string.Equals(model, Model, StringComparison.Ordinal);
         return same
             ? this
-            : new(Enabled, provider, model, ThinkingEffort);
+            : new(Enabled, provider, model, ThinkingEffort, nameOnResume: NameOnResume);
     }
+
+    public TopicModelSettings WithNameOnResume(bool nameOnResume) =>
+        new(Enabled, Provider, Model, ThinkingEffort, ServiceTier, Speed, ContextWindow, nameOnResume);
 
     public TopicModelSettings WithThinkingEffort(ThinkingSelection thinkingEffort)
     {
         ArgumentNullException.ThrowIfNull(thinkingEffort);
-        return new(Enabled, Provider, Model, thinkingEffort, ServiceTier, Speed, ContextWindow);
+        return new(Enabled, Provider, Model, thinkingEffort, ServiceTier, Speed, ContextWindow, NameOnResume);
     }
 
     public TopicModelSettings WithServiceTier(string? serviceTier) =>
-        new(Enabled, Provider, Model, ThinkingEffort, serviceTier, Speed, ContextWindow);
+        new(Enabled, Provider, Model, ThinkingEffort, serviceTier, Speed, ContextWindow, NameOnResume);
 
     public TopicModelSettings WithSpeed(string? speed) =>
-        new(Enabled, Provider, Model, ThinkingEffort, ServiceTier, speed, ContextWindow);
+        new(Enabled, Provider, Model, ThinkingEffort, ServiceTier, speed, ContextWindow, NameOnResume);
 
     public TopicModelSettings WithContextWindow(int? contextWindow) =>
-        new(Enabled, Provider, Model, ThinkingEffort, ServiceTier, Speed, contextWindow);
+        new(Enabled, Provider, Model, ThinkingEffort, ServiceTier, Speed, contextWindow, NameOnResume);
 
     public string Describe()
     {

@@ -130,6 +130,12 @@ public sealed class CodingSessionTopicTests
 
         await headless.Session.SubmitAsync("/topic clear", CancellationToken.None);
         Assert.Null(headless.ReadSaved().Topic);
+
+        var requests = model.RequestCount;
+        await headless.RunTurnAsync("Another turn.");
+        await headless.Session.TopicTask;
+        Assert.Equal(requests + 1, model.RequestCount);
+        Assert.Null(headless.ReadSaved().Topic);
     }
 
     [Fact]
