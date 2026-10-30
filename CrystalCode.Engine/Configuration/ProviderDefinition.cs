@@ -20,7 +20,8 @@ public sealed record ProviderDefinition
         string? apiKey = null,
         bool? requiresApiKey = null,
         ThinkingDisplay? thinkingDisplay = null,
-        ResourceTrimOverride? resourceTrim = null)
+        ResourceTrimOverride? resourceTrim = null,
+        bool requireAssistantContent = false)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(protocol);
@@ -57,6 +58,7 @@ public sealed record ProviderDefinition
         Project = project;
         ReplayReasoningContent = replayReasoningContent
             || protocol == ProviderProtocol.DeepSeek;
+        RequireAssistantContent = requireAssistantContent;
         TokenLimit = tokenLimit ?? TokenLimitStyle.ForProtocol(protocol);
         ApiKeyEnvironment = apiKeyEnvironment;
         ApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey.Trim();
@@ -80,6 +82,12 @@ public sealed record ProviderDefinition
     public string? Project { get; }
 
     public bool ReplayReasoningContent { get; }
+
+    /// <summary>
+    /// Gets whether an assistant message with no text is sent with an empty
+    /// string content. Only the <c>openai</c> protocol uses it.
+    /// </summary>
+    public bool RequireAssistantContent { get; }
 
     public TokenLimitStyle TokenLimit { get; }
 

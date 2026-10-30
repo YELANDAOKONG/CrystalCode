@@ -214,6 +214,7 @@ public sealed class ProviderCatalog
             replacement.ApiKey ?? existing.ApiKey,
             replacement.RequiresApiKey,
             replacement.ThinkingDisplay ?? existing.ThinkingDisplay,
-            replacement.ResourceTrim ?? existing.ResourceTrim);
+            replacement.ResourceTrim ?? existing.ResourceTrim,
+            replacement.RequireAssistantContent);
     }
 }

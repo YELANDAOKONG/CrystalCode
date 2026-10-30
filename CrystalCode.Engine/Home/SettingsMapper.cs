@@ -295,7 +295,8 @@ internal static class SettingsMapper
             entry.ApiKey,
             entry.RequiresApiKey,
             EndpointOptionsReader.Read(name, protocol, entry.Options),
-            ReadResourceTrim(entry.ResourceTrim));
+            ReadResourceTrim(entry.ResourceTrim),
+            entry.RequireAssistantContent ?? false);
     }
 
     private static ResourceTrimOverride? ReadResourceTrim(ProviderResourceTrimDocument? document) =>
@@ -357,6 +358,7 @@ internal static class SettingsMapper
             Organization = provider.Organization,
             Project = provider.Project,
             ReplayReasoningContent = provider.ReplayReasoningContent,
+            RequireAssistantContent = provider.RequireAssistantContent ? true : null,
             TokenLimit = provider.TokenLimit.Value,
             ApiKeyEnvironment = provider.ApiKeyEnvironment,
             ApiKey = provider.ApiKey,

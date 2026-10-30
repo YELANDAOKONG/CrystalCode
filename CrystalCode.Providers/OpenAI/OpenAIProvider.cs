@@ -40,6 +40,7 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
                 ? CompatibleTokenLimit.MaxCompletionTokens
                 : CompatibleTokenLimit.MaxTokens,
             processing: CompatibleProcessing.SharedServiceTier,
+            requireAssistantContent: options.RequireAssistantContent,
             faults: new CompatibleFaults(
                 typeof(OpenAIException),
                 static (message, statusCode, inner, errorCode, retryAfter) =>

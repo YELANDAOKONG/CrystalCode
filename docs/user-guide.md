@@ -777,6 +777,7 @@ ships no entry for it, so Claude models come from `providers.json`. See
 | `organization` | Optional OpenAI organization for the `openai` protocol |
 | `project` | Optional OpenAI project for the `openai` protocol |
 | `replayReasoningContent` | Replay provider reasoning content (DeepSeek always replays it); reasoning that cannot be replayed keeps its readable text (assistant text, or the protocol's readable reasoning field) |
+| `requireAssistantContent` | `openai` protocol only. Send `"content": ""` for an assistant message that has only tool calls or reasoning, instead of `null`. Set it for gateways that reject a null content, such as Aliyun DashScope ("The content field is a required field") |
 | `tokenLimit` | Chat Completions output field: `max_tokens` or `max_completion_tokens` (ignored by `responses` and `anthropic`) |
 | `apiKeyEnvironment` | Environment variable name checked first for this provider |
 | `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |

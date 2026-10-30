@@ -177,6 +177,30 @@ public sealed class OpenAIProviderTests
         Assert.Contains("\"reasoning_content\":\"thought\"", handler.Body, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false, "\"content\":null")]
+    [InlineData(true, "\"content\":\"\"")]
+    public async Task CompleteAsync_WritesToolOnlyAssistantContentPerOption(
+        bool requireAssistantContent,
+        string expected)
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}"""));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(
+            new OpenAIOptions("test-key", "gpt-test", requireAssistantContent: requireAssistantContent),
+            http);
+
+        await provider.CompleteAsync(new ChatRequest(
+        [
+            new ChatMessage(ChatRole.User, "read"),
+            JsonToolCall("call_1", "read", "{}"),
+            new ToolResult("call_1", "data")
+        ]));
+
+        Assert.Contains(expected, handler.Body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task CompleteAsync_RejectsUnmatchedToolCall()
     {

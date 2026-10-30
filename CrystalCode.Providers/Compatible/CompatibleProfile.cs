@@ -10,7 +10,8 @@ internal sealed record CompatibleProfile
         bool writeThinkingObject,
         CompatibleTokenLimit tokenLimit,
         CompatibleFaults faults,
-        CompatibleProcessing processing = CompatibleProcessing.Unsupported)
+        CompatibleProcessing processing = CompatibleProcessing.Unsupported,
+        bool requireAssistantContent = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
         ArgumentException.ThrowIfNullOrWhiteSpace(chatCompletionsPath);
@@ -31,6 +32,7 @@ internal sealed record CompatibleProfile
         TokenLimit = tokenLimit;
         Faults = faults;
         Processing = processing;
+        RequireAssistantContent = requireAssistantContent;
     }
 
     public string VendorName { get; }
@@ -48,4 +50,6 @@ internal sealed record CompatibleProfile
     public CompatibleFaults Faults { get; }
 
     public CompatibleProcessing Processing { get; }
+
+    public bool RequireAssistantContent { get; }
 }

@@ -119,7 +119,7 @@ internal static class CompatibleChatRequestWriter
                 case ChatMessage message:
                     if (pendingToolCallIds.Count > 0)
                     {
-                        FlushAssistant(writer, ref assistant);
+                        FlushAssistant(writer, profile, ref assistant);
                     }
                     FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
                     WriteChatMessage(writer, profile, ref assistant, message);
@@ -136,7 +136,7 @@ internal static class CompatibleChatRequestWriter
                     pendingToolCallIds.Add(toolCall.CallId);
                     break;
                 case ToolResult toolResult:
-                    FlushAssistant(writer, ref assistant);
+                    FlushAssistant(writer, profile, ref assistant);
                     pendingToolCallIds.Remove(toolResult.CallId);
                     WriteToolMessage(writer, toolResult);
                     break;
@@ -146,7 +146,7 @@ internal static class CompatibleChatRequestWriter
             }
         }
 
-        FlushAssistant(writer, ref assistant);
+        FlushAssistant(writer, profile, ref assistant);
         FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
         writer.WriteEndArray();
     }
@@ -175,7 +175,7 @@ internal static class CompatibleChatRequestWriter
         {
             if (assistant is { HasContent: true })
             {
-                FlushAssistant(writer, ref assistant);
+                FlushAssistant(writer, profile, ref assistant);
             }
 
             assistant ??= new AssistantBuffer();
@@ -184,7 +184,7 @@ internal static class CompatibleChatRequestWriter
             return;
         }
 
-        FlushAssistant(writer, ref assistant);
+        FlushAssistant(writer, profile, ref assistant);
 
         if (message.Role != ChatRole.System && message.Role != ChatRole.User)
         {
@@ -211,13 +211,13 @@ internal static class CompatibleChatRequestWriter
         {
             if (pendingToolCallIds.Count > 0)
             {
-                FlushAssistant(writer, ref assistant);
+                FlushAssistant(writer, profile, ref assistant);
             }
 
             FlushPendingToolCalls(writer, profile.VendorName, pendingToolCallIds);
             if (assistant is { HasContent: true } or { ToolCalls.Count: > 0 })
             {
-                FlushAssistant(writer, ref assistant);
+                FlushAssistant(writer, profile, ref assistant);
             }
 
             assistant ??= new AssistantBuffer();
@@ -254,6 +254,7 @@ internal static class CompatibleChatRequestWriter
 
     private static void FlushAssistant(
         Utf8JsonWriter writer,
+        CompatibleProfile profile,
         ref AssistantBuffer? assistant)
     {
         if (assistant is null)
@@ -278,6 +279,12 @@ internal static class CompatibleChatRequestWriter
         if (content is not null)
         {
             writer.WriteString("content", content);
+        }
+        else if (profile.RequireAssistantContent)
+        {
+            // Some gateways (Aliyun DashScope) treat a null or missing content
+            // as absent and reject the request.
+            writer.WriteString("content", string.Empty);
         }
         else if (assistant.HasReasoning || assistant.ToolCalls.Count > 0)
         {

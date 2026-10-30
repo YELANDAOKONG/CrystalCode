@@ -2182,6 +2182,7 @@ do not belong there. The API key for `openrouter` belongs in
       "protocol": "openai",
       "baseUri": "https://openrouter.ai/api/v1/",
       "replayReasoningContent": true,
+      "requireAssistantContent": false,
       "tokenLimit": "max_tokens",
       "models": {
         "anthropic/claude-sonnet-4": {

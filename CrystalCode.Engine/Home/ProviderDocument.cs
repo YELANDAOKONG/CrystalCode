@@ -14,6 +14,8 @@ internal sealed class ProviderDocument
 
     public bool? ReplayReasoningContent { get; set; }
 
+    public bool? RequireAssistantContent { get; set; }
+
     public string? TokenLimit { get; set; }
 
     public string? ApiKeyEnvironment { get; set; }

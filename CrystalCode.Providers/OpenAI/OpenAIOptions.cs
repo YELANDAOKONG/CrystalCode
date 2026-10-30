@@ -36,6 +36,11 @@ public sealed record OpenAIOptions
     /// When true, the output cap is sent as <c>max_completion_tokens</c>.
     /// Compatible gateways that still expect <c>max_tokens</c> set this false.
     /// </param>
+    /// <param name="requireAssistantContent">
+    /// When true, an assistant message with no text is sent with
+    /// <c>"content": ""</c> instead of <c>null</c>. Some compatible gateways
+    /// reject a null content.
+    /// </param>
     /// <param name="vendorName">
     /// Name used in adapter errors. Defaults to <c>OpenAI</c>.
     /// </param>
@@ -56,7 +61,8 @@ public sealed record OpenAIOptions
         string? vendorName = null,
         TimeSpan? requestTimeout = null,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        bool requireAssistantContent = false)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -109,6 +115,7 @@ public sealed record OpenAIOptions
         MaxTokens = maxTokens;
         ReplayReasoningContent = replayReasoningContent;
         UseMaxCompletionTokens = useMaxCompletionTokens;
+        RequireAssistantContent = requireAssistantContent;
         VendorName = string.IsNullOrWhiteSpace(vendorName) ? "OpenAI" : vendorName.Trim();
         RequestTimeout = requestTimeout ?? DefaultRequestTimeout;
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
@@ -163,6 +170,11 @@ public sealed record OpenAIOptions
     /// Gets whether assistant reasoning content is written back on later turns.
     /// </summary>
     public bool ReplayReasoningContent { get; }
+
+    /// <summary>
+    /// Gets whether empty assistant content is sent as an empty string.
+    /// </summary>
+    public bool RequireAssistantContent { get; }
 
     /// <summary>
     /// Gets whether the output cap uses <c>max_completion_tokens</c>.
