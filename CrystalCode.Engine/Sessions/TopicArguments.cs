@@ -4,6 +4,7 @@ namespace CrystalCode.Engine.Sessions;
 /// Parses <c>/topic</c>. A bare command shows the topic and naming settings.
 /// <c>set &lt;text&gt;</c> names the session, <c>clear</c> removes the name, and
 /// <c>regenerate</c> asks the topic model again. <c>on</c>, <c>off</c>,
+/// <c>resume on|off</c>,
 /// <c>model [provider model]</c>, <c>thinking</c>, <c>tier</c>, <c>speed</c>,
 /// and <c>context</c> configure naming. Any other text is a topic.
 /// </summary>
@@ -16,6 +17,7 @@ internal static class TopicArguments
         Clear,
         Regenerate,
         Switch,
+        Resume,
         Model,
         Thinking,
         Slot
@@ -42,6 +44,16 @@ internal static class TopicArguments
         {
             case "on" or "off" when tail.Length == 0:
                 request = new Request(Action.Switch, head.Equals("on", StringComparison.OrdinalIgnoreCase));
+                return true;
+            case "resume":
+                if (!tail.Equals("on", StringComparison.OrdinalIgnoreCase)
+                    && !tail.Equals("off", StringComparison.OrdinalIgnoreCase))
+                {
+                    error = "Use /topic resume on or /topic resume off.";
+                    return false;
+                }
+
+                request = new Request(Action.Resume, tail.Equals("on", StringComparison.OrdinalIgnoreCase));
                 return true;
             case "clear" when tail.Length == 0:
                 request = new Request(Action.Clear);

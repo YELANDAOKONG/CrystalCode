@@ -139,6 +139,21 @@ public sealed class CodingSessionTopicTests
     }
 
     [Fact]
+    public async Task TopicResume_TogglesNamingOfResumedSessionsAndSavesIt()
+    {
+        var model = new ScriptedStreamingClient();
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.Session.SubmitAsync("/topic resume off", CancellationToken.None);
+        Assert.Contains(headless.Observer.Events.OfType<NoteWritten>(), static note => note.Text.Contains("Resume off", StringComparison.Ordinal));
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/topic resume maybe", CancellationToken.None);
+        Assert.Single(headless.Observer.Events.OfType<ErrorWritten>());
+    }
+
+    [Fact]
     public async Task OwnModel_IsConfiguredOnItsOwnAndTheSessionModelFollowsTheSession()
     {
         var model = new ScriptedStreamingClient(Text("Done."), Text("Name it"));
@@ -395,7 +410,7 @@ public sealed class CodingSessionTopicTests
 
         var topic = Command(headless, "topic");
         Assert.Equal(
-            ["set", "clear", "regenerate", "on", "off", "model"],
+            ["set", "clear", "regenerate", "on", "off", "resume", "model"],
             topic.ArgumentOptions.Select(static item => item.Name));
         var models = topic.ArgumentOptions.Single(static item => item.Name == "model").ArgumentOptions;
         Assert.Equal("session", models[0].Name);
@@ -407,7 +422,7 @@ public sealed class CodingSessionTopicTests
             topic.ArgumentOptions.Single(static item => item.Name == "thinking").ArgumentOptions,
             static item => item.Name == "high");
         Assert.Equal(
-            ["set", "clear", "regenerate", "on", "off", "model", "thinking", "tier", "speed", "context"],
+            ["set", "clear", "regenerate", "on", "off", "resume", "model", "thinking", "tier", "speed", "context"],
             topic.ArgumentOptions.Select(static item => item.Name));
         Assert.Equal(["flex"], topic.ArgumentOptions.Single(static item => item.Name == "tier").ArgumentOptions.Select(static item => item.Name));
         Assert.Equal(["100k", "200k"], topic.ArgumentOptions.Single(static item => item.Name == "context").ArgumentOptions.Select(static item => item.Name));

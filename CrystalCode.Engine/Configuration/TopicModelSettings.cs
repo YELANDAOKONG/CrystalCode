@@ -121,6 +121,11 @@ public sealed record TopicModelSettings
     {
         var description = "Topic naming  " + (Enabled ? "On" : "Off") + "  "
             + (UsesSessionModel ? "session model" : Provider + "  " + Model);
+        if (!NameOnResume)
+        {
+            description += "  ·  Resume off";
+        }
+
         if (ThinkingEffort != ThinkingSelection.Default)
         {
             description += "  ·  Think " + ThinkingLabel.For(ThinkingEffort);

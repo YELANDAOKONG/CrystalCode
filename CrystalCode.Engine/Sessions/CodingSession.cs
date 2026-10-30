@@ -9138,6 +9138,9 @@ public sealed class CodingSession : ITurnObserver
             case TopicArguments.Action.Switch:
                 next = current.WithEnabled(request.Enabled);
                 break;
+            case TopicArguments.Action.Resume:
+                next = current.WithNameOnResume(request.Enabled);
+                break;
             case TopicArguments.Action.Model:
                 if (request.Value is null)
                 {
@@ -9842,6 +9845,14 @@ public sealed class CodingSession : ITurnObserver
             new("regenerate", "Ask the topic model again", ["regenerate"]),
             new("on", "Turn topic naming on", ["on"]),
             new("off", "Turn topic naming off", ["off"]),
+            new(
+                "resume",
+                "Name resumed sessions that have no topic",
+                ["resume"],
+                [
+                    new SlashCompletion("on", "Name a resumed session without a topic", ["on"]),
+                    new SlashCompletion("off", "Leave a resumed session unnamed", ["off"])
+                ]),
             new(
                 "model",
                 "Select the topic model, or session for the session model",
