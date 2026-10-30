@@ -48,6 +48,11 @@ internal sealed class CompatibleFaults
         var message = code is null
             ? $"Chat request failed (HTTP {status})."
             : $"Chat request failed (HTTP {status}, code: {code}).";
+        // Gateways often reply with a body that is not the OpenAI error shape.
+        // Show a bounded copy of it so the operator still sees the reason.
+        providerMessage = string.IsNullOrWhiteSpace(providerMessage)
+            ? Truncate(body?.Trim())
+            : providerMessage;
         if (!string.IsNullOrWhiteSpace(providerMessage))
         {
             message = $"{message} {providerMessage}";
@@ -91,6 +96,17 @@ internal sealed class CompatibleFaults
         }
 
         return Create($"{vendorName} chat stream did not contain an event stream.");
+    }
+
+    private static string? Truncate(string? text)
+    {
+        const int maxLength = 500;
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+        {
+            return text;
+        }
+
+        return text[..maxLength] + "...";
     }
 
     private static string BuildMessage(
