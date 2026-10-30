@@ -325,4 +325,35 @@ public sealed class OpenAIProviderTests
         Assert.Equal(new TokenUsage(9, 3), usage.Usage);
         Assert.IsType<ChatUsageReceived>(events[^1]);
     }
+
+    [Fact]
+    public async Task StreamAsync_EmptyOpeningContentDoesNotPrecedeReasoning()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+            data: {"choices":[{"index":0,"delta":{"reasoning_content":"think"},"finish_reason":null}]}
+
+            data: {"choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":null}]}
+
+            data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+            data: [DONE]
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(new OpenAIOptions("test-key", "gpt-test"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        var reasoning = Assert.Single(events.OfType<ChatReasoningTextDelta>());
+        var text = Assert.Single(events.OfType<ChatTextDelta>());
+        Assert.True(reasoning.ItemIndex < text.ItemIndex);
+    }
 }

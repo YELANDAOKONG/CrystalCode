@@ -154,10 +154,11 @@ internal sealed class CompatibleChatStreamParser
         if (CompatibleWire.TryReadString(delta, "content", out var content)
             && content is not null)
         {
-            var isTrailingEmptyContent = content.Length == 0
-                && assembly.ContentItemIndex is null
-                && assembly.ToolCallItemIndexes.Count > 0;
-            if (!isTrailingEmptyContent)
+            // An empty content delta, usually the role chunk that opens the
+            // stream, must not claim an item index. It would sort before any
+            // reasoning or tool call that follows and reorder the transcript.
+            var isEmptyOpening = content.Length == 0 && assembly.ContentItemIndex is null;
+            if (!isEmptyOpening)
             {
                 assembly.ContentItemIndex ??= assembly.NextItemIndex++;
                 events.Add(
