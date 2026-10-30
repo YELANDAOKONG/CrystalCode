@@ -12,11 +12,17 @@ internal sealed class HeldTopicStreamingClient : IStreamingChatClient
     private readonly TaskCompletionSource _topicStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly string _topic;
+    private readonly bool _timeOut;
     private int _turns;
 
-    public HeldTopicStreamingClient(string topic)
+    /// <param name="timeOut">
+    /// Fails naming the way an HTTP timeout does: a cancellation that the
+    /// session did not ask for.
+    /// </param>
+    public HeldTopicStreamingClient(string topic, bool timeOut = false)
     {
         _topic = topic;
+        _timeOut = timeOut;
     }
 
     public Task TopicStarted => _topicStarted.Task;
@@ -42,6 +48,11 @@ internal sealed class HeldTopicStreamingClient : IStreamingChatClient
         {
             _topicStarted.TrySetResult();
             await _release.Task.WaitAsync(cancellationToken);
+            if (_timeOut)
+            {
+                throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout.");
+            }
+
             yield return new ChatTextDelta(0, 0, ChatRole.Assistant, _topic);
         }
         else

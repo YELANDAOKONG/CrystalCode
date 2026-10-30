@@ -8901,6 +8901,7 @@ public sealed class CodingSession : ITurnObserver
         bool announce,
         CancellationToken cancellationToken)
     {
+        ChatResponse response;
         IStreamingChatClient? client = null;
         var owned = false;
         try
@@ -8916,38 +8917,19 @@ public sealed class CodingSession : ITurnObserver
                 assembler.Apply(streamEvent);
             }
 
-            var response = assembler.ToResponse();
-            var read = SideQuestion.TryReadAnswer(response, out var answer, out var ignoredToolCall);
-            var topic = SessionTopic.Normalize(answer);
-            // The prompt answers this when the intent is unclear; the session stays unnamed.
-            if (string.Equals(topic, SessionTopic.Unclear, StringComparison.OrdinalIgnoreCase))
-            {
-                FinishTopic(
-                    generation,
-                    null,
-                    announce ? "The topic model could not tell what the session is about." : null,
-                    retryLater: true);
-                return;
-            }
-
-            if (topic is null)
-            {
-                FinishTopic(generation, null, TopicFailure(response, read, ignoredToolCall));
-                return;
-            }
-
-            FinishTopic(generation, topic, null);
+            response = assembler.ToResponse();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Cancelled by a new conversation, a resume, a manual topic, or close.
+            // That path already cleared the progress row and the running request.
+            return;
         }
         catch (Exception exception)
         {
-            FinishTopic(
-                generation,
-                null,
-                "Topic naming failed: " + (string.IsNullOrWhiteSpace(exception.Message) ? "the model request failed." : exception.Message));
+            // A provider timeout also arrives as a cancellation, but not ours: it is a failure.
+            FinishTopic(generation, null, "Topic naming failed: " + FailureText(exception));
+            return;
         }
         finally
         {
@@ -8956,7 +8938,30 @@ public sealed class CodingSession : ITurnObserver
                 DisposeClient(client);
             }
         }
+
+        // Outside the request's try: a save that fails here is not a naming failure.
+        var read = SideQuestion.TryReadAnswer(response, out var answer, out var ignoredToolCall);
+        var topic = SessionTopic.Normalize(answer);
+        // The prompt answers this when the intent is unclear; the session stays unnamed.
+        if (string.Equals(topic, SessionTopic.Unclear, StringComparison.OrdinalIgnoreCase))
+        {
+            FinishTopic(
+                generation,
+                null,
+                announce ? "The topic model could not tell what the session is about." : null,
+                retryLater: true);
+            return;
+        }
+
+        FinishTopic(generation, topic, topic is null ? TopicFailure(response, read, ignoredToolCall) : null);
     }
+
+    private static string FailureText(Exception exception) => exception switch
+    {
+        OperationCanceledException => "the model request timed out.",
+        _ when string.IsNullOrWhiteSpace(exception.Message) => "the model request failed.",
+        _ => exception.Message
+    };
 
     /// <summary>
     /// Says why a topic reply had no usable text, so a retry can change
@@ -9036,7 +9041,17 @@ public sealed class CodingSession : ITurnObserver
 
             if (HasConversation())
             {
-                SaveSession();
+                try
+                {
+                    SaveSession();
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // The topic is set for this process; the next save writes it.
+                    Note("Topic  " + topic + "  ·  not saved: " + exception.Message);
+                    RefreshChrome();
+                    return;
+                }
             }
 
             RefreshChrome();

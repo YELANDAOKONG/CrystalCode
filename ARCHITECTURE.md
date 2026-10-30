@@ -1757,8 +1757,13 @@ characters. `SessionActivity.NamingTopic` (`naming_topic` on the wire,
 when no turn or compaction owns the row. It starts after `TurnFinished`
 is published, because the turn footer clears the progress row. A
 `New conversation` answer clears the attempted flag so the next completed
-turn asks again; a failed or cut reply does not. The request starts with no
-origin and no input capture, like a turn or a side question, so its notes,
+turn asks again; a failed or cut reply does not. Only a cancellation of the
+naming token itself is silent; a provider timeout, which also surfaces as a
+cancellation, is a failure that says the request timed out and clears the
+running request. The reply is read inside the request's `try` and handled
+outside it, so a session save that fails after naming keeps the topic in
+memory and reports `not saved` once instead of a naming failure. The request
+starts with no origin and no input capture, like a turn or a side question, so its notes,
 `ChromeChanged`, and activity reach every Server client and every Bridge
 session and never fail the request that asked for it. A turn may start while
 naming runs: naming keeps its own client, and when it ends inside a turn it

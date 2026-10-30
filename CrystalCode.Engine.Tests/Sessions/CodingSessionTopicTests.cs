@@ -278,6 +278,89 @@ public sealed class CodingSessionTopicTests
     }
 
     [Fact]
+    public async Task ProviderTimeout_IsAFailureThatClearsTheRowAndLetsNamingRunAgain()
+    {
+        var model = new HeldTopicStreamingClient("unused", timeOut: true);
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("Fix the build.");
+        await model.TopicStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        model.Release();
+        await headless.Session.TopicTask;
+
+        Assert.Contains(
+            headless.Observer.Events.OfType<NoteWritten>(),
+            static note => note.Text == "Topic naming failed: the model request timed out.");
+        Assert.Equal(SessionActivity.Idle, headless.Observer.Events.OfType<ActivityChanged>().Last().Activity);
+
+        // A timed-out request no longer counts as running, so a manual retry starts a new one.
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("/topic regenerate", CancellationToken.None);
+        Assert.Contains(
+            headless.Observer.Events.OfType<ActivityChanged>(),
+            static changed => changed.Activity == SessionActivity.NamingTopic);
+        await headless.Session.TopicTask;
+    }
+
+    [Fact]
+    public async Task SaveFailure_KeepsTheTopicAndReportsOnceWithoutCallingItANamingFailure()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            // Directory modes are POSIX; Windows ACLs are not exercised here.
+            return;
+        }
+
+        var model = new HeldTopicStreamingClient("Fix the build");
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("Fix the build.");
+        await model.TopicStarted.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var sessions = headless.Home.SessionsDirectory;
+        File.SetUnixFileMode(sessions, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        try
+        {
+            if (CanWrite(sessions))
+            {
+                // Running as root ignores directory modes.
+                model.Release();
+                await headless.Session.TopicTask;
+                return;
+            }
+
+            model.Release();
+            await headless.Session.TopicTask;
+        }
+        finally
+        {
+            File.SetUnixFileMode(sessions, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var notes = headless.Observer.Events.OfType<NoteWritten>().Select(static note => note.Text).ToArray();
+        Assert.DoesNotContain(notes, static text => text.StartsWith("Topic naming failed", StringComparison.Ordinal));
+        Assert.Single(notes, static text => text.StartsWith("Topic  Fix the build  ·  not saved: ", StringComparison.Ordinal));
+        Assert.Equal("Fix the build", headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.Topic);
+        Assert.Equal(SessionActivity.Idle, headless.Observer.Events.OfType<ActivityChanged>().Last().Activity);
+    }
+
+    private static bool CanWrite(string directory)
+    {
+        var probe = Path.Combine(directory, ".probe-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            File.WriteAllText(probe, string.Empty);
+            File.Delete(probe);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    [Fact]
     public async Task NamingEvents_HaveNoOrigin()
     {
         var model = new ScriptedStreamingClient(Text("Done."), Text("Fix the build"), Text("Repair the build"));
