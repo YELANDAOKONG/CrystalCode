@@ -152,6 +152,36 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task TopicNaming_ReachesEveryClientEvenWhenOneAskedForIt()
+    {
+        var model = new ScriptedModel(false, TextRound("done"), TextRound("Tidy the build"), TextRound("Repair the build"));
+        await using var fixture = await ServerFixture.StartAsync(model, options: static launch => launch with { Topic = "on" });
+        await fixture.WaitReadyAsync();
+        using var alice = fixture.Client("alice");
+        using var bob = fixture.Client("bob");
+        using var aliceEvents = await fixture.OpenEventsAsync(alice);
+        using var bobEvents = await fixture.OpenEventsAsync(bob);
+
+        await fixture.PostAsync(alice, "/input", new { text = "clean the build" });
+        await bobEvents.WaitForAsync("activity.changed", static value =>
+            value.GetProperty("data").GetProperty("activity").GetString() == "naming_topic");
+        await bobEvents.WaitForAsync("chrome.changed", static value =>
+            value.GetProperty("data").GetProperty("chrome").GetProperty("topic").GetString() == "Tidy the build");
+
+        await fixture.PostAsync(alice, "/input", new { text = "/topic regenerate" });
+        var note = await bobEvents.WaitForAsync("note", static value =>
+            value.GetProperty("data").GetProperty("text").GetString() == "Topic  Repair the build");
+        Assert.Equal("note", note.GetProperty("type").GetString());
+        await aliceEvents.WaitForAsync("note", static value =>
+            value.GetProperty("data").GetProperty("text").GetString() == "Topic  Repair the build");
+
+        var sessions = await fixture.GetAsync(bob, "/sessions");
+        Assert.Equal("Repair the build", sessions.GetProperty("sessions")[0].GetProperty("topic").GetString());
+        var snapshot = await fixture.GetAsync(bob, "/snapshot");
+        Assert.Equal("Repair the build", snapshot.GetProperty("chrome").GetProperty("topic").GetString());
+    }
+
+    [Fact]
     public async Task Snapshot_KeepsApprovalPassesAfterTheTurn()
     {
         var model = new ScriptedModel(false, ToolRound("call-1", "list", "{}"), TextRound("done"));

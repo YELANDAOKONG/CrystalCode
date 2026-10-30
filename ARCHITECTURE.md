@@ -1757,7 +1757,12 @@ characters. `SessionActivity.NamingTopic` (`naming_topic` on the wire,
 when no turn or compaction owns the row. It starts after `TurnFinished`
 is published, because the turn footer clears the progress row. A
 `New conversation` answer clears the attempted flag so the next completed
-turn asks again; a failed or cut reply does not. A generation counter drops a stale
+turn asks again; a failed or cut reply does not. The request starts with no
+origin and no input capture, like a turn or a side question, so its notes,
+`ChromeChanged`, and activity reach every Server client and every Bridge
+session and never fail the request that asked for it. A turn may start while
+naming runs: naming keeps its own client, and when it ends inside a turn it
+does not clear the turn's progress row. A generation counter drops a stale
 reply. A reply with no text says why: cut at the output limit, a tool call,
 or empty. The result is
 normalized by `SessionTopic` (one line, no quotes or trailing period, at most

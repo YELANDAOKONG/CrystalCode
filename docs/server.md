@@ -316,7 +316,10 @@ Otherwise each holds the reviewer's `provider`, `model`, and display labels
 adds `trigger` and `includePrimaryReview`.
 `compaction` is `null` while the compaction model is off, and `image`,
 `audio`, and `video` while that resource description model is off; audio and
-video are configuration only. `topic` is the session topic, or empty. Otherwise each holds that model's `provider`, `model`,
+video are configuration only. `topic` is the session topic, or empty. Topic
+naming runs in the background and has no origin, so its `note`,
+`chrome.changed`, and `activity.changed` (`naming_topic`, then `idle`) go to
+every client, including after `/topic regenerate` from one of them. Otherwise each holds that model's `provider`, `model`,
 and display labels `thinking`, `serviceTier`, `speed`, and `context` (blank
 when the model does not set its own).
 

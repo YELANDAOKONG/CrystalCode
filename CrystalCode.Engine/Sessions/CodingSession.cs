@@ -8874,7 +8874,21 @@ public sealed class CodingSession : ITurnObserver
             source = new CancellationTokenSource();
             _topicSource = source;
             generation = ++_topicGeneration;
-            _topicTask = Task.Run(() => RunTopicAsync(selected, request, generation, announce, source.Token));
+            // The topic belongs to the session, so what naming writes goes to
+            // every client and fails no request, like a turn or a side question.
+            var capture = _inputCapture.Value;
+            _inputCapture.Value = null;
+            try
+            {
+                using (BeginOrigin(null))
+                {
+                    _topicTask = Task.Run(() => RunTopicAsync(selected, request, generation, announce, source.Token));
+                }
+            }
+            finally
+            {
+                _inputCapture.Value = capture;
+            }
         }
 
         SetTopicActivity(naming: true);
@@ -9005,25 +9019,33 @@ public sealed class CodingSession : ITurnObserver
             }
         }
 
-        SetTopicActivity(naming: false);
-        if (error is not null)
+        // Idle goes out last, so a client that reads the snapshot on Idle
+        // already sees the saved topic and the note.
+        try
         {
-            Note(error);
-            return;
-        }
+            if (error is not null)
+            {
+                Note(error);
+                return;
+            }
 
-        if (topic is null)
+            if (topic is null)
+            {
+                return;
+            }
+
+            if (HasConversation())
+            {
+                SaveSession();
+            }
+
+            RefreshChrome();
+            Note("Topic  " + topic);
+        }
+        finally
         {
-            return;
+            SetTopicActivity(naming: false);
         }
-
-        if (HasConversation())
-        {
-            SaveSession();
-        }
-
-        RefreshChrome();
-        Note("Topic  " + topic);
     }
 
     /// <summary>

@@ -107,6 +107,25 @@ public sealed class BridgeExtensionTests
     }
 
     [Fact]
+    public async Task TopicNaming_SendsItsActivityToAnOptedInClient()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(
+            new ScriptedModel(false, ScriptedModel.TextRound("done"), ScriptedModel.TextRound("Tidy the build")),
+            options: static options => options with { Topic = "on" });
+        var id = await fixture.OpenAsync(Notified);
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "clean the build" } } });
+
+        await fixture.WaitForAsync(static message => Method(message) == "_crystal/activity"
+            && message.GetProperty("params").GetProperty("activity").GetString() == "naming_topic");
+        await fixture.WaitForAsync(static message => Method(message) == "_crystal/activity"
+            && message.GetProperty("params").GetProperty("activity").GetString() == "idle");
+        var snapshot = (await fixture.RequestAsync("_crystal/snapshot", new { sessionId = id })).GetProperty("result");
+        Assert.Equal("Tidy the build", snapshot.GetProperty("chrome").GetProperty("topic").GetString());
+        Assert.Equal("idle", snapshot.GetProperty("activity").GetString());
+    }
+
+    [Fact]
     public async Task Images_AttachAndGetBack()
     {
         var png = Convert.FromBase64String(

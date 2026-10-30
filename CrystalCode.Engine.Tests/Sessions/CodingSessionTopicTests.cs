@@ -243,6 +243,62 @@ public sealed class CodingSessionTopicTests
     }
 
     [Fact]
+    public async Task MessageWhileNaming_RunsTheTurnAndNamingFinishingDoesNotClearTheTurnsProgress()
+    {
+        var model = new HeldTopicStreamingClient("Fix the login redirect");
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("The login page redirects twice.");
+        await model.TopicStarted.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(
+            SessionActivity.NamingTopic,
+            headless.Observer.Events.OfType<ActivityChanged>().Last().Activity);
+
+        // The second turn starts and finishes while naming is still held open.
+        await headless.Session.SubmitAsync("Also check logout.", CancellationToken.None);
+        await headless.Session.FinishTurnAsync(CancellationToken.None);
+        Assert.Equal(2, model.Turns);
+        Assert.False(headless.Session.TopicTask.IsCompleted);
+
+        headless.Observer.Clear();
+        await headless.Session.SubmitAsync("And the signup page.", CancellationToken.None);
+        model.Release();
+        await headless.Session.TopicTask;
+        await headless.Session.FinishTurnAsync(CancellationToken.None);
+
+        Assert.Equal("Fix the login redirect", headless.ReadSaved().Topic);
+        // Naming ends inside the third turn, which owns the row, so it must not write Idle there.
+        var during = headless.Observer.Events
+            .SkipWhile(static e => e is not TurnStarted)
+            .TakeWhile(static e => e is not TurnFinished)
+            .OfType<ActivityChanged>();
+        Assert.DoesNotContain(during, static changed => changed.Activity == SessionActivity.Idle);
+        Assert.Equal(3, model.Turns);
+    }
+
+    [Fact]
+    public async Task NamingEvents_HaveNoOrigin()
+    {
+        var model = new ScriptedStreamingClient(Text("Done."), Text("Fix the build"), Text("Repair the build"));
+        using var headless = new HeadlessSession(model, settings: Settings().WithTopicModel(new TopicModelSettings(true)));
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("Fix the build.");
+        await headless.Session.TopicTask;
+        headless.Observer.Clear();
+
+        using (headless.Session.BeginOrigin("client-a"))
+        {
+            await headless.Session.SubmitAsync("/topic regenerate", CancellationToken.None);
+        }
+
+        await headless.Session.TopicTask;
+        var named = headless.Observer.Events.OfType<NoteWritten>().Single(static note => note.Text.StartsWith("Topic  ", StringComparison.Ordinal));
+        Assert.Null(named.Origin);
+        Assert.All(headless.Observer.Events.OfType<ChromeChanged>(), static changed => Assert.Null(changed.Origin));
+    }
+
+    [Fact]
     public async Task TopicAndDescribeMenus_CompleteSubcommandsAndTheirValues()
     {
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
