@@ -15,7 +15,7 @@ public sealed class WireWriterPreferencesTests
     public void Preferences_WritesTheThemeAndApprovalColors(bool approvalColors)
     {
         var preferences = new SessionPreferences(
-            false, true, 4, true, true, true, true, true, true, true, false, [], [new("model", false, 100)], ["model"], "night", approvalColors);
+            false, true, 4, true, true, true, true, true, true, true, false, [], [new("model", false, 100)], ["model"], true, "night", approvalColors);
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {

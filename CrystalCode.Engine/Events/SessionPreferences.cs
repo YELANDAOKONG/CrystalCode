@@ -20,5 +20,6 @@ public sealed record SessionPreferences(
     IReadOnlyList<string> StatusLineFields,
     IReadOnlyList<StatusLineRule> StatusLineRules,
     IReadOnlyList<string> StatusLineDrop,
+    bool StatusLineTitleCase,
     string Theme,
     bool ApprovalColors);

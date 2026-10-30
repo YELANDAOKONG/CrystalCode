@@ -236,7 +236,8 @@ internal sealed class SessionProjection : ISessionObserver
             preferences.StatusLineEnabled,
             preferences.StatusLineFields,
             [.. preferences.StatusLineRules.Select(rule => new StatusFieldRule(rule.Field, rule.Keep, rule.HideBelow))],
-            preferences.StatusLineDrop);
+            preferences.StatusLineDrop,
+            preferences.StatusLineTitleCase);
         _renderer.SetApprovalColors(preferences.ApprovalColors);
         ApplyTheme(preferences.Theme);
     }

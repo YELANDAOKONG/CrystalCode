@@ -352,7 +352,9 @@ separate library with no terminal code. The product can:
   bar until the operator names them in `statusLine` or `/statusline`.
   On the custom status line the operator may mark a field `keep` (never
   hidden) or `hideBelow` a terminal width, and may list fields in
-  `statusLineDrop` to hide first, all in `config.json`.
+  `statusLineDrop` to hide first, all in `config.json`. Names the operator
+  chose, such as the prompt set, show in title case unless
+  `statusLineTitleCase` is `false`.
   A plugin can read the
   live session model and whether review is using its own model. A plugin
   that asks for model clients can call the session model and, while that

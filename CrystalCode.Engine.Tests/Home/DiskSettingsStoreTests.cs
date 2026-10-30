@@ -1954,6 +1954,19 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
+    public void Save_RoundTripsStatusLineTitleCase()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        var settings = store.LoadOrCreate();
+        Assert.True(store.Load().StatusLine.TitleCase);
+
+        store.Save(settings.WithStatusLine(settings.StatusLine.WithTitleCase(false)));
+
+        Assert.False(store.Load().StatusLine.TitleCase);
+    }
+
+    [Fact]
     public void Save_RoundTripsStatusLineRulesAndDropOrder()
     {
         using var root = new TemporaryHome();

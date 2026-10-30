@@ -530,7 +530,7 @@ public sealed class SessionRenderer : IDisposable
             _chrome.Speed = speed;
             _chrome.ContextWindow = UsageText.FormatWindow(contextWindow);
             ContextWindow = contextWindow;
-            _chrome.PromptSet = PromptSetLabel(promptSet);
+            _chrome.PromptSet = promptSet;
             _composer.PlanMode = planMode;
             if (Framed)
             {
@@ -545,7 +545,7 @@ public sealed class SessionRenderer : IDisposable
                 : $"  ·  {MarkupText.Escape(thinking)}";
             var promptText = string.IsNullOrWhiteSpace(promptSet)
                 ? string.Empty
-                : $"  ·  Prompt {MarkupText.Escape(PromptSetLabel(promptSet))}";
+                : $"  ·  Prompt {MarkupText.Escape(_chrome.Name(promptSet))}";
             AnsiConsole.MarkupLine(
                 $"[{Theme.Chrome}]{MarkupText.Escape(model)}  ·  [/]"
                 + $"[{modeColor}]{mode}[/]"
@@ -555,9 +555,6 @@ public sealed class SessionRenderer : IDisposable
             AnsiConsole.WriteLine();
         }
     }
-
-    private static string PromptSetLabel(string promptSet) =>
-        promptSet.Length == 0 ? promptSet : DisplayCase.Token(promptSet);
 
     /// <summary>
     /// Sets the label for settings that apply on the next turn.
@@ -678,7 +675,7 @@ public sealed class SessionRenderer : IDisposable
 
             if (promptSet is not null)
             {
-                _chrome.PromptSet = PromptSetLabel(promptSet);
+                _chrome.PromptSet = promptSet;
             }
             if (!string.IsNullOrWhiteSpace(model))
             {
@@ -698,7 +695,8 @@ public sealed class SessionRenderer : IDisposable
         bool enabled,
         IReadOnlyList<string> fields,
         IReadOnlyList<StatusFieldRule> rules,
-        IReadOnlyList<string> dropOrder)
+        IReadOnlyList<string> dropOrder,
+        bool titleCase)
     {
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(rules);
@@ -709,6 +707,7 @@ public sealed class SessionRenderer : IDisposable
             _chrome.StatusLineFields = [.. fields];
             _chrome.StatusLineRules = [.. rules];
             _chrome.StatusLineDropOrder = [.. dropOrder];
+            _chrome.NameFormat = titleCase ? DisplayCase.Token : static name => name;
             PaintUnlocked(force: true);
         }
     }
@@ -862,7 +861,7 @@ public sealed class SessionRenderer : IDisposable
             ContextWindow = status.ContextWindow;
             _chrome.PromptSet = status.PromptSet == PromptSetNames.Default
                 ? string.Empty
-                : PromptSetLabel(status.PromptSet);
+                : status.PromptSet;
             ApplyUsageUnlocked(status.Usage, status.CumulativeUsage, status.ContextWindow);
             var text = StatusText.Format(status, full);
             var widget = StatusWidget.Create(status, full);

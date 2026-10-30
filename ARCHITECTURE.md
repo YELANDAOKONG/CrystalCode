@@ -2846,6 +2846,11 @@ drop-order entry for a field that is not on the line, `keep` with `hideBelow`,
 `SessionPreferences` carries `StatusLineRules` and `StatusLineDrop`; Server and
 Bridge write them as `statusLineRules` and `statusLineDrop` next to
 `statusLineFields`. `/statusline` shows the rules but does not edit them.
+`statusLineTitleCase` (default on) lives in `StatusLineSettings.TitleCase` and
+rides on `SessionPreferences.StatusLineTitleCase`; Server and Bridge write it as
+`statusLineTitleCase`. When on, the terminal sets `ShellChrome.NameFormat` to
+`DisplayCase.Token`, which formats the names the operator chose (prompt set,
+custom mode) on the status line. `/status` and the transcript keep them as written.
 The adaptive bar keeps its fixed slot order.
 Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled

@@ -209,6 +209,7 @@ internal static class CrystalWire
 
         writer.WriteEndArray();
         Strings(writer, "statusLineDrop", preferences.StatusLineDrop);
+        writer.WriteBoolean("statusLineTitleCase", preferences.StatusLineTitleCase);
         writer.WriteString("theme", preferences.Theme);
         writer.WriteBoolean("approvalColors", preferences.ApprovalColors);
         writer.WriteEndObject();

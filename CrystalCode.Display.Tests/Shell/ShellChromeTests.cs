@@ -736,6 +736,22 @@ public sealed class ShellChromeTests
         Assert.Contains("Prompt concise", line.Plain, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("test", "Prompt [test]")]
+    [InlineData("test_a", "Prompt [test_a]")]
+    public void StatusLine_FormatsPromptSetNameWithNameFormat(string name, string expected)
+    {
+        var chrome = new ShellChrome
+        {
+            Approval = "Default",
+            PromptSet = name,
+            Usage = "CTX --",
+            NameFormat = value => $"[{value}]"
+        };
+
+        Assert.Contains(expected, chrome.StatusLine(120).Plain, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void StatusLine_TitleCasesToolCount()
     {

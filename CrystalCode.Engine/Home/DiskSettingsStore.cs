@@ -90,7 +90,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             StatusLineDocument.Read(
                 document.CustomStatusLine ?? false,
                 document.StatusLine,
-                document.StatusLineDrop),
+                document.StatusLineDrop,
+                document.StatusLineTitleCase ?? true),
             ExecutionBudgetMapper.Read(document.ExecutionBudget),
             BashTimeoutMapper.Read(
                 parsed.RootElement,
@@ -194,6 +195,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             StatusLineDrop = settings.StatusLine.DropOrder.Count == 0
                 ? null
                 : [.. settings.StatusLine.DropOrder],
+            StatusLineTitleCase = settings.StatusLine.TitleCase ? null : false,
             CompactionThreshold = settings.CompactionThreshold,
             ReservedOutputTokens = settings.ReservedOutputTokens,
             ShowCompactionSummary = settings.ShowCompactionSummary ? null : false,

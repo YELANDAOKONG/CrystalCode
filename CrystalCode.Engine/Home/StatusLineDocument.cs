@@ -14,7 +14,8 @@ internal static class StatusLineDocument
     public static StatusLineSettings Read(
         bool enabled,
         JsonElement? fields,
-        IReadOnlyList<string>? dropOrder)
+        IReadOnlyList<string>? dropOrder,
+        bool titleCase)
     {
         var names = new List<string>();
         var rules = new List<StatusLineRule>();
@@ -42,7 +43,7 @@ internal static class StatusLineDocument
             throw new JsonException("statusLine must be an array.");
         }
 
-        return new StatusLineSettings(enabled, names, rules, dropOrder);
+        return new StatusLineSettings(enabled, names, rules, dropOrder, titleCase);
     }
 
     public static JsonElement? WriteFields(StatusLineSettings settings)

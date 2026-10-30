@@ -5766,7 +5766,7 @@ public sealed class CodingSession : ITurnObserver
             {
                 "on" when tokens.Count == 1 => _settings.StatusLine.WithEnabled(true),
                 "off" when tokens.Count == 1 => _settings.StatusLine.WithEnabled(false),
-                "reset" when tokens.Count == 1 => new StatusLineSettings(true),
+                "reset" when tokens.Count == 1 => new StatusLineSettings(true, titleCase: _settings.StatusLine.TitleCase),
                 "on" or "off" or "reset" => throw new ArgumentException(
                     "Status line on, off, and reset do not accept additional fields."),
                 _ => _settings.StatusLine.WithFields(tokens, _loadedPlugins.StatusFieldNames)
@@ -5788,6 +5788,8 @@ public sealed class CodingSession : ITurnObserver
         var text = new StringBuilder();
         text.Append("Custom status line  ");
         text.Append(_settings.StatusLine.Enabled ? "On" : "Off");
+        text.Append("\nTitle case  ");
+        text.Append(_settings.StatusLine.TitleCase ? "On" : "Off");
         text.Append("\nFields  ");
         text.Append(string.Join(' ', _settings.StatusLine.Fields));
         if (_settings.StatusLine.Rules.Count > 0)
@@ -10122,6 +10124,7 @@ public sealed class CodingSession : ITurnObserver
             _settings.StatusLine.Fields,
             _settings.StatusLine.Rules,
             _settings.StatusLine.DropOrder,
+            _settings.StatusLine.TitleCase,
             _settings.Theme,
             _settings.ApprovalColors);
 

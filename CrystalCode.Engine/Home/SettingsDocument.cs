@@ -68,6 +68,8 @@ internal sealed class SettingsDocument
 
     public List<string>? StatusLineDrop { get; set; }
 
+    public bool? StatusLineTitleCase { get; set; }
+
     public double? CompactionThreshold { get; set; }
 
     public int? ReservedOutputTokens { get; set; }

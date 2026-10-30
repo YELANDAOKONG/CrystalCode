@@ -674,6 +674,7 @@ Top-level fields:
 | `verboseThinking` | Show Thinking panels in the interactive transcript (default `true`; omitted when on). Off hides live and restored cards. The gear, progress row, and export stay. `crystal run --show-thinking` is separate |
 | `exportDirectory` | Export root: omitted or `home` for `{home}/exports`, `workspace` for `<workspace>/.crystal/exports`, or any absolute/`~` path |
 | `customStatusLine` | Enable the ordered custom status line (default `false`; the existing adaptive status line remains the default) |
+| `statusLineTitleCase` | Show the prompt set name and a custom mode name in title case on the status line, so `test_a` reads `Test A` (default `true`). `false` shows the names as written. Written only while `false`. Edit `config.json`; there is no slash command |
 | `statusLine` | Ordered custom fields used only when `customStatusLine` is enabled. Built-in names are checked on load. An extra name is kept when it matches a plugin field name, even if that plugin is not loaded yet. An entry is a field name, or an object `{"field": "model", "keep": true, "hideBelow": 100}` (see [Narrow terminals](#custom-status-line-on-narrow-terminals)) |
 | `statusLineDrop` | Optional list of `statusLine` fields to hide first when the line does not fit, in this order |
 | `compactionThreshold` | Fraction of the selected context budget that triggers compaction (greater than 0, at most 1; default `0.8`) |

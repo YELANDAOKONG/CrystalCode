@@ -61,6 +61,15 @@ public sealed class ShellChrome
     /// <summary>Custom fields to hide first, in this order, when the line does not fit.</summary>
     public IReadOnlyList<string> StatusLineDropOrder { get; set; } = [];
 
+    /// <summary>
+    /// Formats names the operator chose, such as the prompt set and a custom
+    /// mode, before they are shown. The default leaves them as written.
+    /// </summary>
+    public Func<string, string> NameFormat { get; set; } = static name => name;
+
+    /// <summary>Formats a chosen name; an empty name stays empty.</summary>
+    public string Name(string name) => name.Length == 0 ? name : NameFormat(name);
+
     public IReadOnlyDictionary<string, string> PluginFields { get; set; } =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -139,7 +148,7 @@ public sealed class ShellChrome
     public string Pending { get; set; } = string.Empty;
 
     private string ModeLabel =>
-        string.IsNullOrEmpty(CustomMode) ? PlanMode ? "Plan" : "Work" : CustomMode;
+        string.IsNullOrEmpty(CustomMode) ? PlanMode ? "Plan" : "Work" : Name(CustomMode);
 
     private string ModeColor =>
         !string.IsNullOrEmpty(CustomMode) ? Theme.Custom : PlanMode ? Theme.Plan : Theme.Work;
@@ -187,8 +196,9 @@ public sealed class ShellChrome
 
         if (!string.IsNullOrWhiteSpace(PromptSet))
         {
-            var prompt = "Prompt " + PromptSet;
-            items.Add((prompt, $"[{Theme.ForValue("prompt-set", PromptSet)}]{MarkupText.Escape(prompt)}[/]", "prompt"));
+            var promptName = Name(PromptSet);
+            var prompt = "Prompt " + promptName;
+            items.Add((prompt, $"[{Theme.ForValue("prompt-set", promptName)}]{MarkupText.Escape(prompt)}[/]", "prompt"));
         }
 
         if (!string.IsNullOrWhiteSpace(Activity))
@@ -264,7 +274,7 @@ public sealed class ShellChrome
                 "context-window" => ContextWindow,
                 "prompt-set" => string.IsNullOrWhiteSpace(PromptSet)
                     ? string.Empty
-                    : "Prompt " + PromptSet,
+                    : "Prompt " + Name(PromptSet),
                 "activity" => string.IsNullOrWhiteSpace(Activity) ? string.Empty : "• " + Activity,
                 "model" => Model,
                 "provider" => Provider,

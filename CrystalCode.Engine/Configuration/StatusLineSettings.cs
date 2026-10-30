@@ -69,8 +69,9 @@ public sealed record StatusLineSettings
         bool enabled = false,
         IReadOnlyList<string>? fields = null,
         IReadOnlyList<StatusLineRule>? rules = null,
-        IReadOnlyList<string>? dropOrder = null)
-        : this(enabled, fields, rules, dropOrder, null)
+        IReadOnlyList<string>? dropOrder = null,
+        bool titleCase = true)
+        : this(enabled, fields, rules, dropOrder, titleCase, null)
     {
     }
 
@@ -79,15 +80,23 @@ public sealed record StatusLineSettings
         IReadOnlyList<string>? fields,
         IReadOnlyList<StatusLineRule>? rules,
         IReadOnlyList<string>? dropOrder,
+        bool titleCase,
         IReadOnlySet<string>? pluginFields)
     {
         Enabled = enabled;
+        TitleCase = titleCase;
         Fields = Normalize(fields, pluginFields);
         Rules = NormalizeRules(rules, Fields);
         DropOrder = NormalizeDropOrder(dropOrder, Fields, Rules);
     }
 
     public bool Enabled { get; }
+
+    /// <summary>
+    /// Whether names the operator chose, the prompt set and a custom mode, show
+    /// in title case such as <c>Test A</c> for <c>test_a</c>.
+    /// </summary>
+    public bool TitleCase { get; }
 
     public IReadOnlyList<string> Fields { get; }
 
@@ -100,7 +109,7 @@ public sealed record StatusLineSettings
     /// </summary>
     public IReadOnlyList<string> DropOrder { get; }
 
-    public StatusLineSettings WithEnabled(bool enabled) => new(enabled, Fields, Rules, DropOrder);
+    public StatusLineSettings WithEnabled(bool enabled) => new(enabled, Fields, Rules, DropOrder, TitleCase);
 
     public StatusLineSettings WithFields(IReadOnlyList<string> fields) => ApplyFields(fields, null);
 
@@ -127,8 +136,12 @@ public sealed record StatusLineSettings
             names,
             Rules.Where(rule => names.Contains(rule.Field, StringComparer.Ordinal)).ToArray(),
             DropOrder.Where(name => names.Contains(name, StringComparer.Ordinal)).ToArray(),
+            TitleCase,
             pluginFields);
     }
+
+    public StatusLineSettings WithTitleCase(bool titleCase) =>
+        new(Enabled, Fields, Rules, DropOrder, titleCase);
 
     private static IReadOnlyList<StatusLineRule> NormalizeRules(
         IReadOnlyList<StatusLineRule>? rules,
