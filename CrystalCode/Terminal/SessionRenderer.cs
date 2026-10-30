@@ -530,7 +530,7 @@ public sealed class SessionRenderer : IDisposable
             _chrome.Speed = speed;
             _chrome.ContextWindow = UsageText.FormatWindow(contextWindow);
             ContextWindow = contextWindow;
-            _chrome.PromptSet = promptSet;
+            _chrome.PromptSet = PromptSetLabel(promptSet);
             _composer.PlanMode = planMode;
             if (Framed)
             {
@@ -545,7 +545,7 @@ public sealed class SessionRenderer : IDisposable
                 : $"  ·  {MarkupText.Escape(thinking)}";
             var promptText = string.IsNullOrWhiteSpace(promptSet)
                 ? string.Empty
-                : $"  ·  Prompt {MarkupText.Escape(promptSet)}";
+                : $"  ·  Prompt {MarkupText.Escape(PromptSetLabel(promptSet))}";
             AnsiConsole.MarkupLine(
                 $"[{Theme.Chrome}]{MarkupText.Escape(model)}  ·  [/]"
                 + $"[{modeColor}]{mode}[/]"
@@ -555,6 +555,9 @@ public sealed class SessionRenderer : IDisposable
             AnsiConsole.WriteLine();
         }
     }
+
+    private static string PromptSetLabel(string promptSet) =>
+        promptSet.Length == 0 ? promptSet : DisplayCase.Token(promptSet);
 
     /// <summary>
     /// Sets the label for settings that apply on the next turn.
@@ -675,7 +678,7 @@ public sealed class SessionRenderer : IDisposable
 
             if (promptSet is not null)
             {
-                _chrome.PromptSet = promptSet;
+                _chrome.PromptSet = PromptSetLabel(promptSet);
             }
             if (!string.IsNullOrWhiteSpace(model))
             {
@@ -859,7 +862,7 @@ public sealed class SessionRenderer : IDisposable
             ContextWindow = status.ContextWindow;
             _chrome.PromptSet = status.PromptSet == PromptSetNames.Default
                 ? string.Empty
-                : status.PromptSet;
+                : PromptSetLabel(status.PromptSet);
             ApplyUsageUnlocked(status.Usage, status.CumulativeUsage, status.ContextWindow);
             var text = StatusText.Format(status, full);
             var widget = StatusWidget.Create(status, full);
