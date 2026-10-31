@@ -57,6 +57,87 @@ public sealed class AgentCommandTests
     }
 
     [Fact]
+    public async Task AgentsOnAndOff_AddAndRemoveTheTaskToolForTheNextRequest()
+    {
+        var settings = HeadlessSession.ScriptedSettings();
+        var model = new ScriptedStreamingClient(Done(), Done(), Done());
+        using var session = new HeadlessSession(model, settings: settings, prepare: (home, _) =>
+        {
+            home.EnsureCreated();
+            File.WriteAllText(home.ProvidersPath, JsonSerializer.Serialize(SettingsMapper.WriteProviders(settings.Catalog)));
+        });
+        await session.Session.StartAsync(CancellationToken.None);
+
+        await session.RunTurnAsync("first");
+        Assert.DoesNotContain(model.LastRequest!.Tools, tool => tool.Name == "task");
+
+        await session.Session.SubmitAsync("/agents on", CancellationToken.None);
+        await session.RunTurnAsync("second");
+        Assert.Contains(model.LastRequest!.Tools, tool => tool.Name == "task");
+
+        await session.Session.SubmitAsync("/agents off", CancellationToken.None);
+        await session.RunTurnAsync("third");
+        Assert.DoesNotContain(model.LastRequest!.Tools, tool => tool.Name == "task");
+        Assert.Empty(session.Observer.Events.OfType<ErrorWritten>());
+    }
+
+    [Fact]
+    public async Task AgentsToggledFromEnabled_KeepsTheTaskToolInWorkAndPlan()
+    {
+        var settings = HeadlessSession.ScriptedSettings().WithAgents(new AgentSettings { Enabled = true });
+        var model = new ScriptedStreamingClient(Done(), Done(), Done(), Done(), Done());
+        using var session = new HeadlessSession(model, settings: settings, prepare: (home, _) =>
+        {
+            home.EnsureCreated();
+            File.WriteAllText(home.ProvidersPath, JsonSerializer.Serialize(SettingsMapper.WriteProviders(settings.Catalog)));
+        });
+        await session.Session.StartAsync(CancellationToken.None);
+
+        await session.RunTurnAsync("a");
+        Assert.Contains(model.LastRequest!.Tools, tool => tool.Name == "task");
+
+        await session.Session.SubmitAsync("/agents off", CancellationToken.None);
+        await session.Session.SubmitAsync("/agents on", CancellationToken.None);
+        await session.RunTurnAsync("b");
+        Assert.Contains(model.LastRequest!.Tools, tool => tool.Name == "task");
+
+        await session.Session.SubmitAsync("/plan", CancellationToken.None);
+        await session.RunTurnAsync("c");
+        Assert.Contains(model.LastRequest!.Tools, tool => tool.Name == "task");
+        Assert.Empty(session.Observer.Events.OfType<ErrorWritten>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AgentsOn_AfterResumeAddsTheTaskToolForTheNextRequest(bool startEnabled)
+    {
+        var settings = HeadlessSession.ScriptedSettings().WithAgents(new AgentSettings { Enabled = startEnabled });
+        using var first = new HeadlessSession(new ScriptedStreamingClient(Done()), settings: settings);
+        await first.Session.StartAsync(CancellationToken.None);
+        await first.RunTurnAsync("first");
+        var saved = first.ReadSaved();
+
+        var model = new ScriptedStreamingClient(Done(), Done());
+        using var resumed = new HeadlessSession(model, resume: saved, settings: settings, prepare: (home, _) =>
+        {
+            home.EnsureCreated();
+            File.WriteAllText(home.ProvidersPath, JsonSerializer.Serialize(SettingsMapper.WriteProviders(settings.Catalog)));
+        });
+        await resumed.Session.StartAsync(CancellationToken.None);
+        await resumed.Session.SubmitAsync("/agents off", CancellationToken.None);
+        await resumed.Session.SubmitAsync("/agents on", CancellationToken.None);
+        await resumed.RunTurnAsync("second");
+
+        Assert.Contains(model.LastRequest!.Tools, tool => tool.Name == "task");
+        Assert.Empty(resumed.Observer.Events.OfType<ErrorWritten>());
+    }
+
+    private static IReadOnlyList<ChatStreamEvent> Done() =>
+        [new ChatTextDelta(0, 0, ChatRole.Assistant, "done"), new ChatUsageReceived(new TokenUsage(10, 2, 1)),
+            new ChatCandidateCompleted(0, FinishReason.Stop)];
+
+    [Fact]
     public async Task AgentLimitCommand_SavesEachFieldAndClearsItWithoutAValue()
     {
         var settings = HeadlessSession.ScriptedSettings();
@@ -83,6 +164,24 @@ public sealed class AgentCommandTests
     }
 
     [Fact]
+    public async Task AgentsList_IsOneDocumentWithSettingsAndATableOfDefinitions()
+    {
+        var settings = HeadlessSession.ScriptedSettings().WithAgents(new AgentSettings { Enabled = true, MaxConcurrent = 3 });
+        using var session = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
+        await session.Session.StartAsync(CancellationToken.None);
+
+        await session.Session.SubmitAsync("/agents", CancellationToken.None);
+
+        var document = session.Observer.Events.OfType<DocumentWritten>().Single().Document;
+        Assert.Contains(document.Blocks[0].Rows, row => row[0] == "Agents" && row[1] == "On");
+        Assert.Contains(document.Blocks[0].Rows, row => row[0] == "Concurrency" && row[1] == "3");
+        var table = document.Blocks.Single(block => block.Kind == "table");
+        Assert.Equal(["Name", "Model", "Description"], table.Columns);
+        Assert.Contains(table.Rows, row => row[0] == "explore" && row[1] == "Inherit");
+        Assert.DoesNotContain(session.Observer.Events.OfType<NoteWritten>(), note => note.Text.Contains("inherit/inherit", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task AgentsBusy_CanListButCannotChangeSettings()
     {
         var client = new BlockingStreamingClient();
@@ -92,7 +191,9 @@ public sealed class AgentCommandTests
         await client.Started.WaitAsync(TimeSpan.FromSeconds(5));
         await session.Session.SubmitAsync("/agents", CancellationToken.None);
         await session.Session.SubmitAsync("/agents on", CancellationToken.None);
-        Assert.Contains(session.Observer.Events.OfType<NoteWritten>(), note => note.Text.StartsWith("Agents off", StringComparison.Ordinal));
+        var listing = session.Observer.Events.OfType<DocumentWritten>().Single().Document;
+        Assert.StartsWith("Agents", listing.Title, StringComparison.Ordinal);
+        Assert.Contains(listing.Blocks[0].Rows, row => row[0] == "Agents" && row[1] == "Off");
         Assert.Contains(session.Observer.Events.OfType<ErrorWritten>(), error => error.Text.Contains("cannot change", StringComparison.Ordinal));
         session.Session.TryInterrupt();
         await session.Session.FinishTurnAsync();

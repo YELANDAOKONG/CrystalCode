@@ -1321,7 +1321,7 @@ that would ask the operator is denied by the same parent policy.
 `crystal run` has no `/child`; the child summary stays with the
 `task` result.
 
-`/agents` lists definitions and settings. While idle it accepts `on`,
+`/agents` lists the settings and the definitions as one card: the switch and concurrency, then a table of name, model (`Inherit` or `provider/model`), and description. Other front ends get the same content as a document. While idle it accepts `on`,
 `off`, `concurrency <1-8>`, `model <name> [provider model]`, and
 `thinking`, `context`, `tier`, or `speed` with `<name> [value]`.
 Omitting the value clears that choice. Completions for those choices

@@ -844,21 +844,46 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    private void ShowAgents()
+    {
+        var catalog = AgentCatalog.Load(_home, _workspace.Root, _settings.Agents with { Enabled = true });
+        var blocks = new List<TranscriptDocumentBlock>
+        {
+            new("keyValues", [],
+            [
+                ["Agents", _settings.Agents.Enabled ? "On" : "Off"],
+                ["Concurrency", _settings.Agents.MaxConcurrent.ToString(System.Globalization.CultureInfo.InvariantCulture)]
+            ], [], 0)
+        };
+        if (catalog.Definitions.Count > 0)
+        {
+            var rows = catalog.Definitions
+                .Select(agent => (IReadOnlyList<string>)
+                [
+                    agent.Name,
+                    agent.Model.Provider is null || agent.Model.Model is null
+                        ? "Inherit"
+                        : agent.Model.Provider + "/" + agent.Model.Model,
+                    agent.Description
+                ])
+                .ToArray();
+            blocks.Add(new("table", ["Name", "Model", "Description"], rows, [], 0));
+        }
+
+        if (catalog.Notes.Count > 0)
+        {
+            blocks.Add(new("list", [], [], [.. catalog.Notes], 0));
+        }
+
+        Publish(new DocumentWritten(new TranscriptDocument($"Agents  {catalog.Definitions.Count} defined", blocks)));
+    }
+
     private void ChangeAgentsCore(string argument)
     {
         var parts = CommandArguments.Split(argument);
         if (parts.Count == 0)
         {
-            Note($"Agents {(_settings.Agents.Enabled ? "on" : "off")}  Concurrency {_settings.Agents.MaxConcurrent}");
-            var catalog = AgentCatalog.Load(_home, _workspace.Root, _settings.Agents with { Enabled = true });
-            foreach (var note in catalog.Notes)
-            {
-                Note(note);
-            }
-            foreach (var agent in catalog.Definitions)
-            {
-                Note($"{agent.Name}  {agent.Model.Provider ?? "inherit"}/{agent.Model.Model ?? "inherit"}  {agent.Description}");
-            }
+            ShowAgents();
             return;
         }
         if (_turnActive || _compacting)
