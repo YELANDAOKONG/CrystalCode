@@ -670,6 +670,23 @@ implemented in the current build.
   clients, and data directories. An example is custom tool execution modes. The set is not closed. Behavior and ownership are not
   defined. Do not reserve a command, flag, configuration field, or public
   type;
+- plugin-provided syntax highlighting. Code blocks in the terminal are drawn
+  in two colors with no token colors. Highlighting is to be a plugin
+  capability, not built into the terminal: a plugin offers a tokenizer for a
+  language and the terminal colors the tokens it returns. The contribution
+  shape, how a language is matched, the token kinds and the theme names that
+  color them, a time and size bound on the tokenizer, and what `crystal server`
+  and `crystal bridge` receive are not defined. Do not add a built-in
+  highlighter or a package for one, and do not reserve a public type, theme
+  color name, or configuration field;
+- a native .NET desktop front end, not a web page. It would reference
+  `CrystalCode.Engine` and supply its own surface, as the terminal, `crystal
+  server`, and `crystal bridge` do. The toolkit, target platforms, launch,
+  packaging, and whether it lives in this repository are not defined. If it
+  uses Avalonia, its UI is written in C# markup with no XAML or AXAML files.
+  A web front end is not this item: it drives `crystal server` and is outside
+  this repository. Do not add a project, package, or public architectural
+  boundary for it;
 - switchable thinking-chain compression. After each thinking pass, a model
   compresses and summarizes that thinking according to a requirement. The
   switch, the requirement, which model writes the summary, and whether the

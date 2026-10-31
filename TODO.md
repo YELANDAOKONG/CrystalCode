@@ -92,6 +92,26 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   plugin never touches the renderer, and an answer for Server and Bridge,
   which have no keyboard. It conflicts the most with the engine boundary, so
   it is undecided, not planned.
+- Plugin-provided syntax highlighting. Code blocks in the terminal are drawn
+  in two colors (`code` on `codeBg`) with no token colors. Highlighting should
+  be a plugin capability, not built into the terminal: a plugin would offer a
+  tokenizer for a language and the terminal would color the tokens it returns.
+  Open points: the contribution shape and where it sits among the existing
+  plugin capabilities; how a language is matched (fence info string, file
+  extension, or both); the token kinds and the theme names that color them,
+  including `fallback256`; a time and size bound so a slow tokenizer cannot
+  stall painting; and what Server and Bridge receive, since they have no
+  terminal colors. No built-in highlighter is added and no package is added
+  for one. Do not reserve a public type, theme color name, or configuration
+  field.
+- A native .NET desktop front end, not a web page. It would reference
+  `CrystalCode.Engine` like the terminal, `crystal server`, and `crystal
+  bridge` do, and supply its own surface. The UI toolkit, which platforms it
+  targets, how it is launched and packaged, and whether it ships from this
+  repository are not defined. If it uses Avalonia, the UI is written in C#
+  markup with no XAML or AXAML files. A web front end is not this item; those
+  drive `crystal server` and live outside this repository. Do not add a
+  project, package, or public architectural boundary for it.
 - Switchable thinking-chain compression. After a thinking pass, a model
   summarizes that thinking. It is not context compaction, microcompaction,
   `verboseThinking`, or `thinkingDisplay`.
