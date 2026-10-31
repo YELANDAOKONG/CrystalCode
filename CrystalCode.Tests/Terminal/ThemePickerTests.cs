@@ -12,6 +12,9 @@ public sealed class ThemePickerTests
     {
         var text = Draw(ThemePicker.Render(["default", "dark", "light", "night"], 2, "dark", failure: null));
 
+        // TEMP DEBUG CODE FOR CI RUNNER, WILL DELETE
+        Console.WriteLine(text);
+
         Assert.Contains("  default", text, StringComparison.Ordinal);
         Assert.Contains("  dark  current", text, StringComparison.Ordinal);
         Assert.Contains("> light", text, StringComparison.Ordinal);
