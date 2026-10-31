@@ -1,6 +1,7 @@
 using Spectre.Console;
 using Spectre.Console.Cli;
 
+using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Terminal;
@@ -63,7 +64,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or IOException or NotSupportedException)
         {
-            AnsiConsole.MarkupLine($"[red]{Markup.Escape(exception.Message)}[/]");
+            AnsiConsole.MarkupLine($"[{Theme.Fail}]{Markup.Escape(exception.Message)}[/]");
             return 1;
         }
 
@@ -84,7 +85,7 @@ public sealed class RunCommand : AsyncCommand<RunSettings>
             return 0;
         }
 
-        AnsiConsole.MarkupLine($"[red]{Markup.Escape(message)}[/]");
+        AnsiConsole.MarkupLine($"[{Theme.Fail}]{Markup.Escape(message)}[/]");
         return 1;
     }
 }

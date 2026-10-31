@@ -252,16 +252,7 @@ internal sealed class SessionProjection : ISessionObserver
             return;
         }
 
-        if (Theme.TryUseBuiltIn(name))
-        {
-            _theme = name;
-            _renderer.RepaintTheme();
-            return;
-        }
-
-        if (!ThemeCatalog.TryRead(_home, name, out var colors, out var error)
-            || !ThemeCatalog.TryReadGauges(_home, name, out var gauges, out error)
-            || !Theme.TryApply(colors, ToGauges(gauges), out error))
+        if (!ThemeApplier.TryApply(_home, name, out var error))
         {
             _renderer.WriteError("Theme not applied  " + error);
             return;
@@ -270,15 +261,6 @@ internal sealed class SessionProjection : ISessionObserver
         _theme = name;
         _renderer.RepaintTheme();
     }
-
-    private static Dictionary<string, IReadOnlyList<GaugeRule>> ToGauges(
-        IReadOnlyDictionary<string, IReadOnlyList<ThemeGaugeRule>> gauges) =>
-        gauges.ToDictionary(
-            static gauge => gauge.Key,
-            static gauge => (IReadOnlyList<GaugeRule>)
-                [.. gauge.Value.Select(static rule =>
-                    new GaugeRule(rule.From, rule.To, rule.Match, rule.Pattern, rule.Color))],
-            StringComparer.OrdinalIgnoreCase);
 
     private static bool TryCompactionSummary(string text, out string body)
     {

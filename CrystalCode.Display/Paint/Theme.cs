@@ -38,6 +38,10 @@ public static class Theme
             ["codeBg"] = "grey23",
             ["diffAdded"] = "darkseagreen",
             ["diffRemoved"] = "indianred",
+            ["diffAddedBg"] = "#1f3a2a",
+            ["diffRemovedBg"] = "#3d2123",
+            ["diffAddedWord"] = "#2f6b47",
+            ["diffRemovedWord"] = "#7a3238",
             ["warning"] = "tan",
             ["approval.plan"] = "grey50",
             ["approval.default"] = "grey50",
@@ -70,6 +74,10 @@ public static class Theme
             ["codeBg"] = "#eceef1",
             ["diffAdded"] = "#4d7c5f",
             ["diffRemoved"] = "#b4534f",
+            ["diffAddedBg"] = "#e3f0e7",
+            ["diffRemovedBg"] = "#f6e2e1",
+            ["diffAddedWord"] = "#b9dcc4",
+            ["diffRemovedWord"] = "#eab8b5",
             ["warning"] = "#a9753a",
             ["approval.plan"] = "#6b7280",
             ["approval.default"] = "#6b7280",
@@ -140,6 +148,13 @@ public static class Theme
     /// </summary>
     public static IReadOnlyList<string> StatusItems { get; } = ["input", "output", "total", "path", "tools", "elapsed", "agents-running", "scrollbar", "scrollbar-thumb"];
 
+    /// <summary>
+    /// True when the terminal shows 24-bit color. Terminal.app and some multiplexers report 256 colors,
+    /// where a theme can name its own replacements.
+    /// </summary>
+    public static bool TrueColor =>
+        AnsiConsole.Profile.Capabilities.ColorSystem == ColorSystem.TrueColor;
+
     public static string Chrome => Get("chrome");
 
     public static string Rule => Get("rule");
@@ -175,6 +190,18 @@ public static class Theme
     public static string DiffAdded => Get("diffAdded");
 
     public static string DiffRemoved => Get("diffRemoved");
+
+    /// <summary>Background of a whole added line.</summary>
+    public static string DiffAddedBg => Get("diffAddedBg");
+
+    /// <summary>Background of a whole removed line.</summary>
+    public static string DiffRemovedBg => Get("diffRemovedBg");
+
+    /// <summary>Background of the changed words inside an added line.</summary>
+    public static string DiffAddedWord => Get("diffAddedWord");
+
+    /// <summary>Background of the changed words inside a removed line.</summary>
+    public static string DiffRemovedWord => Get("diffRemovedWord");
 
     public static string Warning => Get("warning");
 
@@ -366,6 +393,20 @@ public static class Theme
         {
             error = "Invalid theme color  code and codeBg must combine as a foreground on a background";
             return false;
+        }
+
+        foreach (var (foreground, background) in new[]
+        {
+            ("diffAdded", "diffAddedBg"), ("diffAdded", "diffAddedWord"),
+            ("diffRemoved", "diffRemovedBg"), ("diffRemoved", "diffRemovedWord")
+        })
+        {
+            if (!Style.TryParse(next[foreground] + " on " + next[background], out _))
+            {
+                error = "Invalid theme color  " + foreground + " and " + background
+                    + " must combine as a foreground on a background";
+                return false;
+            }
         }
 
         if (!TryReadGauges(gauges, out var nextGauges, out error))

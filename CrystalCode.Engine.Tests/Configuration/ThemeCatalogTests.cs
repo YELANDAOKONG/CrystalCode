@@ -76,6 +76,42 @@ public sealed class ThemeCatalogTests : IDisposable
     }
 
     [Fact]
+    public void TryRead_AppliesFallback256OnlyWithoutTrueColor()
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(
+            Path.Combine(home.ThemesDirectory, "night.json"),
+            """
+            { "accent": "#7aa2f7", "status": { "path": "#7a9cc6", "tools": "#9ece6a" },
+              "fallback256": { "accent": "blue", "status": { "path": "teal" } } }
+            """);
+
+        Assert.True(ThemeCatalog.TryRead(home, "night", trueColor: true, out var rich, out _));
+        Assert.True(ThemeCatalog.TryRead(home, "night", trueColor: false, out var plain, out _));
+
+        Assert.Equal("#7aa2f7", rich["accent"]);
+        Assert.Equal("#7a9cc6", rich["status.path"]);
+        Assert.DoesNotContain(rich.Keys, key => key.StartsWith("fallback256", StringComparison.Ordinal));
+        Assert.Equal("blue", plain["accent"]);
+        Assert.Equal("teal", plain["status.path"]);
+        Assert.Equal("#9ece6a", plain["status.tools"]);
+        Assert.DoesNotContain(plain.Keys, key => key.StartsWith("fallback256", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TryRead_RejectsAFallback256ThatIsNotAnObject()
+    {
+        var home = new CrystalHome(_root);
+        Directory.CreateDirectory(home.ThemesDirectory);
+        File.WriteAllText(Path.Combine(home.ThemesDirectory, "bad.json"), """{ "fallback256": "blue" }""");
+
+        Assert.True(ThemeCatalog.TryRead(home, "bad", trueColor: true, out _, out _));
+        Assert.False(ThemeCatalog.TryRead(home, "bad", trueColor: false, out _, out var error));
+        Assert.Contains("fallback256", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TryReadGauges_ReadsRangesInOrderWithDefaults()
     {
         var home = new CrystalHome(_root);

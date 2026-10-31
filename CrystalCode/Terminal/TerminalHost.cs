@@ -57,7 +57,8 @@ internal sealed class TerminalHost
             new SessionPicker(renderer),
             new TrustPrompt(renderer))
         {
-            ChooseChildAsync = new ChildPicker(renderer).ChooseAsync
+            ChooseChildAsync = new ChildPicker(renderer).ChooseAsync,
+            ChooseThemeAsync = new ThemePicker(renderer, launch.Home).ChooseAsync
         };
         var session = launch.CreateSession(frontEnd, plugins);
         renderer.LoadQuickPromptsAsync = new QuickPromptStore(launch.Home).LoadAsync;

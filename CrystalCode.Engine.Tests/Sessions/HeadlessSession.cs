@@ -32,7 +32,8 @@ internal sealed class HeadlessSession : IDisposable
         Crystal.Multimodal.Chat.IStreamingMultimodalChatClient? images = null,
         Func<IReadOnlyList<ChildSessionDocument>, CancellationToken, Task<string?>>? chooseChild = null,
         IReadOnlyList<CrystalCode.Engine.Mcp.McpServerDefinition>? mcpServers = null,
-        IReadOnlyList<DirectoryAccess>? additionalRoots = null)
+        IReadOnlyList<DirectoryAccess>? additionalRoots = null,
+        Func<IReadOnlyList<string>, string, CancellationToken, Task<string?>>? chooseTheme = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -74,6 +75,7 @@ internal sealed class HeadlessSession : IDisposable
                 new ScriptedTrustPrompt(accept: false))
             {
                 ChooseChildAsync = chooseChild,
+                ChooseThemeAsync = chooseTheme,
                 McpServers = mcpServers ?? []
             },
             plugins,

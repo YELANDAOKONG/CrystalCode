@@ -24,6 +24,14 @@ public sealed record SessionFrontEnd(
         ChooseChildAsync { get; init; }
 
     /// <summary>
+    /// Lets the operator pick a theme from the given names when <c>/theme</c> has no argument. The
+    /// current name is passed so the picker can start on it. A null result means the operator
+    /// cancelled. When this is null the command lists the names as a note.
+    /// </summary>
+    public Func<IReadOnlyList<string>, string, CancellationToken, Task<string?>>?
+        ChooseThemeAsync { get; init; }
+
+    /// <summary>
     /// Servers with <see cref="McpServerSource.Session"/>, connected after
     /// Home and Project and replacing a server of the same name. They are not
     /// saved with the session, and their values appear in no event or text.

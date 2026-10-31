@@ -151,10 +151,7 @@ public static class ApprovalCard
         AddVerdictBlocks(blocks, review, label: null);
         AddVerdictBlocks(blocks, extendedReview, ExtendedLabel);
 
-        foreach (var line in preview)
-        {
-            blocks.Add(Prose(line.Text, line.Color));
-        }
+        AddPreview(blocks, preview);
 
         if (!string.IsNullOrWhiteSpace(footer))
         {
@@ -252,6 +249,41 @@ public static class ApprovalCard
         }
 
         return grid;
+    }
+
+    // Removed and added lines are drawn on a tinted background. Within a run of
+    // removed lines followed by a run of added lines, the pair at the same
+    // position also marks the words that changed.
+    private static void AddPreview(List<IRenderable> blocks, IReadOnlyList<(string Color, string Text)> preview)
+    {
+        var index = 0;
+        while (index < preview.Count)
+        {
+            var line = preview[index];
+            if (line.Color != Theme.DiffRemoved && line.Color != Theme.DiffAdded)
+            {
+                blocks.Add(Prose(line.Text, line.Color));
+                index++;
+                continue;
+            }
+
+            var removed = new List<string>();
+            while (index < preview.Count && preview[index].Color == Theme.DiffRemoved)
+            {
+                removed.Add(preview[index++].Text[1..]);
+            }
+
+            var added = new List<string>();
+            while (index < preview.Count && preview[index].Color == Theme.DiffAdded)
+            {
+                added.Add(preview[index++].Text[1..]);
+            }
+
+            foreach (var diff in DiffLines.Hunk(removed, added))
+            {
+                blocks.Add(new Markup(diff.Markup));
+            }
+        }
     }
 
     private static Markup Prose(string text, string color) =>

@@ -46,20 +46,36 @@ public static class TranscriptCard
 
         var sb = new StringBuilder();
         var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
-        for (var i = 0; i < lines.Length; i++)
+        var index = 0;
+        while (index < lines.Length)
         {
-            var line = lines[i];
+            var line = lines[index];
+            if (IsRemoved(line) || IsAdded(line))
+            {
+                // A run of removed lines then added lines is one hunk: paired lines mark their changed words.
+                var removed = new List<string>();
+                while (index < lines.Length && IsRemoved(lines[index]))
+                {
+                    removed.Add(lines[index++][1..]);
+                }
+
+                var added = new List<string>();
+                while (index < lines.Length && IsAdded(lines[index]))
+                {
+                    added.Add(lines[index++][1..]);
+                }
+
+                foreach (var diff in DiffLines.Hunk(removed, added))
+                {
+                    sb.Append(diff.Markup).Append('\n');
+                }
+
+                continue;
+            }
+
             if (TryTodoColor(line, out var todoColor))
             {
                 sb.Append('[').Append(todoColor).Append(']').Append(MarkupText.Escape(line)).Append("[/]");
-            }
-            else if (line.StartsWith('+') && !line.StartsWith("+++", StringComparison.Ordinal))
-            {
-                sb.Append('[').Append(Theme.DiffAdded).Append(']').Append(MarkupText.Escape(line)).Append("[/]");
-            }
-            else if (line.StartsWith('-') && !line.StartsWith("---", StringComparison.Ordinal))
-            {
-                sb.Append('[').Append(Theme.DiffRemoved).Append(']').Append(MarkupText.Escape(line)).Append("[/]");
             }
             else if (line.StartsWith("@@", StringComparison.Ordinal))
             {
@@ -74,14 +90,24 @@ public static class TranscriptCard
                 sb.Append('[').Append(Theme.Ok).Append(']').Append(MarkupText.Escape(line)).Append("[/]");
             }
 
-            if (i < lines.Length - 1)
-            {
-                sb.Append('\n');
-            }
+            sb.Append('\n');
+            index++;
+        }
+
+        if (sb.Length > 0)
+        {
+            sb.Length--;
         }
 
         return new Markup(sb.ToString());
     }
+
+    private static bool IsAdded(string line) =>
+        line.StartsWith('+') && !line.StartsWith("+++", StringComparison.Ordinal);
+
+    private static bool IsRemoved(string line) =>
+        line.StartsWith('-') && !line.StartsWith("---", StringComparison.Ordinal)
+        && !TryTodoColor(line, out _);
 
     private static bool TryTodoColor(string line, out string color)
     {

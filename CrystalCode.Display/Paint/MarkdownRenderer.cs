@@ -196,13 +196,13 @@ public static class MarkdownRenderer
         {
             if (raw.StartsWith('+') && !raw.StartsWith("+++", StringComparison.Ordinal))
             {
-                AddWrapped(lines, "    " + raw, Theme.DiffAdded, width);
+                AddWrapped(lines, "    " + raw, Theme.DiffAdded, width, onBackground: Theme.DiffAddedBg);
                 return;
             }
 
             if (raw.StartsWith('-') && !raw.StartsWith("---", StringComparison.Ordinal))
             {
-                AddWrapped(lines, "    " + raw, Theme.DiffRemoved, width);
+                AddWrapped(lines, "    " + raw, Theme.DiffRemoved, width, onBackground: Theme.DiffRemovedBg);
                 return;
             }
 

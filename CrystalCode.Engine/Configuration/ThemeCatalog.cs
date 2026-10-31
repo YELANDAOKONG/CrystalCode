@@ -21,6 +21,14 @@ public static partial class ThemeCatalog
     /// </summary>
     public const string GaugesKey = "gauges";
 
+    /// <summary>
+    /// The theme file member that holds replacement colors for a terminal without
+    /// truecolor. It has the same shape as the file itself, so <c>{"fallback256":
+    /// {"accent": "lightsteelblue", "status": {"path": "blue"}}}</c> replaces
+    /// <c>accent</c> and <c>status.path</c> there. Gauge rules are not replaced.
+    /// </summary>
+    public const string FallbackKey = "fallback256";
+
     private const int MaximumRules = 16;
 
     private const int MaximumMatches = 32;
@@ -77,6 +85,18 @@ public static partial class ThemeCatalog
         CrystalHome home,
         string name,
         out IReadOnlyDictionary<string, string> colors,
+        out string error) => TryRead(home, name, trueColor: true, out colors, out error);
+
+    /// <summary>
+    /// Like <see cref="TryRead(CrystalHome, string, out IReadOnlyDictionary{string, string}, out string)"/>.
+    /// With <paramref name="trueColor"/> false, the file's <see cref="FallbackKey"/> colors replace the
+    /// ones of the same name.
+    /// </summary>
+    public static bool TryRead(
+        CrystalHome home,
+        string name,
+        bool trueColor,
+        out IReadOnlyDictionary<string, string> colors,
         out string error)
     {
         ArgumentNullException.ThrowIfNull(home);
@@ -105,38 +125,31 @@ public static partial class ThemeCatalog
             }
 
             var read = new Dictionary<string, string>();
-            foreach (var property in document.RootElement.EnumerateObject())
+            if (!TryReadColors(name, document.RootElement, read, skipFallback: true, out error))
             {
-                if (property.Name.Equals(GaugesKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
+                return false;
+            }
 
-                if (property.Value.ValueKind == JsonValueKind.Object)
+            if (!trueColor)
+            {
+                foreach (var property in document.RootElement.EnumerateObject())
                 {
-                    // One level of grouping, such as "approval": { "full": "red" }, reads as "approval.full".
-                    foreach (var member in property.Value.EnumerateObject())
+                    if (!property.Name.Equals(FallbackKey, StringComparison.OrdinalIgnoreCase))
                     {
-                        var key = property.Name + "." + member.Name;
-                        if (member.Value.ValueKind != JsonValueKind.String)
-                        {
-                            error = "Theme " + name + " color " + key + " must be text.";
-                            return false;
-                        }
-
-                        read[key] = member.Value.GetString()!;
+                        continue;
                     }
 
-                    continue;
-                }
+                    if (property.Value.ValueKind != JsonValueKind.Object)
+                    {
+                        error = "Theme " + name + " " + FallbackKey + " must be an object.";
+                        return false;
+                    }
 
-                if (property.Value.ValueKind != JsonValueKind.String)
-                {
-                    error = "Theme " + name + " color " + property.Name + " must be text.";
-                    return false;
+                    if (!TryReadColors(name, property.Value, read, skipFallback: false, out error))
+                    {
+                        return false;
+                    }
                 }
-
-                read[property.Name] = property.Value.GetString()!;
             }
 
             colors = read;
@@ -147,6 +160,52 @@ public static partial class ThemeCatalog
             error = "Theme " + name + " cannot be read  " + exception.Message;
             return false;
         }
+    }
+
+    private static bool TryReadColors(
+        string name,
+        JsonElement source,
+        Dictionary<string, string> read,
+        bool skipFallback,
+        out string error)
+    {
+        error = string.Empty;
+        foreach (var property in source.EnumerateObject())
+        {
+            if (property.Name.Equals(GaugesKey, StringComparison.OrdinalIgnoreCase)
+                || skipFallback && property.Name.Equals(FallbackKey, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (property.Value.ValueKind == JsonValueKind.Object)
+            {
+                // One level of grouping, such as "approval": { "full": "red" }, reads as "approval.full".
+                foreach (var member in property.Value.EnumerateObject())
+                {
+                    var key = property.Name + "." + member.Name;
+                    if (member.Value.ValueKind != JsonValueKind.String)
+                    {
+                        error = "Theme " + name + " color " + key + " must be text.";
+                        return false;
+                    }
+
+                    read[key] = member.Value.GetString()!;
+                }
+
+                continue;
+            }
+
+            if (property.Value.ValueKind != JsonValueKind.String)
+            {
+                error = "Theme " + name + " color " + property.Name + " must be text.";
+                return false;
+            }
+
+            read[property.Name] = property.Value.GetString()!;
+        }
+
+        return true;
     }
 
     /// <summary>

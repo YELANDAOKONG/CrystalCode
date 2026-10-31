@@ -2826,7 +2826,7 @@ public sealed class CodingSession : ITurnObserver
                 ChangeRules(command.Argument);
                 return (true, false);
             case SessionVerb.Theme:
-                ChangeTheme(command.Argument);
+                await ChangeThemeAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Notify:
                 await ChangeNotifyAsync(command.Argument, cancellationToken);
@@ -6412,13 +6412,32 @@ public sealed class CodingSession : ITurnObserver
         Note(RuleFileArguments.Format(_settings.RuleFiles));
     }
 
-    private void ChangeTheme(string argument)
+    private async Task ChangeThemeAsync(string argument, CancellationToken cancellationToken)
     {
         var name = argument.Trim();
         if (name.Length == 0)
         {
-            Note("Theme  " + _settings.Theme + "\nAvailable  " + string.Join(", ", ThemeCatalog.Names(_home)));
-            return;
+            if (_frontEnd.ChooseThemeAsync is null)
+            {
+                Note("Theme  " + _settings.Theme + "\nAvailable  " + string.Join(", ", ThemeCatalog.Names(_home)));
+                return;
+            }
+
+            await _operatorGate.WaitAsync(cancellationToken);
+            try
+            {
+                name = await _frontEnd.ChooseThemeAsync(ThemeCatalog.Names(_home), _settings.Theme, cancellationToken) ?? string.Empty;
+            }
+            finally
+            {
+                _operatorGate.Release();
+            }
+
+            if (name.Length == 0)
+            {
+                // Cancelled: the picker has already restored the saved theme on screen.
+                return;
+            }
         }
 
         if (!ThemeCatalog.Exists(_home, name))
