@@ -7286,9 +7286,13 @@ public sealed class CodingSession : ITurnObserver
 
     private void RememberCompactedUsage()
     {
+        // The ledger still holds the pre-compaction report. Turn end and
+        // save read it, so it must carry the estimate or CTX jumps back.
+        var estimate = TokenEstimator.Items(_transcript);
         _parentContextEstimated = true;
+        _ledger.ReplaceUsage(new TokenUsage(estimate, 0));
         ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
-        Publish(new ContextEstimated(TokenEstimator.Items(_transcript)));
+        Publish(new ContextEstimated(estimate));
     }
 
     private bool HasConversation() =>
