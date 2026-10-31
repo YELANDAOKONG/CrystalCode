@@ -275,6 +275,7 @@ separate library with no terminal code. The product can:
   selected Home). Each open reloads direct UTF-8 `.md` files; the filename is
   the name and the full body is the prompt. Search matches names and bodies,
   arrows select, PgUp/PgDn or wheel scroll the preview, Tab switches Fill/Send,
+  the page fills the screen with the list beside the preview when it is wide,
   Enter applies, and Esc cancels. Every open defaults to Fill. Fill inserts at
   the cursor without replacing the draft; Send sends only the template and
   preserves the draft and its images. Busy sends wait in the follow-up queue

@@ -324,7 +324,7 @@ CrystalCode.Display:
 
 Quick prompts keep the same dependency direction: Engine Home owns
 `QuickPromptStore`, bounded UTF-8 file reads, validation, and immutable catalog
-values; Display Composer owns the isolated quick-prompt picker and preview, drawn as a Spectre panel through `WidgetPaint`.
+values; Display Composer owns the isolated quick-prompt picker and preview. It paints a full-screen frame itself from `PaintLine` rows, without Spectre widgets: from 100 columns the list sits beside the preview, and below that the preview is stacked under the list. Each of the two areas has its own `TranscriptScrollbar`, shown only while that area overflows. A list row is the name followed by the first non-blank line of the body in `muted`; a broken entry shows its reason in `warning`. Arrows move the selection; PgUp/PgDn and the wheel scroll the preview.
 The terminal maps catalog values, routes F6 and a bare `/quick` only outside
 modal prompts (other front ends only get a note from `SessionVerb.Quick`), and
 inserts Fill at the current composer cursor. Send uses
