@@ -101,7 +101,7 @@ internal sealed class SessionProjection : ISessionObserver
                 _renderer.RestoreRecalledMessage(recalled.Text, restoreComposer: !replay);
                 break;
             case ConversationCleared:
-                _renderer.ClearConversation();
+                _renderer.ResetView();
                 break;
             case HistoryReplayed replayed:
                 _renderer.WriteHistory(replayed.Items);
