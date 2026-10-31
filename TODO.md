@@ -195,6 +195,14 @@ behavior stands until a specific change defines otherwise.
   defined. It is a Bridge wire change only. Do not reserve a configuration
   field or public type.
 
+- Scrollbar beyond the transcript. The main transcript view and the
+  full-screen editor have one. The inline composer, approval and other card
+  overlays, and the side question (`/btw`) panel do not, because a card owns
+  its rounded frame and a bar would have to share that frame, which changes
+  card layout. The child Agent preview and a redesign of the slash and quick
+  prompt pickers are separate work. Do not reserve a configuration field or
+  public type.
+
 ## Low priority
 
 These are part of the product direction and are not in the current build.

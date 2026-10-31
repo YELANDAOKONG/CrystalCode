@@ -38,4 +38,36 @@ public sealed class SessionPickerTests
 
         Assert.Equal("two", Assert.Single(matches).Id);
     }
+
+    [Fact]
+    public void Render_DrawsAScrollbarOnlyWhenMoreSessionsThanRowsMatch()
+    {
+        var few = Sessions(2);
+        var many = Sessions(40);
+
+        var fewText = Draw(SessionPicker.Render(few, string.Empty, 0, null, false));
+        var manyText = Draw(SessionPicker.Render(many, string.Empty, 0, null, false));
+
+        Assert.DoesNotContain('\u2503', fewText);
+        Assert.Contains('\u2503', manyText);
+    }
+
+    private static SessionSummary[] Sessions(int count) =>
+        Enumerable.Range(0, count)
+            .Select(i => new SessionSummary($"id{i}", "/tmp/work", false, null, DateTimeOffset.UtcNow, 1, "Fix " + i))
+            .ToArray();
+
+    private static string Draw(Spectre.Console.Rendering.IRenderable widget)
+    {
+        var writer = new StringWriter();
+        var console = Spectre.Console.AnsiConsole.Create(new Spectre.Console.AnsiConsoleSettings
+        {
+            Ansi = Spectre.Console.AnsiSupport.No,
+            ColorSystem = Spectre.Console.ColorSystemSupport.NoColors,
+            Out = new Spectre.Console.AnsiConsoleOutput(writer)
+        });
+        console.Profile.Width = 100;
+        console.Write(widget);
+        return writer.ToString();
+    }
 }

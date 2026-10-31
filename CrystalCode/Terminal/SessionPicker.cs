@@ -119,7 +119,7 @@ internal sealed class SessionPicker : ISessionChooser
             .Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static IRenderable Render(
+    internal static IRenderable Render(
         IReadOnlyList<SessionSummary> matches,
         string query,
         int selected,
@@ -143,6 +143,8 @@ internal sealed class SessionPicker : ISessionChooser
                 0,
                 Math.Max(0, matches.Count - visibleRows));
             var end = Math.Min(matches.Count, start + visibleRows);
+            var barred = matches.Count > visibleRows;
+            var list = new List<IRenderable>();
             for (var index = start; index < end; index++)
             {
                 var session = matches[index];
@@ -154,12 +156,14 @@ internal sealed class SessionPicker : ISessionChooser
                 var workspace = WorkspaceLabel(session, listWorkspace);
                 var preview = TextWidth.Truncate(
                     session.Title,
-                    Math.Max(8, ScreenSize.Width - 48 - workspace.Length));
+                    Math.Max(8, ScreenSize.Width - 48 - workspace.Length - (barred ? TranscriptScrollbar.Columns : 0)));
                 var label = $"{time}  {session.UserTurns} turns{current}{workspace}  {preview}";
                 var color = index == selected ? Theme.Selected : Theme.User;
-                rows.Add(new Markup($"[{color}]{(index == selected ? "> " : "  ")}{MarkupText.Escape(label)}[/]"));
-                rows.Add(new Markup($"[{Theme.Muted}]  {MarkupText.Escape(session.Id)}[/]"));
+                list.Add(new Markup($"[{color}]{(index == selected ? "> " : "  ")}{MarkupText.Escape(label)}[/]"));
+                list.Add(new Markup($"[{Theme.Muted}]  {MarkupText.Escape(session.Id)}[/]"));
             }
+
+            rows.Add(barred ? WithScrollbar(list, matches.Count, start) : new Rows(list));
         }
 
         var panel = new Panel(new Rows(rows))
@@ -171,6 +175,20 @@ internal sealed class SessionPicker : ISessionChooser
             Expand = true
         };
         return new Padder(panel, new Padding(2, 0, 0, 0));
+    }
+
+    // Each session takes two rows, so the thumb is measured in rows, not sessions.
+    private static IRenderable WithScrollbar(List<IRenderable> list, int count, int start)
+    {
+        var thumb = TranscriptScrollbar.ThumbFromTop(count * 2, list.Count, start * 2);
+        var bar = string.Join(
+            '\n',
+            Enumerable.Range(0, list.Count).Select(row => TranscriptScrollbar.Cell(row, thumb).Markup));
+        var grid = new Grid().Expand();
+        grid.AddColumn(new GridColumn { Padding = new Padding(0, 0, TranscriptScrollbar.Columns - 1, 0) });
+        grid.AddColumn(new GridColumn { Width = 1, NoWrap = true, Padding = new Padding(0, 0, 0, 0) });
+        grid.AddRow(new Rows(list), new Markup(bar));
+        return grid;
     }
 
     private static string WorkspaceLabel(SessionSummary session, bool listWorkspace)

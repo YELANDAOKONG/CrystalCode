@@ -405,15 +405,18 @@ public sealed class ComposerBuffer
         }
 
         maxRows = Math.Max(1, maxRows);
+        var totalRows = lines.Count;
+        var firstRow = 0;
         if (lines.Count > maxRows)
         {
             var start = cursorRow < maxRows ? 0 : cursorRow - maxRows + 1;
             start = Math.Clamp(start, 0, lines.Count - maxRows);
             lines = lines.GetRange(start, maxRows);
             cursorRow -= start;
+            firstRow = start;
         }
 
-        return new ComposerView(lines, cursorRow, promptColumns + cursorBody);
+        return new ComposerView(lines, cursorRow, promptColumns + cursorBody, totalRows, firstRow);
     }
 
     private ComposerView ProjectBordered(string text, int width, int maxRows, string mode)

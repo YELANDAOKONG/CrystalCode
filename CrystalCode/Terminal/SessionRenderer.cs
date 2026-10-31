@@ -2480,6 +2480,14 @@ public sealed class SessionRenderer : IDisposable
         var body = _overlayWidget is null
             ? []
             : WidgetPaint.Lines(_overlayWidget, width);
+        var barred = body.Count > height;
+        if (barred)
+        {
+            // Rendered again one gap and one bar column narrower, so the page
+            // reflows only when it needs a bar.
+            body = WidgetPaint.Lines(_overlayWidget!, Math.Max(1, width - TranscriptScrollbar.Columns));
+        }
+
         var frame = new PaintLine[height];
         var start = Math.Clamp(_pageScroll, 0, Math.Max(0, body.Count - 1));
         _pageScroll = start;
@@ -2487,6 +2495,11 @@ public sealed class SessionRenderer : IDisposable
         {
             var source = start + row;
             frame[row] = source < body.Count ? body[source].Fit(width) : PaintLine.Blank;
+        }
+
+        if (barred)
+        {
+            frame = [.. TranscriptScrollbar.Apply(frame, width, body.Count, Math.Max(0, body.Count - height - start))];
         }
 
         _painter.PaintFrame(

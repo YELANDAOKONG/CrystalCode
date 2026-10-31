@@ -88,6 +88,40 @@ public sealed class FullScreenEditorTests
     }
 
     [Fact]
+    public void Paint_DrawsAThumbInsideTheBorderOnlyWhenTheTextScrolls()
+    {
+        var long_ = new FullScreenEditor(
+            string.Join('\n', Enumerable.Range(1, 40).Select(number => "line " + number)),
+            planMode: false,
+            customMode: null);
+        var short_ = new FullScreenEditor("one\ntwo", planMode: false, customMode: null);
+
+        var scrolled = long_.Paint(30, 8);
+        var fits = short_.Paint(30, 8);
+
+        Assert.Contains(scrolled.Lines, line => line.Plain.EndsWith("\u2502 \u2503", StringComparison.Ordinal));
+        Assert.All(scrolled.Lines.Skip(1).SkipLast(1), line => Assert.Equal('\u2502', line.Plain[^3]));
+        Assert.All(scrolled.Lines, line => Assert.Equal(30, TextWidth.Measure(line.Plain)));
+        Assert.DoesNotContain(fits.Lines, line => line.Plain.Contains('\u2503', StringComparison.Ordinal));
+        Assert.All(fits.Lines, line => Assert.Equal(30, TextWidth.Measure(line.Plain)));
+    }
+
+    [Fact]
+    public void Paint_KeepsWideCharactersWithinTheFrameAndPlacesTheCursorAfterThem()
+    {
+        var editor = new FullScreenEditor(string.Empty, planMode: false, customMode: null);
+
+        editor.Handle(new InputPaste("\u80fd\u597dh"));
+        var view = editor.Paint(40, 8);
+
+        Assert.All(view.Lines, line => Assert.Equal(40, TextWidth.Measure(line.Plain)));
+        Assert.Contains("\u80fd\u597dh", view.Lines[1].Plain, StringComparison.Ordinal);
+        // Border and gap, then two wide characters (4 cells) and one narrow one.
+        Assert.Equal(2 + 4 + 1, view.CursorColumn);
+        Assert.Equal(1, view.CursorRow);
+    }
+
+    [Fact]
     public void Paint_KeepsTheBorderIntactWhileTheTextScrolls()
     {
         var text = string.Join('\n', Enumerable.Range(1, 40).Select(number => "line " + number + " \u4e2d\u6587"));
@@ -106,7 +140,7 @@ public sealed class FullScreenEditorTests
         for (var row = 1; row < 7; row++)
         {
             Assert.StartsWith("\u2502", view.Lines[row].Plain);
-            Assert.EndsWith("\u2502", view.Lines[row].Plain);
+            Assert.Equal('\u2502', view.Lines[row].Plain[^3]);
         }
 
         Assert.Contains("line 40", view.Lines[6].Plain);
@@ -185,7 +219,7 @@ public sealed class FullScreenEditorTests
         for (var row = 1; row < view.Lines.Count - 1; row++)
         {
             Assert.StartsWith("\u2502", view.Lines[row].Plain);
-            Assert.EndsWith("\u2502", view.Lines[row].Plain);
+            Assert.Equal('\u2502', view.Lines[row].Plain[^3]);
         }
     }
 

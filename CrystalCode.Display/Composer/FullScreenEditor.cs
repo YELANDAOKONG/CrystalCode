@@ -1,6 +1,7 @@
 using CrystalCode.Display.Input;
 using CrystalCode.Display.Input.Interfaces;
 using CrystalCode.Display.Paint;
+using CrystalCode.Display.Shell;
 
 namespace CrystalCode.Display.Composer;
 
@@ -74,28 +75,46 @@ public sealed class FullScreenEditor
     /// <summary>
     /// Paints a bordered frame. Every row is built to exactly <paramref name="width"/>
     /// columns with the side borders at fixed columns, so scrolling the text
-    /// window never moves or breaks the border.
+    /// window never moves or breaks the border. The last columns, outside the
+    /// border, hold a gap and the scrollbar; they are always reserved so the
+    /// text wraps the same whether or not the bar shows.
     /// </summary>
     public ComposerView Paint(int width, int height)
     {
-        var inner = Math.Max(1, width - BorderColumns);
+        var barColumns = width - TranscriptScrollbar.Columns > BorderColumns ? TranscriptScrollbar.Columns : 0;
+        var frame = width - barColumns;
+        var inner = Math.Max(1, frame - BorderColumns);
         var bodyRows = Math.Max(1, height - 2);
         _bodyRows = bodyRows;
         // Project reserves one column for the cursor at the right edge.
         var body = _buffer.Project(inner + 1, bodyRows);
+        var thumb = barColumns == 0
+            ? null
+            : TranscriptScrollbar.ThumbFromTop(body.TotalRows, bodyRows, body.FirstRow);
         var lines = new List<PaintLine>(height)
         {
-            TopBorder(width)
+            WithBar(TopBorder(frame), barColumns, null)
         };
         for (var row = 0; row < bodyRows; row++)
         {
-            lines.Add(row < body.Lines.Count
-                ? Side(body.Lines[row], inner)
-                : Side(PaintLine.Blank, inner));
+            var content = row < body.Lines.Count ? body.Lines[row] : PaintLine.Blank;
+            lines.Add(WithBar(Side(content, inner), barColumns, TranscriptScrollbar.Cell(row, thumb)));
         }
 
-        lines.Add(BottomBorder(width));
+        lines.Add(WithBar(BottomBorder(frame), barColumns, null));
         return new ComposerView(lines, body.CursorRow + 1, body.CursorColumn + SideColumns);
+    }
+
+    private static PaintLine WithBar(PaintLine line, int barColumns, PaintLine? cell)
+    {
+        if (barColumns == 0)
+        {
+            return line;
+        }
+
+        var gap = new string(' ', barColumns - 1);
+        var bar = cell ?? new PaintLine(" ", " ");
+        return new PaintLine(line.Markup + gap + bar.Markup, line.Plain + gap + bar.Plain);
     }
 
     private static PaintLine Side(PaintLine content, int inner)

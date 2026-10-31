@@ -2794,7 +2794,7 @@ and a thumb (`┃`) there only while the transcript is taller than its rows; the
 column is blank otherwise. The thumb length is the viewport share of all rows,
 at least one row, and its place follows the distance from the bottom. The theme
 items `status.scrollbar` (track, `rule` when unset) and `status.scrollbar-thumb`
-(`muted` when unset) color it. Overlays, full pages, and the editor have none.
+(`muted` when unset) color it. The `/stats` page and the full-screen editor draw the same bar. The page narrows by the same two columns only while it is taller than the screen. The editor keeps the gap and bar columns outside its border, at the right edge of the screen, so its text wraps the same with or without the bar. The inline composer, card overlays, and the side question panel have none (TODO.md).
 
 Terminal.Gui is referenced from CrystalCode.Display with a floating
 version and is not used. Do not call `Application.Init` or mix a second
