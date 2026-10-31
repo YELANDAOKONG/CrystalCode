@@ -585,6 +585,16 @@ implemented in the current build.
   reserve a configuration field, command, public type, or backend name, and
   do not store a search key in source, logs, or on a command line. Approval,
   trust, the workspace fence, and `ToolInvocationPolicy` stay as they are.
+- feedback and speed for slow session commands. `/resume`, `/sessions`,
+  `/stats`, and `/stats all` can take a noticeable moment before anything
+  shows, with no sign that the command was accepted. The wait grows with the
+  number of saved sessions. The cause is not measured. The wanted result is
+  an immediate sign that the command is running, then a shorter wait. Whether
+  that is a cache, an index, reading only the needed fields, or work off the
+  calling thread is not defined, and `crystal server` and `crystal bridge`
+  run the same commands. Do not reserve a configuration field, command, or
+  public type.
+
 ### Medium priority
 
 - Automatically fetching model-list information from a provider. `/model`

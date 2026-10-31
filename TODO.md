@@ -188,6 +188,21 @@ behavior stands until a specific change defines otherwise.
   configuration field, command, public type, or backend name, and do not
   store a search key in source, logs, or on a command line. Approval, trust,
   the workspace fence, and `ToolInvocationPolicy` stay as they are.
+- Feedback and speed for slow session commands. `/resume`, `/sessions`,
+  `/stats`, and `/stats all` can take a noticeable moment before anything
+  shows, and nothing on screen says the command was accepted. The wait grows
+  with the number of saved sessions, and the all-workspaces forms scan the
+  most. The cause is not measured. A lead, unconfirmed: `ShowStats` lists the
+  sessions and then loads every session file in turn on the calling path, so
+  a large session store means many file reads before the first draw. What is
+  wanted is an immediate sign that the command is running, such as a progress
+  row caption like the existing `Loading Tools`, and then a shorter wait.
+  Whether the second part is a cache, an index, reading only the fields a
+  command needs, or doing the work off the calling thread is not decided.
+  Server and Bridge need to be considered with the terminal, since they run
+  the same commands. Do not reserve a configuration field, command, or
+  public type.
+
 ## Medium priority
 
 These are part of the product direction and are not in the current build.
