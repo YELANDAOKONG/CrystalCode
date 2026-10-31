@@ -178,7 +178,18 @@ public sealed class SessionRenderer : IDisposable
 
     public bool ChildViewActive { get; set; }
 
-    public bool ChildSessionsEnabled { get; set; } = true;
+    public bool ChildSessionsEnabled
+    {
+        get;
+        set
+        {
+            field = value;
+            lock (_gate)
+            {
+                _chrome.AgentsEnabled = value;
+            }
+        }
+    } = true;
 
     internal Action<string>? OnChildShortcut { get; set; }
 
@@ -1205,6 +1216,8 @@ public sealed class SessionRenderer : IDisposable
             ChildFocus = focus;
             _childSessions = children.ToArray();
             _childRows = [];
+            _chrome.AgentsRunning = children.Count(static child => child.Status == "running");
+            _chrome.AgentsQueued = children.Count(static child => child.Status == "queued");
             if (repaint)
             {
                 PaintUnlocked(force: true);

@@ -62,7 +62,9 @@ public sealed record StatusLineSettings
             "session-total",
             "tools",
             "elapsed",
-            "queued"
+            "queued",
+            "agents",
+            "agents-running"
         });
 
     public StatusLineSettings(

@@ -274,6 +274,44 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ShowsAgentFieldsAndColorsThemFromTheTheme()
+    {
+        try
+        {
+            Theme.TryApply(
+                new Dictionary<string, string> { ["status.agents-running"] = "green" },
+                new Dictionary<string, IReadOnlyList<GaugeRule>>
+                {
+                    ["agents"] = [new GaugeRule(null, null, ["off"], null, "red")]
+                },
+                out _);
+            var chrome = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["agents", "agents-running"],
+                AgentsEnabled = false,
+                AgentsRunning = 2,
+                AgentsQueued = 1
+            };
+
+            var off = chrome.StatusLine(200);
+
+            Assert.Contains("[red]Agents Off[/]", off.Markup, StringComparison.Ordinal);
+            Assert.DoesNotContain("Running", off.Plain, StringComparison.Ordinal);
+
+            chrome.AgentsEnabled = true;
+            var on = chrome.StatusLine(200);
+
+            Assert.Contains("[green]Agents 2 Running, 1 Queued[/]", on.Markup, StringComparison.Ordinal);
+            Assert.Contains("Agents On", on.Plain, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
+    [Fact]
     public void StatusLine_ColorsCustomStatusItemsFromTheTheme()
     {
         try

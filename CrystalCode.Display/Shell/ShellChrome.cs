@@ -140,6 +140,15 @@ public sealed class ShellChrome
 
     public int Queued { get; set; }
 
+    /// <summary>Whether child Agents are on, for the <c>agents</c> field.</summary>
+    public bool AgentsEnabled { get; set; } = true;
+
+    /// <summary>Child Agent runs in progress, for the <c>agents-running</c> field.</summary>
+    public int AgentsRunning { get; set; }
+
+    /// <summary>Child Agent runs waiting for a slot, for the <c>agents-running</c> field.</summary>
+    public int AgentsQueued { get; set; }
+
     /// <summary>
     /// Settings chosen during a turn that apply on the next turn, as one
     /// label such as <c>Next: Plan, Approval Full</c>. Empty when none wait.
@@ -296,6 +305,8 @@ public sealed class ShellChrome
                 "tools" => ToolCount switch { 0 => string.Empty, 1 => "1 Tool", _ => $"{ToolCount} Tools" },
                 "elapsed" => Elapsed,
                 "queued" => Queued > 0 ? $"Queued {Queued}" : string.Empty,
+                "agents" => AgentsEnabled ? "Agents On" : "Agents Off",
+                "agents-running" => AgentsRunningText(),
                 _ => ReviewerFields.TryGetValue(field, out var reviewer) ? reviewer : PluginField(field)
             };
             if (!string.IsNullOrWhiteSpace(value))
@@ -320,11 +331,35 @@ public sealed class ShellChrome
                     "workspace" => Theme.ForStatus("path", Theme.Chrome),
                     "tools" => Theme.ForStatus("tools", Theme.Chrome),
                     "elapsed" => Theme.ForStatus("elapsed", Theme.Chrome),
+                    "agents" => ValueColor("agents", value),
+                    "agents-running" => Theme.ForStatus("agents-running", Theme.Accent),
                     _ => ReviewerColor(field, value)
                 };
                 items.Add((value, $"[{color}]{MarkupText.Escape(value)}[/]", field));
             }
         }
+    }
+
+    // Blank while Agents are off or idle, so the field occupies no cell.
+    private string AgentsRunningText()
+    {
+        if (!AgentsEnabled || AgentsRunning + AgentsQueued == 0)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>();
+        if (AgentsRunning > 0)
+        {
+            parts.Add($"{AgentsRunning} Running");
+        }
+
+        if (AgentsQueued > 0)
+        {
+            parts.Add($"{AgentsQueued} Queued");
+        }
+
+        return "Agents " + string.Join(", ", parts);
     }
 
     /// <summary>

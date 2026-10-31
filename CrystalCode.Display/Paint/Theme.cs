@@ -138,7 +138,7 @@ public static class Theme
     /// Status-bar items a theme file may color one by one, as members of its <c>status</c> object.
     /// An item the theme leaves unset keeps the color the status bar gave it before.
     /// </summary>
-    public static IReadOnlyList<string> StatusItems { get; } = ["input", "output", "total", "path", "tools", "elapsed"];
+    public static IReadOnlyList<string> StatusItems { get; } = ["input", "output", "total", "path", "tools", "elapsed", "agents-running"];
 
     public static string Chrome => Get("chrome");
 
@@ -223,7 +223,7 @@ public static class Theme
     /// <summary>
     /// Gauge names a theme file may set ranges for.
     /// </summary>
-    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider", "topic", .. ReviewerGaugeNames];
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider", "topic", "agents", .. ReviewerGaugeNames];
 
     /// <summary>
     /// Style for a context usage percentage. A theme's <c>context</c> rules
