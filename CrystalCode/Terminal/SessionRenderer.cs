@@ -2446,13 +2446,18 @@ public sealed class SessionRenderer : IDisposable
                 : WindowLines(overlay, regions.OverlayRows, ref _overlayScroll);
         }
 
+        var transcriptWidth = Math.Max(1, regions.Width - TranscriptScrollbar.Columns);
         _scrollBack = _scrollAnchor.Resolve(
-            regions.Width,
+            transcriptWidth,
             _log,
             regions.TranscriptRows,
             _scrollBack);
-        _scrollBack = _log.ClampScroll(regions.Width, regions.TranscriptRows, _scrollBack);
-        var transcript = _log.Viewport(regions.Width, regions.TranscriptRows, _scrollBack);
+        _scrollBack = _log.ClampScroll(transcriptWidth, regions.TranscriptRows, _scrollBack);
+        var transcript = TranscriptScrollbar.Apply(
+            _log.Viewport(transcriptWidth, regions.TranscriptRows, _scrollBack),
+            regions.Width,
+            _log.RowCount(transcriptWidth),
+            _scrollBack);
         var resetFrame = regions.Width != _paintedWidth || regions.Height != _paintedHeight;
         _painter.Paint(
             regions,

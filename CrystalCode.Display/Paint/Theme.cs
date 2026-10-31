@@ -138,7 +138,7 @@ public static class Theme
     /// Status-bar items a theme file may color one by one, as members of its <c>status</c> object.
     /// An item the theme leaves unset keeps the color the status bar gave it before.
     /// </summary>
-    public static IReadOnlyList<string> StatusItems { get; } = ["input", "output", "total", "path", "tools", "elapsed", "agents-running"];
+    public static IReadOnlyList<string> StatusItems { get; } = ["input", "output", "total", "path", "tools", "elapsed", "agents-running", "scrollbar", "scrollbar-thumb"];
 
     public static string Chrome => Get("chrome");
 
