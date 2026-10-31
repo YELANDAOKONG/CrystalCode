@@ -129,17 +129,22 @@ internal sealed class ChildPicker(
         {
             var visible = Math.Min(MaximumVisibleRows, Math.Max(1, (height - 12) / 2));
             var start = Math.Clamp(selected - visible + 1, 0, Math.Max(0, matches.Count - visible));
+            var barred = matches.Count > visible;
+            var textWidth = Math.Max(8, width - 12 - (barred ? TranscriptScrollbar.Columns : 0));
+            var list = new List<IRenderable>();
             for (var index = start; index < Math.Min(matches.Count, start + visible); index++)
             {
                 var child = matches[index];
                 var current = child.Id == currentId ? "  current" : string.Empty;
-                var label = TextWidth.Truncate($"{child.Label}  {child.Agent}  {child.Status}{current}", Math.Max(8, width - 12));
+                var label = TextWidth.Truncate($"{child.Label}  {child.Agent}  {child.Status}{current}", textWidth);
                 var color = index == selected ? Theme.Selected : Theme.User;
-                rows.Add(new Markup($"[{color}]{(index == selected ? "> " : "  ")}{MarkupText.Escape(label)}[/]"));
+                list.Add(new Markup($"[{color}]{(index == selected ? "> " : "  ")}{MarkupText.Escape(label)}[/]"));
                 var usage = $"{child.Id}  {child.Model.Model ?? "Unknown model"}  "
                     + $"IN {child.CumulativeUsage?.InputTokenCount.ToString() ?? "?"} / OUT {child.CumulativeUsage?.OutputTokenCount.ToString() ?? "?"}";
-                rows.Add(new Markup($"[{Theme.Muted}]  {MarkupText.Escape(TextWidth.Truncate(usage, Math.Max(8, width - 12)))}[/]"));
+                list.Add(new Markup($"[{Theme.Muted}]  {MarkupText.Escape(TextWidth.Truncate(usage, textWidth))}[/]"));
             }
+
+            rows.Add(PickerScrollbar.Wrap(list, matches.Count, start, barred));
         }
 
         return new Padder(new Panel(new Rows(rows))

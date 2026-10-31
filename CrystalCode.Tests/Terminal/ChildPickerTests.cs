@@ -121,4 +121,36 @@ public sealed class ChildPickerTests
         Assert.DoesNotContain(lines, line => line.Plain.Contains("child-0 ", StringComparison.Ordinal));
         Assert.Contains(lines, line => line.Plain.Contains("[untrusted markup]", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Render_DrawsAScrollbarOnlyWhenMoreChildrenThanRowsMatch()
+    {
+        var few = Children(2);
+        var many = Children(40);
+
+        var fewText = Draw(ChildPicker.Render(few, string.Empty, 0, null, false, 100, 40));
+        var manyText = Draw(ChildPicker.Render(many, string.Empty, 0, null, false, 100, 40));
+
+        Assert.DoesNotContain('\u2503', fewText);
+        Assert.Contains('\u2503', manyText);
+    }
+
+    private static ChildSessionDocument[] Children(int count) =>
+        Enumerable.Range(0, count)
+            .Select(i => new ChildSessionDocument { Id = "child" + i, Label = "task " + i, Agent = "explore" })
+            .ToArray();
+
+    private static string Draw(Spectre.Console.Rendering.IRenderable widget)
+    {
+        var writer = new StringWriter();
+        var console = Spectre.Console.AnsiConsole.Create(new Spectre.Console.AnsiConsoleSettings
+        {
+            Ansi = Spectre.Console.AnsiSupport.No,
+            ColorSystem = Spectre.Console.ColorSystemSupport.NoColors,
+            Out = new Spectre.Console.AnsiConsoleOutput(writer)
+        });
+        console.Profile.Width = 100;
+        console.Write(widget);
+        return writer.ToString();
+    }
 }

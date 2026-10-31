@@ -163,7 +163,7 @@ internal sealed class SessionPicker : ISessionChooser
                 list.Add(new Markup($"[{Theme.Muted}]  {MarkupText.Escape(session.Id)}[/]"));
             }
 
-            rows.Add(barred ? WithScrollbar(list, matches.Count, start) : new Rows(list));
+            rows.Add(PickerScrollbar.Wrap(list, matches.Count, start, barred));
         }
 
         var panel = new Panel(new Rows(rows))
@@ -175,20 +175,6 @@ internal sealed class SessionPicker : ISessionChooser
             Expand = true
         };
         return new Padder(panel, new Padding(2, 0, 0, 0));
-    }
-
-    // Each session takes two rows, so the thumb is measured in rows, not sessions.
-    private static IRenderable WithScrollbar(List<IRenderable> list, int count, int start)
-    {
-        var thumb = TranscriptScrollbar.ThumbFromTop(count * 2, list.Count, start * 2);
-        var bar = string.Join(
-            '\n',
-            Enumerable.Range(0, list.Count).Select(row => TranscriptScrollbar.Cell(row, thumb).Markup));
-        var grid = new Grid().Expand();
-        grid.AddColumn(new GridColumn { Padding = new Padding(0, 0, TranscriptScrollbar.Columns - 1, 0) });
-        grid.AddColumn(new GridColumn { Width = 1, NoWrap = true, Padding = new Padding(0, 0, 0, 0) });
-        grid.AddRow(new Rows(list), new Markup(bar));
-        return grid;
     }
 
     private static string WorkspaceLabel(SessionSummary session, bool listWorkspace)
