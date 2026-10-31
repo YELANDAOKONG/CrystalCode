@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Catalogs;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Bridge.Wire;

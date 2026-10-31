@@ -1,6 +1,7 @@
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Plugins.Placeholders;
+using CrystalCode.Plugins.Placeholders.Interfaces;
 
 using Xunit;
 

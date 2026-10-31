@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using CrystalCode.Bridge.Prompts;
 using CrystalCode.Bridge.Transport;
+using CrystalCode.Bridge.Transport.Interfaces;
 using CrystalCode.Bridge.Wire;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Launch;

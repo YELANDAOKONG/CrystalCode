@@ -3,6 +3,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 
+using CrystalCode.Bridge.Transport.Interfaces;
+
 namespace CrystalCode.Bridge.Transport;
 
 /// <summary>

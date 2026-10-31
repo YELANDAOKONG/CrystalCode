@@ -1,4 +1,5 @@
 using CrystalCode.Display.Input;
+using CrystalCode.Display.Input.Interfaces;
 using CrystalCode.Display.Shell;
 
 using Xunit;

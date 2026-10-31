@@ -2,7 +2,9 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Plugins.Commands;
+using CrystalCode.Plugins.Commands.Interfaces;
 
 using Xunit;
 

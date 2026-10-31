@@ -8,6 +8,9 @@ using Crystal.Tools;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Catalogs;
+using CrystalCode.Engine.Sessions.Children;
+using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Bridge.Wire;

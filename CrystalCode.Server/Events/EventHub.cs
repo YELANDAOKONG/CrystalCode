@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Server.Wire;
 

@@ -1,14 +1,19 @@
 using CrystalCode.Plugins.Approvals;
+using CrystalCode.Plugins.Approvals.Interfaces;
 using CrystalCode.Plugins.Cli;
+using CrystalCode.Plugins.Cli.Interfaces;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Clients.Interfaces;
 using CrystalCode.Plugins.Commands;
+using CrystalCode.Plugins.Commands.Interfaces;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Hooks.Interfaces;
 using CrystalCode.Plugins.Placeholders;
+using CrystalCode.Plugins.Placeholders.Interfaces;
 using CrystalCode.Plugins.Status;
 using CrystalCode.Plugins.Status.Interfaces;
 using CrystalCode.Plugins.Tools;
+using CrystalCode.Plugins.Tools.Interfaces;
 
 namespace CrystalCode.Plugins;
 

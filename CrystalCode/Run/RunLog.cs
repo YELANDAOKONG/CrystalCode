@@ -5,6 +5,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Run.Interfaces;
 using CrystalCode.Terminal;
 
 namespace CrystalCode.Run;

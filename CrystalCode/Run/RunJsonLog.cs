@@ -6,6 +6,7 @@ using Crystal;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Run.Interfaces;
 
 namespace CrystalCode.Run;
 

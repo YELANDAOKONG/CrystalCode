@@ -6,19 +6,27 @@ using Crystal.Multimodal.Chat;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
-using CrystalCode.Engine.Plugins.Disk;
-using CrystalCode.Engine.Tests.Home;
-using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Plugins.Disk;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Prompts;
+using CrystalCode.Engine.Tests.Home;
+using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Plugins.Cli.Interfaces;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Clients.Interfaces;
+using CrystalCode.Plugins.Commands.Interfaces;
+using CrystalCode.Plugins.Data.Interfaces;
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Environment.Interfaces;
 using CrystalCode.Plugins.Hooks;
+using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Plugins.Models;
+using CrystalCode.Plugins.Models.Interfaces;
+using CrystalCode.Plugins.Placeholders.Interfaces;
+using CrystalCode.Plugins.Tools.Interfaces;
 
 using Xunit;
 
@@ -324,17 +332,23 @@ public sealed class PluginCatalogTests
             using System.Text.Json;
             using Crystal.Tools;
             using CrystalCode.Plugins;
+            using CrystalCode.Plugins.Interfaces;
             using CrystalCode.Plugins.Clients;
             using CrystalCode.Plugins.Clients.Interfaces;
             using CrystalCode.Plugins.Data;
+            using CrystalCode.Plugins.Data.Interfaces;
             using CrystalCode.Plugins.Environment;
+            using CrystalCode.Plugins.Environment.Interfaces;
             using CrystalCode.Plugins.Hooks;
             using CrystalCode.Plugins.Hooks.Interfaces;
             using CrystalCode.Plugins.Models;
+            using CrystalCode.Plugins.Models.Interfaces;
             using CrystalCode.Plugins.Placeholders;
+            using CrystalCode.Plugins.Placeholders.Interfaces;
             using CrystalCode.Plugins.Status;
             using CrystalCode.Plugins.Status.Interfaces;
             using CrystalCode.Plugins.Tools;
+            using CrystalCode.Plugins.Tools.Interfaces;
             using CrystalCode.Tools;
             using CrystalCode.Tools.Interfaces;
 
@@ -386,7 +400,7 @@ public sealed class PluginCatalogTests
                     updates.Set("branch", "main");
             }
 
-            public sealed class HelloCli : CrystalCode.Plugins.Cli.IPluginCliCommand
+            public sealed class HelloCli : CrystalCode.Plugins.Cli.Interfaces.IPluginCliCommand
             {
                 public string Name => "hello";
 
@@ -401,7 +415,7 @@ public sealed class PluginCatalogTests
                 }
             }
 
-            public sealed class StatusOverride : CrystalCode.Plugins.Commands.IPluginCommand
+            public sealed class StatusOverride : CrystalCode.Plugins.Commands.Interfaces.IPluginCommand
             {
                 public string Name => "status";
 
@@ -409,7 +423,7 @@ public sealed class PluginCatalogTests
 
                 public bool OverridesBuiltIn => true;
 
-                public void Execute(string argument, CrystalCode.Plugins.Commands.IPluginOutput output) =>
+                public void Execute(string argument, CrystalCode.Plugins.Commands.Interfaces.IPluginOutput output) =>
                     output.Write("custom-status:" + argument);
             }
 

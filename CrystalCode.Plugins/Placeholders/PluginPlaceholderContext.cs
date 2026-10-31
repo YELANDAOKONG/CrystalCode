@@ -1,5 +1,7 @@
 using CrystalCode.Plugins.Environment;
+using CrystalCode.Plugins.Environment.Interfaces;
 using CrystalCode.Plugins.Models;
+using CrystalCode.Plugins.Models.Interfaces;
 
 namespace CrystalCode.Plugins.Placeholders;
 

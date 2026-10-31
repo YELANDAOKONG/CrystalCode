@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Plugins.Placeholders;
+using CrystalCode.Plugins.Placeholders.Interfaces;
 
 namespace CrystalCode.Engine.Plugins;
 

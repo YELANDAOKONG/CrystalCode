@@ -7,6 +7,7 @@ using CrystalCode.Engine.Tools;
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Models;
 using CrystalCode.Plugins.Placeholders;
+using CrystalCode.Plugins.Placeholders.Interfaces;
 
 using Xunit;
 

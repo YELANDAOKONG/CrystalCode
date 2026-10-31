@@ -1,12 +1,15 @@
 using CrystalCode.Display.Cards;
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Shell;
-using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Children;
+using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Terminal.Approvals;
 

@@ -7,6 +7,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions.Children;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions;

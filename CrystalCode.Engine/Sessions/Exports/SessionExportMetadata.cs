@@ -1,0 +1,19 @@
+using System.Text;
+
+namespace CrystalCode.Engine.Sessions.Exports;
+
+/// <summary>
+/// Runtime facts attached to a session export.
+/// </summary>
+public sealed record SessionExportMetadata(
+    string SessionId,
+    string Workspace,
+    string Provider,
+    string Model,
+    string PromptSet,
+    bool PlanMode,
+    DateTimeOffset ExportedUtc,
+    string? Mode = null)
+{
+    public string ModelLine => Provider + " / " + Model;
+}

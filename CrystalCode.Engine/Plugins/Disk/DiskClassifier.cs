@@ -4,6 +4,7 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Plugins.Approvals;
+using CrystalCode.Plugins.Approvals.Interfaces;
 
 namespace CrystalCode.Engine.Plugins.Disk;
 

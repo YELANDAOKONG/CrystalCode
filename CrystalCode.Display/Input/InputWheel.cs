@@ -1,3 +1,5 @@
+using CrystalCode.Display.Input.Interfaces;
+
 namespace CrystalCode.Display.Input;
 
 /// <summary>

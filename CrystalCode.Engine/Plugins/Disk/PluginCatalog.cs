@@ -16,11 +16,16 @@ using CrystalCode.Plugins.Cli;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Clients.Interfaces;
 using CrystalCode.Plugins.Data;
+using CrystalCode.Plugins.Data.Interfaces;
 using CrystalCode.Plugins.Environment;
-using CrystalCode.Plugins.Hooks.Interfaces;
-using CrystalCode.Plugins.Models;
+using CrystalCode.Plugins.Environment.Interfaces;
 using CrystalCode.Plugins.Hooks;
+using CrystalCode.Plugins.Hooks.Interfaces;
+using CrystalCode.Plugins.Interfaces;
+using CrystalCode.Plugins.Models;
+using CrystalCode.Plugins.Models.Interfaces;
 using CrystalCode.Plugins.Tools;
+using CrystalCode.Plugins.Tools.Interfaces;
 using CrystalCode.Tools;
 using CrystalCode.Tools.Interfaces;
 
@@ -544,7 +549,7 @@ public sealed class PluginCatalog
         }
     }
 
-    private static bool TryActivate(DiscoveredPlugin item, out CrystalCode.Plugins.IPlugin? plugin, out string error)
+    private static bool TryActivate(DiscoveredPlugin item, out CrystalCode.Plugins.Interfaces.IPlugin? plugin, out string error)
     {
         plugin = null;
         error = string.Empty;
@@ -569,7 +574,7 @@ public sealed class PluginCatalog
             if (type is null
                 || type.IsAbstract
                 || type.IsInterface
-                || !typeof(CrystalCode.Plugins.IPlugin).IsAssignableFrom(type))
+                || !typeof(CrystalCode.Plugins.Interfaces.IPlugin).IsAssignableFrom(type))
             {
                 error = $"type '{item.Manifest.TypeName}' does not implement IPlugin.";
                 return false;
@@ -581,7 +586,7 @@ public sealed class PluginCatalog
                 return false;
             }
 
-            if (Activator.CreateInstance(type) is not CrystalCode.Plugins.IPlugin created)
+            if (Activator.CreateInstance(type) is not CrystalCode.Plugins.Interfaces.IPlugin created)
             {
                 error = $"type '{item.Manifest.TypeName}' could not be created.";
                 return false;
@@ -1013,5 +1018,5 @@ public sealed class PluginCatalog
         return true;
     }
 
-    private sealed record LoadedPlugin(string DirectoryName, CrystalCode.Plugins.IPlugin Plugin);
+    private sealed record LoadedPlugin(string DirectoryName, CrystalCode.Plugins.Interfaces.IPlugin Plugin);
 }

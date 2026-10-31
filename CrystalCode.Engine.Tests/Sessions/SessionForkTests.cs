@@ -3,6 +3,7 @@ using Crystal.Reasoning;
 
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Transcripts;
 
 using Xunit;
 

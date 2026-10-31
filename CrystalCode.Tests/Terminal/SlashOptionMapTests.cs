@@ -1,6 +1,7 @@
 using CrystalCode.Display.Composer;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Terminal;
 
 using Xunit;

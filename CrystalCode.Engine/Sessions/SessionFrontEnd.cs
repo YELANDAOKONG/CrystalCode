@@ -1,8 +1,10 @@
 using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Mcp;
 using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Interfaces;
 
 namespace CrystalCode.Engine.Sessions;
 

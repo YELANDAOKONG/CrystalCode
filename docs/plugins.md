@@ -90,7 +90,7 @@ on. `crystal run --plugins` remains a process-only override.
 ```
 
 `assembly` is a path inside the plugin directory. `type` is the public
-entry type. It implements `CrystalCode.Plugins.IPlugin` and has a public
+entry type. It implements `CrystalCode.Plugins.Interfaces.IPlugin` and has a public
 parameterless constructor.
 
 ## Contract
@@ -344,7 +344,7 @@ a protocol the built-in adapters do not own.
 ### Data directories
 
 A plugin that keeps its own runtime state implements
-`CrystalCode.Plugins.Data.IPluginDataDirectory`. The host calls
+`CrystalCode.Plugins.Data.Interfaces.IPluginDataDirectory`. The host calls
 `AttachDataDirectories(globalDataDirectory, projectDataDirectory)` after
 `Attach`, and again when the plugin instance is loaded again. The interface
 is opt-in, like `IPluginModelClient`.

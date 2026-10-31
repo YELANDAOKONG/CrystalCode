@@ -4,6 +4,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Exports;
 
 using Xunit;
 

@@ -883,7 +883,7 @@ tool may also implement `CrystalCode.Tools.IHostTool` or
 `IHostMultimodalTool` and then receives the workspace root, session id,
 approval mode, and its global and project runtime-data directories on each
 call. A disk plugin that implements
-`CrystalCode.Plugins.Data.IPluginDataDirectory` receives the same two data
+`CrystalCode.Plugins.Data.Interfaces.IPluginDataDirectory` receives the same two data
 directories. Plugins and tool sets keep that runtime data under
 `data/plugins/<directory>/` and `data/tools/<directory>/` in the home and
 project `.crystal` trees; the host creates those directories lazily, and they

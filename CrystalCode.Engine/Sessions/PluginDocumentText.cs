@@ -1,5 +1,7 @@
 using System.Text;
 
+using CrystalCode.Engine.Sessions.Transcripts;
+
 namespace CrystalCode.Engine.Sessions;
 
 /// <summary>Plain-text form of a <see cref="TranscriptDocument"/>, for front ends that do not draw cards.</summary>

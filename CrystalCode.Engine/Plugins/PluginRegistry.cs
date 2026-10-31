@@ -9,6 +9,7 @@ using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Plugins.Providers;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Engine.Tools.Interfaces;
 
 namespace CrystalCode.Engine.Plugins;
 

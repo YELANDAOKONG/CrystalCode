@@ -1,0 +1,109 @@
+using System.Text;
+using CrystalCode.Engine.Prompts;
+
+namespace CrystalCode.Engine.Sessions.Exports;
+
+/// <summary>
+/// Writes built-in prompt templates for operator customization.
+/// </summary>
+public static class PromptTemplateExport
+{
+    public static IReadOnlyList<string> Write(string directory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        Directory.CreateDirectory(directory);
+        var files = new (string Name, string Text)[]
+        {
+            ("work.md", WorkPrompt.Text),
+            ("plan.md", PlanPrompt.Text),
+            ("review.md", ApprovalReviewPrompt.SystemText),
+            ("topic.md", TopicNamingPrompt.Text),
+            ("review.user.md", ApprovalReviewPrompt.UserTemplate),
+            ("review.extended.md", ExtendedApprovalPrompt.SystemText),
+            ("review.extended.user.md", ExtendedApprovalPrompt.UserTemplate),
+            ("compaction.system.md", CompactionPrompt.SystemText),
+            ("compaction.user.md", CompactionPrompt.UserTemplate),
+            ("image.system.md", ImageDescriptionPrompt.SystemText),
+            ("image.user.md", ImageDescriptionPrompt.UserTemplate),
+            ("placeholders.md", RenderPlaceholderGuide()),
+            (Path.Combine(PromptNames.AgentsDirectory, "general.md"), AgentGeneralPrompt.Text),
+            (Path.Combine(PromptNames.AgentsDirectory, "work.md"), AgentWorkPrompt.Text),
+            (Path.Combine(PromptNames.AgentsDirectory, "plan.md"), AgentPlanPrompt.Text)
+        };
+
+        var written = new List<string>();
+        foreach (var (name, text) in files)
+        {
+            var path = Path.Combine(directory, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text, Encoding.UTF8);
+            written.Add(path);
+        }
+
+        return written;
+    }
+
+    private static string RenderPlaceholderGuide() =>
+        """
+        # Crystal Code prompt placeholders
+
+        Syntax: {{name}} (case-insensitive). Unknown names are left unchanged.
+
+        ## Session
+
+        - {{env}}
+        - {{clock}}
+        - {{session}}
+        - {{model_info}}
+        - {{skills}}
+        - {{instructions}}
+        - {{instructions_section}}
+        - {{directories}}
+        - {{workspace}}
+        - {{is_git_repo}}
+        - {{git_root}}
+        - {{platform}}
+        - {{os}}
+        - {{architecture}}
+        - {{date}}
+        - {{time}}
+        - {{provider}}
+        - {{model}}
+        - {{model_line}}
+        - {{mode}}
+        - {{product_name}}
+        - {{session_id}}
+        - {{approval}}
+        - {{disabled_tools}}
+
+        ## Review user
+
+        - {{conversation}}
+        - {{tool_name}}
+        - {{tool_arguments}}
+        - {{host_risk}}
+        - {{host_authority}}
+        - {{classification_summary}}
+
+        ## Extended review user
+
+        The Review user names above, plus:
+
+        - {{primary_review}}
+
+        ## Compaction user
+
+        - {{conversation}}
+        - {{prior_summary_section}}
+        - {{summary_task}}
+        - {{output_template}}
+        - {{todos_section}}
+
+        ## Image user
+
+        - {{question}}
+
+        A loaded plugin may add further names. Those names are not listed here.
+        The host rejects a name it already owns.
+        """;
+}

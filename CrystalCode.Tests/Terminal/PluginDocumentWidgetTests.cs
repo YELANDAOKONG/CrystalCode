@@ -1,5 +1,6 @@
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Terminal;
 
 using Xunit;

@@ -1866,7 +1866,7 @@ field is omitted from the written file.
 A plugin can add tools, a protocol client, approval classifiers, slash
 commands, hooks, raw hooks, and prompt placeholders. It can read the
 current session model and whether review is using its own model. A plugin
-that implements `CrystalCode.Plugins.Data.IPluginDataDirectory` receives its
+that implements `CrystalCode.Plugins.Data.Interfaces.IPluginDataDirectory` receives its
 global and project runtime-data directories. A plugin
 that asks for model clients can call the session model and, while that
 switch is on, the review model. Those calls use separate clients from the

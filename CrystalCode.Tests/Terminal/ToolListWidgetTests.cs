@@ -4,6 +4,7 @@ using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Catalogs;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Terminal;

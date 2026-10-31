@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Arguments;
 
 using Xunit;
 

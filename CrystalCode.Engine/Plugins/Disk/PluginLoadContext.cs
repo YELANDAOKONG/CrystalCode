@@ -6,6 +6,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Plugins;
+using CrystalCode.Plugins.Interfaces;
 using CrystalCode.Tools;
 using CrystalCode.Tools.Interfaces;
 

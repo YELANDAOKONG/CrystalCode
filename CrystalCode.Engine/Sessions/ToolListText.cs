@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Sessions.Catalogs;
 
 namespace CrystalCode.Engine.Sessions;
 

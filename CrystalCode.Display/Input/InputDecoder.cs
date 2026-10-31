@@ -1,5 +1,6 @@
 using System.Text;
 
+using CrystalCode.Display.Input.Interfaces;
 using CrystalCode.Display.Paint;
 
 namespace CrystalCode.Display.Input;

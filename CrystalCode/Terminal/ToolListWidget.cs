@@ -6,6 +6,7 @@ using Crystal.Tools;
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Catalogs;
 using CrystalCode.Engine.Tools.External;
 
 namespace CrystalCode.Terminal;

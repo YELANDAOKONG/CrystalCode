@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Chat;
 
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Server.Endpoints;
 using CrystalCode.Server.Hosting;

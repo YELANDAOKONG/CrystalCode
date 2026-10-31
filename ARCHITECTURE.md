@@ -289,7 +289,13 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Home` | `~/.crystal` paths and file I/O; `DiskSettingsStore` is the default `config.json` implementation and reads provider files through `ProviderFiles` |
 | `Home/Interfaces` | Configuration persistence contracts such as `ISettingsStore` |
 | `Launch` | Launch options a front end received (`SessionLaunchOptions`), in-memory overrides (`SessionLaunchOverrides`), `--allow-read` / `--allow-write` rules (`SessionLaunchAccess`), and `SessionLauncher`, which resolves the workspace, resume target, trust, prompt attachments, and mode before a session exists |
-| `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, the input loop for front ends without a frame loop (`SessionRunner`), the front-end-neutral reducer (`SessionState`, `SessionSnapshot`, `LiveRound`, `ChildSessionFold`), front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
+| `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, the input loop for front ends without a frame loop (`SessionRunner`), the front-end-neutral reducer (`SessionState`, `SessionSnapshot`, `LiveRound`, `ChildSessionFold` in `Children`), front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
+| `Sessions/Interfaces` | Session contracts such as `ISessionChooser` |
+| `Sessions/Arguments` | Slash-command argument parsers (`*Arguments`) |
+| `Sessions/Catalogs` | Catalog entry and report records for agents, MCP servers, models, plugins, skills, and tools |
+| `Sessions/Children` | Child Agent execution and the child session store and fold |
+| `Sessions/Exports` | Session and transcript export |
+| `Sessions/Transcripts` | Transcript document, codec, and multimodal transcript |
 | `Approvals` | Risk, authority, grants, policy, review transcript |
 | `Approvals/Interfaces` | Prompt and reviewer contracts |
 | `Compaction` | Window accounting and summary substitution |
@@ -2007,7 +2013,7 @@ dotnet host tool reads them from `ToolHostContext.GlobalDataDirectory` and
 `ToolHostContext.ProjectDataDirectory`. An exec child reads them as the
 per-process environment variables `CRYSTAL_TOOL_DATA` (global) and
 `CRYSTAL_PROJECT_DATA` (project). A disk plugin that implements
-`CrystalCode.Plugins.Data.IPluginDataDirectory` receives them through
+`CrystalCode.Plugins.Data.Interfaces.IPluginDataDirectory` receives them through
 `AttachDataDirectories`.
 
 Overlay is built-in default, then `~/.crystal`, then the project
@@ -3116,7 +3122,7 @@ a host in the executable that resolves the first argument against the
 registered commands before any plugin code loads, and a rule for project
 plugins. That host is not written.
 
-Disk plugins use `CrystalCode.Plugins.IPlugin` and are loaded by
+Disk plugins use `CrystalCode.Plugins.Interfaces.IPlugin` and are loaded by
 `PluginCatalog` from `plugins/`. One non-collectible load context serves
 each plugin. Shared contracts (`Crystal`, `Crystal.Tools`,
 `CrystalCode.Tools`, and `CrystalCode.Plugins`) come from the host.
@@ -3253,7 +3259,7 @@ passes a `ToolHostContext` captured at the start of that call (workspace
 root, session id, approval mode, and the set's global and project data
 directories). Other tools keep the original
 `InvokeAsync`. Native multimodal tools join
-the active catalog only for an image-capable model and provider. The external-tool loader does not implement `CrystalCode.Plugins.IPlugin`
+the active catalog only for an image-capable model and provider. The external-tool loader does not implement `CrystalCode.Plugins.Interfaces.IPlugin`
 and does not scan `plugins/`.
 
 Environment variables:

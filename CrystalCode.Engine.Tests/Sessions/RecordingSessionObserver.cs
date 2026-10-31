@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Events.Interfaces;
 
 namespace CrystalCode.Engine.Tests.Sessions;
 

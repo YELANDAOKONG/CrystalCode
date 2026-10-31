@@ -5,6 +5,7 @@ using Crystal.Reasoning;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Configuration;

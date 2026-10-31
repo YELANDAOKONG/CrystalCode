@@ -6,6 +6,7 @@ using Crystal.Tools;
 using CrystalCode.Bridge.Transport;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions.Children;
 
 namespace CrystalCode.Bridge.Wire;
 
@@ -247,7 +248,7 @@ internal sealed class ChildUpdates
         writer.WriteString("status", child.Status);
         writer.WriteNumber("modelCalls", child.ModelCalls);
         writer.WriteNumber("toolCalls", child.ToolCalls);
-        CrystalWire.Todos(writer, "todos", Engine.Sessions.ChildSessionFold.Todos(child));
+        CrystalWire.Todos(writer, "todos", Engine.Sessions.Children.ChildSessionFold.Todos(child));
         writer.WriteEndObject();
         writer.WriteEndObject();
         writer.WriteEndObject();

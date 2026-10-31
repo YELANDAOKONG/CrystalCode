@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Cli.Interfaces;
+
 namespace CrystalCode.Plugins.Cli;
 
 /// <summary>Facts and streams for one <see cref="IPluginCliCommand"/> run.</summary>

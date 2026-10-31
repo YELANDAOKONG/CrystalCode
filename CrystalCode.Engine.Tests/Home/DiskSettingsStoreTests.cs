@@ -6,6 +6,7 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Exports;
 
 using Xunit;
 

@@ -451,7 +451,7 @@ ALC or one executable, many catalog entries.
 ## Dotnet: native text and multimodal tools
 
 The assembly is a **framework-dependent class library**, not a second
-self-contained runtime and not `CrystalCode.Plugins.IPlugin`.
+self-contained runtime and not `CrystalCode.Plugins.Interfaces.IPlugin`.
 
 Compile against `Crystal.Tools` (and the `Crystal` reference it requires).
 Implement `Crystal.Tools.ITool`, `Crystal.Multimodal.Tools.IMultimodalTool`,

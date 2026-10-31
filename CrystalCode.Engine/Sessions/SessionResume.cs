@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions;

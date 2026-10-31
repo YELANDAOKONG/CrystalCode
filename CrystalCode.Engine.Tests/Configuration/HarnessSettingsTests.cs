@@ -2,6 +2,7 @@ using Crystal.Reasoning;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Sessions.Exports;
 
 using Xunit;
 

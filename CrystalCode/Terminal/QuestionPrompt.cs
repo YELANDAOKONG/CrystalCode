@@ -5,6 +5,7 @@ using CrystalCode.Display.Input;
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Interfaces;
 
 namespace CrystalCode.Terminal;
 

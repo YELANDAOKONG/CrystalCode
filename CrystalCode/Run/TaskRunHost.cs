@@ -5,6 +5,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Run.Interfaces;
 
 namespace CrystalCode.Run;
 

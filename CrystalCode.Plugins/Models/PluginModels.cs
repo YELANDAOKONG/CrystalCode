@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Models.Interfaces;
+
 namespace CrystalCode.Plugins.Models;
 
 /// <summary>

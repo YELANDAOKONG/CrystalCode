@@ -6,6 +6,7 @@ using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Transcripts;
 
 using Xunit;
 

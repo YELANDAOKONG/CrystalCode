@@ -14,6 +14,7 @@ using CrystalCode.Engine.Tests.Approvals;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Plugins.Interfaces;
 
 using Xunit;
 
@@ -221,6 +222,7 @@ public sealed class PluginSessionRebindTests
             Path.Combine(project, "RecorderPlugin.cs"),
             """
             using CrystalCode.Plugins;
+            using CrystalCode.Plugins.Interfaces;
             using CrystalCode.Plugins.Hooks;
             using CrystalCode.Plugins.Hooks.Interfaces;
 

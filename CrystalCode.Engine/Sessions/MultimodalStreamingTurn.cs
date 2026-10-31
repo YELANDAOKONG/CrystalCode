@@ -8,6 +8,7 @@ using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Sessions.Interfaces;
+using CrystalCode.Engine.Sessions.Transcripts;
 
 namespace CrystalCode.Engine.Sessions;
 

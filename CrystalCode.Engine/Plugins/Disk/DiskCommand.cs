@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Plugins.Commands;
+using CrystalCode.Plugins.Commands.Interfaces;
 
 namespace CrystalCode.Engine.Plugins.Disk;
 

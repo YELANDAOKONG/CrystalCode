@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Engine.Tests.Home;
 
 using Xunit;

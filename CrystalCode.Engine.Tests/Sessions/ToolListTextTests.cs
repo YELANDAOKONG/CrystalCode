@@ -3,6 +3,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Catalogs;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;

@@ -2,6 +2,7 @@ using Crystal.Tools;
 using Crystal.Multimodal.Tools;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Interfaces;
 
 namespace CrystalCode.Engine.Plugins.Interfaces;
 

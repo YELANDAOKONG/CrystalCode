@@ -1,4 +1,5 @@
 using CrystalCode.Plugins.Cli;
+using CrystalCode.Plugins.Cli.Interfaces;
 
 namespace CrystalCode.Engine.Plugins.Disk;
 

@@ -7,10 +7,12 @@ using CrystalCode.Bridge.Wire;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Interfaces;
 
 namespace CrystalCode.Bridge.Hosting;
 

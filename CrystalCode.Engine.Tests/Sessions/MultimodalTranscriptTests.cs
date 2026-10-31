@@ -5,6 +5,7 @@ using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Transcripts;
 
 using Xunit;
 
