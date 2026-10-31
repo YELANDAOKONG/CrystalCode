@@ -22,6 +22,21 @@ that fixes it.
 
 ## Issues
 
+- `ThemePickerTests.Render_ListsNamesMarksTheSelectionAndCurrentAndShowsASample`
+  is skipped. On the GitHub Actions runners (Linux, macOS, and Windows) it
+  fails at the assertion for `-let count = 1;`: the rendered theme picker has
+  the theme names and the `Heading` sample row but not the diff rows. It
+  passes locally in Debug and Release, with `CI=true`, with other `LANG`,
+  `TERM`, and invariant-globalization settings, with the console height from
+  1 to 40 rows, and with the built-in `default` and `light` palettes. The
+  cause is not known. A debug `Console.WriteLine` of the rendered text was
+  tried on CI and its output did not appear in the log, so standard output
+  may be captured by the test host there; the next try should write the text
+  into the assertion message instead. `ThemePicker.Render` reads
+  `ScreenSize.Height` to size the theme list, which is the only console state
+  it touches. Re-enable the test in the change that finds the cause. The
+  picker itself has not been seen to misbehave in the terminal.
+
 - Waiting .NET 11: a `bash` or `bash_start` command that asks for a password
   breaks the terminal UI. Examples are `git push` over HTTPS or SSH, `ssh`,
   and `sudo`. Stdin is already redirected and closed (ARCHITECTURE.md,
