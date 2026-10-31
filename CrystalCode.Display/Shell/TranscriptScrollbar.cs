@@ -3,17 +3,18 @@ using CrystalCode.Display.Paint;
 namespace CrystalCode.Display.Shell;
 
 /// <summary>
-/// Draws a one-column scrollbar at the right edge of the transcript rows. The
-/// column is always reserved so wrapping does not change when the bar appears;
-/// it stays blank while everything fits on one screen.
+/// Draws a one-column scrollbar at the right edge of the transcript rows, with
+/// one blank column before it so wrapped text does not touch the bar. Both
+/// columns are always reserved so wrapping does not change when the bar
+/// appears; the bar stays blank while everything fits on one screen.
 /// </summary>
 public static class TranscriptScrollbar
 {
     private const string Track = "│";
     private const string Thumb = "┃";
 
-    /// <summary>Columns the bar takes from the transcript width.</summary>
-    public const int Columns = 1;
+    /// <summary>Columns the bar takes from the transcript width: one gap and the bar.</summary>
+    public const int Columns = 2;
 
     /// <summary>
     /// Thumb rows within a viewport of <paramref name="rows"/>, or null when
@@ -57,7 +58,7 @@ public static class TranscriptScrollbar
         for (var row = 0; row < lines.Count; row++)
         {
             var line = lines[row].Fit(body);
-            var pad = new string(' ', body - TextWidth.Measure(line.Plain));
+            var pad = new string(' ', body - TextWidth.Measure(line.Plain) + Columns - 1);
             var (cell, color) = thumb is { } t && row >= t.Start && row < t.Start + t.Length
                 ? (Thumb, thumbColor)
                 : thumb is null ? (" ", trackColor) : (Track, trackColor);

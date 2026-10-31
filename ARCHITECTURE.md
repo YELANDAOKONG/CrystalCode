@@ -2788,8 +2788,8 @@ where no row is anchored, the view follows new output. A scroll that leaves
 the bottom is measured from the latest row count. A width change keeps the
 distance and re-clamps it, then takes a new anchor. When a block above the
 anchor changes height, the same row is found again.
-`TranscriptScrollbar` reserves the last column of the transcript rows, so the
-transcript wraps at one column less than the terminal. It draws a track (`│`)
+`TranscriptScrollbar` reserves the last two columns of the transcript rows (a blank gap, then
+the bar), so the transcript wraps at two columns less than the terminal. It draws a track (`│`)
 and a thumb (`┃`) there only while the transcript is taller than its rows; the
 column is blank otherwise. The thumb length is the viewport share of all rows,
 at least one row, and its place follows the distance from the bottom. The theme
