@@ -980,6 +980,7 @@ public sealed class SessionRenderer : IDisposable
                 usage ?? result.Usage,
                 cumulativeUsage,
                 contextWindow);
+            ClearRetryUnlocked();
             _chrome.ToolCount = result.ToolCallCount;
             _chrome.Elapsed = _turnClock is null
                 ? string.Empty

@@ -239,6 +239,22 @@ public sealed class SessionRendererTests
     }
 
     [Fact]
+    public void WriteTurnFooter_ClearsRetryCountdownWhenInterrupted()
+    {
+        var renderer = new SessionRenderer();
+        renderer.BeginTurn();
+        renderer.OnRetry(new SessionRetryAttempt(1, "rate limit", TimeSpan.FromSeconds(30)));
+
+        renderer.WriteTurnFooter(
+            new TurnResult(TurnStopReason.Interrupted, 1, 0, null, []),
+            usage: null,
+            cumulativeUsage: null,
+            contextWindow: 0);
+
+        Assert.Equal(string.Empty, renderer.ChromeProgress);
+    }
+
+    [Fact]
     public void ShowLiveUsage_RefreshesContextAndCumulativeCounts()
     {
         var renderer = new SessionRenderer { ContextWindow = 1_000 };
