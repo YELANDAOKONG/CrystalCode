@@ -264,7 +264,7 @@ public sealed class ThemeTests : IDisposable
         Assert.False(Theme.TryApply(new Dictionary<string, string> { [token] = value }, out var error));
 
         Assert.Contains("codeBg", error, StringComparison.Ordinal);
-        Assert.Equal("grey23", Theme.CodeBg);
+        Assert.Equal("default", Theme.CodeBg);
     }
 
     [Fact]
@@ -329,7 +329,7 @@ public sealed class ThemeTests : IDisposable
     }
 
     [Fact]
-    public void BuiltIns_DefaultEqualsDarkAndLightDiffers()
+    public void BuiltIns_ShareDefaultAndDarkForegroundsAndLightDiffers()
     {
         Assert.True(Theme.TryUseBuiltIn("light"));
         var light = Theme.Accent;
@@ -341,6 +341,65 @@ public sealed class ThemeTests : IDisposable
         Assert.NotEqual(light, dark);
         Assert.True(Theme.TryUseBuiltIn("LIGHT"));
         Assert.False(Theme.TryUseBuiltIn("night"));
+    }
+
+    [Fact]
+    public void DefaultPalette_LeavesEveryBackgroundUnsetIncludingAfterAnOverride()
+    {
+        Assert.True(Theme.TryUseBuiltIn("dark"));
+        Assert.NotEqual("default", Theme.CodeBg);
+        Assert.True(Theme.TryUseBuiltIn("default"));
+        AssertBackgroundsUnset();
+
+        Assert.True(Theme.TryApply(new Dictionary<string, string> { ["accent"] = "red" }, out var error), error);
+        AssertBackgroundsUnset();
+    }
+
+    [Fact]
+    public void TryApply_AllowsExplicitBackgroundsAndResetClearsThem()
+    {
+        Assert.True(Theme.TryApply(new Dictionary<string, string>
+        {
+            ["codeBg"] = "grey23",
+            ["diffRemovedBg"] = "red",
+            ["diffRemovedWord"] = "maroon"
+        }, out var error), error);
+        Assert.Equal("grey23", Theme.CodeBg);
+        Assert.Equal("red", Theme.DiffRemovedBg);
+        Assert.Equal("maroon", Theme.DiffRemovedWord);
+
+        Theme.Reset();
+        AssertBackgroundsUnset();
+    }
+
+    [Fact]
+    public void DefaultPalette_RendersCodeAndDiffWithoutBackgroundColors()
+    {
+        var lines = MarkdownRenderer.Render("```csharp\nvar count = 1;\n```\n```diff\n-old\n+new\n```", 80)
+            .Concat(DiffLines.Hunk(["let count = 1;"], ["let total = 1;"]));
+
+        foreach (var line in lines)
+        {
+            var rendered = WidgetPaint.Lines(new Spectre.Console.Markup(line.Markup), 80);
+            Assert.All(rendered, row => Assert.DoesNotContain(" on ", row.Markup, StringComparison.Ordinal));
+        }
+    }
+
+    private static void AssertBackgroundsUnset()
+    {
+        foreach (var name in Theme.TokenNames)
+        {
+            var value = (string)typeof(Theme).GetProperty(PropertyName(name))!.GetValue(null)!;
+            Assert.True(Spectre.Console.Style.TryParse(value, out var style));
+            Assert.Equal(Spectre.Console.Color.Default, style.Background);
+            Assert.False(style.Decoration.HasFlag(Spectre.Console.Decoration.Invert));
+        }
+
+        Assert.Equal("default", Theme.CodeBg);
+        Assert.Equal("default", Theme.DiffAddedBg);
+        Assert.Equal("default", Theme.DiffRemovedBg);
+        Assert.Equal("default", Theme.DiffAddedWord);
+        Assert.Equal("default", Theme.DiffRemovedWord);
     }
 
     [Fact]

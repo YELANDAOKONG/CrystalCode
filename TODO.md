@@ -202,27 +202,6 @@ behavior stands until a specific change defines otherwise.
   Server and Bridge need to be considered with the terminal, since they run
   the same commands. Do not reserve a configuration field, command, or
   public type.
-- Default theme without background color. The built-in `default` palette
-  (and `dark`, which holds the same colors today) fills regions with a
-  background: code blocks on `codeBg`, whole diff lines on `diffAddedBg` and
-  `diffRemovedBg`, and changed words on `diffAddedWord` and `diffRemovedWord`.
-  Those fills are tuned for a dark terminal, so on another terminal background
-  the code and diff regions appear as panels instead of part of the session.
-  What is wanted is a default palette that adds no background: foreground
-  colors alone mark code and diff content, and the terminal background shows
-  through. Not defined: whether those color names leave the palette or accept
-  a value that means no background; whether `light` keeps its fills, and how
-  an operator theme file in `~/.crystal/themes` that still sets them combines
-  with the default; and what separates an added line, a removed line, and a
-  changed word once the line fill and the word fill no longer do that work,
-  whether a marker character, a foreground shift, or `dim`. The renderers
-  build `[foreground on background]` markup for code and diffs, and
-  `Theme.TryApply` rejects a pair that does not parse that way, so the palette,
-  those renderers, the theme picker sample, and the theme tests change
-  together. `BUSINESS.md` describes the built-in theme names and needs the same
-  update. This is the terminal palette only; `crystal run`, plain text output,
-  Server, and Bridge do not use it. Do not reserve a replacement color name,
-  configuration field, or public type.
 
 ## Medium priority
 

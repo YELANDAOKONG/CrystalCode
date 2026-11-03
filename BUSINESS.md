@@ -97,8 +97,13 @@ separate library with no terminal code. The product can:
 - ask one or more operator questions in one request, with described choices,
   single or multiple selection, optional custom answers, and confirmation;
 - select a color theme for the terminal. `config.json` `theme` is a built-in
-  (`default`, which equals `dark`, `dark`, or `light`) or the name of a file in `~/.crystal/themes/<name>.json`, which maps color names
-  to Spectre styles and overrides the built-in palette. `/theme` lists and
+  (`default`, `dark`, or `light`) or the name of a file in `~/.crystal/themes/<name>.json`, which maps color names
+  to Spectre styles and overrides the default palette. The default theme sets
+  no background colors, including code blocks, diff lines, and changed words.
+  Diff additions and removals use foreground colors and `+` / `-` markers;
+  changed words are bold. `dark` and `light` retain their background fills.
+  Custom themes may set the existing background tokens explicitly; `default`
+  as a background token value leaves the terminal background visible. `/theme` lists and
   selects it and writes `config.json`; `--theme <name>` on `crystal`,
   `crystal space`, and `crystal run` affects that process only. Themes are
   Home-only so a repository cannot change the interface. `crystal run`, plain

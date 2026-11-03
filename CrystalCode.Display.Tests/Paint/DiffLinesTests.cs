@@ -46,7 +46,9 @@ public sealed class DiffLinesTests
         Assert.Equal(["-let count = 1;", "+let total = 1;", "+extra"], lines.Select(line => line.Plain));
         Assert.Contains(Theme.DiffRemovedWord, lines[0].Markup, StringComparison.Ordinal);
         Assert.Contains(Theme.DiffAddedWord, lines[1].Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain(Theme.DiffAddedWord, lines[2].Markup, StringComparison.Ordinal);
+        Assert.Contains(" bold", lines[0].Markup, StringComparison.Ordinal);
+        Assert.Contains(" bold", lines[1].Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(" bold", lines[2].Markup, StringComparison.Ordinal);
         Assert.Contains(Theme.DiffAddedBg, lines[2].Markup, StringComparison.Ordinal);
     }
 

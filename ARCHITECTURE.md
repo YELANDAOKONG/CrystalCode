@@ -2874,7 +2874,7 @@ terminal draws the full untruncated list in a rounded `Todos` card.
 `/todos bar [on|off]` and `/todos rows [3-10]` write `todoBar` and `todoBarRows`
 to `config.json` (defaults on and 4; each omitted when default) and publish
 `PreferencesChanged`. A `todoBarRows` outside 3 to 10 refuses startup.
-Themes: `config.json` `theme` names a built-in (`default` = `dark`, `dark`, `light`; palettes live in `Theme`) or `~/.crystal/themes/<name>.json`
+Themes: `config.json` `theme` names a built-in (`default`, `dark`, `light`; palettes live in `Theme`). The default palette leaves every background at the terminal default, including `codeBg`, `diffAddedBg`, `diffRemovedBg`, `diffAddedWord`, and `diffRemovedWord` (each uses the Spectre color `default`). Diff foreground colors and `+` / `-` markers distinguish lines; changed words remain bold. `dark` and `light` retain their fills. Custom theme files overlay the default palette and may explicitly set those background tokens, including `default` to remove a fill. The theme picker sample and code/diff renderers use those same tokens. A theme name may also select `~/.crystal/themes/<name>.json`
 (Home only; a workspace file is never read). `ThemeCatalog` in the engine lists
 and reads names and files and touches no console. `SessionPreferences.Theme`
 carries the name; the terminal `SessionProjection` loads the file and calls

@@ -12,10 +12,23 @@ namespace CrystalCode.Display.Paint;
 public static class Theme
 {
     // Default and dark are separate palettes so either can change without the other.
-    // They hold the same colors today.
-    private static readonly IReadOnlyDictionary<string, string> DefaultPalette = CreateDark();
+    // Default leaves the terminal background visible; dark keeps its explicit fills.
+    private static readonly IReadOnlyDictionary<string, string> DefaultPalette = CreateDefault();
 
     private static readonly IReadOnlyDictionary<string, string> DarkPalette = CreateDark();
+
+    private static IReadOnlyDictionary<string, string> CreateDefault()
+    {
+        var palette = new Dictionary<string, string>(CreateDark(), StringComparer.OrdinalIgnoreCase)
+        {
+            ["codeBg"] = "default",
+            ["diffAddedBg"] = "default",
+            ["diffRemovedBg"] = "default",
+            ["diffAddedWord"] = "default",
+            ["diffRemovedWord"] = "default"
+        };
+        return palette;
+    }
 
     private static IReadOnlyDictionary<string, string> CreateDark() =>
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -110,7 +123,8 @@ public static class Theme
     private static IReadOnlyDictionary<string, string> _status = NoStatus;
 
     /// <summary>
-    /// Selects a built-in palette: <c>default</c> and <c>dark</c> (any case) are separate palettes with the same colors, <c>light</c> suits a light terminal.
+    /// Selects a built-in palette: <c>default</c> leaves backgrounds unset,
+    /// <c>dark</c> and <c>light</c> include fills suited to their terminal background.
     /// </summary>
     public static bool TryUseBuiltIn(string name)
     {
@@ -349,7 +363,7 @@ public static class Theme
         ArgumentNullException.ThrowIfNull(colors);
         ArgumentNullException.ThrowIfNull(gauges);
         error = string.Empty;
-        var next = new Dictionary<string, string>(DarkPalette, StringComparer.OrdinalIgnoreCase);
+        var next = new Dictionary<string, string>(DefaultPalette, StringComparer.OrdinalIgnoreCase);
         var nextStatus = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, value) in colors)
         {
@@ -387,9 +401,10 @@ public static class Theme
             next[name] = value.Trim();
         }
 
-        // Code blocks are drawn as "[code on codeBg]". A second background in either token
-        // would make that markup throw at render time.
-        if (!Style.TryParse(next["code"] + " on " + next["codeBg"], out _))
+        // Code blocks are drawn as "[code on codeBg]". Neither token can carry
+        // its own background or the combined style would be ambiguous.
+        if (HasBackground(next["code"]) || HasBackground(next["codeBg"])
+            || !Style.TryParse(next["code"] + " on " + next["codeBg"], out _))
         {
             error = "Invalid theme color  code and codeBg must combine as a foreground on a background";
             return false;
@@ -401,7 +416,8 @@ public static class Theme
             ("diffRemoved", "diffRemovedBg"), ("diffRemoved", "diffRemovedWord")
         })
         {
-            if (!Style.TryParse(next[foreground] + " on " + next[background], out _))
+            if (HasBackground(next[foreground]) || HasBackground(next[background])
+                || !Style.TryParse(next[foreground] + " on " + next[background], out _))
             {
                 error = "Invalid theme color  " + foreground + " and " + background
                     + " must combine as a foreground on a background";
@@ -539,6 +555,10 @@ public static class Theme
     }
 
     private static string Get(string name) => _current[name];
+
+    private static bool HasBackground(string value) =>
+        Style.TryParse(value.Trim(), out var style)
+        && (style.Background != Color.Default || style.Decoration.HasFlag(Decoration.Invert));
 
     private static bool IsStyle(string value) =>
         !string.IsNullOrWhiteSpace(value)
