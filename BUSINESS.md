@@ -599,6 +599,11 @@ implemented in the current build.
   calling thread is not defined, and `crystal server` and `crystal bridge`
   run the same commands. Do not reserve a configuration field, command, or
   public type.
+- Live Bash output in the terminal. Foreground `bash` output should stream as
+  it arrives, and operators should be able to inspect `bash_start` output while
+  a background task runs. The operator interaction and how live output
+  coexists with transcript cards are not defined. Preserve bounded logs,
+  terminal safety, existing tool results, and session-local task lifecycle.
 
 ### Medium priority
 

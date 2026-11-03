@@ -205,6 +205,14 @@ behavior stands until a specific change defines otherwise.
 
 ## Medium priority
 
+- Live Bash output in the terminal: stream foreground `bash` output as it
+  arrives and provide an operator-facing way to inspect output from
+  `bash_start` background tasks while they run. Preserve the existing bounded
+  logs, foreground command/tool result semantics, terminal safety, and
+  session-local task lifecycle. The interaction for viewing background output
+  and how live foreground output coexists with transcript cards are not yet
+  defined; inspect the TUI and event ownership before implementation.
+
 These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work. Current
 behavior stands until a specific change defines otherwise.
