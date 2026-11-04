@@ -1497,6 +1497,17 @@ credential-path rejection, path fencing, and other execution safety floors
 still apply. Tool updates inherit the declaration; there is no content hash or
 version-bound trust grant.
 
+A disk plugin tool can declare `AutoApprovesReadOnlyNetwork`. The declaration
+only has an effect when the plugin loaded from Home, the tool is not a
+built-in replacement, and the plugin classifier rates the call Read risk with
+Network authority and no forced prompt. `PluginCatalog.ReadOnlyNetworkTools`
+holds those names and `ApprovalPolicy` passes such a call before the
+Workspace-authority check, so the prompt and Review are skipped. The
+classification is not rewritten. Network calls from any other tool, any
+Write or Privileged call, and any call from a project plugin still need
+approval. This is separate from the external `approval: always` path, which
+only covers Workspace-authority calls.
+
 Do not name a mode `auto`. That word is ambiguous between review and
 full pass-through.
 

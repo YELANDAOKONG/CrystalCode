@@ -291,6 +291,40 @@ public sealed class PluginCatalogTests
         Assert.Equal(ProviderProtocol.OpenAI, ProviderProtocol.Parse("openai"));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Load_ReadOnlyNetworkDeclarationIsHonoredOnlyForHomePlugins(bool installedInHome)
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var root = installedInHome
+            ? home.Home.PluginsDirectory
+            : Path.Combine(workspace.Path, ".crystal", "plugins");
+        var directory = Path.Combine(root, "Fixture");
+        PublishFixture(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "plugin.json"),
+            """
+            {
+              "assembly": "FixturePlugin.dll",
+              "type": "FixturePlugin.SamplePlugin"
+            }
+            """);
+
+        var catalog = PluginCatalog.Load(home.Home, new Workspace(workspace.Path), enabled: true);
+
+        Assert.Contains(catalog.WorkTools, tool => tool.Definition.Name == "netread");
+        if (installedInHome)
+        {
+            Assert.Equal("netread", Assert.Single(catalog.ReadOnlyNetworkTools));
+        }
+        else
+        {
+            Assert.Empty(catalog.ReadOnlyNetworkTools);
+        }
+    }
+
     private static void WriteManifest(string root, string name, string json)
     {
         var directory = Path.Combine(root, name);
@@ -388,7 +422,7 @@ public sealed class PluginCatalogTests
                 }
 
                 public PluginContribution Contribute() => new PluginContribution(
-                    tools: [new SampleTool(), new HostedTool(), new DataTool(this), new PeerTool(this), new GrepReplacement()],
+                    tools: [new SampleTool(), new HostedTool(), new DataTool(this), new PeerTool(this), new GrepReplacement(), new NetworkTool()],
                     clients: [new OverrideFactory()],
                     commands: [new StatusOverride()],
                     hooks: [new SampleHook()],
@@ -541,6 +575,30 @@ public sealed class PluginCatalogTests
                         ToolCall call,
                         CancellationToken cancellationToken = default) =>
                         ValueTask.FromResult(new ToolOutput("sample-ok"));
+                }
+            }
+
+            public sealed class NetworkTool : IPluginTool
+            {
+                public string Name => "netread";
+                public PluginToolCatalogs Catalogs => PluginToolCatalogs.Work;
+                public bool AutoApprovesReadOnlyNetwork => true;
+                public ITool Tool { get; } = new Inner();
+
+                private sealed class Inner : ITool
+                {
+                    public Inner()
+                    {
+                        using var document = JsonDocument.Parse("{\"type\":\"object\",\"properties\":{}}");
+                        Definition = ToolDefinition.Json("netread", document.RootElement.Clone(), "Network read.");
+                    }
+
+                    public ToolDefinition Definition { get; }
+
+                    public ValueTask<ToolOutput> InvokeAsync(
+                        ToolCall call,
+                        CancellationToken cancellationToken = default) =>
+                        ValueTask.FromResult(new ToolOutput("net-ok"));
                 }
             }
 

@@ -134,6 +134,19 @@ omitted with a note. The host notes each replacement. Approval uses the
 built-in name's classification, so keep the effect no larger than the
 built-in's.
 
+#### Skipping approval for read-only network tools
+
+`IPluginTool.AutoApprovesReadOnlyNetwork` defaults to false. A search or
+fetch tool can set it to true so its calls run without a prompt or Review.
+The host honors it only when all of these hold: the plugin is installed under
+Home (a project plugin is never trusted), the tool is not a built-in
+replacement, a plugin classifier rates the call Read risk with Network
+authority, and the classification does not force a prompt. Any other risk or
+authority, a forced prompt, or a hook that raises the classification still goes
+to the operator or Review. The classification itself is unchanged, so the
+approval card and the review model still see Network. This does not affect
+external tool sets, which use `approval` in `tools.json`.
+
 Catalog order is built-in plugin tools, disk plugin tools, external
 tools, then `skill` when enabled. A disk tool name is reserved against
 external tools.

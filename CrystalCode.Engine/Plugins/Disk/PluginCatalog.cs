@@ -71,7 +71,8 @@ public sealed class PluginCatalog
         IReadOnlyList<PluginStatusFieldRegistration> statusFields,
         IReadOnlyList<PluginActivationFailure> failures,
         PluginReplacements replacements,
-        IReadOnlyList<PluginCliRegistration> cliCommands)
+        IReadOnlyList<PluginCliRegistration> cliCommands,
+        IReadOnlySet<string> readOnlyNetworkTools)
     {
         PlanTools = planTools;
         WorkTools = workTools;
@@ -99,6 +100,7 @@ public sealed class PluginCatalog
         _instances = instances;
         Replacements = replacements;
         CliCommands = cliCommands;
+        ReadOnlyNetworkTools = readOnlyNetworkTools;
     }
 
     public static PluginCatalog Empty { get; } = new(
@@ -119,7 +121,8 @@ public sealed class PluginCatalog
         [],
         [],
         PluginReplacements.Empty,
-        []);
+        [],
+        new HashSet<string>(StringComparer.Ordinal));
 
     public IReadOnlyList<ITool> PlanTools { get; }
 
@@ -156,6 +159,12 @@ public sealed class PluginCatalog
 
     /// <summary>Process commands from plugins that loaded.</summary>
     public IReadOnlyList<PluginCliRegistration> CliCommands { get; }
+
+    /// <summary>
+    /// Gets tools from Home plugins that declare their Read-only Network calls
+    /// need no prompt. Project plugins never appear here.
+    /// </summary>
+    public IReadOnlySet<string> ReadOnlyNetworkTools { get; }
 
     /// <summary>Gets the slash verbs that plugins take over from the host.</summary>
     public IReadOnlyList<ISlashCommand> OverridingCommands =>
@@ -203,6 +212,7 @@ public sealed class PluginCatalog
         var statusFields = new List<PluginStatusFieldRegistration>();
         var failures = new List<PluginActivationFailure>();
         var toolNames = new HashSet<string>(StringComparer.Ordinal);
+        var readOnlyNetworkTools = new HashSet<string>(StringComparer.Ordinal);
         var commandNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pluginNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var placeholderNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -236,9 +246,11 @@ public sealed class PluginCatalog
 
             var toolCount = AddTools(
                 item.DirectoryName,
+                item.Source,
                 contribution,
                 host,
                 toolNames,
+                readOnlyNetworkTools,
                 notes,
                 plan,
                 work,
@@ -300,7 +312,8 @@ public sealed class PluginCatalog
             statusFields,
             failures,
             replacements,
-            cliCommands);
+            cliCommands,
+            readOnlyNetworkTools);
 
         void Skip(DiscoveredPlugin item, string reason)
         {
@@ -606,9 +619,11 @@ public sealed class PluginCatalog
 
     private static int AddTools(
         string directoryName,
+        PluginSource source,
         DiskContribution contribution,
         SessionToolHost host,
         HashSet<string> names,
+        HashSet<string> readOnlyNetworkTools,
         IList<string> notes,
         List<ITool> plan,
         List<ITool> work,
@@ -671,6 +686,11 @@ public sealed class PluginCatalog
             if (catalogs.Contains(PluginToolCatalog.Plan))
             {
                 plan.Add(tool);
+            }
+
+            if (contributionTool.AutoApprovesReadOnlyNetwork && source == PluginSource.Home)
+            {
+                readOnlyNetworkTools.Add(name);
             }
 
             var multimodal = contributionTool.Multimodal;

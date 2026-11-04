@@ -31,4 +31,13 @@ public interface IPluginTool
     /// Without this flag a built-in name is refused.
     /// </summary>
     bool ReplacesBuiltIn => false;
+
+    /// <summary>
+    /// Gets whether the host may run this tool without a prompt or review when
+    /// a plugin classifier rates the call Read risk with Network authority.
+    /// The host honors this only for plugins installed in Home, never for a
+    /// project plugin, and never for a call with any other classification,
+    /// a forced prompt, or a built-in replacement. Default: false.
+    /// </summary>
+    bool AutoApprovesReadOnlyNetwork => false;
 }

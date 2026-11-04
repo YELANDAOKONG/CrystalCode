@@ -7385,7 +7385,8 @@ public sealed class CodingSession : ITurnObserver
             _skills,
             _external.AutomaticTools,
             (call, classification) => _hooks.OnApproval(call, classification),
-            CreateExtendedReviewer());
+            CreateExtendedReviewer(),
+            _loadedPlugins.ReadOnlyNetworkTools);
         var options = new ToolExecutionOptions(ToolExecutionMode.Serial, 1);
         var childPlanTools = WorkspaceCatalog.CreatePlan(_workspace, new TodoList(), question, _plugins, _skills,
             _external, _loadedPlugins, CreateImageDescriber(), _settings.DisabledBuiltInTools.Plan,

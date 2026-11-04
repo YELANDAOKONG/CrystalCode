@@ -241,6 +241,79 @@ public sealed class ApprovalPolicyTests
         Assert.Null(reviewer.LastRequest);
     }
 
+    [Theory]
+    [InlineData("default")]
+    [InlineData("review")]
+    [InlineData("audit")]
+    public async Task DecideAsync_DeclaredReadOnlyNetworkTool_SkipsPromptAndReview(string mode)
+    {
+        using var context = new ApprovalContext(ApprovalMode.Parse(mode));
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var reviewer = new FixedApprovalReviewer(ApprovalReviewVerdict.Deny("should not run"));
+        var classifier = new FixedApprovalClassifier(
+            "websearch",
+            new ToolClassification(Risk.Read, Authority.Network, "Web search"));
+        var policy = context.CreatePolicy(
+            prompt,
+            reviewer,
+            classifiers: [classifier],
+            readOnlyNetworkTools: new HashSet<string>(StringComparer.Ordinal) { "websearch" });
+
+        var decision = await policy.DecideAsync(
+            JsonToolCall("1", "websearch", """{"query":"Crystal"}"""));
+
+        Assert.Equal(ToolInvocationAction.Execute, decision.Action);
+        Assert.Equal(0, prompt.Count);
+        Assert.Equal(0, prompt.ReviewCount);
+        Assert.Equal(1, prompt.PassCount);
+        Assert.Equal(Authority.Network, prompt.LastClassification?.Authority);
+        Assert.Null(reviewer.LastRequest);
+    }
+
+    [Fact]
+    public async Task DecideAsync_UndeclaredReadOnlyNetworkTool_StillAsks()
+    {
+        using var context = new ApprovalContext(ApprovalMode.Default);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var classifier = new FixedApprovalClassifier(
+            "websearch",
+            new ToolClassification(Risk.Read, Authority.Network, "Web search"));
+        var policy = context.CreatePolicy(prompt, classifiers: [classifier]);
+
+        var decision = await policy.DecideAsync(
+            JsonToolCall("1", "websearch", """{"query":"Crystal"}"""));
+
+        Assert.Equal(ToolInvocationAction.Reject, decision.Action);
+        Assert.Equal(1, prompt.Count);
+    }
+
+    [Theory]
+    [InlineData("write", "network", false)]
+    [InlineData("read", "outsideworkspace", false)]
+    [InlineData("privileged", "network", false)]
+    [InlineData("read", "network", true)]
+    public async Task DecideAsync_DeclaredNetworkTool_OnlyPassesPlainReadNetwork(
+        string risk,
+        string authority,
+        bool requirePrompt)
+    {
+        using var context = new ApprovalContext(ApprovalMode.Default);
+        var prompt = new RecordingApprovalPrompt(ApprovalChoice.Deny);
+        var classifier = new FixedApprovalClassifier(
+            "websearch",
+            new ToolClassification(new Risk(risk), new Authority(authority), "Web search", requirePrompt));
+        var policy = context.CreatePolicy(
+            prompt,
+            classifiers: [classifier],
+            readOnlyNetworkTools: new HashSet<string>(StringComparer.Ordinal) { "websearch" });
+
+        var decision = await policy.DecideAsync(
+            JsonToolCall("1", "websearch", """{"query":"Crystal"}"""));
+
+        Assert.Equal(ToolInvocationAction.Reject, decision.Action);
+        Assert.Equal(1, prompt.Count);
+    }
+
     [Fact]
     public async Task DecideAsync_Full_AutoExecutesWorkspaceBash()
     {
@@ -773,7 +846,8 @@ public sealed class ApprovalPolicyTests
             IReadOnlyList<IApprovalClassifier>? classifiers = null,
             IReadOnlySet<string>? automaticTools = null,
             Func<ToolCall, ToolClassification, ToolClassification>? advise = null,
-            ExtendedApprovalReviewer? extended = null) =>
+            ExtendedApprovalReviewer? extended = null,
+            IReadOnlySet<string>? readOnlyNetworkTools = null) =>
             new(
                 _mode,
                 new Workspace(_workspace.Path),
@@ -787,7 +861,8 @@ public sealed class ApprovalPolicyTests
                 skills,
                 automaticTools,
                 advise,
-                extended);
+                extended,
+                readOnlyNetworkTools);
 
         public void Dispose()
         {

@@ -29,6 +29,7 @@ public sealed class ApprovalPolicy
     private readonly ExtendedApprovalReviewer? _extended;
     private readonly IApprovalReviewContext? _reviewContext;
     private readonly IReadOnlySet<string> _automaticTools;
+    private readonly IReadOnlySet<string> _readOnlyNetworkTools;
 
     public ApprovalPolicy(
         ApprovalMode mode,
@@ -41,7 +42,8 @@ public sealed class ApprovalPolicy
         SkillCatalog? skills = null,
         IReadOnlySet<string>? automaticTools = null,
         Func<ToolCall, ToolClassification, ToolClassification>? advise = null,
-        ExtendedApprovalReviewer? extended = null)
+        ExtendedApprovalReviewer? extended = null,
+        IReadOnlySet<string>? readOnlyNetworkTools = null)
     {
         ArgumentNullException.ThrowIfNull(mode);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -57,6 +59,7 @@ public sealed class ApprovalPolicy
         _extended = extended;
         _reviewContext = reviewContext;
         _automaticTools = automaticTools ?? new HashSet<string>(StringComparer.Ordinal);
+        _readOnlyNetworkTools = readOnlyNetworkTools ?? new HashSet<string>(StringComparer.Ordinal);
     }
 
     public async ValueTask<ToolInvocationDecision> DecideAsync(
@@ -205,8 +208,21 @@ public sealed class ApprovalPolicy
         }
 
         if (classification.Risk == Risk.Forbidden
-            || classification.Risk == Risk.Privileged
-            || classification.Authority != Authority.Workspace)
+            || classification.Risk == Risk.Privileged)
+        {
+            return false;
+        }
+
+        // A Home plugin may declare a tool whose Read-only Network calls need
+        // no prompt. Any other risk or authority still goes to review.
+        if (classification.Risk == Risk.Read
+            && classification.Authority == Authority.Network
+            && _readOnlyNetworkTools.Contains(toolName))
+        {
+            return true;
+        }
+
+        if (classification.Authority != Authority.Workspace)
         {
             return false;
         }

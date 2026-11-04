@@ -390,6 +390,10 @@ separate library with no terminal code. The product can:
   and has a separate two-second budget. Reusable grants cover ordinary
   workspace Read/Write only; a raised classification is reviewed again.
   A forced prompt always requires the operator, even after a review allow;
+- let a Home plugin declare that one of its tools needs no approval for
+  Read-only Network calls, so a search or fetch plugin does not prompt on
+  every call. A project plugin cannot make that declaration, and the call
+  stays classified as Network;
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
   Anthropic Messages, native Gemini GenerateContent, and native Ollama Chat
   adapters, including user-added gateways;
