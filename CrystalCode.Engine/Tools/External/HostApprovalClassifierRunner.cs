@@ -41,7 +41,7 @@ internal sealed class HostApprovalClassifierRunner
         var token = timeout.Token;
         // The worker owns the source until external code finishes. It also
         // observes exceptions after the caller has stopped waiting.
-        var task = Task.Run(async () =>
+        var task = Task.Factory.StartNew(async () =>
         {
             using (timeout)
             {
@@ -59,7 +59,7 @@ internal sealed class HostApprovalClassifierRunner
                     return null;
                 }
             }
-        }, CancellationToken.None);
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
 
         try
         {
