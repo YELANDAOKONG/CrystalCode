@@ -1,4 +1,6 @@
+using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Plugins.Commands;
 
 using Xunit;
 
@@ -6,6 +8,19 @@ namespace CrystalCode.Engine.Tests.Sessions;
 
 public sealed class SlashMenuTests
 {
+    [Fact]
+    public void Create_MapsPluginArgumentTrees()
+    {
+        var completion = Assert.Single(SlashMenu.Create([new TestCommand()]), item => item.Name == "deploy");
+        var environment = Assert.Single(completion.ArgumentOptions);
+        var production = Assert.Single(environment.ArgumentOptions);
+
+        Assert.Equal("Choose an environment", environment.Help);
+        Assert.Equal(["prod", "production"], production.Keys);
+        Assert.True(environment.ArgumentsOptional);
+        Assert.Equal("Confirm deployment", Assert.Single(environment.TrailingArgumentOptions).Help);
+    }
+
     [Fact]
     public void Create_NestsApprovalModelAndThinkingArguments()
     {
@@ -72,5 +87,26 @@ public sealed class SlashMenuTests
         Assert.Equal("Toggle the summary printed after automatic compaction", auto.Help);
         Assert.Equal(["on", "off"], summary.ArgumentOptions.Select(item => item.Name));
         Assert.Equal(["on", "off"], auto.ArgumentOptions.Select(item => item.Name));
+    }
+
+    private sealed class TestCommand : ISlashCommand
+    {
+        public string Name => "deploy";
+
+        public string Help => "Deploy the application";
+
+        public IReadOnlyList<PluginCommandArgument> Arguments =>
+        [
+            new PluginCommandArgument(
+                "environment",
+                "Choose an environment",
+                arguments: [new PluginCommandArgument("production", "Deploy to production", ["prod", "production"])],
+                argumentsOptional: true,
+                argumentsAfterValue: [new PluginCommandArgument("confirm", "Confirm deployment")])
+        ];
+
+        public void Execute(string argument, ISlashOutput output)
+        {
+        }
     }
 }

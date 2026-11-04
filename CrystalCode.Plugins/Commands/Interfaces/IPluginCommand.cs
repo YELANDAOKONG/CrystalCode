@@ -1,5 +1,7 @@
 namespace CrystalCode.Plugins.Commands.Interfaces;
 
+using CrystalCode.Plugins.Commands;
+
 /// <summary>
 /// An extra slash command. A built-in verb or alias is refused unless
 /// <see cref="OverridesBuiltIn"/> is true.
@@ -11,6 +13,9 @@ public interface IPluginCommand
 
     /// <summary>Gets the help line.</summary>
     string Help { get; }
+
+    /// <summary>Gets argument completions, including any nested choices.</summary>
+    IReadOnlyList<PluginCommandArgument> Arguments => [];
 
     /// <summary>
     /// Gets whether this command takes over a built-in verb or alias of the

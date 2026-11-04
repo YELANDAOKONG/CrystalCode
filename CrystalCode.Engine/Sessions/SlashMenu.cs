@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Plugins.Interfaces;
+using CrystalCode.Plugins.Commands;
 
 namespace CrystalCode.Engine.Sessions;
 
@@ -81,11 +82,24 @@ public static class SlashMenu
 
         foreach (var command in extras)
         {
-            menu.Add(new SlashCompletion(command.Name, command.Help, [command.Name]));
+            menu.Add(new SlashCompletion(
+                command.Name,
+                command.Help,
+                [command.Name],
+                [.. command.Arguments.Select(Completion)]));
         }
 
         return menu;
     }
+
+    private static SlashCompletion Completion(PluginCommandArgument argument) =>
+        new(
+            argument.Name,
+            argument.Help,
+            argument.Keys,
+            [.. argument.Arguments.Select(Completion)],
+            argument.ArgumentsOptional,
+            [.. argument.ArgumentsAfterValue.Select(Completion)]);
 
     private static IReadOnlyList<SlashCompletion> ArgumentsFor(
         SlashSpec spec,

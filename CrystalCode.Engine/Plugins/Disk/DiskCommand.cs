@@ -23,6 +23,8 @@ internal sealed class DiskCommand : ISlashCommand
 
     public string Help { get; }
 
+    public IReadOnlyList<PluginCommandArgument> Arguments => _inner.Arguments;
+
     public void Execute(string argument, ISlashOutput output)
     {
         ArgumentNullException.ThrowIfNull(output);

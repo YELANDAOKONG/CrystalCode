@@ -8098,7 +8098,26 @@ public sealed class CodingSession : ITurnObserver
     }
 
     private IReadOnlyList<SlashCompletion> PluginHelp() =>
-        [.. PluginCommands().Select(static command => new SlashCompletion(command.Name, command.Help, [command.Name]))];
+        [.. PluginCommands().Select(static command => new SlashCompletion(
+            command.Name,
+            command.Help,
+            [command.Name],
+            [.. command.Arguments.Select(static argument => new SlashCompletion(
+                argument.Name,
+                argument.Help,
+                argument.Keys,
+                [.. argument.Arguments.Select(PluginArgumentCompletion)],
+                argument.ArgumentsOptional,
+                [.. argument.ArgumentsAfterValue.Select(PluginArgumentCompletion)]))]))];
+
+    private static SlashCompletion PluginArgumentCompletion(PluginCommandArgument argument) =>
+        new(
+            argument.Name,
+            argument.Help,
+            argument.Keys,
+            [.. argument.Arguments.Select(PluginArgumentCompletion)],
+            argument.ArgumentsOptional,
+            [.. argument.ArgumentsAfterValue.Select(PluginArgumentCompletion)]);
 
     private IReadOnlyList<ISlashCommand> PluginCommands()
     {

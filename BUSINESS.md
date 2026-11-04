@@ -350,7 +350,8 @@ separate library with no terminal code. The product can:
   or workspace have already changed;
 - load operator plugins from `~/.crystal/plugins` and
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
-  tools, protocol clients, classifiers, slash commands, hooks, raw
+  tools, protocol clients, classifiers, slash commands (with optional
+  argument completion trees), hooks, raw
   hooks, prompt placeholders, and process commands (admitted by the engine; no entry point runs them yet). After catalogs load, a plugin can read
   the resolved Home root and the discovered plugins, external tool sets, loaded external tools, and
   the skills currently available to the skill tool. A loaded plugin may

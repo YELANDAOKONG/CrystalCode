@@ -2517,7 +2517,8 @@ Events are immutable sealed records, one type per file under `Events`:
 Events carry plain data. `ToolsListed` carries a `ToolCatalogReport` (Plan and
 Work definitions, external tool metadata and notes, the external-tools switch,
 and the external approval policy), not the settings object or the live
-catalog. `HelpRequested` carries plugin verbs as `SlashCompletion` values, not
+catalog. `HelpRequested` carries plugin verbs and their argument completion
+trees as `SlashCompletion` values, not
 plugin objects. `SessionEventDataTests` fails when an event can reach
 `HarnessSettings`, a provider definition (which may hold a literal API key),
 `ExternalCatalog`, or a plugin type.

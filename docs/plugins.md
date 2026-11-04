@@ -188,7 +188,12 @@ assigns risk and authority for an unknown tool. It does not reclassify
 win unless the command sets `OverridesBuiltIn`, in which case the plugin
 runs instead, also while a turn is active, and the host notes the takeover.
 `/help` and completion still list the built-in entry. Names use the same
-pattern as tool names. `IPluginOutput.Write`
+pattern as tool names. `IPluginCommand.Arguments` optionally supplies a tree
+of `PluginCommandArgument` values for argument completion. Each node has a
+name, help text, completion keys (default: its name), nested arguments, an
+`ArgumentsOptional` flag, and optional `ArgumentsAfterValue` choices. The
+tree reaches every front end as `SlashCompletion` values. It is advisory:
+execution still receives the original argument string. `IPluginOutput.Write`
 and `Fail` become session notes.
 
 #### Documents
