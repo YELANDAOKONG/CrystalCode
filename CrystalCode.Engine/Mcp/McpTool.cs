@@ -1,5 +1,8 @@
 using System.Text.Json;
 
+using Crystal.Media;
+using Crystal.Multimodal;
+using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Tools;
@@ -14,7 +17,7 @@ namespace CrystalCode.Engine.Mcp;
 /// One tool a connected MCP server provides, exposed to the model under a
 /// Crystal-owned name.
 /// </summary>
-internal sealed class McpTool : ITool
+internal sealed class McpTool : ITool, IMultimodalTool
 {
     private readonly McpClient _client;
     private readonly string _serverName;
@@ -75,6 +78,53 @@ internal sealed class McpTool : ITool
         catch (Exception exception) when (exception is McpException or IOException)
         {
             return Failed(exception.Message);
+        }
+    }
+
+    public async ValueTask<MultimodalToolOutput> InvokeAsync(
+        MultimodalToolCall call,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(call);
+        return await InvokeMultimodalAsync(call, cancellationToken);
+    }
+
+    private async ValueTask<MultimodalToolOutput> InvokeMultimodalAsync(
+        MultimodalToolCall call,
+        CancellationToken cancellationToken)
+    {
+        if (!TryReadArguments(call.Arguments, out var arguments))
+        {
+            return new MultimodalToolOutput(
+                [new TextContent("The tool arguments must be a JSON object.")],
+                MultimodalToolResultStatus.Failure);
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (_timeoutSeconds is { } seconds)
+        {
+            timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
+        }
+
+        try
+        {
+            var result = await _client.CallToolAsync(
+                new CallToolRequestParams { Name = _remoteName, Arguments = arguments },
+                timeout.Token);
+            return McpToolResultText.ToMultimodalOutput(result);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new MultimodalToolOutput(
+                [new TextContent(ToolOutputText.Timeout(_timeoutSeconds ?? 0))],
+                MultimodalToolResultStatus.Failure);
+        }
+        catch (Exception exception) when (exception is McpException or IOException)
+        {
+            return new MultimodalToolOutput(
+                [new TextContent($"MCP server '{_serverName}' tool '{_remoteName}' failed. {exception.Message}")],
+                MultimodalToolResultStatus.Failure);
         }
     }
 

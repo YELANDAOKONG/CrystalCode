@@ -166,9 +166,10 @@ behavior stands until a specific change defines otherwise.
   path.
 - MCP gaps. MCP tools, resources, prompts, elicitation, and roots are in this
   build, and so are servers a front end passes in for one session. Not in it:
-  sampling, OAuth for remote servers, image and audio results (they are
-  named, not sent), and URL-mode elicitation. Do not bypass the existing
-  plugin, approval, and media boundaries.
+  sampling, OAuth for remote servers, audio results (they are named, not sent),
+  and URL-mode elicitation. MCP tool image results are forwarded on image-capable
+  turns through the existing media boundary. Do not bypass the plugin, approval,
+  and media boundaries.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.

@@ -1,4 +1,5 @@
 using Crystal.Tools;
+using Crystal.Multimodal.Tools;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
@@ -56,6 +57,10 @@ internal sealed class McpCatalog : IAsyncDisposable
     public IReadOnlyList<ITool> PlanTools { get; }
 
     public IReadOnlyList<ITool> WorkTools { get; }
+
+    public IReadOnlyList<IMultimodalTool> PlanMultimodalTools => [.. PlanTools.OfType<IMultimodalTool>()];
+
+    public IReadOnlyList<IMultimodalTool> WorkMultimodalTools => [.. WorkTools.OfType<IMultimodalTool>()];
 
     public IReadOnlyList<McpServerInfo> Servers { get; }
 

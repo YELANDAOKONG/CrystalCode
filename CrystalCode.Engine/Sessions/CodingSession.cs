@@ -285,6 +285,9 @@ public sealed class CodingSession : ITurnObserver
     {
         var catalog = EffectiveChildPlanMode ? HostToolCatalog.Plan : HostToolCatalog.Work;
         var tools = _plugins.CreateMultimodalTools(_workspace, todos, _questions, catalog).ToList();
+        tools.AddRange(EffectiveChildPlanMode
+            ? _mcp.PlanMultimodalTools
+            : _mcp.WorkMultimodalTools);
         tools.AddRange(EffectiveChildPlanMode ? _loadedPlugins.PlanMultimodalTools : _loadedPlugins.WorkMultimodalTools);
         tools.AddRange(EffectiveChildPlanMode ? _external.PlanMultimodalTools : _external.WorkMultimodalTools);
         tools.AddRange(ViewImageTool.ForSession(_workspace, sessionAcceptsImages: true));
@@ -7527,6 +7530,9 @@ public sealed class CodingSession : ITurnObserver
                 _todos,
                 prompt,
                 catalog));
+        tools.AddRange(catalog == HostToolCatalog.Plan
+            ? _mcp.PlanMultimodalTools
+            : _mcp.WorkMultimodalTools);
         switch (catalog)
         {
             case HostToolCatalog.Plan:

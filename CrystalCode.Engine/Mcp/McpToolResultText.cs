@@ -1,5 +1,8 @@
 using System.Text;
 
+using Crystal.Multimodal;
+using Crystal.Multimodal.Tools;
+using Crystal.Media;
 using Crystal.Tools;
 
 using CrystalCode.Engine.Tools;
@@ -22,6 +25,77 @@ internal static class McpToolResultText
         var status = result.IsError == true ? ToolResultStatus.Failure : ToolResultStatus.Success;
         return new ToolOutput(ToolOutputText.Truncate(text), status);
     }
+
+    public static MultimodalToolOutput ToMultimodalOutput(CallToolResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var contents = new List<MultimodalContent>();
+        var hasText = false;
+        foreach (var block in result.Content ?? [])
+        {
+            switch (block)
+            {
+                case TextContentBlock text:
+                    contents.Add(new TextContent(text.Text ?? string.Empty));
+                    hasText = true;
+                    break;
+                case ImageContentBlock image:
+                    if (TryImage(image, out var content))
+                    {
+                        contents.Add(content);
+                    }
+                    else
+                    {
+                        contents.Add(new TextContent($"[image content omitted: {MimeName(image.MimeType)}]"));
+                    }
+                    break;
+                default:
+                    contents.Add(new TextContent(Describe(block)));
+                    break;
+            }
+        }
+
+        if (!hasText && result.StructuredContent is { } structured)
+        {
+            contents.Add(new TextContent(structured.GetRawText()));
+        }
+
+        if (contents.Count == 0)
+        {
+            contents.Add(new TextContent(EmptyResult));
+        }
+
+        return new MultimodalToolOutput(
+            contents,
+            result.IsError == true ? MultimodalToolResultStatus.Failure : MultimodalToolResultStatus.Success);
+    }
+
+    private static bool TryImage(ImageContentBlock image, out ImageContent content)
+    {
+        content = null!;
+        if (!IsSupportedImage(image.MimeType) || image.Data is not { Length: > 0 })
+        {
+            return false;
+        }
+
+        try
+        {
+            content = new ImageContent(new ImageMedia(
+                new InlineMediaSource(image.Data),
+                new MediaMimeType(image.MimeType)));
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsSupportedImage(string? mimeType) =>
+        mimeType is not null && (mimeType.Equals("image/png", StringComparison.OrdinalIgnoreCase)
+            || mimeType.Equals("image/jpeg", StringComparison.OrdinalIgnoreCase)
+            || mimeType.Equals("image/gif", StringComparison.OrdinalIgnoreCase)
+            || mimeType.Equals("image/webp", StringComparison.OrdinalIgnoreCase));
 
     private static string Format(CallToolResult result)
     {

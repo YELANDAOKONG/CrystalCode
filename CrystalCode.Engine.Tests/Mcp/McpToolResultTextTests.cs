@@ -1,4 +1,7 @@
 using Crystal.Tools;
+using Crystal.Media;
+using Crystal.Multimodal;
+using Crystal.Multimodal.Tools;
 
 using CrystalCode.Engine.Mcp;
 
@@ -74,6 +77,27 @@ public sealed class McpToolResultTextTests
         Assert.Contains("screenshot", output.Text, StringComparison.Ordinal);
         Assert.Contains("[image content omitted: image/png]", output.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("AAAA", output.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ToMultimodalOutput_PreservesImageAndTextBlocksInOrder()
+    {
+        var bytes = new byte[] { 0x89, 0x50, 0x4e, 0x47 };
+        var output = McpToolResultText.ToMultimodalOutput(new CallToolResult
+        {
+            Content =
+            [
+                new TextContentBlock { Text = "screenshot" },
+                new ImageContentBlock { Data = bytes, MimeType = "image/png" }
+            ]
+        });
+
+        Assert.Equal(MultimodalToolResultStatus.Success, output.Status);
+        Assert.Equal(2, output.Contents.Count);
+        Assert.Equal("screenshot", Assert.IsType<TextContent>(output.Contents[0]).Text);
+        var image = Assert.IsType<ImageContent>(output.Contents[1]);
+        Assert.Equal("image/png", image.Image.MimeType.Value);
+        Assert.Equal(bytes, Assert.IsType<InlineMediaSource>(image.Image.Source).Data.ToArray());
     }
 
     [Fact]

@@ -114,10 +114,13 @@ offer them in Plan. Plan still rejects side effects through approval.
 The host does not trust a server's description of itself. Descriptions are shown
 to the model as given, so only connect servers you trust.
 
-Results are returned as text. Image, audio, and binary content is not sent; a
-short line names what was left out. A result larger than the tool output limit
-is truncated. A server that reports an error produces a failed tool result. The
-SDK may replace the server's error message with a generic one.
+Text results are returned as text. On an image-capable model turn, supported
+PNG, JPEG, GIF, and WebP image blocks are returned through the session's image
+media boundary and become input on the next model round. On text-only turns, or
+for unsupported or invalid images, a short line names what was left out. Audio
+and binary content other than images is not sent. A result larger than the tool
+output limit is truncated. A server that reports an error produces a failed
+tool result. The SDK may replace the server's error message with a generic one.
 
 ## Resources
 
