@@ -22,6 +22,16 @@ that fixes it.
 
 ## Issues
 
+- In some cases with some providers, streamed thinking text segments appear
+  concatenated without a separating space or newline. For example, adjacent
+  Markdown bold segments can render as `**A****B**`, and words in the Thinking
+  transcript run together. The terminal and Responses adapter currently append
+  and forward text deltas as received, so the source is not established: capture
+  a redacted raw provider stream and compare it with parsed events before
+  deciding whether the provider, protocol adapter, or display path is at fault.
+  Do not insert separators speculatively because the intended boundary may be
+  paragraph, sentence, or word continuation.
+
 - `ThemePickerTests.Render_ListsNamesMarksTheSelectionAndCurrentAndShowsASample`
   is skipped. On the GitHub Actions runners (Linux, macOS, and Windows) it
   fails at the assertion for `-let count = 1;`: the rendered theme picker has
