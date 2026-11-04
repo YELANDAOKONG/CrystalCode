@@ -8,23 +8,28 @@ namespace CrystalCode.Plugins.Environment;
 /// </summary>
 public sealed class PluginEnvironment : IPluginEnvironment
 {
-    public static PluginEnvironment Empty { get; } = new([], [], [], []);
+    public static PluginEnvironment Empty { get; } = new(string.Empty, [], [], [], []);
 
     public PluginEnvironment(
+        string homeDirectory,
         IEnumerable<PluginPeer> plugins,
         IEnumerable<ExternalToolSetPeer> toolSets,
         IEnumerable<ExternalToolPeer> externalTools,
         IEnumerable<SkillPeer> skills)
     {
+        ArgumentNullException.ThrowIfNull(homeDirectory);
         ArgumentNullException.ThrowIfNull(plugins);
         ArgumentNullException.ThrowIfNull(toolSets);
         ArgumentNullException.ThrowIfNull(externalTools);
         ArgumentNullException.ThrowIfNull(skills);
+        HomeDirectory = homeDirectory;
         Plugins = Copy(plugins);
         ToolSets = Copy(toolSets);
         ExternalTools = Copy(externalTools);
         Skills = Copy(skills);
     }
+
+    public string HomeDirectory { get; }
 
     public IReadOnlyList<PluginPeer> Plugins { get; }
 

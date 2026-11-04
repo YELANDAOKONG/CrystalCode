@@ -6,6 +6,9 @@ namespace CrystalCode.Plugins.Environment.Interfaces;
 /// </summary>
 public interface IPluginEnvironment
 {
+    /// <summary>Gets the resolved absolute Home root for this process, or empty before attachment.</summary>
+    string HomeDirectory { get; }
+
     IReadOnlyList<PluginPeer> Plugins { get; }
 
     IReadOnlyList<ExternalToolSetPeer> ToolSets { get; }

@@ -25,6 +25,7 @@ public static class PluginEnvironmentFactory
         ArgumentNullException.ThrowIfNull(plugins);
         ArgumentNullException.ThrowIfNull(tools);
         return new PluginEnvironment(
+            home.Root,
             PluginPeers(home, workspaceRoot, plugins),
             ToolSetPeers(home, workspaceRoot, tools),
             ToolPeers(tools),

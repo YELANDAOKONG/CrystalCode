@@ -3142,7 +3142,7 @@ classifiers for unknown tools, slash commands that do not reuse a
 built-in verb, hooks, raw hooks, and prompt placeholders. After plugins,
 external tools, and skills have loaded, the host calls `IPlugin.Attach`
 with a read-only snapshot and calls it again when those catalogs reload.
-The snapshot lists discovered plugin directories and external tool sets
+The snapshot carries the resolved absolute Home root and lists discovered plugin directories and external tool sets
 (directory, source, enabled, effective, loaded, and skip reason), loaded
 external tools (name, set, source, and Plan or Work), and the skills the
 `skill` tool can load (name and description). It includes the calling

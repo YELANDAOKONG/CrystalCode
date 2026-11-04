@@ -183,6 +183,7 @@ public sealed class PluginCatalogTests
         Assert.Equal("branch", value.Name);
         Assert.Equal("main", value.Text);
         var environment = new PluginEnvironment(
+            home.Home.Root,
             [new PluginPeer("Fixture", "home", "Sample", true, true, true, string.Empty)],
             [new ExternalToolSetPeer("Extra", "project", true, true, false, string.Empty)],
             [new ExternalToolPeer("lint", "Extra", "project", plan: false, work: true)],
@@ -218,7 +219,7 @@ public sealed class PluginCatalogTests
         var peers = catalog.WorkTools.Single(tool => tool.Definition.Name == "peers");
         var listed = await peers.InvokeAsync(
             JsonToolCall("4", "peers", "{}"));
-        Assert.Equal("1\n1\n1\n1\nsession\nyes", listed.Text);
+        Assert.Equal(home.Home.Root + "\n1\n1\n1\n1\nsession\nyes", listed.Text);
         var table = new PluginPlaceholderTable(catalog.Placeholders, _ => { });
         table.SetEnvironment(environment);
         var bound = PromptBinder.Apply(
@@ -509,7 +510,8 @@ public sealed class PluginCatalogTests
                         var review = _plugin.Models.Review.Independent ? "own" : "session";
                         var clients = _plugin.Clients is null ? "no" : "yes";
                         return ValueTask.FromResult(new ToolOutput(
-                            environment.Plugins.Count
+                            environment.HomeDirectory
+                            + "\n" + environment.Plugins.Count
                             + "\n" + environment.ToolSets.Count
                             + "\n" + environment.ExternalTools.Count
                             + "\n" + environment.Skills.Count

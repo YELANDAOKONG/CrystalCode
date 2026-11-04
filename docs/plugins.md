@@ -266,11 +266,15 @@ published is removed. The plugin does not choose color, markup, or an extra row.
 
 ### Catalog snapshot
 
-`IPluginEnvironment` is read-only. It does not enable, disable, invoke, or
-reorder anything, and it does not declare a load dependency.
+`IPluginEnvironment` is read-only. `HomeDirectory` is the resolved absolute
+Home root for this process, including a path selected by `--home`; it is not
+reconstructed from `CRYSTAL_HOME` or the default location. The environment
+does not enable, disable, invoke, or reorder anything, and it does not declare
+a load dependency.
 
 | List | Contains |
 | :--- | :--- |
+| `HomeDirectory` | The resolved absolute Home root. |
 | `Plugins` | Every discovered plugin directory, including this plugin. Directory, source (`home` or `project`), display name, enabled, effective, loaded, and skip reason. No assembly path, type name, or manifest path. |
 | `ToolSets` | Every discovered external tool set, with the same directory fields. |
 | `ExternalTools` | Tools that loaded: name, set, source, and whether the tool is in Plan, Work, or both. |

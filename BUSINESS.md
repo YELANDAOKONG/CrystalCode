@@ -352,7 +352,7 @@ separate library with no terminal code. The product can:
   `<workspace>/.crystal/plugins` when Plugins is enabled, including
   tools, protocol clients, classifiers, slash commands, hooks, raw
   hooks, prompt placeholders, and process commands (admitted by the engine; no entry point runs them yet). After catalogs load, a plugin can read
-  the discovered plugins, external tool sets, loaded external tools, and
+  the resolved Home root and the discovered plugins, external tool sets, loaded external tools, and
   the skills currently available to the skill tool. A loaded plugin may
   also register custom status-line fields. They stay off the adaptive
   bar until the operator names them in `statusLine` or `/statusline`.
@@ -922,7 +922,8 @@ tool may also implement `CrystalCode.Tools.IHostTool` or
 approval mode, and its global and project runtime-data directories on each
 call. A disk plugin that implements
 `CrystalCode.Plugins.Data.Interfaces.IPluginDataDirectory` receives the same two data
-directories. Plugins and tool sets keep that runtime data under
+directories. `IPluginEnvironment.HomeDirectory` exposes the resolved absolute
+Home root, including a process `--home` override. Plugins and tool sets keep that runtime data under
 `data/plugins/<directory>/` and `data/tools/<directory>/` in the home and
 project `.crystal` trees; the host creates those directories lazily, and they
 are separate from the `plugins/` and `tools/` install trees. Tools that

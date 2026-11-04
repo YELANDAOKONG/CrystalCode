@@ -59,6 +59,7 @@ public sealed class PluginEnvironmentFactoryTests
             external,
             skills);
 
+        Assert.Equal(home.Home.Root, environment.HomeDirectory);
         var quiet = Assert.Single(environment.Plugins, peer => peer.Directory == "Quiet");
         Assert.Equal("home", quiet.Source);
         Assert.False(quiet.Enabled);
@@ -96,6 +97,13 @@ public sealed class PluginEnvironmentFactoryTests
         Assert.Empty(environment.Skills);
         Assert.Empty(environment.Plugins);
         Assert.Empty(environment.ExternalTools);
+        Assert.Equal(home.Home.Root, environment.HomeDirectory);
+    }
+
+    [Fact]
+    public void Empty_HasNoHomeDirectory()
+    {
+        Assert.Equal(string.Empty, CrystalCode.Plugins.Environment.PluginEnvironment.Empty.HomeDirectory);
     }
 
     private static void WritePlugin(string root, string name, string json)
