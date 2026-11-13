@@ -17,7 +17,9 @@ public sealed class TodoWriteTool : ITool
         + "(three or more steps, non-trivial, or several user items). "
         + "Skip a single simple edit or a purely conversational question. "
         + "Keep exactly one item in_progress. Mark completed only after the work is done and verified. "
-        + "merge true upserts by id; omit or false replaces the list.";
+        + "merge true upserts by id, keeping existing positions and appending new items; "
+        + "omit or false replaces the list. With merge true, reorder true moves supplied items "
+        + "to the front in input order; reorder defaults to false and is ignored when replacing.";
 
     private readonly TodoList _todos;
 
@@ -56,7 +58,11 @@ public sealed class TodoWriteTool : ITool
                     },
                     "merge": {
                       "type": "boolean",
-                      "description": "When true, upsert by id and keep other items. When false, replace the list."
+                      "description": "When true, upsert by id and keep other items, preserving existing positions and appending new items. When false, replace the list."
+                    },
+                    "reorder": {
+                      "type": "boolean",
+                      "description": "With merge true, move supplied items to the front in input order. Defaults to false. Ignored when replacing."
                     }
                   },
                   "required": ["todos"]
@@ -74,12 +80,12 @@ public sealed class TodoWriteTool : ITool
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(call);
 
-        if (!TryRead(call.Arguments, out var items, out var merge, out var error))
+        if (!TryRead(call.Arguments, out var items, out var merge, out var reorder, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
         }
 
-        var text = merge ? _todos.Merge(items) : _todos.Replace(items);
+        var text = merge ? _todos.Merge(items, reorder) : _todos.Replace(items);
         if (text.StartsWith("At most", StringComparison.Ordinal))
         {
             return ValueTask.FromResult(new ToolOutput(text, ToolResultStatus.Failure));
@@ -92,10 +98,12 @@ public sealed class TodoWriteTool : ITool
         string arguments,
         out IReadOnlyList<TodoItem> items,
         out bool merge,
+        out bool reorder,
         out string error)
     {
         items = [];
         merge = false;
+        reorder = false;
         error = "Arguments must include a todos array.";
         if (!ToolArguments.TryReadOptionalBoolean(arguments, "merge", out var mergeValue))
         {
@@ -104,6 +112,13 @@ public sealed class TodoWriteTool : ITool
         }
 
         merge = mergeValue ?? false;
+        if (!ToolArguments.TryReadOptionalBoolean(arguments, "reorder", out var reorderValue))
+        {
+            error = "reorder must be a boolean when supplied.";
+            return false;
+        }
+
+        reorder = reorderValue ?? false;
         if (!TryOpen(arguments, out var document))
         {
             return false;

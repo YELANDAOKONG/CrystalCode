@@ -61,7 +61,7 @@ public sealed class TodoList
         }
     }
 
-    public string Merge(IReadOnlyList<TodoItem> items)
+    public string Merge(IReadOnlyList<TodoItem> items, bool reorder = false)
     {
         ArgumentNullException.ThrowIfNull(items);
         lock (_gate)
@@ -83,9 +83,28 @@ public sealed class TodoList
                 return $"At most {MaximumCount} todos are allowed.";
             }
 
-            _items.Clear();
-            _items.AddRange(items);
-            _items.AddRange(kept);
+            if (reorder)
+            {
+                _items.Clear();
+                _items.AddRange(items);
+                _items.AddRange(kept);
+            }
+            else
+            {
+                foreach (var item in items)
+                {
+                    var index = _items.FindIndex(existing => existing.Id == item.Id);
+                    if (index >= 0)
+                    {
+                        _items[index] = item;
+                    }
+                    else
+                    {
+                        _items.Add(item);
+                    }
+                }
+            }
+
             Version++;
             return FormatUnlocked();
         }

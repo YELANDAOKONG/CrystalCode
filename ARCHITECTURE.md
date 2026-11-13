@@ -1004,7 +1004,13 @@ terminal, reads its keys, or switches it out of raw mode.
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.
 
-The todo list belongs to the session, not to a mode. Built-in Plan text asks
+The todo list belongs to the session, not to a mode. `todowrite` replaces the
+list in input order by default. With `merge: true`, existing ids are updated
+in place and new ids are appended in input order. Optional `reorder: true`
+with merge moves supplied items to the front in input order, followed by
+untouched items in their existing order. `reorder` defaults to false and is
+ignored when replacing the list.
+Built-in Plan text asks
 the model to write the plan's steps as pending todos and leave them pending;
 built-in Work text asks the model to work through pending todos it finds
 instead of starting a new list. Built-in Work and Plan text also direct the
