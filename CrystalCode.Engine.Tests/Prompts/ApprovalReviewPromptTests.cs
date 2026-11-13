@@ -109,4 +109,28 @@ public sealed class ApprovalReviewPromptTests
             ApprovalReviewPrompt.SystemText,
             StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ComposedSystem_RequiresDeletionInspectionAndDeniesUnsafeUncertainty(bool extended)
+    {
+        var context = PromptContext.InstructionsOnly(string.Empty);
+        var text = extended
+            ? ExtendedApprovalPrompt.ComposeSystem(context)
+            : ApprovalReviewPrompt.ComposeSystem(context);
+
+        Assert.Contains("Deletion safety overrides", text, StringComparison.Ordinal);
+        Assert.Contains("Bash and other Unix shells", text, StringComparison.Ordinal);
+        Assert.Contains("PowerShell (Remove-Item and aliases)", text, StringComparison.Ordinal);
+        Assert.Contains("cmd (del, erase, rd, rmdir)", text, StringComparison.Ordinal);
+        Assert.Contains("scripts, APIs, wrappers, or other commands", text, StringComparison.Ordinal);
+        Assert.Contains("working directory and directory changes", text, StringComparison.Ordinal);
+        Assert.Contains("concatenation, interpolation, command substitution, and empty or unset values", text, StringComparison.Ordinal);
+        Assert.Contains("quoting, escaping, word splitting, wildcards", text, StringComparison.Ordinal);
+        Assert.Contains("symbolic links or junctions", text, StringComparison.Ordinal);
+        Assert.Contains("return outcome deny, not ask, even if deletion is authorized", text, StringComparison.Ordinal);
+        Assert.Contains("identify the uncertainty and require a safer alternative", text, StringComparison.Ordinal);
+        Assert.Contains("first inspecting the resolved targets with a read-only command", text, StringComparison.Ordinal);
+    }
 }

@@ -997,6 +997,17 @@ explicitly requested; deny for low authorization or unrequested harm; ask
 otherwise. Host risk and host authority are a lower bound, and the policy
 still refuses to pass a `forbidden` call whatever the verdict says.
 
+Both built-in approval prompts require careful inspection of every deletion
+operation submitted for review, including Bash, PowerShell, cmd, other shells,
+scripts, APIs, and wrappers. Review traces paths, working-directory changes,
+variables and concatenation, expansion, quoting, wildcards, control flow,
+recursive scope, and links from the supplied evidence. Unresolved deletion
+path or command-construction safety requires `deny`, not `ask`, with a
+rationale identifying the uncertainty and requiring a safer alternative.
+This overrides the ordinary outcome fallback and extended approval's default
+allow, including after a primary allow. It changes prompt guidance only;
+classification, grants, automatic passes, and prompt overrides still apply.
+
 Live Work and Plan system text is assembled from overlayable templates using
 host-owned placeholders (`{{name}}`). Review and compaction prompts use the
 same placeholder syntax. Composite session slots are `{{env}}`, `{{clock}}`, `{{session}}`,

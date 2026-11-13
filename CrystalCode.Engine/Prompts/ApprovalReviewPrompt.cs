@@ -33,6 +33,12 @@ public static class ApprovalReviewPrompt
         - deny: low authorization, or the action would cause harm the user did not ask for
         - ask: every other case, or when you cannot tell
 
+        Deletion safety overrides the outcome rules above. Carefully inspect every deletion operation, regardless of shell, tool, or language: Bash and other Unix shells (rm, rmdir, find -delete, xargs), PowerShell (Remove-Item and aliases), cmd (del, erase, rd, rmdir), and deletion through scripts, APIs, wrappers, or other commands. Check the actual operation, not just the command name.
+
+        Trace every deletion target from the available evidence: the working directory and directory changes; absolute and relative paths, parent traversal, drive and UNC roots; variable assignments, environment variables, concatenation, interpolation, command substitution, and empty or unset values; quoting, escaping, word splitting, wildcards, pipelines, loops, and nested shells; recursive and force options; and symbolic links or junctions that could change the target or scope. Confirm that the resulting targets and deletion scope stay within what the user authorized. Do not assume a variable's value, a script's contents, or a path's resolution is safe when the evidence does not establish it.
+
+        If you cannot establish that a deletion's paths, variable expansion, or command construction are safe, return outcome deny, not ask, even if deletion is authorized. In rationale, identify the uncertainty and require a safer alternative, such as first inspecting the resolved targets with a read-only command, then proposing deletion of explicit, narrowly scoped literal paths with appropriate quoting or literal-path handling. A cleanup label, the host classification, or user authorization does not resolve unsafe command construction.
+
         The host also classifies the call. Host risk is usually read, write, privileged, or forbidden. Host authority is where the action takes effect: usually workspace, outside_workspace, network, or privileged_escalation. Treat this classification as a lower bound on risk, not as a verdict. Forbidden actions must not be allowed.
 
         You cannot run tools or read files. Judge only from the conversation, the host classification, and the proposed action above, and never claim to have inspected anything yourself. Truncation notes and omitted entries mean data was removed: be more cautious when evidence is missing, but do not treat the removed text as risky by itself.
