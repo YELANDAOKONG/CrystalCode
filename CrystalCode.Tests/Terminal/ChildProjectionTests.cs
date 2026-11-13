@@ -12,6 +12,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Terminal;
 using CrystalCode.Terminal.Approvals;
@@ -170,6 +171,92 @@ public sealed class ChildProjectionTests
         Assert.Equal("live todo", Assert.Single(snapshot.Todos).Content);
         Assert.Equal(child.Id, renderer.ChildFocus);
         Assert.Contains("beforeafter", TranscriptText(renderer), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ChildSessionChanged_RunningCountsPreserveTranscriptScrollAndProgress()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Status = "running" };
+        var invocation = Guid.NewGuid();
+        projection.OnEvent(new ChildSessionChanged(child, invocation));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new NoteWritten("committed child note")));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, "before"))));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new UsageChanged(new TokenUsage(220, 22), null, 2000, true)));
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new TodosChanged([new TodoItem("a", "live todo", TodoStatus.InProgress)])));
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\0', ConsoleKey.PageUp, false, false, false)],
+            static () => false, CancellationToken.None, checkSize: false);
+        var scrollField = typeof(SessionRenderer).GetField("_scrollBack", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var scroll = Assert.IsType<int>(scrollField.GetValue(renderer));
+        Assert.True(scroll > 0);
+        var log = Assert.IsType<TranscriptLog>(typeof(SessionRenderer)
+            .GetField("_log", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(renderer));
+        var entries = Assert.IsType<List<TranscriptEntry>>(typeof(TranscriptLog)
+            .GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(log));
+        var committed = Assert.Single(entries);
+        var text = TranscriptText(renderer);
+        var progress = renderer.ChromeProgress;
+
+        for (var count = 1; count <= 2; count++)
+        {
+            projection.OnEvent(new ChildSessionChanged(child with { ModelCalls = count, ToolCalls = count }, invocation));
+            Assert.Equal(scroll, scrollField.GetValue(renderer));
+            Assert.Same(committed, Assert.Single(entries));
+            Assert.Equal(text, TranscriptText(renderer));
+            Assert.Equal(progress, renderer.ChromeProgress);
+            var snapshot = Assert.Single(renderer.ChildSessions);
+            Assert.Equal(count, snapshot.ModelCalls);
+            Assert.Equal(count, snapshot.ToolCalls);
+            Assert.Equal(220, snapshot.Usage!.InputTokenCount);
+            Assert.Equal("live todo", Assert.Single(snapshot.Todos).Content);
+        }
+        projection.OnEvent(new ChildEventReceived(child.Id, invocation,
+            new StreamReceived(new ChatTextDelta(0, 0, ChatRole.Assistant, "after"))));
+        Assert.Contains("beforeafter", TranscriptText(renderer), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("queued", "running", false)]
+    [InlineData("running", "completed", false)]
+    [InlineData("running", "failed", false)]
+    [InlineData("running", "interrupted", false)]
+    [InlineData("running", "running", true)]
+    [InlineData("running", "running", false)]
+    public void ChildSessionChanged_LifecycleOrArchiveChangesRefreshFocusedHistory(
+        string previousStatus, string status, bool newInvocation)
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        projection.OnEvent(new SessionStarted(new SessionChrome("parent", "/workspace", false,
+            ApprovalMode.Default, "high", "", 1000, AgentsEnabled: true)));
+        var child = new ChildSessionDocument { Id = "child-one", Agent = "explore", Status = previousStatus };
+        var invocation = Guid.NewGuid();
+        projection.OnEvent(new ChildSessionChanged(child, invocation));
+        projection.OnEvent(new ChildViewRequested(child.Id));
+        renderer.SetProgress(ProgressText.Writing);
+        var archiveChanged = previousStatus == status && !newInvocation;
+        projection.OnEvent(new ChildSessionChanged(child with
+        {
+            Status = status,
+            Archive = archiveChanged
+                ? [.. TranscriptCodec.Write([new ChatMessage(ChatRole.User, "updated child history")])]
+                : child.Archive
+        }, newInvocation ? Guid.NewGuid() : invocation));
+
+        if (archiveChanged)
+        {
+            Assert.Contains("updated child history", TranscriptText(renderer), StringComparison.Ordinal);
+        }
+        Assert.Equal(status is "running" or "queued" ? status : string.Empty, renderer.ChromeProgress);
     }
 
     [Fact]

@@ -171,6 +171,7 @@ public sealed class MultimodalStreamingTurn
                 }
 
                 modelCallCount++;
+                _observer?.OnCallCountsUpdated(modelCallCount, toolCallCount);
                 var outbound = await PrepareOutboundAsync(transcript, linked.Token);
                 var held = _imageSnapshot();
                 var request = new MultimodalChatRequest(
@@ -258,6 +259,7 @@ public sealed class MultimodalStreamingTurn
                 anchor = PublishAnchor(response.Usage, transcript) ?? anchor;
 
                 toolCallCount += toolCalls.Length;
+                _observer?.OnCallCountsUpdated(modelCallCount, toolCallCount);
                 _observer?.OnModelRoundClosed();
                 _observer?.OnToolCalls(toolCalls);
                 var multimodalCalls = toolCalls.Select(static call =>

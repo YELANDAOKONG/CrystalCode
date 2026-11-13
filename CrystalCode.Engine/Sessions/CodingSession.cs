@@ -349,8 +349,24 @@ public sealed class CodingSession : ITurnObserver
         var images = new Dictionary<int, ImageAttachment>(_sessionStore.ReadImages(child.Images));
         var extraUsage = new UsageAccumulator();
         var extraModelCalls = 0;
+        var modelCallsBaseline = child.ModelCalls;
+        var toolCallsBaseline = child.ToolCalls;
+        var runModelCalls = 0;
+        var runToolCalls = 0;
         var latestUsage = SessionMapper.ReadUsage(child.Usage);
         var usageAfterCompaction = latestUsage;
+        void UpdateCallCounts(int modelCalls, int toolCalls)
+        {
+            runModelCalls = modelCalls;
+            runToolCalls = toolCalls;
+            child = child with
+            {
+                ModelCalls = checked(modelCallsBaseline + runModelCalls + extraModelCalls),
+                ToolCalls = checked(toolCallsBaseline + runToolCalls)
+            };
+            _children.Set(child);
+            Publish(new ChildSessionChanged(child, invocation));
+        }
         void Emit(SessionEvent value)
         {
             if (value is ContextEstimated estimate)
@@ -454,7 +470,8 @@ public sealed class CodingSession : ITurnObserver
                     selectedModel.ContextWindow, true));
             }, _ => usageAfterCompaction = null,
                 () => Emit(new TodosChanged(todos.Snapshot())),
-                anchor => childAnchor = anchor);
+                anchor => childAnchor = anchor,
+                UpdateCallCounts);
             var limits = _settings.Agents.Limits.ToTurnLimits();
             IReadOnlyList<ChatItem> reviewItems = items;
             async Task<CompactionOutcome> CompactAsync(IReadOnlyList<ChatItem> context, CancellationToken token)
@@ -472,7 +489,11 @@ public sealed class CodingSession : ITurnObserver
                 var summaryClient = CreateClient(summarySelection.WithOutputTokenCap(compactionLimits.SummaryOutputCap()));
                 try
                 {
-                    var budgeted = new ChildSummaryClient(summaryClient, _sharedBudget, () => extraModelCalls++);
+                    var budgeted = new ChildSummaryClient(summaryClient, _sharedBudget, () =>
+                    {
+                        extraModelCalls++;
+                        UpdateCallCounts(runModelCalls, runToolCalls);
+                    });
                     var compactor = new ContextCompactor(budgeted, _settings.Retry.ToOptions(),
                         attempt => Emit(new RetryScheduled(attempt)),
                         systemText: () => CompactionPrompt.ComposeSystem(facts.WithMode("compaction"),
@@ -574,7 +595,7 @@ public sealed class CodingSession : ITurnObserver
             if (result is not null)
             {
                 var ledger = new SessionLedger();
-                ledger.Restore(0, child.ModelCalls, child.ToolCalls, SessionMapper.ReadUsage(child.Usage),
+                ledger.Restore(0, modelCallsBaseline, toolCallsBaseline, SessionMapper.ReadUsage(child.Usage),
                     SessionMapper.ReadUsage(child.CumulativeUsage));
                 ledger.Record(result);
                 if (extraModelCalls > 0)

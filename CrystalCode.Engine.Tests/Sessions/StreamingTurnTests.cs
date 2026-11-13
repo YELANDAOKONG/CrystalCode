@@ -106,11 +106,13 @@ public sealed class StreamingTurnTests
             JsonChatToolCallDelta(0, 1, "c1", "echo", "{}"),
             new ChatCandidateCompleted(0, FinishReason.ToolCalls)
         ]);
-        var turn = CreateTurn(client, new TurnLimits(2, 0, TimeSpan.FromSeconds(5)));
+        var observer = new TestObserver();
+        var turn = CreateTurn(client, new TurnLimits(2, 0, TimeSpan.FromSeconds(5)), observer);
 
         var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "echo")]);
 
         Assert.Equal(TurnStopReason.ToolCallLimitReached, result.StopReason);
+        Assert.Equal([(1, 0)], observer.CallCounts);
         Assert.Equal(0, result.ToolCallCount);
         Assert.DoesNotContain(result.Transcript, static item => item is ToolCall or ToolResult);
         Assert.Equal("partial", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
@@ -137,19 +139,26 @@ public sealed class StreamingTurnTests
     {
         using var cts = new CancellationTokenSource();
         var client = new ScriptedStreamingClient(ToolRound("c_cancel", "cancel_tool", "{}"));
-        var cancellingTool = new CancellingTool(() => cts.Cancel());
+        var observer = new TestObserver();
+        var cancellingTool = new CancellingTool(() =>
+        {
+            Assert.Equal([(1, 0), (1, 1)], observer.CallCounts);
+            cts.Cancel();
+        });
         var turn = new StreamingTurn(
             client,
             new ToolExecutor(
                 new ToolCatalog([cancellingTool]),
                 new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
-            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)));
+            new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
 
         var result = await turn.RunAsync(
             [new ChatMessage(ChatRole.User, "test")],
             cts.Token);
 
         Assert.Equal(TurnStopReason.Interrupted, result.StopReason);
+        Assert.Equal((result.ModelCallCount, result.ToolCallCount), observer.CallCounts[^1]);
         var call = result.Transcript.OfType<ToolCall>().Single();
         var toolResult = result.Transcript.OfType<ToolResult>().Single();
         Assert.Equal(call.CallId, toolResult.CallId);
@@ -365,6 +374,7 @@ public sealed class StreamingTurnTests
         Assert.Equal(TurnStopReason.Completed, result.StopReason);
         Assert.Equal(1, result.ModelCallCount);
         Assert.Equal(2, client.RequestCount);
+        Assert.Equal([(1, 0)], observer.CallCounts);
         var retry = Assert.Single(observer.Retries);
         Assert.Equal(1, retry.Attempt);
         Assert.Equal(TimeSpan.FromSeconds(8), retry.Delay);
@@ -660,13 +670,15 @@ public sealed class StreamingTurnTests
 
     private static StreamingTurn CreateTurn(
         IStreamingChatClient client,
-        TurnLimits? limits = null) =>
+        TurnLimits? limits = null,
+        ITurnObserver? observer = null) =>
         new(
             client,
             new ToolExecutor(
                 new ToolCatalog([new EchoTool()]),
                 new ToolExecutionOptions(ToolExecutionMode.Serial, 1)),
-            limits ?? new TurnLimits(8, 8, TimeSpan.FromSeconds(5)));
+            limits ?? new TurnLimits(8, 8, TimeSpan.FromSeconds(5)),
+            observer);
 
     private static ChatStreamEvent[] TextRound(string text, TokenUsage? usage = null)
     {
@@ -738,6 +750,10 @@ public sealed class StreamingTurnTests
 
     private sealed class TestObserver : ITurnObserver
     {
+        public List<(int ModelCalls, int ToolCalls)> CallCounts { get; } = [];
+
+        public void OnCallCountsUpdated(int modelCalls, int toolCalls) => CallCounts.Add((modelCalls, toolCalls));
+
         public List<int> ContextEstimates { get; } = [];
 
         public void OnContextEstimated(int tokens) => ContextEstimates.Add(tokens);

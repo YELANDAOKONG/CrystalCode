@@ -13,7 +13,8 @@ internal sealed class ChildTurnObserver(
     Action<TokenUsage?, TokenUsage?>? usage = null,
     Action<int>? estimated = null,
     Action? toolsCompleted = null,
-    Action<ContextAnchor>? anchored = null) : ITurnObserver
+    Action<ContextAnchor>? anchored = null,
+    Action<int, int>? callCounts = null) : ITurnObserver
 {
     public void OnStreamEvent(ChatStreamEvent streamEvent) => publish(new StreamReceived(streamEvent));
     public void OnRetry(SessionRetryAttempt attempt) => publish(new RetryScheduled(attempt));
@@ -31,6 +32,8 @@ internal sealed class ChildTurnObserver(
     }
 
     public void OnContextAnchored(ContextAnchor anchor) => anchored?.Invoke(anchor);
+
+    public void OnCallCountsUpdated(int modelCalls, int toolCalls) => callCounts?.Invoke(modelCalls, toolCalls);
 
     public void OnFault(string message) => publish(new ErrorWritten(message));
     public void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null) =>

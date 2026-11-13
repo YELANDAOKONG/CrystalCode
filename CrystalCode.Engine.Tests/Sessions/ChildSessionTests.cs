@@ -201,6 +201,10 @@ public sealed class ChildSessionTests
         Assert.DoesNotContain("question", child.Tools);
         Assert.DoesNotContain("bash", child.Tools);
         Assert.Equal(2, child.ModelCalls);
+        Assert.Equal(1, child.ToolCalls);
+        Assert.Equal([(1, 0), (1, 1), (2, 1)], session.Observer.Events.OfType<ChildSessionChanged>()
+            .Where(change => change.Child.Status == "running" && change.Child.ModelCalls > 0)
+            .Select(change => (change.Child.ModelCalls, change.Child.ToolCalls)).Distinct());
         Assert.Equal(30, child.CumulativeUsage!.InputTokenCount);
         Assert.Equal(60, saved.CumulativeUsage!.InputTokenCount);
         Assert.Equal(10, saved.Usage!.InputTokenCount);
@@ -215,14 +219,15 @@ public sealed class ChildSessionTests
     public async Task Task_ResumeUsesSameChildAndPreservesHistory()
     {
         using var session = new HeadlessSession(new ScriptedStreamingClient(
-            Tool("task", """{"agent":"explore","label":"first","prompt":"First question"}"""), Text("first answer"), Text("parent"),
-            Text("unused")), settings: Settings());
+            Tool("task", """{"agent":"explore","label":"first","prompt":"First question"}"""),
+            Tool("read", """{"path":"missing.txt"}"""), Text("first answer"), Text("parent")), settings: Settings());
         await session.Session.StartAsync(CancellationToken.None);
         await session.RunTurnAsync("first delegation");
         var original = session.ReadSaved();
         var childId = Assert.Single(original.Children).Id;
         var arguments = JsonSerializer.Serialize(new { agent = "explore", label = "continue", prompt = "Second question", sessionId = childId });
-        using var resumed = new HeadlessSession(new ScriptedStreamingClient(Tool("task", arguments), Text("second answer"), Text("parent")),
+        using var resumed = new HeadlessSession(new ScriptedStreamingClient(Tool("task", arguments),
+                Tool("read", """{"path":"missing.txt"}"""), Text("second answer"), Text("parent")),
             resume: original, settings: Settings());
         await resumed.Session.StartAsync(CancellationToken.None);
         await resumed.RunTurnAsync("continue delegation");
@@ -231,8 +236,61 @@ public sealed class ChildSessionTests
         Assert.Equal(childId, child.Id);
         Assert.Contains(child.Archive, item => item.Text == "first answer");
         Assert.Contains(child.Archive, item => item.Text == "second answer");
-        Assert.Equal(20, child.CumulativeUsage!.InputTokenCount);
-        Assert.Equal(80, saved.CumulativeUsage!.InputTokenCount);
+        Assert.Equal(60, child.CumulativeUsage!.InputTokenCount);
+        Assert.Equal(4, child.ModelCalls);
+        Assert.Equal(2, child.ToolCalls);
+        Assert.Contains(resumed.Observer.Events.OfType<ChildSessionChanged>(),
+            change => change.Child.Status == "running" && change.Child.ModelCalls == 3 && change.Child.ToolCalls == 2);
+        Assert.Contains(resumed.Observer.Events.OfType<ChildSessionChanged>(),
+            change => change.Child.Status == "running" && change.Child.ModelCalls == 4 && change.Child.ToolCalls == 2);
+        Assert.All(resumed.Observer.Events.OfType<ChildSessionChanged>(), change =>
+        {
+            Assert.InRange(change.Child.ModelCalls, 2, 4);
+            Assert.InRange(change.Child.ToolCalls, 1, 2);
+        });
+        Assert.Equal(120, saved.CumulativeUsage!.InputTokenCount);
+    }
+
+    [Fact]
+    public async Task Task_ContinuedChildCountsCompactionBeforeStreamingAndSettlesFromSavedBaseline()
+    {
+        using var first = new HeadlessSession(new ScriptedStreamingClient(
+            Tool("task", """{"agent":"explore","label":"first","prompt":"inspect"}"""),
+            Text(new string('a', 140_000)), Text("parent")), settings: Settings());
+        await first.Session.StartAsync(CancellationToken.None);
+        await first.RunTurnAsync("delegate");
+        var original = first.ReadSaved();
+        var child = Assert.Single(original.Children);
+        child.Usage!.InputTokenCount = 190_000;
+        var arguments = JsonSerializer.Serialize(new { agent = "explore", label = "continue", prompt = "continue", sessionId = child.Id });
+        var model = new GatedReviewStreamingClient(Tool("task", arguments), Text("child done"), Text("parent done"));
+        using var resumed = new HeadlessSession(model, original, settings: Settings());
+        await resumed.Session.StartAsync(CancellationToken.None);
+        await resumed.Session.SubmitAsync("continue delegation", CancellationToken.None);
+        await model.ReviewEntered.WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            var compacting = resumed.Observer.Events.OfType<ChildSessionChanged>().Last().Child;
+            Assert.Equal("running", compacting.Status);
+            Assert.Equal(child.ModelCalls + 1, compacting.ModelCalls);
+            Assert.Equal(child.ToolCalls, compacting.ToolCalls);
+            Assert.False(resumed.Session.TurnTask!.IsCompleted);
+        }
+        finally
+        {
+            model.Release("Earlier work is summarized.");
+            await resumed.Session.TurnTask!.WaitAsync(TimeSpan.FromSeconds(10));
+            await resumed.Session.FinishTurnAsync();
+        }
+
+        var settled = Assert.Single(resumed.ReadSaved().Children);
+        Assert.Equal("completed", settled.Status);
+        Assert.Equal(child.ModelCalls + 2, settled.ModelCalls);
+        Assert.Equal(child.ToolCalls, settled.ToolCalls);
+        Assert.Contains(resumed.Observer.Events.OfType<ChildSessionChanged>(),
+            change => change.Child.Status == "running" && change.Child.ModelCalls == settled.ModelCalls);
+        Assert.Contains(resumed.Observer.Events.OfType<ChildEventReceived>(),
+            received => received.Event is NoteWritten { Text: "Compacted child context" });
     }
 
     [Fact]
@@ -342,6 +400,11 @@ public sealed class ChildSessionTests
         Assert.Contains("view_image", child.Tools);
         Assert.DoesNotContain(text.LastRequest!.Tools, tool => tool.Name == "view_image");
         Assert.Equal(2, vision.Requests.Count);
+        Assert.Equal(2, child.ModelCalls);
+        Assert.Equal(1, child.ToolCalls);
+        Assert.Equal([(1, 0), (1, 1), (2, 1)], session.Observer.Events.OfType<ChildSessionChanged>()
+            .Where(change => change.Child.Status == "running" && change.Child.ModelCalls > 0)
+            .Select(change => (change.Child.ModelCalls, change.Child.ToolCalls)).Distinct());
         Assert.Contains(Assert.Single(vision.Requests[1].Items.OfType<MultimodalToolResult>()).Contents,
             content => content is ImageContent);
         Assert.Empty(saved.Images);
@@ -605,6 +668,11 @@ public sealed class ChildSessionTests
         var child = Assert.Single(session.ReadSaved().Children);
         Assert.Equal(2, children);
         Assert.Equal(1, child.ModelCalls);
+        Assert.All(session.Observer.Events.OfType<ChildSessionChanged>(),
+            change => Assert.InRange(change.Child.ModelCalls, 0, 1));
+        var retryIndex = session.Observer.Events.ToList().FindIndex(item => item is ChildEventReceived { Event: RetryScheduled });
+        Assert.Contains(session.Observer.Events.Take(retryIndex).OfType<ChildSessionChanged>(),
+            change => change.Child.Status == "running" && change.Child.ModelCalls == 1);
         Assert.Contains(session.Observer.Events.OfType<ChildEventReceived>(), received => received.ChildSessionId == child.Id && received.Event is RetryScheduled);
         Assert.Equal(40, session.ReadSaved().CumulativeUsage!.InputTokenCount);
     }
@@ -658,6 +726,8 @@ public sealed class ChildSessionTests
             await session.Session.EnqueueAsync("/child", CancellationToken.None);
             Assert.NotNull(picked);
             Assert.Equal("running", picked.Status);
+            Assert.Equal(2, picked.ModelCalls);
+            Assert.Equal(1, picked.ToolCalls);
             Assert.Equal("child todo", Assert.Single(picked.Todos).Content);
             Assert.Equal(changed.ChildSessionId, session.Observer.Events.OfType<ChildViewRequested>().Last().ChildSessionId);
             await session.Session.EnqueueAsync("/child " + picked.Id[..8], CancellationToken.None);
@@ -677,6 +747,9 @@ public sealed class ChildSessionTests
             await session.Session.FinishTurnAsync();
         }
         var saved = Assert.Single(session.ReadSaved().Children);
+        Assert.Equal("interrupted", saved.Status);
+        Assert.Equal(2, saved.ModelCalls);
+        Assert.Equal(1, saved.ToolCalls);
         Assert.Equal("child todo", Assert.Single(saved.Todos).Content);
     }
 
@@ -700,6 +773,10 @@ public sealed class ChildSessionTests
         {
             await session.Session.EnqueueAsync("/child", CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(10));
             Assert.Equal(1, picked);
+            var child = session.Observer.Events.OfType<ChildSessionChanged>().Last().Child;
+            Assert.Equal("running", child.Status);
+            Assert.Equal(1, child.ModelCalls);
+            Assert.Equal(1, child.ToolCalls);
         }
         finally
         {

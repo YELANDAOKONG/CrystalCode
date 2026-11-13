@@ -8,6 +8,7 @@ using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Providers;
 
 using Xunit;
@@ -21,16 +22,20 @@ public sealed class MultimodalStreamingTurnTests
     {
         var client = new ScriptedClient();
         var images = new Dictionary<int, ImageAttachment>();
+        var observer = new CountObserver();
         var turn = new MultimodalStreamingTurn(
             client,
             new ImageToolExecutor(),
             TurnLimits.Unlimited,
-            images);
+            images,
+            observer);
 
         var result = await turn.RunAsync(
             [new ChatMessage(ChatRole.User, "render")]);
 
         Assert.Equal(TurnStopReason.Completed, result.StopReason);
+        Assert.Equal([(1, 0), (1, 1), (2, 1)], observer.Counts);
+        Assert.Equal((result.ModelCallCount, result.ToolCallCount), observer.Counts[^1]);
         var toolResult = Assert.Single(result.Transcript.OfType<ToolResult>());
         Assert.Contains("[Image #1]", toolResult.Text, StringComparison.Ordinal);
         Assert.Single(images);
@@ -105,15 +110,18 @@ public sealed class MultimodalStreamingTurnTests
     [Fact]
     public async Task RunAsync_ZeroToolBudgetKeepsTextAndDropsTheCall()
     {
+        var observer = new CountObserver();
         var turn = new MultimodalStreamingTurn(
             new BudgetClient(),
             new ImageToolExecutor(),
             new TurnLimits(2, 0, TimeSpan.FromSeconds(5)),
-            new Dictionary<int, ImageAttachment>());
+            new Dictionary<int, ImageAttachment>(),
+            observer);
 
         var result = await turn.RunAsync([new ChatMessage(ChatRole.User, "render")]);
 
         Assert.Equal(TurnStopReason.ToolCallLimitReached, result.StopReason);
+        Assert.Equal([(1, 0)], observer.Counts);
         Assert.Equal(0, result.ToolCallCount);
         Assert.DoesNotContain(result.Transcript, static item => item is ToolCall or ToolResult);
         Assert.Equal("partial", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
@@ -136,6 +144,20 @@ public sealed class MultimodalStreamingTurnTests
         var resumed = Assert.IsType<MultimodalMessage>(client.Requests[1].Items[^1]);
         Assert.Equal(MultimodalChatRole.Assistant, resumed.Role);
         Assert.Equal("done", Assert.IsType<ChatMessage>(result.Transcript[^1]).Text);
+    }
+
+    private sealed class CountObserver : ITurnObserver
+    {
+        public List<(int ModelCalls, int ToolCalls)> Counts { get; } = [];
+
+        public void OnCallCountsUpdated(int modelCalls, int toolCalls) => Counts.Add((modelCalls, toolCalls));
+        public void OnStreamEvent(ChatStreamEvent streamEvent) { }
+        public void OnRetry(SessionRetryAttempt attempt) { }
+        public void OnModelRoundClosed() { }
+        public void OnToolCalls(IReadOnlyList<ToolCall> calls) => Assert.Equal((1, 1), Counts[^1]);
+        public void OnToolResults(IReadOnlyList<ToolResult> results) { }
+        public void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null) { }
+        public void OnFault(string message) { }
     }
 
     private sealed class PausingClient : IStreamingMultimodalChatClient

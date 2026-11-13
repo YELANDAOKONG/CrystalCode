@@ -113,6 +113,7 @@ public sealed class StreamingTurn
                 }
 
                 modelCallCount++;
+                _observer?.OnCallCountsUpdated(modelCallCount, toolCallCount);
                 var outbound = await PrepareOutboundAsync(transcript, linked.Token);
                 var request = new ChatRequest(
                     ImageMarkerText.ForTextModel(outbound),
@@ -197,6 +198,7 @@ public sealed class StreamingTurn
                 anchor = PublishAnchor(response.Usage, transcript) ?? anchor;
 
                 toolCallCount += toolCalls.Length;
+                _observer?.OnCallCountsUpdated(modelCallCount, toolCallCount);
                 _observer?.OnModelRoundClosed();
                 _observer?.OnToolCalls(toolCalls);
                 var toolResults = await _executor.ExecuteAsync(toolCalls, linked.Token);

@@ -22,6 +22,9 @@ public interface ITurnObserver
 
     void OnUsageUpdated(TokenUsage? contextUsage, TokenUsage? turnCumulativeUsage = null);
 
+    /// <summary>Reports logical calls reserved in this turn, excluding retries.</summary>
+    void OnCallCountsUpdated(int modelCalls, int toolCalls) { }
+
     void OnContextEstimated(int tokens) { }
 
     /// <summary>

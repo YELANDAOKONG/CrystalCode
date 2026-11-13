@@ -608,6 +608,46 @@ public sealed class ServerSessionTests
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
+    [Theory]
+    [InlineData(false, 1, 0)]
+    [InlineData(true, 2, 1)]
+    public async Task Children_ChangedAndSnapshotContainCallCountsWhileWaitingForModel(
+        bool executeTool, int expectedModelCalls, int expectedToolCalls)
+    {
+        var task = ToolRound("task-1", "task", """{"agent":"explore","label":"inspect","prompt":"Inspect the workspace"}""");
+        var model = executeTool
+            ? new ScriptedModel(true, task, ToolRound("list-1", "list", "{}")) { Silent = true }
+            : new ScriptedModel(true, task) { Silent = true };
+        await using var fixture = await ServerFixture.StartAsync(model, options: static launch => launch with { Agents = "on" });
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "delegate inspection" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        var changed = await events.WaitForAsync("child.changed", value =>
+        {
+            var child = value.GetProperty("data").GetProperty("child");
+            return child.GetProperty("status").GetString() == "running"
+                && child.GetProperty("modelCalls").GetInt32() == expectedModelCalls
+                && child.GetProperty("toolCalls").GetInt32() == expectedToolCalls;
+        });
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+
+        var liveChild = changed.GetProperty("data").GetProperty("child");
+        var snapshotChild = Assert.Single(snapshot.GetProperty("children").EnumerateArray());
+        Assert.Equal(liveChild.GetProperty("id").GetString(), snapshotChild.GetProperty("id").GetString());
+        Assert.Equal("running", snapshotChild.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, snapshotChild.GetProperty("stopReason").ValueKind);
+        Assert.True(snapshot.GetProperty("turnActive").GetBoolean());
+        Assert.Equal(expectedModelCalls, snapshotChild.GetProperty("modelCalls").GetInt32());
+        Assert.Equal(expectedToolCalls, snapshotChild.GetProperty("toolCalls").GetInt32());
+        Assert.True(snapshot.GetProperty("lastSeq").GetInt64() >= changed.GetProperty("seq").GetInt64());
+        Assert.DoesNotContain("turn.finished", events.Types());
+
+        await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+        await events.WaitForAsync("turn.finished");
+    }
+
     [Fact]
     public async Task Mode_CyclesAndSetsByName()
     {

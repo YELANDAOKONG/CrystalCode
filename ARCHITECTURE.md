@@ -471,6 +471,12 @@ tools. A child summarizer uses its own context budget and the configured
 compaction prompt overlays; a configured compaction model is honored.
 
 Each completed invocation updates its child ledger and the parent ledger once.
+During execution, each logical model reservation and accepted tool batch updates
+the child's cumulative call counts through `ChildSessionChanged`, including
+compaction calls and excluding retries. Text and image turns report counts at
+the same reservation points. Continuations add to the invocation's saved baseline;
+final settlement uses that baseline so live counts are not added twice. Server
+events and reconnect snapshots expose these same cumulative child counts.
 Parallel increments and saved snapshots are serialized. Live cumulative usage
 uses per-child snapshots rather than adding every stream update. The parent's
 last-request usage stays its own; child usage never replaces it. Missing usage

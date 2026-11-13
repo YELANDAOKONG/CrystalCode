@@ -26,6 +26,7 @@ internal sealed class SessionProjection : ISessionObserver
     private readonly object _projectionGate = new();
     private readonly List<SessionEvent> _parentEvents = [];
     private readonly Dictionary<string, ChildSessionDocument> _children = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ChildSessionChanged> _childChanges = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<SessionEvent>> _childEvents = new(StringComparer.Ordinal);
     private string? _childFocus;
     private SessionChrome? _parentChrome;
@@ -299,6 +300,18 @@ internal sealed class SessionProjection : ISessionObserver
             switch (sessionEvent)
             {
                 case ChildSessionChanged changed:
+                    // Todos also change between count notifications and are already folded from live events.
+                    var countsOnly = _childChanges.TryGetValue(changed.Child.Id, out var previous)
+                        && changed.InvocationId != Guid.Empty
+                        && previous.InvocationId == changed.InvocationId
+                        && previous.Child.Status == "running"
+                        && previous.Child == changed.Child with
+                        {
+                            ModelCalls = previous.Child.ModelCalls,
+                            ToolCalls = previous.Child.ToolCalls,
+                            Todos = previous.Child.Todos
+                        };
+                    _childChanges[changed.Child.Id] = changed;
                     var updated = changed.Child;
                     if (ChildSessionFold.IsActive(updated)
                         && _childEvents.TryGetValue(updated.Id, out var liveEvents))
@@ -317,7 +330,7 @@ internal sealed class SessionProjection : ISessionObserver
                         }
                     }
                     _renderer.SetChildSessions(_children.Values.ToArray(), _childFocus);
-                    if (_childFocus == changed.Child.Id)
+                    if (_childFocus == changed.Child.Id && !countsOnly)
                     {
                         ShowChild(changed.Child.Id);
                     }
@@ -365,6 +378,7 @@ internal sealed class SessionProjection : ISessionObserver
                     if (!chrome.Chrome.AgentsEnabled)
                     {
                         _children.Clear();
+                        _childChanges.Clear();
                         _childEvents.Clear();
                         _renderer.SetChildSessions([], null);
                     }
@@ -373,6 +387,7 @@ internal sealed class SessionProjection : ISessionObserver
                     _childFocus = null;
                     _renderer.ChildViewActive = false;
                     _children.Clear();
+                    _childChanges.Clear();
                     _renderer.SetChildSessions([], null);
                     _childEvents.Clear();
                     _parentEvents.Clear();
@@ -381,6 +396,7 @@ internal sealed class SessionProjection : ISessionObserver
                     _childFocus = null;
                     _renderer.ChildViewActive = false;
                     _children.Clear();
+                    _childChanges.Clear();
                     _childEvents.Clear();
                     _renderer.SetChildSessions([], null);
                     _parentEvents.Clear();
@@ -421,6 +437,7 @@ internal sealed class SessionProjection : ISessionObserver
         {
             _childFocus = null;
             _children.Clear();
+            _childChanges.Clear();
             _childEvents.Clear();
             _renderer.SetChildSessions([], null);
             SwitchView(null);
