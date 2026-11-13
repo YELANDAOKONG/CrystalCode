@@ -217,6 +217,7 @@ behavior stands until a specific change defines otherwise.
   Server and Bridge need to be considered with the terminal, since they run
   the same commands. Do not reserve a configuration field, command, or
   public type.
+- Pursue optimization. Optimize the `/pursue` feature.
 
 ## Medium priority
 
