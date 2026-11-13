@@ -600,6 +600,10 @@ its value: a hidden option keeps whatever the terminal or `config.json` set.
 | `topic` | `_crystal_topic` | switch | `/topic on\|off` |
 | `topic_model` | `_crystal_topic` | `session` plus catalog | `/topic model [provider model]` |
 | `topic_thinking`, `topic_tier`, `topic_speed`, `topic_context` | `_crystal_topic` | the topic model's gears; tier, speed, and context only for its own model | `/topic thinking\|tier\|speed\|context` |
+| `pursue_model` | `_crystal_pursue` | `session` plus catalog | `/pursue model [provider model]` |
+| `pursue_thinking`, `pursue_tier`, `pursue_speed`, `pursue_context` | `_crystal_pursue` | checker gears; tier, speed, and context only for its own model | `/pursue thinking\|tier\|speed\|context` |
+| `pursue_compaction_model` | `_crystal_pursue` | `session` (session setting, then checker model) plus catalog | `/pursue compaction model [provider model]` |
+| `pursue_compaction_thinking`, `pursue_compaction_tier`, `pursue_compaction_speed`, `pursue_compaction_context` | `_crystal_pursue` | tuning supported by the selected pursue compaction model | `/pursue compaction thinking\|tier\|speed\|context` |
 | `image_model`, `audio_model`, `video_model` | `_crystal_describe` | off plus catalog models that declare that input | `/describe <kind> model`, `/describe <kind> off` |
 | `image_thinking`, `image_tier`, `image_speed`, `image_context`, and the same for `audio` and `video` | `_crystal_describe` | that model's gears, tiers plus unset, speeds plus unset, and declared budgets | `/describe <kind> thinking\|tier\|speed\|context` |
 | `micro_compaction` | `_crystal_compaction` | switch | `/compact micro on\|off` |
@@ -705,6 +709,8 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 | `_crystal/side/ask {question}`, `_crystal/side/cancel`, `_crystal/side/clear` | `/btw`, `TryCancelSideQuestion`, `ClearSideQuestions` |
 | `_crystal/children/list`, `_crystal/children/get {childSessionId}` | child summaries; one record with archive, usage, and todos |
 | `_crystal/pursue/get` | `GetPursue`: `pursue` state or null, including objective `id`, `runId`, `checkCount`, and `latestCheck` |
+| `_crystal/pursue/configuration` | `GetPursueConfiguration`: `configuration` with `model`, `compaction`, and `limits` as in `GET /pursue/configuration`, also without an objective |
+| `_crystal/pursue/limit {name, value}` | Edits one limit through `/pursue limit`, saves it, and returns `configuration`. Names: `continuations`, `stalls`, `model-calls`, `tool-calls`, `duration`, `wait`. Value is an integer or null for unlimited except stalls; time units are seconds. Invalid input is `-32602`; busy refusal is `-32603` with `error.data.crystal.kind: command_refused` |
 | `_crystal/pursue/checks {after?, limit?}` | `ListPursueChecks`: the fields and paging rules of `GET /pursue/checks`. Invalid parameters are `-32602` |
 | `_crystal/pursue/check {id}` | `GetPursueCheck`: `check` with identities, time, verdict, reason, next step, integer `evidence`, resolved `evidenceContent`, wait task ids, and usage, as in `crystal server`. Unknown id is `-32002` |
 | `_crystal/export {format, system}` | `TryExport` markdown or json; returns `fileName`, `mediaType`, `text` |

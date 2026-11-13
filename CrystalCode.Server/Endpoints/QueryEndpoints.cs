@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Server.Hosting;
 using CrystalCode.Server.Security;
@@ -267,6 +268,36 @@ internal static class QueryEndpoints
         app.MapGet("/pursue", async Task<IResult> (HttpContext context) =>
             await Query(context, server, static session => session.GetPursue(),
                 static (writer, state) => WireWriter.Pursue(writer, "pursue", state)));
+
+        app.MapGet("/pursue/configuration", async Task<IResult> (HttpContext context) =>
+            await Query(context, server, static session => session.GetPursueConfiguration(),
+                static (writer, configuration) => WireWriter.PursueConfiguration(writer, configuration)));
+
+        app.MapPut("/pursue/limits/{name}", (HttpContext context, string name, CancellationToken token) =>
+            ServerEndpoints.Mutate(context, server, ServerScope.Admin, token, async (body, runner, client) =>
+            {
+                if (!body.TryGetProperty("value", out var value)
+                    || value.ValueKind is not (JsonValueKind.Number or JsonValueKind.Null)
+                    || value.ValueKind == JsonValueKind.Number && !value.TryGetInt32(out _))
+                {
+                    return RequestOutcome.Error(400, "value must be an integer or null for unlimited.");
+                }
+
+                if (!PursueLimitCommand.TryCreate(name, value.ValueKind == JsonValueKind.Null ? null : value.GetInt32(),
+                        out var command, out var error))
+                {
+                    return RequestOutcome.Error(400, error);
+                }
+
+                var result = await runner.SubmitAsync(command, client);
+                if (!result.Accepted)
+                {
+                    return RequestOutcome.Error(409, result.Error!);
+                }
+
+                var configuration = await runner.InvokeAsync(static session => session.GetPursueConfiguration(), client);
+                return RequestOutcome.Ok(Json.Write(writer => WireWriter.PursueConfiguration(writer, configuration)));
+            }));
 
         app.MapGet("/pursue/checks", async Task<IResult> (HttpContext context) =>
         {

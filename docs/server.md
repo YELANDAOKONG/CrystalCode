@@ -250,6 +250,8 @@ and the `server.state` event.
 | `POST /side/cancel`, `POST /side/clear` | operate | Side question control; `/btw` itself goes through `/input` |
 | `GET /children`, `GET /children/{id}` | observe | Child list, archive, events, usage, and todos (F7 and `/child`) |
 | `GET /pursue` | observe | `pursue`: current objective state or null, including `id`, `runId`, `checkCount`, and `latestCheck` |
+| `GET /pursue/configuration` | observe | `configuration`: checker `model`, `compaction`, and `limits`, available without an objective |
+| `PUT /pursue/limits/{name}` | admin | `{"value": integer or null}`: edits one limit through `/pursue limit`; returns `configuration`. Names: `continuations`, `stalls`, `model-calls`, `tool-calls`, `duration`, `wait`. Times are seconds; null is unlimited except for stalls. Invalid names, types, or ranges return 400; busy refusal returns 409 |
 | `GET /pursue/checks?after=0&limit=50` | observe | Checks oldest first: `objectiveId`, `checks`, `nextOffset`, `hasMore`. `after` is the number already read; `limit` is 1–100. No objective returns an empty page with null `objectiveId`. Invalid parameters return 400 |
 | `GET /pursue/checks/{id}` | observe | `check`: one retained checker attempt with evidence; 404 for an unknown id |
 | `GET /export?format=markdown\|json&system=true\|false` | observe | `TryExport` as a download; `/export` still writes on the server |
@@ -275,6 +277,27 @@ and uses `SubmitQuickPromptAsync`: exact template text, no draft or pending
 images consumed, and a busy send queues without interrupting the turn. The
 terminal still opens its picker for bare `/quick`. The dedicated quick-prompt
 routes above are unchanged; Fill stays in the client.
+
+## Pursue configuration
+
+Pursue model settings are offered by `GET /options` and set with
+`PUT /options/{id}`: `pursue_model`, `pursue_thinking`, `pursue_tier`,
+`pursue_speed`, `pursue_context`, and the same suffixes under
+`pursue_compaction_`. Both model pickers use `session` to restore inheritance.
+Tuning depends on the selected model's capabilities; checker tier, speed,
+and context are omitted while it uses the session model. Changes publish
+`options.changed`. Writes need admin scope and are refused while busy.
+
+`configuration.model` has `usesSessionModel`, nullable `provider`, `model`,
+`tier`, `speed`, `context`, and `thinking`. `configuration.compaction` uses
+the same fields with `usesSessionSetting` instead of `usesSessionModel`:
+inheritance falls back to session compaction, then the checker model.
+`configuration.limits` has `continuations`, `stalls`, `modelCalls`,
+`toolCalls`, `durationSeconds`, and `waitSeconds`. Null means unlimited.
+These are configured choices; inherited slots are resolved at runtime.
+Configuration edits also emit the formatted `report.document` acknowledgement
+to their originating client. Read configuration again to refresh limits;
+there is no dedicated configuration-change event.
 
 ## Events
 

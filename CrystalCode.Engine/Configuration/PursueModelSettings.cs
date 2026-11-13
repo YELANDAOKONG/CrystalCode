@@ -104,36 +104,5 @@ public sealed record PursueModelSettings
         return new(Provider, Model, ThinkingEffort, ServiceTier, Speed, ContextWindow, compaction);
     }
 
-    public string Describe()
-    {
-        var description = "Pursue model  " + (UsesSessionModel ? "session model" : Provider + "  " + Model);
-        if (ThinkingEffort != ThinkingSelection.Default)
-        {
-            description += "  ·  Think " + ThinkingLabel.For(ThinkingEffort);
-        }
-
-        if (ServiceTier is not null)
-        {
-            description += "  ·  Tier " + DisplayCase.Token(ServiceTier);
-        }
-
-        if (Speed is not null)
-        {
-            description += "  ·  Speed " + DisplayCase.Token(Speed);
-        }
-
-        if (ContextWindow is int window)
-        {
-            description += "  ·  Context " + ContextWindowSelection.Format(window);
-        }
-
-        if (Compaction.HasSelection)
-        {
-            description += "\n" + Compaction.Describe().Replace("Compaction model", "Pursue compaction model", StringComparison.Ordinal);
-        }
-
-        return description;
-    }
-
     public override string ToString() => nameof(PursueModelSettings);
 }

@@ -112,14 +112,4 @@ public sealed record PursueLimits
             MaximumToolCalls,
             MaximumDurationSeconds is int seconds ? TimeSpan.FromSeconds(seconds) : null);
 
-    public string Describe()
-    {
-        static string Value(int? value) => value is int number ? number.ToString(System.Globalization.CultureInfo.InvariantCulture) : "unlimited";
-        return "Pursue limits  continuations " + Value(MaximumContinuations)
-            + "  ·  stalls " + MaximumStalls.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            + "  ·  model calls " + Value(MaximumModelCalls)
-            + "  ·  tool calls " + Value(MaximumToolCalls)
-            + "  ·  duration " + Value(MaximumDurationSeconds) + (MaximumDurationSeconds is null ? "" : "s")
-            + "  ·  wait " + Value(MaximumWaitSeconds) + (MaximumWaitSeconds is null ? "" : "s");
-    }
 }

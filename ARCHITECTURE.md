@@ -709,6 +709,17 @@ from 1 through 100 (default 50), returning `objectiveId`, `checks`,
 `nextOffset`, and `hasMore`. Clients discard pages for a replaced objective.
 Server and Bridge own only explicit wire mapping and parameter validation.
 
+`PursueReport` builds a `DocumentWritten` key/value report for status and
+setting acknowledgements, reusing the terminal document renderer and the
+protocol report mappings. `GetPursueConfiguration` returns checker choices
+and limits independently of the objective. Both front ends write those fields
+explicitly. `SessionOptionCatalog` provides `pursue_*` and
+`pursue_compaction_*` model and tuning options; `BridgeHostSettings` permits
+them in custom lists. Model edits publish `SessionOptionsChanged` so clients
+refresh dependent choices. Integer limits use `PursueLimitCommand.TryCreate`
+to validate a named value and produce the shared slash command; front ends
+submit it through the runner, preserving busy refusals and persistence.
+
 ## Session and turn
 
 One user message is one turn:

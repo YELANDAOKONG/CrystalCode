@@ -41,4 +41,22 @@ public sealed class PluginDocumentWidgetTests
 
         Assert.Contains(lines, line => line.Plain.Contains("Nothing to show.", StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData(40)]
+    [InlineData(80)]
+    public void Create_PursueRowsRemainReadableAtTerminalWidths(int width)
+    {
+        var document = new TranscriptDocument("Pursue",
+        [
+            new("keyValues", [], [["Status", "No objective"], ["Checker model", "Session model"]], [], 0),
+            new("keyValues", [], [["Continuation limit", "1,000"], ["Duration limit", "7 days"], ["Wait limit", "3 hours"]], [], 0)
+        ]);
+        var lines = WidgetPaint.Lines(PluginDocumentWidget.Create(document), width);
+        Assert.Contains(lines, line => line.Plain.Contains("Duration limit", StringComparison.Ordinal)
+            && line.Plain.Contains("7 days", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Plain.Contains("Wait limit", StringComparison.Ordinal)
+            && line.Plain.Contains("3 hours", StringComparison.Ordinal));
+        Assert.All(lines, line => Assert.True(TextWidth.Measure(line.Plain) <= width));
+    }
 }

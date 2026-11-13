@@ -214,8 +214,8 @@ public sealed class CodingSessionPursueTests
         Assert.Contains(errors, text => text.Contains("cannot be unlimited", StringComparison.Ordinal));
         Assert.Contains(errors, text => text.Contains("own model", StringComparison.Ordinal));
         Assert.Contains(
-            headless.Observer.Events.OfType<NoteWritten>(),
-            note => note.Text.Contains("continuations 5", StringComparison.Ordinal));
+            headless.Observer.Events.OfType<DocumentWritten>().SelectMany(item => item.Document.Blocks).SelectMany(block => block.Rows),
+            row => row[0] == "Continuation limit" && row[1] == "5");
         Assert.Equal(0, model.RequestCount);
     }
 

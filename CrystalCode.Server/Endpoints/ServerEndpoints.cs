@@ -33,7 +33,8 @@ public static class ServerEndpoints
         "POST /auth/tokens", "DELETE /auth/tokens/{id}", "POST /shutdown",
         "GET /sessions", "GET /models", "GET /options", "GET /agents", "GET /skills", "GET /mcp",
         "GET /plugins", "GET /tasks", "GET /tasks/{id}/logs", "PUT /options/{id}",
-        "GET /pursue", "GET /pursue/checks", "GET /pursue/checks/{id}"
+        "GET /pursue", "GET /pursue/checks", "GET /pursue/checks/{id}",
+        "GET /pursue/configuration", "PUT /pursue/limits/{name}"
     ];
 
     public static void Map(WebApplication app, ServerContext server)

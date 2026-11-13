@@ -41,6 +41,40 @@ public sealed class BridgeConfigOptionsTests
         Assert.Contains("prompt_set", ids);
         Assert.Contains("micro_compaction", ids);
         Assert.Contains("estimated_tokens", ids);
+        Assert.Contains("pursue_model", ids);
+        Assert.Contains("pursue_compaction_model", ids);
+    }
+
+    [Fact]
+    public async Task Pursue_CustomOptionsPublishChangesAndSupportReturningToSessionSettings()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false),
+            prepare: static (home, _) => File.WriteAllText(Path.Combine(home.Root, "providers.json"),
+                """{"side":{"protocol":"ollama","baseUri":"http://127.0.0.1:9/","models":{"tuned":{"contextWindow":8192,"serviceTiers":["priority"]}}}}"""),
+            configOptions: ["pursue_model", "pursue_tier", "pursue_compaction_model", "pursue_compaction_tier"]);
+        var sessionId = await fixture.OpenAsync();
+        await SetAsync("pursue_model", "side/tuned");
+        var tier = await SetAsync("pursue_tier", "priority");
+        Assert.Equal("priority", tier.GetProperty("result").GetProperty("configOptions").EnumerateArray()
+            .Single(option => option.GetProperty("id").GetString() == "pursue_tier").GetProperty("currentValue").GetString());
+        await fixture.WaitForUpdateAsync("config_option_update", update => update.GetProperty("configOptions").EnumerateArray()
+            .Any(option => option.GetProperty("id").GetString() == "pursue_tier" && option.GetProperty("currentValue").GetString() == "priority"));
+        await SetAsync("pursue_compaction_model", "side/tuned");
+        await SetAsync("pursue_compaction_tier", "priority");
+        await SetAsync("pursue_model", "session");
+        var reset = await SetAsync("pursue_compaction_model", "session");
+        Assert.DoesNotContain("pursue_tier", Ids(reset.GetProperty("result").GetProperty("configOptions")));
+        var configuration = (await fixture.RequestAsync("_crystal/pursue/configuration", new { sessionId }))
+            .GetProperty("result").GetProperty("configuration");
+        Assert.True(configuration.GetProperty("model").GetProperty("usesSessionModel").GetBoolean());
+        Assert.True(configuration.GetProperty("compaction").GetProperty("usesSessionSetting").GetBoolean());
+
+        async Task<JsonElement> SetAsync(string configId, string value)
+        {
+            var result = await fixture.RequestAsync("session/set_config_option", new { sessionId, configId, value });
+            Assert.True(result.TryGetProperty("result", out _), result.GetRawText());
+            return result;
+        }
     }
 
     [Fact]

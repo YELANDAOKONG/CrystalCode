@@ -581,6 +581,69 @@ internal static class CrystalWire
         writer.WriteEndObject();
     }
 
+    public static void PursueConfiguration(Utf8JsonWriter writer, PursueConfiguration configuration)
+    {
+        writer.WriteStartObject("configuration");
+        var model = configuration.Model;
+        writer.WriteStartObject("model");
+        writer.WriteBoolean("usesSessionModel", model.UsesSessionModel);
+        Optional(writer, "provider", model.Provider);
+        Optional(writer, "model", model.Model);
+        writer.WriteString("thinking", model.ThinkingEffort.Value);
+        Optional(writer, "tier", model.ServiceTier);
+        Optional(writer, "speed", model.Speed);
+        if (model.ContextWindow is int context)
+        {
+            writer.WriteNumber("context", context);
+        }
+        else
+        {
+            writer.WriteNull("context");
+        }
+
+        writer.WriteEndObject();
+        var compaction = model.Compaction;
+        writer.WriteStartObject("compaction");
+        writer.WriteBoolean("usesSessionSetting", !compaction.HasSelection);
+        Optional(writer, "provider", compaction.Provider);
+        Optional(writer, "model", compaction.Model);
+        writer.WriteString("thinking", compaction.ThinkingEffort.Value);
+        Optional(writer, "tier", compaction.ServiceTier);
+        Optional(writer, "speed", compaction.Speed);
+        if (compaction.ContextWindow is int window)
+        {
+            writer.WriteNumber("context", window);
+        }
+        else
+        {
+            writer.WriteNull("context");
+        }
+
+        writer.WriteEndObject();
+        writer.WriteStartObject("limits");
+        var limits = configuration.Limits;
+        Limit("continuations", limits.MaximumContinuations);
+        Limit("stalls", limits.MaximumStalls);
+        Limit("modelCalls", limits.MaximumModelCalls);
+        Limit("toolCalls", limits.MaximumToolCalls);
+        Limit("durationSeconds", limits.MaximumDurationSeconds);
+        Limit("waitSeconds", limits.MaximumWaitSeconds);
+        writer.WriteEndObject();
+        writer.WriteEndObject();
+
+        void Limit(string name, int? value)
+        {
+            if (value is int number)
+            {
+                writer.WriteNumber(name, number);
+            }
+            else
+            {
+                writer.WriteNull(name);
+            }
+        }
+    }
+
     public static void WritePursueCheck(Utf8JsonWriter writer, string name, PursueCheckRecord? check)
     {
         if (check is null)

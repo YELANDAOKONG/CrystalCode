@@ -77,6 +77,7 @@ public sealed class ServerParityTests
         ["ListPlugins"] = "GET /plugins",
         ["ListBackgroundTasks"] = "GET /tasks",
         ["GetPursue"] = "GET /pursue",
+        ["GetPursueConfiguration"] = "GET /pursue/configuration",
         ["ListPursueChecks"] = "GET /pursue/checks",
         ["GetPursueCheck"] = "GET /pursue/checks/{id}",
         ["TryReadBackgroundTaskLog"] = "GET /tasks/{id}/logs"
@@ -163,7 +164,7 @@ public sealed class ServerParityTests
     [Fact]
     public void Info_ListsEveryRoute()
     {
-        Assert.Equal(39, ServerEndpoints.Operations.Count);
+        Assert.Equal(41, ServerEndpoints.Operations.Count);
         Assert.Contains("POST /recall", ServerEndpoints.Operations);
         Assert.Contains("GET /pursue/checks/{id}", ServerEndpoints.Operations);
     }

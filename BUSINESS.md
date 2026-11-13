@@ -534,6 +534,16 @@ rules, and the approval mode are unchanged. The checker has no tools.
   `pursueLimits`: continuations, stalls, model-calls, tool-calls, duration,
   and wait. Limits count per run, so a resume starts a new allowance. The
   defaults are wide.
+- Status and configuration acknowledgements are key/value reports with one
+  parameter per row, grouped counts, and exact readable durations. Checker
+  and pursue compaction model choices are session options for Server and the
+  Bridge custom configuration bar. The bar keeps its existing default list;
+  `all` includes these choices. Tuning appears only when supported, and tier,
+  speed, and context follow the session when the checker uses its model.
+  Read-only configuration queries work without an objective. Dedicated
+  single-limit edits accept integers or null for unlimited (except stalls),
+  persist through the command path, and are refused while busy. HTTP writes
+  require admin scope; configuration reads require observe scope.
 - When the checker's view of the conversation does not fit, older entries are
   summarized by the pursue compaction model (`/pursue compaction`), else the
   session compaction model, else the checker's own model; if that fails they are dropped. The summary is not citable.

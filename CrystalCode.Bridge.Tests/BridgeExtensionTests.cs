@@ -29,7 +29,7 @@ public sealed class BridgeExtensionTests
         Assert.Contains("_crystal/snapshot", extensions);
         Assert.Contains("_crystal/session/fork", extensions);
         Assert.Contains("_crystal/tasks/logs", extensions);
-        Assert.Equal(32, extensions.Length);
+        Assert.Equal(34, extensions.Length);
         Assert.Contains("_crystal/queue", crystal.GetProperty("eventKinds").EnumerateArray().Select(static value => value.GetString()));
         Assert.Equal("rfd", crystal.GetProperty("fork").GetString());
         Assert.Equal("rfd", crystal.GetProperty("subagents").GetString());
@@ -53,6 +53,72 @@ public sealed class BridgeExtensionTests
 
         Assert.Equal("completed", snapshot.GetProperty("lastTurn").GetProperty("reason").GetString());
         Assert.Contains(snapshot.GetProperty("conversation").EnumerateArray(), static item => item.GetProperty("text").GetString() == "snap");
+    }
+
+    [Fact]
+    public async Task Pursue_LimitsAreValidatedAndPersistedWithoutAnObjective()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var sessionId = await fixture.OpenAsync();
+        var initial = (await fixture.RequestAsync("_crystal/pursue/configuration", new { sessionId }))
+            .GetProperty("result").GetProperty("configuration");
+        Assert.Equal(1000, initial.GetProperty("limits").GetProperty("continuations").GetInt32());
+        var changed = await fixture.RequestAsync("_crystal/pursue/limit", new { sessionId, name = "continuations", value = 7 });
+        Assert.Equal(7, changed.GetProperty("result").GetProperty("configuration").GetProperty("limits").GetProperty("continuations").GetInt32());
+        var unlimited = await fixture.RequestAsync("_crystal/pursue/limit", new { sessionId, name = "wait", value = (int?)null });
+        Assert.Equal(JsonValueKind.Null, unlimited.GetProperty("result").GetProperty("configuration").GetProperty("limits").GetProperty("waitSeconds").ValueKind);
+        foreach (var parameters in new object[]
+                 { new { sessionId, name = "stalls", value = (int?)null }, new { sessionId, name = "wait", value = 0 },
+                     new { sessionId, name = "unknown", value = 1 }, new { sessionId, name = "wait" },
+                     new { sessionId, name = "wait", value = "unlimited" } })
+        {
+            var invalid = await fixture.RequestAsync("_crystal/pursue/limit", parameters);
+            Assert.Equal(-32602, invalid.GetProperty("error").GetProperty("code").GetInt32());
+        }
+
+        using var stored = JsonDocument.Parse(File.ReadAllText(Path.Combine(fixture.Home, "config.json")));
+        Assert.Equal(7, stored.RootElement.GetProperty("pursueLimits").GetProperty("maximumContinuations").GetInt32());
+    }
+
+    [Fact]
+    public async Task Pursue_StatusIsReadableWithoutNoticesOrExtensions()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var sessionId = await fixture.OpenAsync();
+        var result = await fixture.RequestAsync("session/prompt", new
+        {
+            sessionId,
+            prompt = new[] { new { type = "text", text = "/pursue status" } }
+        });
+        Assert.True(result.TryGetProperty("result", out _));
+        var document = Assert.Single(fixture.Updates(), update => update.TryGetProperty("_meta", out var meta)
+            && meta.GetProperty("crystal").GetProperty("event").GetString() == "DocumentWritten");
+        var text = document.GetProperty("content").GetProperty("text").GetString();
+        Assert.Contains("No objective", text);
+        Assert.Contains("7 days", text);
+        Assert.Equal("agent_message_chunk", document.GetProperty("sessionUpdate").GetString());
+    }
+
+    [Fact]
+    public async Task Pursue_LimitEditWhileWorkingIsRefused()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await BridgeFixture.StartAsync(model);
+        var sessionId = await fixture.OpenAsync();
+        var prompt = fixture.RequestAsync("session/prompt", new
+        {
+            sessionId,
+            prompt = new[] { new { type = "text", text = "/pursue start work" } }
+        });
+        await model.Held.Task.WaitAsync(BridgeFixture.Wait);
+        var refused = await fixture.RequestAsync("_crystal/pursue/limit", new { sessionId, name = "stalls", value = 2 });
+        Assert.Equal(-32603, refused.GetProperty("error").GetProperty("code").GetInt32());
+        Assert.Equal("command_refused", refused.GetProperty("error").GetProperty("data").GetProperty("crystal").GetProperty("kind").GetString());
+        var unchanged = (await fixture.RequestAsync("_crystal/pursue/configuration", new { sessionId }))
+            .GetProperty("result").GetProperty("configuration");
+        Assert.Equal(10, unchanged.GetProperty("limits").GetProperty("stalls").GetInt32());
+        await fixture.NotifyAsync("session/cancel", new { sessionId });
+        await prompt;
     }
 
     [Fact]
@@ -271,13 +337,16 @@ public sealed class BridgeExtensionTests
                 """));
         var id = await fixture.OpenAsync(Notified);
 
-        foreach (var method in new[] { "_crystal/models", "_crystal/agents", "_crystal/skills", "_crystal/mcp", "_crystal/plugins", "_crystal/tasks" })
+        foreach (var method in new[] { "_crystal/models", "_crystal/agents", "_crystal/skills", "_crystal/mcp", "_crystal/plugins", "_crystal/tasks", "_crystal/pursue/configuration" })
         {
             var reply = await fixture.RequestAsync(method, new { sessionId = id });
             Assert.True(reply.TryGetProperty("result", out _), method);
         }
 
-        Assert.All(fixture.Lines, line => Assert.DoesNotContain(secret, line, StringComparison.Ordinal));
+        lock (fixture.Lines)
+        {
+            Assert.All(fixture.Lines, line => Assert.DoesNotContain(secret, line, StringComparison.Ordinal));
+        }
     }
 
     [Fact]

@@ -163,6 +163,41 @@ internal static class SessionOptionCatalog
             }
         }
 
+        var pursue = settings.PursueModel;
+        var pursuePicker = Picker("pursue_model", "Pursue model", "_crystal_pursue", "/pursue model",
+            settings, pursue.UsesSessionModel ? SessionModel : pursue.Provider + "/" + pursue.Model);
+        options.Add(pursuePicker with
+        {
+            Values = [new SessionOptionValue(SessionModel, "Session model", "/pursue model"), .. pursuePicker.Values.Skip(1)]
+        });
+        if (pursue.UsesSessionModel)
+        {
+            if (Thinking(settings.ActiveModel, pursue.ThinkingEffort, "pursue_thinking", "Pursue thinking",
+                    "_crystal_pursue", "/pursue thinking") is { } gear)
+            {
+                options.Add(gear);
+            }
+        }
+        else
+        {
+            AddTuning(options, settings, "pursue", "Pursue", "_crystal_pursue", "/pursue",
+                (pursue.Provider!, pursue.Model!, pursue.ThinkingEffort, pursue.ServiceTier, pursue.Speed, pursue.ContextWindow));
+        }
+
+        var pursueCompaction = pursue.Compaction;
+        var compactionPicker = Picker("pursue_compaction_model", "Pursue compaction model", "_crystal_pursue",
+            "/pursue compaction model", settings,
+            pursueCompaction.HasSelection ? pursueCompaction.Provider + "/" + pursueCompaction.Model : SessionModel);
+        options.Add(compactionPicker with
+        {
+            Values = [new SessionOptionValue(SessionModel, "Session setting", "/pursue compaction model"), .. compactionPicker.Values.Skip(1)]
+        });
+        AddTuning(options, settings, "pursue_compaction", "Pursue compaction", "_crystal_pursue", "/pursue compaction",
+            pursueCompaction.HasSelection
+                ? (pursueCompaction.Provider!, pursueCompaction.Model!, pursueCompaction.ThinkingEffort,
+                    pursueCompaction.ServiceTier, pursueCompaction.Speed, pursueCompaction.ContextWindow)
+                : null);
+
         foreach (var kind in ResourceKinds.All)
         {
             var word = ResourceKinds.Word(kind);

@@ -90,6 +90,33 @@ public sealed class SideModelOptionTests
         Assert.Null(LastChrome(headless).Compaction);
     }
 
+    [Fact]
+    public async Task Pursue_OffersCheckerAndCompactionChoicesAndPublishesChanges()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
+        await headless.Session.StartAsync(CancellationToken.None);
+        var picker = headless.Session.ListOptions().Single(option => option.Id == "pursue_model");
+        Assert.Equal("session", picker.Current);
+        Assert.Equal("/pursue model", picker.Values[0].Command);
+        Assert.DoesNotContain("pursue_tier", Ids(headless));
+
+        await headless.RunTurnAsync("/pursue model scripted rich");
+        await headless.RunTurnAsync("/pursue compaction model scripted rich");
+        await headless.RunTurnAsync("/pursue tier priority");
+        var published = headless.Observer.Events.OfType<SessionOptionsChanged>().Last().Options;
+        Assert.Equal("priority", published.Single(option => option.Id == "pursue_tier").Current);
+        Assert.Contains(published.Single(option => option.Id == "pursue_compaction_context").Values,
+            value => value.Command == "/pursue compaction context 200000");
+        Assert.Contains(published.Single(option => option.Id == "pursue_thinking").Values,
+            value => value.Command == "/pursue thinking high");
+
+        await headless.RunTurnAsync("/pursue model");
+        await headless.RunTurnAsync("/pursue compaction model");
+        Assert.DoesNotContain("pursue_tier", Ids(headless));
+        Assert.DoesNotContain("pursue_compaction_context", Ids(headless));
+        Assert.Equal("session", headless.Session.ListOptions().Single(option => option.Id == "pursue_compaction_model").Current);
+    }
+
     private static SessionChrome LastChrome(HeadlessSession headless) =>
         headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome;
 

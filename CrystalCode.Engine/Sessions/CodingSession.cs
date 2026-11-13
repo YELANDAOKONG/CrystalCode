@@ -11210,36 +11210,10 @@ public sealed class CodingSession : ITurnObserver
         Note("Objective cleared.");
     }
 
-    private void ShowPursueStatus()
-    {
-        if (_pursue is not { } state)
-        {
-            Note("Pursue  no objective");
-        }
-        else
-        {
-            var status = "Pursue  " + DisplayCase.Token(PursueState.StatusToken(state.Status));
-            if (state.Phase != PursuePhase.None)
-            {
-                status += "  ·  " + DisplayCase.Token(PursueState.PhaseToken(state.Phase));
-            }
+    public PursueConfiguration GetPursueConfiguration() => new(_settings.PursueModel, _settings.PursueLimits);
 
-            Note(status);
-            Note("Objective  " + state.Objective);
-            if (state.Reason.Length > 0)
-            {
-                Note("Reason  " + state.Reason);
-            }
-
-            Note(
-                "Checks " + state.Checks.ToString(CultureInfo.InvariantCulture)
-                + "  ·  Continuations " + state.Continuations.ToString(CultureInfo.InvariantCulture)
-                + "  ·  Stalls " + state.Stalls.ToString(CultureInfo.InvariantCulture));
-        }
-
-        Note(_settings.PursueModel.Describe());
-        Note(_settings.PursueLimits.Describe());
-    }
+    private void ShowPursueStatus() =>
+        Publish(new DocumentWritten(PursueReport.Build(_pursue, GetPursueConfiguration())));
 
     private void RunPursueWhileBusy(SessionCommand command, string trimmed)
     {
@@ -11280,7 +11254,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         SaveSettings(settings => settings.WithPursueLimits(next));
-        Note(next.Describe());
+        ShowPursueStatus();
     }
 
     private void ChangePursueCompaction(PursueArguments.Request request)
@@ -11364,7 +11338,8 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        Note(next.HasSelection ? updated.Describe() : "Pursue compaction model  session setting");
+        PublishOptions();
+        ShowPursueStatus();
     }
 
     private void ChangePursueModel(PursueArguments.Request request)
@@ -11441,7 +11416,8 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        Note(next.Describe());
+        PublishOptions();
+        ShowPursueStatus();
     }
 
     /// <summary>The catalog entry the pursue check uses: its own model, or the session model.</summary>

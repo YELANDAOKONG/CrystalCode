@@ -5,6 +5,7 @@ using CrystalCode.Bridge.Transport;
 using CrystalCode.Bridge.Wire;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Bridge.Hosting;
@@ -50,6 +51,8 @@ internal static class Extensions
         "_crystal/plugins",
         "_crystal/tasks",
         "_crystal/pursue/get",
+        "_crystal/pursue/configuration",
+        "_crystal/pursue/limit",
         "_crystal/pursue/checks",
         "_crystal/pursue/check",
         "_crystal/tasks/logs"
@@ -223,6 +226,25 @@ internal static class Extensions
 
                 var page = await QueryAsync(runner, value => value.ListPursueChecks(after, count), origin);
                 return Result(writer => CrystalWire.PursuePage(writer, page));
+            case "_crystal/pursue/configuration":
+                var configuration = await QueryAsync(runner, static value => value.GetPursueConfiguration(), origin);
+                return Result(writer => CrystalWire.PursueConfiguration(writer, configuration));
+            case "_crystal/pursue/limit":
+                var limitName = JsonParams.RequiredString(parameters, "name");
+                if (!parameters.TryGetProperty("value", out _))
+                {
+                    throw JsonRpcException.InvalidParams("value is required; use null for unlimited.");
+                }
+
+                var limitValue = OptionalInt(parameters, "value");
+                if (!PursueLimitCommand.TryCreate(limitName, limitValue, out var limitCommand, out var limitError))
+                {
+                    throw JsonRpcException.InvalidParams(limitError);
+                }
+
+                await SubmitAsync(bridge, limitCommand, origin);
+                var changedConfiguration = await QueryAsync(runner, static value => value.GetPursueConfiguration(), origin);
+                return Result(writer => CrystalWire.PursueConfiguration(writer, changedConfiguration));
             case "_crystal/pursue/check":
                 var checkId = JsonParams.RequiredString(parameters, "id");
                 var check = await QueryAsync(runner, value => value.GetPursueCheck(checkId), origin)
