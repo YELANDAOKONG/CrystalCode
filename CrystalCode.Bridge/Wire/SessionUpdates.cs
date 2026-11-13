@@ -273,6 +273,12 @@ internal sealed class SessionUpdates
                 case PursueChecked pursueChecked:
                     _crystal("_crystal/pursueChecked", writer =>
                     {
+                        if (pursueChecked.Check is { } check)
+                        {
+                            CrystalWire.PursueCheckFields(writer, check);
+                            return;
+                        }
+
                         writer.WriteNumber("index", pursueChecked.Index);
                         writer.WriteString("verdict", pursueChecked.Verdict);
                         writer.WriteString("reason", pursueChecked.Reason);

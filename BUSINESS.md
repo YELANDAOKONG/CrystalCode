@@ -543,6 +543,16 @@ rules, and the approval mode are unchanged. The checker has no tools.
 - Server and Bridge carry `/pursue` through the shared command path,
   `PursueChanged`, `PursueChecked`, and the snapshot `pursue` field.
   `crystal run --pursue` treats the task as the objective.
+- Each objective retains checker attempts across resume and process restarts,
+  including failed, invalid, interrupted, and timed-out attempts. Objective,
+  run, and check ids distinguish resumes whose local check indexes repeat.
+  Each citation retains the exact numbered entry text and kind the checker
+  saw, including truncation, rather than a position in the parent archive.
+  Later compaction cannot change that evidence. A new start or pursue clear
+  replaces the history; session clear and fork drop it with the objective.
+  HTTP and ACP snapshots carry the latest check and total count; read-only
+  queries provide paged history and check details. Old session files have
+  no historical checks to recover. The terminal has no pursue detail view.
 
 ## Child Agents
 

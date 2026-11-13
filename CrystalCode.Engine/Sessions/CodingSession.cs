@@ -10992,6 +10992,23 @@ public sealed class CodingSession : ITurnObserver
         }
     }
 
+    public PursueState? GetPursue() => _pursue;
+
+    public PursueCheckPage ListPursueChecks(int after = 0, int limit = 50)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(after);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, 100);
+        var state = _pursue;
+        var history = state?.History ?? [];
+        var checks = history.Skip(after).Take(limit).ToArray();
+        var next = Math.Min(after, history.Count) + checks.Length;
+        return new PursueCheckPage(state?.Id, checks, next, next < history.Count);
+    }
+
+    public PursueCheckRecord? GetPursueCheck(string id) =>
+        _pursue?.History.FirstOrDefault(check => string.Equals(check.Id, id, StringComparison.Ordinal));
+
     private void ShowPursue() => Publish(new PursueChanged(_pursue));
 
     /// <summary>
@@ -11019,6 +11036,9 @@ public sealed class CodingSession : ITurnObserver
         _pursue is { } state
             ? new PursueDocument
             {
+                Id = state.Id,
+                RunId = state.RunId,
+                History = state.History,
                 Objective = state.Objective,
                 Status = PursueState.StatusToken(state.Status),
                 ReasonCode = state.ReasonCode,
@@ -11039,7 +11059,12 @@ public sealed class CodingSession : ITurnObserver
             return null;
         }
 
-        var state = PursueState.Start(document.Objective);
+        var state = PursueState.Start(document.Objective) with
+        {
+            Id = document.Id ?? Guid.NewGuid().ToString("N"),
+            RunId = document.RunId ?? string.Empty,
+            History = document.History ?? []
+        };
         var reasonCode = document.ReasonCode ?? string.Empty;
         var reason = document.Reason ?? string.Empty;
         return document.Status switch
@@ -11548,7 +11573,10 @@ public sealed class CodingSession : ITurnObserver
         }
 
         return PursueVerdictParser.TryParse(answer, rendering.Entries, out var verdict, out var parseError)
-            ? PursueCheck.Verdicted(verdict, response.Usage, rendering.Entries.Count)
+            ? PursueCheck.Verdicted(verdict, response.Usage, rendering.Entries.Count) with
+            {
+                Evidence = rendering.Evidence.Where(entry => verdict.Evidence.Contains(entry.Number)).ToArray()
+            }
             : PursueCheck.Failed(PursueCheckFailure.Invalid, "The pursue model gave an unusable verdict: " + parseError, response.Usage);
     }
 
@@ -11662,7 +11690,11 @@ public sealed class CodingSession : ITurnObserver
             });
         }
 
-        public void Publish(PursueChecked checkedEvent) => session.Publish(checkedEvent);
+        public void Publish(PursueChecked checkedEvent)
+        {
+            session.CheckpointSession();
+            session.Publish(checkedEvent);
+        }
 
         public void Note(string text) => session.Note(text);
 

@@ -329,6 +329,63 @@ public sealed class CodingSessionPursueTests
         Assert.True(session.IsDefault);
     }
 
+    [Fact]
+    public async Task History_RetainsEvidenceAcrossResumeAndPersistenceAndClearsWithTheObjective()
+    {
+        var model = new ScriptedStreamingClient(
+            Text("Need access."), Text("""{"verdict":"blocked","reason":"Missing access."}"""),
+            Text("Tests pass."), Text(Done(4)));
+        using var headless = new HeadlessSession(model);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("/pursue start fix it");
+        var first = Assert.Single(headless.Session.ListPursueChecks().Checks);
+        await headless.RunTurnAsync("/pursue resume");
+        var history = headless.Session.ListPursueChecks();
+        Assert.Equal(2, history.Checks.Count);
+        var last = history.Checks[1];
+        Assert.Equal(first.ObjectiveId, last.ObjectiveId);
+        Assert.NotEqual(first.RunId, last.RunId);
+        Assert.NotEqual(first.Id, last.Id);
+        Assert.Equal(1, last.Index);
+        Assert.Contains("Tests pass.", Assert.Single(last.Evidence).Text);
+        Assert.Equal(last, headless.Session.GetPursueCheck(last.Id));
+        var page = headless.Session.ListPursueChecks(limit: 1);
+        Assert.True(page.HasMore);
+        Assert.Equal(last, Assert.Single(headless.Session.ListPursueChecks(page.NextOffset).Checks));
+
+        using var restored = new HeadlessSession(new ScriptedStreamingClient(), resume: headless.ReadSaved());
+        await restored.Session.StartAsync(CancellationToken.None);
+        var restoredCheck = restored.Session.GetPursueCheck(last.Id)!;
+        Assert.Equal(last.Evidence, restoredCheck.Evidence);
+        Assert.Equal(last.Usage, restoredCheck.Usage);
+        var state = new SessionState();
+        foreach (var item in restored.Observer.Events)
+        {
+            state.Apply(item);
+        }
+
+        Assert.Equal(last.Id, state.Snapshot().Pursue!.History.Last().Id);
+        await restored.RunTurnAsync("/pursue clear");
+        Assert.Null(restored.Session.GetPursue());
+        Assert.Empty(restored.Session.ListPursueChecks().Checks);
+    }
+
+    [Fact]
+    public async Task History_InvalidVerdictIsSavedAndNewStartReplacesIt()
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(
+            Text("Done."), Text("invalid"), Text("Finished."), Text(Done(4))));
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("/pursue start first");
+        var failed = Assert.Single(headless.ReadSaved().Pursue!.History);
+        Assert.Equal("failed", failed.Verdict);
+        Assert.Contains("unusable verdict", failed.Reason);
+        await headless.RunTurnAsync("/pursue start second");
+        Assert.Null(headless.Session.GetPursueCheck(failed.Id));
+        Assert.NotEqual(failed.ObjectiveId, headless.Session.GetPursue()!.Id);
+        Assert.Single(headless.Session.ListPursueChecks().Checks);
+    }
+
     private static PursueState LastState(HeadlessSession headless) =>
         headless.Observer.Events.OfType<PursueChanged>().Last().Pursue!;
 

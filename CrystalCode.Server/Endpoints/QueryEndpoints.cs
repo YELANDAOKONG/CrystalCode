@@ -264,6 +264,36 @@ internal static class QueryEndpoints
                 writer.WriteEndArray();
             }));
 
+        app.MapGet("/pursue", async Task<IResult> (HttpContext context) =>
+            await Query(context, server, static session => session.GetPursue(),
+                static (writer, state) => WireWriter.Pursue(writer, "pursue", state)));
+
+        app.MapGet("/pursue/checks", async Task<IResult> (HttpContext context) =>
+        {
+            if (!TryInt(context.Request.Query["after"].ToString(), 0, out var after)
+                || !TryInt(context.Request.Query["limit"].ToString(), 50, out var limit)
+                || after < 0 || limit is < 1 or > 100)
+            {
+                return Json.Problem(400, "after must be non-negative and limit must be between 1 and 100.");
+            }
+
+            return await Query(context, server, session => session.ListPursueChecks(after, limit),
+                static (writer, page) => WireWriter.PursuePage(writer, page));
+        });
+
+        app.MapGet("/pursue/checks/{id}", async Task<IResult> (HttpContext context, string id) =>
+        {
+            var failure = Guard(context, server, out var runner);
+            if (failure is not null)
+            {
+                return failure;
+            }
+
+            var check = await runner!.InvokeAsync(session => session.GetPursueCheck(id), AccessGuard.Client(context));
+            return check is null ? Json.Problem(404, "No matching pursue check.")
+                : Json.Ok(writer => WireWriter.WritePursueCheck(writer, "check", check));
+        });
+
         app.MapGet("/tasks/{id}/logs", async Task<IResult> (HttpContext context, string id) =>
         {
             if (!TryInt(context.Request.Query["offset"].ToString(), 0, out var offset)

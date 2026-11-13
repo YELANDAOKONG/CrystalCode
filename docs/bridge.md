@@ -704,6 +704,9 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 | `_crystal/quickPrompts/list`, `_crystal/quickPrompts/send {name}` | the F6 catalog, `SubmitQuickPromptAsync` |
 | `_crystal/side/ask {question}`, `_crystal/side/cancel`, `_crystal/side/clear` | `/btw`, `TryCancelSideQuestion`, `ClearSideQuestions` |
 | `_crystal/children/list`, `_crystal/children/get {childSessionId}` | child summaries; one record with archive, usage, and todos |
+| `_crystal/pursue/get` | `GetPursue`: `pursue` state or null, including objective `id`, `runId`, `checkCount`, and `latestCheck` |
+| `_crystal/pursue/checks {after?, limit?}` | `ListPursueChecks`: the fields and paging rules of `GET /pursue/checks`. Invalid parameters are `-32602` |
+| `_crystal/pursue/check {id}` | `GetPursueCheck`: `check` with identities, time, verdict, reason, next step, integer `evidence`, resolved `evidenceContent`, wait task ids, and usage, as in `crystal server`. Unknown id is `-32002` |
 | `_crystal/export {format, system}` | `TryExport` markdown or json; returns `fileName`, `mediaType`, `text` |
 | `_crystal/compact {full}` | `/compact` or `/compact full` |
 | `_crystal/status {full}`, `_crystal/stats {scope}`, `_crystal/tools` | the command, answered with the structured report values |

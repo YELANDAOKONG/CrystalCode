@@ -66,6 +66,9 @@ public sealed class BridgeParityTests
         ["ListMcp"] = "_crystal/mcp",
         ["ListPlugins"] = "_crystal/plugins",
         ["ListBackgroundTasks"] = "_crystal/tasks",
+        ["GetPursue"] = "_crystal/pursue/get",
+        ["ListPursueChecks"] = "_crystal/pursue/checks",
+        ["GetPursueCheck"] = "_crystal/pursue/check",
         ["TryReadBackgroundTaskLog"] = "_crystal/tasks/logs"
     };
 

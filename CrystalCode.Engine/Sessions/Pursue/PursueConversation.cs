@@ -25,7 +25,7 @@ internal static class PursueConversation
     {
         ArgumentNullException.ThrowIfNull(items);
         // A compaction summary is context, not evidence, so it carries no number.
-        var entries = new List<(int? Number, string Text)>();
+        var entries = new List<(int? Number, string Text, string Kind)>();
         var number = 0;
         foreach (var item in items)
         {
@@ -35,7 +35,14 @@ internal static class PursueConversation
                 continue;
             }
 
-            entries.Add((CompactionSelection.IsSummary(item) ? null : ++number, text));
+            var kind = item switch
+            {
+                ChatMessage message => message.Role.Value,
+                ToolCall => "tool_call",
+                ToolResult => "tool_result",
+                _ => "unknown"
+            };
+            entries.Add((CompactionSelection.IsSummary(item) ? null : ++number, text, kind));
         }
 
         var shown = new List<string>();
@@ -65,7 +72,11 @@ internal static class PursueConversation
 
         var omitted = shown.Count < entries.Count;
         var text2 = string.Join("\n\n", shown);
-        return new PursueRendering(omitted ? OmittedNote + "\n\n" + text2 : text2, numbers, Fits: true, Omitted: omitted);
+        return new PursueRendering(omitted ? OmittedNote + "\n\n" + text2 : text2, numbers, Fits: true, Omitted: omitted)
+        {
+            Evidence = entries.Where(entry => entry.Number is int value && numbers.Contains(value))
+                .Select(entry => new PursueEvidence(entry.Number!.Value, entry.Kind, entry.Text)).ToArray()
+        };
     }
 
     private static string Entry(ChatItem item)

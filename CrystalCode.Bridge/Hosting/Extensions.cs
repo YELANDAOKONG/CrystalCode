@@ -49,6 +49,9 @@ internal static class Extensions
         "_crystal/mcp",
         "_crystal/plugins",
         "_crystal/tasks",
+        "_crystal/pursue/get",
+        "_crystal/pursue/checks",
+        "_crystal/pursue/check",
         "_crystal/tasks/logs"
     ];
 
@@ -207,6 +210,24 @@ internal static class Extensions
             case "_crystal/tasks":
                 var tasks = await QueryAsync(runner, static value => value.ListBackgroundTasks(), origin);
                 return Result(writer => CatalogWire.Tasks(writer, tasks));
+            case "_crystal/pursue/get":
+                var pursuit = await QueryAsync(runner, static value => value.GetPursue(), origin);
+                return Result(writer => CrystalWire.Pursue(writer, "pursue", pursuit));
+            case "_crystal/pursue/checks":
+                var after = OptionalInt(parameters, "after") ?? 0;
+                var count = OptionalInt(parameters, "limit") ?? 50;
+                if (after < 0 || count is < 1 or > 100)
+                {
+                    throw JsonRpcException.InvalidParams("after must be non-negative and limit must be between 1 and 100.");
+                }
+
+                var page = await QueryAsync(runner, value => value.ListPursueChecks(after, count), origin);
+                return Result(writer => CrystalWire.PursuePage(writer, page));
+            case "_crystal/pursue/check":
+                var checkId = JsonParams.RequiredString(parameters, "id");
+                var check = await QueryAsync(runner, value => value.GetPursueCheck(checkId), origin)
+                    ?? throw JsonRpcException.NotFound("No matching pursue check.");
+                return Result(writer => CrystalWire.WritePursueCheck(writer, "check", check));
             case "_crystal/tasks/logs":
                 return await TaskLogAsync(runner, parameters, origin);
             default:

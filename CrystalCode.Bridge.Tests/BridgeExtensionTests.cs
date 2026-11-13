@@ -29,7 +29,7 @@ public sealed class BridgeExtensionTests
         Assert.Contains("_crystal/snapshot", extensions);
         Assert.Contains("_crystal/session/fork", extensions);
         Assert.Contains("_crystal/tasks/logs", extensions);
-        Assert.Equal(29, extensions.Length);
+        Assert.Equal(32, extensions.Length);
         Assert.Contains("_crystal/queue", crystal.GetProperty("eventKinds").EnumerateArray().Select(static value => value.GetString()));
         Assert.Equal("rfd", crystal.GetProperty("fork").GetString());
         Assert.Equal("rfd", crystal.GetProperty("subagents").GetString());
@@ -53,6 +53,33 @@ public sealed class BridgeExtensionTests
 
         Assert.Equal("completed", snapshot.GetProperty("lastTurn").GetProperty("reason").GetString());
         Assert.Contains(snapshot.GetProperty("conversation").EnumerateArray(), static item => item.GetProperty("text").GetString() == "snap");
+    }
+
+    [Fact]
+    public async Task Pursue_ChecksRemainQueryableWithoutNotifications()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false,
+            ScriptedModel.TextRound("Tests passed."),
+            ScriptedModel.TextRound("""{"verdict":"done","reason":"Tests passed.","evidence":[2]}""")));
+        var sessionId = await fixture.OpenAsync();
+        await fixture.RequestAsync("session/prompt", new
+        {
+            sessionId,
+            prompt = new[] { new { type = "text", text = "/pursue start fix tests" } }
+        });
+        var current = (await fixture.RequestAsync("_crystal/pursue/get", new { sessionId })).GetProperty("result");
+        var latest = current.GetProperty("pursue").GetProperty("latestCheck");
+        var id = latest.GetProperty("id").GetString();
+        var page = (await fixture.RequestAsync("_crystal/pursue/checks", new { sessionId, limit = 1 })).GetProperty("result");
+        Assert.Equal(id, page.GetProperty("checks")[0].GetProperty("id").GetString());
+        var detail = (await fixture.RequestAsync("_crystal/pursue/check", new { sessionId, id })).GetProperty("result");
+        Assert.Contains("Tests passed.", detail.GetProperty("check").GetProperty("evidenceContent")[0].GetProperty("text").GetString());
+        var snapshot = (await fixture.RequestAsync("_crystal/snapshot", new { sessionId })).GetProperty("result");
+        Assert.Equal(id, snapshot.GetProperty("pursue").GetProperty("latestCheck").GetProperty("id").GetString());
+        var invalid = await fixture.RequestAsync("_crystal/pursue/checks", new { sessionId, limit = 0 });
+        Assert.Equal(-32602, invalid.GetProperty("error").GetProperty("code").GetInt32());
+        var missing = await fixture.RequestAsync("_crystal/pursue/check", new { sessionId, id = "missing" });
+        Assert.Equal(-32002, missing.GetProperty("error").GetProperty("code").GetInt32());
     }
 
     [Fact]

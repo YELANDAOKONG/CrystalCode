@@ -54,6 +54,10 @@ public static class WireWriter
         }
 
         writer.WriteStartObject(name);
+        writer.WriteString("id", pursue.Id);
+        writer.WriteString("runId", pursue.RunId);
+        writer.WriteNumber("checkCount", pursue.History.Count);
+        WritePursueCheck(writer, "latestCheck", pursue.History.LastOrDefault());
         writer.WriteString("objective", pursue.Objective);
         writer.WriteString("status", PursueState.StatusToken(pursue.Status));
         writer.WriteString("phase", PursueState.PhaseToken(pursue.Phase));
@@ -64,6 +68,67 @@ public static class WireWriter
         writer.WriteNumber("stalls", pursue.Stalls);
         writer.WriteString("nextStep", pursue.NextStep);
         writer.WriteEndObject();
+    }
+
+    public static void WritePursueCheck(Utf8JsonWriter writer, string name, PursueCheckRecord? check)
+    {
+        if (check is null)
+        {
+            writer.WriteNull(name);
+            return;
+        }
+
+        writer.WriteStartObject(name);
+        PursueCheckFields(writer, check);
+        writer.WriteEndObject();
+    }
+
+    public static void PursueCheckFields(Utf8JsonWriter writer, PursueCheckRecord check)
+    {
+        writer.WriteString("id", check.Id);
+        writer.WriteString("objectiveId", check.ObjectiveId);
+        writer.WriteString("runId", check.RunId);
+        writer.WriteNumber("index", check.Index);
+        writer.WriteString("checkedUtc", check.CheckedUtc);
+        writer.WriteString("verdict", check.Verdict);
+        writer.WriteString("reason", check.Reason);
+        writer.WriteString("nextStep", check.NextStep);
+        writer.WriteStartArray("evidence");
+        foreach (var entry in check.Evidence)
+        {
+            writer.WriteNumberValue(entry.Number);
+        }
+
+        writer.WriteEndArray();
+        writer.WriteStartArray("evidenceContent");
+        foreach (var entry in check.Evidence)
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("number", entry.Number);
+            writer.WriteString("kind", entry.Kind);
+            writer.WriteString("text", entry.Text);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        Strings(writer, "waitFor", check.WaitFor);
+        Usage(writer, "usage", check.Usage);
+    }
+
+    public static void PursuePage(Utf8JsonWriter writer, PursueCheckPage page)
+    {
+        Optional(writer, "objectiveId", page.ObjectiveId);
+        writer.WriteStartArray("checks");
+        foreach (var check in page.Checks)
+        {
+            writer.WriteStartObject();
+            PursueCheckFields(writer, check);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        writer.WriteNumber("nextOffset", page.NextOffset);
+        writer.WriteBoolean("hasMore", page.HasMore);
     }
 
     public static void Chrome(Utf8JsonWriter writer, string name, SessionChrome? chrome)

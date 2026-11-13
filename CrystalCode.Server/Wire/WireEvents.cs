@@ -217,6 +217,12 @@ public static class WireEvents
                 WireWriter.Pursue(writer, "pursue", pursue.Pursue);
                 break;
             case PursueChecked pursueChecked:
+                if (pursueChecked.Check is { } check)
+                {
+                    WireWriter.PursueCheckFields(writer, check);
+                    break;
+                }
+
                 writer.WriteNumber("index", pursueChecked.Index);
                 writer.WriteString("verdict", pursueChecked.Verdict);
                 writer.WriteString("reason", pursueChecked.Reason);

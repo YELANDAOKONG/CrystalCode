@@ -692,6 +692,23 @@ for listed session tasks only. New stop reasons are `pursue_blocked` and
 `PursueChecked` events, `SessionSnapshot.Pursue`, and `SessionDocument.Pursue`
 carry it. Continuation messages are saved as ordinary user messages.
 
+`PursueState.History` holds immutable `PursueCheckRecord` values with objective,
+run, and check ids, UTC time, verdict or failure, reason, next step, wait task
+ids, usage, and `PursueEvidence` (number, kind, exact rendered text). Rendering
+captures evidence before the temporary checker context disappears. Numbers
+are local to that rendering, never archive indexes. Each completed attempt
+updates state and checkpoints before its `PursueChecked` notification. Failed
+attempts count as checks and use verdict `failed`; retries remain one attempt.
+`PursueDocument` saves identities and history; older documents load an empty
+history. Resume retains it, while start, clear, and fork replace or drop it.
+`SessionState` receives history through `PursueChanged`; HTTP and ACP writers
+emit only `checkCount` and `latestCheck` with the state. `GetPursue`,
+`ListPursueChecks`, and `GetPursueCheck` are Engine queries through the runner.
+Pages use a non-negative offset (`after`), default 0, and `limit`
+from 1 through 100 (default 50), returning `objectiveId`, `checks`,
+`nextOffset`, and `hasMore`. Clients discard pages for a replaced objective.
+Server and Bridge own only explicit wire mapping and parameter validation.
+
 ## Session and turn
 
 One user message is one turn:

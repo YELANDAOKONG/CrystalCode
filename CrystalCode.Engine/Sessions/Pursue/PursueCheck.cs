@@ -12,6 +12,8 @@ internal sealed record PursueCheck(
     TokenUsage? Usage,
     int Entries)
 {
+    public IReadOnlyList<PursueEvidence> Evidence { get; init; } = [];
+
     public static PursueCheck Verdicted(PursueVerdict verdict, TokenUsage? usage, int entries) =>
         new(verdict, PursueCheckFailure.None, string.Empty, usage, entries);
 

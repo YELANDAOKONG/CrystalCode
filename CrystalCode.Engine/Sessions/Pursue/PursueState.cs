@@ -16,6 +16,12 @@ public sealed record PursueState(
     int Stalls = 0,
     string NextStep = "")
 {
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+
+    public string RunId { get; init; } = string.Empty;
+
+    public IReadOnlyList<PursueCheckRecord> History { get; init; } = [];
+
     public const int MaximumObjectiveCharacters = 8000;
 
     public static PursueState Start(string objective) =>

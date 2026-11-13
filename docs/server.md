@@ -249,6 +249,9 @@ and the `server.state` event.
 | `POST /quick-prompts/{name}/send` | operate | `SubmitQuickPromptAsync`; Fill stays in the client |
 | `POST /side/cancel`, `POST /side/clear` | operate | Side question control; `/btw` itself goes through `/input` |
 | `GET /children`, `GET /children/{id}` | observe | Child list, archive, events, usage, and todos (F7 and `/child`) |
+| `GET /pursue` | observe | `pursue`: current objective state or null, including `id`, `runId`, `checkCount`, and `latestCheck` |
+| `GET /pursue/checks?after=0&limit=50` | observe | Checks oldest first: `objectiveId`, `checks`, `nextOffset`, `hasMore`. `after` is the number already read; `limit` is 1–100. No objective returns an empty page with null `objectiveId`. Invalid parameters return 400 |
+| `GET /pursue/checks/{id}` | observe | `check`: one retained checker attempt with evidence; 404 for an unknown id |
 | `GET /export?format=markdown\|json&system=true\|false` | observe | `TryExport` as a download; `/export` still writes on the server |
 | `GET /sessions?all=true\|false` | observe | `ListSavedSessions`: saved sessions with content, newest first, for this workspace or every workspace. Each has `id`, `workspace`, `mode`, `createdUtc`, `updatedUtc`, `userTurns`, `preview` (the first user message), `topic` (the session topic, or `null`), `current`, and `open` (another process, or this one, holds it). Resume one with `/resume <id>` through `POST /input` |
 | `GET /models` | observe | `ListModels`: every catalog model with `provider`, `model`, `protocol`, `current`, `credentialReady`, `contextWindows`, `thinking`, `thinkingCanDisable`, `thinkingEfforts`, `serviceTiers`, `speeds`, `imageInput`, and `maxTokens`, plus `pending`. No base address, header, or key |
@@ -350,6 +353,19 @@ request. A running turn, a child, and a queued follow-up have no origin, so
 everything they produce goes to every client.
 
 ## Snapshot
+
+Pursue state includes `id` (objective identity), `runId` (latest run),
+`checkCount` (all retained attempts), and `latestCheck` (or null), in both
+the snapshot and `pursue.changed`. A check has `id`, `objectiveId`, `runId`,
+`index` (per run), `checkedUtc`, `verdict`, `reason`, `nextStep`, `evidence`
+(integer citations), `evidenceContent` (`number`, `kind`, `text`), `waitFor`
+(background task ids), and `usage`. `pursue.checked` carries these same fields.
+Failed attempts use verdict `failed` and an explanatory reason, with no
+citations. Evidence is the exact rendered text the checker saw, including
+any truncation; its numbers are not parent conversation array indexes.
+History survives session resume and restart, including after SSE resync.
+Start and clear replace it. Clients merge by check id and discard responses
+whose objective id no longer matches. Older saved files contain no history.
 
 `GET /snapshot` returns the state a client needs to draw the session without
 replaying history: `state`, `sessionId`, chrome, preferences, slash

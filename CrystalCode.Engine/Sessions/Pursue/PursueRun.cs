@@ -34,7 +34,7 @@ internal sealed class PursueRun
         ArgumentNullException.ThrowIfNull(state);
         _host = host;
         _limits = limits;
-        _state = state with { Checks = 0, Continuations = 0, Stalls = 0 };
+        _state = state with { Checks = 0, Continuations = 0, Stalls = 0, RunId = Guid.NewGuid().ToString("N") };
     }
 
     public async Task<TurnResult> RunAsync(
@@ -89,22 +89,16 @@ internal sealed class PursueRun
             var check = await CheckAsync(cancellationToken);
             if (check is null)
             {
+                Record(PursueCheck.Failed(PursueCheckFailure.Request,
+                    cancellationToken.IsCancellationRequested ? "The check was interrupted." : "The check timed out."));
                 return TimedOutOrInterrupted(cancellationToken);
             }
 
+            Record(check);
             if (check.Verdict is not { } verdict)
             {
                 return StopForCheckFailure(check);
             }
-
-            _state = _state with { Checks = _state.Checks + 1 };
-            _host.Publish(new PursueChecked(
-                _state.Checks,
-                PursueVerdict.Token(verdict.Kind),
-                verdict.Reason,
-                verdict.NextStep,
-                verdict.Evidence,
-                check.Usage));
 
             switch (verdict.Kind)
             {
@@ -155,6 +149,21 @@ internal sealed class PursueRun
             AppendContinuation(resumed: false, verdict);
             needSegment = true;
         }
+    }
+
+    private void Record(PursueCheck check)
+    {
+        var verdict = check.Verdict;
+        var record = new PursueCheckRecord(
+            Guid.NewGuid().ToString("N"), _state.Id, _state.RunId, _state.Checks + 1,
+            DateTimeOffset.UtcNow,
+            verdict is null ? "failed" : PursueVerdict.Token(verdict.Kind),
+            verdict?.Reason ?? check.Error, verdict?.NextStep ?? string.Empty,
+            check.Evidence, verdict?.WaitFor ?? [], check.Usage);
+        _state = _state with { Checks = record.Index, History = [.. _state.History, record] };
+        _host.Publish(_state);
+        _host.Publish(new PursueChecked(record.Index, record.Verdict, record.Reason, record.NextStep,
+            verdict?.Evidence ?? [], record.Usage, record));
     }
 
     private async Task<PursueCheck?> CheckAsync(CancellationToken cancellationToken)
