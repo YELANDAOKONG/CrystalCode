@@ -169,7 +169,7 @@ and the `server.state` event.
     model or its slots, prompt sets, rules, agents, the workspace, saved
     configuration, or quit the session (`/approval`, `/thinking`, `/context`,
     `/tier`, `/speed`, `/tokens`, `/model`, `/promptset`, `/promptattach`,
-    `/statusline`, `/cd <path>`, `/space`, `/trust`, `/rules`, `/access`,
+    `/statusline`, `/title <text>`, `/cd <path>`, `/space`, `/trust`, `/rules`, `/access`,
     `/resume`, `/agents`, `/verbose`, `/quit`, and the argument forms of
     `/compact`, `/todos`, `/tools`, `/skills`, `/plugins`, `/notify`, and `/mcp`, and `/pursue model|thinking|tier|speed|context|limit`, which write `config.json`).
     `/notify test` runs the operator's `operatorNotify` command on the server

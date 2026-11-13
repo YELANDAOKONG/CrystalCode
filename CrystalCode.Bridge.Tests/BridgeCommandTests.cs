@@ -86,6 +86,64 @@ public sealed class BridgeCommandTests
     }
 
     [Fact]
+    public async Task Title_IsOfferedWithoutTopicOptionsAndRenamesTheSessionWithoutCallingTheModel()
+    {
+        var model = new ScriptedModel(false, ScriptedModel.TextRound("done"));
+        await using var fixture = await BridgeFixture.StartAsync(model);
+        var id = await fixture.OpenAsync();
+        var offered = await fixture.WaitForUpdateAsync("available_commands_update");
+        var commands = offered.GetProperty("params").GetProperty("update").GetProperty("availableCommands").EnumerateArray().ToArray();
+        var title = Assert.Single(commands, command => command.GetProperty("name").GetString() == "title");
+        Assert.False(title.TryGetProperty("input", out _));
+        await PromptAsync(fixture, id, "First message");
+
+        var response = await PromptAsync(fixture, id, "/title clear");
+        Assert.Equal("end_turn", response.GetProperty("result").GetProperty("stopReason").GetString());
+        await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.TryGetProperty("title", out var text) && text.GetString() == "clear");
+        var listed = await fixture.RequestAsync("session/list", new { cwd = fixture.Workspace });
+        var saved = Assert.Single(listed.GetProperty("result").GetProperty("sessions").EnumerateArray());
+        Assert.Equal("clear", saved.GetProperty("title").GetString());
+        Assert.Single(model.Requests);
+    }
+
+    [Theory]
+    [InlineData("/title", "Use /title <text>.")]
+    [InlineData("/title \"\"...", "Use /title <text>.")]
+    public async Task InvalidTitle_ReportsTheEngineUsageWithoutCallingTheModel(string command, string expected)
+    {
+        var model = new ScriptedModel(false);
+        await using var fixture = await BridgeFixture.StartAsync(model);
+        var id = await fixture.OpenAsync();
+
+        var response = await PromptAsync(fixture, id, command);
+
+        Assert.Equal("command_refused", response.GetProperty("error").GetProperty("data").GetProperty("crystal").GetProperty("kind").GetString());
+        Assert.Contains(expected, response.GetProperty("error").GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Empty(model.Requests);
+    }
+
+    [Fact]
+    public async Task Title_WhileBusyIsRefusedWithoutCancellingThePrompt()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await BridgeFixture.StartAsync(model);
+        var id = await fixture.OpenAsync();
+        await PromptAsync(fixture, id, "/title Original");
+        var held = model.Held.Task;
+        var (_, running) = await fixture.StartRequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "Keep working" } } });
+        await held.WaitAsync(BridgeFixture.Wait);
+
+        var refused = await PromptAsync(fixture, id, "/title Changed");
+        Assert.Equal("command_refused", refused.GetProperty("error").GetProperty("data").GetProperty("crystal").GetProperty("kind").GetString());
+        Assert.Contains("Finish the current turn before using /title.", refused.GetProperty("error").GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.False(running.IsCompleted);
+        Assert.Single(model.Requests);
+        await fixture.NotifyAsync("session/cancel", new { sessionId = id });
+        await running.WaitAsync(BridgeFixture.Wait);
+    }
+
+    [Fact]
     public async Task PlainClient_CompletionsHideUnsupportedViewsAndExplainResume()
     {
         await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));

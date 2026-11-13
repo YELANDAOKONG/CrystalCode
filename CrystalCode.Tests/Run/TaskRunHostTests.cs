@@ -676,13 +676,15 @@ public sealed class TaskRunHostTests
         Assert.Equal(1, events.Count(item => item.GetProperty("type").GetString() == "step_start"));
     }
 
-    [Fact]
-    public async Task SlashCommand_DoesNotChangeSettings()
+    [Theory]
+    [InlineData("/approval full")]
+    [InlineData("/title Changed")]
+    public async Task SlashCommand_DoesNotChangeSettings(string command)
     {
         using var fixture = new RunFixture();
         var client = new ScriptedRunClient(AllowReview, TextRound("unused"));
 
-        var result = await fixture.RunAsync(client, "/approval full");
+        var result = await fixture.RunAsync(client, command);
 
         Assert.Equal(RunExit.Invalid, result.Code);
         Assert.Contains("slash command", result.Error, StringComparison.Ordinal);

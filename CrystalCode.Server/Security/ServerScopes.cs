@@ -76,6 +76,7 @@ public static class ServerScopes
             // A bare command or a kind lists; every other form writes config.json.
             // A bare /topic shows; naming the session and configuring naming write state.
             SessionVerb.Topic => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
+            SessionVerb.Title => ServerScope.Admin,
             SessionVerb.Describe => IsResourceListing(argument) ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Quick => ServerScope.Operate,
             SessionVerb.Edit => ServerScope.Operate,

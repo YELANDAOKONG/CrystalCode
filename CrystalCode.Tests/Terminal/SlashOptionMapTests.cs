@@ -24,6 +24,18 @@ public sealed class SlashOptionMapTests
     }
 
     [Fact]
+    public void Title_CompletesAsACommandAndOffersNoTopicSubcommands()
+    {
+        var commands = SlashMenu.Create(null).Select(SlashOptionMap.From).ToArray();
+
+        var picker = SlashPicker.Create("/tit", commands);
+
+        Assert.NotNull(picker);
+        Assert.Equal("/title ", picker.CompletedText);
+        Assert.Null(SlashPicker.Create("/title cl", commands));
+    }
+
+    [Fact]
     public void From_ToolPolicyCompletesThroughThePicker()
     {
         var menu = new SlashCompletion("tools", "tools", ["tools"], ToolCompletions.All);

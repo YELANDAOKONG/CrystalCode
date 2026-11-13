@@ -3088,6 +3088,9 @@ public sealed class CodingSession : ITurnObserver
             case SessionVerb.Topic:
                 ChangeTopic(command.Argument);
                 return (true, false);
+            case SessionVerb.Title:
+                ChangeTitle(command.Argument);
+                return (true, false);
             case SessionVerb.Pursue:
                 await ChangePursueAsync(command.Argument, cancellationToken);
                 return (true, false);
@@ -9391,6 +9394,27 @@ public sealed class CodingSession : ITurnObserver
         {
             SetTopicActivity(naming: false);
         }
+    }
+
+    /// <summary>
+    /// <c>/title &lt;text&gt;</c> always names the session. It is not a bare
+    /// <c>/topic</c>, where words such as clear or on would be read as switches.
+    /// </summary>
+    private void ChangeTitle(string argument)
+    {
+        if (_turnActive || _compacting)
+        {
+            RefuseCommand("/title");
+            return;
+        }
+
+        if (SessionTopic.Normalize(argument) is null)
+        {
+            Error("Use /title <text>.");
+            return;
+        }
+
+        ChangeTopic("set " + argument);
     }
 
     /// <summary>

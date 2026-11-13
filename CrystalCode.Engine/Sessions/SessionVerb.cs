@@ -38,6 +38,7 @@ public enum SessionVerb
     Compact,
     Describe,
     Topic,
+    Title,
     Pursue,
     Trim,
     Todos,

@@ -191,8 +191,10 @@ public sealed class CodingSessionContextTests
         Assert.True(summary > compacted);
     }
 
-    [Fact]
-    public async Task Compaction_ForkCommandIsRefusedAndDoesNotSendText()
+    [Theory]
+    [InlineData("/fork")]
+    [InlineData("/title Changed")]
+    public async Task Compaction_SessionCommandIsRefusedAndDoesNotSendText(string command)
     {
         var client = new GatedSummaryClient();
         using var headless = await OpenReadyToCompactAsync(client);
@@ -200,7 +202,7 @@ public sealed class CodingSessionContextTests
         await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
         var sessionId = headless.Session.SessionId;
 
-        headless.Session.Enqueue("/fork");
+        headless.Session.Enqueue(command);
         headless.Session.Enqueue(string.Empty);
         Assert.False(compacting.IsCompleted);
         client.Release();
@@ -210,17 +212,17 @@ public sealed class CodingSessionContextTests
         Assert.Equal(sessionId, headless.Session.SessionId);
         Assert.Contains(
             headless.Observer.Events.OfType<ErrorWritten>(),
-            error => error.Text == "Finish the current turn before using /fork.");
+            error => error.Text == "Finish the current turn before using " + command.Split(' ')[0] + ".");
         Assert.Contains(headless.Observer.Events.OfType<NoteWritten>(), note => note.Text == "Compacted context");
         Assert.DoesNotContain(
             headless.Observer.Events.OfType<UserMessageSent>(),
-            user => user.Text.Contains("/fork", StringComparison.Ordinal));
+            user => user.Text.Contains(command, StringComparison.Ordinal));
         Assert.DoesNotContain(
             headless.Observer.Events.OfType<QueueChanged>(),
-            queue => queue.Items.Contains("/fork"));
+            queue => queue.Items.Contains(command));
         Assert.False(headless.Session.TurnActive);
         var history = new CrystalCode.Engine.Home.PromptHistoryStore(headless.Home, headless.WorkspacePath);
-        Assert.Contains("/fork", await history.LoadAsync(CancellationToken.None));
+        Assert.Contains(command, await history.LoadAsync(CancellationToken.None));
     }
 
     [Fact]

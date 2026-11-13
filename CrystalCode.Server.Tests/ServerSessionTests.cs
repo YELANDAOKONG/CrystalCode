@@ -152,6 +152,52 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task Title_RenamesChromeSnapshotAndSavedListAndRequiresAdmin()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("done")));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "First message" });
+        await events.WaitForAsync("turn.finished");
+
+        var issued = await fixture.PostAsync(fixture.Http, "/auth/tokens", new { scope = "operate" });
+        using var operate = fixture.Client("operator", issued.GetProperty("token").GetString());
+        using var forbidden = await operate.PostAsync("/input", ServerFixture.Body(new { text = "/title Forbidden" }));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "/title clear" });
+        await events.WaitForAsync("chrome.changed", static value =>
+            value.GetProperty("data").GetProperty("chrome").GetProperty("topic").GetString() == "clear");
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+        Assert.Equal("clear", snapshot.GetProperty("chrome").GetProperty("topic").GetString());
+        Assert.False(snapshot.GetProperty("turnActive").GetBoolean());
+        var commands = snapshot.GetProperty("commands").EnumerateArray().ToArray();
+        var title = Assert.Single(commands, command => command.GetProperty("name").GetString() == "title");
+        Assert.False(title.TryGetProperty("arguments", out _));
+        var sessions = await fixture.GetAsync(fixture.Http, "/sessions");
+        Assert.Equal("clear", sessions.GetProperty("sessions")[0].GetProperty("topic").GetString());
+    }
+
+    [Fact]
+    public async Task Title_WhileBusyIsRefusedWithoutStoppingTheTurn()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "/title Original" });
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "Keep working" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+
+        var refused = await fixture.PostAsync(fixture.Http, "/input", new { text = "/title Changed" });
+        Assert.False(refused.GetProperty("accepted").GetBoolean());
+        Assert.Equal("Finish the current turn before using /title.", refused.GetProperty("error").GetString());
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+        Assert.True(snapshot.GetProperty("turnActive").GetBoolean());
+        Assert.Equal("Original", snapshot.GetProperty("chrome").GetProperty("topic").GetString());
+        await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+    }
+
+    [Fact]
     public async Task TopicNaming_ReachesEveryClientEvenWhenOneAskedForIt()
     {
         var model = new ScriptedModel(false, TextRound("done"), TextRound("Tidy the build"), TextRound("Repair the build"));
