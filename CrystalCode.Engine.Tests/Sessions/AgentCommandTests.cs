@@ -57,6 +57,43 @@ public sealed class AgentCommandTests
     }
 
     [Fact]
+    public async Task AgentCompaction_SavesPerAgentAndClearsAndRejectsBeforeModel()
+    {
+        var provider = new ProviderDefinition(new ProviderName("scripted"), ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"), new Dictionary<string, ModelSettings>
+            {
+                ["model"] = new(200_000),
+                ["summary"] = new(200_000, thinking: true, thinkingEfforts: ["high"], contextWindows: [100_000, 200_000])
+            });
+        var settings = new HarnessSettings(provider.Name, "model", ApprovalMode.Default, 0.8, new ProviderCatalog([provider]));
+        using var session = new HeadlessSession(new ScriptedStreamingClient(), settings: settings, prepare: (home, _) =>
+        {
+            home.EnsureCreated();
+            File.WriteAllText(home.ProvidersPath, JsonSerializer.Serialize(SettingsMapper.WriteProviders(settings.Catalog)));
+        });
+        await session.Session.StartAsync(CancellationToken.None);
+        await session.Session.SubmitAsync("/agents on", CancellationToken.None);
+
+        await session.Session.SubmitAsync("/agents compaction explore thinking high", CancellationToken.None);
+        Assert.Single(session.Observer.Events.OfType<ErrorWritten>());
+
+        foreach (var command in new[] { "/agents compaction explore model scripted summary",
+            "/agents compaction explore thinking high", "/agents compaction explore context 100k" })
+        {
+            await session.Session.SubmitAsync(command, CancellationToken.None);
+        }
+
+        var stored = new DiskSettingsStore(session.Home).Load().Agents;
+        Assert.Equal("summary", stored.Explore.Compaction!.Model);
+        Assert.Equal("high", stored.Explore.Compaction.Thinking);
+        Assert.Equal(100_000, stored.Explore.Compaction.Context);
+        Assert.Null(stored.Work.Compaction);
+
+        await session.Session.SubmitAsync("/agents compaction explore clear", CancellationToken.None);
+        Assert.Null(new DiskSettingsStore(session.Home).Load().Agents.Explore.Compaction);
+    }
+
+    [Fact]
     public async Task AgentsOnAndOff_AddAndRemoveTheTaskToolForTheNextRequest()
     {
         var settings = HeadlessSession.ScriptedSettings();

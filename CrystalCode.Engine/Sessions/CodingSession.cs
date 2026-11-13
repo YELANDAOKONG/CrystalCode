@@ -332,7 +332,7 @@ public sealed class CodingSession : ITurnObserver
                     .Distinct(StringComparer.Ordinal).ToArray();
                 child = new ChildSessionDocument
                 {
-                    Id = SessionStore.NewId(), Agent = agent, Label = label, Model = AgentSnapshot(selected),
+                    Id = SessionStore.NewId(), Agent = agent, Label = label, Model = AgentSnapshot(selected) with { Compaction = definition.Model.Compaction },
                     SystemPrompt = definition.Prompt, Tools = tools
                 };
             }
@@ -485,10 +485,28 @@ public sealed class CodingSession : ITurnObserver
                 {
                     return new CompactionOutcome(context, CompactionKind.Unchanged);
                 }
-                var summarySelection = _settings.CompactionModel.Enabled
-                    ? selectedModel.WithSelection(new ProviderName(_settings.CompactionModel.Provider!), _settings.CompactionModel.Model!)
-                        .WithThinkingEffort(_settings.CompactionModel.ThinkingEffort)
-                    : selectedModel;
+                HarnessSettings summarySelection;
+                if (child.Model.Compaction is { Provider: not null, Model: not null } ownCompaction)
+                {
+                    try
+                    {
+                        summarySelection = ResolveAgentModel(ownCompaction);
+                    }
+                    catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException or InvalidOperationException)
+                    {
+                        Emit(new ErrorWritten("Agent compaction model unavailable: " + exception.Message));
+                        return new CompactionOutcome(context, CompactionKind.Exhausted);
+                    }
+
+                    compactionLimits = LimitsFor(selectedModel, summarySelection);
+                }
+                else
+                {
+                    summarySelection = _settings.CompactionModel.Enabled
+                        ? selectedModel.WithSelection(new ProviderName(_settings.CompactionModel.Provider!), _settings.CompactionModel.Model!)
+                            .WithThinkingEffort(_settings.CompactionModel.ThinkingEffort)
+                        : selectedModel;
+                }
                 var summaryClient = CreateClient(summarySelection.WithOutputTokenCap(compactionLimits.SummaryOutputCap()));
                 try
                 {
@@ -825,6 +843,18 @@ public sealed class CodingSession : ITurnObserver
             new("tool-calls", "Tool calls for each child run", ["tool-calls"], ArgumentsOptional: true),
             new("duration", "Seconds for each child run", ["duration"], ArgumentsOptional: true)
         ]));
+        commands.Add(new SlashCompletion("compaction", "Set an Agent's own compaction model", ["compaction"],
+            catalog.Definitions.Select(definition => new SlashCompletion(definition.Name, definition.Description, [definition.Name],
+            [
+                new("model", "Select the compaction model", ["model"], _settings.Catalog.Providers.Keys.Select(provider => new SlashCompletion(provider,
+                    "Compaction provider", [provider], _settings.Catalog.GetModelNames(new ProviderName(provider))
+                        .Select(model => new SlashCompletion(model, "Compaction model", [model])).ToArray())).ToArray(), ArgumentsOptional: true),
+                new("thinking", "Compaction thinking gear", ["thinking"], ArgumentsOptional: true),
+                new("context", "Compaction context budget", ["context"], ArgumentsOptional: true),
+                new("tier", "Compaction service tier", ["tier"], ArgumentsOptional: true),
+                new("speed", "Compaction speed", ["speed"], ArgumentsOptional: true),
+                new("clear", "Use the session compaction setting", ["clear"])
+            ])).ToArray()));
         foreach (var command in new[] { "model", "thinking", "context", "tier", "speed" })
         {
             var names = new List<SlashCompletion>();
@@ -888,9 +918,12 @@ public sealed class CodingSession : ITurnObserver
                 .Select(agent => (IReadOnlyList<string>)
                 [
                     agent.Name,
-                    agent.Model.Provider is null || agent.Model.Model is null
+                    (agent.Model.Provider is null || agent.Model.Model is null
                         ? "Inherit"
-                        : agent.Model.Provider + "/" + agent.Model.Model,
+                        : agent.Model.Provider + "/" + agent.Model.Model)
+                    + (agent.Model.Compaction is { Provider: not null, Model: not null } own
+                        ? "  ·  Compaction " + own.Provider + "/" + own.Model
+                        : string.Empty),
                     agent.Description
                 ])
                 .ToArray();
@@ -903,6 +936,100 @@ public sealed class CodingSession : ITurnObserver
         }
 
         Publish(new DocumentWritten(new TranscriptDocument($"Agents  {catalog.Definitions.Count} defined", blocks)));
+    }
+
+    private bool TryChangeAgentCompaction(IReadOnlyList<string> parts, AgentSettings settings)
+    {
+        var definition = AgentCatalog.Load(_home, _workspace.Root, settings with { Enabled = true })
+            .Definitions.FirstOrDefault(agent => agent.Name == parts[1]);
+        if (definition is null)
+        {
+            Error("Unknown or disabled Agent.");
+            return false;
+        }
+
+        var kind = parts[2];
+        var value = parts.Count > 3 ? parts[3] : null;
+        var current = definition.Model.Compaction ?? new AgentModelSettings();
+        AgentModelSettings? next;
+        switch (kind)
+        {
+            case "clear" when parts.Count == 3:
+                next = null;
+                break;
+            case "model" when parts.Count is 3 or 5:
+                next = parts.Count == 5 ? new AgentModelSettings { Provider = parts[3], Model = parts[4] } : null;
+                break;
+            case "thinking" or "context" or "tier" or "speed" when parts.Count <= 4:
+                if (current.Provider is null || current.Model is null)
+                {
+                    Error("Select an Agent compaction model first with /agents compaction <name> model <provider> <model>.");
+                    return false;
+                }
+
+                next = kind switch
+                {
+                    "thinking" => current with { Thinking = value is null ? null : ThinkingSelection.Parse(value).Value },
+                    "context" => current with
+                    {
+                        Context = value is null ? null : ContextWindowSelection.TryParse(value, out var window)
+                            ? window
+                            : throw new ArgumentException("Invalid Agent context window.", nameof(parts))
+                    },
+                    "tier" => current with { Tier = value },
+                    _ => current with { Speed = value }
+                };
+                break;
+            default:
+                Error("Use /agents compaction <name> model [provider model]|thinking|context|tier|speed [value]|clear.");
+                return false;
+        }
+
+        if (next is not null)
+        {
+            HarnessSettings resolved;
+            try
+            {
+                resolved = ResolveAgentModel(next);
+            }
+            catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException or InvalidOperationException)
+            {
+                Error(exception.Message);
+                return false;
+            }
+
+            if (next.Thinking is string gear && gear != "default"
+                && !ThinkingSelection.ChoicesFor(resolved.ActiveModel).Any(choice => choice.Value == gear)
+                || next.Context is int budget && !resolved.ActiveModel.ContextWindows.Contains(budget)
+                || next.Tier is string tier && !resolved.ActiveModel.ServiceTiers.Contains(tier)
+                || next.Speed is string speed && !resolved.ActiveModel.Speeds.Contains(speed))
+            {
+                Error("This option is not available for the Agent compaction model.");
+                return false;
+            }
+        }
+
+        if (definition.ManifestPath is string path)
+        {
+            var manifest = JsonNode.Parse(File.ReadAllText(path))?.AsObject()
+                ?? throw new InvalidDataException("Agent manifest is invalid.");
+            if (next is null)
+            {
+                manifest.Remove("compaction");
+            }
+            else
+            {
+                manifest["compaction"] = JsonSerializer.SerializeToNode(next, HomeJson.Options);
+            }
+
+            AtomicFile.WriteText(path, manifest.ToJsonString(HomeJson.Options), ownerOnly: false);
+        }
+        else
+        {
+            SaveSettings(current => current.WithAgents(current.Agents.WithModel(definition.Name, definition.Model with { Compaction = next })));
+        }
+
+        return true;
     }
 
     private void ChangeAgentsCore(string argument)
@@ -943,6 +1070,13 @@ public sealed class CodingSession : ITurnObserver
             settings = settings with { Limits = limits };
             SaveSettings(current => current.WithAgents(current.Agents with { Limits = limits }));
         }
+        else if (parts.Count >= 3 && parts[0] == "compaction")
+        {
+            if (!TryChangeAgentCompaction(parts, settings))
+            {
+                return;
+            }
+        }
         else if (parts.Count >= 2 && parts[0] is "model" or "thinking" or "context" or "tier" or "speed")
         {
             var definition = AgentCatalog.Load(_home, _workspace.Root, settings with { Enabled = true })
@@ -971,7 +1105,7 @@ public sealed class CodingSession : ITurnObserver
             }
             model = parts[0] switch
             {
-                "model" => new AgentModelSettings { Provider = value, Model = parts.Count == 4 ? parts[3] : null },
+                "model" => new AgentModelSettings { Provider = value, Model = parts.Count == 4 ? parts[3] : null, Compaction = model.Compaction },
                 "thinking" => model with { Thinking = value is null ? null : ThinkingSelection.Parse(value).Value },
                 "context" => model with { Context = value is null ? null : ContextWindowSelection.TryParse(value, out var window)
                     ? window : throw new ArgumentException("Invalid Agent context window.", nameof(argument)) },
@@ -1021,7 +1155,7 @@ public sealed class CodingSession : ITurnObserver
         }
         else
         {
-            Error("Use /agents [on|off|concurrency <1-8>|limit <model-calls|tool-calls|duration> [value]|model <name> [provider model]|thinking|context|tier|speed <name> [value]].");
+            Error("Use /agents [on|off|concurrency <1-8>|limit <model-calls|tool-calls|duration> [value]|model <name> [provider model]|thinking|context|tier|speed <name> [value]|compaction <name> model|thinking|context|tier|speed|clear [value]].");
             return;
         }
         RebuildExecutors();
@@ -6624,9 +6758,11 @@ public sealed class CodingSession : ITurnObserver
 
     private CompactionLimits CurrentLimits() => LimitsFor(_settings);
 
-    private CompactionLimits LimitsFor(HarnessSettings settings)
+    private CompactionLimits LimitsFor(HarnessSettings settings, HarnessSettings? summaryModel = null)
     {
-        var writer = SummaryWriter(settings);
+        var writer = summaryModel is null
+            ? SummaryWriter(settings)
+            : (Math.Min(summaryModel.ContextWindow, settings.ContextWindow), summaryModel.ActiveModel.MaxTokens, true);
         return new CompactionLimits(
             settings.ContextWindow,
             settings.ActiveModel.MaxTokens,
@@ -11218,6 +11354,17 @@ public sealed class CodingSession : ITurnObserver
         var reserve = Math.Min(PursueOutputReserveTokens, selected.ContextWindow / 4);
         var budget = Math.Max(0, ((selected.ContextWindow - reserve) * 3) - system.Length - state.Objective.Length);
         var rendering = PursueConversation.Render(transcript, budget);
+        if (rendering.Omitted)
+        {
+            // Summarize the older entries instead of dropping them; if that
+            // fails the oldest entries are dropped as before.
+            var compacted = await CompactForPursueAsync(transcript, selected, cancellationToken);
+            if (compacted is not null)
+            {
+                rendering = PursueConversation.Render(compacted, budget);
+            }
+        }
+
         if (!rendering.Fits)
         {
             return PursueCheck.Failed(
@@ -11295,6 +11442,71 @@ public sealed class CodingSession : ITurnObserver
     }
 
     private const int PursueOutputReserveTokens = 8192;
+
+    /// <summary>
+    /// Folds older entries into one summary for the checker, with the session
+    /// compaction model when one is on and the checker's own model otherwise.
+    /// Returns null when nothing was compacted or the summary call failed.
+    /// </summary>
+    private async Task<IReadOnlyList<ChatItem>?> CompactForPursueAsync(
+        IReadOnlyList<ChatItem> transcript,
+        HarnessSettings checker,
+        CancellationToken cancellationToken)
+    {
+        HarnessSettings summarySelection;
+        try
+        {
+            summarySelection = _settings.CompactionModel.Enabled
+                ? _settings.ForCompaction(_settings.CompactionModel)
+                : checker;
+        }
+        catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException or InvalidOperationException)
+        {
+            Note("The pursue summary model is unavailable: " + exception.Message);
+            return null;
+        }
+
+        var limits = LimitsFor(checker, summarySelection);
+        var facts = CurrentPromptContext().WithMode("compaction");
+        IStreamingChatClient? summaryClient = null;
+        try
+        {
+            summaryClient = CreateClient(summarySelection.WithOutputTokenCap(limits.SummaryOutputCap()));
+            var budgeted = new ChildSummaryClient(summaryClient, _sharedBudget, () => { });
+            var compactor = new ContextCompactor(
+                budgeted,
+                _settings.Retry.ToOptions(),
+                attempt => Publish(new RetryScheduled(attempt)),
+                systemText: () => CompactionPrompt.ComposeSystem(facts, _placeholders, _prompts.CompactionSystem),
+                reportResponse: (response, _) =>
+                {
+                    lock (_usageGate)
+                    {
+                        _ledger.RecordChildUsage(1, 0, response.Usage);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                userText: (conversation, todoText, prior) => CompactionPrompt.UserText(
+                    conversation, todoText, prior, CurrentPromptBinding(facts), _prompts.CompactionUser),
+                reasoning: summarySelection.ThinkingEffort.ToReasoningOptions(summarySelection.ActiveModel));
+            var result = await compactor.CompactAsync(transcript, string.Empty, limits, cancellationToken);
+            return result.Compacted ? result.Transcript : null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Note("The pursue summary failed, so older entries were dropped instead: " + FailureText(exception));
+            return null;
+        }
+        finally
+        {
+            DisposeClient(summaryClient);
+        }
+    }
 
     private sealed class PursueHostAdapter(CodingSession session) : IPursueHost
     {

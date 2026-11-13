@@ -17,19 +17,25 @@ internal static class PursueConversation
 {
     public const int EntryMaxCharacters = 16_000;
 
+    public const string SummaryLabel = "[Summary of earlier entries, not citable]";
+
     public const string OmittedNote = "[Earlier entries were omitted to fit the context.]";
 
     public static PursueRendering Render(IReadOnlyList<ChatItem> items, int maxCharacters)
     {
         ArgumentNullException.ThrowIfNull(items);
-        var entries = new List<(int Number, string Text)>();
+        // A compaction summary is context, not evidence, so it carries no number.
+        var entries = new List<(int? Number, string Text)>();
+        var number = 0;
         foreach (var item in items)
         {
             var text = Entry(item);
-            if (text.Length > 0)
+            if (text.Length == 0)
             {
-                entries.Add((entries.Count + 1, text));
+                continue;
             }
+
+            entries.Add((CompactionSelection.IsSummary(item) ? null : ++number, text));
         }
 
         var shown = new List<string>();
@@ -37,7 +43,7 @@ internal static class PursueConversation
         var used = 0;
         for (var index = entries.Count - 1; index >= 0; index--)
         {
-            var line = "[" + entries[index].Number + "] " + entries[index].Text;
+            var line = (entries[index].Number is int cited ? "[" + cited + "] " : SummaryLabel + " ") + entries[index].Text;
             if (used + line.Length > maxCharacters)
             {
                 break;
@@ -45,18 +51,21 @@ internal static class PursueConversation
 
             used += line.Length + 2;
             shown.Add(line);
-            numbers.Add(entries[index].Number);
+            if (entries[index].Number is int shownNumber)
+            {
+                numbers.Add(shownNumber);
+            }
         }
 
         shown.Reverse();
         if (entries.Count > 0 && shown.Count == 0)
         {
-            return new PursueRendering(string.Empty, numbers, Fits: false);
+            return new PursueRendering(string.Empty, numbers, Fits: false, Omitted: true);
         }
 
         var omitted = shown.Count < entries.Count;
         var text2 = string.Join("\n\n", shown);
-        return new PursueRendering(omitted ? OmittedNote + "\n\n" + text2 : text2, numbers, Fits: true);
+        return new PursueRendering(omitted ? OmittedNote + "\n\n" + text2 : text2, numbers, Fits: true, Omitted: omitted);
     }
 
     private static string Entry(ChatItem item)

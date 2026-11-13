@@ -9,4 +9,11 @@ public sealed record AgentModelSettings
     public int? Context { get; init; }
     public string? Tier { get; init; }
     public string? Speed { get; init; }
+
+    /// <summary>
+    /// The model that summarizes this Agent's context. Null uses the session
+    /// compaction setting. Its own tier, speed, and context follow the same
+    /// own-model rules as the Agent model, and its own Compaction is ignored.
+    /// </summary>
+    public AgentModelSettings? Compaction { get; init; }
 }

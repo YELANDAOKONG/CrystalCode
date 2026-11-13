@@ -13,10 +13,11 @@ internal sealed record AgentManifest
     public int? Context { get; init; }
     public string? Tier { get; init; }
     public string? Speed { get; init; }
+    public AgentModelSettings? Compaction { get; init; }
 
     public AgentModelSettings ModelSettings() => new()
     {
         Provider = Provider, Model = Model, Thinking = Thinking,
-        Context = Context, Tier = Tier, Speed = Speed
+        Context = Context, Tier = Tier, Speed = Speed, Compaction = Compaction
     };
 }
