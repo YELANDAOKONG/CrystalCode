@@ -468,6 +468,58 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task QuickInput_ListsReportsErrorsAndSendsNamesWithSpaces()
+    {
+        const string body = "  Review the diff\r\ncarefully\n";
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), prepare: (home, _) =>
+        {
+            Directory.CreateDirectory(home.ShortcutsDirectory);
+            File.WriteAllText(Path.Combine(home.ShortcutsDirectory, "review my diff.md"), body);
+            File.WriteAllText(Path.Combine(home.ShortcutsDirectory, "invalid.md"), "");
+        });
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        var listed = await fixture.PostAsync(fixture.Http, "/input", new { text = "/quick list" });
+        Assert.True(listed.GetProperty("accepted").GetBoolean());
+        var report = await events.WaitForAsync("report.document");
+        Assert.Contains("review my diff", report.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Prompt is empty", report.ToString(), StringComparison.Ordinal);
+        foreach (var command in new[] { "/quick send", "/quick list extra", "/quick send missing", "/shortcuts send invalid" })
+        {
+            var refused = await fixture.PostAsync(fixture.Http, "/input", new { text = command });
+            Assert.False(refused.GetProperty("accepted").GetBoolean());
+            Assert.False(string.IsNullOrEmpty(refused.GetProperty("error").GetString()));
+        }
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "/shortcuts send review my diff" });
+        var sent = await events.WaitForAsync("message.sent");
+        Assert.Equal(body, sent.GetProperty("data").GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task QuickInput_QueuesWithoutInterruptingTheRunningTurn()
+    {
+        var model = new ScriptedModel(true);
+        const string body = "  Follow up\n";
+        await using var fixture = await ServerFixture.StartAsync(model, prepare: (home, _) =>
+        {
+            Directory.CreateDirectory(home.ShortcutsDirectory);
+            File.WriteAllText(Path.Combine(home.ShortcutsDirectory, "later.md"), body);
+        });
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        var accepted = await fixture.PostAsync(fixture.Http, "/input", new { text = "/quick send later" });
+        Assert.True(accepted.GetProperty("accepted").GetBoolean());
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+        Assert.Equal(body, Assert.Single(snapshot.GetProperty("queue").EnumerateArray()).GetString());
+        Assert.DoesNotContain("turn.finished", events.Types());
+        await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+        await events.WaitForAsync("message.sent", value => value.GetProperty("data").GetProperty("text").GetString() == body);
+    }
+
+    [Fact]
     public async Task QuickPrompt_SendsTheTemplate()
     {
         await using var fixture = await ServerFixture.StartAsync(

@@ -100,6 +100,8 @@ internal sealed class SessionUpdates
     private readonly HashSet<string> _announced = new(StringComparer.Ordinal);
     private readonly Dictionary<int, string> _streamingCalls = [];
     private readonly ReasoningStreamText _thoughtText = new();
+    private readonly bool _extensions;
+    private readonly bool _forms;
     private int _round;
     private int _reports;
     private int _replays;
@@ -128,13 +130,17 @@ internal sealed class SessionUpdates
         Func<int, (string MimeType, byte[] Data)?>? image = null,
         bool compaction = false,
         Action<string, Action<Utf8JsonWriter>>? crystal = null,
-        IReadOnlySet<string>? offered = null)
+        IReadOnlySet<string>? offered = null,
+        bool extensions = false,
+        bool forms = false)
     {
         ArgumentNullException.ThrowIfNull(send);
         ArgumentNullException.ThrowIfNull(workspace);
         _send = send;
         _workspace = workspace;
         _notices = notices;
+        _extensions = extensions;
+        _forms = forms;
         _booleans = booleans;
         _compaction = compaction;
         _offered = offered;
@@ -365,7 +371,14 @@ internal sealed class SessionUpdates
                         writer => CrystalWire.Document(writer, "document", written.Document));
                     break;
                 case NoteWritten note:
-                    Notice("info", note.Text, null, "NoteWritten");
+                    if (!_notices && note.Origin?.StartsWith("prompt-", StringComparison.Ordinal) == true)
+                    {
+                        Report("note", "NoteWritten", note.Text);
+                    }
+                    else
+                    {
+                        Notice("info", note.Text, null, "NoteWritten");
+                    }
                     break;
                 case ErrorWritten error:
                     if (_notices)
@@ -473,6 +486,38 @@ internal sealed class SessionUpdates
     /// </summary>
     private void Commands(IReadOnlyList<SlashCompletion> commands)
     {
+        // Only built-in entries need Bridge capability filtering. Plugin extras
+        // follow them and may intentionally override the same command name.
+        var available = new List<SlashCompletion>();
+        for (var index = 0; index < commands.Count; index++)
+        {
+            var command = commands[index];
+            if (index >= SlashCatalog.BuiltIn.Count)
+            {
+                available.Add(command);
+                continue;
+            }
+
+            var verb = SlashCatalog.BuiltIn[index].Verb;
+            if (verb == SessionVerb.Edit
+                || (!_extensions && verb is SessionVerb.Btw or SessionVerb.Child))
+            {
+                continue;
+            }
+
+            if (!_forms && verb == SessionVerb.Resume)
+            {
+                command = command with { Help = "Resume by explicit session id; use /sessions to list ids." };
+            }
+            else if (!_forms && verb == SessionVerb.Child)
+            {
+                command = command with { Help = "Inspect by explicit child id; use _crystal/children/list to list ids." };
+            }
+
+            available.Add(command);
+        }
+
+        commands = available;
         Update("available_commands_update", "SlashCommandsChanged", writer =>
         {
             writer.WriteStartArray("availableCommands");

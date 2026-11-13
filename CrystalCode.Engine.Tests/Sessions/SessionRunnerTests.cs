@@ -87,20 +87,57 @@ public sealed class SessionRunnerTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => runner.SubmitAsync("late"));
     }
 
-    [Fact]
-    public async Task QuickPrompt_SendsTheTemplateAsAUserMessage()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QuickPrompt_SendsTheTemplateAsAUserMessage(bool slash)
     {
         var client = new ScriptedStreamingClient(TextRound("done"));
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
         var runner = new SessionRunner(headless.Session);
 
-        var submitted = runner.SubmitQuickPromptAsync("Review the diff");
+        Directory.CreateDirectory(headless.Home.ShortcutsDirectory);
+        await File.WriteAllTextAsync(Path.Combine(headless.Home.ShortcutsDirectory, "review diff.md"), "Review the diff");
+        var submitted = slash
+            ? runner.SubmitAsync("/quick send review diff")
+            : runner.SubmitQuickPromptAsync("Review the diff");
         runner.Complete();
         await runner.RunAsync(CancellationToken.None).WaitAsync(Wait);
 
         Assert.True((await submitted).TurnActive);
         Assert.Equal("Review the diff", Assert.Single(headless.Observer.Events.OfType<UserMessageSent>()).Text);
+    }
+
+    [Fact]
+    public async Task QuickCommand_WhileACommandRunsQueuesThenStartsAfterIt()
+    {
+        var opened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(TextRound("done")),
+            chooseTheme: (_, _, _) =>
+            {
+                opened.TrySetResult();
+                return release.Task;
+            });
+        Directory.CreateDirectory(headless.Home.ShortcutsDirectory);
+        await File.WriteAllTextAsync(Path.Combine(headless.Home.ShortcutsDirectory, "review.md"), "  Review the diff\n");
+        await headless.Session.StartAsync(CancellationToken.None);
+        var runner = new SessionRunner(headless.Session);
+        using var stop = new CancellationTokenSource();
+        var running = runner.RunAsync(stop.Token);
+        var theme = runner.SubmitAsync("/theme");
+        await opened.Task.WaitAsync(Wait);
+        var queued = await runner.SubmitAsync("/quick send review").WaitAsync(Wait);
+        Assert.True(queued.Accepted);
+        Assert.False(queued.TurnActive);
+        Assert.Equal("  Review the diff\n", Assert.Single(headless.Observer.Events.OfType<QueueChanged>().Last().Items));
+        release.SetResult(null);
+        await theme.WaitAsync(Wait);
+        runner.Complete();
+        await running.WaitAsync(Wait);
+        Assert.Equal("  Review the diff\n", Assert.Single(headless.Observer.Events.OfType<UserMessageSent>()).Text);
+        Assert.Single(headless.Observer.Events.OfType<TurnFinished>());
     }
 
     [Fact]

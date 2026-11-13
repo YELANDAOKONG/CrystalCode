@@ -200,7 +200,14 @@ separate library with no terminal code. The product can:
   session and are never saved, its additional directories become the
   session's outside write roots, and the `question` tool, MCP elicitation,
   workspace trust, and `/resume` and `/child` choices are editor forms when
-  it supports them. Approval, trust, the workspace fence, and
+  it supports them. Slash commands use the engine path. Without notices,
+  command notes from prompts appear as agent text; background notes and
+  retries still require notices. Side questions and full child inspection
+  require Crystal extension notifications; parent `task` progress remains
+  available without them. Without forms, resume and child pickers are
+  refused with instructions to use explicit ids; child inspection still
+  requires extensions. `/edit` and `/editor` are terminal-only and refused.
+  Approval, trust, the workspace fence, and
   `ToolInvocationPolicy` are unchanged; without forms an untrusted directory
   is refused with instructions, not trusted silently. Bridge never calls the
   editor's file system or terminal. Child Agents appear as progress on the
@@ -290,7 +297,12 @@ separate library with no terminal code. The product can:
   invalid UTF-8, slash-command bodies, unsupported controls, symbolic links,
   unreadable files, and files larger than 64 KiB are disabled with reasons.
   Up to 256 files are shown. A missing directory shows its path and creates
-  no examples. There is no project override, in-TUI file editor, or run flag;
+  no examples. The engine's `/quick` or `/quick list` lists names and disabled
+  reasons as a document report; `/quick send <name>` sends the template through
+  the same Send path, preserving its exact text. The entire remainder after
+  `send` is the name, including spaces. `/shortcuts` aliases every form; bare
+  `/quick` in the terminal still opens the picker. There is no project
+  override, in-TUI file editor, or run flag;
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace; a set may replace Work, Plan,
   Review, the Review user turn, extended approval system and user text, topic

@@ -7,6 +7,18 @@ namespace CrystalCode.Engine.Tests.Sessions;
 public sealed class SlashCatalogTests
 {
     [Fact]
+    public void Quick_OffersListAndSendCompletionAndAlias()
+    {
+        var quick = SlashCatalog.BuiltIn.Single(spec => spec.Verb == SessionVerb.Quick);
+
+        Assert.Equal(["list", "send"], quick.Arguments);
+        Assert.Contains("shortcuts", quick.Aliases);
+        Assert.True(SessionCommand.TryParse("/shortcuts send", out var command));
+        Assert.Equal(SessionVerb.Quick, command.Verb);
+        Assert.Equal("send", command.Argument);
+    }
+
+    [Fact]
     public void Status_OffersFullCompletion()
     {
         var status = SlashCatalog.BuiltIn.Single(spec => spec.Verb == SessionVerb.Status);

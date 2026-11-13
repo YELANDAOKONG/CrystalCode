@@ -63,7 +63,9 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             Image,
             features.Compaction,
             SendCrystal,
-            offeredOptions);
+            offeredOptions,
+            extensions: features.Extensions,
+            forms: features.Forms);
         Children = new ChildUpdates(
             SendTo,
             child => new SessionUpdates(
@@ -142,6 +144,18 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
 
     /// <summary>The F6 catalog in Home, for <c>_crystal/quickPrompts/*</c>.</summary>
     public QuickPromptStore QuickPrompts => _quickPrompts!;
+
+    public bool IsPluginCommand(string text)
+    {
+        var name = text.Trim().Split(' ', 2)[0].TrimStart('/');
+        // SlashMenu appends plugin entries after every built-in, without deduplication.
+        return Snapshot().Commands.Skip(SlashCatalog.BuiltIn.Count)
+            .Any(command => command.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public bool ResumeNeedsPicker(string argument) =>
+        ResumeRequest.TryParse(argument, Workspace!, _store!, out var request, out _)
+        && request.Target != ResumeRequest.Kind.Session;
 
     /// <summary>Records an image from <c>_crystal/image/attach</c> that a prompt may name as plain text.</summary>
     public void Attached(int number)
@@ -465,7 +479,7 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         return result is { } value ? FormWire.Answers(value, questions) : dismissed;
     }
 
-    /// <summary><c>/resume</c> without an id, as a form; declined without forms.</summary>
+    /// <summary>Resume selection as a form; explicitly refused without forms.</summary>
     public async Task<string?> ChooseAsync(
         IReadOnlyList<SessionSummary> sessions,
         string? currentId,
@@ -473,7 +487,13 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sessions);
-        if (!_features.Forms || sessions.Count == 0)
+        if (!_features.Forms)
+        {
+            throw JsonRpcException.Refused("command_refused",
+                "The resume picker requires form support. Use /sessions and /resume <id>, or session/list and session/load.");
+        }
+
+        if (sessions.Count == 0)
         {
             return null;
         }

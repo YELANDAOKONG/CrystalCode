@@ -21,6 +21,22 @@ public sealed class RemoteFrontEndOperationTests
     private static readonly byte[] Png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00];
 
     [Fact]
+    public async Task QuickCommand_PreservesDraftImagesAndSendsOnlyTheTemplate()
+    {
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(), settings: VisionSettings(), images: new ChildVisionClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+        Assert.True(headless.Session.TryAttachImage(Png, out var image, out var error), error);
+        Directory.CreateDirectory(headless.Home.ShortcutsDirectory);
+        await File.WriteAllTextAsync(Path.Combine(headless.Home.ShortcutsDirectory, "review.md"), "Review the diff");
+        await headless.Session.SubmitAsync("/quick list", CancellationToken.None);
+        Assert.True(headless.Session.TryGetImage(image!.Number, out _));
+        await headless.RunTurnAsync("/quick send review");
+        Assert.Equal("Review the diff", Assert.Single(headless.Observer.Events.OfType<UserMessageSent>()).Text);
+        Assert.True(headless.Session.TryGetImage(image.Number, out _));
+    }
+
+    [Fact]
     public async Task TryAttachImage_AddsADraftImageTheSessionCanReturn()
     {
         using var headless = new HeadlessSession(

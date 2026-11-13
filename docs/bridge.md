@@ -207,7 +207,7 @@ Client capabilities Bridge reads:
 | Client capability | Effect |
 | :--- | :--- |
 | `elicitation.form` | Enables the `question` tool, MCP elicitation, trust, and session and child choices as forms. Without it they fall back as described under Interactions. |
-| `session.notices` | Notes, errors, and retries become `notice`. Without it, only errors and turn-level failures become agent text. |
+| `session.notices` | Notes, errors, and retries become `notice`. Without it, prompt-origin command notes, errors, and turn-level failures become agent text; background notes and retries still require notices. |
 | `session.compaction` | Compaction becomes `compaction_update` and `compaction_summary_chunk`. Without it, a displayed summary becomes agent text. |
 | `session.configOptions.boolean` | Switches are sent as boolean options. Without it they are two-value selects. |
 | `_meta.crystal.subagents` (not ACP) | Child sessions are exposed as restricted sessions in the subagent RFD shapes. Without it, child progress goes into the parent `task` tool call and child prompts use the parent session id. See Deviations. |
@@ -363,8 +363,11 @@ link as its mention text or its image, not as the original block.
   command finishes. Its output arrives as updates first. A command the
   engine refuses (for example while busy, or an unknown command) is
   `-32603`, `kind` `command_refused`, with the engine's text. A command sent
-  while a turn runs returns `end_turn` at once and follows the engine's busy
-  rules. `/quit` closes the session; the next request for its id is `-32002`.
+  while a turn runs follows the engine's busy rules; one that starts no turn
+  returns `end_turn` at once. `/quick send <name>` and its `/shortcuts` alias
+  wait for the turn that consumes the expanded text, including when queued
+  while busy, without interrupting the active turn. `/quit` closes the
+  session; the next request for its id is `-32002`.
 - A prompt sent while a turn runs is a follow-up through
   `SessionRunner`/`EnqueueAsync`, with the engine's queue semantics. Its
   response resolves when the turn that consumed it ends. `QueueChanged` is
@@ -379,7 +382,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 
 | Engine | Update |
 | :--- | :--- |
-| `UserMessageSent` | Not echoed during a live turn; the client shows the prompt it sent. Replay on `session/load` sends `user_message_chunk` with text and image blocks, `messageId` |
+| `UserMessageSent` | Not echoed during a live turn; the client shows the prompt or slash command it sent, with no extra echo of an expanded quick template. Replay on `session/load` sends the actual expanded user text and images as `user_message_chunk`, with `messageId` |
 | `UserMessageRecalled` | `_crystal/recalled` notification with the draft (trusted markers kept) |
 | `StreamReceived` text | `agent_message_chunk`, `messageId` per model round |
 | `StreamReceived` reasoning | `agent_thought_chunk` |
@@ -402,7 +405,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `ActivityChanged` | `_crystal/activity` (loading tools, loading plugins, compacting, naming topic, waiting for model) |
 | `LoadingProgressed` | `_crystal/loading` with `kind` (`tool_set`, `plugin`, or `mcp_server`) and `name` |
 | `QueueChanged` | `_crystal/queue` |
-| `NoteWritten`, `ErrorWritten` | `notice` info or error |
+| `NoteWritten`, `ErrorWritten` | With notices: `notice` info or error. Without notices: prompt-origin notes become `agent_message_chunk` reports with kind `note`, errors become `agent_message_chunk`, and background notes are omitted |
 | `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed`, `DocumentWritten` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`, `TranscriptDocument.ToText`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`, `document`), and `_crystal/report` with the kind and the structured values |
 | `SideQuestionSnapshot` | `_crystal/side` notification; never conversation content |
 | `HistoryReplayed` | the replay sequence above |
@@ -411,7 +414,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `PromptHistoryLoaded`, `ImageHistoryInvalidated` | `_crystal/promptHistory`, `_crystal/imagesInvalidated` |
 | `ChildSessionChanged`, `ChildEventReceived` | see Children |
 | `ChildViewRequested` | `_crystal/childView` |
-| `CompactionStarted`, `CompactionFinished` | with `session.compaction`: `compaction_update` `in_progress`, then `compaction_summary_chunk` when a summary is shown, then `compaction_update` `completed`, `failed`, or `cancelled` (`unchanged` is sent as `completed` with `_meta.crystal.status`). Without it, a shown summary is `agent_message_chunk` whose `messageId` is the compaction id; the engine notes still arrive as notices |
+| `CompactionStarted`, `CompactionFinished` | with `session.compaction`: `compaction_update` `in_progress`, then `compaction_summary_chunk` when a summary is shown, then `compaction_update` `completed`, `failed`, or `cancelled` (`unchanged` is sent as `completed` with `_meta.crystal.status`). Without it, a shown summary is `agent_message_chunk` whose `messageId` is the compaction id; engine notes follow the `NoteWritten` mapping above |
 | `TurnStarted`, `TurnFinished` | `_meta` on the first and last update; the prompt response |
 
 `_crystal/*` notifications use the `params.sessionId` envelope of
@@ -490,8 +493,11 @@ With `elicitation.form`, these become `elicitation/create` with
 
 URL mode is never used. Without form support, questions are dismissed (the
 model gets the existing dismissed result), MCP elicitation is cancelled,
-trust is refused with an error, and choices are declined; `/resume <id>` and
-`/child <id>` still work.
+trust is refused with an error, and `/resume`, `/resume all` (including alias
+`/continue`), and bare `/child` are refused with explicit-id instructions.
+`/resume <id>` remains available. `/child <id>` and `_crystal/children/get`
+remain available with extensions but no forms; slash child inspection always
+requires extension notifications.
 
 ## Configuration
 
@@ -606,12 +612,36 @@ a slash command.
 
 ## Slash commands
 
-`available_commands_update` lists every completable verb from
-`SlashCommandsChanged`, including plugin and MCP prompt commands, with the
-engine help text. Verbs that take arguments get `input.hint` built from the
-first argument keys, and `_meta.crystal.arguments` carries the full
-`SlashCompletion` tree. Every
-`SessionVerb` is reachable by typing it. `/quit` closes the session as
+Slash input goes through `SessionRunner.SubmitAsync` and the engine's shared
+command path, including plugin and MCP prompt commands. Before submission,
+Bridge refuses built-in `/btw` (alias `/side`) and every built-in `/child` form without
+`_meta.crystal.extensions`, because their results require extension
+notifications. Parent `task` progress still works without that capability.
+Without forms, resume selectors (bare `/resume`, `/resume all`, and workspace
+paths, including alias `/continue`) are refused; explicit session ids remain available. With extensions but no forms, bare
+`/child` is refused while `/child <id>` and the child extension queries remain
+available. `/edit` and `/editor` are always refused as terminal-only. These
+refusals return `-32603`, `command_refused`, before model execution. Dedicated
+`_crystal/*` requests keep their existing behavior.
+
+`/quick` or `/quick list` emits a `DocumentWritten` catalog report with names
+and disabled reasons. `/quick send <name>` sends the exact template through
+the existing quick-send path, keeping draft images and waiting in the queue
+without interrupting an active turn. The full remainder after `send` is the
+name, including spaces; `/shortcuts` aliases all forms. Bare `/quick` still
+opens the picker in the terminal.
+
+`available_commands_update` lists completable verbs from
+`SlashCommandsChanged`, including plugin and MCP prompt commands. It omits
+`edit` and `editor`, and without extensions also omits `btw`, `side`, and
+`child`. Without forms, resume and child descriptions direct the client to
+explicit ids. Other descriptions use the engine help text. Verbs that take
+arguments get `input.hint` built from the first argument keys, and
+`_meta.crystal.arguments` carries the full `SlashCompletion` tree. Every
+supported command remains reachable by typing it. Plugin overrides retain their
+own completions and execution; these restrictions apply only to built-in handlers.
+Bridge identifies plugin entries from the engine catalog's built-in-first,
+plugin-last ordering. `/quit` closes the session as
 `session/close` does. `/cd <path>` and `/space` move the session and are
 reported through `session_info_update._meta.crystal.workspace`.
 
@@ -860,7 +890,8 @@ All four are in this build.
   under Forms apply.
 - `session/load` and `session/resume` keep the requested id as the ACP id.
 - Notes and retries are notices only for a client with `session.notices`;
-  an error without notices is agent message text.
+  without notices, prompt-origin command notes and errors are agent message
+  text. Background notes and retries are omitted.
 - Every `SessionEvent` is in `SessionUpdates.Mapped` (a `session/update`)
   or `SessionUpdates.Notified` (a `_crystal/*` notification). Only
   `UserMessageSent`, `TurnStarted`, and `TurnFinished` are in

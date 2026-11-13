@@ -1661,8 +1661,16 @@ public sealed class CodingSession : ITurnObserver
 
     private async Task<bool> SubmitCoreAsync(string text, CancellationToken cancellationToken)
     {
-        await SavePromptHistoryAsync(text, cancellationToken);
         var input = text.Trim();
+        if (!OverriddenByPlugin(input)
+            && SessionCommand.TryParse(input, out var quick)
+            && quick.Verb == SessionVerb.Quick)
+        {
+            await HandleQuickAsync(quick.Argument, queueOnly: false, cancellationToken);
+            return false;
+        }
+
+        await SavePromptHistoryAsync(text, cancellationToken);
         PruneDraftImages(input);
         if (RefuseCompactionCommand(input))
         {
@@ -1750,6 +1758,62 @@ public sealed class CodingSession : ITurnObserver
         }
 
         await StartTurnAsync(text, cancellationToken, attachPendingImages: false);
+    }
+
+    private async Task HandleQuickAsync(string argument, bool queueOnly, CancellationToken cancellationToken)
+    {
+        CloseRecallWindow();
+        var space = argument.IndexOf(' ');
+        var action = space < 0 ? argument : argument[..space];
+        var name = space < 0 ? string.Empty : argument[(space + 1)..].Trim();
+        var list = argument.Length == 0 || string.Equals(argument, "list", StringComparison.OrdinalIgnoreCase);
+        if (!list && (!string.Equals(action, "send", StringComparison.OrdinalIgnoreCase) || name.Length == 0))
+        {
+            Error("Usage: /quick list or /quick send <name>.");
+            return;
+        }
+
+        var catalog = await new QuickPromptStore(_home).LoadAsync(cancellationToken);
+        if (list)
+        {
+            var rows = catalog.Entries.Select(entry => (IReadOnlyList<string>)
+                [entry.Name, entry.Error ?? "Available"]).ToArray();
+            var blocks = new List<TranscriptDocumentBlock>
+            {
+                new("keyValues", [], [["Directory", catalog.Directory]], [], 0)
+            };
+            if (rows.Length > 0)
+            {
+                blocks.Add(new("table", ["Name", "Status"], rows, [], 0));
+            }
+            else
+            {
+                blocks.Add(new("list", [], [], ["No quick prompts found."], 0));
+            }
+
+            if (catalog.Error is not null)
+            {
+                blocks.Add(new("list", [], [], [catalog.Error], 0));
+            }
+
+            Publish(new DocumentWritten(new TranscriptDocument("Quick prompts", blocks)));
+            return;
+        }
+
+        var prompt = catalog.Entries.FirstOrDefault(entry => string.Equals(entry.Name, name, StringComparison.Ordinal));
+        if (prompt is null)
+        {
+            Error(catalog.Error ?? $"Quick prompt '{name}' was not found.");
+            return;
+        }
+
+        if (prompt.Error is not null)
+        {
+            Error($"Quick prompt '{name}' is unavailable: {prompt.Error}");
+            return;
+        }
+
+        await SubmitQuickPromptAsync(prompt.Text, queueOnly || _compacting, cancellationToken);
     }
 
     /// <summary>
@@ -2870,7 +2934,7 @@ public sealed class CodingSession : ITurnObserver
                 await ShowChildAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Quick:
-                Note("Quick prompts open from the terminal with /quick or F6.");
+                await HandleQuickAsync(command.Argument, queueOnly: _turnActive || _compacting, cancellationToken);
                 return (true, false);
             case SessionVerb.Edit:
                 Note("The full-screen editor opens from the terminal with /edit or F8.");
@@ -10352,6 +10416,14 @@ public sealed class CodingSession : ITurnObserver
     {
         ArgumentNullException.ThrowIfNull(input);
         cancellationToken.ThrowIfCancellationRequested();
+        if (!OverriddenByPlugin(input.Trim())
+            && SessionCommand.TryParse(input.Trim(), out var quick)
+            && quick.Verb == SessionVerb.Quick)
+        {
+            await HandleQuickAsync(quick.Argument, queueOnly: true, cancellationToken);
+            return;
+        }
+
         if (SessionCommand.TryParse(input.Trim(), out var command) && command.Verb == SessionVerb.Child)
         {
             CloseRecallWindow();

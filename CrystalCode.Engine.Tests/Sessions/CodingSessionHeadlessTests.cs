@@ -16,6 +16,68 @@ namespace CrystalCode.Engine.Tests.Sessions;
 /// </summary>
 public sealed class CodingSessionHeadlessTests
 {
+    [Theory]
+    [InlineData("/quick")]
+    [InlineData("/quick list")]
+    [InlineData("/shortcuts")]
+    public async Task QuickCommand_ListsMissingDirectoryAsDocument(string command)
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync(command, CancellationToken.None);
+        var text = Assert.Single(headless.Observer.Events.OfType<DocumentWritten>()).Document.ToText();
+        Assert.Contains(headless.Home.ShortcutsDirectory, text, StringComparison.Ordinal);
+        Assert.Contains("No quick prompts found.", text, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(headless.Home.ShortcutsDirectory));
+        Assert.Empty(headless.Observer.Events.OfType<UserMessageSent>());
+    }
+
+    [Theory]
+    [InlineData("/quick send", "Usage:")]
+    [InlineData("/quick list extra", "Usage:")]
+    [InlineData("/quick fill review", "Usage:")]
+    [InlineData("/quick send missing", "was not found")]
+    [InlineData("/shortcuts send invalid", "Prompt is empty")]
+    public async Task QuickCommand_ReportsInvalidInput(string command, string error)
+    {
+        using var headless = new HeadlessSession(new ScriptedStreamingClient());
+        Directory.CreateDirectory(headless.Home.ShortcutsDirectory);
+        await File.WriteAllTextAsync(Path.Combine(headless.Home.ShortcutsDirectory, "invalid.md"), "");
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync(command, CancellationToken.None);
+        Assert.Contains(error, Assert.Single(headless.Observer.Events.OfType<ErrorWritten>()).Text, StringComparison.Ordinal);
+        Assert.Null(headless.Session.TurnTask);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QuickCommand_BusyQueuesExactBodyThroughBothInputPaths(bool pump)
+    {
+        var client = new BlockingStreamingClient();
+        using var headless = new HeadlessSession(client);
+        Directory.CreateDirectory(headless.Home.ShortcutsDirectory);
+        const string body = "  Review this\r\nwith care\n";
+        await File.WriteAllTextAsync(Path.Combine(headless.Home.ShortcutsDirectory, "review my diff.md"), body);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.Session.SubmitAsync("long task", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        if (pump)
+        {
+            await headless.Session.EnqueueAsync("/shortcuts send review my diff", CancellationToken.None);
+        }
+        else
+        {
+            await headless.Session.SubmitAsync("/quick send review my diff", CancellationToken.None);
+        }
+
+        Assert.Equal(body, Assert.Single(headless.Observer.Events.OfType<QueueChanged>().Last().Items));
+        Assert.False(headless.Session.TurnTask!.IsCompleted);
+        Assert.Empty(headless.Observer.Events.OfType<ErrorWritten>());
+        headless.Session.TryInterrupt();
+        await headless.Session.FinishTurnAsync(CancellationToken.None);
+    }
+
     [Fact]
     public async Task QuickPrompt_PreservesActualBodyInSessionAndHistory()
     {
@@ -23,7 +85,9 @@ public sealed class CodingSessionHeadlessTests
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
         const string body = "  审查代码\n第二行\n";
-        await headless.Session.SubmitQuickPromptAsync(body, false, CancellationToken.None);
+        Directory.CreateDirectory(headless.Home.ShortcutsDirectory);
+        await File.WriteAllTextAsync(Path.Combine(headless.Home.ShortcutsDirectory, "review diff.md"), body);
+        await headless.Session.SubmitAsync("/quick send review diff", CancellationToken.None);
         await headless.Session.TurnTask!;
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
         Assert.Equal(body, Assert.Single(headless.Observer.Events.OfType<UserMessageSent>()).Text);

@@ -331,13 +331,29 @@ Quick prompts keep the same dependency direction: Engine Home owns
 `QuickPromptStore`, bounded UTF-8 file reads, validation, and immutable catalog
 values; Display Composer owns the isolated quick-prompt picker and preview. It paints a full-screen frame itself from `PaintLine` rows, without Spectre widgets: from 100 columns the list sits beside the preview, and below that the preview is stacked under the list. Each of the two areas has its own `TranscriptScrollbar`, shown only while that area overflows. A list row is the name followed by the first non-blank line of the body in `muted`; a broken entry shows its reason in `warning`. Arrows move the selection; PgUp/PgDn and the wheel scroll the preview.
 The terminal maps catalog values, routes F6 and a bare `/quick` only outside
-modal prompts (other front ends only get a note from `SessionVerb.Quick`), and
-inserts Fill at the current composer cursor. Send uses
+modal prompts, and inserts Fill at the current composer cursor. Engine
+`SessionVerb.Quick` handles `/quick` and `/quick list` as a `DocumentWritten`
+catalog report with the directory, names, and disabled reasons.
+`/quick send <name>` uses the entire remaining name, including spaces, to select an entry;
+`/shortcuts` aliases all forms. Send uses
 `CodingSession.SubmitQuickPromptAsync`, bypasses slash parsing, and never
 consumes pending or composer draft images. Ordinary queued submissions bind
 pending images at enqueue time so later quick sends cannot steal them. Quick
 queue entries do not request cancellation after tools; explicit queue release
 and ordinary follow-ups retain their existing interrupt behavior.
+
+Bridge submits slash commands through `SessionRunner` to the same engine
+path. A quick send waits for the turn that consumes it, including while
+queued. The client displays its submitted slash command; Bridge does not echo
+the expanded template live. Archive replay carries the expanded user text.
+Without notices, `NoteWritten` from a prompt origin becomes agent report text;
+background notes and retries still require notices. Before engine submission,
+Bridge refuses side questions and full child inspection without extension
+notifications, resume pickers without forms, child pickers without forms, and
+the terminal-only editor. Explicit resume ids remain available; explicit child
+ids require extensions. These checks do not change parent `task` progress or
+the dedicated extension methods. Bridge filters its command completions to
+match these capabilities. See [docs/bridge.md](docs/bridge.md#slash-commands).
 
 The full-screen editor is terminal-only. Display Composer owns
 `FullScreenEditor`, which edits an isolated `ComposerBuffer` seeded from the

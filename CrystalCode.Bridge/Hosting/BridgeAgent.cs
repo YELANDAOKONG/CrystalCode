@@ -467,12 +467,22 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         // A $/cancel_request for this prompt cancels its turn like session/cancel;
         // the request still waits for the turn to end before it answers.
         using var cancel = cancellationToken.Register(bridge.Cancel);
-        var command = SessionCommand.TryParse(text.Trim(), out _);
+        var command = SessionCommand.TryParse(text.Trim(), out var parsed);
+        var pluginCommand = command && bridge.IsPluginCommand(text);
+        if (command && !pluginCommand && CommandUnavailable(bridge, parsed) is { } unavailable)
+        {
+            throw JsonRpcException.Refused("command_refused", unavailable);
+        }
+
+        var quickSend = command && !pluginCommand && parsed.Verb == SessionVerb.Quick
+            && parsed.Argument.StartsWith("send ", StringComparison.OrdinalIgnoreCase)
+            && parsed.Argument[5..].Trim().Length > 0;
+        var turnInput = !command || quickSend;
         var clears = bridge.Turns.Clears;
         var before = bridge.Turns.Started;
         var busy = bridge.Session!.TurnActive;
         var target = before + 1;
-        using var waiting = command ? null : bridge.Await(target);
+        using var waiting = turnInput ? bridge.Await(target) : null;
 
         SessionInputResult result;
         try
@@ -486,13 +496,13 @@ internal sealed class BridgeAgent : IJsonRpcHandler
 
         var refused = bridge.TakeError(origin);
         var startedTurn = bridge.Turns.Started > before;
-        var queued = !command && bridge.Queued > 0;
+        var queued = turnInput && result.Accepted && bridge.Queued > 0;
         if (command && refused is not null && !startedTurn)
         {
             throw JsonRpcException.Refused("command_refused", refused);
         }
 
-        if (result.Quit || (command && busy) || (!startedTurn && !queued))
+        if (result.Quit || (command && !turnInput && busy) || (!startedTurn && !queued))
         {
             // A command that started no turn, or /quit: its output already went out.
             cancellationToken.ThrowIfCancellationRequested();
@@ -525,6 +535,20 @@ internal sealed class BridgeAgent : IJsonRpcHandler
 
         return Reply(stop, finished);
     }
+
+    private string? CommandUnavailable(BridgeSession bridge, SessionCommand command) => command.Verb switch
+    {
+        SessionVerb.Btw when !_features.Extensions =>
+            "Side questions require Crystal extensions so their answers can be displayed. Enable clientCapabilities._meta.crystal.extensions.",
+        SessionVerb.Child when !_features.Extensions =>
+            "Full child inspection requires Crystal extensions. Child task progress remains available on the parent task call.",
+        SessionVerb.Child when !_features.Forms && command.Argument.Length == 0 =>
+            "The child picker requires form support. Use _crystal/children/list and _crystal/children/get, or /child <id>.",
+        SessionVerb.Resume when !_features.Forms && bridge.ResumeNeedsPicker(command.Argument) =>
+            "The resume picker requires form support. Use /sessions and /resume <id>, or session/list and session/load.",
+        SessionVerb.Edit => "The full-screen editor is terminal-only. Edit the prompt in your editor's composer before sending it.",
+        _ => null
+    };
 
     private static ImageAttachResult Attached(bool attached, ImageAttachment? image, string error) =>
         attached ? new ImageAttachResult(image!.TrustedMarker, string.Empty) : new ImageAttachResult(null, error);

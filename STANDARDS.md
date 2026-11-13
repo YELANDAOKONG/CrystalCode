@@ -43,6 +43,13 @@
   event; `SessionEventDataTests` enforces this.
 - Front ends prepare sessions through `CrystalCode.Engine.Launch` and do not
   copy override, trust, or resume logic.
+- Bridge slash input uses the shared engine command path. Refuse commands
+  whose output or picker the client cannot display before model execution,
+  and keep available-command descriptions consistent with client capabilities.
+  Without notices, prompt-origin command notes remain visible as agent text;
+  background notes and retries still require notices. The client displays its
+  submitted slash command; live updates do not duplicate expanded quick text,
+  while replay preserves the actual expanded user message.
 
 ## C# conventions
 
@@ -243,8 +250,10 @@ block and file image links, streaming, cancel during streaming, a follow-up,
 and a pending permission, `$/cancel_request`, close, `/clear` keeping the ACP
 id, `/cd`, `/quit`, permission answers, diffs, plans, config options and
 modes with next-turn settings and refusal while busy, available commands, usage, session info,
-reports, the question, trust, and resume forms with and without form
-support, editor MCP servers without leaking their values, additional roots,
+reports, prompt-origin notes without notices, capability-based command
+refusals and completions, quick slash sends with queueing and expanded replay,
+the question, trust, and resume forms with and without form support,
+editor MCP servers without leaking their values, additional roots,
 error codes, launch and trust refusals, stdin closing, protocol-only stdout,
 compaction with and without `session.compaction`, fork, children and child
 approvals with and without the subagents opt-in, the `_crystal/*` methods,

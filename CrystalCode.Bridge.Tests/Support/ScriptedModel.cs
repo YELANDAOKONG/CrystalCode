@@ -31,6 +31,8 @@ internal sealed class ScriptedModel : IStreamingChatClient, IPlugin, IChatClient
 
     public List<ChatRequest> Requests { get; } = [];
 
+    public TaskCompletionSource? FailHeld { get; init; }
+
     /// <summary>The image-capable client for models that declare image input.</summary>
     public VisionModel? Vision { get; init; }
 
@@ -52,6 +54,11 @@ internal sealed class ScriptedModel : IStreamingChatClient, IPlugin, IChatClient
             {
                 return EnumerateAsync(_rounds.Dequeue(), cancellationToken);
             }
+        }
+
+        if (FailHeld?.Task.IsCompleted == true)
+        {
+            return EnumerateAsync(TextRound("Recovered"), cancellationToken);
         }
 
         return _holdWhenEmpty
@@ -99,6 +106,12 @@ internal sealed class ScriptedModel : IStreamingChatClient, IPlugin, IChatClient
         }
 
         held.TrySetResult();
+        if (FailHeld is { } fail)
+        {
+            await fail.Task.WaitAsync(cancellationToken);
+            throw new InvalidOperationException("Scripted held request failed.");
+        }
+
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 

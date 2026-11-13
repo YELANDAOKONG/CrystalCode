@@ -160,7 +160,8 @@ and the `server.state` event.
     quick prompt send, side question control, interaction answers, and the
     slash commands that only report or act inside the session: `/help`,
     `/status`, `/stats`, `/btw`, `/clear`, `/fork`, `/child`, `/sessions`,
-    `/compact` and `/compact full`, `/todos`, `/attach`, `/export`, `/tools`,
+    `/compact` and `/compact full`, `/todos`, `/attach`, `/quick` (alias
+    `/shortcuts`, including `list` and `send <name>`), `/export`, `/tools`,
     `/plugins`, `/skills`, `/notify`, and `/mcp` without arguments, `/mcp list|show`,
     `/cd` without a path, `/plan`, `/mode`, and plugin or MCP prompt commands.
   - `admin`: shutdown, token management, answering a `trust` interaction,
@@ -263,6 +264,14 @@ and the `server.state` event.
 | `POST /auth/ticket` | observe | Event-stream ticket |
 | `GET /auth/tokens`, `POST /auth/tokens`, `DELETE /auth/tokens/{id}` | admin | List, issue (`scope`, optional `label`), and revoke process-local tokens; the startup token cannot be revoked |
 | `POST /shutdown` | admin | Same as `/quit` |
+
+`POST /input` accepts `/quick` or `/quick list` (alias `/shortcuts`) to list
+the Home catalog through `report.document`, including disabled reasons.
+`/quick send <name>` treats the entire remainder as the name, including spaces,
+and uses `SubmitQuickPromptAsync`: exact template text, no draft or pending
+images consumed, and a busy send queues without interrupting the turn. The
+terminal still opens its picker for bare `/quick`. The dedicated quick-prompt
+routes above are unchanged; Fill stays in the client.
 
 ## Events
 
