@@ -102,6 +102,14 @@ internal sealed class RunLog : IRunLog
                     Flush();
                     WriteSection("[Note]", note.Text);
                     break;
+                case PursueChecked pursueChecked:
+                    Flush();
+                    WriteSection("[Pursue]", $"Check {pursueChecked.Index}: {pursueChecked.Verdict}. {pursueChecked.Reason}");
+                    break;
+                case PursueChanged { Pursue: { Status: not Engine.Sessions.Pursue.PursueStatus.Active } stopped }:
+                    Flush();
+                    WriteSection("[Pursue]", Engine.Sessions.Pursue.PursueState.StatusToken(stopped.Status) + " (" + stopped.ReasonCode + "). " + stopped.Reason);
+                    break;
                 case TurnFinished finished:
                     Flush();
                     StopReason = finished.Result.StopReason;

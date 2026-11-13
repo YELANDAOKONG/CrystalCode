@@ -200,6 +200,7 @@ CLI options:
 | `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
 | `--compaction-context <budget>` | Summarizer context budget for this process. Must be declared by that model. Does not write the file |
 | `--topic <on\|off>` | Topic naming for this process |
+| `--pursue-provider`, `--pursue-model-id`, `--pursue-thinking`, `--pursue-tier`, `--pursue-speed`, `--pursue-context`, `--pursue-limit <name=value>` | Pursue checker model and limits for this process; pass provider and model id together. Not written to `config.json` |
 | `--topic-provider`, `--topic-model-id` | Topic model for this process; pass both. Without them the saved choice or the session model applies |
 | `--topic-thinking`, `--topic-tier`, `--topic-speed`, `--topic-context` | Topic model gear and own slots for this process. Does not write the file |
 | `--image-model <on\|off>`, `--audio-model <on\|off>`, `--video-model <on\|off>` | Use the saved resource description model, or turn it off for this process |
@@ -381,6 +382,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
 | `--compaction-context <budget>` | Summarizer context budget for this process. Must be declared by that model. Does not write the file |
 | `--topic <on\|off>` | Topic naming for this process |
+| `--pursue-provider`, `--pursue-model-id`, `--pursue-thinking`, `--pursue-tier`, `--pursue-speed`, `--pursue-context`, `--pursue-limit <name=value>` | Pursue checker model and limits for this process; pass provider and model id together. Not written to `config.json` |
 | `--topic-provider`, `--topic-model-id` | Topic model for this process; pass both. Without them the saved choice or the session model applies |
 | `--topic-thinking`, `--topic-tier`, `--topic-speed`, `--topic-context` | Topic model gear and own slots for this process. Does not write the file |
 | `--image-model <on\|off>`, `--audio-model <on\|off>`, `--video-model <on\|off>` | Use the saved resource description model, or turn it off for this process |
@@ -406,6 +408,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--bash-timeout <seconds>` | Foreground per-command bash cap. Default 600. `unlimited` disables that timer |
 | `--disable-tool <name>` | Repeatable. Omits that built-in tool for this process. An unknown name refuses to start. Does not write the file, and does not free the name |
 | `--show-thinking` | Print reasoning text for this run, and label each reply `[Assistant]`. Independent of `verboseThinking` |
+| `--pursue` | Treat the task as the objective of `/pursue`: the run continues until the checker finds it met, is blocked, or a limit is reached. Checker model and limits come from `pursueModel`, `pursueLimits`, and the `--pursue-*` flags. Exit codes: met 0, blocked 2 (4 if an operator prompt was denied), limit 3, checker failure 2 |
 | `--format` | `default` for plain text, or `json` for one JSON object per line |
 
 `--approval-model off` cannot be combined with `--approval-provider` or
@@ -454,7 +457,7 @@ the session id.
 
 Each JSON line has `type`, a UTC `timestamp`, and `sessionID`. The types
 are `step_start`, `text`, `reasoning`, `tool_use`, `error`, `note`,
-`retry`, `step_finish`, `stopped`, and `session`. `tool_use` carries
+`retry`, `pursue_check`, `pursue`, `step_finish`, `stopped`, and `session`. With `--pursue`, `pursue_check` carries `index`, `verdict`, `reason`, and `nextStep`, and `pursue` is the final status with `reasonCode`. `tool_use` carries
 `name`, `callId`, `arguments`, `status` (`success` or `failure`), and
 `output`. `step_finish` carries `reason`, `modelCalls`, and `toolCalls`.
 `reasoning` is present only with `--show-thinking`. `stopped` is present
@@ -645,6 +648,8 @@ Top-level fields:
 | `approval` | `default`, `edit`, `review`, `audit`, or `full` |
 | `approvalModel` | Optional reviewer. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, and `contextWindow` (a token count the model declares in `contextWindows`). Omitted means off. `enabled: false` keeps a stored provider, model, and gear unused. A tier or speed applies to the reviewer only and must be listed by that model; unset sends none, and the session `/tier` and `/speed` choice does not apply. An unset context is that model's first declared budget; the session `/context` choice does not apply. |
 | `extendedApproval` | Optional extended approval model for Review and Audit. `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, `contextWindow`, `trigger` (`low`, `medium`, or `high`; default `low`, which checks every review allow), and `includePrimaryReview` (default `true`). Omitted means off. It never falls back to the session or approval model |
+| `pursueModel` | Checker for `/pursue`. Optional `provider` and `model`, `thinkingEffort`, `serviceTier`, `speed`, `contextWindow`, with the same rules as `topicModel`; without a model the session model checks |
+| `pursueLimits` | Per-run bounds for `/pursue`: `maximumContinuations` (1000), `maximumStalls` (10, never unlimited), `maximumModelCalls` (10000), `maximumToolCalls` (100000), `maximumDurationSeconds` (7 days), `maximumWaitSeconds` (3 hours). `null` is unlimited; `"unlimited"` unlimits all but stalls |
 | `topicModel` | Session topic naming. `enabled` (default off), and optional `provider` and `model`; without them the session model names the topic with its current tier, speed, and context. `thinkingEffort` is the gear either way. With its own model, optional `serviceTier`, `speed`, and `contextWindow` apply to that model only: unset tier or speed is not sent, and unset context is its first declared budget. `nameOnResume` (default `true`) names a resumed session that has no topic after its next completed turn; `false` leaves it unnamed until `/topic regenerate` |
 | `compactionModel` | Optional summarizer. `enabled`, `provider`, `model`, and optional `thinkingEffort` (`default`, `off`, or a gear that model lists), `serviceTier`, `speed`, and `contextWindow`. A tier or speed applies to the summarizer only and must be listed by that model; unset sends no tier or speed, and the session `/tier` and `/speed` choice does not apply. An unset context is that model's first declared budget; the session `/context` choice does not apply. Omitted means off, and summaries use the session model. `enabled: false` keeps a stored provider, model, gear, and slots unused. The model does not need `imageInput`. Opening it requires a catalog model; a missing credential or unknown model is refused and the saved value stays |
 | `imageModel`, `audioModel`, `videoModel` | Resource description models. Each is `enabled`, `provider`, `model`, and optional `thinkingEffort`, `serviceTier`, `speed`, and `contextWindow`, like `approvalModel`. A model is on only with `enabled: true`; an entry without it keeps its selection unused, so an older `imageModel` with only `provider` and `model` is off until `/describe image on`. An enabled model must declare `imageInput`, `audioInput`, or `videoInput` in `providers.json`. A tier or speed applies to that model only and must be listed by it; unset sends none. An unset context is that model's first declared budget. The session `/tier`, `/speed`, and `/context` choice does not apply. Only `imageModel` is connected, to `describe_image`. `audioModel` and `videoModel` are stored and checked but no tool uses them yet |
@@ -1669,6 +1674,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/mode` | | List modes, or switch with `/mode <name>` |
 | `/approval` | | Cycle or set `default`, `edit`, `review`, `audit`, `full`. `model` shows or sets the approval model; `thinking`, `tier`, `speed`, and `context` cycle or set its gear and slots; `extended` configures extended approval |
 | `/attach` | | Attach an image from the workspace |
+| `/pursue` | | Work toward an objective until a checker model finds it met. `start <objective>`, `pause`, `resume`, `clear`, and `status` control it. `model [provider model]`, `thinking`, `tier`, `speed`, and `context` configure the checker like `/topic`; `limit <name> <number|unlimited>` sets continuations, stalls, model-calls, tool-calls, duration (seconds), or wait (seconds). Settings write `config.json`. Approval and access rules still apply to every continuation |
 | `/topic` | | Show the session topic and naming settings. `/topic <text>` or `set <text>` names the session; `clear` removes the name; `regenerate` asks the topic model again. `on` and `off` switch naming. `resume on` or `resume off` sets whether a resumed session without a topic is named. `model [provider model]` selects its own model, and a bare `model` returns to the session model. `thinking` cycles or sets its gear; `tier`, `speed`, and `context` do the same for its own model. Settings write `config.json` |
 | `/describe` | | List the resource description models. `image`, `audio`, or `video` shows one; then `on`, `off`, `model <provider model>`, and `thinking`, `tier`, `speed`, or `context` with an optional value set it and write `config.json`. A bare `thinking`, `tier`, `speed`, or `context` cycles. Selecting another model clears its tier, speed, and context. Audio and video are configuration only and print a note that they are not connected yet |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
@@ -1968,7 +1974,8 @@ by placing files under `~/.crystal/prompts` and
 `<workspace>/.crystal/prompts`.
 
 Named files (`work.md`, `plan.md`, `review.md`, `review.user.md`,
-`review.extended.md`, `review.extended.user.md`, `topic.md`,
+`review.extended.md`, `review.extended.user.md`, `topic.md`, `pursue.system.md`,
+`pursue.user.md`, `pursue.continue.md`,
 `compaction.system.md`, `compaction.user.md`, `image.system.md`,
 `image.user.md`, and `agents/general.md`, `agents/work.md`, and
 `agents/plan.md`; `.txt` is also accepted):

@@ -17,7 +17,9 @@ public sealed class PromptTemplateExportTests
 
         var written = PromptTemplateExport.Write(directory);
 
-        Assert.Equal(15, written.Count);
+        Assert.Equal(18, written.Count);
+        Assert.Equal(PursuePrompt.SystemText, File.ReadAllText(Path.Combine(directory, "pursue.system.md")));
+        Assert.Equal(PursuePrompt.ContinueTemplate, File.ReadAllText(Path.Combine(directory, "pursue.continue.md")));
         Assert.Equal(
             ExtendedApprovalPrompt.SystemText,
             File.ReadAllText(Path.Combine(directory, "review.extended.md")));

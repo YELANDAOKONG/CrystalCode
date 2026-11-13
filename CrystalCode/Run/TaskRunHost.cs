@@ -134,7 +134,8 @@ internal static class TaskRunHost
                 }
 
                 var runner = new SessionRunner(session);
-                var submitted = runner.SubmitAsync(task);
+                // The task text is the objective; a slash task was refused above.
+                var submitted = runner.SubmitAsync(settings.Pursue ? "/pursue start " + task : task);
                 runner.Complete();
                 var quit = await runner.RunAsync(cancellationToken);
                 var accepted = await submitted;

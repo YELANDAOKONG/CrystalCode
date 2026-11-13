@@ -351,7 +351,8 @@ link as its mention text or its image, not as the original block.
 | :--- | :--- |
 | `completed` | `end_turn` |
 | `output_truncated` | `max_tokens` |
-| `model_call_limit_reached`, `tool_call_limit_reached`, `duration_limit_reached` | `max_turn_requests` |
+| `model_call_limit_reached`, `tool_call_limit_reached`, `duration_limit_reached`, `pursue_limit_reached` | `max_turn_requests` |
+| `pursue_blocked` | `end_turn`; the reason is in the preceding note and in `_meta.crystal` |
 | `content_filtered` | `refusal` |
 | `interrupted` | `cancelled` |
 | `failed`, `context_overflow` | error `-32603`, `kind` `turn_failed` or `context_overflow`, with the engine text |
@@ -402,9 +403,10 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `SessionStarted`, `ChromeChanged` | also `_crystal/chrome` with the full plain chrome |
 | `PreferencesChanged` | also `_crystal/preferences` |
 | `StatusFieldsChanged` | `_crystal/statusFields` |
-| `ActivityChanged` | `_crystal/activity` (loading tools, loading plugins, compacting, naming topic, waiting for model) |
+| `ActivityChanged` | `_crystal/activity` (loading tools, loading plugins, compacting, naming topic, waiting for model, checking objective, waiting for task) |
 | `LoadingProgressed` | `_crystal/loading` with `kind` (`tool_set`, `plugin`, or `mcp_server`) and `name` |
 | `QueueChanged` | `_crystal/queue` |
+| `PursueChanged`, `PursueChecked` | `_crystal/pursue` (`pursue`, same fields as `crystal server`) and `_crystal/pursueChecked` (`index`, `verdict`, `reason`, `nextStep`, `evidence`, `usage`); only for a client that opted in under `clientCapabilities._meta.crystal`. `_crystal/snapshot` carries `pursue`. Other clients see the engine's `Note` lines. `/pursue start` and `resume` are one prompt turn: the prompt is answered once, when the whole run ends |
 | `NoteWritten`, `ErrorWritten` | With notices: `notice` info or error. Without notices: prompt-origin notes become `agent_message_chunk` reports with kind `note`, errors become `agent_message_chunk`, and background notes are omitted |
 | `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed`, `DocumentWritten` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`, `TranscriptDocument.ToText`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`, `document`), and `_crystal/report` with the kind and the structured values |
 | `SideQuestionSnapshot` | `_crystal/side` notification; never conversation content |

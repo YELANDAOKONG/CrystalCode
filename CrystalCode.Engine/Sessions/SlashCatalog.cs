@@ -67,6 +67,8 @@ public static class SlashCatalog
             ["list", "show", "on", "off", "reload", "enable", "disable", "approval", "home", "project"]),
         new(SessionVerb.Topic, "topic", [], "Show, set, clear, or regenerate the session topic, or configure topic naming",
             ["set", "clear", "regenerate", "on", "off", "model", "thinking", "tier", "speed", "context"]),
+        new(SessionVerb.Pursue, "pursue", [], "Work toward an objective until a checker finds it met",
+            ["start", "status", "pause", "resume", "clear", "model", "thinking", "tier", "speed", "context", "limit"]),
         new(SessionVerb.Describe, "describe", [], "Show or set the image, audio, and video description models",
             ["image", "audio", "video"]),
         new(SessionVerb.Attach, "attach", ["image"], "Attach a workspace image"),

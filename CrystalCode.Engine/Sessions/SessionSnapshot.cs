@@ -3,6 +3,7 @@ using Crystal.Chat;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions;
@@ -37,4 +38,5 @@ public sealed record SessionSnapshot(
     SideQuestionSnapshot Side,
     IReadOnlyList<ChildSessionDocument> Children,
     TurnFinished? LastTurn,
-    IReadOnlyList<ApprovalPassed> Approvals);
+    IReadOnlyList<ApprovalPassed> Approvals,
+    PursueState? Pursue = null);

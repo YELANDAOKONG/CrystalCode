@@ -673,6 +673,25 @@ machines, interpret coordinates, or define frame/device protocols. External
 plugins own those behaviors and may return ordinary typed images through the
 generic tool boundary.
 
+## Pursue runtime
+
+`PursueRun` (`CrystalCode.Engine/Sessions/Pursue`) runs inside the one turn
+that `/pursue start` or `resume` opens. `CodingSession.ExecuteTurnAsync` hands
+it an `IPursueHost`; each segment is the ordinary `StreamingTurn` or
+`MultimodalStreamingTurn`, and the run merges segment counts, usage, and the
+last transcript into one `TurnResult`. The turn uses a `SharedTurnBudget` built
+from `pursueLimits` instead of `executionBudget`, shared by every segment, the
+checker, and child Agents; each segment gets only the remaining duration.
+The checker reads a numbered rendering of the transcript that drops the oldest
+entries to fit its own context, cites entry numbers, and its JSON answer is
+parsed strictly by `PursueVerdictParser` with no repair request. Transport
+failures use the `retry` policy. Checker usage goes to the ledger through
+`RecordChildUsage`. A wait verdict waits on `BackgroundTaskRegistry.WaitAnyAsync`
+for listed session tasks only. New stop reasons are `pursue_blocked` and
+`pursue_limit_reached`. State is `PursueState`; `PursueChanged` and
+`PursueChecked` events, `SessionSnapshot.Pursue`, and `SessionDocument.Pursue`
+carry it. Continuation messages are saved as ordinary user messages.
+
 ## Session and turn
 
 One user message is one turn:

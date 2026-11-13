@@ -91,7 +91,8 @@ public static class TranscriptExport
         switch (item)
         {
             case ChatMessage message when message.Role == ChatRole.User:
-                lines.Add("### User");
+                var automatic = message.Text.StartsWith(PursuePrompt.ContinuationMarker, StringComparison.Ordinal);
+                lines.Add(automatic ? "### Automatic continuation" : "### User");
                 lines.Add(string.Empty);
                 lines.Add(ImageMarkerText.Display(message.Text).Trim());
                 lines.Add(string.Empty);

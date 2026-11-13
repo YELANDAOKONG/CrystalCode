@@ -31,6 +31,10 @@ public static class ProgressText
 
     public const string NamingTopic = "Naming Topic";
 
+    public const string CheckingObjective = "Checking Objective";
+
+    public const string WaitingForTask = "Waiting for Task";
+
     public const string LoadingTools = "Loading Tools";
 
     public const string LoadingPlugins = "Loading Plugins";

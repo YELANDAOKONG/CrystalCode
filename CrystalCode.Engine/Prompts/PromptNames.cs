@@ -19,6 +19,12 @@ public static class PromptNames
 
     public const string Topic = "topic";
 
+    public const string PursueSystem = "pursue.system";
+
+    public const string PursueUser = "pursue.user";
+
+    public const string PursueContinue = "pursue.continue";
+
     public const string CompactionSystem = "compaction.system";
 
     public const string CompactionUser = "compaction.user";
@@ -51,6 +57,9 @@ public static class PromptNames
         ReviewExtended,
         ReviewExtendedUser,
         Topic,
+        PursueSystem,
+        PursueUser,
+        PursueContinue,
         CompactionSystem,
         CompactionUser,
         ImageSystem,

@@ -31,6 +31,7 @@ internal static class RunExit
         if (reason == TurnStopReason.ModelCallLimitReached
             || reason == TurnStopReason.ToolCallLimitReached
             || reason == TurnStopReason.DurationLimitReached
+            || reason == TurnStopReason.PursueLimitReached
             || reason == TurnStopReason.ContextOverflow
             || reason == TurnStopReason.OutputTruncated)
         {

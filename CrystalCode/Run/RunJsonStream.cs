@@ -7,6 +7,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Pursue;
 
 namespace CrystalCode.Run;
 
@@ -65,6 +66,27 @@ internal sealed class RunJsonStream
             case NoteWritten note:
                 Flush();
                 _emit("note", writer => writer.WriteString("message", note.Text));
+                break;
+            case PursueChecked pursueChecked:
+                Flush();
+                _emit("pursue_check", writer =>
+                {
+                    writer.WriteNumber("index", pursueChecked.Index);
+                    writer.WriteString("verdict", pursueChecked.Verdict);
+                    writer.WriteString("reason", pursueChecked.Reason);
+                    writer.WriteString("nextStep", pursueChecked.NextStep);
+                });
+                break;
+            case PursueChanged { Pursue: { Status: not PursueStatus.Active } stopped }:
+                Flush();
+                _emit("pursue", writer =>
+                {
+                    writer.WriteString("status", PursueState.StatusToken(stopped.Status));
+                    writer.WriteString("reasonCode", stopped.ReasonCode);
+                    writer.WriteString("reason", stopped.Reason);
+                    writer.WriteNumber("checks", stopped.Checks);
+                    writer.WriteNumber("continuations", stopped.Continuations);
+                });
                 break;
             case RetryScheduled retry:
                 // The failed attempt's partial output is replaced by the retry.

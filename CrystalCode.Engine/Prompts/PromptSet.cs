@@ -28,7 +28,11 @@ public sealed record PromptSet
         IReadOnlyList<string>? agentWorkAttachments = null,
         IReadOnlyList<string>? agentPlanAttachments = null,
         string? reviewExtended = null,
-        string? reviewExtendedUser = null)
+        string? reviewExtendedUser = null,
+        string? pursueSystem = null,
+        string? pursueUser = null,
+        string? pursueContinue = null,
+        IReadOnlyList<string>? pursueAttachments = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(work);
         ArgumentException.ThrowIfNullOrWhiteSpace(plan);
@@ -43,6 +47,10 @@ public sealed record PromptSet
         PlanAttachments = CopyAttachments(planAttachments);
         ReviewAttachments = CopyAttachments(reviewAttachments);
         Topic = TextOrBuiltIn(topic, TopicNamingPrompt.Text);
+        PursueSystem = TextOrBuiltIn(pursueSystem, PursuePrompt.SystemText);
+        PursueUser = TextOrBuiltIn(pursueUser, PursuePrompt.UserTemplate);
+        PursueContinue = TextOrBuiltIn(pursueContinue, PursuePrompt.ContinueTemplate);
+        PursueAttachments = CopyAttachments(pursueAttachments);
         ReviewUser = TextOrBuiltIn(reviewUser, ApprovalReviewPrompt.UserTemplate);
         ReviewExtended = TextOrBuiltIn(reviewExtended, ExtendedApprovalPrompt.SystemText);
         ReviewExtendedUser = TextOrBuiltIn(reviewExtendedUser, ExtendedApprovalPrompt.UserTemplate);
@@ -73,6 +81,17 @@ public sealed record PromptSet
     public IReadOnlyList<string> ReviewAttachments { get; }
 
     public string Topic { get; }
+
+    /// <summary>Checker system template. Prompt attachments append to it.</summary>
+    public string PursueSystem { get; }
+
+    /// <summary>Checker user template. Prompt attachments do not append to it.</summary>
+    public string PursueUser { get; }
+
+    /// <summary>Continuation message template. Prompt attachments do not append to it.</summary>
+    public string PursueContinue { get; }
+
+    public IReadOnlyList<string> PursueAttachments { get; }
 
     public string ReviewUser { get; }
 
@@ -120,6 +139,15 @@ public sealed record PromptSet
 
     public string ComposeReview(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
         AppendAttachments(PromptBinder.Apply(Review, context, placeholders), ReviewAttachments, context, placeholders);
+
+    public string ComposePursue(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
+        AppendAttachments(
+            PromptBinder.Apply(
+                PursueSystem,
+                new PromptBinding(Session: context, Placeholders: placeholders, Pursue: new PursuePromptContext(string.Empty))),
+            PursueAttachments,
+            context,
+            placeholders);
 
     public string ComposeReviewExtended(PromptContext context, PluginPlaceholderTable? placeholders = null) =>
         PromptBinder.Apply(ReviewExtended, context, placeholders);

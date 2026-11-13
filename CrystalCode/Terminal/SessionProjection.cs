@@ -283,6 +283,8 @@ internal sealed class SessionProjection : ISessionObserver
             SessionActivity.Compacting => ProgressText.Compacting,
             SessionActivity.NamingTopic => ProgressText.NamingTopic,
             SessionActivity.WaitingForModel => ProgressText.WaitingForModel,
+            SessionActivity.CheckingObjective => ProgressText.CheckingObjective,
+            SessionActivity.WaitingForTask => ProgressText.WaitingForTask,
             _ => string.Empty
         };
 

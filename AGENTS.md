@@ -48,8 +48,8 @@ semantics. Do not copy its Demo UI into this product.
   and image description via
   `~/.crystal/prompts`, a selected prompt set, and `<workspace>/.crystal/prompts`.
   The file stems are `work`, `plan`, `review`, `review.user`,
-  `review.extended`, `review.extended.user`, `topic`,
-  `compaction.system`, `compaction.user`, `image.system`, and `image.user`.
+  `review.extended`, `review.extended.user`, `topic`, `pursue.system`,
+  `pursue.user`, `pursue.continue`, `compaction.system`, `compaction.user`, `image.system`, and `image.user`.
   Built-in child Agents add `agents/general`, `agents/work`, and `agents/plan`
   under those same prompt, prompt-set, and prompt-attachment directories.
   `AGENTS.md` and

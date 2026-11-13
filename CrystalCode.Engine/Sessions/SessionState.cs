@@ -7,6 +7,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Sessions.Children;
 using CrystalCode.Engine.Tools;
 
@@ -33,6 +34,7 @@ public sealed class SessionState
     private IReadOnlyList<string> _history = [];
     private IReadOnlyList<string> _queue = [];
     private IReadOnlyList<TodoItem> _todos = [];
+    private PursueState? _pursue;
     private IReadOnlyList<StatusFieldValue> _statusFields = [];
     private SideQuestionSnapshot _side = SideQuestionSnapshot.Empty;
     private SessionActivity _activity = SessionActivity.Idle;
@@ -93,6 +95,9 @@ public sealed class SessionState
                 break;
             case TodosChanged todos:
                 _todos = todos.Items;
+                break;
+            case PursueChanged pursue:
+                _pursue = pursue.Pursue;
                 break;
             case SideQuestionSnapshot side:
                 _side = side;
@@ -191,7 +196,8 @@ public sealed class SessionState
             _side,
             [.. _children.Values],
             _lastTurn,
-            [.. _approvals]);
+            [.. _approvals],
+            _pursue);
 
     private void CommitRound()
     {

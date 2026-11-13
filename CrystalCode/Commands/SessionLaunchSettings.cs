@@ -119,6 +119,27 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--topic-context <BUDGET>")]
     public string? TopicContext { get; init; }
 
+    [CommandOption("--pursue-provider <PROVIDER>")]
+    public string? PursueProvider { get; init; }
+
+    [CommandOption("--pursue-model-id <MODEL>")]
+    public string? PursueModelId { get; init; }
+
+    [CommandOption("--pursue-thinking <EFFORT>")]
+    public string? PursueThinking { get; init; }
+
+    [CommandOption("--pursue-tier <TOKEN>")]
+    public string? PursueTier { get; init; }
+
+    [CommandOption("--pursue-speed <TOKEN>")]
+    public string? PursueSpeed { get; init; }
+
+    [CommandOption("--pursue-context <BUDGET>")]
+    public string? PursueContext { get; init; }
+
+    [CommandOption("--pursue-limit <NAME=VALUE>")]
+    public string[] PursueLimit { get; init; } = [];
+
     [CommandOption("--image-model <on|off>")]
     public string? ImageModel { get; init; }
 
@@ -299,6 +320,13 @@ public class SessionLaunchSettings : CommandSettings
             TopicTier = TopicTier,
             TopicSpeed = TopicSpeed,
             TopicContext = TopicContext,
+            PursueProvider = PursueProvider,
+            PursueModelId = PursueModelId,
+            PursueThinking = PursueThinking,
+            PursueTier = PursueTier,
+            PursueSpeed = PursueSpeed,
+            PursueContext = PursueContext,
+            PursueLimit = PursueLimit,
             ImageModel = ImageModel,
             ImageProvider = ImageProvider,
             ImageModelId = ImageModelId,

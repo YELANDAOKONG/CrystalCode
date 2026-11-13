@@ -97,6 +97,8 @@ public static class SessionLaunchOverrides
             }
 
             next = next.WithTopicModel(ParseTopicModel(next.TopicModel, request));
+            next = next.WithPursueModel(ParsePursueModel(next.PursueModel, request));
+            next = next.WithPursueLimits(ParsePursueLimits(next.PursueLimits, request));
 
             foreach (var flags in ResourceFlags.For(request))
             {
@@ -571,6 +573,75 @@ public static class SessionLaunchOverrides
     /// <c>--topic on|off</c> and its model flags. A provider and model id
     /// together select an own model; without them the stored choice stays.
     /// </summary>
+    private static PursueModelSettings ParsePursueModel(PursueModelSettings stored, SessionLaunchOptions request)
+    {
+        var next = stored;
+        if (request.PursueProvider is not null || request.PursueModelId is not null)
+        {
+            if (request.PursueProvider is null || request.PursueModelId is null)
+            {
+                throw new ArgumentException("Pass --pursue-provider and --pursue-model-id together.");
+            }
+
+            next = next.WithModel(
+                ProviderName.Parse(Required(request.PursueProvider, "Pursue provider")).Value,
+                Required(request.PursueModelId, "Pursue model"));
+        }
+
+        if (request.PursueThinking is not null)
+        {
+            next = next.WithThinkingEffort(ThinkingSelection.Parse(Required(request.PursueThinking, "Pursue thinking")));
+        }
+
+        if (request.PursueTier is not null)
+        {
+            next = next.WithServiceTier(Token(request.PursueTier, "Pursue service tier"));
+        }
+
+        if (request.PursueSpeed is not null)
+        {
+            next = next.WithSpeed(Token(request.PursueSpeed, "Pursue speed"));
+        }
+
+        if (request.PursueContext is not null)
+        {
+            next = next.WithContextWindow(Budget(request.PursueContext, "Pursue context budget"));
+        }
+
+        return next;
+    }
+
+    private static PursueLimits ParsePursueLimits(PursueLimits stored, SessionLaunchOptions request)
+    {
+        var next = stored;
+        foreach (var entry in request.PursueLimit)
+        {
+            var parts = (entry ?? string.Empty).Split('=', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length != 2 || parts[0].Length == 0)
+            {
+                throw new ArgumentException("--pursue-limit must be name=number or name=unlimited.");
+            }
+
+            int? number;
+            if (parts[1].Equals("unlimited", StringComparison.OrdinalIgnoreCase))
+            {
+                number = null;
+            }
+            else if (int.TryParse(parts[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+            {
+                number = parsed;
+            }
+            else
+            {
+                throw new ArgumentException("--pursue-limit must be name=number or name=unlimited.");
+            }
+
+            next = next.With(parts[0].ToLowerInvariant(), number);
+        }
+
+        return next;
+    }
+
     private static TopicModelSettings ParseTopicModel(TopicModelSettings stored, SessionLaunchOptions request)
     {
         var next = stored;

@@ -80,6 +80,21 @@ public sealed record SessionLaunchOptions
 
     public string? TopicContext { get; init; }
 
+    public string? PursueProvider { get; init; }
+
+    public string? PursueModelId { get; init; }
+
+    public string? PursueThinking { get; init; }
+
+    public string? PursueTier { get; init; }
+
+    public string? PursueSpeed { get; init; }
+
+    public string? PursueContext { get; init; }
+
+    /// <summary>Each entry is <c>name=number</c> or <c>name=unlimited</c>.</summary>
+    public IReadOnlyList<string> PursueLimit { get; init; } = [];
+
     public string? ImageModel { get; init; }
 
     public string? ImageProvider { get; init; }

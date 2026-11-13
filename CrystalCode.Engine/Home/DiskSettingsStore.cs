@@ -113,6 +113,8 @@ public sealed class DiskSettingsStore : ISettingsStore
                 ReadResourceModel(document.AudioModel, "audioModel"),
                 ReadResourceModel(document.VideoModel, "videoModel")),
             topicModel: ReadTopicModel(document.TopicModel),
+            pursueModel: ReadPursueModel(document.PursueModel),
+            pursueLimits: PursueLimitsMapper.Read(document.PursueLimits),
             contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
             tierSelections: SettingsMapper.ReadTokenSelections(document.TierSelections, "tierSelections"),
             speedSelections: SettingsMapper.ReadTokenSelections(document.SpeedSelections, "speedSelections"),
@@ -222,6 +224,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             AudioModel = WriteResourceModel(settings.ResourceModels.Audio),
             VideoModel = WriteResourceModel(settings.ResourceModels.Video),
             TopicModel = WriteTopicModel(settings.TopicModel),
+            PursueModel = WritePursueModel(settings.PursueModel),
+            PursueLimits = PursueLimitsMapper.Write(settings.PursueLimits),
             Retry = WriteRetry(settings.Retry),
             ApprovalRetry = WriteRetry(settings.ApprovalRetry),
             DisabledBuiltInTools = settings.PersistentDisabledBuiltInTools.Plan.Count == 0
@@ -861,6 +865,51 @@ public sealed class DiskSettingsStore : ISettingsStore
             ReadSlot(document.Speed, "topicModel.speed"),
             ReadContextWindow(document.ContextWindow, "topicModel.contextWindow"),
             document.NameOnResume ?? true);
+    }
+
+    private static PursueModelSettings ReadPursueModel(PursueModelDocument? document)
+    {
+        if (document is null)
+        {
+            return PursueModelSettings.Default;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider) ? null : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model) ? null : document.Model.Trim();
+        if ((provider is null) != (model is null))
+        {
+            throw new InvalidOperationException(
+                "pursueModel requires provider and model together, or neither to use the session model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new PursueModelSettings(
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, "pursueModel.serviceTier"),
+            ReadSlot(document.Speed, "pursueModel.speed"),
+            ReadContextWindow(document.ContextWindow, "pursueModel.contextWindow"));
+    }
+
+    private static PursueModelDocument? WritePursueModel(PursueModelSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new PursueModelDocument
+        {
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
+        };
     }
 
     private static TopicModelDocument? WriteTopicModel(TopicModelSettings settings)

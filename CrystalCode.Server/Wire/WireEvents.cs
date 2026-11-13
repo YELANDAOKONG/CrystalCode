@@ -39,6 +39,8 @@ public static class WireEvents
         [typeof(ContextEstimated)] = "context.estimated",
         [typeof(QueueChanged)] = "queue.changed",
         [typeof(TodosChanged)] = "todos.changed",
+        [typeof(PursueChanged)] = "pursue.changed",
+        [typeof(PursueChecked)] = "pursue.checked",
         [typeof(HistoryReplayed)] = "conversation.replayed",
         [typeof(ConversationCleared)] = "conversation.cleared",
         [typeof(CompactionStarted)] = "compaction.started",
@@ -211,6 +213,23 @@ public static class WireEvents
             case TodosListed todos:
                 WireWriter.Todos(writer, "items", todos.Items);
                 break;
+            case PursueChanged pursue:
+                WireWriter.Pursue(writer, "pursue", pursue.Pursue);
+                break;
+            case PursueChecked pursueChecked:
+                writer.WriteNumber("index", pursueChecked.Index);
+                writer.WriteString("verdict", pursueChecked.Verdict);
+                writer.WriteString("reason", pursueChecked.Reason);
+                writer.WriteString("nextStep", pursueChecked.NextStep);
+                writer.WriteStartArray("evidence");
+                foreach (var entry in pursueChecked.Evidence)
+                {
+                    writer.WriteNumberValue(entry);
+                }
+
+                writer.WriteEndArray();
+                WireWriter.Usage(writer, "usage", pursueChecked.Usage);
+                break;
             case DocumentWritten written:
                 WireWriter.Document(writer, "document", written.Document);
                 break;
@@ -324,6 +343,8 @@ public static class WireEvents
         SessionActivity.Compacting => "compacting",
         SessionActivity.NamingTopic => "naming_topic",
         SessionActivity.WaitingForModel => "waiting_for_model",
+        SessionActivity.CheckingObjective => "checking_objective",
+        SessionActivity.WaitingForTask => "waiting_for_task",
         _ => "unknown"
     };
 

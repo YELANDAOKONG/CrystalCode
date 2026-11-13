@@ -55,6 +55,11 @@ public static partial class PromptBinder
             return imageValue;
         }
 
+        if (binding.Pursue is not null && TryGetPursueValue(name, binding.Pursue, out var pursueValue))
+        {
+            return pursueValue;
+        }
+
         if (binding.Placeholders is not null
             && binding.Placeholders.TryResolve(name, CreatePlaceholderContext(binding), out var pluginValue))
         {
@@ -79,6 +84,10 @@ public static partial class PromptBinder
         else if (mode.Length == 0 && binding.Image is not null)
         {
             mode = "image";
+        }
+        else if (mode.Length == 0 && binding.Pursue is not null)
+        {
+            mode = "pursue";
         }
 
         return new PluginPlaceholderContext(
@@ -223,6 +232,40 @@ public static partial class PromptBinder
                 return true;
             case PromptPlaceholder.TodosSection:
                 value = context.TodosSection;
+                return true;
+            default:
+                value = string.Empty;
+                return false;
+        }
+    }
+
+    private static bool TryGetPursueValue(string name, PursuePromptContext context, out string value)
+    {
+        switch (name)
+        {
+            case PromptPlaceholder.Objective:
+                value = context.Objective;
+                return true;
+            case PromptPlaceholder.Conversation:
+                value = context.Conversation;
+                return true;
+            case PromptPlaceholder.ModeName:
+                value = context.ModeName;
+                return true;
+            case PromptPlaceholder.VerdictFormat:
+                value = context.VerdictFormat;
+                return true;
+            case PromptPlaceholder.Reason:
+                value = context.Reason;
+                return true;
+            case PromptPlaceholder.NextStep:
+                value = context.NextStep;
+                return true;
+            case PromptPlaceholder.RemainingContinuations:
+                value = context.RemainingContinuations;
+                return true;
+            case PromptPlaceholder.Resumed:
+                value = context.Resumed;
                 return true;
             default:
                 value = string.Empty;

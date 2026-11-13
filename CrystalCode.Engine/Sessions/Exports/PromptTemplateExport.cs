@@ -25,6 +25,9 @@ public static class PromptTemplateExport
             ("compaction.user.md", CompactionPrompt.UserTemplate),
             ("image.system.md", ImageDescriptionPrompt.SystemText),
             ("image.user.md", ImageDescriptionPrompt.UserTemplate),
+            ("pursue.system.md", PursuePrompt.SystemText),
+            ("pursue.user.md", PursuePrompt.UserTemplate),
+            ("pursue.continue.md", PursuePrompt.ContinueTemplate),
             ("placeholders.md", RenderPlaceholderGuide()),
             (Path.Combine(PromptNames.AgentsDirectory, "general.md"), AgentGeneralPrompt.Text),
             (Path.Combine(PromptNames.AgentsDirectory, "work.md"), AgentWorkPrompt.Text),
@@ -98,6 +101,24 @@ public static class PromptTemplateExport
         - {{summary_task}}
         - {{output_template}}
         - {{todos_section}}
+
+        ## Pursue user
+
+        - {{objective}}
+        - {{conversation}}
+        - {{mode_name}}
+
+        ## Pursue system
+
+        - {{verdict_format}}
+
+        ## Pursue continue
+
+        - {{objective}}
+        - {{reason}}
+        - {{next_step}}
+        - {{remaining_continuations}}
+        - {{resumed}}
 
         ## Image user
 

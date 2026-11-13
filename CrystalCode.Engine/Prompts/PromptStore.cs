@@ -123,6 +123,21 @@ public sealed class PromptStore
             TopicNamingPrompt.Text,
             selection.Selected,
             project);
+        var pursueSystem = ResolveNamed(
+            PromptNames.PursueSystem,
+            PursuePrompt.SystemText,
+            selection.Selected,
+            project);
+        var pursueUser = ResolveNamed(
+            PromptNames.PursueUser,
+            PursuePrompt.UserTemplate,
+            selection.Selected,
+            project);
+        var pursueContinue = ResolveNamed(
+            PromptNames.PursueContinue,
+            PursuePrompt.ContinueTemplate,
+            selection.Selected,
+            project);
         var compactionSystem = ResolveNamed(
             PromptNames.CompactionSystem,
             CompactionPrompt.SystemText,
@@ -186,7 +201,11 @@ public sealed class PromptStore
                 enabled.AgentWork,
                 enabled.AgentPlan,
                 reviewExtended.Text,
-                reviewExtendedUser.Text),
+                reviewExtendedUser.Text,
+                pursueSystem.Text,
+                pursueUser.Text,
+                pursueContinue.Text,
+                enabled.Pursue),
             selection.Effective,
             catalog.Names,
             work.Source,
@@ -385,6 +404,7 @@ public sealed class PromptStore
         var work = new List<string>();
         var plan = new List<string>();
         var review = new List<string>();
+        var pursue = new List<string>();
         var agentGeneral = new List<string>();
         var agentWork = new List<string>();
         var agentPlan = new List<string>();
@@ -393,6 +413,7 @@ public sealed class PromptStore
             AddNamed(work, definition.Directory, PromptNames.Work);
             AddNamed(plan, definition.Directory, PromptNames.Plan);
             AddNamed(review, definition.Directory, PromptNames.Review);
+            AddNamed(pursue, definition.Directory, PromptNames.PursueSystem);
             AddAgent(agentGeneral, definition.Directory, PromptNames.AgentGeneral);
             AddAgent(agentWork, definition.Directory, PromptNames.AgentWork);
             AddAgent(agentPlan, definition.Directory, PromptNames.AgentPlan);
@@ -415,7 +436,7 @@ public sealed class PromptStore
             entries.Add(Entry(definition, effective: false));
         }
 
-        return new AttachmentSelection(work, plan, review, agentGeneral, agentWork, agentPlan, entries);
+        return new AttachmentSelection(work, plan, review, agentGeneral, agentWork, agentPlan, pursue, entries);
     }
 
     private static PromptAttachmentEntry Entry(PromptAttachmentDefinition definition, bool effective) =>
@@ -529,5 +550,6 @@ public sealed class PromptStore
         IReadOnlyList<string> AgentGeneral,
         IReadOnlyList<string> AgentWork,
         IReadOnlyList<string> AgentPlan,
+        IReadOnlyList<string> Pursue,
         IReadOnlyList<PromptAttachmentEntry> Entries);
 }

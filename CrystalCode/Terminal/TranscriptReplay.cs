@@ -69,6 +69,14 @@ public static class TranscriptReplay
         out string text)
     {
         text = ImageMarkerText.Display(message.Text);
+        if (message.Role == ChatRole.User
+            && message.Text.StartsWith(PursuePrompt.ContinuationMarker, StringComparison.Ordinal))
+        {
+            kind = TranscriptKind.Note;
+            text = "Automatic continuation";
+            return true;
+        }
+
         if (message.Role == ChatRole.User)
         {
             kind = TranscriptKind.User;

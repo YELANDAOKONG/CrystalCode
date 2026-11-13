@@ -135,6 +135,34 @@ public sealed class BackgroundTaskRegistry : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Waits until any listed task of this session ends. Returns false at once
+    /// when none of them is still running, including ids that are unknown.
+    /// </summary>
+    public async Task<bool> WaitAnyAsync(IReadOnlyList<string> taskIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(taskIds);
+        var waits = new List<Task>();
+        lock (_gate)
+        {
+            foreach (var id in taskIds)
+            {
+                if (_tasks.TryGetValue(id, out var task) && task.IsActive)
+                {
+                    waits.Add(task.Completion);
+                }
+            }
+        }
+
+        if (waits.Count == 0)
+        {
+            return false;
+        }
+
+        await Task.WhenAny(waits).WaitAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<BackgroundTaskSnapshot?> StopAsync(
         string taskId,
         CancellationToken cancellationToken = default)

@@ -81,6 +81,9 @@ internal sealed class BackgroundBashTask
         }
     }
 
+    /// <summary>Completes when the process has been observed to end.</summary>
+    public Task Completion => _runTask;
+
     public string StartError => _startError ?? "The background shell process failed to start.";
 
     public bool IsActive

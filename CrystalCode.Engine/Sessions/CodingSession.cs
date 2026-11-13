@@ -35,6 +35,7 @@ using CrystalCode.Engine.Sessions.Catalogs;
 using CrystalCode.Engine.Sessions.Children;
 using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Engine.Sessions.Interfaces;
+using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Engine.Tools;
@@ -78,6 +79,8 @@ public sealed class CodingSession : ITurnObserver
     private bool _parentContextEstimated;
     private ContextAnchor? _contextAnchor;
     private SharedTurnBudget? _sharedBudget;
+    private PursueState? _pursue;
+    private bool _pursueResume;
     private TokenUsage? _childTurnUsage;
     private bool _childUsageComplete = true;
     private TokenUsage? _parentTurnUsage;
@@ -1629,6 +1632,7 @@ public sealed class CodingSession : ITurnObserver
         RefreshSlashCommands();
         await OpenPluginSessionAsync(cancellationToken);
         ShowTodos();
+        ShowPursue();
     }
 
     /// <summary>
@@ -2949,6 +2953,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Topic:
                 ChangeTopic(command.Argument);
+                return (true, false);
+            case SessionVerb.Pursue:
+                await ChangePursueAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Todos:
                 ChangeTodos(command.Argument);
@@ -6894,7 +6901,8 @@ public sealed class CodingSession : ITurnObserver
                 : _ledger.CumulativeUsage),
             Children = _children.Snapshot().ToList(),
             Topic = CurrentTopic(),
-            TopicSource = TopicSourceText()
+            TopicSource = TopicSourceText(),
+            Pursue = WritePursue()
         };
     }
 
@@ -6928,6 +6936,7 @@ public sealed class CodingSession : ITurnObserver
         ReleaseChildClients();
         _ledger.Clear();
         _todos.Clear();
+        _pursue = null;
         BindReviewConversation();
         if (hadSessionDisablement)
         {
@@ -6937,6 +6946,7 @@ public sealed class CodingSession : ITurnObserver
         SeedWorkspaceDefaults();
         SaveSession();
         ShowTodos();
+        ShowPursue();
     }
 
     private async Task ResumeSessionAsync(
@@ -7244,12 +7254,14 @@ public sealed class CodingSession : ITurnObserver
                     ClaimFreshSession(),
                     _workspace.Root,
                     DateTimeOffset.UtcNow));
+                _pursue = null;
                 SeedWorkspaceDefaults();
                 SaveSession();
                 RefreshChrome();
                 ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
                 Publish(new HistoryReplayed(ArchiveSnapshot()));
                 ShowTodos();
+                ShowPursue();
                 Note($"Forked  {sourceId}  ->  {_sessionId}");
             },
             cancellationToken);
@@ -7384,6 +7396,7 @@ public sealed class CodingSession : ITurnObserver
 
         _todos.Clear();
         _todos.Replace(SessionMapper.ReadTodos(document.Todos));
+        _pursue = ReadPursue(document.Pursue);
         _children = new ChildSessionStore(document.Children);
         _ledger.Restore(
             Math.Max(0, document.UserTurns),
@@ -7411,6 +7424,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         ShowTodos();
+        ShowPursue();
     }
 
     private void ReplaceLiveSystem()
@@ -10458,6 +10472,12 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
+            if (command.Verb == SessionVerb.Pursue)
+            {
+                RunPursueWhileBusy(command, trimmed);
+                return;
+            }
+
             if (RunsWhileBusy(command.Verb))
             {
                 if (!TryRunWhileBusy(command))
@@ -10730,22 +10750,31 @@ public sealed class CodingSession : ITurnObserver
     private async Task StartTurnAsync(
         string input,
         CancellationToken cancellationToken,
-        bool attachPendingImages = true)
+        bool attachPendingImages = true,
+        bool resumePursuit = false)
     {
-        var message = attachPendingImages ? AttachPendingImages(input) : input;
-        message = await _hooks.OnUserMessageAsync(message, cancellationToken);
-        Publish(new UserMessageSent(message));
-        var user = new ChatMessage(ChatRole.User, message);
-        _transcript.Add(user);
-        CommitArchive([user]);
-        var images = ImageSnapshot();
-        foreach (var number in _draftImages.Keys.ToArray())
+        var message = input;
+        // A resumed pursuit sends no new user message; its first segment starts
+        // from the continuation message the run adds.
+        if (!resumePursuit)
         {
-            if (message.Contains(images[number].TrustedMarker, StringComparison.Ordinal))
+            message = attachPendingImages ? AttachPendingImages(input) : input;
+            message = await _hooks.OnUserMessageAsync(message, cancellationToken);
+            Publish(new UserMessageSent(message));
+            var user = new ChatMessage(ChatRole.User, message);
+            _transcript.Add(user);
+            CommitArchive([user]);
+            var images = ImageSnapshot();
+            foreach (var number in _draftImages.Keys.ToArray())
             {
-                _draftImages.Remove(number);
+                if (message.Contains(images[number].TrustedMarker, StringComparison.Ordinal))
+                {
+                    _draftImages.Remove(number);
+                }
             }
         }
+
+        _pursueResume = resumePursuit;
         var turnSource = new CancellationTokenSource();
         _turnSource = turnSource;
         _turnActive = true;
@@ -10762,7 +10791,8 @@ public sealed class CodingSession : ITurnObserver
         _childParentPlanMode = InPlanCeiling;
         _childSlots.Dispose();
         _childSlots = new SemaphoreSlim(_settings.Agents.MaxConcurrent, _settings.Agents.MaxConcurrent);
-        _sharedBudget = new SharedTurnBudget(_settings.ExecutionBudget);
+        _sharedBudget = new SharedTurnBudget(
+            _pursue is { Status: PursueStatus.Active } ? _settings.PursueLimits.ToTurnLimits() : _settings.ExecutionBudget);
         _childModelCalls = 0;
         _childToolCalls = 0;
         _childTurnUsage = null;
@@ -10800,6 +10830,517 @@ public sealed class CodingSession : ITurnObserver
                 _inputCapture.Value = capture;
             }
         }
+    }
+
+    private void ShowPursue() => Publish(new PursueChanged(_pursue));
+
+    /// <summary>
+    /// Replaces the pursued objective and tells every client. A stop is saved
+    /// when it comes from an operator command, so a restart finds it.
+    /// </summary>
+    private void SetPursue(PursueState? state, bool save)
+    {
+        _pursue = state;
+        Publish(new PursueChanged(state));
+        if (save && HasConversation())
+        {
+            try
+            {
+                SaveSession();
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Note("Pursuit state could not be saved: " + exception.Message);
+            }
+        }
+    }
+
+    private PursueDocument? WritePursue() =>
+        _pursue is { } state
+            ? new PursueDocument
+            {
+                Objective = state.Objective,
+                Status = PursueState.StatusToken(state.Status),
+                ReasonCode = state.ReasonCode,
+                Reason = state.Reason
+            }
+            : null;
+
+    /// <summary>
+    /// A pursuit never resumes on its own: one saved as active was running when
+    /// the process ended, so it comes back paused.
+    /// </summary>
+    private static PursueState? ReadPursue(PursueDocument? document)
+    {
+        if (document is null
+            || string.IsNullOrWhiteSpace(document.Objective)
+            || document.Objective.Length > PursueState.MaximumObjectiveCharacters)
+        {
+            return null;
+        }
+
+        var state = PursueState.Start(document.Objective);
+        var reasonCode = document.ReasonCode ?? string.Empty;
+        var reason = document.Reason ?? string.Empty;
+        return document.Status switch
+        {
+            "paused" => state.Stopped(PursueStatus.Paused, reasonCode, reason),
+            "blocked" => state.Stopped(PursueStatus.Blocked, reasonCode, reason),
+            "complete" => state.Stopped(PursueStatus.Complete, reasonCode, reason),
+            "active" => state.Stopped(PursueStatus.Paused, PursueReasonCodes.Restarted, "The session was restarted while the objective was running."),
+            _ => state.Stopped(PursueStatus.Paused, PursueReasonCodes.Restarted, "The saved objective status was not recognized.")
+        };
+    }
+
+    private async Task ChangePursueAsync(string argument, CancellationToken cancellationToken)
+    {
+        if (!PursueArguments.TryParse(argument, out var request, out var parseError))
+        {
+            Error(parseError);
+            return;
+        }
+
+        switch (request.Action)
+        {
+            case PursueArguments.Action.Show:
+                ShowPursueStatus();
+                return;
+            case PursueArguments.Action.Pause:
+                PausePursue();
+                return;
+            case PursueArguments.Action.Clear:
+                ClearPursue();
+                return;
+            default:
+                break;
+        }
+
+        if (_turnActive || _compacting)
+        {
+            Error("Finish the current turn before using /pursue " + argument.Split(' ', 2)[0].ToLowerInvariant() + ".");
+            return;
+        }
+
+        switch (request.Action)
+        {
+            case PursueArguments.Action.Start:
+                await StartPursueAsync(request.Value!, cancellationToken);
+                return;
+            case PursueArguments.Action.Resume:
+                await ResumePursueAsync(cancellationToken);
+                return;
+            case PursueArguments.Action.Limit:
+                ChangePursueLimit(request);
+                return;
+            default:
+                ChangePursueModel(request);
+                return;
+        }
+    }
+
+    private async Task StartPursueAsync(string objective, CancellationToken cancellationToken)
+    {
+        var text = objective.Trim();
+        if (text.Length > PursueState.MaximumObjectiveCharacters)
+        {
+            Error($"The objective is longer than {PursueState.MaximumObjectiveCharacters} characters.");
+            return;
+        }
+
+        var previous = _pursue;
+        _pursue = PursueState.Start(text);
+        ShowPursue();
+        try
+        {
+            await StartTurnAsync(text, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            SetPursue(previous, save: false);
+            throw;
+        }
+    }
+
+    private async Task ResumePursueAsync(CancellationToken cancellationToken)
+    {
+        if (_pursue is not { Status: PursueStatus.Paused or PursueStatus.Blocked } previous)
+        {
+            Error("There is no paused or blocked objective to resume.");
+            return;
+        }
+
+        _pursue = previous.Active(PursuePhase.Working);
+        ShowPursue();
+        try
+        {
+            await StartTurnAsync(previous.Objective, cancellationToken, attachPendingImages: false, resumePursuit: true);
+        }
+        catch (OperationCanceledException)
+        {
+            SetPursue(previous, save: false);
+            throw;
+        }
+    }
+
+    private void PausePursue()
+    {
+        switch (_pursue)
+        {
+            case null:
+                Error("There is no objective to pause.");
+                return;
+            case { Status: PursueStatus.Active }:
+                Error("The turn is still running.");
+                return;
+            case { Status: PursueStatus.Paused } paused:
+                SetPursue(
+                    paused.Stopped(PursueStatus.Paused, PursueReasonCodes.UserPaused, "Paused by the operator."),
+                    save: true);
+                Note("Pursuit paused. Use /pursue resume to continue.");
+                return;
+            case var other:
+                Error("The objective is " + PursueState.StatusToken(other.Status) + "; there is nothing to pause.");
+                return;
+        }
+    }
+
+    private void ClearPursue()
+    {
+        if (_pursue is null)
+        {
+            Note("There is no objective.");
+            return;
+        }
+
+        if (_pursue.Status == PursueStatus.Active)
+        {
+            Error("The turn is still running.");
+            return;
+        }
+
+        SetPursue(null, save: true);
+        Note("Objective cleared.");
+    }
+
+    private void ShowPursueStatus()
+    {
+        if (_pursue is not { } state)
+        {
+            Note("Pursue  no objective");
+        }
+        else
+        {
+            var status = "Pursue  " + DisplayCase.Token(PursueState.StatusToken(state.Status));
+            if (state.Phase != PursuePhase.None)
+            {
+                status += "  ·  " + DisplayCase.Token(PursueState.PhaseToken(state.Phase));
+            }
+
+            Note(status);
+            Note("Objective  " + state.Objective);
+            if (state.Reason.Length > 0)
+            {
+                Note("Reason  " + state.Reason);
+            }
+
+            Note(
+                "Checks " + state.Checks.ToString(CultureInfo.InvariantCulture)
+                + "  ·  Continuations " + state.Continuations.ToString(CultureInfo.InvariantCulture)
+                + "  ·  Stalls " + state.Stalls.ToString(CultureInfo.InvariantCulture));
+        }
+
+        Note(_settings.PursueModel.Describe());
+        Note(_settings.PursueLimits.Describe());
+    }
+
+    private void RunPursueWhileBusy(SessionCommand command, string trimmed)
+    {
+        CloseRecallWindow();
+        if (!PursueArguments.TryParse(command.Argument, out var request, out _))
+        {
+            RefuseCommand(trimmed);
+            return;
+        }
+
+        switch (request.Action)
+        {
+            case PursueArguments.Action.Show:
+                ShowPursueStatus();
+                return;
+            case PursueArguments.Action.Pause or PursueArguments.Action.Clear when !_compacting:
+                _deferredStops.Add(trimmed);
+                ShowQueue();
+                TryInterrupt();
+                return;
+            default:
+                RefuseCommand(trimmed);
+                return;
+        }
+    }
+
+    private void ChangePursueLimit(PursueArguments.Request request)
+    {
+        PursueLimits next;
+        try
+        {
+            next = _settings.PursueLimits.With(request.Value!, request.Number);
+        }
+        catch (ArgumentException exception)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        SaveSettings(settings => settings.WithPursueLimits(next));
+        Note(next.Describe());
+    }
+
+    private void ChangePursueModel(PursueArguments.Request request)
+    {
+        var current = _settings.PursueModel;
+        PursueModelSettings next;
+        switch (request.Action)
+        {
+            case PursueArguments.Action.Model:
+                if (request.Value is null)
+                {
+                    next = current.WithModel(null, null);
+                    break;
+                }
+
+                if (!ModelSelection.TryResolve(
+                        _settings.Catalog,
+                        current.Provider is string stored ? new ProviderName(stored) : _settings.Provider,
+                        request.Value,
+                        out var selection,
+                        out var error)
+                    || selection is null)
+                {
+                    Error((error ?? string.Empty).Replace("/model", "/pursue model", StringComparison.Ordinal));
+                    return;
+                }
+
+                next = current.WithModel(selection.Provider.Value, selection.Model);
+                break;
+            case PursueArguments.Action.Thinking:
+                if (!TrySelectThinking(PursueCatalogModel(), current.ThinkingEffort, request.Value, "pursue model", out var gear))
+                {
+                    return;
+                }
+
+                next = current.WithThinkingEffort(gear);
+                break;
+            default:
+                if (current.UsesSessionModel)
+                {
+                    Error("The pursue model uses the session model and its /tier, /speed, and /context choice. "
+                        + "Select its own model with /pursue model <provider model> first.");
+                    return;
+                }
+
+                if (!TrySelectSlot(
+                        request.Slot,
+                        PursueCatalogModel(),
+                        current.ServiceTier,
+                        current.Speed,
+                        current.ContextWindow,
+                        "pursue model",
+                        out var selected))
+                {
+                    return;
+                }
+
+                next = request.Slot.Slot switch
+                {
+                    SideModelSlot.ServiceTier => current.WithServiceTier(selected.Token),
+                    SideModelSlot.Speed => current.WithSpeed(selected.Token),
+                    _ => current.WithContextWindow(selected.Window)
+                };
+                break;
+        }
+
+        try
+        {
+            SaveSettings(settings => settings.WithPursueModel(next));
+        }
+        catch (InvalidOperationException exception)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        Note(next.Describe());
+    }
+
+    /// <summary>The catalog entry the pursue check uses: its own model, or the session model.</summary>
+    private ModelSettings PursueCatalogModel()
+    {
+        var pursue = _settings.PursueModel;
+        return pursue.UsesSessionModel
+            ? _settings.ActiveModel
+            : _settings.Catalog.GetModel(new ProviderName(pursue.Provider!), pursue.Model!);
+    }
+
+    private ChatMessage BuildPursueContinuation(PursueState state, int remainingContinuations, bool resumed)
+    {
+        var context = new PursuePromptContext(
+            state.Objective,
+            Reason: state.Reason.Length == 0 ? string.Empty : "Checker finding: " + state.Reason,
+            NextStep: state.NextStep.Length == 0 ? "Review the objective and decide what is left." : state.NextStep,
+            RemainingContinuations: remainingContinuations == int.MaxValue
+                ? "unlimited"
+                : remainingContinuations.ToString(CultureInfo.InvariantCulture),
+            Resumed: resumed ? "yes" : string.Empty);
+        var text = PromptBinder.Apply(
+            _prompts.PursueContinue,
+            new PromptBinding(Session: CurrentPromptContext(), Placeholders: _placeholders, Pursue: context));
+        return new ChatMessage(ChatRole.User, PursuePrompt.ContinuationMarker + "\n" + text);
+    }
+
+    private async Task<PursueCheck> CheckPursueAsync(
+        IReadOnlyList<ChatItem> transcript,
+        PursueState state,
+        CancellationToken cancellationToken)
+    {
+        HarnessSettings selected;
+        try
+        {
+            selected = _settings.ForPursue();
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or KeyNotFoundException)
+        {
+            return PursueCheck.Failed(PursueCheckFailure.Request, "The pursue check could not start: " + exception.Message);
+        }
+
+        var context = CurrentPromptContext().WithMode("pursue");
+        var system = _prompts.ComposePursue(context, _placeholders);
+        // Characters, not tokens: about three per token, with room kept for the reply.
+        var reserve = Math.Min(PursueOutputReserveTokens, selected.ContextWindow / 4);
+        var budget = Math.Max(0, ((selected.ContextWindow - reserve) * 3) - system.Length - state.Objective.Length);
+        var rendering = PursueConversation.Render(transcript, budget);
+        if (!rendering.Fits)
+        {
+            return PursueCheck.Failed(
+                PursueCheckFailure.Overflow,
+                "The newest conversation entry does not fit in the pursue model's context.");
+        }
+
+        var user = PromptBinder.Apply(
+            _prompts.PursueUser,
+            new PromptBinding(
+                Session: context,
+                Placeholders: _placeholders,
+                Pursue: new PursuePromptContext(state.Objective, rendering.Text, CurrentModeName())));
+        var request = new ChatRequest(
+            [new ChatMessage(ChatRole.System, system), new ChatMessage(ChatRole.User, user)],
+            [],
+            _settings.PursueModel.ThinkingEffort.ToReasoningOptions(selected.ActiveModel));
+        IStreamingChatClient? client = null;
+        var owned = false;
+        ChatResponse response;
+        try
+        {
+            client = CreateClient(selected);
+            owned = !ReferenceEquals(client, _client);
+            var checkClient = client;
+            response = await SessionRetry.RunAsync(
+                async token =>
+                {
+                    var assembler = new ChatStreamAssembler();
+                    await foreach (var streamEvent in checkClient.StreamAsync(request, token))
+                    {
+                        assembler.Apply(streamEvent);
+                    }
+
+                    return assembler.ToResponse();
+                },
+                _settings.Retry.ToOptions(),
+                attempt => Publish(new RetryScheduled(attempt)),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return PursueCheck.Failed(PursueCheckFailure.Request, "The pursue check failed: " + FailureText(exception));
+        }
+        finally
+        {
+            if (owned)
+            {
+                DisposeClient(client);
+            }
+        }
+
+        lock (_usageGate)
+        {
+            _ledger.RecordChildUsage(1, 0, response.Usage);
+        }
+
+        if (!SideQuestion.TryReadAnswer(response, out var answer, out var ignoredToolCall))
+        {
+            return PursueCheck.Failed(
+                PursueCheckFailure.Invalid,
+                ignoredToolCall
+                    ? "The pursue model asked for a tool instead of judging the objective."
+                    : "The pursue model returned no text.",
+                response.Usage);
+        }
+
+        return PursueVerdictParser.TryParse(answer, rendering.Entries, out var verdict, out var parseError)
+            ? PursueCheck.Verdicted(verdict, response.Usage, rendering.Entries.Count)
+            : PursueCheck.Failed(PursueCheckFailure.Invalid, "The pursue model gave an unusable verdict: " + parseError, response.Usage);
+    }
+
+    private const int PursueOutputReserveTokens = 8192;
+
+    private sealed class PursueHostAdapter(CodingSession session) : IPursueHost
+    {
+        public bool HasQueuedInput => session._queue.Count > 0 || session._deferredStops.Count > 0;
+
+        public Task<TurnResult> RunSegmentAsync(
+            IReadOnlyList<ChatItem> input,
+            TurnLimits limits,
+            CancellationToken cancellationToken) =>
+            session.ExecuteSegmentAsync(input, limits, cancellationToken);
+
+        public Task<PursueCheck> CheckAsync(
+            IReadOnlyList<ChatItem> transcript,
+            PursueState state,
+            CancellationToken cancellationToken) =>
+            session.CheckPursueAsync(transcript, state, cancellationToken);
+
+        public bool TryReserveCheck() => session._sharedBudget?.TryModelCall() ?? true;
+
+        public ChatMessage BuildContinuation(PursueState state, int remainingContinuations, bool resumed) =>
+            session.BuildPursueContinuation(state, remainingContinuations, resumed);
+
+        public void CommitContinuation(ChatMessage message) => session.CommitTurnItems([message]);
+
+        public bool TaskExists(string taskId) => session._backgroundTasks.TryGetSnapshot(taskId, out _);
+
+        public Task<bool> WaitAnyAsync(IReadOnlyList<string> taskIds, CancellationToken cancellationToken) =>
+            session._backgroundTasks.WaitAnyAsync(taskIds, cancellationToken);
+
+        public void Publish(PursueState state)
+        {
+            session.SetPursue(state, save: false);
+            session.SetActivity(state.Phase switch
+            {
+                PursuePhase.Checking => SessionActivity.CheckingObjective,
+                PursuePhase.Waiting => SessionActivity.WaitingForTask,
+                PursuePhase.Working => SessionActivity.WaitingForModel,
+                _ => SessionActivity.Idle
+            });
+        }
+
+        public void Publish(PursueChecked checkedEvent) => session.Publish(checkedEvent);
+
+        public void Note(string text) => session.Note(text);
+
+        public void Error(string text) => session.Error(text);
     }
 
     private string CurrentModeName() => _customMode ?? (_planMode ? "plan" : "work");
@@ -10861,12 +11402,26 @@ public sealed class CodingSession : ITurnObserver
 
     private Task<TurnResult> ExecuteTurnAsync(CancellationToken cancellationToken)
     {
+        if (_pursue is { Status: PursueStatus.Active } pursuit)
+        {
+            var run = new PursueRun(new PursueHostAdapter(this), _settings.PursueLimits, pursuit);
+            return run.RunAsync(_transcript, _pursueResume, cancellationToken);
+        }
+
+        return ExecuteSegmentAsync(_transcript, _settings.ExecutionBudget, cancellationToken);
+    }
+
+    private Task<TurnResult> ExecuteSegmentAsync(
+        IReadOnlyList<ChatItem> input,
+        TurnLimits limits,
+        CancellationToken cancellationToken)
+    {
         if (_multimodalClient is not null)
         {
             var multimodalTurn = new MultimodalStreamingTurn(
                 _multimodalClient,
                 CurrentMultimodalExecutor(),
-                _settings.ExecutionBudget,
+                limits,
                 ImageSnapshot(),
                 this,
                 CurrentReasoning(),
@@ -10880,13 +11435,13 @@ public sealed class CodingSession : ITurnObserver
                 (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token),
                 _sharedBudget,
                 (context, held) => _resourceTrimmer.Apply(context, held, _settings.EffectiveResourceTrim));
-            return multimodalTurn.RunAsync(_transcript, cancellationToken);
+            return multimodalTurn.RunAsync(input, cancellationToken);
         }
 
         var turn = new StreamingTurn(
             _client,
             CurrentTextExecutor(),
-            _settings.ExecutionBudget,
+            limits,
             this,
             CurrentReasoning(),
             CompactRoundAsync,
@@ -10895,7 +11450,7 @@ public sealed class CodingSession : ITurnObserver
             PrepareOutboundAsync,
             (response, token) => ReportModelResponseAsync(CurrentModelPurpose(), response, token),
             _sharedBudget);
-        return turn.RunAsync(_transcript, cancellationToken);
+        return turn.RunAsync(input, cancellationToken);
     }
 
     private string AttachPendingImages(string input)
@@ -11228,6 +11783,12 @@ public sealed class CodingSession : ITurnObserver
 
         var stop = result?.StopReason ?? TurnStopReason.Failed;
         _lastStop = stop;
+        if (_pursue is { Status: PursueStatus.Active } unfinished)
+        {
+            // A faulted run never reached its own stop, so it must not stay active.
+            SetPursue(unfinished.Stopped(PursueStatus.Paused, PursueReasonCodes.RunFailed, "The run ended unexpectedly."), save: false);
+        }
+
         var error = string.IsNullOrWhiteSpace(failure) ? _turnFault : failure;
         // Record the result before the plugin hook: a cancelled hook must not
         // leave the pre-turn transcript for Close to save over the checkpoint.
@@ -11821,7 +12382,13 @@ public sealed class CodingSession : ITurnObserver
     }
 
     private static bool StopsBusyTurn(string input) =>
-        SessionCommand.TryParse(input, out var command) && StopsBusyTurn(command.Verb);
+        SessionCommand.TryParse(input, out var command)
+        && (StopsBusyTurn(command.Verb) || StopsPursuit(command));
+
+    private static bool StopsPursuit(SessionCommand command) =>
+        command.Verb == SessionVerb.Pursue
+        && PursueArguments.TryParse(command.Argument, out var request, out _)
+        && request.Action is PursueArguments.Action.Pause or PursueArguments.Action.Clear;
 
     private static bool StopsBusyTurn(SessionVerb verb) =>
         verb is SessionVerb.Quit

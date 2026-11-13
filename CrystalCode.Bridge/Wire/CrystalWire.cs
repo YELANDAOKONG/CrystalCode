@@ -10,6 +10,7 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Catalogs;
 using CrystalCode.Engine.Sessions.Children;
+using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Tools;
 
@@ -580,6 +581,27 @@ internal static class CrystalWire
         writer.WriteEndObject();
     }
 
+    public static void Pursue(Utf8JsonWriter writer, string name, PursueState? pursue)
+    {
+        if (pursue is null)
+        {
+            writer.WriteNull(name);
+            return;
+        }
+
+        writer.WriteStartObject(name);
+        writer.WriteString("objective", pursue.Objective);
+        writer.WriteString("status", PursueState.StatusToken(pursue.Status));
+        writer.WriteString("phase", PursueState.PhaseToken(pursue.Phase));
+        writer.WriteString("reasonCode", pursue.ReasonCode);
+        writer.WriteString("reason", pursue.Reason);
+        writer.WriteNumber("checks", pursue.Checks);
+        writer.WriteNumber("continuations", pursue.Continuations);
+        writer.WriteNumber("stalls", pursue.Stalls);
+        writer.WriteString("nextStep", pursue.NextStep);
+        writer.WriteEndObject();
+    }
+
     public static string ActivityName(SessionActivity activity) => activity switch
     {
         SessionActivity.Idle => "idle",
@@ -588,6 +610,8 @@ internal static class CrystalWire
         SessionActivity.Compacting => "compacting",
         SessionActivity.NamingTopic => "naming_topic",
         SessionActivity.WaitingForModel => "waiting_for_model",
+        SessionActivity.CheckingObjective => "checking_objective",
+        SessionActivity.WaitingForTask => "waiting_for_task",
         _ => "unknown"
     };
 
@@ -634,6 +658,7 @@ internal static class CrystalWire
         writer.WriteString("activity", ActivityName(snapshot.Activity));
         Strings(writer, "queue", snapshot.Queue.Select(ImageMarkerText.Display));
         Todos(writer, "todos", snapshot.Todos);
+        Pursue(writer, "pursue", snapshot.Pursue);
         StatusFields(writer, "statusFields", snapshot.StatusFields);
         Usage(writer, "usage", snapshot.Usage);
         Usage(writer, "cumulativeUsage", snapshot.CumulativeUsage);

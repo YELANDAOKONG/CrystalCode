@@ -78,6 +78,20 @@ public static class PromptPlaceholder
 
     public const string Question = "question";
 
+    public const string Objective = "objective";
+
+    public const string ModeName = "mode_name";
+
+    public const string VerdictFormat = "verdict_format";
+
+    public const string Reason = "reason";
+
+    public const string NextStep = "next_step";
+
+    public const string RemainingContinuations = "remaining_continuations";
+
+    public const string Resumed = "resumed";
+
     public static IReadOnlyList<string> All { get; } =
     [
         Env,
@@ -115,6 +129,13 @@ public static class PromptPlaceholder
         SummaryTask,
         OutputTemplate,
         TodosSection,
-        Question
+        Question,
+        Objective,
+        ModeName,
+        VerdictFormat,
+        Reason,
+        NextStep,
+        RemainingContinuations,
+        Resumed
     ];
 }

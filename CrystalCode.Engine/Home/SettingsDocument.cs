@@ -112,6 +112,10 @@ internal sealed class SettingsDocument
 
     public TopicModelDocument? TopicModel { get; set; }
 
+    public PursueModelDocument? PursueModel { get; set; }
+
+    public System.Text.Json.JsonElement? PursueLimits { get; set; }
+
     public RetryDocument? Retry { get; set; }
 
     public RetryDocument? ApprovalRetry { get; set; }

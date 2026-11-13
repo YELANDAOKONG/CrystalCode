@@ -71,6 +71,8 @@ public static class ServerScopes
             SessionVerb.Trim => IsSwitch(argument) ? ServerScope.Admin : ServerScope.Operate,
             SessionVerb.Todos => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Attach => ServerScope.Operate,
+            // Running or stopping the objective is an operator action; model and limit forms write config.json.
+            SessionVerb.Pursue => IsPursueControl(argument) ? ServerScope.Operate : ServerScope.Admin,
             // A bare command or a kind lists; every other form writes config.json.
             // A bare /topic shows; naming the session and configuring naming write state.
             SessionVerb.Topic => argument.Trim().Length == 0 ? ServerScope.Operate : ServerScope.Admin,
@@ -108,6 +110,17 @@ public static class ServerScopes
             // A verb added to the engine must be classified here first.
             _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "The command has no server scope.")
         };
+    }
+
+    private static bool IsPursueControl(string argument)
+    {
+        var word = argument.Trim().Split(' ', 2)[0];
+        return word.Length == 0
+            || word.Equals("status", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("start", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("pause", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("resume", StringComparison.OrdinalIgnoreCase)
+            || word.Equals("clear", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsSwitch(string argument)

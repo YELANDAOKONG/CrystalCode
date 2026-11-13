@@ -41,6 +41,7 @@ public static class SnapshotWriter
         writer.WriteString("activity", WireEvents.ActivityName(snapshot.Activity));
         WireWriter.Strings(writer, "queue", snapshot.Queue.Select(ImageMarkerText.Display));
         WireWriter.Todos(writer, "todos", snapshot.Todos);
+        WireWriter.Pursue(writer, "pursue", snapshot.Pursue);
         writer.WriteStartArray("statusFields");
         foreach (var field in snapshot.StatusFields)
         {

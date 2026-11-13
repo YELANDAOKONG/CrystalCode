@@ -505,6 +505,37 @@ results. Server, Bridge, and `crystal run` keep the original text and do not
 request tokenization; no syntax wire fields or routes are added. See
 [docs/plugins.md](docs/plugins.md#syntax-tokenizers).
 
+## Pursue
+
+`/pursue start <objective>` gives the session an objective and works toward it
+without the operator re-prompting. The session model works as usual. When it
+stops, a separate checker model judges from numbered conversation entries
+whether the objective is met: done, continue, blocked, or wait for a named
+background task. Continue sends the working model on again with an automatic
+continuation message; it grants no new permission, and tool approval, access
+rules, and the approval mode are unchanged. The checker has no tools.
+
+- Nothing starts on its own; no setting turns pursuit on.
+- One `start` or `resume` is one logical turn: one `TurnStarted` and one
+  `TurnFinished`, with the counts of every segment. Checker calls are recorded
+  on the ledger but are not in that result.
+- The objective is paused, blocked, or complete when no run is active. A run
+  never survives a restart: a saved active objective comes back paused.
+  `/clear`, a fork, and a new session drop it. New input while a run works
+  pauses it after the current segment and the input runs as the next turn.
+- `/pursue pause`, `resume`, `clear`, and `status` control it. `model`,
+  `thinking`, `tier`, `speed`, and `context` configure the checker like the
+  topic model (no model means the session model). `limit` sets
+  `pursueLimits`: continuations, stalls, model-calls, tool-calls, duration,
+  and wait. Limits count per run, so a resume starts a new allowance. The
+  defaults are wide.
+- The checker prompts are `pursue.system` (overridable and appendable by prompt
+  attachments), `pursue.user`, and `pursue.continue`. The verdict JSON format is
+  host-owned (`{{verdict_format}}`); a reply off the contract pauses the run.
+- Server and Bridge carry `/pursue` through the shared command path,
+  `PursueChanged`, `PursueChecked`, and the snapshot `pursue` field.
+  `crystal run --pursue` treats the task as the objective.
+
 ## Child Agents
 
 Child Agents are delegated conversations inside a parent session. They are

@@ -324,6 +324,7 @@ public sealed class SessionStore
         CumulativeUsage = source.CumulativeUsage,
         Topic = source.Topic,
         TopicSource = source.TopicSource,
+        Pursue = source.Pursue,
         Children = source.Children.Select(child => child with
         {
             Items = child.Items.ToArray(), Archive = child.Archive.ToArray(),

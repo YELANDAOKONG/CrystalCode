@@ -117,7 +117,9 @@ public sealed record HarnessSettings
         ServerHostSettings? server = null,
         BridgeHostSettings? bridge = null,
         string theme = ThemeCatalog.DefaultName,
-        bool approvalColors = DefaultApprovalColors)
+        bool approvalColors = DefaultApprovalColors,
+        PursueModelSettings? pursueModel = null,
+        PursueLimits? pursueLimits = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -236,6 +238,8 @@ public sealed record HarnessSettings
             SessionDisabledBuiltInTools);
         ResourceModels = resourceModels ?? ResourceModels.Off;
         TopicModel = topicModel ?? TopicModelSettings.Off;
+        PursueModel = pursueModel ?? PursueModelSettings.Default;
+        PursueLimits = pursueLimits ?? PursueLimits.Default;
         Plugins = plugins;
         WorkspaceTrust = workspaceTrust;
         ShowCompactionSummary = showCompactionSummary;
@@ -276,6 +280,7 @@ public sealed record HarnessSettings
         }
 
         RequireTopicModel(catalog, TopicModel);
+        RequirePursueModel(catalog, PursueModel);
     }
 
     public ProviderName Provider { get; }
@@ -536,6 +541,12 @@ public sealed record HarnessSettings
 
     /// <summary>Session topic naming: its switch, model, and tuning.</summary>
     public TopicModelSettings TopicModel { get; }
+
+    /// <summary>The model that judges a pursued objective.</summary>
+    public PursueModelSettings PursueModel { get; }
+
+    /// <summary>Bounds for one pursue run.</summary>
+    public PursueLimits PursueLimits { get; }
 
     public ProviderDefinition ActiveProvider => Catalog.GetModelProvider(Provider, Model);
 
@@ -871,6 +882,30 @@ public sealed record HarnessSettings
             contextWindow ?? selected.ActiveModel.ContextWindows[0]);
     }
 
+    public HarnessSettings WithPursueModel(PursueModelSettings pursueModel)
+    {
+        ArgumentNullException.ThrowIfNull(pursueModel);
+        return Copy(pursueModel: pursueModel);
+    }
+
+    public HarnessSettings WithPursueLimits(PursueLimits pursueLimits)
+    {
+        ArgumentNullException.ThrowIfNull(pursueLimits);
+        return Copy(pursueLimits: pursueLimits);
+    }
+
+    /// <summary>
+    /// Settings the pursue check runs on: this session, or its own model with
+    /// its own tier, speed, and context.
+    /// </summary>
+    public HarnessSettings ForPursue()
+    {
+        var pursue = PursueModel;
+        return pursue.UsesSessionModel
+            ? this
+            : ForModel(new ProviderName(pursue.Provider!), pursue.Model!, pursue.ServiceTier, pursue.Speed, pursue.ContextWindow);
+    }
+
     public HarnessSettings WithTopicModel(TopicModelSettings topicModel)
     {
         ArgumentNullException.ThrowIfNull(topicModel);
@@ -979,7 +1014,9 @@ public sealed record HarnessSettings
         ServerHostSettings? server = null,
         BridgeHostSettings? bridge = null,
         string? theme = null,
-        bool? approvalColors = null) =>
+        bool? approvalColors = null,
+        PursueModelSettings? pursueModel = null,
+        PursueLimits? pursueLimits = null) =>
         new(
             provider ?? Provider,
             model ?? Model,
@@ -1038,7 +1075,9 @@ public sealed record HarnessSettings
             server ?? Server,
             bridge ?? Bridge,
             theme ?? Theme,
-            approvalColors ?? ApprovalColors);
+            approvalColors ?? ApprovalColors,
+            pursueModel ?? PursueModel,
+            pursueLimits ?? PursueLimits);
 
     public override string ToString() => nameof(HarnessSettings);
 
@@ -1192,6 +1231,26 @@ public sealed record HarnessSettings
     /// session model needs no check, and slots without an own model are kept
     /// but never sent.
     /// </summary>
+    private static void RequirePursueModel(ProviderCatalog catalog, PursueModelSettings pursue)
+    {
+        if (pursue.UsesSessionModel)
+        {
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = catalog.GetModel(new ProviderName(pursue.Provider!), pursue.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+
+        RequireSlots(model, pursue.ServiceTier, pursue.Speed, pursue.ContextWindow, "Pursue model");
+    }
+
     private static void RequireTopicModel(ProviderCatalog catalog, TopicModelSettings topic)
     {
         if (topic.UsesSessionModel || !topic.Enabled)

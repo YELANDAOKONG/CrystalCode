@@ -64,6 +64,8 @@ internal static class Extensions
         "_crystal/recalled",
         "_crystal/queue",
         "_crystal/side",
+        "_crystal/pursue",
+        "_crystal/pursueChecked",
         "_crystal/childView",
         "_crystal/report"
     ];

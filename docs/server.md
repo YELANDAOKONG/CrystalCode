@@ -160,7 +160,7 @@ and the `server.state` event.
     quick prompt send, side question control, interaction answers, and the
     slash commands that only report or act inside the session: `/help`,
     `/status`, `/stats`, `/btw`, `/clear`, `/fork`, `/child`, `/sessions`,
-    `/compact` and `/compact full`, `/todos`, `/attach`, `/quick` (alias
+    `/compact` and `/compact full`, `/todos`, `/pursue` with no argument or `status`, `start`, `pause`, `resume`, or `clear`, `/attach`, `/quick` (alias
     `/shortcuts`, including `list` and `send <name>`), `/export`, `/tools`,
     `/plugins`, `/skills`, `/notify`, and `/mcp` without arguments, `/mcp list|show`,
     `/cd` without a path, `/plan`, `/mode`, and plugin or MCP prompt commands.
@@ -171,7 +171,7 @@ and the `server.state` event.
     `/tier`, `/speed`, `/tokens`, `/model`, `/promptset`, `/promptattach`,
     `/statusline`, `/cd <path>`, `/space`, `/trust`, `/rules`, `/access`,
     `/resume`, `/agents`, `/verbose`, `/quit`, and the argument forms of
-    `/compact`, `/todos`, `/tools`, `/skills`, `/plugins`, `/notify`, and `/mcp`).
+    `/compact`, `/todos`, `/tools`, `/skills`, `/plugins`, `/notify`, and `/mcp`, and `/pursue model|thinking|tier|speed|context|limit`, which write `config.json`).
     `/notify test` runs the operator's `operatorNotify` command on the server
     host, so it needs `admin`.
     `ServerScopes.ForVerb` throws for a verb it does not classify, and a test
@@ -304,6 +304,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `ToolCallsIssued`, `ToolResultsReceived` | `tools.called`, `tools.results` |
 | `RetryScheduled`, `UsageChanged`, `ContextEstimated` | `retry.scheduled`, `usage.changed`, `context.estimated` |
 | `QueueChanged`, `TodosChanged` | `queue.changed`, `todos.changed` |
+| `PursueChanged`, `PursueChecked` | `pursue.changed` (`pursue`: null, or `objective`, `status`, `phase`, `reasonCode`, `reason`, `checks`, `continuations`, `stalls`, `nextStep`), `pursue.checked` (`index`, `verdict`, `reason`, `nextStep`, `evidence`, `usage`). `/pursue start` and `resume` run as one turn: one `turn.started` and one `turn.finished`, with stop reasons `pursue_blocked` and `pursue_limit_reached` in addition to the usual ones. Activity values `checking_objective` and `waiting_for_task` appear while the checker runs or a background task is awaited |
 | `HistoryReplayed`, `ConversationCleared` | `conversation.replayed`, `conversation.cleared` |
 | `CompactionStarted`, `CompactionFinished` | `compaction.started` (`id`, `manual`), `compaction.finished` (`id`, `status`: `completed`, `unchanged`, `failed`, or `cancelled`; `summary`, the stored summary of a completed compaction or null; `shown`, whether the operator's summary display setting draws it) |
 | `NoteWritten`, `ErrorWritten` | `note`, `error` |
@@ -355,7 +356,7 @@ replaying history: `state`, `sessionId`, chrome, preferences, slash
 commands, prompt history, `conversation` (messages, readable reasoning, tool
 calls, and tool results), `live` (the in-progress model round: text,
 reasoning, tool-call arguments so far, retries), `turnActive`, activity,
-queue, todos, status fields, usage, context window and estimate, the
+queue, todos, `pursue` (same shape as `pursue.changed`, or null), status fields, usage, context window and estimate, the
 side-question thread, child summaries, the last turn's stop reason and
 counts, `approvals` (each call that passed approval in this conversation,
 with the same fields as `approval.passed`), the pending interactions this

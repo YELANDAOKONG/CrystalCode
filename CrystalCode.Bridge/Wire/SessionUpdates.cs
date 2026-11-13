@@ -75,6 +75,8 @@ internal sealed class SessionUpdates
         typeof(UserMessageRecalled),
         typeof(QueueChanged),
         typeof(SideQuestionSnapshot),
+        typeof(PursueChanged),
+        typeof(PursueChecked),
         typeof(ChildViewRequested)
     ];
 
@@ -264,6 +266,26 @@ internal sealed class SessionUpdates
                     break;
                 case QueueChanged queue:
                     _crystal("_crystal/queue", writer => CrystalWire.Strings(writer, "items", queue.Items.Select(ImageMarkerText.Display)));
+                    break;
+                case PursueChanged pursue:
+                    _crystal("_crystal/pursue", writer => CrystalWire.Pursue(writer, "pursue", pursue.Pursue));
+                    break;
+                case PursueChecked pursueChecked:
+                    _crystal("_crystal/pursueChecked", writer =>
+                    {
+                        writer.WriteNumber("index", pursueChecked.Index);
+                        writer.WriteString("verdict", pursueChecked.Verdict);
+                        writer.WriteString("reason", pursueChecked.Reason);
+                        writer.WriteString("nextStep", pursueChecked.NextStep);
+                        writer.WriteStartArray("evidence");
+                        foreach (var entry in pursueChecked.Evidence)
+                        {
+                            writer.WriteNumberValue(entry);
+                        }
+
+                        writer.WriteEndArray();
+                        CrystalWire.Usage(writer, "usage", pursueChecked.Usage);
+                    });
                     break;
                 case SideQuestionSnapshot side:
                     _crystal("_crystal/side", writer => CrystalWire.Side(writer, "side", side));

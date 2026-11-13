@@ -10,5 +10,7 @@ public enum SessionActivity
     LoadingPlugins,
     Compacting,
     NamingTopic,
-    WaitingForModel
+    WaitingForModel,
+    CheckingObjective,
+    WaitingForTask
 }

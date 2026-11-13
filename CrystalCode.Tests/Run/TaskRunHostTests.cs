@@ -650,6 +650,33 @@ public sealed class TaskRunHostTests
     }
 
     [Fact]
+    public async Task Pursue_RunsTheTaskAsAnObjectiveUntilTheCheckerFindsItMet()
+    {
+        using var fixture = new RunFixture();
+        var client = new ScriptedRunClient(
+            AllowReview,
+            TextRound("Part one."),
+            TextRound("""{"verdict":"continue","reason":"More to do.","nextStep":"Finish it."}"""),
+            TextRound("Part two."),
+            TextRound("""{"verdict":"done","reason":"Met.","evidence":[4]}"""));
+        var plain = fixture.Settings("Do the thing");
+        var settings = new TaskRunSettings
+        {
+            TaskText = plain.TaskText, Home = plain.Home, Workspace = plain.Workspace, Provider = plain.Provider,
+            Model = plain.Model, Skills = "off", ExternalTools = "off", Duration = "60", Pursue = true, Format = "json"
+        };
+
+        var result = await fixture.RunAsync(client, settings);
+
+        Assert.True(result.Code == RunExit.Completed, result.Output + result.Error);
+        var events = ReadEvents(result.Output);
+        Assert.Equal(2, events.Count(item => item.GetProperty("type").GetString() == "pursue_check"));
+        Assert.Contains(events, item => item.GetProperty("type").GetString() == "pursue"
+            && item.GetProperty("status").GetString() == "complete");
+        Assert.Equal(1, events.Count(item => item.GetProperty("type").GetString() == "step_start"));
+    }
+
+    [Fact]
     public async Task SlashCommand_DoesNotChangeSettings()
     {
         using var fixture = new RunFixture();

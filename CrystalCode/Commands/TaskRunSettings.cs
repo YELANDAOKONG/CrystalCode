@@ -23,6 +23,9 @@ public sealed class TaskRunSettings : SessionLaunchSettings
     [CommandOption("--show-thinking")]
     public bool ShowThinking { get; init; }
 
+    [CommandOption("--pursue")]
+    public bool Pursue { get; init; }
+
     [CommandOption("--format <default|json>")]
     public string? Format { get; init; }
 }

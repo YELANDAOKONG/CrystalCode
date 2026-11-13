@@ -15,6 +15,10 @@ public sealed record TurnStopReason
 
     public static TurnStopReason DurationLimitReached { get; } = new("duration_limit_reached");
 
+    public static TurnStopReason PursueBlocked { get; } = new("pursue_blocked");
+
+    public static TurnStopReason PursueLimitReached { get; } = new("pursue_limit_reached");
+
     public static TurnStopReason ContextOverflow { get; } = new("context_overflow");
 
     public static TurnStopReason OutputTruncated { get; } = new("output_truncated");

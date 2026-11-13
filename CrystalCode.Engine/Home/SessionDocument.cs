@@ -66,4 +66,7 @@ public sealed class SessionDocument
     /// when <c>/topic</c> set it. An operator topic is never replaced automatically.
     /// </summary>
     public string? TopicSource { get; set; }
+
+    /// <summary>The pursued objective and why it is not running. Null means none.</summary>
+    public PursueDocument? Pursue { get; set; }
 }

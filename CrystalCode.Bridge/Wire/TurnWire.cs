@@ -24,9 +24,9 @@ internal static class TurnWire
         ArgumentNullException.ThrowIfNull(reason);
         return reason.Value switch
         {
-            "completed" => EndTurn,
+            "completed" or "pursue_blocked" => EndTurn,
             "output_truncated" => "max_tokens",
-            "model_call_limit_reached" or "tool_call_limit_reached" or "duration_limit_reached" => "max_turn_requests",
+            "model_call_limit_reached" or "tool_call_limit_reached" or "duration_limit_reached" or "pursue_limit_reached" => "max_turn_requests",
             "content_filtered" => "refusal",
             "interrupted" => Cancelled,
             _ => null
