@@ -92,6 +92,18 @@ public sealed record SessionLaunchOptions
 
     public string? PursueContext { get; init; }
 
+    public string? PursueCompactionProvider { get; init; }
+
+    public string? PursueCompactionModelId { get; init; }
+
+    public string? PursueCompactionThinking { get; init; }
+
+    public string? PursueCompactionTier { get; init; }
+
+    public string? PursueCompactionSpeed { get; init; }
+
+    public string? PursueCompactionContext { get; init; }
+
     /// <summary>Each entry is <c>name=number</c> or <c>name=unlimited</c>.</summary>
     public IReadOnlyList<string> PursueLimit { get; init; } = [];
 

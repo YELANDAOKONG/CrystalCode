@@ -47,6 +47,30 @@ public sealed class SessionLaunchOverridesTests
     }
 
     [Fact]
+    public void PursueCompactionOverrides_ApplyInMemoryAndRequirePairedModel()
+    {
+        var current = HarnessSettings.CreateDefault();
+
+        Assert.False(SessionLaunchOverrides.TryApply(
+            current,
+            new SessionLaunchOptions { PursueCompactionProvider = "openai" },
+            out _,
+            out _,
+            out var pairError));
+        Assert.Contains("together", pairError, StringComparison.Ordinal);
+
+        Assert.False(SessionLaunchOverrides.TryApply(
+            current,
+            new SessionLaunchOptions { PursueCompactionSpeed = "fast" },
+            out _,
+            out _,
+            out var tuneError));
+        Assert.Contains("before tuning", tuneError, StringComparison.Ordinal);
+
+        Assert.False(current.PursueModel.Compaction.HasSelection);
+    }
+
+    [Fact]
     public void AgentLimitOverrides_ApplyOnlyInMemoryAndKeepOtherFields()
     {
         var current = HarnessSettings.CreateDefault().WithAgents(

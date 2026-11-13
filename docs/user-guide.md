@@ -200,7 +200,7 @@ CLI options:
 | `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
 | `--compaction-context <budget>` | Summarizer context budget for this process. Must be declared by that model. Does not write the file |
 | `--topic <on\|off>` | Topic naming for this process |
-| `--pursue-provider`, `--pursue-model-id`, `--pursue-thinking`, `--pursue-tier`, `--pursue-speed`, `--pursue-context`, `--pursue-limit <name=value>` | Pursue checker model and limits for this process; pass provider and model id together. Not written to `config.json` |
+| `--pursue-provider`, `--pursue-model-id`, `--pursue-thinking`, `--pursue-tier`, `--pursue-speed`, `--pursue-context`, `--pursue-compaction-provider`, `--pursue-compaction-model-id`, `--pursue-compaction-thinking`, `--pursue-compaction-tier`, `--pursue-compaction-speed`, `--pursue-compaction-context`, `--pursue-limit <name=value>` | Pursue checker model, its compaction model, and limits for this process; pass each provider and model id together. Not written to `config.json` |
 | `--topic-provider`, `--topic-model-id` | Topic model for this process; pass both. Without them the saved choice or the session model applies |
 | `--topic-thinking`, `--topic-tier`, `--topic-speed`, `--topic-context` | Topic model gear and own slots for this process. Does not write the file |
 | `--image-model <on\|off>`, `--audio-model <on\|off>`, `--video-model <on\|off>` | Use the saved resource description model, or turn it off for this process |
@@ -382,7 +382,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--compaction-tier <token>`, `--compaction-speed <token>` | Summarizer service tier and speed for this process. Must be listed by that model. Does not write the file |
 | `--compaction-context <budget>` | Summarizer context budget for this process. Must be declared by that model. Does not write the file |
 | `--topic <on\|off>` | Topic naming for this process |
-| `--pursue-provider`, `--pursue-model-id`, `--pursue-thinking`, `--pursue-tier`, `--pursue-speed`, `--pursue-context`, `--pursue-limit <name=value>` | Pursue checker model and limits for this process; pass provider and model id together. Not written to `config.json` |
+| `--pursue-provider`, `--pursue-model-id`, `--pursue-thinking`, `--pursue-tier`, `--pursue-speed`, `--pursue-context`, `--pursue-compaction-provider`, `--pursue-compaction-model-id`, `--pursue-compaction-thinking`, `--pursue-compaction-tier`, `--pursue-compaction-speed`, `--pursue-compaction-context`, `--pursue-limit <name=value>` | Pursue checker model, its compaction model, and limits for this process; pass each provider and model id together. Not written to `config.json` |
 | `--topic-provider`, `--topic-model-id` | Topic model for this process; pass both. Without them the saved choice or the session model applies |
 | `--topic-thinking`, `--topic-tier`, `--topic-speed`, `--topic-context` | Topic model gear and own slots for this process. Does not write the file |
 | `--image-model <on\|off>`, `--audio-model <on\|off>`, `--video-model <on\|off>` | Use the saved resource description model, or turn it off for this process |

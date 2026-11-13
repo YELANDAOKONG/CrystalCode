@@ -137,6 +137,24 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--pursue-context <BUDGET>")]
     public string? PursueContext { get; init; }
 
+    [CommandOption("--pursue-compaction-provider <PROVIDER>")]
+    public string? PursueCompactionProvider { get; init; }
+
+    [CommandOption("--pursue-compaction-model-id <MODEL>")]
+    public string? PursueCompactionModelId { get; init; }
+
+    [CommandOption("--pursue-compaction-thinking <EFFORT>")]
+    public string? PursueCompactionThinking { get; init; }
+
+    [CommandOption("--pursue-compaction-tier <TOKEN>")]
+    public string? PursueCompactionTier { get; init; }
+
+    [CommandOption("--pursue-compaction-speed <TOKEN>")]
+    public string? PursueCompactionSpeed { get; init; }
+
+    [CommandOption("--pursue-compaction-context <BUDGET>")]
+    public string? PursueCompactionContext { get; init; }
+
     [CommandOption("--pursue-limit <NAME=VALUE>")]
     public string[] PursueLimit { get; init; } = [];
 
@@ -326,6 +344,12 @@ public class SessionLaunchSettings : CommandSettings
             PursueTier = PursueTier,
             PursueSpeed = PursueSpeed,
             PursueContext = PursueContext,
+            PursueCompactionProvider = PursueCompactionProvider,
+            PursueCompactionModelId = PursueCompactionModelId,
+            PursueCompactionThinking = PursueCompactionThinking,
+            PursueCompactionTier = PursueCompactionTier,
+            PursueCompactionSpeed = PursueCompactionSpeed,
+            PursueCompactionContext = PursueCompactionContext,
             PursueLimit = PursueLimit,
             ImageModel = ImageModel,
             ImageProvider = ImageProvider,

@@ -98,6 +98,7 @@ public static class SessionLaunchOverrides
 
             next = next.WithTopicModel(ParseTopicModel(next.TopicModel, request));
             next = next.WithPursueModel(ParsePursueModel(next.PursueModel, request));
+            next = next.WithPursueModel(next.PursueModel.WithCompaction(ParsePursueCompaction(next.PursueModel.Compaction, request)));
             next = next.WithPursueLimits(ParsePursueLimits(next.PursueLimits, request));
 
             foreach (var flags in ResourceFlags.For(request))
@@ -606,6 +607,55 @@ public static class SessionLaunchOverrides
         if (request.PursueContext is not null)
         {
             next = next.WithContextWindow(Budget(request.PursueContext, "Pursue context budget"));
+        }
+
+        return next;
+    }
+
+    private static CompactionModelSettings ParsePursueCompaction(CompactionModelSettings stored, SessionLaunchOptions request)
+    {
+        var next = stored;
+        if (request.PursueCompactionProvider is not null || request.PursueCompactionModelId is not null)
+        {
+            if (request.PursueCompactionProvider is null || request.PursueCompactionModelId is null)
+            {
+                throw new ArgumentException("Pass --pursue-compaction-provider and --pursue-compaction-model-id together.");
+            }
+
+            // A new model starts without the previous model's gear and slots.
+            next = new CompactionModelSettings(
+                true,
+                ProviderName.Parse(Required(request.PursueCompactionProvider, "Pursue compaction provider")).Value,
+                Required(request.PursueCompactionModelId, "Pursue compaction model"));
+        }
+
+        var tuned = request.PursueCompactionThinking is not null
+            || request.PursueCompactionTier is not null
+            || request.PursueCompactionSpeed is not null
+            || request.PursueCompactionContext is not null;
+        if (tuned && !next.HasSelection)
+        {
+            throw new ArgumentException("Pass --pursue-compaction-provider and --pursue-compaction-model-id before tuning the pursue compaction model.");
+        }
+
+        if (request.PursueCompactionThinking is not null)
+        {
+            next = next.WithThinkingEffort(ThinkingSelection.Parse(Required(request.PursueCompactionThinking, "Pursue compaction thinking")));
+        }
+
+        if (request.PursueCompactionTier is not null)
+        {
+            next = next.WithServiceTier(Token(request.PursueCompactionTier, "Pursue compaction service tier"));
+        }
+
+        if (request.PursueCompactionSpeed is not null)
+        {
+            next = next.WithSpeed(Token(request.PursueCompactionSpeed, "Pursue compaction speed"));
+        }
+
+        if (request.PursueCompactionContext is not null)
+        {
+            next = next.WithContextWindow(Budget(request.PursueCompactionContext, "Pursue compaction context budget"));
         }
 
         return next;
