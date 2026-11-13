@@ -20,6 +20,18 @@ that is tracked here until it is fixed. It is not a scope change and has no
 priority. A fix is not decided by being listed. Remove the entry in the change
 that fixes it.
 
+Plugin-provided syntax highlighting is available for assistant Markdown
+fences through plugin-owned language aliases and bounded tokenizer calls.
+The product ships no language tokenizer; test samples exercise the contract.
+Terminal scheduling follows changed visible assistant entries with bounded
+pending work; cache completion repaints never schedule misses. There is no
+stable fence identity or per-block streaming coalescing, so queue pressure
+can leave fences in ordinary code colors until revisited.
+See [BUSINESS.md](BUSINESS.md#plugin-syntax-highlighting) for the current
+capability and [docs/plugins.md](docs/plugins.md#syntax-tokenizers) for its
+contract. Server, Bridge, and `crystal run` retain original text without
+tokenization.
+
 ## Issues
 
 - In some cases with some providers, streamed thinking text segments appear
@@ -104,6 +116,10 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   execution mode is not the deferred host setting for serial or concurrent
   ordinary tool batches. Pending hook methods and plugin dependencies stay
   undecided.
+- A unified LSP plugin contract. CrystalCode does not provide built-in language
+  service capabilities; external plugins must provide them. The contribution
+  shape and host integration are not defined. Do not reserve a public type,
+  command, configuration field, or package for it.
 - Plugin full-screen pages, like the `/stats` page. `IPluginOutput` would
   gain a `ShowPage(PluginDocument)` beside `WriteDocument`, using the same
   document model, with the terminal's existing full-page overlay (scroll,
@@ -117,18 +133,6 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   plugin never touches the renderer, and an answer for Server and Bridge,
   which have no keyboard. It conflicts the most with the engine boundary, so
   it is undecided, not planned.
-- Plugin-provided syntax highlighting. Code blocks in the terminal are drawn
-  in two colors (`code` on `codeBg`) with no token colors. Highlighting should
-  be a plugin capability, not built into the terminal: a plugin would offer a
-  tokenizer for a language and the terminal would color the tokens it returns.
-  Open points: the contribution shape and where it sits among the existing
-  plugin capabilities; how a language is matched (fence info string, file
-  extension, or both); the token kinds and the theme names that color them,
-  including `fallback256`; a time and size bound so a slow tokenizer cannot
-  stall painting; and what Server and Bridge receive, since they have no
-  terminal colors. No built-in highlighter is added and no package is added
-  for one. Do not reserve a public type, theme color name, or configuration
-  field.
 - A native .NET desktop front end, not a web page. It would reference
   `CrystalCode.Engine` like the terminal, `crystal server`, and `crystal
   bridge` do, and supply its own surface. The UI toolkit, which platforms it

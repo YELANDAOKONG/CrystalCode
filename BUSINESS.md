@@ -456,6 +456,43 @@ separate library with no terminal code. The product can:
   the session. Approval, trust, the workspace fence, and
   `ToolInvocationPolicy` still apply to its tool calls;
 
+## Plugin syntax highlighting
+
+Plugins may provide tokenizers for assistant Markdown fences in the terminal.
+The first word of the fence info string selects a plugin-owned language alias,
+compared without case. There is no filename detection. User messages,
+thinking, tool output, inline code, and approval previews do not use tokenizers.
+Existing diff rendering takes precedence over token colors. No language
+tokenizer ships with the product; tokenizer implementations in this repository
+are test samples only. This version adds no project or package.
+
+The eight token kinds are Keyword, String, Number, Comment, Type, Function,
+Operator, and Punctuation. Themes color them through `syntax.*` names in
+`default`, `dark`, `light`, and custom palettes, including `fallback256`.
+Unmatched or unavailable fences retain `code` on `codeBg`.
+
+The engine runs plugin entry and result validation off the calling thread,
+accepts at most 65,536 UTF-16 code units and 16,384 tokens per request, and
+waits at most 200 ms. Ranges must be in bounds, positive in length, ordered,
+non-overlapping, and must not split a surrogate pair. A timeout, exception,
+or invalid result disables that tokenizer until plugin reload. Two actual
+invocations may run at once per session, shared across catalog generations.
+A timeout stops waiting; it cannot kill plugin code or free its running slot.
+Diagnostics contain host-authored reasons rather than plugin exception text
+or code text. These bounds are not a security sandbox.
+
+The terminal keeps a theme-independent cache bounded to 128 entries and
+8 MiB, a queue of 32 requests, two workers, and a 150 ms scheduling delay.
+Changed content, viewport, or width schedules assistant entries intersecting
+the viewport; completion repaints only read the cache. Identical requests
+share work, and a full queue drops its oldest pending request. Prefix-related
+bodies remain independent because fences have no stable identity. Large
+entries or busy streams may retain ordinary code colors until revisited.
+Replacing the service clears the cache and drops late
+results. Server, Bridge, and `crystal run` keep the original text and do not
+request tokenization; no syntax wire fields or routes are added. See
+[docs/plugins.md](docs/plugins.md#syntax-tokenizers).
+
 ## Child Agents
 
 Child Agents are delegated conversations inside a parent session. They are
@@ -692,18 +729,13 @@ implemented in the current build.
 - more plugin capabilities beyond tools, built-in replacement, protocol
   clients, classifiers, slash commands, process commands, hooks, raw hooks,
   prompt placeholders, status fields, catalog snapshots, model facts, model
-  clients, and data directories. An example is custom tool execution modes. The set is not closed. Behavior and ownership are not
+  clients, syntax tokenizers, and data directories. An example is custom tool execution modes. The set is not closed. Behavior and ownership are not
   defined. Do not reserve a command, flag, configuration field, or public
   type;
-- plugin-provided syntax highlighting. Code blocks in the terminal are drawn
-  in two colors with no token colors. Highlighting is to be a plugin
-  capability, not built into the terminal: a plugin offers a tokenizer for a
-  language and the terminal colors the tokens it returns. The contribution
-  shape, how a language is matched, the token kinds and the theme names that
-  color them, a time and size bound on the tokenizer, and what `crystal server`
-  and `crystal bridge` receive are not defined. Do not add a built-in
-  highlighter or a package for one, and do not reserve a public type, theme
-  color name, or configuration field;
+- a unified LSP plugin contract. CrystalCode does not provide built-in language
+  service capabilities; external plugins must provide them. The contribution
+  shape and host integration are not defined. Do not reserve a public type,
+  command, configuration field, or package for it;
 - a native .NET desktop front end, not a web page. It would reference
   `CrystalCode.Engine` and supply its own surface, as the terminal, `crystal
   server`, and `crystal bridge` do. The toolkit, target platforms, launch,

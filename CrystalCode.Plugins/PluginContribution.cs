@@ -12,6 +12,7 @@ using CrystalCode.Plugins.Placeholders;
 using CrystalCode.Plugins.Placeholders.Interfaces;
 using CrystalCode.Plugins.Status;
 using CrystalCode.Plugins.Status.Interfaces;
+using CrystalCode.Plugins.Syntax;
 using CrystalCode.Plugins.Tools;
 using CrystalCode.Plugins.Tools.Interfaces;
 
@@ -68,6 +69,14 @@ public sealed record PluginContribution
     /// <see cref="StatusFields"/>, the original constructor leaves this empty.
     /// </summary>
     public IReadOnlyList<IPluginCliCommand> CliCommands { get; init; } = [];
+
+    public IReadOnlyList<IPluginTokenizer> Tokenizers { get; init; } = [];
+
+    public PluginContribution WithTokenizers(IEnumerable<IPluginTokenizer> tokenizers)
+    {
+        ArgumentNullException.ThrowIfNull(tokenizers);
+        return this with { Tokenizers = tokenizers.ToArray() };
+    }
 
     public PluginContribution WithCliCommands(IEnumerable<IPluginCliCommand> cliCommands)
     {

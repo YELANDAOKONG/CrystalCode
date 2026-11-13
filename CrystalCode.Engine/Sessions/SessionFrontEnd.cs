@@ -2,6 +2,7 @@ using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Mcp;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.Interfaces;
@@ -20,6 +21,9 @@ public sealed record SessionFrontEnd(
     ISessionChooser Sessions,
     IWorkspaceTrustPrompt Trust)
 {
+    /// <summary>Receives the current syntax service after plugin startup or replacement.</summary>
+    public Action<SyntaxService>? SyntaxReady { get; init; }
+
     public Func<IReadOnlyList<CrystalCode.Engine.Home.ChildSessionDocument>, CancellationToken, Task<string?>>?
         ChooseChildAsync { get; init; }
 

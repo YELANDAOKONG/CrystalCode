@@ -131,8 +131,8 @@ CrystalCode.Engine.Tests.
 ### CrystalCode.Plugins
 
 The contract a disk plugin references. It defines `IPlugin`, contribution
-lists, the hook and raw hook interfaces, the hook context types, the model
-and environment views, and `IPluginDataDirectory` for an extension's runtime
+lists, the hook and raw hook interfaces, the hook context types, syntax
+tokenizer contracts, the model and environment views, and `IPluginDataDirectory` for an extension's runtime
 data directories. It references only Crystal and
 Crystal.Tools. It does not reference the engine, the display, the
 executable, or a terminal library. There is no paired test project;
@@ -238,6 +238,11 @@ high-level components participate in resize, scrollback, and repaint like
 text. Non-interactive output renders the same widget directly. The shell
 progress region owns transient indeterminate progress and elapsed time;
 static command reports remain committed transcript widgets.
+
+Plugin syntax paint uses Display-owned `SyntaxSpan` values and a cache lookup
+callback on `MarkdownRenderer` and `TranscriptLog`. Display never references
+plugin or engine contracts. The terminal host adapts validated engine tokens
+and owns asynchronous scheduling, cache lifetime, and repaint requests.
 
 ### CrystalCode.Display.Tests
 
@@ -2414,6 +2419,8 @@ A front end supplies (`SessionFrontEnd`):
   A front end that cannot ask returns false.
 - Optionally `ChooseChildAsync` for `/child` and `McpServers`, the MCP
   servers it passes in for this session only.
+- Optionally `SyntaxReady` (`Action<SyntaxService>`) receives the controlled
+  syntax service after plugin attachment. See [Plugin syntax highlighting](#plugin-syntax-highlighting).
 
 `CodingSession` wraps `Approvals` and `Questions` once, at construction, in
 `NotifyingApprovalPrompt` and `NotifyingUserPrompt`. Every engine path that
@@ -3097,6 +3104,66 @@ that contains Backspace or Delete. Escape sequences that are not a
 bracketed-paste wrap are not treated as paste. The host does not parse VT. The frame polls terminal
 size and repaints when the window is resized. Redirected output stays
 sequential.
+
+### Plugin syntax highlighting
+
+`CrystalCode.Plugins.Syntax` owns `IPluginTokenizer`, `PluginSyntaxToken`,
+and the eight `PluginSyntaxKind` values: Keyword, String, Number, Comment,
+Type, Function, Operator, and Punctuation. `PluginContribution.WithTokenizers`
+adds tokenizers without changing the original constructor. `PluginCatalog`
+admits aliases in plugin load order; the first registration wins each alias,
+compared without case. There is no built-in language tokenizer or tokenizer
+package. Implementations in tests are samples only.
+
+`CrystalCode.Engine.Plugins.SyntaxService` owns invocation and validation.
+`Supports` and `TokenizeAsync` expose engine values, never plugin objects.
+Plugin entry and collection access run on a worker. Input is bounded to
+65,536 UTF-16 code units and output to 16,384 tokens; token ranges have positive
+length, stay in bounds, are ordered without overlap, and cannot split a
+surrogate pair. The engine copies validated tokens into immutable engine
+`SyntaxToken` values with lowercase kind names. The 200 ms wait includes
+plugin entry and validation. Timeout, error, and invalid output disable the
+tokenizer instance, including its other aliases, until plugin reload. A
+host-authored diagnostic identifies the plugin directory without printing
+exception text or source text.
+
+`CodingSession` keeps one two-slot semaphore across syntax service generations.
+A slot is released only when plugin work actually exits, including after a
+timeout; a reload cannot accumulate more running calls. Saturation or an
+oversize input returns no tokens. Retirement cancels waiting and drops late
+results. Cancellation is cooperative and in-process code cannot be killed;
+these bounds are not a security sandbox. `SessionFrontEnd.SyntaxReady` is an
+optional service callback after plugins are attached, not an event. A plugin
+reload replaces and retires the service, and session close retires it. No
+plugin object enters `SessionEvent`, and no syntax event, wire field, or route
+is added. Server, Bridge, and `crystal run` omit the callback and never request
+tokenization; their assistant text remains unchanged.
+
+The terminal host owns a theme-independent token cache bounded to 128 entries
+and 8 MiB, a queue of 32 requests, two workers, and a 150 ms scheduling delay.
+`TranscriptLog.SyntaxTokens` only reads cached spans. `SyntaxRequested` queues
+fences in assistant entries intersecting a changed content/viewport/width;
+completion invalidation preserves that scheduling snapshot, so rebuilding
+evicted history cannot reschedule it. Identical requests share work; queue
+overflow drops the oldest pending request. Prefix bodies are independent,
+with no stable fence identity or per-block streaming coalescing. Scheduling
+is entry-granular: a visible part of a large assistant entry requests its
+fences, and some may keep ordinary colors until revisited under queue or cache
+pressure. Neither callback invokes a tokenizer. Null or empty completions
+do not request repaint. Service replacement clears cached and queued
+work and rejects late completions. The host maps engine tokens to Display
+`SyntaxSpan` values. Display uses only the first whitespace-delimited word of
+an assistant Markdown fence's info string as a lowercase alias, with no
+filename detection. Existing diff semantics override token colors, including
+added, removed, and hunk lines. User, thinking, tool, result, and approval
+content do not request syntax tokens.
+
+Display themes own `syntax.keyword`, `syntax.string`, `syntax.number`,
+`syntax.comment`, `syntax.type`, `syntax.function`, `syntax.operator`, and
+`syntax.punctuation`. All three built-in palettes define them; a custom
+palette overlays the default values and may override them in `fallback256`.
+Uncovered text uses `code` on `codeBg`, and unknown or unavailable tokenization
+keeps that fallback. Theme changes repaint tokens without tokenizing again.
 
 ## Plugins
 

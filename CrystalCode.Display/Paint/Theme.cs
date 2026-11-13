@@ -49,6 +49,14 @@ public static class Theme
             ["heading"] = "bold lightsteelblue",
             ["code"] = "grey74",
             ["codeBg"] = "grey23",
+            ["syntax.keyword"] = "lightsteelblue",
+            ["syntax.string"] = "darkseagreen",
+            ["syntax.number"] = "tan",
+            ["syntax.comment"] = "grey70",
+            ["syntax.type"] = "paleturquoise1",
+            ["syntax.function"] = "wheat1",
+            ["syntax.operator"] = "grey84",
+            ["syntax.punctuation"] = "grey74",
             ["diffAdded"] = "darkseagreen",
             ["diffRemoved"] = "indianred",
             ["diffAddedBg"] = "#1f3a2a",
@@ -85,6 +93,14 @@ public static class Theme
             ["heading"] = "bold #4a6a94",
             ["code"] = "#374151",
             ["codeBg"] = "#eceef1",
+            ["syntax.keyword"] = "#355880",
+            ["syntax.string"] = "#356443",
+            ["syntax.number"] = "#805323",
+            ["syntax.comment"] = "#59616d",
+            ["syntax.type"] = "#23646b",
+            ["syntax.function"] = "#704b83",
+            ["syntax.operator"] = "#374151",
+            ["syntax.punctuation"] = "#4b5563",
             ["diffAdded"] = "#4d7c5f",
             ["diffRemoved"] = "#b4534f",
             ["diffAddedBg"] = "#e3f0e7",
@@ -200,6 +216,27 @@ public static class Theme
     public static string Code => Get("code");
 
     public static string CodeBg => Get("codeBg");
+
+    public static string SyntaxKeyword => Get("syntax.keyword");
+
+    public static string SyntaxString => Get("syntax.string");
+
+    public static string SyntaxNumber => Get("syntax.number");
+
+    public static string SyntaxComment => Get("syntax.comment");
+
+    public static string SyntaxType => Get("syntax.type");
+
+    public static string SyntaxFunction => Get("syntax.function");
+
+    public static string SyntaxOperator => Get("syntax.operator");
+
+    public static string SyntaxPunctuation => Get("syntax.punctuation");
+
+    internal static bool IsSyntaxKind(string? kind) => kind is
+        "keyword" or "string" or "number" or "comment" or "type" or "function" or "operator" or "punctuation";
+
+    public static string ForSyntax(string kind) => IsSyntaxKind(kind) ? Get("syntax." + kind) : Code;
 
     public static string DiffAdded => Get("diffAdded");
 

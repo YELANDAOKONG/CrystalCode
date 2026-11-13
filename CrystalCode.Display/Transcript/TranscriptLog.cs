@@ -23,6 +23,7 @@ public sealed class TranscriptLog
     private TerminalText.StreamState _streamState;
 
     private int _cachedWidth;
+    private (int Width, int Rows, int Scroll, int Entries, int LiveLength)? _syntaxViewport;
     private readonly List<PaintLine> _committedLines = [];
 
     // Row counts parallel to _entries at the cached width. A zero count is a
@@ -320,6 +321,7 @@ public sealed class TranscriptLog
 
     public void Clear()
     {
+        _syntaxViewport = null;
         _entries.Clear();
         _committedLines.Clear();
         _entryRows.Clear();
@@ -331,7 +333,21 @@ public sealed class TranscriptLog
         ClearOtherLive();
     }
 
-    public void InvalidateCache() => _cachedWidth = 0;
+    /// <summary>Reads host-cached tokens only; the callback must never tokenize or wait for work.</summary>
+    public Func<string, string, IReadOnlyList<SyntaxSpan>?>? SyntaxTokens { get; set; }
+
+    /// <summary>Queues optional work for assistant entries intersecting a changed viewport. Must return immediately.</summary>
+    public Action<string, string>? SyntaxRequested { get; set; }
+
+    public void InvalidateCache(bool requestSyntax = true)
+    {
+        _cachedWidth = 0;
+        ClearOtherLive();
+        if (requestSyntax)
+        {
+            _syntaxViewport = null;
+        }
+    }
 
     public IReadOnlyList<PaintLine> Viewport(int width, int rows, int scrollBack)
     {
@@ -342,6 +358,7 @@ public sealed class TranscriptLog
         var back = Math.Clamp(scrollBack, 0, maxScroll);
         var take = Math.Min(rows, total);
         var start = Math.Max(0, total - take - back);
+        RequestVisibleSyntax(width, rows, back, start, total);
         var visible = new List<PaintLine>(Math.Max(rows, 0));
         var pad = rows - Math.Min(rows, total - start);
         for (var i = 0; i < pad; i++)
@@ -572,6 +589,43 @@ public sealed class TranscriptLog
         }
     }
 
+    private void RequestVisibleSyntax(int width, int rows, int back, int start, int total)
+    {
+        var viewport = (width, rows, back, _entries.Count, _live.Length);
+        if (SyntaxRequested is null || _syntaxViewport == viewport)
+        {
+            return;
+        }
+
+        _syntaxViewport = viewport;
+        var offset = 0;
+        for (var index = 0; index < _entries.Count; index++)
+        {
+            var end = offset + _entryRows[index];
+            if (end > start && offset < start + rows && _entries[index].Kind == TranscriptKind.Assistant)
+            {
+                RequestEntrySyntax(_entries[index].Text, width);
+            }
+
+            offset = end;
+        }
+
+        if (_liveKind == TranscriptKind.Assistant && total > offset && offset < start + rows)
+        {
+            RequestEntrySyntax(_live.ToString(), width);
+        }
+    }
+
+    private void RequestEntrySyntax(string text, int width)
+    {
+        // Reuse fence parsing so scheduling and painting select exactly the same aliases and bodies.
+        _ = MarkdownRenderer.Render(text, width, (language, code) =>
+        {
+            SyntaxRequested!(language, code);
+            return null;
+        });
+    }
+
     private IReadOnlyList<PaintLine> RenderEntry(
         TranscriptEntry entry,
         int width)
@@ -603,7 +657,7 @@ public sealed class TranscriptLog
 
         if (entry.Kind == TranscriptKind.Assistant)
         {
-            lines.AddRange(MarkdownRenderer.Render(entry.Text, width));
+            lines.AddRange(MarkdownRenderer.Render(entry.Text, width, SyntaxTokens));
             return lines;
         }
 

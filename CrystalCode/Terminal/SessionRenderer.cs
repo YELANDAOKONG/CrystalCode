@@ -34,6 +34,40 @@ public sealed class SessionRenderer : IDisposable
     private static readonly TimeSpan PaintBudget = TimeSpan.FromMilliseconds(33);
     private readonly object _gate = new();
     private readonly TranscriptLog _log = new();
+    private TerminalSyntaxCache? _syntaxCache;
+    private long _syntaxGeneration;
+
+    internal void BindSyntax(TerminalSyntaxCache cache)
+    {
+        lock (_gate)
+        {
+            _syntaxCache = cache;
+            _log.SyntaxTokens = cache.LookupTokens;
+            _log.SyntaxRequested = (language, text) => cache.GetTokens(language, text);
+            _log.InvalidateCache();
+        }
+    }
+
+    internal bool RefreshSyntax()
+    {
+        lock (_gate)
+        {
+            return RefreshSyntaxUnlocked();
+        }
+    }
+
+    private bool RefreshSyntaxUnlocked()
+    {
+        if (_syntaxCache?.ConsumeRefresh() != true)
+        {
+            return false;
+        }
+
+        var generation = _syntaxCache.Generation;
+        _log.InvalidateCache(requestSyntax: generation != _syntaxGeneration);
+        _syntaxGeneration = generation;
+        return true;
+    }
     private readonly ComposerBuffer _composer = new();
     private readonly ShellChrome _chrome = new();
     private readonly List<string> _modalOverlay = [];
@@ -2359,6 +2393,7 @@ public sealed class SessionRenderer : IDisposable
 
     private void PaintUnlocked(bool force)
     {
+        force |= RefreshSyntaxUnlocked();
         if (!Framed)
         {
             return;
@@ -3084,7 +3119,7 @@ public sealed class SessionRenderer : IDisposable
                 tooSmall = haveSize && BelowUsableSize(pollWidth, pollHeight);
                 var sizeChanged = pollWidth != _paintedWidth || pollHeight != _paintedHeight;
                 var now = DateTimeOffset.UtcNow;
-                var pluginStatusDirty = _pluginStatusDirty;
+                var pluginStatusDirty = _pluginStatusDirty | RefreshSyntaxUnlocked();
                 _pluginStatusDirty = false;
                 var startupDue = _startupPage && now - _startupSpinnerAt >= ProgressSpinner.Interval;
                 if (sizeChanged || startupDue || _chrome.SpinnerDue(now) || SideSpinnerDue(now))

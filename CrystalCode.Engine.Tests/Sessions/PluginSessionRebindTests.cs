@@ -25,6 +25,30 @@ public sealed class PluginSessionRebindTests
     private static readonly Lazy<string> RecorderPublish = new(PublishRecorder);
 
     [Fact]
+    public async Task SyntaxReady_StartReloadOffAndCloseReplaceAndRetireServices()
+    {
+        var services = new List<SyntaxService>();
+        using var opened = Open(syntaxReady: services.Add);
+        Assert.Empty(services);
+        await opened.Session.StartAsync(CancellationToken.None);
+        Assert.Single(services);
+        Assert.True(services[0].Supports("cs"));
+        Assert.Single(ReadLog(opened.Workspace));
+        await opened.Session.SubmitAsync("/plugins reload", CancellationToken.None);
+        Assert.Equal(2, services.Count);
+        Assert.NotSame(services[0], services[1]);
+        Assert.False(services[0].Supports("cs"));
+        Assert.True(services[1].Supports("cs"));
+        Assert.Null(await services[0].TokenizeAsync("cs", "var", CancellationToken.None));
+        await opened.Session.SubmitAsync("/plugins off", CancellationToken.None);
+        Assert.Equal(3, services.Count);
+        Assert.False(services[1].Supports("cs"));
+        Assert.False(services[2].Supports("cs"));
+        await opened.Session.CloseAsync();
+        Assert.Null(await services[2].TokenizeAsync("cs", "var", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Clear_EndsTheOldSessionBeforeStartingTheNewOne()
     {
         using var opened = Open();
@@ -120,7 +144,8 @@ public sealed class PluginSessionRebindTests
 
     private static Opened Open(
         IStreamingChatClient? client = null,
-        ISessionChooser? chooser = null)
+        ISessionChooser? chooser = null,
+        Action<SyntaxService>? syntaxReady = null)
     {
         var home = new TemporaryHome();
         var workspace = new TemporaryWorkspace();
@@ -151,7 +176,7 @@ public sealed class PluginSessionRebindTests
                 new RecordingApprovalPrompt(ApprovalChoice.Deny),
                 new FixedUserPrompt("unused"),
                 chooser ?? new DecliningSessionChooser(),
-                new ScriptedTrustPrompt(accept: false)),
+                new ScriptedTrustPrompt(accept: false)) { SyntaxReady = syntaxReady },
             plugins);
         return new Opened(home, workspace, session);
     }
@@ -232,7 +257,17 @@ public sealed class PluginSessionRebindTests
             {
                 public string Name => "Recorder";
 
-                public PluginContribution Contribute() => new(hooks: [new SessionHook()]);
+                public PluginContribution Contribute() => new PluginContribution(hooks: [new SessionHook()])
+                    .WithTokenizers([new Tokenizer()]);
+            }
+
+            public sealed class Tokenizer : CrystalCode.Plugins.Syntax.IPluginTokenizer
+            {
+                public IReadOnlyList<string> Languages => ["cs"];
+
+                public Task<IReadOnlyList<CrystalCode.Plugins.Syntax.PluginSyntaxToken>> TokenizeAsync(
+                    string language, string text, CancellationToken cancellationToken) =>
+                    Task.FromResult<IReadOnlyList<CrystalCode.Plugins.Syntax.PluginSyntaxToken>>([]);
             }
 
             public sealed class SessionHook : IPluginHook

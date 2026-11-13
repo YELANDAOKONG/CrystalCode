@@ -1061,6 +1061,9 @@ public sealed class CodingSession : ITurnObserver
     private readonly object _mcpGate = new();
     private readonly HashSet<string> _mcpChanged = new(StringComparer.Ordinal);
     private PluginCatalog _loadedPlugins = PluginCatalog.Empty;
+    private readonly SemaphoreSlim _syntaxLimiter = new(2, 2);
+    private SyntaxService? _syntaxService;
+    private bool _syntaxReady;
     private PluginPlaceholderTable _placeholders = PluginPlaceholderTable.Empty;
     private PluginStatusBoard _statusBoard = new(static _ => { }, static _ => { });
     private bool _statusAttached;
@@ -2450,6 +2453,7 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public async Task<SessionClosure> CloseAsync(CancellationToken cancellationToken = default)
     {
+        _syntaxService?.Retire();
         await _notifier.StopAsync();
         await ClosePluginSessionAsync(cancellationToken);
         await _backgroundTasks.StopAllAsync();
@@ -2461,6 +2465,7 @@ public sealed class CodingSession : ITurnObserver
 
     public SessionClosure Close()
     {
+        _syntaxService?.Retire();
         _notifier.Cancel();
         CancelAndClearSide(announce: false);
         CancelTopic();
@@ -7789,6 +7794,9 @@ public sealed class CodingSession : ITurnObserver
 
     private void ApplyPlugins(PluginCatalog loaded)
     {
+        _syntaxService?.Retire();
+        _syntaxService = new SyntaxService(loaded.Tokenizers, _syntaxLimiter, Note);
+        _syntaxReady = false;
         _statusBoard.Retire();
         _loadedPlugins = loaded;
         _hooks = new PluginHookPipeline(_loadedPlugins.Hooks, Note, _loadedPlugins.RawHooks);
@@ -7872,7 +7880,7 @@ public sealed class CodingSession : ITurnObserver
     private async Task RebindPluginSessionAsync(Func<Task> change, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(change);
-        var reopen = _pluginSessionOpen;
+        var reopen = _pluginSessionOpen || _syntaxReady;
         if (reopen)
         {
             await ClosePluginSessionAsync(cancellationToken);
@@ -7900,13 +7908,17 @@ public sealed class CodingSession : ITurnObserver
 
     private async Task OpenPluginSessionAsync(CancellationToken cancellationToken)
     {
-        if (_pluginSessionOpen || _loadedPlugins.Hooks.Count == 0)
+        if (!_pluginSessionOpen && _loadedPlugins.Hooks.Count > 0)
         {
-            return;
+            _pluginSessionOpen = true;
+            await _hooks.StartAsync(CurrentPluginSession(), cancellationToken);
         }
 
-        _pluginSessionOpen = true;
-        await _hooks.StartAsync(CurrentPluginSession(), cancellationToken);
+        if (!_syntaxReady && _syntaxService is not null)
+        {
+            _syntaxReady = true;
+            _frontEnd.SyntaxReady?.Invoke(_syntaxService);
+        }
     }
 
     private async Task ClosePluginSessionAsync(CancellationToken cancellationToken)

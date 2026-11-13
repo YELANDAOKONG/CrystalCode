@@ -53,6 +53,8 @@ public sealed class PluginCatalog
     private readonly List<IPluginClientFactory> _overrides;
     private readonly IReadOnlyList<LoadedPlugin> _instances;
 
+    internal IReadOnlyList<PluginTokenizerRegistration> Tokenizers { get; private init; } = [];
+
     private PluginCatalog(
         IReadOnlyList<ITool> planTools,
         IReadOnlyList<ITool> workTools,
@@ -210,6 +212,7 @@ public sealed class PluginCatalog
         var instances = new List<LoadedPlugin>();
         var placeholders = new List<PluginPlaceholderRegistration>();
         var statusFields = new List<PluginStatusFieldRegistration>();
+        var tokenizers = new List<PluginTokenizerRegistration>();
         var failures = new List<PluginActivationFailure>();
         var toolNames = new HashSet<string>(StringComparer.Ordinal);
         var readOnlyNetworkTools = new HashSet<string>(StringComparer.Ordinal);
@@ -263,6 +266,7 @@ public sealed class PluginCatalog
             var hookCount = AddHooks(item.DirectoryName, contribution, notes, hooks);
             var rawHookCount = AddRawHooks(item.DirectoryName, contribution, notes, rawHooks);
             AddCliCommands(item.DirectoryName, contribution, notes, cliCommands);
+            PluginTokenizerAdmission.Add(item.DirectoryName, contribution.Tokenizers, tokenizers, notes);
             AddPlaceholders(
                 item.DirectoryName,
                 contribution,
@@ -313,7 +317,10 @@ public sealed class PluginCatalog
             failures,
             replacements,
             cliCommands,
-            readOnlyNetworkTools);
+            readOnlyNetworkTools)
+        {
+            Tokenizers = tokenizers.ToArray()
+        };
 
         void Skip(DiscoveredPlugin item, string reason)
         {

@@ -3,7 +3,8 @@
 Operators add in-process extensions as **plugins**. A plugin is one
 directory, one `plugin.json`, and one assembly in its own load context.
 It can contribute tools, a protocol client, approval classifiers, slash
-commands, process commands (admitted, not yet run), hooks, raw hooks, and prompt placeholders. A
+commands, process commands (admitted, not yet run), hooks, raw hooks, prompt
+placeholders, and syntax tokenizers. A
 plugin is executable code the operator chose to install, so the contract does
 not fence what it replaces: it may take over built-in tools, slash verbs,
 and protocols. After the host has
@@ -100,7 +101,8 @@ a tool needs `ToolHostContext`. Do not reference `CrystalCode.Engine`,
 `CrystalCode`, `CrystalCode.Display`, or `CrystalCode.Providers`.
 
 `Contribute` returns tools, client factories, classifiers, commands,
-hooks, raw hooks, prompt placeholders, and status fields. A null entry is omitted with a note. One bad plugin does not
+hooks, raw hooks, prompt placeholders, status fields, and syntax tokenizers.
+A null entry is omitted with a note. One bad plugin does not
 stop the others.
 
 `Attach` runs after `Contribute`, once plugins, external tools, and skills
@@ -281,6 +283,108 @@ text is not published again. A name this plugin did not register is ignored,
 and that name is noted once. A sink from an older catalog ignores later
 calls. If `AttachStatus` throws, that sink is closed and any text it already
 published is removed. The plugin does not choose color, markup, or an extra row.
+
+### Syntax tokenizers
+
+A plugin may supply token colors for assistant Markdown fences in the terminal.
+Register `CrystalCode.Plugins.Syntax.IPluginTokenizer` instances with
+`PluginContribution.WithTokenizers`. The original `PluginContribution`
+constructor is unchanged and leaves `Tokenizers` empty. No language tokenizer
+ships with CrystalCode; repository implementations are test samples only.
+
+`Languages` lists aliases owned by the plugin. Each alias is 1–64 ASCII
+characters, starts with a letter, and then uses letters, digits, `+`, `#`, `_`,
+or `-`. Matching is case-insensitive; the first loaded registration wins each
+alias, and later duplicates are omitted with a note. An empty or invalid alias
+list omits that tokenizer. The first whitespace-delimited word of a fence's
+info string selects the alias: `CS extra-info` selects `cs`. CrystalCode does
+not detect languages from filenames or extensions. The host passes the
+lowercase alias and the complete fence body with LF line breaks, without the
+fence markers or info string, to `TokenizeAsync`.
+
+`PluginSyntaxToken(Start, Length, Kind)` uses zero-based UTF-16 code-unit
+offsets into that body. Return an ordered, non-overlapping list of positive
+length ranges entirely inside the input. Neither end may split a surrogate
+pair. Gaps are allowed and retain the ordinary code style. Return an empty
+list for no token colors; do not return null. The kinds and theme names are:
+
+| `PluginSyntaxKind` | Theme name |
+| :--- | :--- |
+| `Keyword` | `syntax.keyword` |
+| `String` | `syntax.string` |
+| `Number` | `syntax.number` |
+| `Comment` | `syntax.comment` |
+| `Type` | `syntax.type` |
+| `Function` | `syntax.function` |
+| `Operator` | `syntax.operator` |
+| `Punctuation` | `syntax.punctuation` |
+
+For example, this deliberately small sample colors just the leading `let`
+word for a made-up language. It is not a shipped language tokenizer:
+
+```csharp
+using CrystalCode.Plugins;
+using CrystalCode.Plugins.Syntax;
+
+public sealed class SampleTokenizer : IPluginTokenizer
+{
+    public IReadOnlyList<string> Languages { get; } = ["sample"];
+
+    public Task<IReadOnlyList<PluginSyntaxToken>> TokenizeAsync(
+        string language, string text, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<PluginSyntaxToken> tokens = text.StartsWith("let ", StringComparison.Ordinal)
+            ? [new PluginSyntaxToken(0, 3, PluginSyntaxKind.Keyword)]
+            : [];
+        return Task.FromResult(tokens);
+    }
+}
+```
+
+Return `new PluginContribution().WithTokenizers([new SampleTokenizer()])`
+from the plugin's existing `Contribute` method to register it. A fence whose
+info string starts with `sample` can then use it. Plugins return kinds and
+ranges only; the terminal chooses styles from the current theme.
+
+The engine runs plugin entry and result collection access off the calling
+thread. It accepts at most 65,536 UTF-16 code units and 16,384 tokens, validates
+and copies the result, and waits at most 200 ms. A timeout, exception, or
+invalid result disables that tokenizer instance and all its aliases until
+plugin reload. `/plugins reload` creates a new service. Diagnostics identify
+the plugin directory with a host-authored reason and never include plugin
+exception text or the fence body. Oversize input, an unknown alias, or a full
+running limit simply produces no tokens.
+
+Two actual tokenizer invocations may run at once per session, shared across
+service generations. Timeout requests cancellation and stops waiting; it does
+not kill plugin code or release its running slot before it exits. Honor the
+cancellation token, keep results stable after return, and allow concurrent
+calls. These limits are not a security sandbox for executable plugin code.
+
+The terminal uses a theme-independent cache bounded to 128 entries and 8 MiB,
+a queue of 32 requests, two workers, and a 150 ms scheduling delay.
+Changed content, viewport, or width requests fences in assistant entries
+intersecting the viewport. Completion repaints only read cached ranges, so
+evicted history cannot produce a repaint loop. Identical requests share work;
+queue overflow drops the oldest pending request. Prefix-related fence bodies
+remain independent; there is no stable block identity or per-block streaming
+coalescing. Large entries and busy streams may keep ordinary code colors
+until revisited. Null and empty results do not request repaint.
+Replacing the service clears the cache and drops late results. Unavailable
+results retain `code` on `codeBg`. Existing diff line colors and hunk styling
+take precedence. User, thinking, tool, result, inline code, and approval content
+do not request tokenization. The archive, model requests, and exports keep the
+original text. Server, Bridge, and `crystal run` never request tokenization and
+add no syntax wire fields or routes. A front end may opt into the engine's
+controlled `SyntaxService` through `SessionFrontEnd.SyntaxReady`, called after
+plugin attachment; no plugin object is sent in a session event.
+
+All three built-in themes define the eight `syntax.*` names. Custom themes
+may override the dotted names directly or use a `syntax` object, including
+inside `fallback256`; see [Syntax highlighting](user-guide.md#syntax-highlighting)
+for a theme example. Theme changes reuse ranges without calling the plugin
+again.
 
 ### Catalog snapshot
 

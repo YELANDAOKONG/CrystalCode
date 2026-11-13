@@ -15,7 +15,12 @@ public static class MarkdownRenderer
     private const string TableGap = "  ";
     private const int TableMinColumnWidth = 4;
 
-    public static IReadOnlyList<PaintLine> Render(string markdown, int width)
+    public static IReadOnlyList<PaintLine> Render(string markdown, int width) => Render(markdown, width, null);
+
+    public static IReadOnlyList<PaintLine> Render(
+        string markdown,
+        int width,
+        Func<string, string, IReadOnlyList<SyntaxSpan>?>? syntaxTokens)
     {
         ArgumentNullException.ThrowIfNull(markdown);
         if (markdown.Length == 0)
@@ -27,7 +32,6 @@ public static class MarkdownRenderer
         var pieces = new List<InlinePiece>();
         var scratch = new StringBuilder();
         var markup = new StringBuilder();
-        var inFence = false;
         string? fenceLang = null;
         var source = markdown.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
 
@@ -36,28 +40,31 @@ public static class MarkdownRenderer
             var raw = source[index];
             if (raw.StartsWith("```", StringComparison.Ordinal))
             {
-                if (!inFence)
+                var info = raw.Length > 3 ? raw[3..].Trim() : string.Empty;
+                fenceLang = info.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault()?.ToLowerInvariant();
+                if (info.Length > 0)
                 {
-                    inFence = true;
-                    fenceLang = raw.Length > 3 ? raw[3..].Trim() : null;
-                    if (!string.IsNullOrEmpty(fenceLang))
-                    {
-                        var badge = $"── {fenceLang} ──";
-                        lines.Add(PaintLine.Colored(Theme.Muted, "    " + badge));
-                    }
-                }
-                else
-                {
-                    inFence = false;
-                    fenceLang = null;
+                    lines.Add(PaintLine.Colored(Theme.Muted, $"    ── {info} ──"));
                 }
 
-                continue;
-            }
+                var start = index + 1;
+                var end = start;
+                while (end < source.Length && !source[end].StartsWith("```", StringComparison.Ordinal))
+                {
+                    end++;
+                }
 
-            if (inFence)
-            {
-                RenderFencedLine(lines, raw, fenceLang, width);
+                var text = string.Join('\n', source[start..end]);
+                var tokens = QuerySyntax(fenceLang, text, syntaxTokens);
+                var textOffset = 0;
+                for (var line = start; line < end; line++)
+                {
+                    RenderFencedLine(lines, source[line], fenceLang, width, tokens, textOffset);
+                    textOffset += source[line].Length + 1;
+                }
+
+                index = end;
                 continue;
             }
 
@@ -187,7 +194,9 @@ public static class MarkdownRenderer
         List<PaintLine> lines,
         string raw,
         string? fenceLang,
-        int width)
+        int width,
+        IReadOnlyList<SyntaxSpan>? tokens,
+        int textOffset)
     {
         var isDiff = fenceLang is "diff" or "patch"
             || (raw.Length > 0 && (raw[0] is '+' or '-' or '@'));
@@ -213,8 +222,78 @@ public static class MarkdownRenderer
             }
         }
 
-        AddWrapped(lines, "    " + raw, Theme.Code, width, onBackground: Theme.CodeBg);
+        if (tokens is null || tokens.Count == 0)
+        {
+            AddWrapped(lines, "    " + raw, Theme.Code, width, onBackground: Theme.CodeBg);
+            return;
+        }
+
+        var offset = 0;
+        foreach (var wrapped in TextWidth.Wrap("    " + raw, width))
+        {
+            var markup = new StringBuilder($"[{Theme.Code} on {Theme.CodeBg}]");
+            var cursor = 0;
+            foreach (var token in tokens)
+            {
+                var from = Math.Max(Math.Max(0, 4 - offset), token.Start - textOffset + 4 - offset);
+                var to = Math.Min(wrapped.Length, token.Start + token.Length - textOffset + 4 - offset);
+                if (to <= from)
+                {
+                    continue;
+                }
+
+                markup.Append(MarkupText.Escape(wrapped[cursor..from]));
+                markup.Append('[').Append(Theme.ForSyntax(token.Kind)).Append(']');
+                markup.Append(MarkupText.Escape(wrapped[from..to])).Append("[/]");
+                cursor = to;
+            }
+
+            markup.Append(MarkupText.Escape(wrapped[cursor..])).Append("[/]");
+            lines.Add(new PaintLine(markup.ToString(), wrapped));
+            offset += wrapped.Length;
+        }
     }
+
+    private static IReadOnlyList<SyntaxSpan>? QuerySyntax(
+        string? language,
+        string text,
+        Func<string, string, IReadOnlyList<SyntaxSpan>?>? query)
+    {
+        if (language is null || query is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var tokens = query(language, text)?.ToArray();
+            var end = 0;
+            foreach (var token in tokens ?? [])
+            {
+                if (token.Start < end || token.Length <= 0 || token.Start > text.Length
+                    || token.Length > text.Length - token.Start
+                    || !IsRuneBoundary(text, token.Start)
+                    || !IsRuneBoundary(text, token.Start + token.Length)
+                    || !Theme.IsSyntaxKind(token.Kind))
+                {
+                    return null;
+                }
+
+                end = token.Start + token.Length;
+            }
+
+            return tokens;
+        }
+        catch (Exception)
+        {
+            // Cache failures must leave streamed code readable.
+            return null;
+        }
+    }
+
+    private static bool IsRuneBoundary(string text, int index) =>
+        index == 0 || index == text.Length
+        || !char.IsLowSurrogate(text[index]) || !char.IsHighSurrogate(text[index - 1]);
 
     private static void AddWrapped(
         List<PaintLine> lines,

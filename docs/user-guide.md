@@ -1065,6 +1065,65 @@ chrome are Title Case. Approval cards for edit and write show a short
 `+` / `-` preview of the change. A patch card names each file, then lists its
 removed and added lines; the 12-line cap covers the whole card.
 
+### Syntax highlighting
+
+The terminal can color tokens in assistant Markdown fences when an installed
+plugin provides a tokenizer for that fence's language alias. The first word
+of the info string is matched without case: `CS extra-info` asks for the `cs`
+alias. Aliases belong to plugins; filenames and extensions do not select a
+language. CrystalCode ships no language tokenizer. The tokenizer examples in
+this repository are test samples only. See the [plugin contract](plugins.md#syntax-tokenizers)
+to provide one.
+
+Unmatched fences and text between tokens use `code` on `codeBg`. Existing diff
+colors take precedence over token colors. User messages, thinking, tool and
+result panels, inline code, and approval previews do not use tokenizers.
+Highlighting changes presentation only: saved conversations, model requests,
+and exports keep the original text. Server, Bridge, and `crystal run` keep
+original text without requesting tokenization or adding syntax fields.
+
+Tokenizer work runs away from painting. A block longer than 65,536 UTF-16 code
+units is left in the ordinary code style. A tokenizer that throws, exceeds
+200 ms, or returns invalid ranges is disabled until `/plugins reload`; a
+host-authored note identifies its plugin. Plugin code runs in the process,
+and a timeout cannot forcibly stop it. The terminal bounds queued work and
+cached results, so a busy or unavailable tokenizer also falls back to the
+ordinary code style. New content, scrolling, and resizing request highlighting
+for assistant entries intersecting the viewport. Completed work repaints from
+the cache without scheduling evicted history again. Pending requests wait
+150 ms; identical bodies share work, while distinct bodies remain independent.
+If the queue fills, its oldest pending request is dropped. Large entries or
+busy streams can therefore leave some fences in ordinary colors until you
+revisit them; the terminal does not track a stable identity for each fence.
+
+All three built-in themes (`default`, `dark`, and `light`) define these names:
+`syntax.keyword`, `syntax.string`, `syntax.number`, `syntax.comment`,
+`syntax.type`, `syntax.function`, `syntax.operator`, and `syntax.punctuation`.
+A custom theme overlays the default palette. For example, save this as
+`~/.crystal/themes/my-code.json` and select `/theme my-code`:
+
+```json
+{
+  "syntax": {
+    "keyword": "#7aa2f7",
+    "string": "#9ece6a",
+    "comment": "#737c94"
+  },
+  "fallback256": {
+    "syntax": {
+      "keyword": "lightsteelblue",
+      "string": "darkseagreen",
+      "comment": "grey70"
+    }
+  }
+}
+```
+
+The dotted form, such as `"syntax.keyword": "lightsteelblue"`, works too.
+Unset names keep the default palette's value. `fallback256` replaces the
+corresponding colors when the terminal does not report 24-bit color. Token
+ranges are independent of the theme, so switching themes reuses them.
+
 ### Result detail
 
 Success result panels use three switches. `verboseResults` is the parent.
@@ -1635,7 +1694,7 @@ Submitting returns the transcript viewport to the latest output.
 
 `gauges.context-window` also takes `from` and `to` as numbers of tokens, both ends inclusive and either one optional, as in `{"gauges": {"context-window": [{"from": 1000000, "color": "gold1"}, {"from": 200000, "to": 999999, "color": "yellow"}]}}`. A window may use `match` or `regex` rules too. A from/to rule never holds when the window is unknown.
 
-`gauges.thinking`, `gauges.tier`, `gauges.speed`, `gauges.model`, `gauges.context-window`, `gauges.prompt-set`, `gauges.mode`, `gauges.provider`, `gauges.topic`, `gauges.agents` (sees `On` or `Off`), and the twelve reviewer gauges `gauges.approval-provider`, `approval-model`, `approval-thinking`, `approval-tier`, `approval-speed`, `extended-provider`, `extended-model`, `extended-thinking`, `extended-tier`, `extended-speed`, `extended-trigger`, and `extended-primary` color the matching status-bar text by its value instead of a number. Each rule has a `color` and one of `match` (a text or a list of texts, compared without case, `*` for every value) or `regex` (a regular expression, case-insensitive, up to 200 characters). The first rule in the list that holds the value wins, as in `{"gauges": {"thinking": [{"match": "off", "color": "grey"}, {"match": ["high", "xhigh"], "color": "orange1"}, {"regex": "^m", "color": "red"}, {"match": "*", "color": "yellow"}]}}`. The rule sees the value without its label, so `Think High` is `High`, `Context 200K` is `200K`, `Prompt Review` is `Review`, and `Default` and `Off` are values too; `model` sees the model name, `mode` sees `Work`, `Plan`, or the custom mode name, and `provider` sees the provider name. With no rules, or no rule holding the value, the text keeps its usual color: `user` for the model name in the default status bar, `work`, `plan`, or `custom` for `mode`, and `chrome` for the rest. The built-in themes have no rules. They color the default status bar, the custom status-bar field of the same name (`mode` and `provider` have no default status-bar text), and the Thinking, Tier, Speed, Approval thinking, Extended thinking, Model, and Prompt set rows of `/status`. `approval`, `status`, and `gauges` are the only objects a theme file may contain. Unlisted colors keep the built-in value; an unknown name or bad style rejects the file. The four `diff…Bg` and `diff…Word` names color the background of a whole added or removed line and of the words that changed inside a paired line; `diffAdded` and `diffRemoved` must combine with each as a foreground on a background. A file may also hold `fallback256`, an object shaped like the file itself that replaces those colors when the terminal does not report 24-bit color, as in `{"accent": "#7aa2f7", "fallback256": {"accent": "blue"}}`; it does not replace gauge rules |
+`gauges.thinking`, `gauges.tier`, `gauges.speed`, `gauges.model`, `gauges.context-window`, `gauges.prompt-set`, `gauges.mode`, `gauges.provider`, `gauges.topic`, `gauges.agents` (sees `On` or `Off`), and the twelve reviewer gauges `gauges.approval-provider`, `approval-model`, `approval-thinking`, `approval-tier`, `approval-speed`, `extended-provider`, `extended-model`, `extended-thinking`, `extended-tier`, `extended-speed`, `extended-trigger`, and `extended-primary` color the matching status-bar text by its value instead of a number. Each rule has a `color` and one of `match` (a text or a list of texts, compared without case, `*` for every value) or `regex` (a regular expression, case-insensitive, up to 200 characters). The first rule in the list that holds the value wins, as in `{"gauges": {"thinking": [{"match": "off", "color": "grey"}, {"match": ["high", "xhigh"], "color": "orange1"}, {"regex": "^m", "color": "red"}, {"match": "*", "color": "yellow"}]}}`. The rule sees the value without its label, so `Think High` is `High`, `Context 200K` is `200K`, `Prompt Review` is `Review`, and `Default` and `Off` are values too; `model` sees the model name, `mode` sees `Work`, `Plan`, or the custom mode name, and `provider` sees the provider name. With no rules, or no rule holding the value, the text keeps its usual color: `user` for the model name in the default status bar, `work`, `plan`, or `custom` for `mode`, and `chrome` for the rest. The built-in themes have no rules. They color the default status bar, the custom status-bar field of the same name (`mode` and `provider` have no default status-bar text), and the Thinking, Tier, Speed, Approval thinking, Extended thinking, Model, and Prompt set rows of `/status`. `approval`, `status`, `syntax`, and `gauges` group theme settings; `fallback256` holds fallback colors. Unlisted colors keep the built-in value; an unknown name or bad style rejects the file. The four `diff…Bg` and `diff…Word` names color the background of a whole added or removed line and of the words that changed inside a paired line; `diffAdded` and `diffRemoved` must combine with each as a foreground on a background. A file may also hold `fallback256`, an object shaped like the file itself that replaces those colors when the terminal does not report 24-bit color, as in `{"accent": "#7aa2f7", "fallback256": {"accent": "blue"}}`; it does not replace gauge rules |
 | `/notify` | | Show operator notification. `on` / `off` writes `operatorNotify.enabled` to `config.json`; `on` needs a configured command. `test` runs the command once, even while off, with `CRYSTAL_NOTIFY_EVENT=test`, and reports its exit |
 | `/resume` | `/continue` | Choose a session in this workspace. `/resume <path>` lists that directory and enters it. `/resume all` lists every workspace and enters the chosen session's directory. `/resume <id>` loads that file and stays here |
 | `/fork` | | Branch the current conversation, or `/fork <id>` to branch a saved session |
@@ -1865,7 +1924,8 @@ of the same name replaces the home plugin. `"enabled": false` in
 field is omitted from the written file.
 
 A plugin can add tools, a protocol client, approval classifiers, slash
-commands, hooks, raw hooks, and prompt placeholders. It can read the
+commands, hooks, raw hooks, prompt placeholders, and syntax tokenizers for
+assistant Markdown fences (see [Syntax highlighting](#syntax-highlighting)). It can read the
 current session model and whether review is using its own model. A plugin
 that implements `CrystalCode.Plugins.Data.Interfaces.IPluginDataDirectory` receives its
 global and project runtime-data directories. A plugin

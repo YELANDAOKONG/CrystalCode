@@ -173,6 +173,11 @@ public sealed class PluginCatalogTests
         Assert.Equal("raw-line", added.Text);
         Assert.Equal("sample_token", Assert.Single(catalog.Placeholders).Name);
         Assert.Equal("branch", Assert.Single(catalog.StatusFields).Name);
+        using var syntaxLimiter = new SemaphoreSlim(2, 2);
+        var syntax = new SyntaxService(catalog.Tokenizers, syntaxLimiter, static _ => { });
+        Assert.True(syntax.Supports("CS"));
+        Assert.Equal(new SyntaxToken(0, 3, "keyword"),
+            Assert.Single((await syntax.TokenizeAsync("cs", "var", CancellationToken.None))!));
         var published = new List<IReadOnlyList<StatusFieldValue>>();
         var board = new PluginStatusBoard(
             fields => published.Add(fields),
@@ -429,6 +434,7 @@ public sealed class PluginCatalogTests
                     rawHooks: [new SampleRawHook()],
                     placeholders: [new SamplePlaceholder()])
                     .WithStatusFields([new SampleStatus()])
+                    .WithTokenizers([new SampleTokenizer()])
                     .WithCliCommands([new HelloCli()]);
 
                 public void AttachStatus(IPluginStatusUpdates updates) =>
@@ -494,6 +500,16 @@ public sealed class PluginCatalogTests
                         CancellationToken cancellationToken = default) =>
                         ValueTask.FromResult(new ToolOutput("grep-replaced"));
                 }
+            }
+
+            public sealed class SampleTokenizer : CrystalCode.Plugins.Syntax.IPluginTokenizer
+            {
+                public IReadOnlyList<string> Languages => ["cs"];
+
+                public Task<IReadOnlyList<CrystalCode.Plugins.Syntax.PluginSyntaxToken>> TokenizeAsync(
+                    string language, string text, CancellationToken cancellationToken) =>
+                    Task.FromResult<IReadOnlyList<CrystalCode.Plugins.Syntax.PluginSyntaxToken>>(
+                        [new(0, 3, CrystalCode.Plugins.Syntax.PluginSyntaxKind.Keyword)]);
             }
 
             public sealed class SampleStatus : IPluginStatusField

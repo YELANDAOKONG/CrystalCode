@@ -33,11 +33,14 @@ internal sealed class TerminalHost
     private readonly SessionRenderer _renderer;
     private readonly SessionProjection _projection;
     private readonly CodingSession _session;
+    private readonly TerminalSyntaxCache _syntaxCache;
     private readonly string? _launchMode;
     private int _idleCancels;
 
-    private TerminalHost(SessionRenderer renderer, CodingSession session, string? launchMode, SessionProjection projection)
+    private TerminalHost(SessionRenderer renderer, CodingSession session, string? launchMode, SessionProjection projection,
+        TerminalSyntaxCache syntaxCache)
     {
+        _syntaxCache = syntaxCache;
         _projection = projection;
         _renderer = renderer;
         _session = session;
@@ -49,6 +52,8 @@ internal sealed class TerminalHost
         ArgumentNullException.ThrowIfNull(launch);
         ArgumentNullException.ThrowIfNull(plugins);
         var renderer = new SessionRenderer();
+        var syntaxCache = new TerminalSyntaxCache();
+        renderer.BindSyntax(syntaxCache);
         var projection = new SessionProjection(renderer, launch.Home);
         var frontEnd = new SessionFrontEnd(
             projection,
@@ -57,14 +62,25 @@ internal sealed class TerminalHost
             new SessionPicker(renderer),
             new TrustPrompt(renderer))
         {
+            SyntaxReady = syntaxCache.SetService,
             ChooseChildAsync = new ChildPicker(renderer).ChooseAsync,
             ChooseThemeAsync = new ThemePicker(renderer, launch.Home).ChooseAsync
         };
-        var session = launch.CreateSession(frontEnd, plugins);
+        CodingSession session;
+        try
+        {
+            session = launch.CreateSession(frontEnd, plugins);
+        }
+        catch
+        {
+            syntaxCache.Dispose();
+            renderer.Dispose();
+            throw;
+        }
         renderer.LoadQuickPromptsAsync = new QuickPromptStore(launch.Home).LoadAsync;
         renderer.ChildSessionsEnabled = session.AgentsEnabled;
         renderer.QueueQuickPromptAsync = (text, token) => session.SubmitQuickPromptAsync(text, true, token);
-        return new TerminalHost(renderer, session, launch.Mode, projection);
+        return new TerminalHost(renderer, session, launch.Mode, projection, syntaxCache);
     }
 
     /// <summary>
@@ -108,6 +124,7 @@ internal sealed class TerminalHost
         }
         finally
         {
+            _syntaxCache.Dispose();
             try
             {
                 await CloseSessionAsync();
