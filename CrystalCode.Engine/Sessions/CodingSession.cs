@@ -11068,6 +11068,9 @@ public sealed class CodingSession : ITurnObserver
             case PursueArguments.Action.Limit:
                 ChangePursueLimit(request);
                 return;
+            case PursueArguments.Action.Compaction:
+                ChangePursueCompaction(request);
+                return;
             default:
                 ChangePursueModel(request);
                 return;
@@ -11229,6 +11232,90 @@ public sealed class CodingSession : ITurnObserver
 
         SaveSettings(settings => settings.WithPursueLimits(next));
         Note(next.Describe());
+    }
+
+    private void ChangePursueCompaction(PursueArguments.Request request)
+    {
+        var current = _settings.PursueModel.Compaction;
+        CompactionModelSettings next;
+        switch (request.Number)
+        {
+            case 0:
+                if (request.Value is null)
+                {
+                    next = CompactionModelSettings.Off;
+                    break;
+                }
+
+                if (!ModelSelection.TryResolve(
+                        _settings.Catalog,
+                        current.Provider is string stored ? new ProviderName(stored) : _settings.Provider,
+                        request.Value,
+                        out var selection,
+                        out var error)
+                    || selection is null)
+                {
+                    Error((error ?? string.Empty).Replace("/model", "/pursue compaction model", StringComparison.Ordinal));
+                    return;
+                }
+
+                next = new CompactionModelSettings(true, selection.Provider.Value, selection.Model, current.ThinkingEffort);
+                break;
+            case 1:
+                if (!current.HasSelection)
+                {
+                    Error("Select a pursue compaction model first with /pursue compaction model <provider model>.");
+                    return;
+                }
+
+                var model = _settings.Catalog.GetModel(new ProviderName(current.Provider!), current.Model!);
+                if (!TrySelectThinking(model, current.ThinkingEffort, request.Value, "pursue compaction model", out var gear))
+                {
+                    return;
+                }
+
+                next = current.WithThinkingEffort(gear);
+                break;
+            default:
+                if (!current.HasSelection)
+                {
+                    Error("Select a pursue compaction model first with /pursue compaction model <provider model>.");
+                    return;
+                }
+
+                if (!TrySelectSlot(
+                        request.Slot,
+                        _settings.Catalog.GetModel(new ProviderName(current.Provider!), current.Model!),
+                        current.ServiceTier,
+                        current.Speed,
+                        current.ContextWindow,
+                        "pursue compaction model",
+                        out var selected))
+                {
+                    return;
+                }
+
+                next = request.Slot.Slot switch
+                {
+                    SideModelSlot.ServiceTier => current.WithServiceTier(selected.Token),
+                    SideModelSlot.Speed => current.WithSpeed(selected.Token),
+                    _ => current.WithContextWindow(selected.Window)
+                };
+                break;
+        }
+
+        var updated = _settings.PursueModel.WithCompaction(next);
+        try
+        {
+            SaveSettings(settings => settings.WithPursueModel(updated));
+        }
+        catch (InvalidOperationException exception)
+        {
+            Error(exception.Message);
+            return;
+        }
+
+        Note(next.HasSelection ? updated.Describe() : "Pursue compaction model  session setting");
     }
 
     private void ChangePursueModel(PursueArguments.Request request)
@@ -11444,8 +11531,9 @@ public sealed class CodingSession : ITurnObserver
     private const int PursueOutputReserveTokens = 8192;
 
     /// <summary>
-    /// Folds older entries into one summary for the checker, with the session
-    /// compaction model when one is on and the checker's own model otherwise.
+    /// Folds older entries into one summary for the checker, with the pursue
+    /// compaction model when set, else the session compaction model when one is
+    /// on, else the checker's own model.
     /// Returns null when nothing was compacted or the summary call failed.
     /// </summary>
     private async Task<IReadOnlyList<ChatItem>?> CompactForPursueAsync(
@@ -11456,9 +11544,11 @@ public sealed class CodingSession : ITurnObserver
         HarnessSettings summarySelection;
         try
         {
-            summarySelection = _settings.CompactionModel.Enabled
-                ? _settings.ForCompaction(_settings.CompactionModel)
-                : checker;
+            summarySelection = _settings.PursueModel.Compaction.HasSelection
+                ? _settings.ForCompaction(_settings.PursueModel.Compaction)
+                : _settings.CompactionModel.Enabled
+                    ? _settings.ForCompaction(_settings.CompactionModel)
+                    : checker;
         }
         catch (Exception exception) when (exception is ArgumentException or KeyNotFoundException or InvalidOperationException)
         {

@@ -281,6 +281,7 @@ public sealed record HarnessSettings
 
         RequireTopicModel(catalog, TopicModel);
         RequirePursueModel(catalog, PursueModel);
+        RequirePursueCompaction(catalog, PursueModel);
     }
 
     public ProviderName Provider { get; }
@@ -1249,6 +1250,27 @@ public sealed record HarnessSettings
         }
 
         RequireSlots(model, pursue.ServiceTier, pursue.Speed, pursue.ContextWindow, "Pursue model");
+    }
+
+    private static void RequirePursueCompaction(ProviderCatalog catalog, PursueModelSettings pursue)
+    {
+        var compaction = pursue.Compaction;
+        if (!compaction.HasSelection)
+        {
+            return;
+        }
+
+        ModelSettings model;
+        try
+        {
+            model = catalog.GetModel(new ProviderName(compaction.Provider!), compaction.Model!);
+        }
+        catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+
+        RequireSlots(model, compaction.ServiceTier, compaction.Speed, compaction.ContextWindow, "Pursue compaction model");
     }
 
     private static void RequireTopicModel(ProviderCatalog catalog, TopicModelSettings topic)

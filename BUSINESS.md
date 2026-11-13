@@ -530,8 +530,8 @@ rules, and the approval mode are unchanged. The checker has no tools.
   and wait. Limits count per run, so a resume starts a new allowance. The
   defaults are wide.
 - When the checker's view of the conversation does not fit, older entries are
-  summarized by the session compaction model (or the checker's own model when
-  none is on); if that fails they are dropped. The summary is not citable.
+  summarized by the pursue compaction model (`/pursue compaction`), else the
+  session compaction model, else the checker's own model; if that fails they are dropped. The summary is not citable.
 - The checker prompts are `pursue.system` (overridable and appendable by prompt
   attachments), `pursue.user`, and `pursue.continue`. The verdict JSON format is
   host-owned (`{{verdict_format}}`); a reply off the contract pauses the run.

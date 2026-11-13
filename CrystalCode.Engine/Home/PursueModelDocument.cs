@@ -14,4 +14,6 @@ internal sealed class PursueModelDocument
     public string? Speed { get; set; }
 
     public int? ContextWindow { get; set; }
+
+    public CompactionModelDocument? Compaction { get; set; }
 }

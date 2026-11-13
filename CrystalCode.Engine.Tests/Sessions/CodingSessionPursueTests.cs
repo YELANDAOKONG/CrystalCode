@@ -270,6 +270,51 @@ public sealed class CodingSessionPursueTests
     }
 
     [Fact]
+    public async Task Compaction_IsConfiguredSeparatelyAndSurvivesAModelChange()
+    {
+        var provider = new ProviderName("scripted");
+        var definition = new ProviderDefinition(
+            provider,
+            ScriptedChatPlugin.Protocol,
+            new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
+            {
+                ["model"] = new(200_000),
+                ["summary"] = new(200_000, thinking: true, thinkingEfforts: ["high"])
+            },
+            requiresApiKey: false);
+        var settings = new HarnessSettings(
+            provider,
+            "model",
+            ApprovalMode.Default,
+            0.8,
+            ProviderCatalog.CreateStarter().Overlay([definition]));
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(),
+            settings: settings,
+            prepare: (home, _) =>
+            {
+                home.EnsureCreated();
+                File.WriteAllText(home.ProvidersPath, System.Text.Json.JsonSerializer.Serialize(SettingsMapper.WriteProviders(settings.Catalog)));
+            });
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("/pursue compaction thinking high");
+        Assert.Single(headless.Observer.Events.OfType<ErrorWritten>());
+
+        await headless.RunTurnAsync("/pursue compaction model scripted summary");
+        await headless.RunTurnAsync("/pursue compaction thinking high");
+        await headless.RunTurnAsync("/pursue model scripted model");
+
+        var stored = new DiskSettingsStore(headless.Home).Load().PursueModel;
+        Assert.Equal("summary", stored.Compaction.Model);
+        Assert.Equal("high", stored.Compaction.ThinkingEffort.Value);
+
+        await headless.RunTurnAsync("/pursue compaction model");
+        Assert.False(new DiskSettingsStore(headless.Home).Load().PursueModel.Compaction.HasSelection);
+    }
+
+    [Fact]
     public void Model_ChangeClearsTheSlotsOfThePreviousSelection()
     {
         var own = new PursueModelSettings("scripted", "checker", serviceTier: "flex", speed: "fast", contextWindow: 1000);

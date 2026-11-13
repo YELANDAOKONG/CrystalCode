@@ -22,6 +22,7 @@ internal static class PursueArguments
         Model,
         Thinking,
         Slot,
+        Compaction,
         Limit
     }
 
@@ -73,6 +74,8 @@ internal static class PursueArguments
             case "thinking":
                 request = new Request(Action.Thinking, Value: tail.Length == 0 ? null : tail);
                 return true;
+            case "compaction":
+                return TryParseCompaction(tail, out request, out error);
             case "limit":
                 return TryParseLimit(tail, out request, out error);
             default:
@@ -87,6 +90,36 @@ internal static class PursueArguments
 
         error = "Use /pursue start <objective>, status, pause, resume, clear, model, thinking, tier, speed, context, or limit.";
         return false;
+    }
+
+    private static bool TryParseCompaction(string tail, out Request request, out string error)
+    {
+        request = new Request(Action.Compaction);
+        error = "Use /pursue compaction model [provider model], or thinking, tier, speed, or context [value].";
+        var (head, rest) = Split(tail);
+        switch (head.ToLowerInvariant())
+        {
+            case "model":
+                request = new Request(
+                    Action.Compaction,
+                    Value: rest.Length == 0 || rest.Equals("session", StringComparison.OrdinalIgnoreCase) ? null : rest,
+                    Number: 0);
+                error = string.Empty;
+                return true;
+            case "thinking":
+                request = new Request(Action.Compaction, Value: rest.Length == 0 ? null : rest, Number: 1);
+                error = string.Empty;
+                return true;
+            default:
+                if (tail.Length > 0 && ApprovalSlotArguments.TryParse(tail, out var slot))
+                {
+                    request = new Request(Action.Compaction, Slot: slot, Number: 2);
+                    error = string.Empty;
+                    return true;
+                }
+
+                return false;
+        }
     }
 
     private static bool TryParseLimit(string tail, out Request request, out string error)

@@ -891,7 +891,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             thinkingEffort,
             ReadSlot(document.ServiceTier, "pursueModel.serviceTier"),
             ReadSlot(document.Speed, "pursueModel.speed"),
-            ReadContextWindow(document.ContextWindow, "pursueModel.contextWindow"));
+            ReadContextWindow(document.ContextWindow, "pursueModel.contextWindow"),
+            ReadCompactionModel(document.Compaction));
     }
 
     private static PursueModelDocument? WritePursueModel(PursueModelSettings settings)
@@ -908,7 +909,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             ThinkingEffort = WriteGear(settings.ThinkingEffort),
             ServiceTier = settings.ServiceTier,
             Speed = settings.Speed,
-            ContextWindow = settings.ContextWindow
+            ContextWindow = settings.ContextWindow,
+            Compaction = WriteCompactionModel(settings.Compaction)
         };
     }
 

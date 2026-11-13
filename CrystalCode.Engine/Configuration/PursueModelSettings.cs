@@ -16,7 +16,8 @@ public sealed record PursueModelSettings
         ThinkingSelection? thinkingEffort = null,
         string? serviceTier = null,
         string? speed = null,
-        int? contextWindow = null)
+        int? contextWindow = null,
+        CompactionModelSettings? compaction = null)
     {
         Provider = string.IsNullOrWhiteSpace(provider) ? null : provider.Trim();
         Model = string.IsNullOrWhiteSpace(model) ? null : model.Trim();
@@ -34,6 +35,7 @@ public sealed record PursueModelSettings
         ServiceTier = serviceTier is null ? null : new CatalogToken(serviceTier).Value;
         Speed = speed is null ? null : new CatalogToken(speed).Value;
         ContextWindow = contextWindow;
+        Compaction = compaction ?? CompactionModelSettings.Off;
     }
 
     public static PursueModelSettings Default { get; } = new();
@@ -54,6 +56,12 @@ public sealed record PursueModelSettings
     /// <summary>Context budget for its own model, or null for its first declared budget. Ignored for the session model.</summary>
     public int? ContextWindow { get; }
 
+    /// <summary>
+    /// Summarizes older entries for the checker. Off falls back to the session
+    /// compaction setting, then to the checker's own model.
+    /// </summary>
+    public CompactionModelSettings Compaction { get; }
+
     public bool UsesSessionModel => Provider is null;
 
     public bool IsDefault =>
@@ -61,7 +69,8 @@ public sealed record PursueModelSettings
         && ThinkingEffort == ThinkingSelection.Default
         && ServiceTier is null
         && Speed is null
-        && ContextWindow is null;
+        && ContextWindow is null
+        && Compaction == CompactionModelSettings.Off;
 
     /// <summary>
     /// Selects an own model, or the session model with nulls. A tier, speed,
@@ -71,23 +80,29 @@ public sealed record PursueModelSettings
     {
         var same = string.Equals(provider, Provider, StringComparison.Ordinal)
             && string.Equals(model, Model, StringComparison.Ordinal);
-        return same ? this : new(provider, model, ThinkingEffort);
+        return same ? this : new(provider, model, ThinkingEffort, compaction: Compaction);
     }
 
     public PursueModelSettings WithThinkingEffort(ThinkingSelection thinkingEffort)
     {
         ArgumentNullException.ThrowIfNull(thinkingEffort);
-        return new(Provider, Model, thinkingEffort, ServiceTier, Speed, ContextWindow);
+        return new(Provider, Model, thinkingEffort, ServiceTier, Speed, ContextWindow, Compaction);
     }
 
     public PursueModelSettings WithServiceTier(string? serviceTier) =>
-        new(Provider, Model, ThinkingEffort, serviceTier, Speed, ContextWindow);
+        new(Provider, Model, ThinkingEffort, serviceTier, Speed, ContextWindow, Compaction);
 
     public PursueModelSettings WithSpeed(string? speed) =>
-        new(Provider, Model, ThinkingEffort, ServiceTier, speed, ContextWindow);
+        new(Provider, Model, ThinkingEffort, ServiceTier, speed, ContextWindow, Compaction);
 
     public PursueModelSettings WithContextWindow(int? contextWindow) =>
-        new(Provider, Model, ThinkingEffort, ServiceTier, Speed, contextWindow);
+        new(Provider, Model, ThinkingEffort, ServiceTier, Speed, contextWindow, Compaction);
+
+    public PursueModelSettings WithCompaction(CompactionModelSettings compaction)
+    {
+        ArgumentNullException.ThrowIfNull(compaction);
+        return new(Provider, Model, ThinkingEffort, ServiceTier, Speed, ContextWindow, compaction);
+    }
 
     public string Describe()
     {
@@ -110,6 +125,11 @@ public sealed record PursueModelSettings
         if (ContextWindow is int window)
         {
             description += "  ·  Context " + ContextWindowSelection.Format(window);
+        }
+
+        if (Compaction.HasSelection)
+        {
+            description += "\n" + Compaction.Describe().Replace("Compaction model", "Pursue compaction model", StringComparison.Ordinal);
         }
 
         return description;
