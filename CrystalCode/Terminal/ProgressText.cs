@@ -33,7 +33,7 @@ public static class ProgressText
 
     public const string CheckingObjective = "Checking Objective";
 
-    public const string WaitingForTask = "Waiting for Task";
+    public const string WaitingForTask = "Waiting For Task";
 
     public const string LoadingTools = "Loading Tools";
 
