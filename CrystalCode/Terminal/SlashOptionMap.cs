@@ -17,7 +17,9 @@ internal static class SlashOptionMap
             options.Add(From(completion));
         }
 
-        return options;
+        return options.Select(option => option.Name == "pursue"
+            ? option with { Arguments = [new SlashOption("view", "Inspect pursue checks and evidence (F9)", ["view"]), .. option.ArgumentOptions] }
+            : option).ToArray();
     }
 
     public static SlashOption From(SlashCompletion completion)

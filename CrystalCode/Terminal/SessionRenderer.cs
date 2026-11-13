@@ -20,6 +20,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Pursue;
 
 namespace CrystalCode.Terminal;
 
@@ -144,6 +145,115 @@ public sealed class SessionRenderer : IDisposable
     private int _startupFrame;
     private DateTimeOffset _startupSpinnerAt;
     private bool _holdSubmission;
+    private PursuePage? _pursuePage;
+    private PursueState? _pursue;
+    private readonly ShellChrome _pursueChrome = new();
+    private DateTimeOffset? _pursueRetryUntil;
+    private int _pursueRetryAttempt;
+
+    internal Func<PursueConfiguration>? PursueConfiguration { get; set; }
+    internal bool PursuePageOpen => _pursuePage is not null;
+
+    internal void SetPursue(PursueState? state)
+    {
+        lock (_gate)
+        {
+            _pursue = state;
+            _pursuePage?.Update(state);
+            if (state?.Status != PursueStatus.Active)
+            {
+                _pursueChrome.Progress = string.Empty;
+                _pursueRetryUntil = null;
+            }
+
+            PaintUnlocked(force: true);
+        }
+    }
+
+    internal void ResetPursue()
+    {
+        lock (_gate)
+        {
+            _pursue = null;
+            _pursuePage = null;
+            _pursueChrome.Progress = string.Empty;
+            _pursueRetryUntil = null;
+        }
+    }
+
+    internal void SetPursueProgress(string caption)
+    {
+        lock (_gate)
+        {
+            _pursueRetryUntil = null;
+            _pursueChrome.Progress = caption;
+            PaintUnlocked(force: false);
+        }
+    }
+
+    internal void SetPursueRetry(SessionRetryAttempt attempt)
+    {
+        lock (_gate)
+        {
+            _pursueRetryUntil = DateTimeOffset.UtcNow + attempt.Delay;
+            _pursueRetryAttempt = attempt.Attempt;
+            _pursueChrome.Progress = ProgressText.Retrying(attempt.Attempt, attempt.Delay);
+        }
+    }
+
+    internal void ShowPursueError(string text)
+    {
+        lock (_gate)
+        {
+            _pursuePage?.ShowError(text);
+        }
+    }
+
+    internal void ShowPursuePage()
+    {
+        lock (_gate)
+        {
+            _pursuePage = new PursuePage();
+            _pursuePage.Update(_pursue);
+            _picker = null;
+            PaintUnlocked(force: true);
+        }
+    }
+
+    internal bool ClosePursuePage()
+    {
+        lock (_gate)
+        {
+            if (_pursuePage is null || _composerPaused || _overlayWidget is not null || _modalOverlay.Count > 0)
+            {
+                return false;
+            }
+
+            _pursuePage = null;
+            PaintUnlocked(force: true);
+            return true;
+        }
+    }
+
+    internal IReadOnlyList<PaintLine> PursueFrame(int width, int height)
+    {
+        lock (_gate)
+        {
+            return PursueFrameUnlocked(width, height, DateTimeOffset.UtcNow);
+        }
+    }
+
+    private IReadOnlyList<PaintLine> PursueFrameUnlocked(int width, int height, DateTimeOffset now)
+    {
+        if (_pursueRetryUntil is { } until)
+        {
+            _pursueChrome.ReplaceProgress(ProgressText.Retrying(_pursueRetryAttempt, until - now));
+        }
+
+        _pursueChrome.TickSpinner(now);
+        var progress = ChildViewActive ? _pursueChrome.ProgressLine(width) : _chrome.ProgressLine(width);
+        return _pursuePage?.Paint(width, height, PursueConfiguration?.Invoke(), progress) ?? [];
+    }
 
     /// <summary>
     /// True while operator tools or plugins load in a live session. The
@@ -246,7 +356,7 @@ public sealed class SessionRenderer : IDisposable
         {
             lock (_gate)
             {
-                return _overlayWidget is not null || _modalOverlay.Count > 0;
+                return _pursuePage is not null || _overlayWidget is not null || _modalOverlay.Count > 0;
             }
         }
     }
@@ -927,6 +1037,7 @@ public sealed class SessionRenderer : IDisposable
         lock (_gate)
         {
             CommitLiveUnlocked();
+            _pursuePage = null;
             _fullPageOverlay = true;
             _pageScroll = 0;
             _modalOverlay.Clear();
@@ -1523,7 +1634,8 @@ public sealed class SessionRenderer : IDisposable
             if (_sideSuspended
                 && _side is not null
                 && !SideQuestionWidget.IsEmpty(_side)
-                && !_fullPageOverlay)
+                && !_fullPageOverlay
+                && _pursuePage is null)
             {
                 _sideOpen = true;
             }
@@ -1567,6 +1679,7 @@ public sealed class SessionRenderer : IDisposable
             lock (_gate)
             {
                 return _composer.IsEmpty
+                    && _pursuePage is null
                     && _quickPicker is null
                     && _editor is null
                     && !_fullPageOverlay
@@ -1615,6 +1728,11 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
+            if (ClosePursuePage())
+            {
+                return true;
+            }
+
             if (_quickPicker is not null)
             {
                 _quickPicker = null;
@@ -2063,6 +2181,24 @@ public sealed class SessionRenderer : IDisposable
             return null;
         }
 
+        if (_pursuePage is { } pursuit)
+        {
+            var command = pursuit.Handle(item);
+            if (pursuit.Closed)
+            {
+                _pursuePage = null;
+            }
+
+            return command;
+        }
+
+        if (!_fullPageOverlay && !_sideOpen && !_holdSubmission
+            && item is InputKey { Key: ConsoleKey.F9, Modifiers: ConsoleModifiers.None })
+        {
+            ShowPursuePage();
+            return null;
+        }
+
         if (!_fullPageOverlay && !_sideOpen && !ChildViewActive
             && item is InputKey { Key: ConsoleKey.F8, Modifiers: ConsoleModifiers.None })
         {
@@ -2240,6 +2376,16 @@ public sealed class SessionRenderer : IDisposable
                     return null;
                 }
 
+                if (SessionCommand.TryParse(text.Trim(), out var pursueCommand)
+                    && pursueCommand.Verb == SessionVerb.Pursue
+                    && pursueCommand.Argument.Equals("view", StringComparison.OrdinalIgnoreCase))
+                {
+                    _composer.Clear();
+                    OnComposerEdited?.Invoke(_composer.SubmissionText);
+                    ShowPursuePage();
+                    return null;
+                }
+
                 _composer.RememberAndClear();
                 _picker = null;
                 _scrollBack = 0;
@@ -2293,6 +2439,7 @@ public sealed class SessionRenderer : IDisposable
             "f6           Quick prompts; Tab: Fill / Send",
             "f7           Inspect child sessions; Esc returns to parent",
             "f8           Full-screen editor; F8 or ctrl+s applies, Esc cancels",
+            "f9           Pursue checks and evidence; /pursue view also opens",
             "empty enter  Send the queue now",
             "queue        Stays above the composer; sends after this tool or turn",
             "ctrl+j       Newline",
@@ -2420,6 +2567,16 @@ public sealed class SessionRenderer : IDisposable
         _chrome.TickSpinner(now);
         TickSideSpinner(now);
         RefreshRetryCaptionUnlocked(now);
+        if (_pursuePage is not null && !_composerPaused && _overlayWidget is null && _modalOverlay.Count == 0)
+        {
+            _painter.PaintFrame(PursueFrameUnlocked(width, height, now), width, height,
+                resetFrame: width != _paintedWidth || height != _paintedHeight);
+            _paintedWidth = width;
+            _paintedHeight = height;
+            _lastPaint = now;
+            return;
+        }
+
         if (_startupPage && _overlayWidget is null && _modalOverlay.Count == 0 && !_composerPaused)
         {
             PaintStartupUnlocked(width, height, now);
@@ -3122,7 +3279,8 @@ public sealed class SessionRenderer : IDisposable
                 var pluginStatusDirty = _pluginStatusDirty | RefreshSyntaxUnlocked();
                 _pluginStatusDirty = false;
                 var startupDue = _startupPage && now - _startupSpinnerAt >= ProgressSpinner.Interval;
-                if (sizeChanged || startupDue || _chrome.SpinnerDue(now) || SideSpinnerDue(now))
+                if (sizeChanged || startupDue || _chrome.SpinnerDue(now) || SideSpinnerDue(now)
+                    || _pursuePage is not null && _pursueChrome.SpinnerDue(now))
                 {
                     PaintUnlocked(force: true);
                 }

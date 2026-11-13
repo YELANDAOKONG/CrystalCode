@@ -79,6 +79,7 @@ internal sealed class TerminalHost
         }
         renderer.LoadQuickPromptsAsync = new QuickPromptStore(launch.Home).LoadAsync;
         renderer.ChildSessionsEnabled = session.AgentsEnabled;
+        renderer.PursueConfiguration = session.GetPursueConfiguration;
         renderer.QueueQuickPromptAsync = (text, token) => session.SubmitQuickPromptAsync(text, true, token);
         return new TerminalHost(renderer, session, launch.Mode, projection, syntaxCache);
     }
@@ -191,6 +192,12 @@ internal sealed class TerminalHost
         Console.CancelKeyPress += (_, args) =>
         {
             args.Cancel = true;
+            if (_renderer.ClosePursuePage())
+            {
+                _idleCancels = 0;
+                return;
+            }
+
             if (_renderer.SideQuestionOpen)
             {
                 _session.TryCancelSideQuestion();

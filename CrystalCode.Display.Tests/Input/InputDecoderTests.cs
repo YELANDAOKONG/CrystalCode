@@ -9,6 +9,15 @@ namespace CrystalCode.Display.Tests.Input;
 public sealed class InputDecoderTests
 {
     [Fact]
+    public void Push_F9MatchesTheNativeAndVtKey()
+    {
+        var native = new InputDecoder().Push(Linux(new ConsoleKeyInfo('\0', ConsoleKey.F9, false, false, false)));
+        Assert.Equal(ConsoleKey.F9, Assert.IsType<InputKey>(Assert.Single(native)).Key);
+        var vt = new InputDecoder().Push(WindowsVt("\u001b[20~"));
+        Assert.Equal(ConsoleKey.F9, Assert.IsType<InputKey>(Assert.Single(vt)).Key);
+    }
+
+    [Fact]
     public void Push_TabAndEnter_MatchOnWindowsLinuxAndMac()
     {
         var decoder = new InputDecoder();

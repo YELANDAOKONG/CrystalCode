@@ -562,7 +562,24 @@ rules, and the approval mode are unchanged. The checker has no tools.
   replaces the history; session clear and fork drop it with the objective.
   HTTP and ACP snapshots carry the latest check and total count; read-only
   queries provide paged history and check details. Old session files have
-  no historical checks to recover. The terminal has no pursue detail view.
+  no historical checks to recover.
+- The terminal's F9 or `/pursue view` opens the live pursue inspector, also
+  during work or child inspection. It shows the objective, phase, run counts,
+  checker attempts, reasons, next steps, wait task ids, usage, and retained
+  evidence. Wide terminals put the newest-first check list beside details;
+  narrower terminals stack them. Up/Down selects a check without changing the
+  selection when new checks arrive; L follows the latest again. PgUp/PgDn,
+  Home/End, and the wheel read the full details. Separate themed scrollbars
+  show list and detail position. The progress spinner and elapsed caption
+  remain visible; continuation and stall bars show budget use, not objective
+  completion. All colors follow the built-in or custom theme, including a
+  theme change while the page is open. P requests pause, and R resumes a
+  paused or blocked objective through the same commands and refusal rules.
+  Esc, Q, F9, or Ctrl+C returns to the previous view, preserving the composer
+  draft and images, transcript scroll, and live stream. Approval and question
+  modals take precedence and return to the inspector afterward. Clear and
+  history replacement close it; ordinary turn completion leaves it open.
+  `/pursue view` is a terminal entry; Server and Bridge use pursue queries.
 
 ## Child Agents
 

@@ -36,6 +36,15 @@ public sealed class SlashOptionMapTests
     }
 
     [Fact]
+    public void From_AddsTheTerminalPursueInspectorCompletion()
+    {
+        var commands = SlashOptionMap.From(SlashMenu.Create(null));
+        var picker = SlashPicker.Create("/pursue vi", commands);
+        Assert.NotNull(picker);
+        Assert.Equal("/pursue view ", picker.CompletedText);
+    }
+
+    [Fact]
     public void From_ToolPolicyCompletesThroughThePicker()
     {
         var menu = new SlashCompletion("tools", "tools", ["tools"], ToolCompletions.All);

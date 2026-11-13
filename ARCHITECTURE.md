@@ -239,6 +239,21 @@ text. Non-interactive output renders the same widget directly. The shell
 progress region owns transient indeterminate progress and elapsed time;
 static command reports remain committed transcript widgets.
 
+Terminal `PursuePage` owns the live inspector's stable check-id selection,
+follow-latest state, cached unstyled detail rows, and independent detail
+scroll. It draws `PaintLine` frames using existing theme tokens and
+`TranscriptScrollbar`, side by side from 100 columns and stacked below.
+`SessionProjection` forwards parent `PursueChanged` even when a child has
+focus. `SessionRenderer` paints the page in its existing polling loop,
+reserves footer rows for progress and navigation, and keeps the parent
+composer, transcript, and stream in place. Parent activity uses a separate
+progress chrome while a child has focus, preventing child progress from
+being shown as pursue activity. Modals suspend the page without discarding
+its selection or scroll. F9 and terminal-only `/pursue view` are intercepted
+in the renderer; `SlashOptionMap` adds that completion only for the terminal.
+Pause/resume keys return ordinary slash input to the host, never invoke
+execution directly. No engine command, event, or protocol is added.
+
 Plugin syntax paint uses Display-owned `SyntaxSpan` values and a cache lookup
 callback on `MarkdownRenderer` and `TranscriptLog`. Display never references
 plugin or engine contracts. The terminal host adapts validated engine tokens

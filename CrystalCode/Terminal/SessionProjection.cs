@@ -1,3 +1,5 @@
+using Crystal.Chat;
+
 using CrystalCode.Display.Cards;
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Shell;
@@ -292,6 +294,51 @@ internal sealed class SessionProjection : ISessionObserver
     {
         lock (_projectionGate)
         {
+            // Pursue belongs to the parent even while a child transcript has focus.
+            switch (sessionEvent)
+            {
+                case PursueChanged changed:
+                    _renderer.SetPursue(changed.Pursue);
+                    return;
+                case ActivityChanged activity:
+                    _renderer.SetPursueProgress(Caption(activity.Activity));
+                    break;
+                case ApprovalReviewing reviewing:
+                    _renderer.SetPursueProgress(reviewing.Stage == ApprovalReviewStage.Extended
+                        ? ProgressText.ExtendedReviewing : ProgressText.Reviewing);
+                    break;
+                case ApprovalPassed passed:
+                    _renderer.SetPursueProgress(ProgressText.Running(passed.Call.Name));
+                    break;
+                case StreamReceived { StreamEvent: ChatTextDelta { Text.Length: > 0 } }:
+                    _renderer.SetPursueProgress(ProgressText.Writing);
+                    break;
+                case StreamReceived { StreamEvent: ChatReasoningTextDelta { Text.Length: > 0 } }:
+                    _renderer.SetPursueProgress(ProgressText.Thinking);
+                    break;
+                case ToolCallsIssued { Calls.Count: > 0 } calls:
+                    _renderer.SetPursueProgress(ProgressText.Running(calls.Calls[0].Name));
+                    break;
+                case ToolResultsReceived:
+                    _renderer.SetPursueProgress(ProgressText.WaitingForModel);
+                    break;
+                case RetryScheduled retry:
+                    _renderer.SetPursueRetry(retry.Attempt);
+                    break;
+                case TurnFinished:
+                    _renderer.SetPursueProgress(string.Empty);
+                    break;
+                case ErrorWritten error:
+                    _renderer.ShowPursueError(error.Text);
+                    break;
+                case ConversationCleared:
+                case HistoryReplayed:
+                    _renderer.ResetPursue();
+                    break;
+                default:
+                    break;
+            }
+
             if (sessionEvent is ActivityChanged changedActivity)
             {
                 // Submission is held in every view, including a child view.
