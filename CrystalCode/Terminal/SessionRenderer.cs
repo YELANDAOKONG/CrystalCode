@@ -97,6 +97,7 @@ public sealed class SessionRenderer : IDisposable
     private AlternateScreen? _screen;
     private SlashPicker? _picker;
     private QuickPromptPicker? _quickPicker;
+    private ResumePicker? _resumePicker;
     private bool _quickOpenRequested;
     private bool _quickSubmission;
     private FullScreenEditor? _editor;
@@ -370,7 +371,7 @@ public sealed class SessionRenderer : IDisposable
         {
             lock (_gate)
             {
-                return _pursuePage is not null || _overlayWidget is not null || _modalOverlay.Count > 0;
+                return _pursuePage is not null || _resumePicker is not null || _overlayWidget is not null || _modalOverlay.Count > 0;
             }
         }
     }
@@ -2025,6 +2026,61 @@ public sealed class SessionRenderer : IDisposable
             pageRows,
             out delta);
 
+    internal async Task<string?> ReadResumePickerAsync(ResumePicker picker, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            CommitLiveUnlocked();
+            PauseComposer();
+            _resumePicker = picker;
+        }
+
+        try
+        {
+            lock (_gate)
+            {
+                PaintUnlocked(force: true);
+            }
+
+            while (!picker.Closed)
+            {
+                var burst = await ReadAvailableKeysAsync(wake: null, ignorePause: true, cancellationToken);
+                if (burst is null)
+                {
+                    continue;
+                }
+
+                lock (_gate)
+                {
+                    foreach (var item in _decoder.Push(burst))
+                    {
+                        picker.Handle(item);
+                        if (picker.Closed)
+                        {
+                            break;
+                        }
+                    }
+
+                    if (!picker.Closed)
+                    {
+                        PaintUnlocked(force: true);
+                    }
+                }
+            }
+
+            return picker.ChosenId;
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _resumePicker = null;
+                ResumeComposer();
+            }
+        }
+    }
+
     internal async Task<string?> ReadOverlayInputAsync(
         string initialText,
         Func<string, int, IRenderable> widget,
@@ -2581,6 +2637,16 @@ public sealed class SessionRenderer : IDisposable
         _chrome.TickSpinner(now);
         TickSideSpinner(now);
         RefreshRetryCaptionUnlocked(now);
+        if (_resumePicker is not null)
+        {
+            _painter.PaintFrame(_resumePicker.Paint(width, height), width, height,
+                resetFrame: width != _paintedWidth || height != _paintedHeight);
+            _paintedWidth = width;
+            _paintedHeight = height;
+            _lastPaint = now;
+            return;
+        }
+
         if (_pursuePage is not null && !_composerPaused && _overlayWidget is null && _modalOverlay.Count == 0)
         {
             _painter.PaintFrame(PursueFrameUnlocked(width, height, now), width, height,

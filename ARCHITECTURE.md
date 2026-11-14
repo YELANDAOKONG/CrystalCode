@@ -341,7 +341,7 @@ CrystalCode.Display:
 | Folder | Owns |
 | :--- | :--- |
 | `Input` | Decode ReadKey bursts into keys, paste, and wheel events |
-| `Shell` | Alternate screen, painter, layout, key burst, scroll policy, status and progress chrome |
+| `Shell` | Alternate screen, painter, layout, key burst, scroll policy, status and progress chrome, full-screen resume picker |
 | `Composer` | Prompt buffer, keys, slash picker |
 | `Cards` | Queue overlay |
 | `Transcript` | Viewport log, role cards, sequential fallback |
@@ -1878,7 +1878,14 @@ existing directory and a session id is rejected. After a workspace change,
 the live system prompt is refreshed from that directory's Plan, Work, or custom-mode text;
 the summary and tail are kept. The selector lists resumable sessions newest
 first by update time, supports typing to filter by id, preview, or workspace
-path, and leaves the current session untouched on Escape. Usage is restored
+path, and leaves the current session untouched on Escape. Both terminal entry
+points map session summaries to Display `ResumeOption` values through
+`SessionPicker`. Display `ResumePicker` owns search, selection, and the
+height-based list viewport and paints the scrollbar with
+`TranscriptScrollbar`. `SessionRenderer` pauses the composer, routes decoded
+input to the page, and restores the previous frame on exit. Wheel input
+scrolls the list and moves the selection only when it would leave the
+viewport. Usage is restored
 so the status bar, `/status`, and the next compact decision
 have a baseline. Sessions saved before cumulative usage was introduced retain
 an unknown cumulative value rather than treating their last request as the

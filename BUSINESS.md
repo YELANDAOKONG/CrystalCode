@@ -317,7 +317,10 @@ separate library with no terminal code. The product can:
   write `prompt.json`;
 - list saved sessions for the current workspace or every workspace; resume the
   current workspace, a named directory, or every workspace, entering that
-  directory when the choice names one; and fork into a new independent session;
+  directory when the choice names one; and fork into a new independent session.
+  The terminal resume picker is full-screen both at launch and inside a
+  session. It supports typing to filter, keyboard selection, and mouse wheel
+  scrolling;
 - discover OpenCode-compatible agent skills and load them through the
   `skill` tool when Skills is enabled;
 - discover operator tool sets under `~/.crystal/tools` and

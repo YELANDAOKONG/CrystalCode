@@ -2253,8 +2253,8 @@ alternate screen, then print the session id and `crystal --resume <id>`.
 `kill` (SIGTERM), a system shutdown, or closing the terminal window
 (SIGHUP) interrupts the running turn, saves the session, and exits the same
 way. A second signal exits at once.
-`--resume` without a value opens a selector for this workspace before the
-alternate screen. `--resume <id>` loads that file and stays in the process
+`--resume` without a value opens a full-screen selector for this workspace
+before the session starts. `--resume <id>` loads that file and stays in the process
 workspace. `--resume <path>` lists that directory and, after a session is
 chosen, enters it. `--resume all` lists every workspace and enters the
 chosen session's directory. `--workspace` and `--resume <path>` must name
@@ -2268,6 +2268,11 @@ opens. Escape leaves the current workspace unchanged. Choosing a session
 from `/resume all` asks for trust before entering that session's directory.
 Declining trust does not restore the session. `/resume <id>` restores that
 transcript and stays in the current workspace.
+
+The selector lists sessions newest first. Type to filter by title, first
+message, ID, or workspace path. Use Up/Down or PgUp/PgDn to move the
+selection. The mouse wheel scrolls the list and keeps the selection within
+view. Enter resumes the highlighted session and Esc closes the selector.
 
 | Command | Effect |
 | :--- | :--- |
