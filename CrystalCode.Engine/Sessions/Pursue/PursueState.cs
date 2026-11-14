@@ -30,6 +30,16 @@ public sealed record PursueState(
     public PursueState Active(PursuePhase phase) =>
         this with { Status = PursueStatus.Active, Phase = phase, ReasonCode = string.Empty, Reason = string.Empty };
 
+    internal PursueState BeginRun() => this with
+    {
+        Status = PursueStatus.Active,
+        Phase = PursuePhase.Working,
+        RunId = Guid.NewGuid().ToString("N"),
+        Checks = 0,
+        Continuations = 0,
+        Stalls = 0
+    };
+
     public PursueState Stopped(PursueStatus status, string reasonCode, string reason) =>
         this with { Status = status, Phase = PursuePhase.None, ReasonCode = reasonCode, Reason = reason };
 

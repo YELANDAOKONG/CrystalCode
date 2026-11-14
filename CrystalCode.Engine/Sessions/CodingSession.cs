@@ -11042,7 +11042,11 @@ public sealed class CodingSession : ITurnObserver
                 Objective = state.Objective,
                 Status = PursueState.StatusToken(state.Status),
                 ReasonCode = state.ReasonCode,
-                Reason = state.Reason
+                Reason = state.Reason,
+                Checks = state.Checks,
+                Continuations = state.Continuations,
+                Stalls = state.Stalls,
+                NextStep = state.NextStep
             }
             : null;
 
@@ -11059,11 +11063,19 @@ public sealed class CodingSession : ITurnObserver
             return null;
         }
 
+        var history = document.History ?? [];
+        var lastCheck = history.LastOrDefault(check => check.RunId == document.RunId);
+        var lastNextStep = history.LastOrDefault(check =>
+            check.RunId == document.RunId && check.NextStep.Length > 0)?.NextStep;
         var state = PursueState.Start(document.Objective) with
         {
             Id = document.Id ?? Guid.NewGuid().ToString("N"),
             RunId = document.RunId ?? string.Empty,
-            History = document.History ?? []
+            History = history,
+            Checks = Math.Max(0, document.Checks ?? lastCheck?.Index ?? 0),
+            Continuations = Math.Max(0, document.Continuations ?? 0),
+            Stalls = Math.Max(0, document.Stalls ?? 0),
+            NextStep = document.NextStep ?? lastNextStep ?? string.Empty
         };
         var reasonCode = document.ReasonCode ?? string.Empty;
         var reason = document.Reason ?? string.Empty;
@@ -11136,7 +11148,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var previous = _pursue;
-        _pursue = PursueState.Start(text);
+        _pursue = PursueState.Start(text).BeginRun();
         ShowPursue();
         try
         {
@@ -11157,7 +11169,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        _pursue = previous.Active(PursuePhase.Working);
+        _pursue = previous.BeginRun();
         ShowPursue();
         try
         {
@@ -11448,6 +11460,7 @@ public sealed class CodingSession : ITurnObserver
     private async Task<PursueCheck> CheckPursueAsync(
         IReadOnlyList<ChatItem> transcript,
         PursueState state,
+        PursueHostAdapter host,
         CancellationToken cancellationToken)
     {
         HarnessSettings selected;
@@ -11462,18 +11475,38 @@ public sealed class CodingSession : ITurnObserver
 
         var context = CurrentPromptContext().WithMode("pursue");
         var system = _prompts.ComposePursue(context, _placeholders);
-        // Characters, not tokens: about three per token, with room kept for the reply.
+        var marker = Guid.NewGuid().ToString("N");
+        var userParts = PromptBinder.Apply(
+            _prompts.PursueUser,
+            new PromptBinding(
+                Session: context,
+                Placeholders: _placeholders,
+                Pursue: new PursuePromptContext(state.Objective, marker, CurrentModeName())))
+            .Split(marker, StringSplitOptions.None);
+
+        // Use the bound template so repeated conversation placeholders share the input budget.
         var reserve = Math.Min(PursueOutputReserveTokens, selected.ContextWindow / 4);
-        var budget = Math.Max(0, ((selected.ContextWindow - reserve) * 3) - system.Length - state.Objective.Length);
-        var rendering = PursueConversation.Render(transcript, budget);
+        var available = ((long)selected.ContextWindow - reserve) * 3 - system.Length
+            - userParts.Sum(part => (long)part.Length);
+        if (available < 0)
+        {
+            return PursueCheck.Failed(
+                PursueCheckFailure.Overflow,
+                "The pursue checker prompt does not fit in the model's context.");
+        }
+
+        var budget = (int)Math.Clamp(available / Math.Max(1, userParts.Length - 1), 0, int.MaxValue);
+        var conversation = host.GetCheckerConversation(transcript);
+        var rendering = PursueConversation.Render(conversation, budget);
         if (rendering.Omitted)
         {
             // Summarize the older entries instead of dropping them; if that
             // fails the oldest entries are dropped as before.
-            var compacted = await CompactForPursueAsync(transcript, selected, cancellationToken);
+            var compacted = await CompactForPursueAsync(conversation, selected, cancellationToken);
             if (compacted is not null)
             {
                 rendering = PursueConversation.Render(compacted, budget);
+                host.RememberCheckerConversation(transcript, compacted);
             }
         }
 
@@ -11481,15 +11514,10 @@ public sealed class CodingSession : ITurnObserver
         {
             return PursueCheck.Failed(
                 PursueCheckFailure.Overflow,
-                "The newest conversation entry does not fit in the pursue model's context.");
+                "The pursue checker prompt and newest conversation entry do not fit in the model's context.");
         }
 
-        var user = PromptBinder.Apply(
-            _prompts.PursueUser,
-            new PromptBinding(
-                Session: context,
-                Placeholders: _placeholders,
-                Pursue: new PursuePromptContext(state.Objective, rendering.Text, CurrentModeName())));
+        var user = string.Join(rendering.Text, userParts);
         var request = new ChatRequest(
             [new ChatMessage(ChatRole.System, system), new ChatMessage(ChatRole.User, user)],
             [],
@@ -11628,6 +11656,9 @@ public sealed class CodingSession : ITurnObserver
 
     private sealed class PursueHostAdapter(CodingSession session) : IPursueHost
     {
+        private IReadOnlyList<ChatItem> _summarySource = [];
+        private IReadOnlyList<ChatItem> _summaryConversation = [];
+
         public bool HasQueuedInput => session._queue.Count > 0 || session._deferredStops.Count > 0;
 
         public Task<TurnResult> RunSegmentAsync(
@@ -11640,7 +11671,28 @@ public sealed class CodingSession : ITurnObserver
             IReadOnlyList<ChatItem> transcript,
             PursueState state,
             CancellationToken cancellationToken) =>
-            session.CheckPursueAsync(transcript, state, cancellationToken);
+            session.CheckPursueAsync(transcript, state, this, cancellationToken);
+
+        public IReadOnlyList<ChatItem> GetCheckerConversation(IReadOnlyList<ChatItem> transcript)
+        {
+            if (_summarySource.Count > 0 && transcript.Count >= _summarySource.Count
+                && _summarySource.SequenceEqual(transcript.Take(_summarySource.Count), ReferenceEqualityComparer.Instance))
+            {
+                return [.. _summaryConversation, .. transcript.Skip(_summarySource.Count)];
+            }
+
+            _summarySource = [];
+            _summaryConversation = [];
+            return transcript;
+        }
+
+        public void RememberCheckerConversation(
+            IReadOnlyList<ChatItem> source,
+            IReadOnlyList<ChatItem> compacted)
+        {
+            _summarySource = [.. source];
+            _summaryConversation = compacted;
+        }
 
         public bool TryReserveCheck() => session._sharedBudget?.TryModelCall() ?? true;
 
@@ -11649,10 +11701,33 @@ public sealed class CodingSession : ITurnObserver
 
         public void CommitContinuation(ChatMessage message) => session.CommitTurnItems([message]);
 
-        public bool TaskExists(string taskId) => session._backgroundTasks.TryGetSnapshot(taskId, out _);
+        public BackgroundTaskSnapshot? FindTask(string taskId) =>
+            session._backgroundTasks.TryGetSnapshot(taskId, out var snapshot) ? snapshot : null;
 
-        public Task<bool> WaitAnyAsync(IReadOnlyList<string> taskIds, CancellationToken cancellationToken) =>
-            session._backgroundTasks.WaitAnyAsync(taskIds, cancellationToken);
+        public async Task<bool> WaitForTaskOrInputAsync(
+            IReadOnlyList<string> taskIds,
+            CancellationToken cancellationToken)
+        {
+            using var waiting = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var queued = session._queue.WhenNotEmpty();
+            var finished = session._backgroundTasks.WaitAnyAsync(taskIds, includeCompleted: true, waiting.Token);
+            if (await Task.WhenAny(queued, finished) == queued)
+            {
+                await waiting.CancelAsync();
+                try
+                {
+                    await finished;
+                }
+                catch (OperationCanceledException) when (waiting.IsCancellationRequested)
+                {
+                }
+
+                return true;
+            }
+
+            await finished;
+            return false;
+        }
 
         public void Publish(PursueState state)
         {

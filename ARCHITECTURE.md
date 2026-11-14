@@ -701,11 +701,21 @@ The checker reads a numbered rendering of the transcript that drops the oldest
 entries to fit its own context, cites entry numbers, and its JSON answer is
 parsed strictly by `PursueVerdictParser` with no repair request. Transport
 failures use the `retry` policy. Checker usage goes to the ledger through
-`RecordChildUsage`. A wait verdict waits on `BackgroundTaskRegistry.WaitAnyAsync`
-for listed session tasks only. New stop reasons are `pursue_blocked` and
+`RecordChildUsage`. A wait verdict races completion of the listed session
+tasks against queued input. A task result is delivered once per run through
+a budgeted continuation to the working model. The host adds only task ids,
+statuses, and available exit codes from the registry to the continuation.
+New stop reasons are `pursue_blocked` and
 `pursue_limit_reached`. State is `PursueState`; `PursueChanged` and
 `PursueChecked` events, `SessionSnapshot.Pursue`, and `SessionDocument.Pursue`
 carry it. Continuation messages are saved as ordinary user messages.
+
+The checker reserves response space and budgets the bound prompt, including
+repeated conversation placeholders and omission notices. Its run-local
+compaction cache keeps the summary and tail while the original items are
+unchanged, appends new items, and folds older items into the cached summary
+when needed. Changed or replaced prefixes invalidate the cache. The working
+transcript and previously captured evidence remain independent of that cache.
 
 `PursueState.History` holds immutable `PursueCheckRecord` values with objective,
 run, and check ids, UTC time, verdict or failure, reason, next step, wait task
@@ -714,8 +724,13 @@ captures evidence before the temporary checker context disappears. Numbers
 are local to that rendering, never archive indexes. Each completed attempt
 updates state and checkpoints before its `PursueChecked` notification. Failed
 attempts count as checks and use verdict `failed`; retries remain one attempt.
-`PursueDocument` saves identities and history; older documents load an empty
-history. Resume retains it, while start, clear, and fork replace or drop it.
+Appends share immutable history across state snapshots. The terminal inspector
+keeps the selected row index and reuses its wrapped evidence until the record,
+visible state text, or pane width changes.
+`PursueDocument` saves identities, history, run counters, and next step.
+Older documents without counters recover the check count and next step from
+matching history where available. A new run resets counters while retaining
+the objective's history on resume. Start, clear, and fork replace or drop it.
 `SessionState` receives history through `PursueChanged`; HTTP and ACP writers
 emit only `checkCount` and `latestCheck` with the state. `GetPursue`,
 `ListPursueChecks`, and `GetPursueCheck` are Engine queries through the runner.

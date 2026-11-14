@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
 
 using Crystal;
@@ -5,6 +6,7 @@ using Crystal.Chat;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions.Pursue;
 
@@ -19,6 +21,8 @@ internal sealed class PursueRun
     private readonly IPursueHost _host;
     private readonly PursueLimits _limits;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly HashSet<string> _reportedTasks = new(StringComparer.Ordinal);
+    private ImmutableList<PursueCheckRecord> _history;
     private PursueState _state;
     private IReadOnlyList<ChatItem> _transcript = [];
     private int _modelCalls;
@@ -34,7 +38,8 @@ internal sealed class PursueRun
         ArgumentNullException.ThrowIfNull(state);
         _host = host;
         _limits = limits;
-        _state = state with { Checks = 0, Continuations = 0, Stalls = 0, RunId = Guid.NewGuid().ToString("N") };
+        _state = state;
+        _history = state.History.ToImmutableList();
     }
 
     public async Task<TurnResult> RunAsync(
@@ -50,34 +55,28 @@ internal sealed class PursueRun
         }
 
         var lastNextStep = string.Empty;
-        var needSegment = true;
-        var segmentToolCalls = 0;
         while (true)
         {
-            if (needSegment)
+            SetPhase(PursuePhase.Working);
+            var remaining = Remaining();
+            if (remaining is { } left && left <= TimeSpan.Zero)
             {
-                SetPhase(PursuePhase.Working);
-                var remaining = Remaining();
-                if (remaining is { } left && left <= TimeSpan.Zero)
-                {
-                    return Stop(TurnStopReason.DurationLimitReached, PursueReasonCodes.DurationLimit, "The pursue duration limit was reached.");
-                }
+                return Stop(TurnStopReason.DurationLimitReached, PursueReasonCodes.DurationLimit, "The pursue duration limit was reached.");
+            }
 
-                var segment = await _host.RunSegmentAsync(
-                    _transcript,
-                    new TurnLimits(null, null, remaining),
-                    cancellationToken);
-                Add(segment);
-                segmentToolCalls = segment.ToolCallCount;
-                if (segment.StopReason != TurnStopReason.Completed)
-                {
-                    return StopForSegment(segment.StopReason);
-                }
+            var segment = await _host.RunSegmentAsync(
+                _transcript,
+                new TurnLimits(null, null, remaining),
+                cancellationToken);
+            Add(segment);
+            if (segment.StopReason != TurnStopReason.Completed)
+            {
+                return StopForSegment(segment.StopReason);
+            }
 
-                if (_host.HasQueuedInput)
-                {
-                    return Stop(TurnStopReason.Completed, PursueReasonCodes.InputPending, "New input arrived, so the pursuit paused.");
-                }
+            if (_host.HasQueuedInput)
+            {
+                return StopForQueuedInput();
             }
 
             if (!_host.TryReserveCheck())
@@ -114,7 +113,6 @@ internal sealed class PursueRun
                         return waited;
                     }
 
-                    needSegment = false;
                     continue;
                 case PursueVerdictKind.Continue:
                     break;
@@ -124,15 +122,15 @@ internal sealed class PursueRun
 
             if (_host.HasQueuedInput)
             {
-                return Stop(TurnStopReason.Completed, PursueReasonCodes.InputPending, "New input arrived, so the pursuit paused.");
+                return StopForQueuedInput();
             }
 
-            var noProgress = needSegment && segmentToolCalls == 0;
-            var repeated = string.Equals(Normalize(verdict.NextStep), lastNextStep, StringComparison.Ordinal);
-            lastNextStep = Normalize(verdict.NextStep);
+            var nextStep = Normalize(verdict.NextStep);
+            var repeated = string.Equals(nextStep, lastNextStep, StringComparison.Ordinal);
+            lastNextStep = nextStep;
             _state = _state with
             {
-                Stalls = noProgress || repeated ? _state.Stalls + 1 : 0,
+                Stalls = segment.ToolCallCount == 0 || repeated ? _state.Stalls + 1 : 0,
                 NextStep = verdict.NextStep
             };
             if (_state.Stalls >= _limits.MaximumStalls)
@@ -140,14 +138,10 @@ internal sealed class PursueRun
                 return Stop(TurnStopReason.PursueLimitReached, PursueReasonCodes.Stalled, "The run made no progress for several checks in a row.");
             }
 
-            if (_limits.MaximumContinuations is int maximum && _state.Continuations >= maximum)
+            if (Continue(verdict) is { } stopped)
             {
-                return Stop(TurnStopReason.PursueLimitReached, PursueReasonCodes.ContinuationLimit, "The pursue continuation limit was reached.");
+                return stopped;
             }
-
-            _state = _state with { Continuations = _state.Continuations + 1 };
-            AppendContinuation(resumed: false, verdict);
-            needSegment = true;
         }
     }
 
@@ -160,7 +154,8 @@ internal sealed class PursueRun
             verdict is null ? "failed" : PursueVerdict.Token(verdict.Kind),
             verdict?.Reason ?? check.Error, verdict?.NextStep ?? string.Empty,
             check.Evidence, verdict?.WaitFor ?? [], check.Usage);
-        _state = _state with { Checks = record.Index, History = [.. _state.History, record] };
+        _history = _history.Add(record);
+        _state = _state with { Checks = record.Index, History = _history };
         _host.Publish(_state);
         _host.Publish(new PursueChecked(record.Index, record.Verdict, record.Reason, record.NextStep,
             verdict?.Evidence ?? [], record.Usage, record));
@@ -186,10 +181,39 @@ internal sealed class PursueRun
 
     private async Task<TurnResult?> WaitAsync(PursueVerdict verdict, CancellationToken cancellationToken)
     {
-        if (verdict.WaitFor.Any(id => !_host.TaskExists(id)))
+        var taskIds = new List<string>();
+        var completed = new List<BackgroundTaskSnapshot>();
+        foreach (var id in verdict.WaitFor.Distinct(StringComparer.Ordinal))
         {
-            _host.Error("The checker named a background task that does not exist in this session.");
-            return Stop(TurnStopReason.Failed, PursueReasonCodes.ReviewInvalid, "The checker named an unknown background task.");
+            var task = _host.FindTask(id);
+            if (task is null)
+            {
+                return InvalidWait("The checker named an unknown background task.");
+            }
+
+            if (!_reportedTasks.Contains(id))
+            {
+                taskIds.Add(id);
+                if (IsFinished(task))
+                {
+                    completed.Add(task);
+                }
+            }
+        }
+
+        if (taskIds.Count == 0)
+        {
+            return InvalidWait("The checker is still waiting for background tasks whose results were already reported.");
+        }
+
+        if (_host.HasQueuedInput)
+        {
+            return StopForQueuedInput();
+        }
+
+        if (completed.Count > 0)
+        {
+            return ContinueAfterWait(verdict, completed);
         }
 
         SetPhase(PursuePhase.Waiting);
@@ -208,10 +232,24 @@ internal sealed class PursueRun
 
         try
         {
-            await _host.WaitAnyAsync(verdict.WaitFor, linked.Token);
-            return _host.HasQueuedInput
-                ? Stop(TurnStopReason.Completed, PursueReasonCodes.InputPending, "New input arrived, so the pursuit paused.")
-                : null;
+            var queued = await _host.WaitForTaskOrInputAsync(taskIds, linked.Token);
+            if (queued || _host.HasQueuedInput)
+            {
+                return StopForQueuedInput();
+            }
+
+            linked.Token.ThrowIfCancellationRequested();
+            foreach (var id in taskIds)
+            {
+                if (_host.FindTask(id) is { } task && IsFinished(task))
+                {
+                    completed.Add(task);
+                }
+            }
+
+            return completed.Count > 0
+                ? ContinueAfterWait(verdict, completed)
+                : InvalidWait("The background tasks are no longer available.");
         }
         catch (OperationCanceledException)
         {
@@ -225,6 +263,48 @@ internal sealed class PursueRun
                 : Stop(TurnStopReason.PursueLimitReached, PursueReasonCodes.WaitTimeout, "Waiting for a background task timed out.");
         }
     }
+
+    private static bool IsFinished(BackgroundTaskSnapshot task) =>
+        task.Status is not (BackgroundTaskStatus.Starting or BackgroundTaskStatus.Running);
+
+    private TurnResult? ContinueAfterWait(PursueVerdict verdict, IReadOnlyList<BackgroundTaskSnapshot> completed)
+    {
+        var results = new List<string>(completed.Count);
+        foreach (var task in completed)
+        {
+            _reportedTasks.Add(task.TaskId);
+            results.Add(task.ExitCode is int exitCode
+                ? FormattableString.Invariant($"- {task.TaskId}: {task.Status} (exit code {exitCode})")
+                : $"- {task.TaskId}: {task.Status}");
+        }
+
+        const string nextStep = "Review the finished background tasks and continue the objective as needed.";
+        _state = _state with { Stalls = 0, NextStep = nextStep };
+        return Continue(
+            verdict with { NextStep = nextStep },
+            "Background task results:\n" + string.Join("\n", results));
+    }
+
+    private TurnResult? Continue(PursueVerdict verdict, string? taskResults = null)
+    {
+        if (_limits.MaximumContinuations is int maximum && _state.Continuations >= maximum)
+        {
+            return Stop(TurnStopReason.PursueLimitReached, PursueReasonCodes.ContinuationLimit, "The pursue continuation limit was reached.");
+        }
+
+        _state = _state with { Continuations = _state.Continuations + 1 };
+        AppendContinuation(resumed: false, verdict, taskResults);
+        return null;
+    }
+
+    private TurnResult InvalidWait(string message)
+    {
+        _host.Error(message);
+        return Stop(TurnStopReason.Failed, PursueReasonCodes.ReviewInvalid, message);
+    }
+
+    private TurnResult StopForQueuedInput() =>
+        Stop(TurnStopReason.Completed, PursueReasonCodes.InputPending, "New input arrived, so the pursuit paused.");
 
     private TurnResult TimedOutOrInterrupted(CancellationToken cancellationToken) =>
         cancellationToken.IsCancellationRequested
@@ -279,7 +359,7 @@ internal sealed class PursueRun
         return Stop(stop, PursueReasonCodes.RunFailed, "The working model stopped with " + stop.Value + ".");
     }
 
-    private void AppendContinuation(bool resumed, PursueVerdict? verdict = null)
+    private void AppendContinuation(bool resumed, PursueVerdict? verdict = null, string? taskResults = null)
     {
         var remaining = _limits.MaximumContinuations is int maximum
             ? Math.Max(0, maximum - _state.Continuations)
@@ -288,6 +368,11 @@ internal sealed class PursueRun
             ? _state
             : _state with { Reason = verdict.Reason, NextStep = verdict.NextStep };
         var message = _host.BuildContinuation(state, remaining, resumed);
+        if (taskResults is not null)
+        {
+            message = new ChatMessage(message.Role, message.Text + "\n\n" + taskResults);
+        }
+
         _host.CommitContinuation(message);
         _transcript = [.. _transcript, message];
     }

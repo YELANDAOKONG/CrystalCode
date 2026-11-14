@@ -47,20 +47,36 @@ internal static class PursueConversation
 
         var shown = new List<string>();
         var numbers = new HashSet<int>();
-        var used = 0;
+        long used = 0;
         for (var index = entries.Count - 1; index >= 0; index--)
         {
             var line = (entries[index].Number is int cited ? "[" + cited + "] " : SummaryLabel + " ") + entries[index].Text;
-            if (used + line.Length > maxCharacters)
+            var separatedLength = shown.Count == 0 ? line.Length : line.Length + 2L;
+            if (used + separatedLength > maxCharacters)
             {
                 break;
             }
 
-            used += line.Length + 2;
+            used += separatedLength;
             shown.Add(line);
             if (entries[index].Number is int shownNumber)
             {
                 numbers.Add(shownNumber);
+            }
+        }
+
+        if (shown.Count < entries.Count)
+        {
+            while (shown.Count > 0 && used + OmittedNote.Length + 2L > maxCharacters)
+            {
+                var removedIndex = entries.Count - shown.Count;
+                if (entries[removedIndex].Number is int removedNumber)
+                {
+                    numbers.Remove(removedNumber);
+                }
+
+                used -= shown[^1].Length + (shown.Count > 1 ? 2 : 0);
+                shown.RemoveAt(shown.Count - 1);
             }
         }
 

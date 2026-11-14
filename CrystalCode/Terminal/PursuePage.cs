@@ -19,43 +19,48 @@ internal sealed class PursuePage
     private const int MaximumStackedChecks = 4;
     private const int BarColumns = 10;
     private PursueState? _state;
-    private string? _selectedId;
+    private int _selectedIndex = -1;
     private bool _followLatest = true;
     private int _scroll;
     private int _detailRows = 1;
     private int _detailCount;
-    private string? _cachedId;
-    private PursueState? _cachedState;
+    private PursueCheckRecord? _cachedCheck;
+    private string? _cachedObjective;
+    private string? _cachedReason;
+    private string? _cachedNextStep;
     private int _cachedWidth;
     private IReadOnlyList<(string Text, string Style)> _detail = [];
     private string? _notice;
 
     public void ShowError(string text) => _notice = text;
 
-    internal string? SelectedId => _selectedId;
+    internal string? SelectedId => _selectedIndex >= 0 ? History[_selectedIndex].Id : null;
     internal int Scroll => _scroll;
     internal bool FollowLatest => _followLatest;
 
     public void Update(PursueState? state)
     {
+        var selectedId = SelectedId;
         if (_state?.Id != state?.Id)
         {
-            _selectedId = null;
             _followLatest = true;
             _scroll = 0;
             _notice = null;
         }
 
         _state = state;
-        if (_followLatest || !History.Any(check => check.Id == _selectedId))
+        if (_followLatest || selectedId is null)
         {
-            var latest = History.LastOrDefault()?.Id;
-            if (latest != _selectedId)
-            {
-                _scroll = 0;
-            }
+            _selectedIndex = History.Count - 1;
+        }
+        else if (_selectedIndex >= History.Count || History[_selectedIndex].Id != selectedId)
+        {
+            _selectedIndex = FindSelection(selectedId);
+        }
 
-            _selectedId = latest;
+        if (SelectedId != selectedId)
+        {
+            _scroll = 0;
         }
     }
 
@@ -76,7 +81,7 @@ internal sealed class PursuePage
                 break;
             case InputKey { Key: ConsoleKey.L, Modifiers: ConsoleModifiers.None }:
                 _followLatest = true;
-                _selectedId = History.LastOrDefault()?.Id;
+                _selectedIndex = History.Count - 1;
                 _scroll = 0;
                 break;
             case InputKey { Key: ConsoleKey.Home }:
@@ -146,23 +151,22 @@ internal sealed class PursuePage
             return;
         }
 
-        var index = SelectedIndex();
-        _selectedId = History[Math.Clamp(index + delta, 0, History.Count - 1)].Id;
+        _selectedIndex = Math.Clamp(_selectedIndex + delta, 0, History.Count - 1);
         _followLatest = false;
         _scroll = 0;
     }
 
-    private int SelectedIndex()
+    private int FindSelection(string selectedId)
     {
         for (var index = 0; index < History.Count; index++)
         {
-            if (History[index].Id == _selectedId)
+            if (History[index].Id == selectedId)
             {
                 return index;
             }
         }
 
-        return Math.Max(0, History.Count - 1);
+        return History.Count - 1;
     }
 
     private IReadOnlyList<PaintLine> Body(int width, int rows)
@@ -178,7 +182,7 @@ internal sealed class PursuePage
         var detail = Detail(Math.Max(1, detailWidth - TranscriptScrollbar.Columns));
         _detailCount = detail.Count;
         _scroll = Math.Clamp(_scroll, 0, Math.Max(0, detail.Count - _detailRows));
-        var selected = SelectedIndex();
+        var selected = _selectedIndex;
         // History is saved oldest first; the inspector lists the newest check first.
         var selectedRow = Math.Max(0, History.Count - 1 - selected);
         var start = Math.Clamp(selectedRow - listRows + 1, 0, Math.Max(0, History.Count - listRows));
@@ -226,8 +230,13 @@ internal sealed class PursuePage
 
     private IReadOnlyList<(string Text, string Style)> Detail(int width)
     {
-        var check = History.FirstOrDefault(item => item.Id == _selectedId);
-        if (_cachedId == check?.Id && _cachedState == _state && _cachedWidth == width)
+        var check = _selectedIndex >= 0 ? History[_selectedIndex] : null;
+        var objective = _state?.Objective;
+        var reason = _state?.Reason;
+        var nextStep = check is null ? _state?.NextStep : null;
+        if (ReferenceEquals(_cachedCheck, check)
+            && _cachedObjective == objective && _cachedReason == reason
+            && _cachedNextStep == nextStep && _cachedWidth == width)
         {
             return _detail;
         }
@@ -236,17 +245,17 @@ internal sealed class PursuePage
         if (check is null)
         {
             Add("Objective", "heading");
-            Add(_state?.Objective ?? "No objective.", "user");
-            if (_state?.Reason is { Length: > 0 } reason)
+            Add(objective ?? "No objective.", "user");
+            if (reason is { Length: > 0 })
             {
                 Add("Reason", "heading");
                 Add(reason, "user");
             }
 
-            if (_state?.NextStep is { Length: > 0 } next)
+            if (nextStep is { Length: > 0 })
             {
                 Add("Next step", "heading");
-                Add(next, "user");
+                Add(nextStep, "user");
             }
 
             Add(_state is null ? "Close this page and use /pursue start <objective> to begin."
@@ -291,17 +300,19 @@ internal sealed class PursuePage
             }
 
             Add("Objective", "heading");
-            Add(_state?.Objective ?? "No objective.", "user");
+            Add(objective ?? "No objective.", "user");
             Add("Run " + check.RunId, "muted");
-            if (_state?.Reason is { Length: > 0 } reason)
+            if (reason is { Length: > 0 })
             {
                 Add("Current stop reason", "heading");
                 Add(reason, "user");
             }
         }
 
-        _cachedId = check?.Id;
-        _cachedState = _state;
+        _cachedCheck = check;
+        _cachedObjective = objective;
+        _cachedReason = reason;
+        _cachedNextStep = nextStep;
         _cachedWidth = width;
         _detail = lines;
         return lines;

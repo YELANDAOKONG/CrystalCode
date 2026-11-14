@@ -1,6 +1,7 @@
 using Crystal.Chat;
 
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions.Pursue;
 
@@ -31,9 +32,10 @@ internal interface IPursueHost
     /// <summary>Records a continuation message in the saved conversation.</summary>
     void CommitContinuation(ChatMessage message);
 
-    bool TaskExists(string taskId);
+    BackgroundTaskSnapshot? FindTask(string taskId);
 
-    Task<bool> WaitAnyAsync(IReadOnlyList<string> taskIds, CancellationToken cancellationToken);
+    /// <summary>Returns true when queued input ends the wait.</summary>
+    Task<bool> WaitForTaskOrInputAsync(IReadOnlyList<string> taskIds, CancellationToken cancellationToken);
 
     void Publish(PursueState state);
 

@@ -3,8 +3,7 @@ using CrystalCode.Engine.Sessions.Pursue;
 namespace CrystalCode.Engine.Home;
 
 /// <summary>
-/// The saved objective, stop reason, and checker history. Live counters belong
-/// to a run; individual check records retain their run and local index.
+/// The saved objective, most recent run, and checker history.
 /// </summary>
 public sealed class PursueDocument
 {
@@ -21,4 +20,12 @@ public sealed class PursueDocument
     public string? ReasonCode { get; set; }
 
     public string? Reason { get; set; }
+
+    public int? Checks { get; set; }
+
+    public int? Continuations { get; set; }
+
+    public int? Stalls { get; set; }
+
+    public string? NextStep { get; set; }
 }

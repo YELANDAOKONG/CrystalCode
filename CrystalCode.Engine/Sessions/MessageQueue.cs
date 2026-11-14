@@ -8,6 +8,17 @@ public sealed class MessageQueue
 {
     private readonly object _gate = new();
     private readonly List<(string Text, bool Interrupts)> _items = [];
+    private TaskCompletionSource? _inputAvailable;
+
+    internal Task WhenNotEmpty()
+    {
+        lock (_gate)
+        {
+            return _items.Count > 0
+                ? Task.CompletedTask
+                : (_inputAvailable ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+        }
+    }
 
     public int Count
     {
@@ -51,6 +62,8 @@ public sealed class MessageQueue
         lock (_gate)
         {
             _items.Add((preserveText ? text : trimmed, interruptAfterTools));
+            _inputAvailable?.SetResult();
+            _inputAvailable = null;
         }
     }
 

@@ -530,6 +530,12 @@ rules, and the approval mode are unchanged. The checker has no tools.
   never survives a restart: a saved active objective comes back paused.
   `/clear`, a fork, and a new session drop it. New input while a run works
   pauses it after the current segment and the input runs as the next turn.
+  New input while waiting for a background task ends the wait and pauses
+  the run so the queued input can run next.
+- After a named background task finishes, the working model receives its
+  status and exit code when available in an automatic continuation. That
+  continuation counts toward the usual limit. The checker cannot wait again
+  solely on tasks whose results have already been delivered in the run.
 - `/pursue pause`, `resume`, `clear`, and `status` control it. `model`,
   `thinking`, `tier`, `speed`, and `context` configure the checker like the
   topic model (no model means the session model). `limit` sets
@@ -548,7 +554,9 @@ rules, and the approval mode are unchanged. The checker has no tools.
   require admin scope; configuration reads require observe scope.
 - When the checker's view of the conversation does not fit, older entries are
   summarized by the pursue compaction model (`/pursue compaction`), else the
-  session compaction model, else the checker's own model; if that fails they are dropped. The summary is not citable.
+  session compaction model, else the checker's own model. A run reuses the
+  compacted view while the underlying conversation prefix is unchanged. If
+  summarization fails, older entries are dropped. The summary is not citable.
 - The checker prompts are `pursue.system` (overridable and appendable by prompt
   attachments), `pursue.user`, and `pursue.continue`. The verdict JSON format is
   host-owned (`{{verdict_format}}`); a reply off the contract pauses the run.
@@ -560,6 +568,7 @@ rules, and the approval mode are unchanged. The checker has no tools.
   Checking, or Waiting) or the stopped state (Paused, Blocked, or Complete).
   The counts describe the current or most recent run of the objective,
   including zero. With no objective, these fields occupy no cells.
+  Reopening a session restores the last run's counts and next step.
 - Each objective retains checker attempts across resume and process restarts,
   including failed, invalid, interrupted, and timed-out attempts. Objective,
   run, and check ids distinguish resumes whose local check indexes repeat.

@@ -1,3 +1,5 @@
+using System.Reflection;
+
 using Crystal;
 using Crystal.Chat;
 
@@ -7,6 +9,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Pursue;
+using CrystalCode.Engine.Tools;
 
 using Xunit;
 
@@ -66,6 +69,69 @@ public sealed class CodingSessionPursueTests
             archive,
             item => item.Text is not null && item.Text.Contains("automatic continuation", StringComparison.Ordinal)
                 && item.Text.Contains("Run the tests.", StringComparison.Ordinal));
+        using var restored = new HeadlessSession(new ScriptedStreamingClient(), resume: headless.ReadSaved());
+        await restored.Session.StartAsync(CancellationToken.None);
+        Assert.Equal(2, LastState(restored).Checks);
+        Assert.Equal(1, LastState(restored).Continuations);
+        Assert.Equal(1, LastState(restored).Stalls);
+        Assert.Equal("Run the tests.", LastState(restored).NextStep);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Wait_WakesForCompletionOrQueuedInput(bool queueInput)
+    {
+        var verdict = new List<ChatStreamEvent>();
+        var model = new ScriptedStreamingClient(
+            Text("Background work started."), verdict, Text("Follow-up response."), verdict);
+        using var headless = new HeadlessSession(model);
+        await headless.Session.StartAsync(CancellationToken.None);
+        var registry = Assert.IsType<BackgroundTaskRegistry>(typeof(CodingSession)
+            .GetField("_backgroundTasks", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(headless.Session));
+        Assert.True(registry.TryStart(
+            "while [ ! -f release ]; do sleep 0.1; done; exit 7", out var background, out var error), error);
+        verdict.AddRange(Text(
+            $$"""{"verdict":"wait","reason":"Wait for background work.","waitFor":["{{background.TaskId}}"]}"""));
+
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        headless.Observer.Hook = sessionEvent =>
+        {
+            if (sessionEvent is PursueChanged { Pursue.Phase: PursuePhase.Waiting })
+            {
+                waiting.TrySetResult();
+            }
+        };
+
+        await headless.Session.SubmitAsync("/pursue start finish the background work", CancellationToken.None);
+        var turn = headless.Session.TurnTask!;
+        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        if (queueInput)
+        {
+            await headless.Session.SubmitAsync("Please do something else.", CancellationToken.None);
+        }
+        else
+        {
+            File.WriteAllText(Path.Combine(headless.WorkspacePath, "release"), string.Empty);
+        }
+
+        await turn.WaitAsync(TimeSpan.FromSeconds(10));
+        await headless.Session.CompleteTurnAsync(CancellationToken.None);
+        if (queueInput)
+        {
+            Assert.Equal(PursueReasonCodes.InputPending, LastState(headless).ReasonCode);
+            Assert.True(registry.TryGetSnapshot(background.TaskId, out var snapshot));
+            Assert.Equal(BackgroundTaskStatus.Running, snapshot.Status);
+            Assert.Equal(0, LastState(headless).Continuations);
+        }
+        else
+        {
+            Assert.Equal(PursueReasonCodes.ReviewInvalid, LastState(headless).ReasonCode);
+            Assert.Equal(4, model.RequestCount);
+            Assert.Equal(1, LastState(headless).Continuations);
+            Assert.Contains(headless.ReadSaved().Archive!, item =>
+                item.Text?.Contains($"{background.TaskId}: Failed (exit code 7)", StringComparison.Ordinal) == true);
+        }
     }
 
     [Fact]
@@ -312,6 +378,61 @@ public sealed class CodingSessionPursueTests
 
         await headless.RunTurnAsync("/pursue compaction model");
         Assert.False(new DiskSettingsStore(headless.Home).Load().PursueModel.Compaction.HasSelection);
+    }
+
+    [Fact]
+    public async Task Compaction_ReusesTheCheckerSummaryForAnAppendedTranscript()
+    {
+        var model = new ScriptedStreamingClient(
+            Text("First segment finished."),
+            Text(Continue("Verify the result.", "The result needs verification.")),
+            Text("Verification finished."),
+            Text("""{"verdict":"blocked","reason":"Needs an external decision."}"""));
+        var client = new PursueSummaryClient(model);
+        var provider = new ProviderName("scripted");
+        var definition = new ProviderDefinition(
+            provider, ScriptedChatPlugin.Protocol, new Uri("http://localhost:11434/"),
+            new Dictionary<string, ModelSettings> { ["model"] = new(200_000), ["checker"] = new(10_000) });
+        var settings = new HarnessSettings(
+            provider, "model", ApprovalMode.Default, 0.8, ProviderCatalog.CreateStarter().Overlay([definition]))
+            .WithPursueModel(new PursueModelSettings("scripted", "checker"));
+        using var headless = new HeadlessSession(client, resume: new SessionDocument
+        {
+            Items = [
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "Earlier work" },
+                new SessionItemDocument { Kind = "message", Role = "assistant", Text = new string('x', 15_000) },
+                new SessionItemDocument { Kind = "message", Role = "user", Text = "More work" },
+                new SessionItemDocument { Kind = "message", Role = "assistant", Text = new string('y', 9_000) }
+            ]
+        }, settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("/pursue start verify the project");
+
+        Assert.Equal(4, model.RequestCount);
+        Assert.Equal(1, client.Summaries);
+        Assert.Equal(PursueStatus.Blocked, LastState(headless).Status);
+        var prompt = Assert.IsType<ChatMessage>(model.LastRequest!.Items[1]).Text;
+        Assert.Contains("Summary of earlier work.", prompt);
+        Assert.Contains("Verification finished.", prompt);
+        Assert.DoesNotContain(new string('x', 30), prompt);
+    }
+
+    private sealed class PursueSummaryClient(ScriptedStreamingClient model) : IStreamingChatClient
+    {
+        public int Summaries { get; private set; }
+
+        public IAsyncEnumerable<ChatStreamEvent> StreamAsync(ChatRequest request, CancellationToken cancellationToken) =>
+            model.StreamAsync(request, cancellationToken);
+
+        public Task<ChatResponse> CompleteAsync(ChatRequest request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Summaries++;
+            return Task.FromResult(new ChatResponse([
+                new ChatCandidate([new ChatMessage(ChatRole.Assistant, "Summary of earlier work.")], FinishReason.Stop)
+            ]));
+        }
     }
 
     [Fact]

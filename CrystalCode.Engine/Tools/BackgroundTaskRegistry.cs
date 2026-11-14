@@ -139,7 +139,13 @@ public sealed class BackgroundTaskRegistry : IDisposable
     /// Waits until any listed task of this session ends. Returns false at once
     /// when none of them is still running, including ids that are unknown.
     /// </summary>
-    public async Task<bool> WaitAnyAsync(IReadOnlyList<string> taskIds, CancellationToken cancellationToken)
+    public Task<bool> WaitAnyAsync(IReadOnlyList<string> taskIds, CancellationToken cancellationToken) =>
+        WaitAnyAsync(taskIds, includeCompleted: false, cancellationToken);
+
+    internal async Task<bool> WaitAnyAsync(
+        IReadOnlyList<string> taskIds,
+        bool includeCompleted,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(taskIds);
         var waits = new List<Task>();
@@ -147,9 +153,18 @@ public sealed class BackgroundTaskRegistry : IDisposable
         {
             foreach (var id in taskIds)
             {
-                if (_tasks.TryGetValue(id, out var task) && task.IsActive)
+                if (!_tasks.TryGetValue(id, out var task))
+                {
+                    continue;
+                }
+
+                if (task.IsActive)
                 {
                     waits.Add(task.Completion);
+                }
+                else if (includeCompleted)
+                {
+                    return true;
                 }
             }
         }
