@@ -356,4 +356,57 @@ public sealed class OpenAIProviderTests
         var text = Assert.Single(events.OfType<ChatTextDelta>());
         Assert.True(reasoning.ItemIndex < text.ItemIndex);
     }
+
+    [Fact]
+    public async Task StreamAsync_IgnoresARepeatedFinishReasonAndKeepsUsage()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":"stop"}]}
+
+            data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":1,"total_tokens":5}}
+
+            data: [DONE]
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(new OpenAIOptions("test-key", "gpt-test"), http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var streamEvent in provider.StreamAsync(
+            new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+        {
+            events.Add(streamEvent);
+        }
+
+        Assert.Equal(FinishReason.Stop, Assert.Single(events.OfType<ChatCandidateCompleted>()).FinishReason);
+        Assert.Equal(new TokenUsage(4, 1), Assert.Single(events.OfType<ChatUsageReceived>()).Usage);
+    }
+
+    [Fact]
+    public async Task StreamAsync_RejectsADifferentSecondFinishReason()
+    {
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            """
+            data: {"choices":[{"index":0,"delta":{"content":"Hi"},"finish_reason":"stop"}]}
+
+            data: {"choices":[{"index":0,"delta":{},"finish_reason":"length"}]}
+
+            data: [DONE]
+
+            """));
+        using var http = new HttpClient(handler);
+        using var provider = new OpenAIProvider(new OpenAIOptions("test-key", "gpt-test"), http);
+
+        var exception = await Assert.ThrowsAsync<OpenAIException>(async () =>
+        {
+            await foreach (var streamEvent in provider.StreamAsync(
+                new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+            {
+                _ = streamEvent;
+            }
+        });
+
+        Assert.Contains("completed a candidate more than once", exception.Message, StringComparison.Ordinal);
+    }
 }

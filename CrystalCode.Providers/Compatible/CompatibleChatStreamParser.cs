@@ -102,13 +102,23 @@ internal sealed class CompatibleChatStreamParser
         if (CompatibleWire.TryReadString(choice, "finish_reason", out var finishReason)
             && !string.IsNullOrWhiteSpace(finishReason))
         {
+            var reason = CompatibleWire.ReadFinishReason(finishReason);
             if (assembly.Completed)
             {
+                // OpenRouter and some upstreams repeat the same finish reason on a
+                // later chunk, often the usage snapshot. A different reason is a
+                // broken stream.
+                if (assembly.Finish == reason)
+                {
+                    return;
+                }
+
                 throw _profile.Faults.Create(
                     $"{_profile.VendorName} chat stream completed a candidate more than once.");
             }
 
             assembly.Completed = true;
+            assembly.Finish = reason;
             if (assembly.Reasoning.Length > 0
                 && assembly.ReasoningItemIndex is { } reasoningIndex
                 && _profile.ReasoningStateFormat is not null)
@@ -122,10 +132,7 @@ internal sealed class CompatibleChatStreamParser
                             assembly.Reasoning.ToString())));
             }
 
-            events.Add(
-                new ChatCandidateCompleted(
-                    candidateIndex,
-                    CompatibleWire.ReadFinishReason(finishReason)));
+            events.Add(new ChatCandidateCompleted(candidateIndex, reason));
         }
     }
 
@@ -259,5 +266,7 @@ internal sealed class CompatibleChatStreamParser
         public Dictionary<int, int> ToolCallItemIndexes { get; } = [];
 
         public bool Completed { get; set; }
+
+        public FinishReason? Finish { get; set; }
     }
 }
