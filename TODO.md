@@ -263,6 +263,10 @@ behavior stands until a specific change defines otherwise.
   card layout. The child Agent preview and a redesign of the slash and quick
   prompt pickers are separate work. Do not reserve a configuration field or
   public type.
+- Collapsible repeated tool calls. Consecutive repeated Tool cards in the
+  transcript can fold, behind a setting whose default keeps the current
+  expanded cards. What counts as a repeat is not defined. Do not reserve a
+  configuration field.
 
 ## Low priority
 
