@@ -39,7 +39,7 @@ public sealed class BridgeHostSettingsTests
         var settings = new BridgeHostSettings(true, ["all"]);
 
         Assert.Equal(BridgeHostSettings.AvailableOptions, settings.Effective);
-        Assert.Equal(57, settings.Effective.Count);
+        Assert.Equal(62, settings.Effective.Count);
     }
 
     [Fact]
