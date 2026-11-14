@@ -304,6 +304,11 @@ it speculatively, and do not reserve types or configuration for it.
   configurable and are not part of this question. A later decision must
   define which limits may vary, at which scope, and how a larger limit
   interacts with context compaction.
+- More detailed token and model usage statistics. The current `/stats` report
+  aggregates session totals and does not show usage by model or call purpose.
+  Which model calls to include, how to represent missing provider usage, which
+  breakdowns to expose, and how the report appears across the terminal, Server,
+  and Bridge are not defined. See [BUSINESS.md](BUSINESS.md#pending-evaluation).
 - Deferred questions. Not decided. A way for the model to ask a low-stakes
   question without stopping, continue on a stated default, and have the
   operator answer later. It would be a separate path beside the built-in

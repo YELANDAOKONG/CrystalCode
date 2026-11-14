@@ -992,6 +992,15 @@ question. No change is scheduled, and a later decision may revisit it. Such a
 decision must define which limits may vary, at which scope, and how a larger
 limit interacts with context compaction.
 
+More detailed token and model usage statistics are under consideration and
+are not decided. `/stats` currently aggregates session totals without a
+per-model or call-purpose breakdown, and not every side-model call contributes
+usage. Which model calls belong in the totals, how missing provider-reported
+usage is represented, which breakdowns are useful, and how reports work across
+the terminal, Server, and Bridge are not defined. No change is scheduled, and
+a later decision may revisit it. Do not reserve a configuration field, public
+type, event, or wire field.
+
 Deferred questions are under consideration and are not decided. The idea is
 that the model can ask a low-stakes question without stopping, continue on a
 stated default, and have the operator answer later. The current behavior
