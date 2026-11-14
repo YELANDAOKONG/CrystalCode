@@ -7,9 +7,11 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 using Xunit;
 

@@ -7,6 +7,8 @@ using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Engine.Tools.Images;
+using CrystalCode.Engine.Tools.Shell;
 using CrystalCode.Tools;
 using CrystalCode.Tools.Interfaces;
 

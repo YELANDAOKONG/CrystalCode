@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Version;

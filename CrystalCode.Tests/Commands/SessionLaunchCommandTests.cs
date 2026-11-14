@@ -3,6 +3,7 @@ using Spectre.Console.Cli;
 
 using CrystalCode.Commands;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Tools;
 
 using Xunit;

@@ -1,6 +1,11 @@
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Skills;
+using CrystalCode.Engine.Tests.Tools.Questions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Images;
+using CrystalCode.Engine.Tools.Questions;
+using CrystalCode.Engine.Tools.Shell;
+using CrystalCode.Engine.Tools.Todos;
 
 using Xunit;
 

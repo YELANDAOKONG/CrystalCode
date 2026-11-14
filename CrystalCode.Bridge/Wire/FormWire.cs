@@ -4,6 +4,7 @@ using System.Text.Json;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Questions;
 
 namespace CrystalCode.Bridge.Wire;
 

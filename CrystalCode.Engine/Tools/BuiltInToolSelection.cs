@@ -1,4 +1,8 @@
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Engine.Tools.Images;
+using CrystalCode.Engine.Tools.Questions;
+using CrystalCode.Engine.Tools.Shell;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Engine.Tools;
 

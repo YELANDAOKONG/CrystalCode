@@ -3,11 +3,13 @@ using Crystal.Chat;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Approvals;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Engine.Tests.Tools.Questions;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Tests.Sessions;

@@ -14,6 +14,7 @@ using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Server.Wire;
 

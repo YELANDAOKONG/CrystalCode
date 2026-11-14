@@ -2,6 +2,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Engine.Tools.Shell;
 
 namespace CrystalCode.Engine.Modes;
 

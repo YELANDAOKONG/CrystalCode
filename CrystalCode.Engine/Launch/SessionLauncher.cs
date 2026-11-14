@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Modes;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Interfaces;

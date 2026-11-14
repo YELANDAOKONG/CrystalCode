@@ -306,8 +306,9 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | :--- | :--- |
 | `Configuration` | Loaded options, defaults, thinking and mode labels, display-case helpers |
 | `Events` | Immutable session events, observer interface, chrome and preference snapshots |
-| `Home` | `~/.crystal` paths and file I/O; `DiskSettingsStore` is the default `config.json` implementation and reads provider files through `ProviderFiles` |
-| `Home/Interfaces` | Configuration persistence contracts such as `ISettingsStore` |
+| `Home` | `~/.crystal` paths, shared file I/O, and session, access, and prompt storage |
+| `Home/Settings` | `DiskSettingsStore`, `config.json` documents and mappers, and `Interfaces/ISettingsStore` |
+| `Home/Providers` | Provider catalog files, endpoint options, and provider and model documents |
 | `Launch` | Launch options a front end received (`SessionLaunchOptions`), in-memory overrides (`SessionLaunchOverrides`), `--allow-read` / `--allow-write` rules (`SessionLaunchAccess`), and `SessionLauncher`, which resolves the workspace, resume target, trust, prompt attachments, and mode before a session exists |
 | `Sessions` | Session (`CodingSession`), transcript, ledger, streaming turn, slash commands and completions, chat client lifetime, status, usage, and tool-list text, the input loop for front ends without a frame loop (`SessionRunner`), the front-end-neutral reducer (`SessionState`, `SessionSnapshot`, `LiveRound`, `ChildSessionFold` in `Children`), front-end contract (`SessionFrontEnd`, `ISessionChooser`) |
 | `Sessions/Interfaces` | Session contracts such as `ISessionChooser` |
@@ -321,6 +322,10 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Compaction` | Window accounting and summary substitution |
 | `Catalog` | Plain-text column padding shared by inventory reports (`AlignedRows`). Not a model, tool, or plugin catalog |
 | `Tools` | Workspace fence and built-in `ITool` types |
+| `Tools/Shell` | Foreground Bash, background commands, task registry, and bounded logs |
+| `Tools/Todos` | Todo storage, records, and read and write tools |
+| `Tools/Images` | Image access, viewing, and description tools |
+| `Tools/Questions` | Question tool, request and response values, and `Interfaces/IUserPrompt` |
 | `Tools/External` | Operator tool sets (`tools.json`), exec and isolated `ITool` / `IMultimodalTool` loaders, and host-context dispatch |
 | `Prompts` | Caller-owned system text. Built-in Work and Plan identify the assistant as Crystal Code |
 | `Modes` | Operator-defined custom modes: `modes/<name>` discovery, tool selection, prompt composition, and launch-name validation |

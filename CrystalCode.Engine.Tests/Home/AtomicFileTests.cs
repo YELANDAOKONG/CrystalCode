@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Tests.Tools;
 
 using Xunit;

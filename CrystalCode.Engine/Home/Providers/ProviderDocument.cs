@@ -1,0 +1,36 @@
+using System.Text.Json;
+
+namespace CrystalCode.Engine.Home.Providers;
+
+internal sealed class ProviderDocument
+{
+    public string? Protocol { get; set; }
+
+    public string? BaseUri { get; set; }
+
+    public string? Organization { get; set; }
+
+    public string? Project { get; set; }
+
+    public bool? ReplayReasoningContent { get; set; }
+
+    public bool? RequireAssistantContent { get; set; }
+
+    public string? TokenLimit { get; set; }
+
+    public string? ApiKeyEnvironment { get; set; }
+
+    public string? ApiKey { get; set; }
+
+    public bool? RequiresApiKey { get; set; }
+
+    public ProviderResourceTrimDocument? ResourceTrim { get; set; }
+
+    /// <summary>
+    /// Raw endpoint options. Names are interpreted by protocol and are not
+    /// properties of this document.
+    /// </summary>
+    public JsonElement? Options { get; set; }
+
+    public Dictionary<string, ModelDocument>? Models { get; set; }
+}

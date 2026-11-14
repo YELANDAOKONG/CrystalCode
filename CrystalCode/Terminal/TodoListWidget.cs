@@ -3,6 +3,7 @@ using Spectre.Console.Rendering;
 
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Terminal;
 

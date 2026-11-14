@@ -1,5 +1,7 @@
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
+using CrystalCode.Engine.Tools.Todos;
 
 using Xunit;
 using CrystalCode.Terminal;

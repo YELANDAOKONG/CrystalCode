@@ -2,6 +2,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 using Xunit;
 

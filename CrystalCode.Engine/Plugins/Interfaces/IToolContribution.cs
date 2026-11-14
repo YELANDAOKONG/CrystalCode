@@ -2,7 +2,8 @@ using Crystal.Tools;
 using Crystal.Multimodal.Tools;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Tools;
-using CrystalCode.Engine.Tools.Interfaces;
+using CrystalCode.Engine.Tools.Questions.Interfaces;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Engine.Plugins.Interfaces;
 

@@ -7,6 +7,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Tests.Home;
 
 using Xunit;

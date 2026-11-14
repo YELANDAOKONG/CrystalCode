@@ -6,6 +6,7 @@ using Spectre.Console.Cli;
 using CrystalCode.Bridge.Hosting;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Version;

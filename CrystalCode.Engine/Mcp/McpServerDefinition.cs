@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 namespace CrystalCode.Engine.Mcp;
 

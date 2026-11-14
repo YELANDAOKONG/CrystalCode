@@ -1,0 +1,14 @@
+namespace CrystalCode.Engine.Home.Settings;
+
+internal sealed class ResourceTrimDocument
+{
+    public bool? Enabled { get; set; }
+
+    public int? KeepRecent { get; set; }
+
+    public int? Slack { get; set; }
+
+    public long? MaxBytes { get; set; }
+
+    public bool? IncludeUserResources { get; set; }
+}

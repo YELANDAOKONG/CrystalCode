@@ -3,6 +3,7 @@ using Crystal.Tools;
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 using Xunit;
 using CrystalCode.Terminal.Approvals;

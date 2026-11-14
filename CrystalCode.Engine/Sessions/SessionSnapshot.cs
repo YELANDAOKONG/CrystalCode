@@ -5,6 +5,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Engine.Sessions;
 

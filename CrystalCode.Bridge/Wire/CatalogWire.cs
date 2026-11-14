@@ -4,6 +4,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Catalogs;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 namespace CrystalCode.Bridge.Wire;
 

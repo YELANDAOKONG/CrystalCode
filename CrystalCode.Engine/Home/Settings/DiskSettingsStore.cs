@@ -1,0 +1,1103 @@
+using System.Text.Json;
+using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Home.Providers;
+using CrystalCode.Engine.Home.Settings.Interfaces;
+using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Exports;
+using CrystalCode.Engine.Tools;
+
+namespace CrystalCode.Engine.Home.Settings;
+
+/// <summary>
+/// Reads user preferences from <c>config.json</c> and provider definitions
+/// from <c>providers.json</c> and <c>providers/</c> under a Crystal home directory.
+/// </summary>
+public sealed class DiskSettingsStore : ISettingsStore
+{
+    private readonly CrystalHome _home;
+
+    public DiskSettingsStore(CrystalHome home)
+    {
+        ArgumentNullException.ThrowIfNull(home);
+        _home = home;
+    }
+
+    public HarnessSettings LoadOrCreate()
+    {
+        _home.EnsureCreated();
+        if (!File.Exists(_home.ConfigPath))
+        {
+            var created = HarnessSettings.CreateDefault();
+            Save(created);
+            return Load();
+        }
+
+        return Load();
+    }
+
+    public HarnessSettings Load()
+    {
+        var json = File.ReadAllText(_home.ConfigPath);
+        using var parsed = JsonDocument.Parse(json);
+        var document = JsonSerializer.Deserialize<SettingsDocument>(parsed.RootElement, HomeJson.Options)
+            ?? new SettingsDocument();
+        var catalog = ProviderCatalog.CreateStarter()
+            .Overlay(ReadProviders(document));
+        var defaults = HarnessSettings.CreateDefault();
+        var provider = string.IsNullOrWhiteSpace(document.Provider)
+            ? defaults.Provider
+            : ProviderName.Parse(document.Provider);
+        var model = string.IsNullOrWhiteSpace(document.Model)
+            ? defaults.Model
+            : document.Model.Trim();
+        var approval = string.IsNullOrWhiteSpace(document.Approval)
+            ? defaults.Approval
+            : ApprovalMode.Parse(document.Approval);
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? defaults.ThinkingEffort
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        var externalToolApproval = ReadExternalToolApproval(
+            document.ExternalToolApproval,
+            defaults.ExternalToolApproval);
+        var mcpToolApproval = ReadMcpToolApproval(
+            document.McpToolApproval,
+            defaults.McpToolApproval);
+        var theme = ReadTheme(document.Theme);
+
+        return new HarnessSettings(
+            provider,
+            model,
+            approval,
+            document.CompactionThreshold ?? defaults.CompactionThreshold,
+            catalog,
+            thinkingEffort,
+            document.Skills ?? defaults.Skills,
+            document.ExternalTools ?? defaults.ExternalTools,
+            document.EstimatedTokens ?? defaults.EstimatedTokens,
+            document.TodoBar ?? defaults.TodoBar,
+            document.TodoBarRows ?? defaults.TodoBarRows,
+            document.VerboseTools ?? defaults.VerboseTools,
+            document.VerboseCommands ?? defaults.VerboseCommands,
+            document.VerboseResults ?? defaults.VerboseResults,
+            document.VerboseCalls ?? defaults.VerboseCalls,
+            document.VerboseApprovals ?? defaults.VerboseApprovals,
+            document.VerboseReview ?? defaults.VerboseReview,
+            document.VerboseThinking ?? defaults.VerboseThinking,
+            defaults.PromptSet,
+            externalToolApproval,
+            string.IsNullOrWhiteSpace(document.ExportDirectory)
+                ? null
+                : document.ExportDirectory.Trim(),
+            StatusLineDocument.Read(
+                document.CustomStatusLine ?? false,
+                document.StatusLine,
+                document.StatusLineDrop,
+                document.StatusLineTitleCase ?? true),
+            ExecutionBudgetMapper.Read(document.ExecutionBudget),
+            BashTimeoutMapper.Read(
+                parsed.RootElement,
+                BashTimeoutMapper.PropertyName,
+                WorkspaceLimits.BashTimeoutSeconds),
+            BashTimeoutMapper.Read(
+                parsed.RootElement,
+                BashTimeoutMapper.BackgroundPropertyName,
+                WorkspaceLimits.BackgroundBashTimeoutSeconds),
+            ReadApprovalModel(document.ApprovalModel),
+            document.Plugins ?? defaults.Plugins,
+            document.WorkspaceTrust ?? defaults.WorkspaceTrust,
+            document.ShowCompactionSummary ?? defaults.ShowCompactionSummary,
+            showAutomaticCompactionSummary: document.ShowAutomaticCompactionSummary
+                ?? defaults.ShowAutomaticCompactionSummary,
+            resourceModels: new ResourceModels(
+                ReadResourceModel(document.ImageModel, "imageModel"),
+                ReadResourceModel(document.AudioModel, "audioModel"),
+                ReadResourceModel(document.VideoModel, "videoModel")),
+            topicModel: ReadTopicModel(document.TopicModel),
+            pursueModel: ReadPursueModel(document.PursueModel),
+            pursueLimits: PursueLimitsMapper.Read(document.PursueLimits),
+            contextSelections: SettingsMapper.ReadContextSelections(document.ContextSelections),
+            tierSelections: SettingsMapper.ReadTokenSelections(document.TierSelections, "tierSelections"),
+            speedSelections: SettingsMapper.ReadTokenSelections(document.SpeedSelections, "speedSelections"),
+            retry: ReadRetry(document.Retry),
+            approvalRetry: ReadRetry(document.ApprovalRetry),
+            compactionModel: ReadCompactionModel(document.CompactionModel),
+            microCompaction: ReadMicroCompaction(document.MicroCompaction),
+            resourceTrim: ReadResourceTrim(document.ResourceTrim),
+            ruleFiles: ReadRuleFiles(document.RuleFiles),
+            reservedOutputTokens: document.ReservedOutputTokens,
+            agents: document.Agents,
+            persistentDisabledBuiltInTools: ReadDisabledBuiltInTools(document.DisabledBuiltInTools),
+            mcp: document.Mcp ?? defaults.Mcp,
+            mcpToolApproval: mcpToolApproval,
+            extendedApproval: ReadExtendedApproval(document.ExtendedApproval),
+            operatorNotify: ReadOperatorNotify(document.OperatorNotify),
+            server: ReadServer(document.Server),
+            bridge: ReadBridge(document.Bridge),
+            theme: theme.Name,
+            approvalColors: theme.ApprovalColors);
+    }
+
+    public void Save(HarnessSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _home.EnsureCreated();
+        var previous = File.Exists(_home.ConfigPath)
+            ? JsonSerializer.Deserialize<SettingsDocument>(
+                File.ReadAllText(_home.ConfigPath), HomeJson.Options)
+            : null;
+        if (ProviderFiles.Discover(_home).Count == 0
+            && previous?.Providers is { ValueKind: JsonValueKind.Object } legacyProviders)
+        {
+            _ = SettingsMapper.ReadProviders(legacyProviders);
+            CopyProviders(legacyProviders);
+        }
+
+        var document = new SettingsDocument
+        {
+            Agents = settings.Agents == new AgentSettings() ? null : settings.Agents,
+            Provider = settings.Provider.Value,
+            Model = settings.Model,
+            Approval = settings.Approval.Value,
+            ThinkingEffort = settings.ThinkingEffort == ThinkingSelection.Default
+                ? null
+                : settings.ThinkingEffort.Value,
+            ContextSelections = settings.ContextSelections.Count == 0
+                ? null
+                : SettingsMapper.WriteContextSelections(settings.ContextSelections),
+            TierSelections = settings.TierSelections.Count == 0
+                ? null
+                : SettingsMapper.WriteTokenSelections(settings.TierSelections),
+            SpeedSelections = settings.SpeedSelections.Count == 0
+                ? null
+                : SettingsMapper.WriteTokenSelections(settings.SpeedSelections),
+            Skills = settings.Skills ? null : false,
+            ExternalTools = settings.ExternalTools ? null : false,
+            Mcp = settings.Mcp ? null : false,
+            Plugins = settings.Plugins ? null : false,
+            WorkspaceTrust = settings.WorkspaceTrust ? null : false,
+            Theme = WriteTheme(settings),
+            ExternalToolApproval = WriteExternalToolApproval(settings.ExternalToolApproval),
+            McpToolApproval = WriteMcpToolApproval(settings.McpToolApproval),
+            EstimatedTokens = settings.EstimatedTokens ? true : null,
+            TodoBar = settings.TodoBar ? null : false,
+            TodoBarRows = settings.TodoBarRows == HarnessSettings.DefaultTodoBarRows
+                ? null
+                : settings.TodoBarRows,
+            VerboseTools = settings.VerboseTools ? null : false,
+            VerboseCommands = settings.VerboseCommands ? null : false,
+            VerboseResults = settings.VerboseResults ? null : false,
+            VerboseCalls = settings.VerboseCalls ? null : false,
+            VerboseApprovals = settings.VerboseApprovals ? null : false,
+            VerboseReview = settings.VerboseReview ? null : false,
+            VerboseThinking = settings.VerboseThinking ? null : false,
+            PromptSet = null,
+            PromptAttachments = null,
+            ExportDirectory = settings.ExportDirectory,
+            CustomStatusLine = settings.StatusLine.Enabled ? true : null,
+            StatusLine = StatusLineDocument.WriteFields(settings.StatusLine),
+            StatusLineDrop = settings.StatusLine.DropOrder.Count == 0
+                ? null
+                : [.. settings.StatusLine.DropOrder],
+            StatusLineTitleCase = settings.StatusLine.TitleCase ? null : false,
+            CompactionThreshold = settings.CompactionThreshold,
+            ReservedOutputTokens = settings.ReservedOutputTokens,
+            ShowCompactionSummary = settings.ShowCompactionSummary ? null : false,
+            ShowAutomaticCompactionSummary = settings.ShowAutomaticCompactionSummary ? true : null,
+            ExecutionBudget = ExecutionBudgetMapper.Write(settings.ExecutionBudget),
+            BashTimeoutSeconds = BashTimeoutMapper.Write(
+                settings.BashTimeoutSeconds,
+                WorkspaceLimits.BashTimeoutSeconds),
+            BackgroundBashTimeoutSeconds = BashTimeoutMapper.Write(
+                settings.BackgroundBashTimeoutSeconds,
+                WorkspaceLimits.BackgroundBashTimeoutSeconds),
+            Providers = previous?.Providers,
+            ApprovalModel = WriteApprovalModel(settings.ApprovalModel),
+            ExtendedApproval = WriteExtendedApproval(settings.ExtendedApproval),
+            OperatorNotify = WriteOperatorNotify(settings.OperatorNotify),
+            Server = WriteServer(settings.Server),
+            Bridge = WriteBridge(settings.Bridge),
+            CompactionModel = WriteCompactionModel(settings.CompactionModel),
+            MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
+            ResourceTrim = WriteResourceTrim(settings.ResourceTrim),
+            RuleFiles = WriteRuleFiles(settings.RuleFiles),
+            ImageModel = WriteResourceModel(settings.ResourceModels.Image),
+            AudioModel = WriteResourceModel(settings.ResourceModels.Audio),
+            VideoModel = WriteResourceModel(settings.ResourceModels.Video),
+            TopicModel = WriteTopicModel(settings.TopicModel),
+            PursueModel = WritePursueModel(settings.PursueModel),
+            PursueLimits = PursueLimitsMapper.Write(settings.PursueLimits),
+            Retry = WriteRetry(settings.Retry),
+            ApprovalRetry = WriteRetry(settings.ApprovalRetry),
+            DisabledBuiltInTools = settings.PersistentDisabledBuiltInTools.Plan.Count == 0
+                && settings.PersistentDisabledBuiltInTools.Work.Count == 0
+                ? null
+                : JsonSerializer.SerializeToElement(
+                    new BuiltInToolDisablementDocument
+                    {
+                        Plan = [.. settings.PersistentDisabledBuiltInTools.Plan],
+                        Work = [.. settings.PersistentDisabledBuiltInTools.Work]
+                    },
+                    HomeJson.Options)
+        };
+        AtomicFile.WriteText(
+            _home.ConfigPath,
+            JsonSerializer.Serialize(document, HomeJson.Options),
+            ownerOnly: false,
+            followLink: true);
+    }
+
+    private IReadOnlyList<ProviderDefinition> ReadProviders(SettingsDocument document)
+    {
+        var files = ProviderFiles.Discover(_home);
+        return files.Count == 0
+            ? SettingsMapper.ReadProviders(document.Providers)
+            : ProviderFiles.Read(_home, files);
+    }
+
+    private static BuiltInToolDisablement? ReadDisabledBuiltInTools(JsonElement? value)
+    {
+        if (value is not { } element || element.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            var names = element.Deserialize<List<string>>(HomeJson.Options);
+            return names is null ? null : new BuiltInToolDisablement(names, names);
+        }
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("disabledBuiltInTools must be an array or an object with plan and work arrays.");
+        }
+
+        var document = element.Deserialize<BuiltInToolDisablementDocument>(HomeJson.Options)
+            ?? throw new InvalidOperationException("disabledBuiltInTools is invalid.");
+        return new BuiltInToolDisablement(document.Plan, document.Work);
+    }
+
+    private void CopyProviders(JsonElement providers)
+    {
+        var temporaryPath = Path.Combine(_home.Root, $".providers-{Guid.NewGuid():N}.tmp");
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None
+        };
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        try
+        {
+            using (var stream = new FileStream(temporaryPath, options))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.Write(JsonSerializer.Serialize(providers, HomeJson.Options));
+                writer.Flush();
+                stream.Flush(flushToDisk: true);
+            }
+
+            // No overwrite: the migration must not replace a providers.json
+            // that appeared after discovery.
+            File.Move(temporaryPath, _home.ProvidersPath);
+        }
+        finally
+        {
+            File.Delete(temporaryPath);
+        }
+    }
+
+    private static ApprovalModelSettings ReadApprovalModel(ApprovalModelDocument? document)
+    {
+        if (document is null)
+        {
+            return ApprovalModelSettings.Off;
+        }
+
+        return ReadReviewer(
+            "approvalModel",
+            document.Enabled,
+            document.Provider,
+            document.Model,
+            document.ThinkingEffort,
+            document.ServiceTier,
+            document.Speed,
+            document.ContextWindow);
+    }
+
+    private static ApprovalModelDocument? WriteApprovalModel(ApprovalModelSettings settings)
+    {
+        if (IsEmptyReviewer(settings))
+        {
+            return null;
+        }
+
+        return new ApprovalModelDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
+        };
+    }
+
+    private static ExtendedApprovalSettings ReadExtendedApproval(ExtendedApprovalDocument? document)
+    {
+        if (document is null)
+        {
+            return ExtendedApprovalSettings.Off;
+        }
+
+        var reviewer = ReadReviewer(
+            "extendedApproval",
+            document.Enabled,
+            document.Provider,
+            document.Model,
+            document.ThinkingEffort,
+            document.ServiceTier,
+            document.Speed,
+            document.ContextWindow);
+        var trigger = ExtendedApprovalSettings.DefaultTrigger;
+        if (document.Trigger is not null && !ReviewRiskLevel.TryParse(document.Trigger, out trigger))
+        {
+            throw new InvalidOperationException(
+                "extendedApproval.trigger must be low, medium, or high.");
+        }
+
+        return new ExtendedApprovalSettings(
+            reviewer,
+            trigger,
+            document.IncludePrimaryReview ?? ExtendedApprovalSettings.DefaultIncludePrimaryReview);
+    }
+
+    private static ExtendedApprovalDocument? WriteExtendedApproval(ExtendedApprovalSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        var reviewer = settings.Reviewer;
+        return new ExtendedApprovalDocument
+        {
+            Enabled = reviewer.Enabled ? true : null,
+            Provider = reviewer.Provider,
+            Model = reviewer.Model,
+            ThinkingEffort = WriteGear(reviewer.ThinkingEffort),
+            ServiceTier = reviewer.ServiceTier,
+            Speed = reviewer.Speed,
+            ContextWindow = reviewer.ContextWindow,
+            Trigger = settings.Trigger == ExtendedApprovalSettings.DefaultTrigger
+                ? null
+                : settings.Trigger.Value,
+            IncludePrimaryReview = settings.IncludePrimaryReview
+                == ExtendedApprovalSettings.DefaultIncludePrimaryReview
+                    ? null
+                    : settings.IncludePrimaryReview
+        };
+    }
+
+    private static ApprovalModelSettings ReadReviewer(
+        string field,
+        bool? enabled,
+        string? providerText,
+        string? modelText,
+        string? thinkingText,
+        string? tierText,
+        string? speedText,
+        int? contextWindow)
+    {
+        var provider = string.IsNullOrWhiteSpace(providerText) ? null : providerText.Trim();
+        var model = string.IsNullOrWhiteSpace(modelText) ? null : modelText.Trim();
+        if (enabled == true && (provider is null || model is null))
+        {
+            throw new InvalidOperationException(
+                field + ".enabled requires provider and model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(thinkingText)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(thinkingText);
+        return new ApprovalModelSettings(
+            enabled ?? false,
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(tierText, field + ".serviceTier"),
+            ReadSlot(speedText, field + ".speed"),
+            ReadContextWindow(contextWindow, field + ".contextWindow"));
+    }
+
+    private static string? ReadSlot(string? text, string field)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        if (!CatalogToken.TryNormalize(text, out var token))
+        {
+            throw new InvalidOperationException(
+                field + " must start with a letter and then use only letters, digits, underscores, and hyphens.");
+        }
+
+        return token;
+    }
+
+    private static int? ReadContextWindow(int? window, string field) =>
+        window is <= 0
+            ? throw new InvalidOperationException(field + " must be a positive token count.")
+            : window;
+
+    private static bool IsEmptyReviewer(ApprovalModelSettings settings) =>
+        !settings.Enabled
+        && !settings.HasSelection
+        && settings.ThinkingEffort == ThinkingSelection.Default
+        && settings.ServiceTier is null
+        && settings.Speed is null
+        && settings.ContextWindow is null;
+
+    private static string? WriteGear(ThinkingSelection gear) =>
+        gear == ThinkingSelection.Default ? null : gear.Value;
+
+    private static CompactionModelSettings ReadCompactionModel(CompactionModelDocument? document)
+    {
+        if (document is null)
+        {
+            return CompactionModelSettings.Off;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider)
+            ? null
+            : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model)
+            ? null
+            : document.Model.Trim();
+        if (document.Enabled == true && (provider is null || model is null))
+        {
+            throw new InvalidOperationException(
+                "compactionModel.enabled requires provider and model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new CompactionModelSettings(
+            document.Enabled ?? false,
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, "compactionModel.serviceTier"),
+            ReadSlot(document.Speed, "compactionModel.speed"),
+            ReadContextWindow(document.ContextWindow, "compactionModel.contextWindow"));
+    }
+
+    private static CompactionModelDocument? WriteCompactionModel(CompactionModelSettings settings)
+    {
+        if (!settings.Enabled
+            && !settings.HasSelection
+            && settings.ThinkingEffort == ThinkingSelection.Default
+            && settings.ServiceTier is null
+            && settings.Speed is null
+            && settings.ContextWindow is null)
+        {
+            return null;
+        }
+
+        return new CompactionModelDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
+        };
+    }
+
+    /// <summary>
+    /// <c>theme</c> is the theme name, or an object with <c>name</c> and <c>approvalColors</c>.
+    /// </summary>
+    private static (string Name, bool ApprovalColors) ReadTheme(JsonElement? element)
+    {
+        if (element is null || element.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return (ThemeCatalog.DefaultName, HarnessSettings.DefaultApprovalColors);
+        }
+
+        ThemeDocument document;
+        if (element.Value.ValueKind == JsonValueKind.String)
+        {
+            document = new ThemeDocument { Name = element.Value.GetString() };
+        }
+        else if (element.Value.ValueKind == JsonValueKind.Object)
+        {
+            document = element.Value.Deserialize<ThemeDocument>(HomeJson.Options)
+                ?? throw new InvalidOperationException("theme is invalid.");
+        }
+        else
+        {
+            throw new InvalidOperationException("theme must be a name or an object with name and approvalColors.");
+        }
+
+        return (
+            string.IsNullOrWhiteSpace(document.Name) ? ThemeCatalog.DefaultName : document.Name.Trim(),
+            document.ApprovalColors ?? HarnessSettings.DefaultApprovalColors);
+    }
+
+    private static JsonElement? WriteTheme(HarnessSettings settings)
+    {
+        var named = settings.Theme != ThemeCatalog.DefaultName;
+        if (settings.ApprovalColors)
+        {
+            return named ? JsonSerializer.SerializeToElement(settings.Theme) : null;
+        }
+
+        return JsonSerializer.SerializeToElement(
+            new ThemeDocument
+            {
+                Name = named ? settings.Theme : null,
+                ApprovalColors = false
+            },
+            HomeJson.Options);
+    }
+
+    private static MicroCompactionSettings ReadMicroCompaction(MicroCompactionDocument? document)
+    {
+        if (document is null)
+        {
+            return MicroCompactionSettings.Default;
+        }
+
+        return new MicroCompactionSettings(
+            document.Enabled ?? false,
+            document.ProtectTurns ?? MicroCompactionSettings.DefaultProtectTurns,
+            document.ProtectTokens ?? MicroCompactionSettings.DefaultProtectTokens,
+            document.MinimumTokens ?? MicroCompactionSettings.DefaultMinimumTokens);
+    }
+
+    private static MicroCompactionDocument? WriteMicroCompaction(MicroCompactionSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new MicroCompactionDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            ProtectTurns = settings.ProtectTurns == MicroCompactionSettings.DefaultProtectTurns
+                ? null
+                : settings.ProtectTurns,
+            ProtectTokens = settings.ProtectTokens == MicroCompactionSettings.DefaultProtectTokens
+                ? null
+                : settings.ProtectTokens,
+            MinimumTokens = settings.MinimumTokens == MicroCompactionSettings.DefaultMinimumTokens
+                ? null
+                : settings.MinimumTokens
+        };
+    }
+
+    private static ResourceTrimSettings ReadResourceTrim(ResourceTrimDocument? document)
+    {
+        if (document is null)
+        {
+            return ResourceTrimSettings.Default;
+        }
+
+        return new ResourceTrimSettings(
+            document.Enabled ?? ResourceTrimSettings.DefaultEnabled,
+            document.KeepRecent ?? ResourceTrimSettings.DefaultKeepRecent,
+            document.Slack ?? ResourceTrimSettings.DefaultSlack,
+            document.MaxBytes ?? ResourceTrimSettings.DefaultMaxBytes,
+            document.IncludeUserResources ?? ResourceTrimSettings.DefaultIncludeUserResources);
+    }
+
+    private static ResourceTrimDocument? WriteResourceTrim(ResourceTrimSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new ResourceTrimDocument
+        {
+            Enabled = settings.Enabled == ResourceTrimSettings.DefaultEnabled ? null : settings.Enabled,
+            KeepRecent = settings.KeepRecent == ResourceTrimSettings.DefaultKeepRecent
+                ? null
+                : settings.KeepRecent,
+            Slack = settings.Slack == ResourceTrimSettings.DefaultSlack ? null : settings.Slack,
+            MaxBytes = settings.MaxBytes == ResourceTrimSettings.DefaultMaxBytes
+                ? null
+                : settings.MaxBytes,
+            IncludeUserResources = settings.IncludeUserResources == ResourceTrimSettings.DefaultIncludeUserResources
+                ? null
+                : settings.IncludeUserResources
+        };
+    }
+
+    /// <summary>
+    /// A resource description model is on only with <c>enabled: true</c>,
+    /// like <c>approvalModel</c> and <c>compactionModel</c>. An entry without
+    /// it keeps the stored selection unused.
+    /// </summary>
+    private static ResourceModelSettings ReadResourceModel(ResourceModelDocument? document, string field)
+    {
+        if (document is null)
+        {
+            return ResourceModelSettings.Off;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider) ? null : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model) ? null : document.Model.Trim();
+        if ((provider is null) != (model is null))
+        {
+            throw new InvalidOperationException(field + " requires provider and model together.");
+        }
+
+        if (document.Enabled == true && provider is null)
+        {
+            throw new InvalidOperationException(field + ".enabled requires provider and model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new ResourceModelSettings(
+            document.Enabled ?? false,
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, field + ".serviceTier"),
+            ReadSlot(document.Speed, field + ".speed"),
+            ReadContextWindow(document.ContextWindow, field + ".contextWindow"));
+    }
+
+    /// <summary>
+    /// An object with a command but no <c>enabled</c> field is on, so the
+    /// smallest useful entry is just the command. <c>enabled: false</c> keeps
+    /// the command unused.
+    /// </summary>
+    private static OperatorNotifySettings ReadOperatorNotify(OperatorNotifyDocument? document)
+    {
+        if (document is null)
+        {
+            return OperatorNotifySettings.Off;
+        }
+
+        var command = document.Command ?? [];
+        if (command.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new InvalidOperationException("operatorNotify.command entries cannot be empty.");
+        }
+
+        var enabled = document.Enabled ?? command.Count > 0;
+        if (enabled && command.Count == 0)
+        {
+            throw new InvalidOperationException("operatorNotify.enabled requires a command array.");
+        }
+
+        List<OperatorNotifyEvent>? events = null;
+        if (document.Events is not null)
+        {
+            events = [];
+            foreach (var text in document.Events)
+            {
+                if (!OperatorNotifyEvent.TryParse(text, out var parsed))
+                {
+                    throw new InvalidOperationException(
+                        "operatorNotify.events entries must be approval, question, or turn.");
+                }
+
+                events.Add(parsed);
+            }
+        }
+
+        var delay = document.DelaySeconds ?? OperatorNotifySettings.DefaultDelaySeconds;
+        if (delay is < 0 or > OperatorNotifySettings.MaximumDelaySeconds)
+        {
+            throw new InvalidOperationException(
+                $"operatorNotify.delaySeconds must be between 0 and {OperatorNotifySettings.MaximumDelaySeconds}.");
+        }
+
+        var timeout = document.TimeoutSeconds ?? OperatorNotifySettings.DefaultTimeoutSeconds;
+        if (timeout is < 1 or > OperatorNotifySettings.MaximumTimeoutSeconds)
+        {
+            throw new InvalidOperationException(
+                $"operatorNotify.timeoutSeconds must be between 1 and {OperatorNotifySettings.MaximumTimeoutSeconds}.");
+        }
+
+        return new OperatorNotifySettings(enabled, command, events, delay, timeout);
+    }
+
+    private static ServerHostSettings ReadServer(ServerHostDocument? document)
+    {
+        if (document is null)
+        {
+            return ServerHostSettings.Default;
+        }
+
+        try
+        {
+            return new ServerHostSettings(
+                document.AllowOrigins ?? [],
+                document.AllowHosts ?? [],
+                document.ExposeHeaders ?? [],
+                document.AllowPrivateNetwork ?? false);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+    }
+
+    private static BridgeHostSettings ReadBridge(BridgeHostDocument? document)
+    {
+        if (document is null)
+        {
+            return BridgeHostSettings.Default;
+        }
+
+        try
+        {
+            return new BridgeHostSettings(
+                document.CustomConfigOptions ?? false,
+                document.ConfigOptions,
+                document.WorkspaceTrust ?? false);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+    }
+
+    private static BridgeHostDocument? WriteBridge(BridgeHostSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new BridgeHostDocument
+        {
+            CustomConfigOptions = settings.Custom ? true : null,
+            WorkspaceTrust = settings.WorkspaceTrust ? true : null,
+            ConfigOptions = settings.Options.SequenceEqual(BridgeHostSettings.DefaultOptions, StringComparer.Ordinal)
+                ? null
+                : [.. settings.Options]
+        };
+    }
+
+    private static ServerHostDocument? WriteServer(ServerHostSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new ServerHostDocument
+        {
+            AllowOrigins = settings.AllowOrigins.Count == 0 ? null : [.. settings.AllowOrigins],
+            AllowHosts = settings.AllowHosts.Count == 0 ? null : [.. settings.AllowHosts],
+            ExposeHeaders = settings.ExposeHeaders.Count == 0 ? null : [.. settings.ExposeHeaders],
+            AllowPrivateNetwork = settings.AllowPrivateNetwork ? true : null
+        };
+    }
+
+    private static OperatorNotifyDocument? WriteOperatorNotify(OperatorNotifySettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new OperatorNotifyDocument
+        {
+            // Written explicitly, so a hand-edited file keeps its meaning after a save.
+            Enabled = settings.Enabled,
+            Command = settings.HasCommand ? [.. settings.Command] : null,
+            Events = settings.HasDefaultEvents ? null : [.. settings.Events.Select(static value => value.Value)],
+            DelaySeconds = settings.DelaySeconds == OperatorNotifySettings.DefaultDelaySeconds
+                ? null
+                : settings.DelaySeconds,
+            TimeoutSeconds = settings.TimeoutSeconds == OperatorNotifySettings.DefaultTimeoutSeconds
+                ? null
+                : settings.TimeoutSeconds
+        };
+    }
+
+    /// <summary>
+    /// Topic naming is on only with <c>enabled: true</c>. Omitted provider and
+    /// model use the session model.
+    /// </summary>
+    private static TopicModelSettings ReadTopicModel(TopicModelDocument? document)
+    {
+        if (document is null)
+        {
+            return TopicModelSettings.Off;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider) ? null : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model) ? null : document.Model.Trim();
+        if ((provider is null) != (model is null))
+        {
+            throw new InvalidOperationException(
+                "topicModel requires provider and model together, or neither to use the session model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new TopicModelSettings(
+            document.Enabled ?? false,
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, "topicModel.serviceTier"),
+            ReadSlot(document.Speed, "topicModel.speed"),
+            ReadContextWindow(document.ContextWindow, "topicModel.contextWindow"),
+            document.NameOnResume ?? true);
+    }
+
+    private static PursueModelSettings ReadPursueModel(PursueModelDocument? document)
+    {
+        if (document is null)
+        {
+            return PursueModelSettings.Default;
+        }
+
+        var provider = string.IsNullOrWhiteSpace(document.Provider) ? null : document.Provider.Trim();
+        var model = string.IsNullOrWhiteSpace(document.Model) ? null : document.Model.Trim();
+        if ((provider is null) != (model is null))
+        {
+            throw new InvalidOperationException(
+                "pursueModel requires provider and model together, or neither to use the session model.");
+        }
+
+        var thinkingEffort = string.IsNullOrWhiteSpace(document.ThinkingEffort)
+            ? ThinkingSelection.Default
+            : ThinkingSelection.Parse(document.ThinkingEffort);
+        return new PursueModelSettings(
+            provider,
+            model,
+            thinkingEffort,
+            ReadSlot(document.ServiceTier, "pursueModel.serviceTier"),
+            ReadSlot(document.Speed, "pursueModel.speed"),
+            ReadContextWindow(document.ContextWindow, "pursueModel.contextWindow"),
+            ReadCompactionModel(document.Compaction));
+    }
+
+    private static PursueModelDocument? WritePursueModel(PursueModelSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new PursueModelDocument
+        {
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow,
+            Compaction = WriteCompactionModel(settings.Compaction)
+        };
+    }
+
+    private static TopicModelDocument? WriteTopicModel(TopicModelSettings settings)
+    {
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new TopicModelDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow,
+            NameOnResume = settings.NameOnResume ? null : false
+        };
+    }
+
+    private static ResourceModelDocument? WriteResourceModel(ResourceModelSettings settings)
+    {
+        if (settings.IsEmpty)
+        {
+            return null;
+        }
+
+        return new ResourceModelDocument
+        {
+            Enabled = settings.Enabled ? true : null,
+            Provider = settings.Provider,
+            Model = settings.Model,
+            ThinkingEffort = WriteGear(settings.ThinkingEffort),
+            ServiceTier = settings.ServiceTier,
+            Speed = settings.Speed,
+            ContextWindow = settings.ContextWindow
+        };
+    }
+
+    private static RetrySettings ReadRetry(RetryDocument? document)
+    {
+        if (document is null)
+        {
+            return RetrySettings.Default;
+        }
+
+        return new RetrySettings(
+            document.Enabled ?? true,
+            document.MaximumRetries ?? SessionRetryOptions.DefaultMaximumRetries,
+            document.InitialDelaySeconds ?? SessionRetryOptions.DefaultInitialDelaySeconds,
+            document.BackoffFactor ?? SessionRetryOptions.DefaultBackoffFactor,
+            document.JitterFactor ?? SessionRetryOptions.DefaultJitterFactor,
+            document.MaximumDelaySeconds ?? SessionRetryOptions.DefaultMaximumDelaySeconds);
+    }
+
+    private static RetryDocument? WriteRetry(RetrySettings settings)
+    {
+        if (settings == RetrySettings.Default)
+        {
+            return null;
+        }
+
+        return new RetryDocument
+        {
+            Enabled = settings.Enabled ? null : false,
+            MaximumRetries = settings.MaximumRetries == SessionRetryOptions.DefaultMaximumRetries
+                ? null
+                : settings.MaximumRetries,
+            InitialDelaySeconds = settings.InitialDelaySeconds
+                == SessionRetryOptions.DefaultInitialDelaySeconds
+                    ? null
+                    : settings.InitialDelaySeconds,
+            BackoffFactor = settings.BackoffFactor == SessionRetryOptions.DefaultBackoffFactor
+                ? null
+                : settings.BackoffFactor,
+            JitterFactor = settings.JitterFactor == SessionRetryOptions.DefaultJitterFactor
+                ? null
+                : settings.JitterFactor,
+            MaximumDelaySeconds = settings.MaximumDelaySeconds
+                == SessionRetryOptions.DefaultMaximumDelaySeconds
+                    ? null
+                    : settings.MaximumDelaySeconds
+        };
+    }
+
+    private static ExternalToolApprovalSettings ReadExternalToolApproval(
+        ExternalToolApprovalDocument? document,
+        ExternalToolApprovalSettings defaults)
+    {
+        if (document is null)
+        {
+            return defaults;
+        }
+
+        var home = string.IsNullOrWhiteSpace(document.Home)
+            ? defaults.Home
+            : ExternalToolTrustPolicy.Parse(document.Home);
+        var project = string.IsNullOrWhiteSpace(document.Project)
+            ? defaults.Project
+            : ExternalToolTrustPolicy.Parse(document.Project);
+        return new ExternalToolApprovalSettings(home, project);
+    }
+
+    private static ExternalToolApprovalDocument? WriteExternalToolApproval(
+        ExternalToolApprovalSettings settings)
+    {
+        if (settings == ExternalToolApprovalSettings.Default)
+        {
+            return null;
+        }
+
+        return new ExternalToolApprovalDocument
+        {
+            Home = settings.Home == ExternalToolApprovalSettings.Default.Home
+                ? null
+                : settings.Home.Value,
+            Project = settings.Project == ExternalToolApprovalSettings.Default.Project
+                ? null
+                : settings.Project.Value
+        };
+    }
+
+    private static McpToolApprovalSettings ReadMcpToolApproval(
+        McpToolApprovalDocument? document,
+        McpToolApprovalSettings defaults)
+    {
+        if (document is null)
+        {
+            return defaults;
+        }
+
+        var home = string.IsNullOrWhiteSpace(document.Home)
+            ? defaults.Home
+            : ExternalToolTrustPolicy.Parse(document.Home);
+        var project = string.IsNullOrWhiteSpace(document.Project)
+            ? defaults.Project
+            : ExternalToolTrustPolicy.Parse(document.Project);
+        return new McpToolApprovalSettings(home, project);
+    }
+
+    private static McpToolApprovalDocument? WriteMcpToolApproval(
+        McpToolApprovalSettings settings)
+    {
+        if (settings == McpToolApprovalSettings.Default)
+        {
+            return null;
+        }
+
+        return new McpToolApprovalDocument
+        {
+            Home = settings.Home == McpToolApprovalSettings.Default.Home
+                ? null
+                : settings.Home.Value,
+            Project = settings.Project == McpToolApprovalSettings.Default.Project
+                ? null
+                : settings.Project.Value
+        };
+    }
+
+    private static RuleFileSettings ReadRuleFiles(RuleFilesDocument? document)
+    {
+        if (document is null)
+        {
+            return RuleFileSettings.Default;
+        }
+
+        return new RuleFileSettings(
+            document.Global ?? RuleFileSettings.Default.Global,
+            document.Project ?? RuleFileSettings.Default.Project);
+    }
+
+    private static RuleFilesDocument? WriteRuleFiles(RuleFileSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (settings.IsDefault)
+        {
+            return null;
+        }
+
+        return new RuleFilesDocument
+        {
+            Global = settings.Global ? null : false,
+            Project = settings.Project ? null : false
+        };
+    }
+}

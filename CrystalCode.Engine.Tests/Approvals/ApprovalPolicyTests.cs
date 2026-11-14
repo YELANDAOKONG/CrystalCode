@@ -8,6 +8,7 @@ using CrystalCode.Engine.Skills;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 using Xunit;
 

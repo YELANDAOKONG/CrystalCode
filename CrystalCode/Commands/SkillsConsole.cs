@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using CrystalCode.Display.Paint;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Skills;
 
 using Spectre.Console;

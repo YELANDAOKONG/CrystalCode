@@ -7,6 +7,7 @@ using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 namespace CrystalCode.Engine.Configuration;
 

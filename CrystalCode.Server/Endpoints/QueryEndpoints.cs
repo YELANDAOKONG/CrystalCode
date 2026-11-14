@@ -8,6 +8,7 @@ using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 using CrystalCode.Server.Hosting;
 using CrystalCode.Server.Security;
 using CrystalCode.Server.Wire;

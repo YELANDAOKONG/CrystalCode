@@ -14,6 +14,7 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Todos;
 using CrystalCode.Terminal;
 using CrystalCode.Terminal.Approvals;
 

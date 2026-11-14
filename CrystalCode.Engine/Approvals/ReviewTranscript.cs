@@ -3,6 +3,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Questions;
 
 namespace CrystalCode.Engine.Approvals;
 

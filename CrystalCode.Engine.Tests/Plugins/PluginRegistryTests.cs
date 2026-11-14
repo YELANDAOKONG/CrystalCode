@@ -5,7 +5,9 @@ using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Tests.Sessions;
 using CrystalCode.Engine.Tests.Tools;
+using CrystalCode.Engine.Tests.Tools.Questions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Todos;
 
 using Xunit;
 

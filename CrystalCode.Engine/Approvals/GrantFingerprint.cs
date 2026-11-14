@@ -1,5 +1,7 @@
 using Crystal.Tools;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Images;
+using CrystalCode.Engine.Tools.Shell;
 
 namespace CrystalCode.Engine.Approvals;
 

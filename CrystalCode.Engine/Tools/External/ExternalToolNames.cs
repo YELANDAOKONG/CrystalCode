@@ -1,5 +1,10 @@
 using System.Text.RegularExpressions;
 
+using CrystalCode.Engine.Tools.Images;
+using CrystalCode.Engine.Tools.Questions;
+using CrystalCode.Engine.Tools.Shell;
+using CrystalCode.Engine.Tools.Todos;
+
 namespace CrystalCode.Engine.Tools.External;
 
 /// <summary>

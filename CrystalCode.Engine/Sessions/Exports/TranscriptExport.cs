@@ -3,6 +3,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Engine.Sessions.Exports;
 

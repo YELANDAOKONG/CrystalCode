@@ -1,5 +1,6 @@
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 
 using Xunit;
 

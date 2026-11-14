@@ -4,6 +4,8 @@ using Crystal.Tools;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Questions;
+using CrystalCode.Engine.Tools.Shell;
 
 using Xunit;
 

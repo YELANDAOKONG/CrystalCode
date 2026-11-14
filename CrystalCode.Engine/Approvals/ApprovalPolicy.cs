@@ -3,6 +3,7 @@ using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Shell;
 
 namespace CrystalCode.Engine.Approvals;
 

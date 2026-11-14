@@ -2,6 +2,10 @@ using Crystal.Tools;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Images;
+using CrystalCode.Engine.Tools.Questions;
+using CrystalCode.Engine.Tools.Shell;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Engine.Approvals;
 

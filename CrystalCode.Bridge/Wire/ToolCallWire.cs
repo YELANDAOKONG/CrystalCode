@@ -5,6 +5,9 @@ using Crystal.Tools;
 using CrystalCode.Bridge.Transport;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Engine.Tools.Images;
+using CrystalCode.Engine.Tools.Shell;
+using CrystalCode.Engine.Tools.Todos;
 
 namespace CrystalCode.Bridge.Wire;
 

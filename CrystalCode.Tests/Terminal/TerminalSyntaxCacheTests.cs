@@ -5,6 +5,7 @@ using CrystalCode.Display.Paint;
 using CrystalCode.Display.Transcript;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;

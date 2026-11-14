@@ -6,6 +6,7 @@ using System.Threading.Channels;
 
 using CrystalCode.Bridge.Hosting;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Launch;
 using CrystalCode.Engine.Plugins;
 
