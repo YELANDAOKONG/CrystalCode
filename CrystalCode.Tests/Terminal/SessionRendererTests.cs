@@ -1,3 +1,5 @@
+using System.Reflection;
+
 using Spectre.Console;
 
 using Crystal;
@@ -9,8 +11,10 @@ using CrystalCode.Display.Input;
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Shell;
 using CrystalCode.Engine.Approvals;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Pursue;
 
 using Xunit;
 using CrystalCode.Terminal;
@@ -19,6 +23,39 @@ namespace CrystalCode.Tests.Terminal;
 
 public sealed class SessionRendererTests
 {
+    [Fact]
+    public void PursueChanged_UpdatesConfiguredStatusItemsAndClearsOnHistoryReplay()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        var settings = new StatusLineSettings(
+            true, ["pursue-status", "pursue-checks", "pursue-continuations"]);
+        renderer.SetStatusLine(
+            settings.Enabled, settings.Fields, [], ["pursue-continuations"], settings.TitleCase);
+        var chrome = Assert.IsType<ShellChrome>(typeof(SessionRenderer)
+            .GetField("_chrome", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(renderer));
+        var working = PursueState.Start("Private objective");
+
+        Assert.True(string.IsNullOrWhiteSpace(chrome.StatusLine(120).Plain));
+
+        projection.OnEvent(new PursueChanged(working));
+        Assert.Equal(
+            "  Pursue Working  ·  Pursue Checks 0  ·  Pursue Continuations 0",
+            chrome.StatusLine(120).Plain);
+
+        var waiting = working.Active(PursuePhase.Waiting) with { Checks = 1200, Continuations = 1 };
+        projection.OnEvent(new PursueChanged(waiting));
+        Assert.Equal("  Pursue Waiting  ·  Pursue Checks 1,200", chrome.StatusLine(42).Plain);
+
+        projection.OnEvent(new PursueChanged(waiting.Stopped(PursueStatus.Blocked, "blocked", "Private reason")));
+        Assert.Equal(
+            "  Pursue Blocked  ·  Pursue Checks 1,200  ·  Pursue Continuations 1",
+            chrome.StatusLine(120).Plain);
+
+        projection.OnEvent(new HistoryReplayed([]));
+        Assert.True(string.IsNullOrWhiteSpace(chrome.StatusLine(120).Plain));
+    }
+
     [Fact]
     public void WriteHeader_SetsSelectedContextWindowChrome()
     {

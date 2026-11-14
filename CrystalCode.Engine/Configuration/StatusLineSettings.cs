@@ -64,7 +64,10 @@ public sealed record StatusLineSettings
             "elapsed",
             "queued",
             "agents",
-            "agents-running"
+            "agents-running",
+            "pursue-status",
+            "pursue-checks",
+            "pursue-continuations"
         });
 
     public StatusLineSettings(

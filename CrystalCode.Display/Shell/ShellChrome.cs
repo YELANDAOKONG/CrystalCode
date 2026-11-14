@@ -98,6 +98,12 @@ public sealed class ShellChrome
 
     public string SessionTotal { get; set; } = string.Empty;
 
+    public string PursueStatus { get; set; } = string.Empty;
+
+    public int? PursueChecks { get; set; }
+
+    public int? PursueContinuations { get; set; }
+
     /// <summary>
     /// Status-bar activity. Tool names come from the model, so the text is
     /// reduced to one clean line.
@@ -307,6 +313,13 @@ public sealed class ShellChrome
                 "queued" => Queued > 0 ? $"Queued {Queued}" : string.Empty,
                 "agents" => AgentsEnabled ? "Agents On" : "Agents Off",
                 "agents-running" => AgentsRunningText(),
+                "pursue-status" => PursueStatus,
+                "pursue-checks" => PursueChecks is int checks
+                    ? FormattableString.Invariant($"Pursue Checks {checks:N0}")
+                    : string.Empty,
+                "pursue-continuations" => PursueContinuations is int continuations
+                    ? FormattableString.Invariant($"Pursue Continuations {continuations:N0}")
+                    : string.Empty,
                 _ => ReviewerFields.TryGetValue(field, out var reviewer) ? reviewer : PluginField(field)
             };
             if (!string.IsNullOrWhiteSpace(value))

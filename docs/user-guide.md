@@ -1736,6 +1736,14 @@ custom fields are `mode`, `approval`, `thinking`, `tier`, `speed`, `context-wind
 `request-input`, `request-output`, `request-total`, `session-input`,
 `session-output`, `session-total`, `tools`, `elapsed`, `queued`, `agents`, and `agents-running`.
 `agents` shows `Agents On` or `Agents Off`. `agents-running` shows `Agents 2 Running, 1 Queued` for child Agent runs and is blank while Agents are off or idle.
+
+Add `pursue-status`, `pursue-checks`, or `pursue-continuations` to show live
+Pursue information. For example, `/statusline model pursue-status pursue-checks pursue-continuations`
+shows the model followed by fields such as `Pursue Checking`, `Pursue Checks 2`,
+and `Pursue Continuations 1`. The counts are per run.
+The fields are blank when the session has no objective. F9 opens the objective
+and checker evidence.
+
 Approval reviewer fields show only while that reviewer is on, and occupy no
 cell otherwise: `approval-provider`, `approval-model`, `approval-thinking`,
 `approval-tier`, `approval-speed`, and `approval-context` for the approval

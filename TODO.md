@@ -198,7 +198,6 @@ behavior stands until a specific change defines otherwise.
   the same commands. Do not reserve a configuration field, command, or
   public type.
 - Pursue optimization. Optimize the `/pursue` feature.
-- Pursue status line items. Add Pursue-related status line items.
 
 ## Medium priority
 

@@ -555,6 +555,11 @@ rules, and the approval mode are unchanged. The checker has no tools.
 - Server and Bridge carry `/pursue` through the shared command path,
   `PursueChanged`, `PursueChecked`, and the snapshot `pursue` field.
   `crystal run --pursue` treats the task as the objective.
+- The terminal's custom status line offers `pursue-status`, `pursue-checks`,
+  and `pursue-continuations`. The status shows the active phase (Working,
+  Checking, or Waiting) or the stopped state (Paused, Blocked, or Complete).
+  The counts describe the current or most recent run of the objective,
+  including zero. With no objective, these fields occupy no cells.
 - Each objective retains checker attempts across resume and process restarts,
   including failed, invalid, interrupted, and timed-out attempts. Objective,
   run, and check ids distinguish resumes whose local check indexes repeat.

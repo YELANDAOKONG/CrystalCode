@@ -2957,6 +2957,12 @@ reviewer sees the primary review (`extended-primary`, always `On` or `Off`
 while extended approval is on). Server and Bridge write both objects as
 `reviewer` and `extendedApproval` in the chrome object. The terminal keeps
 their text in `ShellChrome.ReviewerFields`, apart from plugin fields.
+The custom-only `pursue-status`, `pursue-checks`, and
+`pursue-continuations` fields use the parent session's `PursueChanged` event,
+including while a child transcript has focus. The terminal projects the
+active phase or stopped status and per-run counts into `ShellChrome`.
+Null state and conversation replacement clear those values. The fields
+follow the existing custom status line's width and ordering rules.
 `SessionChrome.Compaction` and `SessionChrome.Image` (`SideModelChrome`) carry
 the compaction model while it is on and the image model while it is set, with
 display labels for thinking, tier, and speed. `CodingSession` refreshes the

@@ -158,7 +158,7 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
-            _pursue = state;
+            UpdatePursueChrome(state);
             _pursuePage?.Update(state);
             if (state?.Status != PursueStatus.Active)
             {
@@ -174,11 +174,25 @@ public sealed class SessionRenderer : IDisposable
     {
         lock (_gate)
         {
-            _pursue = null;
+            UpdatePursueChrome(null);
             _pursuePage = null;
             _pursueChrome.Progress = string.Empty;
             _pursueRetryUntil = null;
         }
+    }
+
+    private void UpdatePursueChrome(PursueState? state)
+    {
+        _pursue = state;
+        _chrome.PursueStatus = state switch
+        {
+            null => string.Empty,
+            { Status: PursueStatus.Active, Phase: not PursuePhase.None } =>
+                "Pursue " + DisplayCase.Token(PursueState.PhaseToken(state.Phase)),
+            _ => "Pursue " + DisplayCase.Token(PursueState.StatusToken(state.Status))
+        };
+        _chrome.PursueChecks = state?.Checks;
+        _chrome.PursueContinuations = state?.Continuations;
     }
 
     internal void SetPursueProgress(string caption)
