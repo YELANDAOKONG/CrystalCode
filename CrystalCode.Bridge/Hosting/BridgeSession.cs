@@ -383,9 +383,6 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
                 }
 
                 break;
-            case TurnFinished finished:
-                Turns.OnTurnFinished(finished);
-                break;
             case ErrorWritten error:
                 Turns.OnError(error.Text);
                 if (error.Origin is { } origin)
@@ -433,6 +430,11 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         lock (_state)
         {
             _state.Apply(sessionEvent);
+        }
+
+        if (sessionEvent is TurnFinished finished)
+        {
+            Turns.OnTurnFinished(finished);
         }
 
         if (sessionEvent is ChildSessionChanged or ChildEventReceived)
