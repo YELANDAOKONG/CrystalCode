@@ -59,26 +59,6 @@ tokenization.
   it touches. Re-enable the test in the change that finds the cause. The
   picker itself has not been seen to misbehave in the terminal.
 
-- Waiting .NET 11: a `bash` or `bash_start` command that asks for a password
-  breaks the terminal UI. Examples are `git push` over HTTPS or SSH, `ssh`,
-  and `sudo`. Stdin is already redirected and closed (ARCHITECTURE.md,
-  Background Bash tasks), but these programs open `/dev/tty` directly instead
-  of reading stdin. The child inherits the controlling terminal of the TUI
-  process, so its prompt and the operator's keystrokes bypass the TUI and
-  corrupt the screen. Confirmed on Unix only with a pty experiment: a child
-  can write to `/dev/tty`, and a child in a new session cannot. Not yet
-  checked: Windows behavior, such as Git Bash, Git Credential Manager, and
-  console-attached prompts.
-
-  The intended fix waits for .NET 11, where `ProcessStartInfo.StartDetached`
-  detaches the child without an external command. The project targets net10.0
-  today. Whether to ship an interim fix is not decided. Candidates are
-  environment variables for git and ssh (`GIT_TERMINAL_PROMPT`,
-  `GIT_ASKPASS`, `SSH_ASKPASS_REQUIRE`, `GCM_INTERACTIVE`), which cover only
-  those programs, and a note in the `bash` tool description. Any fix must work
-  on Windows, macOS, and Linux and must not add an external command
-  dependency.
-
 ## Deferred
 
 These are part of the product direction and are not in the current build.

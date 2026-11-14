@@ -217,6 +217,8 @@ Do not add another package without asking.
 
 ## Verification
 
+Build CrystalCode with the .NET 11 SDK. Its projects target `net11.0`.
+
 ```bash
 dotnet build CrystalCode.sln
 dotnet test CrystalCode.sln

@@ -50,6 +50,29 @@ public sealed class BashToolTests
     }
 
     [Fact]
+    public async Task InvokeAsync_DetachesFromTheControllingTerminal()
+    {
+        using var root = new TemporaryWorkspace();
+        Assert.True(BashProcess.CreateStartInfo(root.Path, ":").StartDetached);
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var tool = new BashTool(new Workspace(root.Path), timeoutSeconds: 10);
+
+        var output = await tool.InvokeAsync(
+            JsonToolCall(
+                "1",
+                BashTool.ToolName,
+                """{"command":"if ( : </dev/tty ) 2>/dev/null; then exit 1; fi; printf 'stdout\\n'; printf 'stderr\\n' >&2"}"""));
+
+        Assert.True(output.Status == ToolResultStatus.Success, output.Text);
+        Assert.Contains("stdout", output.Text);
+        Assert.Contains("stderr", output.Text);
+    }
+
+    [Fact]
     public async Task InvokeAsync_ReportsNonZeroExit()
     {
         using var root = new TemporaryWorkspace();
@@ -98,7 +121,7 @@ public sealed class BashToolTests
             JsonToolCall(
                 "1",
                 BashTool.ToolName,
-                """{"command":"while true; do printf x >> beat.txt; done"}"""),
+                """{"command":"(while (( SECONDS < 45 )); do printf x >> beat.txt; done) & wait"}"""),
             cancellation.Token).AsTask();
 
         var beat = Path.Combine(root.Path, "beat.txt");

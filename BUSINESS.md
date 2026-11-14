@@ -39,6 +39,8 @@ separate library with no terminal code. The product can:
 - configure the built-in bash per-command timeout, including unlimited;
 - start session-local background shell tasks in Work, inspect their status and
   bounded logs, and stop them with child-process cleanup;
+- run foreground and background shell commands detached from the operator's
+  terminal, with output captured by the tool and no interactive terminal input;
 - retry a failed model round on rate limits, server errors, timeouts,
   network faults, and incomplete streams, waiting with backoff, a
   countdown on the progress row, and a transcript note;

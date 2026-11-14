@@ -8,9 +8,6 @@ namespace CrystalCode.Engine.Tools;
 /// </summary>
 internal static class BashProcess
 {
-    // Stdin is always redirected so the shell never inherits the operator's
-    // terminal. An inherited TTY makes .NET restore cooked mode for the child
-    // and lets the child consume keystrokes meant for the TUI.
     public static ProcessStartInfo CreateStartInfo(
         string workspaceRoot,
         string command)
@@ -22,6 +19,9 @@ internal static class BashProcess
         {
             FileName = ResolveBashFileName(),
             WorkingDirectory = workspaceRoot,
+            // Programs can open the controlling terminal directly even with redirected stdin.
+            StartDetached = true,
+            // Closing this pipe gives interactive readers EOF without touching terminal mode.
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

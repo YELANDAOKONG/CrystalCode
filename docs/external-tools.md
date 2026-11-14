@@ -573,7 +573,7 @@ Operators publish into the set directory:
 dotnet publish -c Release -o ~/.crystal/tools/<directory>
 ```
 
-The project is `OutputType=Library`, `TargetFramework=net10.0` (or a
+The project is `OutputType=Library`, `TargetFramework=net11.0` (or a
 lower TFM the host can load). **Do not** publish `--self-contained` or
 `--runtime` as a second RID-specific runtime. Native RID assets belong
 under `runtimes/<rid>/native/` via a framework-dependent publish.

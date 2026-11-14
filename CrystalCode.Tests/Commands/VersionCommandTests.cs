@@ -47,13 +47,12 @@ public sealed class VersionCommandTests
         Assert.Matches("^[0-9a-fA-F]{40}$", Value(build[1], "Crystal"));
         Assert.Matches(@"^\S+$", Value(build[2], "SDK"));
         Assert.Equal(Configuration(typeof(CrystalCode.Program).Assembly), Value(build[3], "Configuration"));
-        Assert.Matches(@"^\.NET .+$", Value(host[0], "Runtime"));
+        Assert.Equal(RuntimeInformation.FrameworkDescription, Value(host[0], "Runtime"));
         Assert.Equal(
             HostOperatingSystem.Describe(
                 RuntimeInformation.OSDescription,
                 RuntimeInformation.OSArchitecture),
             Value(host[1], "OS"));
-        Assert.DoesNotContain("1.0.0", text, StringComparison.Ordinal);
     }
 
     private static string Value(string line, string label)

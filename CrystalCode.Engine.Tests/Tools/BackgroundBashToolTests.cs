@@ -16,7 +16,10 @@ public sealed class BackgroundBashToolTests
         var start = new BackgroundBashStartTool(registry);
 
         var started = await start.InvokeAsync(
-            JsonToolCall("1", BackgroundBashStartTool.ToolName, """{"command":"printf ready"}"""));
+            JsonToolCall(
+                "1",
+                BackgroundBashStartTool.ToolName,
+                """{"command":"cat; printf 'ready\\n'; printf 'diagnostic\\n' >&2"}"""));
 
         Assert.Equal(ToolResultStatus.Success, started.Status);
         var taskId = ReadValue(started.Text, "task_id");
@@ -34,6 +37,7 @@ public sealed class BackgroundBashToolTests
 
         Assert.Equal(ToolResultStatus.Success, logsOutput.Status);
         Assert.Contains("ready", logsOutput.Text, StringComparison.Ordinal);
+        Assert.Contains("diagnostic", logsOutput.Text, StringComparison.Ordinal);
         Assert.Contains("next_offset:", logsOutput.Text, StringComparison.Ordinal);
     }
 
@@ -48,7 +52,7 @@ public sealed class BackgroundBashToolTests
             JsonToolCall(
                 "1",
                 BackgroundBashStartTool.ToolName,
-                """{"command":"while true; do printf x >> beat.txt; done"}"""));
+                """{"command":"(while (( SECONDS < 45 )); do printf x >> beat.txt; done) & wait"}"""));
         var taskId = ReadValue(started.Text, "task_id");
         var beat = Path.Combine(root.Path, "beat.txt");
         await ShellHeartbeat.WaitUntilWritingAsync(beat);

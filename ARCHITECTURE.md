@@ -1059,9 +1059,13 @@ restart, and are stopped when the session closes. The configured
 foreground `bashTimeoutSeconds`; omitting it keeps 10800 seconds (3 hours), and `null`
 or `"unlimited"` disables that timer. At most
 32 tasks may be active at once; completed tasks remain queryable but do not
-consume an active-task slot. Foreground and background Bash stdin is
-redirected and closed after startup, so a shell never inherits the operator's
-terminal, reads its keys, or switches it out of raw mode.
+consume an active-task slot. The shared Bash launcher uses .NET 11
+`ProcessStartInfo.StartDetached` for both foreground and background commands.
+On Unix the shell starts in a new session without the operator's controlling
+terminal. On Windows it starts detached from the host console. Standard input
+is redirected and closed after startup, and standard output and error remain
+redirected for capture. The engine retains the process handle for exit status,
+timeouts, cancellation, and process-tree cleanup.
 
 Switching modes replaces the first system message and the executor catalog.
 The transcript is otherwise the same conversation.

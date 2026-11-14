@@ -111,7 +111,7 @@ Linux and macOS are the recommended platforms. On Windows, install [Git for Wind
 
 Building from source also requires:
 
-- .NET 10 or .NET 11 SDK
+- .NET 11 SDK
 - A sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal` (relative to this
   repository root)
 
@@ -136,7 +136,7 @@ On Windows:
 powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1
 ```
 
-The script checks for the .NET 10 or .NET 11 SDK, the sibling Crystal
+The script checks for the .NET 11 SDK, the sibling Crystal
 checkout, and the current platform. It then publishes Release into `build/`
 with the same arguments as the release workflow:
 
@@ -301,10 +301,10 @@ writes `config.json`.
 ```text
 Crystal Code   3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a
 Crystal        1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d
-SDK            10.0.201
+SDK            11.0.100
 Configuration  Debug
 
-Runtime        .NET 10.0.4
+Runtime        .NET 11.0.0
 OS             Ubuntu 24.04.2 LTS x64
 ```
 

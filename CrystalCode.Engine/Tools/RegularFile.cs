@@ -59,7 +59,7 @@ internal static class RegularFile
         return (status.Mode & UnixFileTypeMask) == UnixRegularFile;
     }
 
-    // Field order matches SystemNative_Stat's FileStatus in .NET 10.
+    // Field order matches SystemNative_Stat's FileStatus in .NET 11.
     [StructLayout(LayoutKind.Sequential)]
     private struct UnixFileStatus
     {
@@ -80,6 +80,7 @@ internal static class RegularFile
         public long DeviceType;
         public long Inode;
         public uint UserFlags;
+        public uint HardLinkCount;
     }
 
     [DllImport("libSystem.Native", EntryPoint = "SystemNative_Stat", SetLastError = true)]

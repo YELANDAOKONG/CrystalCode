@@ -139,7 +139,7 @@ File edits and shell commands stay within the workspace. Reads outside it requir
 
 ## 🔨 Build from source
 
-You need the .NET 10 or .NET 11 SDK and a sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal`.
+You need the .NET 11 SDK and a sibling checkout of [Crystal](https://github.com/YELANDAOKONG/Crystal) at `../Crystal`.
 
 ```bash
 dotnet build CrystalCode.sln
@@ -159,7 +159,7 @@ On Windows:
 powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1
 ```
 
-The script checks for the .NET 10 or .NET 11 SDK, the sibling Crystal checkout, and the current platform, then publishes Release into `build/` with the release workflow arguments (`--self-contained true`, `-p:PublishSingleFile=true`, and the matching runtime). It replaces `~/.crystal/binaries/code/` and leaves configuration, credentials, and prompts in place. The script locates the repository from its own path.
+The script checks for the .NET 11 SDK, the sibling Crystal checkout, and the current platform, then publishes Release into `build/` with the release workflow arguments (`--self-contained true`, `-p:PublishSingleFile=true`, and the matching runtime). It replaces `~/.crystal/binaries/code/` and leaves configuration, credentials, and prompts in place. The script locates the repository from its own path.
 
 Run `dotnet build`, `dotnet test`, and `dotnet run` from the Crystal Code repository root. To work on a different repository, add `--workspace <path>` after the final `--` in the `dotnet run` command. A TTY is required for the interactive UI, and `bash` must be on the path (Git Bash is used on Windows when available).
 
