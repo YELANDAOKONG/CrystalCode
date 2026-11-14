@@ -24,21 +24,21 @@ internal static class PluginModelFacts
         ArgumentNullException.ThrowIfNull(model);
         ArgumentException.ThrowIfNullOrWhiteSpace(thinking);
         return new PluginModel(
-            provider.Name.Value,
-            provider.Protocol.Value,
-            modelName.Trim(),
-            model.ContextWindow,
-            model.MaxTokens,
-            model.Temperature,
-            model.TopP,
-            model.ImageInput,
-            thinking.Trim(),
-            model.AudioInput,
-            model.VideoInput,
-            serviceTier,
-            speed,
-            provider.BaseUri,
-            fileInput: model.FileInput);
+            provider: provider.Name.Value,
+            protocol: provider.Protocol.Value,
+            name: modelName.Trim(),
+            contextWindow: model.ContextWindow,
+            maxTokens: model.MaxTokens,
+            temperature: model.Temperature,
+            topP: model.TopP,
+            thinking: thinking.Trim(),
+            imageInput: model.ImageInput,
+            audioInput: model.AudioInput,
+            videoInput: model.VideoInput,
+            fileInput: model.FileInput,
+            serviceTier: serviceTier,
+            speed: speed,
+            baseUri: provider.BaseUri);
     }
 
     public static PluginReview DescribeReview(

@@ -21,14 +21,14 @@ public sealed record PluginModel
         int? maxTokens,
         double? temperature,
         double? topP,
-        bool imageInput,
         string thinking,
+        bool imageInput,
         bool audioInput = false,
         bool videoInput = false,
+        bool fileInput = false,
         string? serviceTier = null,
         string? speed = null,
-        Uri? baseUri = null,
-        bool fileInput = false)
+        Uri? baseUri = null)
         : this(
             provider,
             protocol,
@@ -37,15 +37,15 @@ public sealed record PluginModel
             maxTokens,
             temperature,
             topP,
-            imageInput,
             thinking,
-            unavailable: false,
+            imageInput,
             audioInput,
             videoInput,
+            fileInput,
             serviceTier,
             speed,
             baseUri,
-            fileInput)
+            unavailable: false)
     {
     }
 
@@ -58,15 +58,15 @@ public sealed record PluginModel
             null,
             null,
             null,
-            false,
             string.Empty,
-            unavailable,
+            imageInput: false,
             audioInput: false,
             videoInput: false,
+            fileInput: false,
             serviceTier: null,
             speed: null,
             baseUri: null,
-            fileInput: false)
+            unavailable: unavailable)
     {
     }
 
@@ -78,15 +78,15 @@ public sealed record PluginModel
         int? maxTokens,
         double? temperature,
         double? topP,
-        bool imageInput,
         string thinking,
-        bool unavailable,
+        bool imageInput,
         bool audioInput,
         bool videoInput,
+        bool fileInput,
         string? serviceTier,
         string? speed,
         Uri? baseUri,
-        bool fileInput)
+        bool unavailable)
     {
         if (!unavailable)
         {

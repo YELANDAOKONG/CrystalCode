@@ -263,20 +263,20 @@ internal static class SettingsMapper
 
                 models[model] = new ModelSettings(
                     contextWindow,
-                    modelEntry.Temperature,
-                    modelEntry.TopP,
-                    modelEntry.MaxTokens,
-                    modelEntry.Thinking ?? false,
-                    modelEntry.ThinkingEfforts,
-                    modelEntry.ImageInput ?? false,
-                    modelEntry.ThinkingCanDisable ?? true,
-                    modelEntry.AudioInput ?? false,
-                    modelEntry.VideoInput ?? false,
-                    modelEntry.ContextWindows,
-                    modelEntry.ServiceTiers,
-                    modelEntry.Speeds,
-                    modelEntry.TextTools ?? false,
-                    modelEntry.FileInput ?? false);
+                    contextWindows: modelEntry.ContextWindows,
+                    maxTokens: modelEntry.MaxTokens,
+                    temperature: modelEntry.Temperature,
+                    topP: modelEntry.TopP,
+                    thinking: modelEntry.Thinking ?? false,
+                    thinkingEfforts: modelEntry.ThinkingEfforts,
+                    thinkingCanDisable: modelEntry.ThinkingCanDisable ?? true,
+                    imageInput: modelEntry.ImageInput ?? false,
+                    audioInput: modelEntry.AudioInput ?? false,
+                    videoInput: modelEntry.VideoInput ?? false,
+                    fileInput: modelEntry.FileInput ?? false,
+                    textTools: modelEntry.TextTools ?? false,
+                    serviceTiers: modelEntry.ServiceTiers,
+                    speeds: modelEntry.Speeds);
             }
         }
 

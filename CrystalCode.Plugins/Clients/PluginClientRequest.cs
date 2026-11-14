@@ -12,20 +12,20 @@ public sealed record PluginClientRequest
         string model,
         Uri baseUri,
         string apiKey,
+        bool requiresApiKey,
         string? organization,
         string? project,
+        int? maxTokens,
+        string tokenLimit,
         double? temperature,
         double? topP,
-        int? maxTokens,
         bool replayReasoningContent,
-        string tokenLimit,
         bool imageInput,
-        bool requiresApiKey,
         bool audioInput = false,
         bool videoInput = false,
+        bool fileInput = false,
         string? serviceTier = null,
-        string? speed = null,
-        bool fileInput = false)
+        string? speed = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);

@@ -179,6 +179,11 @@ and a later `/tier` or `/speed`. `CreateMultimodal` is used only when
 the selected model accepts image input and no built-in factory owns the
 protocol.
 
+`PluginModel` and `PluginClientRequest` group constructor parameters by
+responsibility. Plugins that construct either type with a previous signature
+must rebuild against the current contract. Update positional calls to the
+current parameter order or use named arguments.
+
 ### Process commands
 
 `IPluginCliCommand` describes `crystal <name> ...`. It is added with

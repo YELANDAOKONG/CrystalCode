@@ -12,24 +12,24 @@ internal static class PluginClientRequests
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new PluginClientRequest(
-            provider.Protocol.Value,
-            provider.Name.Value,
-            settings.Model,
-            provider.BaseUri,
-            apiKey,
-            provider.Organization,
-            provider.Project,
-            model.Temperature,
-            model.TopP,
-            settings.MaxOutputTokens,
-            provider.ReplayReasoningContent,
-            provider.TokenLimit.Value,
-            model.ImageInput,
-            provider.RequiresApiKey,
-            model.AudioInput,
-            model.VideoInput,
-            settings.ServiceTier,
-            settings.Speed,
-            fileInput: model.FileInput);
+            protocol: provider.Protocol.Value,
+            provider: provider.Name.Value,
+            model: settings.Model,
+            baseUri: provider.BaseUri,
+            apiKey: apiKey,
+            requiresApiKey: provider.RequiresApiKey,
+            organization: provider.Organization,
+            project: provider.Project,
+            maxTokens: settings.MaxOutputTokens,
+            tokenLimit: provider.TokenLimit.Value,
+            temperature: model.Temperature,
+            topP: model.TopP,
+            replayReasoningContent: provider.ReplayReasoningContent,
+            imageInput: model.ImageInput,
+            audioInput: model.AudioInput,
+            videoInput: model.VideoInput,
+            fileInput: model.FileInput,
+            serviceTier: settings.ServiceTier,
+            speed: settings.Speed);
     }
 }

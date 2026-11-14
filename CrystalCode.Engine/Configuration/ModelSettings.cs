@@ -9,20 +9,20 @@ public sealed record ModelSettings
 {
     public ModelSettings(
         int contextWindow,
+        IReadOnlyList<int>? contextWindows = null,
+        int? maxTokens = null,
         double? temperature = null,
         double? topP = null,
-        int? maxTokens = null,
         bool thinking = false,
         IReadOnlyList<string>? thinkingEfforts = null,
-        bool imageInput = false,
         bool thinkingCanDisable = true,
+        bool imageInput = false,
         bool audioInput = false,
         bool videoInput = false,
-        IReadOnlyList<int>? contextWindows = null,
-        IReadOnlyList<string>? serviceTiers = null,
-        IReadOnlyList<string>? speeds = null,
+        bool fileInput = false,
         bool textTools = false,
-        bool fileInput = false)
+        IReadOnlyList<string>? serviceTiers = null,
+        IReadOnlyList<string>? speeds = null)
     {
         if (contextWindow <= 0)
         {

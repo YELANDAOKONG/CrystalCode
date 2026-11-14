@@ -65,6 +65,8 @@
 - Avoid magic numbers, double negatives, nested loops, and clever compression.
 - Nullable reference types stay enabled.
 - Declare variables near first use, one variable per declaration.
+- Group long constructor parameter lists by responsibility. Use named arguments
+  in mapping code, especially for adjacent values of the same type.
 
 ## Async
 

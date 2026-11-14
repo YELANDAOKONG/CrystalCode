@@ -21,7 +21,12 @@ public sealed class PluginModelFactsTests
             settings.ActiveModel,
             "high");
         var stripped = new PluginModel(
-            "acme", "openai", "m", 1, null, null, null, false, "high",
+            "acme", "openai", "m", 1,
+            maxTokens: null,
+            temperature: null,
+            topP: null,
+            thinking: "high",
+            imageInput: false,
             baseUri: new Uri("https://user:secret@api.example.test/v1"));
 
         Assert.Equal(settings.ActiveProvider.BaseUri, fact.BaseUri);
