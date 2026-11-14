@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 
@@ -62,7 +64,8 @@ public sealed record OpenAIOptions
         TimeSpan? requestTimeout = null,
         string? serviceTier = null,
         string? speed = null,
-        bool requireAssistantContent = false)
+        bool requireAssistantContent = false,
+        JsonElement? modelOptions = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -70,6 +73,11 @@ public sealed record OpenAIOptions
         if (baseUri is { IsAbsoluteUri: false })
         {
             throw new ArgumentException("Base URI must be absolute.", nameof(baseUri));
+        }
+
+        if (modelOptions is { } configured)
+        {
+            (temperature, topP) = SamplingOptions.Read(configured, temperature, topP);
         }
 
         if (temperature is < 0 or > 2)

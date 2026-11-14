@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 
@@ -15,9 +17,15 @@ public sealed record OllamaOptions
         string? vendorName = null,
         TimeSpan? requestTimeout = null,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        JsonElement? modelOptions = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        if (modelOptions is { } configured)
+        {
+            (temperature, topP) = SamplingOptions.Read(configured, temperature, topP);
+        }
+
         if (temperature is < 0 or > 2)
         {
             throw new ArgumentOutOfRangeException(nameof(temperature));

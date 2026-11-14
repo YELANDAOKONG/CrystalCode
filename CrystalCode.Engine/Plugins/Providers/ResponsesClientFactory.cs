@@ -38,13 +38,12 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 apiKey,
                 settings.Model,
                 provider.BaseUri,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
-                provider.Name.Value,
+                maxTokens: settings.MaxOutputTokens,
+                vendorName: provider.Name.Value,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
-                textTools: TextToolsFor(model)));
+                textTools: TextToolsFor(model),
+                modelOptions: model.Options));
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -63,12 +62,11 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 apiKey,
                 settings.Model,
                 provider.BaseUri,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
-                provider.Name.Value,
+                maxTokens: settings.MaxOutputTokens,
+                vendorName: provider.Name.Value,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
-                textTools: TextToolsFor(model)));
+                textTools: TextToolsFor(model),
+                modelOptions: model.Options));
     }
 }

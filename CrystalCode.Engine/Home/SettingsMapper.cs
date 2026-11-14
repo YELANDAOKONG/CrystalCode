@@ -261,12 +261,16 @@ internal static class SettingsMapper
                         $"Model '{model}' on provider '{name}' declares textTools, which only the responses protocol supports.");
                 }
 
+                if (modelEntry.Options is { ValueKind: not JsonValueKind.Object })
+                {
+                    throw new InvalidOperationException(
+                        $"Model '{model}' on provider '{name}' options must be a JSON object.");
+                }
+
                 models[model] = new ModelSettings(
                     contextWindow,
                     contextWindows: modelEntry.ContextWindows,
                     maxTokens: modelEntry.MaxTokens,
-                    temperature: modelEntry.Temperature,
-                    topP: modelEntry.TopP,
                     thinking: modelEntry.Thinking ?? false,
                     thinkingEfforts: modelEntry.ThinkingEfforts,
                     thinkingCanDisable: modelEntry.ThinkingCanDisable ?? true,
@@ -276,7 +280,8 @@ internal static class SettingsMapper
                     fileInput: modelEntry.FileInput ?? false,
                     textTools: modelEntry.TextTools ?? false,
                     serviceTiers: modelEntry.ServiceTiers,
-                    speeds: modelEntry.Speeds);
+                    speeds: modelEntry.Speeds,
+                    options: modelEntry.Options);
             }
         }
 
@@ -331,8 +336,7 @@ internal static class SettingsMapper
                 ContextWindows = settings.ContextWindows.SequenceEqual([settings.ContextWindow])
                     ? null
                     : [.. settings.ContextWindows],
-                Temperature = settings.Temperature,
-                TopP = settings.TopP,
+                Options = settings.Options,
                 MaxTokens = settings.MaxTokens,
                 Thinking = settings.Thinking ? true : null,
                 ThinkingEfforts = settings.ThinkingEfforts.Count == 0

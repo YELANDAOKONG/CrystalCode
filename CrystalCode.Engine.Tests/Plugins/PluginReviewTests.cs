@@ -35,8 +35,6 @@ public sealed class PluginReviewTests
             "gpt",
             SampleContextWindow,
             maxTokens: null,
-            temperature: null,
-            topP: null,
             imageInput: false,
             thinking: "low");
 }

@@ -355,7 +355,7 @@ public sealed class DiskSettingsStoreTests
     [InlineData(
         "\"options\": {\"temperature\": 0.2}",
         "anthropic",
-        "Set it on the model")]
+        "not valid for protocol")]
     [InlineData(
         "\"options\": [\"omitted\"]",
         "anthropic",
@@ -971,7 +971,7 @@ public sealed class DiskSettingsStoreTests
                   "models": {
                     "anthropic/claude-sonnet-4": {
                       "contextWindow": 200000,
-                      "temperature": 0.2,
+                      "options": { "temperature": 0.2, "topP": 0.9 },
                       "maxTokens": 4096
                     }
                   }
@@ -987,11 +987,49 @@ public sealed class DiskSettingsStoreTests
         Assert.Equal(ProviderProtocol.OpenAI, settings.ActiveProvider.Protocol);
         Assert.Equal(TokenLimitStyle.MaxTokens, settings.ActiveProvider.TokenLimit);
         Assert.Equal(200000, settings.ActiveModel.ContextWindow);
-        Assert.Equal(0.2, settings.ActiveModel.Temperature);
+        Assert.Equal(0.2, settings.ActiveModel.Options!.Value.GetProperty("temperature").GetDouble());
+        Assert.Equal(0.9, settings.ActiveModel.Options!.Value.GetProperty("topP").GetDouble());
         Assert.Equal(4096, settings.ActiveModel.MaxTokens);
         Assert.False(settings.ActiveModel.Thinking);
         Assert.Equal(ThinkingSelection.Default, settings.ThinkingEffort);
         Assert.True(settings.Catalog.Providers.ContainsKey("deepseek"));
+    }
+
+    [Fact]
+    public void ProviderDocument_RoundTripsOpaqueModelOptions()
+    {
+        const string fields = """{"custom": {"values": [1, true, null]}, "future": "value"}""";
+        var provider = ReadModelOptions(fields);
+        var written = SettingsMapper.WriteProviders(new ProviderCatalog([provider]));
+        var model = written.GetProperty("gateway").GetProperty("models").GetProperty("m");
+        using var expected = JsonDocument.Parse(fields);
+
+        Assert.True(JsonElement.DeepEquals(expected.RootElement, model.GetProperty("options")));
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("true")]
+    public void ProviderDocument_RejectsNonObjectModelOptions(string fields)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => ReadModelOptions(fields));
+
+        Assert.Contains("options must be a JSON object", error.Message, StringComparison.Ordinal);
+    }
+
+    private static ProviderDefinition ReadModelOptions(string fields)
+    {
+        using var document = JsonDocument.Parse(
+            $$"""
+            {
+              "gateway": {
+                "protocol": "openai",
+                "baseUri": "https://example.test/",
+                "models": { "m": { "contextWindow": 1024, "options": {{fields}} } }
+              }
+            }
+            """);
+        return SettingsMapper.ReadProviders(document.RootElement).Single();
     }
 
     [Fact]

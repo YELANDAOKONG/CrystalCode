@@ -168,8 +168,11 @@ factories run after the built-in adapters. A custom protocol is a token of 1–6
 a letter, then letters, digits, `_`, or `-`. Put that token in
 `providers.json` as `protocol`.
 
-`PluginClientRequest` carries the endpoint, model sampling, and API key
-for that call. Do not log the key. It also carries the model's input
+`PluginClientRequest` carries the endpoint and API key for that call. Do not
+log the key. `ModelOptions` carries the model's JSON `options` object, or null
+when omitted. The factory interprets and validates the object. Read sampling
+settings there in place of the former `Temperature` and `TopP` properties.
+The request also carries the model's input
 declarations (`AudioInput`, `VideoInput`, and `FileInput`), plus `ServiceTier`
 and `Speed` when those slots are set.
 A factory that cannot write a non-null slot must throw
@@ -419,8 +422,8 @@ that plugin instance is loaded again. The object stays live. `/model`,
 not call `AttachSession` again for those changes.
 
 `Session` carries the provider, protocol, model name, context window,
-maximum tokens, temperature, top-p, image input, declared audio input,
-declared video input, the current thinking gear, and the selected
+maximum tokens, image input, declared audio, video, and file input, the
+current thinking gear, and the selected
 service tier and speed. Audio and video
 flags copy the model entry. They do not make a turn, a tool result, or
 `CreateMultimodal` accept audio or video.

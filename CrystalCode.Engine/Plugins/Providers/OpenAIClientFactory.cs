@@ -33,15 +33,14 @@ public sealed class OpenAIClientFactory : IChatClientFactory
                 provider.BaseUri,
                 provider.Organization,
                 provider.Project,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
-                provider.ReplayReasoningContent,
+                maxTokens: settings.MaxOutputTokens,
+                replayReasoningContent: provider.ReplayReasoningContent,
                 useMaxCompletionTokens: provider.TokenLimit == TokenLimitStyle.MaxCompletionTokens,
                 vendorName: provider.Name.Value,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
-                requireAssistantContent: provider.RequireAssistantContent));
+                requireAssistantContent: provider.RequireAssistantContent,
+                modelOptions: model.Options));
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -62,14 +61,13 @@ public sealed class OpenAIClientFactory : IChatClientFactory
                 provider.BaseUri,
                 provider.Organization,
                 provider.Project,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
-                provider.ReplayReasoningContent,
+                maxTokens: settings.MaxOutputTokens,
+                replayReasoningContent: provider.ReplayReasoningContent,
                 useMaxCompletionTokens: provider.TokenLimit == TokenLimitStyle.MaxCompletionTokens,
                 vendorName: provider.Name.Value,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
-                requireAssistantContent: provider.RequireAssistantContent));
+                requireAssistantContent: provider.RequireAssistantContent,
+                modelOptions: model.Options));
     }
 }

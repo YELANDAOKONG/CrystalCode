@@ -29,8 +29,6 @@ internal static class PluginModelFacts
             name: modelName.Trim(),
             contextWindow: model.ContextWindow,
             maxTokens: model.MaxTokens,
-            temperature: model.Temperature,
-            topP: model.TopP,
             thinking: thinking.Trim(),
             imageInput: model.ImageInput,
             audioInput: model.AudioInput,

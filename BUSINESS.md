@@ -422,6 +422,8 @@ separate library with no terminal code. The product can:
 - record `audioInput`, `videoInput`, and `fileInput` on a model entry. The
   host stores these declarations in `providers.json` and publishes them to
   plugins;
+- configure provider-specific parameters per model through `options` in
+  `providers.json`. The selected adapter interprets and validates the object;
 - Session topic. A session can have a short topic that names what it is
   about. Topic naming is off by default. `topicModel` in `config.json`,
   `/topic`, launch flags, and session options configure it: `enabled`, and an

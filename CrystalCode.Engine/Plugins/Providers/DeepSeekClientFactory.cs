@@ -31,11 +31,10 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
                 apiKey,
                 settings.Model,
                 provider.BaseUri,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
+                maxTokens: settings.MaxOutputTokens,
                 serviceTier: settings.ServiceTier,
-                speed: settings.Speed));
+                speed: settings.Speed,
+                modelOptions: model.Options));
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -54,10 +53,9 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
                 apiKey,
                 settings.Model,
                 provider.BaseUri,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
+                maxTokens: settings.MaxOutputTokens,
                 serviceTier: settings.ServiceTier,
-                speed: settings.Speed));
+                speed: settings.Speed,
+                modelOptions: model.Options));
     }
 }

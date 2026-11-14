@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace CrystalCode.Plugins.Clients;
 
 /// <summary>
@@ -17,15 +19,14 @@ public sealed record PluginClientRequest
         string? project,
         int? maxTokens,
         string tokenLimit,
-        double? temperature,
-        double? topP,
         bool replayReasoningContent,
         bool imageInput,
         bool audioInput = false,
         bool videoInput = false,
         bool fileInput = false,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        JsonElement? modelOptions = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -44,8 +45,7 @@ public sealed record PluginClientRequest
         ApiKey = apiKey ?? string.Empty;
         Organization = organization;
         Project = project;
-        Temperature = temperature;
-        TopP = topP;
+        ModelOptions = modelOptions?.Clone();
         MaxTokens = maxTokens;
         ReplayReasoningContent = replayReasoningContent;
         TokenLimit = tokenLimit.Trim();
@@ -72,9 +72,8 @@ public sealed record PluginClientRequest
 
     public string? Project { get; }
 
-    public double? Temperature { get; }
-
-    public double? TopP { get; }
+    /// <summary>Gets the model options for this factory to interpret.</summary>
+    public JsonElement? ModelOptions { get; }
 
     public int? MaxTokens { get; }
 

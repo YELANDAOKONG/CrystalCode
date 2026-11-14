@@ -15,6 +15,8 @@
 - Comments explain constraints and intent rather than syntax.
 - Do not leave commented-out production code.
 - Do not modify dependencies without explicit user authorization.
+- Preserve model `options` as a JSON object in Engine. Provider adapters
+  and plugin client factories interpret its keys and validate their values.
 
 ## Source organization
 

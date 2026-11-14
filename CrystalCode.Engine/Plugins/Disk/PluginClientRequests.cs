@@ -22,14 +22,13 @@ internal static class PluginClientRequests
             project: provider.Project,
             maxTokens: settings.MaxOutputTokens,
             tokenLimit: provider.TokenLimit.Value,
-            temperature: model.Temperature,
-            topP: model.TopP,
             replayReasoningContent: provider.ReplayReasoningContent,
             imageInput: model.ImageInput,
             audioInput: model.AudioInput,
             videoInput: model.VideoInput,
             fileInput: model.FileInput,
             serviceTier: settings.ServiceTier,
-            speed: settings.Speed);
+            speed: settings.Speed,
+            modelOptions: model.Options);
     }
 }

@@ -2303,14 +2303,16 @@ across that array; duplicates fail configuration loading. A selected model
 determines the endpoint, protocol, and credentials used by the adapter.
 Repeated JSON provider keys are rejected; the array form preserves both
 endpoints. Repeated model keys within one endpoint are also rejected.
-Context size and sampling live on each model, not
-on the host. Thinking capability also lives on the model. The current thinking
-gear is a host setting. An endpoint may also carry an `options` object of
-JSON scalars. The object is not a fixed field list: names are read from the
-JSON and interpreted by `protocol`. Unknown names fail loading. The only
-recognized name is Anthropic `thinkingDisplay`, `summarized` (the default,
-not written back) or `omitted` (do not send `display`). Sampling parameters
-do not belong there. The API key for `openrouter` belongs in
+Context size, output caps, and thinking capability live on each model. The
+current thinking gear is a host setting. A model's optional `options` is a
+JSON object. Engine snapshots and passes it through to the selected built-in
+adapter or plugin client factory, which owns key validation and wire encoding.
+Built-in adapters read `temperature` and `topP` when the
+client is created, then validate them with their protocol options.
+An endpoint's own `options` holds protocol settings shared by its models.
+The recognized endpoint option is Anthropic `thinkingDisplay`, with values
+`summarized` (the default) and `omitted`. Unknown endpoint keys fail catalog
+loading. The API key for `openrouter` belongs in
 `credentials.json` under that provider name.
 
 ```json
@@ -2329,7 +2331,7 @@ do not belong there. The API key for `openrouter` belongs in
       "models": {
         "anthropic/claude-sonnet-4": {
           "contextWindow": 200000,
-          "temperature": 0.2,
+          "options": { "temperature": 0.2 },
           "maxTokens": 8192,
           "thinking": true,
           "thinkingEfforts": ["low", "medium", "high"]
@@ -3357,8 +3359,9 @@ exists. The snapshot does not enable, disable, invoke, or reorder other
 plugins or tools. The host then calls `IPlugin.AttachSession` with a live
 view of the session model and the review model. Each read returns the
 current provider, protocol, model name, context window, maximum tokens,
-temperature, top-p, image input, declared audio input, declared video
-input, thinking gear, and the selected service tier and speed when set.
+image input, declared audio, video, and file input, thinking gear, and the
+selected service tier and speed when set. Plugin client factories receive the
+model's raw options through `PluginClientRequest.ModelOptions`.
 The plugin model's `ContextWindow` describes the
 configured maximum model capability, not the selected local session budget.
 `/context` does not change that capability value; chrome and usage events

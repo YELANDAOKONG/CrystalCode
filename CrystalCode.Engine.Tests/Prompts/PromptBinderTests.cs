@@ -402,8 +402,6 @@ public sealed class PromptBinderTests
                 "gpt",
                 contextWindow: 8,
                 maxTokens: null,
-                temperature: null,
-                topP: null,
                 imageInput: false,
                 thinking: "low"),
             new PluginReview(
@@ -414,8 +412,6 @@ public sealed class PromptBinderTests
                     "claude",
                     contextWindow: 8,
                     maxTokens: null,
-                    temperature: null,
-                    topP: null,
                     imageInput: false,
                     thinking: "default"))));
 

@@ -19,8 +19,6 @@ public sealed record PluginModel
         string name,
         int contextWindow,
         int? maxTokens,
-        double? temperature,
-        double? topP,
         string thinking,
         bool imageInput,
         bool audioInput = false,
@@ -35,8 +33,6 @@ public sealed record PluginModel
             name,
             contextWindow,
             maxTokens,
-            temperature,
-            topP,
             thinking,
             imageInput,
             audioInput,
@@ -56,8 +52,6 @@ public sealed record PluginModel
             string.Empty,
             0,
             null,
-            null,
-            null,
             string.Empty,
             imageInput: false,
             audioInput: false,
@@ -76,8 +70,6 @@ public sealed record PluginModel
         string name,
         int contextWindow,
         int? maxTokens,
-        double? temperature,
-        double? topP,
         string thinking,
         bool imageInput,
         bool audioInput,
@@ -110,22 +102,6 @@ public sealed record PluginModel
                     "Maximum token count must be positive.");
             }
 
-            if (temperature is < 0 or > 2)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(temperature),
-                    temperature,
-                    "Temperature must be between 0 and 2.");
-            }
-
-            if (topP is < 0 or > 1)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(topP),
-                    topP,
-                    "Top-P must be between 0 and 1.");
-            }
-
             provider = provider.Trim();
             protocol = protocol.Trim();
             name = name.Trim();
@@ -137,8 +113,6 @@ public sealed record PluginModel
         Name = name;
         ContextWindow = contextWindow;
         MaxTokens = maxTokens;
-        Temperature = temperature;
-        TopP = topP;
         ImageInput = imageInput;
         AudioInput = audioInput;
         VideoInput = videoInput;
@@ -168,10 +142,6 @@ public sealed record PluginModel
     public int ContextWindow { get; }
 
     public int? MaxTokens { get; }
-
-    public double? Temperature { get; }
-
-    public double? TopP { get; }
 
     public bool ImageInput { get; }
 

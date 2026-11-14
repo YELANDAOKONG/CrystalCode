@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins;
@@ -23,8 +25,6 @@ public sealed class PluginModelFactsTests
         var stripped = new PluginModel(
             "acme", "openai", "m", 1,
             maxTokens: null,
-            temperature: null,
-            topP: null,
             thinking: "high",
             imageInput: false,
             baseUri: new Uri("https://user:secret@api.example.test/v1"));
@@ -99,7 +99,9 @@ public sealed class PluginModelFactsTests
     public void Describe_PublishesDeclaredMediaWithoutImageInput()
     {
         var providerName = new ProviderName("local");
-        var model = new ModelSettings(8192, audioInput: true, videoInput: true, fileInput: true);
+        using var options = JsonDocument.Parse("""{"custom":{"values":[7]}}""");
+        var model = new ModelSettings(8192, audioInput: true, videoInput: true, fileInput: true,
+            options: options.RootElement);
         var provider = new ProviderDefinition(
             providerName,
             ProviderProtocol.OpenAI,
@@ -123,6 +125,7 @@ public sealed class PluginModelFactsTests
         Assert.True(request.AudioInput);
         Assert.True(request.VideoInput);
         Assert.True(request.FileInput);
+        Assert.True(JsonElement.DeepEquals(options.RootElement, request.ModelOptions!.Value));
         Assert.Null(request.ServiceTier);
         Assert.Null(request.Speed);
 

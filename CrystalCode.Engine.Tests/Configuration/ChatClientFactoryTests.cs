@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Providers;
@@ -38,16 +40,20 @@ public sealed class ChatClientFactoryTests
         var handler = new CapturingHandler(
             """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}]}""");
         using var http = new HttpClient(handler);
+        using var options = JsonDocument.Parse("""{"temperature":0,"topP":0.9}""");
         using var provider = new ResponsesProvider(
-            new ResponsesOptions("key", "m", new Uri("https://example.test/"), textTools: [binding]),
+            new ResponsesOptions("key", "m", new Uri("https://example.test/"),
+                textTools: [binding], modelOptions: options.RootElement),
             http);
 
         await provider.CompleteAsync(new Crystal.Chat.ChatRequest(
             [new Crystal.Chat.ChatMessage(Crystal.Chat.ChatRole.User, "go")],
             [tool.Definition]));
 
-        using var sent = System.Text.Json.JsonDocument.Parse(handler.Body!);
+        using var sent = JsonDocument.Parse(handler.Body!);
         Assert.Equal("custom", sent.RootElement.GetProperty("tools")[0].GetProperty("type").GetString());
+        Assert.Equal(0, sent.RootElement.GetProperty("temperature").GetDouble());
+        Assert.Equal(0.9, sent.RootElement.GetProperty("top_p").GetDouble());
     }
 
     private sealed class CapturingHandler(string response) : HttpMessageHandler
@@ -134,7 +140,7 @@ public sealed class ChatClientFactoryTests
                 new Uri("https://api.groq.com/openai/v1/"),
                 new Dictionary<string, ModelSettings>
                 {
-                    ["llama"] = new(131072, temperature: 0.1, maxTokens: 1024)
+                    ["llama"] = new(131072, maxTokens: 1024)
                 },
                 tokenLimit: TokenLimitStyle.MaxTokens)
         ]);
@@ -154,6 +160,29 @@ public sealed class ChatClientFactoryTests
         {
             (client as IDisposable)?.Dispose();
         }
+    }
+
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("responses")]
+    [InlineData("anthropic")]
+    [InlineData("gemini")]
+    [InlineData("ollama")]
+    [InlineData("deepseek")]
+    public void Clients_DelegateModelOptionsValidationToBuiltInAdapters(string protocol)
+    {
+        using var options = JsonDocument.Parse("""{"temperature":"invalid"}""");
+        var provider = new ProviderDefinition(
+            new ProviderName("gateway"), ProviderProtocol.Parse(protocol), new Uri("https://example.test/"),
+            new Dictionary<string, ModelSettings> { ["m"] = new(8192, imageInput: true, options: options.RootElement) });
+        var settings = new HarnessSettings(provider.Name, "m", ApprovalMode.Default,
+            HarnessSettings.DefaultCompactionThreshold, new ProviderCatalog([provider]));
+
+        var textError = Assert.Throws<ArgumentException>(() => ChatClientFactory.Create(settings, "key"));
+        var imageError = Assert.Throws<ArgumentException>(() => MultimodalChatClientFactory.Create(settings, "key"));
+
+        Assert.Contains("temperature", textError.Message, StringComparison.Ordinal);
+        Assert.Contains("temperature", imageError.Message, StringComparison.Ordinal);
     }
 
     [Theory]

@@ -39,12 +39,6 @@ internal static class EndpointOptionsReader
                     $"Provider '{provider}' option '{property.Name}' is listed more than once.");
             }
 
-            if (IsModelSampling(property.Name))
-            {
-                throw new InvalidOperationException(
-                    $"Provider '{provider}' option '{property.Name}' is not an endpoint option. Set it on the model.");
-            }
-
             if (!IsScalar(property.Value.ValueKind))
             {
                 throw new InvalidOperationException(
@@ -104,11 +98,6 @@ internal static class EndpointOptionsReader
                 exception);
         }
     }
-
-    private static bool IsModelSampling(string name) =>
-        name.Equals("temperature", StringComparison.OrdinalIgnoreCase)
-        || name.Equals("topP", StringComparison.OrdinalIgnoreCase)
-        || name.Equals("maxTokens", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsScalar(JsonValueKind kind) =>
         kind is JsonValueKind.String or JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False;

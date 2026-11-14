@@ -1,7 +1,9 @@
+using System.Text.Json;
+
 namespace CrystalCode.Engine.Configuration;
 
 /// <summary>
-/// Per-model limits, sampling, and thinking capability. Context size is
+/// Per-model limits, capabilities, and provider options. Context size is
 /// required. The current thinking gear is a host setting, not a model field.
 /// Audio, video, and file input are stored declarations.
 /// </summary>
@@ -11,8 +13,6 @@ public sealed record ModelSettings
         int contextWindow,
         IReadOnlyList<int>? contextWindows = null,
         int? maxTokens = null,
-        double? temperature = null,
-        double? topP = null,
         bool thinking = false,
         IReadOnlyList<string>? thinkingEfforts = null,
         bool thinkingCanDisable = true,
@@ -22,7 +22,8 @@ public sealed record ModelSettings
         bool fileInput = false,
         bool textTools = false,
         IReadOnlyList<string>? serviceTiers = null,
-        IReadOnlyList<string>? speeds = null)
+        IReadOnlyList<string>? speeds = null,
+        JsonElement? options = null)
     {
         if (contextWindow <= 0)
         {
@@ -32,20 +33,9 @@ public sealed record ModelSettings
                 "Context window must be positive.");
         }
 
-        if (temperature is < 0 or > 2)
+        if (options is { ValueKind: not JsonValueKind.Object })
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(temperature),
-                temperature,
-                "Temperature must be between 0 and 2.");
-        }
-
-        if (topP is < 0 or > 1)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(topP),
-                topP,
-                "Top-P must be between 0 and 1.");
+            throw new ArgumentException("Model options must be a JSON object.", nameof(options));
         }
 
         if (maxTokens is <= 0)
@@ -68,8 +58,7 @@ public sealed record ModelSettings
 
         Array.Sort(windows);
         ContextWindows = Array.AsReadOnly(windows);
-        Temperature = temperature;
-        TopP = topP;
+        Options = options?.Clone();
         MaxTokens = maxTokens;
         Thinking = thinking;
         ThinkingEfforts = NormalizeEfforts(thinking, thinkingEfforts);
@@ -87,9 +76,8 @@ public sealed record ModelSettings
 
     public IReadOnlyList<int> ContextWindows { get; }
 
-    public double? Temperature { get; }
-
-    public double? TopP { get; }
+    /// <summary>Gets the JSON options interpreted by the selected provider adapter.</summary>
+    public JsonElement? Options { get; }
 
     public int? MaxTokens { get; }
 

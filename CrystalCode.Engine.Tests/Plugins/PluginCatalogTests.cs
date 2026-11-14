@@ -202,8 +202,6 @@ public sealed class PluginCatalogTests
                     "gpt",
                     contextWindow: 8,
                     maxTokens: null,
-                    temperature: null,
-                    topP: null,
                     imageInput: false,
                     thinking: "low"),
                 PluginReview.UsingSession),

@@ -42,11 +42,10 @@ public sealed class GeminiClientFactory : IChatClientFactory
             apiKey,
             settings.Model,
             provider.BaseUri,
-            model.Temperature,
-            model.TopP,
-            settings.MaxOutputTokens,
-            provider.Name.Value,
+            maxTokens: settings.MaxOutputTokens,
+            vendorName: provider.Name.Value,
             serviceTier: settings.ServiceTier,
-            speed: settings.Speed);
+            speed: settings.Speed,
+            modelOptions: model.Options);
     }
 }

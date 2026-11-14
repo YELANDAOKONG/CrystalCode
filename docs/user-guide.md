@@ -787,7 +787,7 @@ ships no entry for it, so Claude models come from `providers.json`. See
 | `apiKeyEnvironment` | Environment variable name checked first for this provider |
 | `apiKey` | Literal, `{env:NAME}`, or `{file:path}` |
 | `requiresApiKey` | Whether a missing key is an error (default `true`, except `ollama`; set `false` for an unauthenticated endpoint) |
-| `options` | Optional object of protocol-specific settings. Values are JSON strings, numbers, or booleans. Unknown names, and names that do not apply to `protocol`, fail loading. `temperature`, `topP`, and `maxTokens` stay on the model |
+| `options` | Optional endpoint-wide protocol settings. Values are JSON strings, numbers, or booleans. Unknown names and names that do not apply to `protocol` fail loading |
 | `models` | Table of selectable model ids |
 
 Provider names are letters, digits, hyphen, or underscore.
@@ -813,8 +813,7 @@ are not supported by the current adapter.
 | :--- | :--- |
 | `contextWindow` | Required positive maximum model context size in tokens. Upper bound for selectable local budgets; used as the sole budget when `contextWindows` is omitted or empty |
 | `contextWindows` | Optional distinct positive token budgets no greater than `contextWindow`, for example `[272000, 1000000]`. `/context` cycles these values; the lowest is the initial budget. Compaction and the status bar use the selected budget |
-| `temperature` | Optional, 0 to 2 |
-| `topP` | Optional, 0 to 1 |
+| `options` | Optional JSON object interpreted by the selected adapter. Built-in adapters accept `temperature` and `topP` here. Custom adapters define their own keys and values |
 | `maxTokens` | Optional positive output-token cap. The host lowers the cap a request asks for so the prompt and the reply fit the selected context budget; it never raises it. Anthropic Messages requires a cap on every request, so an `anthropic` model without `maxTokens` is sent 8192 and long replies stop at `max_tokens`. Declare `maxTokens` for every Claude model |
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
@@ -829,6 +828,10 @@ are not supported by the current adapter.
 
 `audioInput`, `videoInput`, and `fileInput` are configuration declarations
 visible to plugins. Native attachments and multimodal tools use `imageInput`.
+Move existing `temperature` and `topP` fields from the model entry into its
+`options` object. Built-in adapters validate them when they create a client.
+Temperature ranges from 0 to 1 for Anthropic and 0 to 2 for the other built-in
+protocols. Top-p ranges from 0 to 1. Omitted or null values use server defaults.
 Service tier and speed are sent only when the active model lists the
 selected token. The host does not choose the JSON field and does not
 compare the response with the request. Chat Completions and OpenAI
@@ -877,7 +880,7 @@ file. Write it in `~/.crystal/credentials.json` under `openrouter`.
     "models": {
       "anthropic/claude-sonnet-4": {
         "contextWindow": 200000,
-        "temperature": 0.2,
+        "options": { "temperature": 0.2 },
         "maxTokens": 8192,
         "thinking": true,
         "thinkingEfforts": ["low", "medium", "high"]

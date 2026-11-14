@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace CrystalCode.Engine.Home;
 
 internal sealed class ModelDocument
@@ -6,9 +8,7 @@ internal sealed class ModelDocument
 
     public List<int>? ContextWindows { get; set; }
 
-    public double? Temperature { get; set; }
-
-    public double? TopP { get; set; }
+    public JsonElement? Options { get; set; }
 
     public int? MaxTokens { get; set; }
 

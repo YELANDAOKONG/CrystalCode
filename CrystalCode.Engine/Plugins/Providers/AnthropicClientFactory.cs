@@ -28,13 +28,12 @@ public sealed class AnthropicClientFactory : IChatClientFactory
                 apiKey,
                 settings.Model,
                 provider.BaseUri,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
-                provider.Name.Value,
+                maxTokens: settings.MaxOutputTokens,
+                vendorName: provider.Name.Value,
                 summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
                 serviceTier: settings.ServiceTier,
-                speed: settings.Speed));
+                speed: settings.Speed,
+                modelOptions: model.Options));
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -53,12 +52,11 @@ public sealed class AnthropicClientFactory : IChatClientFactory
                 apiKey,
                 settings.Model,
                 provider.BaseUri,
-                model.Temperature,
-                model.TopP,
-                settings.MaxOutputTokens,
-                provider.Name.Value,
+                maxTokens: settings.MaxOutputTokens,
+                vendorName: provider.Name.Value,
                 summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
                 serviceTier: settings.ServiceTier,
-                speed: settings.Speed));
+                speed: settings.Speed,
+                modelOptions: model.Options));
     }
 }

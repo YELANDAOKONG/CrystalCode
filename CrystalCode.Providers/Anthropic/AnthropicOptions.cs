@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 
@@ -18,7 +20,8 @@ public sealed record AnthropicOptions
         TimeSpan? requestTimeout = null,
         bool summarizeThinking = true,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        JsonElement? modelOptions = null)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -26,6 +29,11 @@ public sealed record AnthropicOptions
         if (!baseUri.IsAbsoluteUri)
         {
             throw new ArgumentException("Base URI must be absolute.", nameof(baseUri));
+        }
+
+        if (modelOptions is { } configured)
+        {
+            (temperature, topP) = SamplingOptions.Read(configured, temperature, topP);
         }
 
         if (temperature is < 0 or > 1)
