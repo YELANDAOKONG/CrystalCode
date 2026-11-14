@@ -176,7 +176,8 @@ public sealed class TerminalSyntaxCacheTests
     public async Task GetTokens_EnforcesLruEntryAndMemoryBounds()
     {
         using var cache = new TerminalSyntaxCache(TimeSpan.Zero);
-        cache.SetService((_, _, _) => Task.FromResult<IReadOnlyList<SyntaxToken>?>(null), _ => true);
+        cache.SetService((_, _, _) => Task.FromResult<IReadOnlyList<SyntaxToken>?>(
+            [new SyntaxToken(0, 1, "keyword")]), _ => true);
         for (var index = 0; index < TerminalSyntaxCache.MaximumEntries; index++)
         {
             cache.GetTokens("cs", $"item-{index}");
@@ -188,10 +189,10 @@ public sealed class TerminalSyntaxCacheTests
         cache.GetTokens("cs", "extra");
         await UntilAsync(() => cache.Counts.Queued == 0 && cache.Counts.Active == 0);
         Assert.Equal(TerminalSyntaxCache.MaximumEntries, cache.Counts.Entries);
-        cache.GetTokens("cs", "item-0");
+        Assert.NotNull(cache.GetTokens("cs", "item-0"));
         Assert.Equal(0, cache.Counts.Queued);
-        cache.GetTokens("cs", "item-1");
-        Assert.Equal(1, cache.Counts.Queued);
+        // A miss is queued and a worker may drain it within one poll, so absence is observed without scheduling.
+        Assert.Null(cache.LookupTokens("cs", "item-1"));
         Assert.True(cache.Counts.Bytes <= TerminalSyntaxCache.MaximumBytes);
     }
 
