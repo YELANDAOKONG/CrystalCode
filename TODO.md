@@ -127,11 +127,6 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Configurable serial or concurrent execution of ordinary tool-call batches.
   Ordinary Work and Plan tools remain serial. Adjacent child `task` groups
   use their own bounded concurrency.
-- OAuth sign-in for model providers, such as a ChatGPT account login for
-  OpenAI. Today a provider authenticates only with a static API key. Whether
-  it is built, which providers, the token store, and refresh behavior are not
-  defined. Do not reserve a command, configuration field, or public type. It
-  is not OAuth for remote MCP servers (see MCP gaps).
 - Several concurrent tasks in one terminal process.
 - Several active sessions in one `crystal server` process. Plugin and
   external tool load contexts are not collectible, so this needs that
@@ -154,6 +149,11 @@ behavior stands until a specific change defines otherwise.
   and URL-mode elicitation. MCP tool image results are forwarded on image-capable
   turns through the existing media boundary. Do not bypass the plugin, approval,
   and media boundaries.
+- OAuth sign-in for model providers, such as a ChatGPT account login for
+  OpenAI. Today a provider authenticates only with a static API key. The
+  supported providers, token storage, and refresh behavior are to be defined.
+  Do not reserve a command, configuration field, or public type. See MCP gaps
+  for remote MCP server OAuth.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.
