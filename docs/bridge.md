@@ -378,6 +378,10 @@ link as its mention text or its image, not as the original block.
   `SessionRunner`/`EnqueueAsync`, with the engine's queue semantics. Its
   response resolves when the turn that consumed it ends. `QueueChanged` is
   reported in `_meta`. `_crystal/queue/release` is the empty-Enter release.
+  `_crystal/queue/retract` takes the newest queued follow-up back and returns
+  it. It does not interrupt, and a deferred `/clear`, `/resume`, or `/fork`
+  stays queued. A `session/prompt` that already queued still waits for the
+  follow-up turn. Retract does not answer that request.
 - A cancelled turn always answers `cancelled`, never an error.
 
 ## Session updates
@@ -708,6 +712,7 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 | `_crystal/session/fork` | Fork a saved session (see Sessions) |
 | `_crystal/recall` | `TryRecall`; returns `recalled`, and the draft follows as `_crystal/recalled` |
 | `_crystal/queue/release` | empty input release |
+| `_crystal/queue/retract` | `TryRetractQueued`; returns `retracted` and `text` (the raw newest follow-up, trusted image markers kept, or null). Does not interrupt. A deferred `/clear`, `/resume`, or `/fork` stays queued |
 | `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode` moves forward through Work, Plan, and enabled custom modes in name order. Both methods return the active `mode` and `planMode`, and `pending`. During a turn the change applies on the next turn |
 | `_crystal/verbose {target, enabled}` | `SetVerbose` |
 | `_crystal/draft {text}` | `NotifyDraftChanged` |

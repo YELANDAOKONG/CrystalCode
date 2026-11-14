@@ -40,7 +40,7 @@ public sealed class ServerParityTests
         ["FinishTurnAsync"] = "SessionRunner shutdown",
         ["TryInterrupt"] = "POST /interrupt",
         ["TryRecall"] = "POST /recall",
-        ["TryRetractQueued"] = "Excluded: the terminal Ctrl+C returns the queued text to its composer",
+        ["TryRetractQueued"] = "POST /queue/retract",
         ["RecallPending"] = "Recall state is part of POST /recall and message.recalled",
         ["TogglePlan"] = "POST /mode toggle-plan",
         ["CycleMode"] = "POST /mode cycle",
@@ -164,8 +164,9 @@ public sealed class ServerParityTests
     [Fact]
     public void Info_ListsEveryRoute()
     {
-        Assert.Equal(41, ServerEndpoints.Operations.Count);
+        Assert.Equal(42, ServerEndpoints.Operations.Count);
         Assert.Contains("POST /recall", ServerEndpoints.Operations);
+        Assert.Contains("POST /queue/retract", ServerEndpoints.Operations);
         Assert.Contains("GET /pursue/checks/{id}", ServerEndpoints.Operations);
     }
 

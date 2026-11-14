@@ -26,6 +26,7 @@ internal static class Extensions
         "_crystal/session/fork",
         "_crystal/recall",
         "_crystal/queue/release",
+        "_crystal/queue/retract",
         "_crystal/mode/cycle",
         "_crystal/mode/togglePlan",
         "_crystal/verbose",
@@ -98,6 +99,14 @@ internal static class Extensions
             case "_crystal/queue/release":
                 await SubmitAsync(bridge, string.Empty, origin);
                 return JsonRpcReply.Empty;
+            case "_crystal/queue/retract":
+                // Ctrl+C semantics: a direct call, not queued behind the running turn.
+                var retracted = session.TryRetractQueued(out var queuedText);
+                return Result(writer =>
+                {
+                    writer.WriteBoolean("retracted", retracted);
+                    CrystalWire.Optional(writer, "text", retracted ? queuedText : null);
+                });
             case "_crystal/mode/cycle":
                 await runner.InvokeAsync(static value => value.CycleMode(), origin);
                 return Mode(session);

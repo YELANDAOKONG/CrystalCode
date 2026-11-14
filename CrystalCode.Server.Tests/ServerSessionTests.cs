@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Sessions;
 using CrystalCode.Server.Tests.Support;
 
 using Xunit;
@@ -494,6 +495,51 @@ public sealed class ServerSessionTests
         Assert.True(interrupted.GetProperty("interrupted").GetBoolean());
         Assert.Equal("interrupted", finished.GetProperty("data").GetProperty("reason").GetString());
         await events.WaitForAsync("message.sent", value => value.GetProperty("data").GetProperty("text").GetString() == "later");
+    }
+
+    [Fact]
+    public async Task QueueRetract_ReturnsTheNewestFollowUpAndKeepsItsMarker()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await ServerFixture.StartAsync(model);
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        var idle = await fixture.PostAsync(fixture.Http, "/queue/retract", new { });
+        Assert.False(idle.GetProperty("retracted").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, idle.GetProperty("text").ValueKind);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
+        await model.Held.Task.WaitAsync(ServerFixture.Wait);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "first" });
+        var marked = "see " + ImageMarkerText.Tag(3);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = marked });
+        var queued = await events.WaitForAsync(
+            "queue.changed",
+            value => value.GetProperty("data").GetProperty("items").GetArrayLength() == 2);
+
+        var retracted = await fixture.PostAsync(fixture.Http, "/queue/retract", new { });
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+
+        Assert.Equal("see [Image #3]", queued.GetProperty("data").GetProperty("items")[1].GetString());
+        Assert.True(retracted.GetProperty("retracted").GetBoolean());
+        Assert.Equal(marked, retracted.GetProperty("text").GetString());
+        Assert.Equal("first", Assert.Single(snapshot.GetProperty("queue").EnumerateArray()).GetString());
+        Assert.True(snapshot.GetProperty("turnActive").GetBoolean());
+        Assert.DoesNotContain("turn.finished", events.Types());
+
+        var older = await fixture.PostAsync(fixture.Http, "/queue/retract", new { });
+        var emptyQueue = await fixture.GetAsync(fixture.Http, "/snapshot");
+        var done = await fixture.PostAsync(fixture.Http, "/queue/retract", new { });
+
+        Assert.True(older.GetProperty("retracted").GetBoolean());
+        Assert.Equal("first", older.GetProperty("text").GetString());
+        Assert.Empty(emptyQueue.GetProperty("queue").EnumerateArray());
+        Assert.False(done.GetProperty("retracted").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("text").ValueKind);
+
+        await fixture.PostAsync(fixture.Http, "/interrupt", new { });
+        await events.WaitForAsync("turn.finished");
     }
 
     [Fact]

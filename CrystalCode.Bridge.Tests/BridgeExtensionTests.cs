@@ -29,7 +29,7 @@ public sealed class BridgeExtensionTests
         Assert.Contains("_crystal/snapshot", extensions);
         Assert.Contains("_crystal/session/fork", extensions);
         Assert.Contains("_crystal/tasks/logs", extensions);
-        Assert.Equal(34, extensions.Length);
+        Assert.Equal(35, extensions.Length);
         Assert.Contains("_crystal/queue", crystal.GetProperty("eventKinds").EnumerateArray().Select(static value => value.GetString()));
         Assert.Equal("rfd", crystal.GetProperty("fork").GetString());
         Assert.Equal("rfd", crystal.GetProperty("subagents").GetString());
@@ -413,6 +413,58 @@ public sealed class BridgeExtensionTests
         await second.WaitAsync(BridgeFixture.Wait);
 
         Assert.Equal("later", queue.GetProperty("params").GetProperty("items")[0].GetString());
+    }
+
+    [Fact]
+    public async Task QueueRetract_ReturnsTheNewestFollowUp()
+    {
+        var model = new ScriptedModel(true);
+        await using var fixture = await BridgeFixture.StartAsync(model);
+        var id = await fixture.OpenAsync(Notified);
+        var held = model.Held.Task;
+        var (_, turn) = await fixture.StartRequestAsync(
+            "session/prompt",
+            new { sessionId = id, prompt = new[] { new { type = "text", text = "long" } } });
+        await held.WaitAsync(BridgeFixture.Wait);
+
+        var idle = (await fixture.RequestAsync("_crystal/queue/retract", new { sessionId = id })).GetProperty("result");
+        Assert.False(idle.GetProperty("retracted").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, idle.GetProperty("text").ValueKind);
+
+        var (_, older) = await fixture.StartRequestAsync(
+            "session/prompt",
+            new { sessionId = id, prompt = new[] { new { type = "text", text = "first" } } });
+        await fixture.WaitForAsync(message => Method(message) == "_crystal/queue"
+            && message.GetProperty("params").GetProperty("items").GetArrayLength() == 1);
+        var (_, newest) = await fixture.StartRequestAsync(
+            "session/prompt",
+            new { sessionId = id, prompt = new[] { new { type = "text", text = "second" } } });
+        var queue = await fixture.WaitForAsync(message => Method(message) == "_crystal/queue"
+            && message.GetProperty("params").GetProperty("items").GetArrayLength() == 2);
+
+        var retracted = (await fixture.RequestAsync("_crystal/queue/retract", new { sessionId = id })).GetProperty("result");
+        var snapshot = (await fixture.RequestAsync("_crystal/snapshot", new { sessionId = id })).GetProperty("result");
+
+        Assert.Equal("second", queue.GetProperty("params").GetProperty("items")[1].GetString());
+        Assert.True(retracted.GetProperty("retracted").GetBoolean());
+        Assert.Equal("second", retracted.GetProperty("text").GetString());
+        Assert.Equal("first", Assert.Single(snapshot.GetProperty("queue").EnumerateArray()).GetString());
+        Assert.False(turn.IsCompleted);
+
+        var again = (await fixture.RequestAsync("_crystal/queue/retract", new { sessionId = id })).GetProperty("result");
+        var empty = (await fixture.RequestAsync("_crystal/snapshot", new { sessionId = id })).GetProperty("result");
+        var done = (await fixture.RequestAsync("_crystal/queue/retract", new { sessionId = id })).GetProperty("result");
+
+        Assert.True(again.GetProperty("retracted").GetBoolean());
+        Assert.Equal("first", again.GetProperty("text").GetString());
+        Assert.Empty(empty.GetProperty("queue").EnumerateArray());
+        Assert.False(done.GetProperty("retracted").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("text").ValueKind);
+        Assert.False(older.IsCompleted);
+        Assert.False(newest.IsCompleted);
+
+        await fixture.NotifyAsync("session/cancel", new { sessionId = id });
+        await turn.WaitAsync(BridgeFixture.Wait);
     }
 
     [Fact]

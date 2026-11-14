@@ -169,8 +169,9 @@ separate library with no terminal code. The product can:
   active session; `/clear`, `/resume`, `/fork`, `/cd`, and `/space` behave as
   in the terminal. Every engine capability is reachable: every slash command,
   Plan, Work, and custom modes, quick prompts, side questions, recall,
-  interrupts, image upload and download, child inspection, export, and every
-  event, including approval and extended approval. What a slash command
+  retract of the newest queued follow-up, interrupts, image upload and
+  download, child inspection, export, and every event, including approval
+  and extended approval. What a slash command
   lists as text (saved sessions, models, options, Agents, skills, MCP
   servers, plugins, and background tasks) is also readable as structured
   data, with no secret in it. Mode, approval, thinking, tier, speed,
@@ -218,7 +219,8 @@ separate library with no terminal code. The product can:
   child approvals reach the editor under the parent session unless it does.
   Compaction appears as ACP compaction updates for an editor that supports
   them. A saved session can be forked into a new one without changing the
-  source. Every other session capability (snapshot, recall, the queue, modes,
+  source. Every other session capability (snapshot, recall, the queue,
+  including release and retract of the newest follow-up, modes,
   verbose output, images, quick prompts, side questions, children, export,
   compaction, and structured reports) is a `_crystal/*` request, and live
   state that ACP has no update for is a `_crystal/*` notification sent only

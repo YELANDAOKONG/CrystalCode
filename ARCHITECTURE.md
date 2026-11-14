@@ -877,7 +877,10 @@ the session, workspace, or model, except the next-turn settings below.
 adjust the display run immediately. `/quit` cancels compaction and exits.
 With an empty composer and a queued follow-up, Ctrl+C takes the newest queued
 message out of the queue and puts it in the composer (`TryRetractQueued`); it
-does not interrupt. With nothing queued, Ctrl+C interrupts.
+does not interrupt. Server `POST /queue/retract` and Bridge
+`_crystal/queue/retract` make that same call and return the text to the
+caller. A deferred `/clear`, `/resume`, or `/fork` stays in the queue. With
+nothing queued, Ctrl+C interrupts.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
 
@@ -2608,7 +2611,7 @@ A front end calls `CodingSession`: `Create`, `StartAsync`, `SubmitAsync`
 (slash commands, follow-ups while a turn runs, interrupts, and turn starts;
 returns true when the operator asked to quit), `CompleteTurnAsync` once
 `TurnTask` finishes, `FinishTurnAsync` to collect a turn before exit,
-`TryInterrupt`, `TryRecall`, `TogglePlan`, `CycleMode`, `TrySetMode`,
+`TryInterrupt`, `TryRecall`, `TryRetractQueued`, `TogglePlan`, `CycleMode`, `TrySetMode`,
 `SetVerbose`, `NotifyDraftChanged`, `Enqueue`, `EnqueueAsync`,
 `SubmitQuickPromptAsync`, `PasteClipboardImageAsync`, `TryAttachImage`,
 `TryAttachImageFile`, `TryGetImage`, `TryExport`, `TryCancelSideQuestion`,
@@ -2628,9 +2631,9 @@ image attach, an export) in order with the inputs, also while a call is
 running. Text that was queued while a command ran, with no turn to collect, is
 started once that command returns. Cancellation interrupts and collects the
 turn without starting queued work. `crystal run` and `crystal server` use it;
-the terminal keeps its own pump. `TryInterrupt`, `TryRecall`, and
-`TryCancelSideQuestion` stay direct calls because Ctrl+C makes them from any
-thread.
+the terminal keeps its own pump. `TryInterrupt`, `TryRecall`,
+`TryRetractQueued`, and `TryCancelSideQuestion` stay direct calls because
+Ctrl+C makes them from any thread.
 
 `SessionEvent.Origin` names the client whose request produced an event. A
 front end serving several clients wraps each request in

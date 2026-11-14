@@ -26,7 +26,7 @@ public static class ServerEndpoints
     public static IReadOnlyList<string> Operations { get; } =
     [
         "GET /health", "GET /info", "GET /snapshot", "GET /events",
-        "POST /input", "POST /interrupt", "POST /recall", "POST /mode", "POST /verbose", "PUT /draft",
+        "POST /input", "POST /interrupt", "POST /recall", "POST /queue/retract", "POST /mode", "POST /verbose", "PUT /draft",
         "POST /images", "GET /images/{number}", "GET /quick-prompts", "POST /quick-prompts/{name}/send",
         "POST /side/cancel", "POST /side/clear", "GET /children", "GET /children/{id}", "GET /export",
         "GET /interactions", "POST /interactions/{id}", "POST /auth/ticket", "GET /auth/tokens",
@@ -116,6 +116,14 @@ public static class ServerEndpoints
         app.MapPost("/recall", (HttpContext context) =>
             Direct(context, server, ServerScope.Operate, session => Json.Ok(writer =>
                 writer.WriteBoolean("recalled", session.TryRecall()))));
+
+        app.MapPost("/queue/retract", (HttpContext context) =>
+            Direct(context, server, ServerScope.Operate, session => Json.Ok(writer =>
+            {
+                var retracted = session.TryRetractQueued(out var text);
+                writer.WriteBoolean("retracted", retracted);
+                WireWriter.Optional(writer, "text", retracted ? text : null);
+            })));
 
         app.MapPost("/mode", (HttpContext context, CancellationToken token) =>
             Mutate(context, server, ServerScope.Operate, token, async (body, runner, client) =>
