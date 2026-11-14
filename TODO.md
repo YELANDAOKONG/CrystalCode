@@ -344,3 +344,19 @@ it speculatively, and do not reserve types or configuration for it.
   are not defined. It must not be treated as permission to add a command,
   project, public type, wire field, or server behavior until those boundaries
   are decided.
+- Several queued follow-ups as separate user messages. Not decided. The
+  follow-up queue keeps each submission as its own item, and the Queued
+  panel lists them separately. Sending the queue joins every waiting item
+  with a blank line into one string and starts one turn with that string as
+  one user message. That send happens when a turn ends, when a queued item
+  interrupts after the current tool batch, or on an empty Enter while items
+  are waiting. `MessageQueue.Drain` performs the join. A session already
+  stores one user message per turn. Whether each queued item should instead
+  be its own user message, and therefore its own turn, in queue order, is
+  not decided. Also open: what an empty Enter sends when more than one item
+  is waiting, how Ctrl+C taking the newest item back into the composer
+  behaves if items are sent one at a time, how attached images and
+  non-interrupting quick prompts travel with an item, and how the terminal,
+  Server, Bridge, and `crystal run` present the queue. Current behavior
+  stands. Do not reserve a command, configuration field, public type, event,
+  or wire field.

@@ -1028,6 +1028,20 @@ dependencies on one another, and related loading questions, are under
 consideration and are not decided. They are not part of the deferred list
 above until a decision is made.
 
+Whether several queued follow-ups are sent as separate user messages is
+under consideration and is not decided. The current behavior stands: the
+follow-up queue keeps each submission as its own item and lists them
+separately, and sending the queue joins every waiting item with a blank
+line into one user message and one turn. A session already stores one user
+message per turn. A later decision must define whether each queued item is
+its own user message and turn, in queue order, what an empty Enter sends
+when more than one item is waiting, how Ctrl+C taking the newest item back
+behaves if items are sent one at a time, how attached images and
+non-interrupting quick prompts travel with an item, and how the terminal,
+Server, Bridge, and `crystal run` present the queue. No change is
+scheduled. Do not reserve a command, configuration field, public type,
+event, or wire field.
+
 ## Relationship to Crystal
 
 Crystal is provider-neutral, prompt-neutral, and tool-neutral. It does not
