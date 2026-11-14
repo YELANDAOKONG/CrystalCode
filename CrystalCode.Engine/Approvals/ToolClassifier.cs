@@ -102,7 +102,8 @@ public sealed class ToolClassifier
                 new ToolClassification(Risk.Read, Authority.Workspace, "Read-only tool"),
             WriteTool.ToolName => ClassifyWrite(call.Arguments),
             EditTool.ToolName => ClassifyEdit(call.Arguments),
-            ApplyPatchTool.ToolName => ClassifyPatch(call.Arguments),
+            MultiEditTool.ToolName => ClassifyFileBatch(MultiEditTool.PathsOf(call.Arguments), "Edit", "Edit files"),
+            ApplyPatchTool.ToolName => ClassifyFileBatch(ApplyPatchTool.PathsOf(call.Arguments), "Patch", "Apply patch"),
             BashTool.ToolName => ClassifyBash(call.Arguments),
             BackgroundBashStartTool.ToolName => ClassifyBash(call.Arguments),
             BackgroundBashStatusTool.ToolName or BackgroundBashLogsTool.ToolName =>
@@ -202,22 +203,16 @@ public sealed class ToolClassifier
     }
 
     /// <summary>
-    /// A patch is as risky as its riskiest path: one credential path makes
-    /// the whole call Forbidden, and one path outside the session's
-    /// directories makes it an outside write. A patch that cannot be read
-    /// fails inside the tool before it writes anything.
+    /// A file batch is as risky as its riskiest path: one credential path
+    /// makes it Forbidden, and one unlisted path makes it an outside write.
+    /// Malformed batches fail inside the tool before writing anything.
     /// </summary>
-    private ToolClassification ClassifyPatch(string arguments)
+    private ToolClassification ClassifyFileBatch(IReadOnlyList<string> paths, string verb, string summary)
     {
-        if (!ApplyPatchTool.TryReadPaths(arguments, out var paths))
-        {
-            return new ToolClassification(Risk.Write, Authority.Workspace, "Apply patch");
-        }
-
         var outside = false;
         foreach (var path in paths)
         {
-            var classification = ClassifyFilePath(path, "Patch");
+            var classification = ClassifyFilePath(path, verb);
             if (classification.Risk == Risk.Forbidden)
             {
                 return classification;
@@ -227,8 +222,8 @@ public sealed class ToolClassifier
         }
 
         return outside
-            ? new ToolClassification(Risk.Write, Authority.OutsideWorkspace, "Patch outside workspace")
-            : new ToolClassification(Risk.Write, Authority.Workspace, "Apply patch");
+            ? new ToolClassification(Risk.Write, Authority.OutsideWorkspace, $"{verb} outside workspace")
+            : new ToolClassification(Risk.Write, Authority.Workspace, summary);
     }
 
     private ToolClassification ClassifyFilePath(string path, string verb)

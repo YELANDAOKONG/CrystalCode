@@ -99,7 +99,7 @@ public static class ProgressText
             ListTool.ToolName => "Listing",
             TreeTool.ToolName => "Listing",
             WriteTool.ToolName => "Writing File",
-            EditTool.ToolName => "Editing",
+            EditTool.ToolName or MultiEditTool.ToolName => "Editing",
             ApplyPatchTool.ToolName => "Applying Patch",
             GlobTool.ToolName => "Searching",
             GrepTool.ToolName => "Searching",

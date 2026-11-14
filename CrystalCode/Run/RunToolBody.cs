@@ -47,6 +47,7 @@ internal static class RunToolBody
 
     private static bool IsEditOrWrite(string? toolName) =>
         string.Equals(toolName, "edit", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "multi_edit", StringComparison.OrdinalIgnoreCase)
         || string.Equals(toolName, "write", StringComparison.OrdinalIgnoreCase)
         || string.Equals(toolName, "apply_patch", StringComparison.OrdinalIgnoreCase);
 

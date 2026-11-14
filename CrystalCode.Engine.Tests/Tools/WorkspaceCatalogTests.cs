@@ -32,6 +32,7 @@ public sealed class WorkspaceCatalogTests
         Assert.NotNull(catalog.Find(TodoReadTool.ToolName));
         Assert.NotNull(catalog.Find(QuestionTool.ToolName));
         Assert.Null(catalog.Find(EditTool.ToolName));
+        Assert.Null(catalog.Find(MultiEditTool.ToolName));
         Assert.Null(catalog.Find(WriteTool.ToolName));
         Assert.Null(catalog.Find(ApplyPatchTool.ToolName));
         Assert.Null(catalog.Find(BashTool.ToolName));
@@ -49,6 +50,7 @@ public sealed class WorkspaceCatalogTests
             backgroundTasks: new BackgroundTaskRegistry(new Workspace(root.Path)));
 
         Assert.NotNull(catalog.Find(EditTool.ToolName));
+        Assert.NotNull(catalog.Find(MultiEditTool.ToolName));
         Assert.NotNull(catalog.Find(WriteTool.ToolName));
         Assert.NotNull(catalog.Find(ApplyPatchTool.ToolName));
         Assert.NotNull(catalog.Find(BashTool.ToolName));

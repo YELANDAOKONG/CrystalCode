@@ -22,8 +22,8 @@ From a workspace you want the agent to inspect or change, CrystalCode:
 - retries a failed model round on rate limits, server errors, timeouts,
   network faults, and incomplete streams, waiting with backoff;
 - switches the configured provider and model with `/model`;
-- switches Plan (built-in reads; no edit, write, apply_patch, or bash) and Work
-  (edit, write, multi-file patches, shell);
+- switches Plan (built-in reads; no edit, multi_edit, write, apply_patch, or bash) and Work
+  (edit, multi_edit, write, multi-file patches, shell);
 - approves side effects manually, by a reviewing model, or by full
   pass-through according to risk and authority;
 - compacts conversation context when usage approaches the selected
@@ -332,7 +332,7 @@ echo "Summarize the repository." | crystal run --model-calls 8 --tool-calls 32
 
 `--format default` prints a readable trace: the assistant reply, then each
 tool beside its own result. `read`, `list`, `glob`, and `grep` keep a short head
-excerpt and say how many lines were omitted. `edit`, `write`, and `apply_patch` keep their
+excerpt and say how many lines were omitted. `edit`, `multi_edit`, `write`, and `apply_patch` keep their
 result. `bash` keeps the command, the exit status, and a short tail, with
 a longer tail when the command fails. Other successful tools use the same
 short excerpt. Failures other than `bash` keep the result text.
@@ -436,7 +436,7 @@ the tool, deny returns its reason, and ask is denied. Anything that
 would ask the operator, including Default and Edit prompts, is
 denied with the usual rejection text. Full auto-passes tool calls.
 The `question` tool is dismissed.
-Plan does not offer write, edit, apply_patch, or bash. Credential paths stay forbidden.
+Plan does not offer write, edit, multi_edit, apply_patch, or bash. Credential paths stay forbidden.
 
 A reviewer denial is a tool error. If the model then finishes, the
 process exits 0. A denied operator prompt or a dismissed question does
@@ -1297,8 +1297,8 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, write, apply_patch, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
-| **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, write, apply_patch, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
+| **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, multi_edit, write, apply_patch, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, multi_edit, write, apply_patch, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
 Tab and Shift+Tab cycle Plan, Work, and enabled custom modes. `/plan` toggles
 Plan and Work, and `/mode <name>` picks any mode. When child Agents are
@@ -1454,9 +1454,9 @@ Grant: Once, Session, Persistent.
 | Mode | Behavior |
 | :--- | :--- |
 | **Default** | Workspace read auto-executes. Write, shell, and paths outside the workspace ask you. When Skills is enabled, any path in a Skills search directory auto-passes. |
-| **Edit** | Workspace file changes for built-in `write`, `edit`, and `apply_patch` pass without review. Shell, external tools, and paths outside the workspace still ask. |
-| **Review** | Workspace file changes for built-in `write`, `edit`, and `apply_patch` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, tree, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Answers given through the question tool count as user authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. A transient reviewer request failure is retried per `approvalRetry` (five times by default); if it still fails you are asked. Review is not a grant and is not full pass-through. |
-| **Audit** | The same reviewer and transcript rules as Review, but workspace `write`, `edit`, and `apply_patch` are also checked. They do not auto-pass. |
+| **Edit** | Workspace file changes for built-in `write`, `edit`, `multi_edit`, and `apply_patch` pass without review. Shell, external tools, and paths outside the workspace still ask. |
+| **Review** | Workspace file changes for built-in `write`, `edit`, `multi_edit`, and `apply_patch` pass without review, same as Edit. Another model checks each remaining side-effect call, including `bash`, `bash_start`, `bash_stop`, and read, list, tree, glob, grep, search, write, and edit outside the workspace, and external Write. Skills search directories auto-pass when Skills is enabled. A bounded transcript excerpt is attached (first and latest user turns as anchors, then other user turns, then recent assistant and tool evidence). A compaction summary stands in for folded turns. Without that evidence the host asks you. Later user messages refine the task; a status question does not revoke earlier authorization. Answers given through the question tool count as user authorization. Allow executes unless the call is Forbidden or requires a forced prompt. Deny becomes model-visible rejection text. Ask, Forbidden-allow, and forced-prompt allow fall back to you. A transient reviewer request failure is retried per `approvalRetry` (five times by default); if it still fails you are asked. Review is not a grant and is not full pass-through. |
+| **Audit** | The same reviewer and transcript rules as Review, but workspace `write`, `edit`, `multi_edit`, and `apply_patch` are also checked. They do not auto-pass. |
 | **Full** | All tool calls pass without review or operator approval, including outside-workspace paths, session read-only directories, Network, Privileged, Forbidden classifications, and forced prompts. Credential paths remain prohibited. Tool availability, argument validation, OS permissions, cancellation, and budgets still apply. |
 
 Do not name a mode `auto`. That word is ambiguous between review and
@@ -1807,9 +1807,9 @@ is unchanged.
 
 ## Built-in tools
 
-`read`, `list`, `tree`, `glob`, `grep`, `search`, `edit`, `write`, and `apply_patch` may use a path
+`read`, `list`, `tree`, `glob`, `grep`, `search`, `edit`, `multi_edit`, `write`, and `apply_patch` may use a path
 outside the workspace after approval (you, or the Review model in Review or
-Audit). Workspace `write`, `edit`, and `apply_patch` still follow the approval mode.
+Audit). Workspace `write`, `edit`, `multi_edit`, and `apply_patch` still follow the approval mode.
 A patch is judged by its riskiest path: one path outside the workspace makes the whole
 call an outside write, and one credential path makes it forbidden.
 `bash` starts in the workspace root and is approved as a side effect. Its
@@ -1846,6 +1846,7 @@ is the workspace root.
 | `skill` | Plan, Work | Load an available skill by `name` (omitted when `skills` is `false`) |
 | `task` | Plan, Work | Delegate to a child Agent (`agent`, `label`, `prompt`, optional `sessionId`). Present only while child Agents are enabled and at least one Agent is available. `work` is omitted in Plan. A call without `sessionId` creates a child; a call with it continues that child |
 | `edit` | Work | Replace one unique `old_string` in a file, or every occurrence with `replace_all`. The result shows the changed lines with five lines of context on each side |
+| `multi_edit` | Work | Apply ordered exact replacements to one or more existing UTF-8 files. Pass `files`, a nonempty array of entries with `path` and `edits`. Each edit uses `old_string`, `new_string`, and optional `replace_all`. List each file once. The full batch is checked before any writes, and the result gives a replacement count per file |
 | `write` | Work | Create or overwrite a UTF-8 text file. The result shows the first lines of the file |
 | `apply_patch` | Work | Change several files in one call with `patchText`: Add File, Update File (with optional Move to), and Delete File sections between `*** Begin Patch` and `*** End Patch`. Every section is checked before any file changes. A move needs a destination that does not exist. The result lists each file and shows the changed lines |
 | `bash` | Work | Run one shell command after approval (`bash -lc`). Per-command timeout is `bashTimeoutSeconds` (default 600 seconds) |

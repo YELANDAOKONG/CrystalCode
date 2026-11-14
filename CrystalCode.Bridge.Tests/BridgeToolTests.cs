@@ -135,6 +135,38 @@ public sealed class BridgeToolTests
     }
 
     [Fact]
+    public async Task MultiEdit_SendsDiffsAndLocationsForEachFile()
+    {
+        var model = new ScriptedModel(false,
+            ScriptedModel.ToolRound("call-1", "multi_edit",
+                """
+                {"files":[
+                  {"path":"first.txt","edits":[{"old_string":"alpha","new_string":"beta"}]},
+                  {"path":"second.txt","edits":[{"old_string":"alpha","new_string":"gamma"}]}
+                ]}
+                """),
+            ScriptedModel.TextRound("edited"));
+        await using var fixture = await BridgeFixture.StartAsync(model, options: static launch => launch with { Approval = "edit" });
+        var first = Path.Combine(fixture.Workspace, "first.txt");
+        var second = Path.Combine(fixture.Workspace, "second.txt");
+        File.WriteAllText(first, "alpha");
+        File.WriteAllText(second, "alpha");
+        var id = await fixture.OpenAsync();
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "edit" } } });
+
+        var announced = fixture.Updates().First(static update => ToolCallId(update) == "call-1"
+            && update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ToolCallsIssued");
+        Assert.Equal("edit", announced.GetProperty("kind").GetString());
+        Assert.Equal(2, announced.GetProperty("locations").GetArrayLength());
+        Assert.Collection(announced.GetProperty("content").EnumerateArray(),
+            diff => Assert.Equal("beta", diff.GetProperty("newText").GetString()),
+            diff => Assert.Equal("gamma", diff.GetProperty("newText").GetString()));
+        Assert.Equal("beta", File.ReadAllText(first));
+        Assert.Equal("gamma", File.ReadAllText(second));
+    }
+
+    [Fact]
     public async Task Todos_BecomeAPlan()
     {
         var model = new ScriptedModel(false,

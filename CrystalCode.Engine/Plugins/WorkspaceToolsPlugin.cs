@@ -58,6 +58,10 @@ public sealed class WorkspaceToolsPlugin : IPlugin
                     HostToolCatalogs.Work,
                     (workspace, _, _) => new EditTool(workspace)),
                 new FactoryToolContribution(
+                    MultiEditTool.ToolName,
+                    HostToolCatalogs.Work,
+                    (workspace, _, _) => new MultiEditTool(workspace)),
+                new FactoryToolContribution(
                     WriteTool.ToolName,
                     HostToolCatalogs.Work,
                     (workspace, _, _) => new WriteTool(workspace)),

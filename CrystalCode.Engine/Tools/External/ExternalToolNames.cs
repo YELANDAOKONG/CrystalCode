@@ -36,6 +36,7 @@ public static class ExternalToolNames
         TodoReadTool.ToolName,
         QuestionTool.ToolName,
         EditTool.ToolName,
+        MultiEditTool.ToolName,
         WriteTool.ToolName,
         ApplyPatchTool.ToolName,
         BashTool.ToolName,

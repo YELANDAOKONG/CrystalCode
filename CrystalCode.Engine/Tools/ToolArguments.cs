@@ -185,7 +185,7 @@ public static class ToolArguments
         }
     }
 
-    private static bool TryOpen(string arguments, out JsonDocument document)
+    internal static bool TryOpen(string arguments, out JsonDocument document)
     {
         try
         {

@@ -53,8 +53,8 @@ separate library with no terminal code. The product can:
 - declare per-model service tiers and speeds in `providers.json`, switch them
   through `/tier` and `/speed`, remember each model's choice, and show the
   selected values in the default or custom status bar;
-- switch Plan (built-in reads; no edit, write, apply_patch, or bash) and Work
-  (edit, write, multi-file patches, shell, and session-local background shell
+- switch Plan (built-in reads; no edit, multi_edit, write, apply_patch, or bash) and Work
+  (edit, multi_edit, write, multi-file patches, shell, and session-local background shell
   tasks); operator tool sets
   may add extra catalog entries to either;
 - define custom modes as directories `modes/<name>/` under `~/.crystal` and
@@ -979,7 +979,7 @@ not remove that rule.
 not a priority. Parent/child Agents do not decide them.
 
 Whether Plan may include bash is under consideration and is not decided.
-The current behavior stands: built-in Plan has no edit, write, apply_patch, or bash. No
+The current behavior stands: built-in Plan has no edit, multi_edit, write, apply_patch, or bash. No
 change is scheduled, and a later decision may revisit it.
 
 Whether built-in tool limits become operator configuration is under

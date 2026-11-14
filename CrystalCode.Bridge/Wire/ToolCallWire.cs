@@ -27,7 +27,7 @@ internal static class ToolCallWire
                 or ViewImageTool.ToolName or DescribeImageTool.ToolName
                 or "read_mcp_resource" or "list_mcp_resources" => "read",
             GlobTool.ToolName or GrepTool.ToolName or SearchTool.ToolName => "search",
-            EditTool.ToolName or WriteTool.ToolName => "edit",
+            EditTool.ToolName or MultiEditTool.ToolName or WriteTool.ToolName => "edit",
             ApplyPatchTool.ToolName => PatchKind(call.Arguments),
             BashTool.ToolName or BackgroundBashStartTool.ToolName or BackgroundBashStatusTool.ToolName
                 or BackgroundBashLogsTool.ToolName or BackgroundBashStopTool.ToolName => "execute",

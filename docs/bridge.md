@@ -436,7 +436,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | :--- | :--- |
 | `read`, `list`, `tree`, `skill`, `view_image`, `describe_image`, `read_mcp_resource`, `list_mcp_resources` | `read` |
 | `glob`, `grep`, `search` | `search` |
-| `edit`, `write`, `apply_patch` | `edit`; a patch with only Delete File is `delete`, with only a Move is `move` |
+| `edit`, `multi_edit`, `write`, `apply_patch` | `edit`; a patch with only Delete File is `delete`, with only a Move is `move` |
 | `bash`, `bash_start`, `bash_status`, `bash_logs`, `bash_stop` | `execute` |
 | `todowrite`, `todoread` | `think` |
 | `question` | `other` |
@@ -446,7 +446,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 - `locations` list the absolute paths a call reads or writes (with a line
   where the arguments name one), resolved by the same workspace resolver
   approval uses.
-- Content: `edit`, `write`, and `apply_patch` send `diff` entries (`path`,
+- Content: `edit`, `multi_edit`, `write`, and `apply_patch` send `diff` entries (`path`,
   `oldText`, `newText`) computed from disk before execution, one per file;
   a Delete is a diff with empty `newText` and `_meta.crystal.delete`. Results
   send the tool text as `content`. Tool images send `image` blocks with the

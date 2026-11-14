@@ -18,6 +18,7 @@ internal sealed record ModeDefinition(
     private static readonly string[] WriteTools =
     [
         EditTool.ToolName,
+        MultiEditTool.ToolName,
         WriteTool.ToolName,
         ApplyPatchTool.ToolName,
         BashTool.ToolName,

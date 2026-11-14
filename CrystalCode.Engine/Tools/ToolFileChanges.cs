@@ -36,6 +36,7 @@ public static class ToolFileChanges
         return call.Name switch
         {
             EditTool.ToolName => Edit(workspace, call.Arguments),
+            MultiEditTool.ToolName => MultiEdit(workspace, call.Arguments),
             WriteTool.ToolName => Write(workspace, call.Arguments),
             ApplyPatchTool.ToolName => Patch(workspace, call.Arguments),
             _ => []
@@ -60,13 +61,14 @@ public static class ToolFileChanges
             return [];
         }
 
-        IEnumerable<string> named = call.Name == ApplyPatchTool.ToolName
-            ? ApplyPatchTool.PathsOf(call.Arguments)
-            : ToolArguments.TryReadRequiredString(call.Arguments, "path", out var path)
-                ? [path]
-                : ToolArguments.TryReadRequiredString(call.Arguments, "filePath", out var filePath)
-                    ? [filePath]
-                    : [];
+        IEnumerable<string> named = call.Name switch
+        {
+            ApplyPatchTool.ToolName => ApplyPatchTool.PathsOf(call.Arguments),
+            MultiEditTool.ToolName => MultiEditTool.PathsOf(call.Arguments),
+            _ when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var path) => [path],
+            _ when ToolArguments.TryReadRequiredString(call.Arguments, "filePath", out var filePath) => [filePath],
+            _ => []
+        };
         var resolved = new List<string>();
         foreach (var value in named)
         {
@@ -102,6 +104,11 @@ public static class ToolFileChanges
             : string.Concat(current.AsSpan(0, first), newText, current.AsSpan(first + oldText.Length));
         return [new ToolFileChange(full, current, updated)];
     }
+
+    private static IReadOnlyList<ToolFileChange> MultiEdit(Workspace workspace, string arguments) =>
+        MultiEditTool.TryPrepare(workspace, arguments, default, out var files, out _)
+            ? [.. files.Select(static file => file.Change)]
+            : [];
 
     private static IReadOnlyList<ToolFileChange> Write(Workspace workspace, string arguments)
     {

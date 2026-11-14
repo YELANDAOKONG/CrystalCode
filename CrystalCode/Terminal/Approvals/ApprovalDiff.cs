@@ -22,6 +22,11 @@ public static class ApprovalDiff
             return PatchLines(call);
         }
 
+        if (call.Name == MultiEditTool.ToolName)
+        {
+            return MultiEditLines(call);
+        }
+
         if (ToolArguments.TryReadRequiredString(call.Arguments, "old_string", out var oldText)
             && ToolArguments.TryReadRequiredString(call.Arguments, "new_string", out var newText))
         {
@@ -101,6 +106,44 @@ public static class ApprovalDiff
                 ? $"... ({hidden} more lines in {files.Count} files)"
                 : $"... ({hidden} more lines)";
             lines.Add((Theme.Muted, more));
+        }
+
+        return lines;
+    }
+
+    private static IReadOnlyList<(string Color, string Text)> MultiEditLines(ToolCall call)
+    {
+        var lines = new List<(string Color, string Text)>();
+        string? path = null;
+        foreach (var edit in MultiEditTool.PreviewEdits(call.Arguments))
+        {
+            if (path != edit.Path)
+            {
+                path = edit.Path;
+                lines.Add((Theme.Accent, "Update " + TerminalText.Reveal(path)));
+            }
+
+            if (edit.ReplaceAll)
+            {
+                lines.Add((Theme.Muted, ReplaceAllNotice));
+            }
+
+            if (edit.OldText.Length > 0)
+            {
+                AddPrefixed(lines, edit.OldText, '-', Theme.DiffRemoved);
+            }
+
+            if (edit.NewText.Length > 0)
+            {
+                AddPrefixed(lines, edit.NewText, '+', Theme.DiffAdded);
+            }
+
+            if (lines.Count > MaximumLines)
+            {
+                lines.RemoveRange(MaximumLines, lines.Count - MaximumLines);
+                lines.Add((Theme.Muted, "... (more changes)"));
+                break;
+            }
         }
 
         return lines;

@@ -10,7 +10,7 @@ namespace CrystalCode.Engine.Tools;
 /// </summary>
 public static class ToolCallSummary
 {
-    private const int ShownPatchPaths = 3;
+    private const int ShownFilePaths = 3;
 
     private const int MaximumCompactArguments = 80;
 
@@ -75,24 +75,25 @@ public static class ToolCallSummary
             return title + "  " + OneLine(taskId);
         }
 
-        if (name == ApplyPatchTool.ToolName)
+        if (name is ApplyPatchTool.ToolName or MultiEditTool.ToolName)
         {
-            // The argument is the patch text itself, so never fall back to
-            // echoing it as JSON.
-            var patchPaths = ApplyPatchTool.PathsOf(arguments);
-            return patchPaths.Count > 0 ? title + "  " + PatchPaths(patchPaths) : title;
+            // The arguments contain file contents, so do not echo them as JSON.
+            var paths = name == ApplyPatchTool.ToolName
+                ? ApplyPatchTool.PathsOf(arguments)
+                : MultiEditTool.PathsOf(arguments);
+            return paths.Count > 0 ? title + "  " + FormatPaths(paths) : title;
         }
 
         var compact = CompactFinished(arguments);
         return compact.Length == 0 ? title : title + "  " + compact;
     }
 
-    private static string PatchPaths(IReadOnlyList<string> paths)
+    private static string FormatPaths(IReadOnlyList<string> paths)
     {
         var unique = paths.Select(OneLine).Distinct(StringComparer.Ordinal).ToList();
-        var listed = string.Join(", ", unique.Take(ShownPatchPaths));
-        return unique.Count > ShownPatchPaths
-            ? listed + $" and {unique.Count - ShownPatchPaths} more"
+        var listed = string.Join(", ", unique.Take(ShownFilePaths));
+        return unique.Count > ShownFilePaths
+            ? listed + $" and {unique.Count - ShownFilePaths} more"
             : listed;
     }
 

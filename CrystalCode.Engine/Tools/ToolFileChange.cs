@@ -1,7 +1,7 @@
 namespace CrystalCode.Engine.Tools;
 
 /// <summary>
-/// What one file would look like after a proposed <c>edit</c>, <c>write</c>,
+/// What one file would look like after a proposed <c>edit</c>, <c>multi_edit</c>, <c>write</c>,
 /// or <c>apply_patch</c> call, for a front end that shows a diff before the
 /// call runs.
 /// </summary>

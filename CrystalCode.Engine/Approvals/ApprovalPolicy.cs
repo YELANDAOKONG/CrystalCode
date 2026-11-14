@@ -240,7 +240,7 @@ public sealed class ApprovalPolicy
 
         if (classification.Risk == Risk.Write)
         {
-            return toolName is WriteTool.ToolName or EditTool.ToolName or ApplyPatchTool.ToolName
+            return toolName is WriteTool.ToolName or EditTool.ToolName or MultiEditTool.ToolName or ApplyPatchTool.ToolName
                 && (_mode == ApprovalMode.Edit || _mode == ApprovalMode.Review);
         }
 
@@ -255,9 +255,12 @@ public sealed class ApprovalPolicy
                 && IsReadOnlyPath(path);
         }
 
-        return call.Name == ApplyPatchTool.ToolName
-            && ApplyPatchTool.TryReadPaths(call.Arguments, out var paths)
-            && paths.Any(IsReadOnlyPath);
+        return call.Name switch
+        {
+            MultiEditTool.ToolName => MultiEditTool.PathsOf(call.Arguments).Any(IsReadOnlyPath),
+            ApplyPatchTool.ToolName => ApplyPatchTool.PathsOf(call.Arguments).Any(IsReadOnlyPath),
+            _ => false
+        };
     }
 
     private bool IsReadOnlyPath(string path) =>
@@ -266,6 +269,7 @@ public sealed class ApprovalPolicy
 
     private static bool IsSideEffect(string toolName) =>
         toolName is EditTool.ToolName
+            or MultiEditTool.ToolName
             or WriteTool.ToolName
             or ApplyPatchTool.ToolName
             or BashTool.ToolName

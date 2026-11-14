@@ -81,6 +81,7 @@ internal static class TranscriptResultDisplay
 
     private static bool IsEditOrWrite(string? toolName) =>
         string.Equals(toolName, EditToolName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(toolName, "multi_edit", StringComparison.OrdinalIgnoreCase)
         || string.Equals(toolName, WriteToolName, StringComparison.OrdinalIgnoreCase)
         || string.Equals(toolName, ApplyPatchToolName, StringComparison.OrdinalIgnoreCase);
 }

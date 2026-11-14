@@ -121,22 +121,11 @@ public sealed class EditTool : ITool
         }
 
         var contents = File.ReadAllText(fullPath);
-        var count = CountOccurrences(contents, oldText);
-        if (count == 0)
+        if (!TryReplace(contents, oldText, newText, replaceAll, out var updated, out var count, out error))
         {
-            return ValueTask.FromResult(
-                new ToolOutput("old_string was not found.", ToolResultStatus.Failure));
+            return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
         }
 
-        if (count > 1 && !replaceAll)
-        {
-            return ValueTask.FromResult(
-                new ToolOutput(
-                    $"old_string matches {count} times; it must be unique.",
-                    ToolResultStatus.Failure));
-        }
-
-        var updated = contents.Replace(oldText, newText, StringComparison.Ordinal);
         File.WriteAllText(
             fullPath,
             updated,
@@ -172,6 +161,49 @@ public sealed class EditTool : ITool
         return ToolArguments.TryReadRequiredString(arguments, "path", out path)
             && ToolArguments.TryReadString(arguments, "old_string", out oldText)
             && ToolArguments.TryReadString(arguments, "new_string", out newText);
+    }
+
+    internal static bool TryReplace(
+        string contents,
+        string oldText,
+        string newText,
+        bool replaceAll,
+        out string updated,
+        out int count,
+        out string error,
+        int? maximumBytes = null)
+    {
+        updated = contents;
+        count = CountOccurrences(contents, oldText);
+        if (count == 0)
+        {
+            error = "old_string was not found.";
+            return false;
+        }
+
+        if (count > 1 && !replaceAll)
+        {
+            error = $"old_string matches {count} times; it must be unique.";
+            return false;
+        }
+
+        // Bound the allocation before replacing a short match with a large string.
+        var length = contents.Length + (long)count * (newText.Length - oldText.Length);
+        if (length > maximumBytes)
+        {
+            error = $"The result exceeds {maximumBytes} bytes.";
+            return false;
+        }
+
+        updated = contents.Replace(oldText, newText, StringComparison.Ordinal);
+        if (maximumBytes is int limit && Encoding.UTF8.GetByteCount(updated) > limit)
+        {
+            error = $"The result exceeds {limit} bytes.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
     }
 
     private static int CountOccurrences(string text, string value)
