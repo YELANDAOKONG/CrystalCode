@@ -24,6 +24,8 @@
 - Exactly one top-level type per file. File name equals type name.
 - Folder path under the project root equals the namespace after the project
   name.
+- Put top-level interfaces in an `Interfaces` folder within the feature
+  that owns the contract.
 - Using directives: System, then third-party, then Crystal, then
   CrystalCode, with a blank line between groups that are present.
 - No top-level statements.

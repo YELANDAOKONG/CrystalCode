@@ -6,6 +6,7 @@ using Crystal.Chat;
 
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Sessions.Pursue.Interfaces;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Sessions.Pursue;

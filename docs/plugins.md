@@ -295,10 +295,13 @@ published is removed. The plugin does not choose color, markup, or an extra row.
 ### Syntax tokenizers
 
 A plugin may supply token colors for assistant Markdown fences in the terminal.
-Register `CrystalCode.Plugins.Syntax.IPluginTokenizer` instances with
+Register `CrystalCode.Plugins.Syntax.Interfaces.IPluginTokenizer` instances with
 `PluginContribution.WithTokenizers`. The original `PluginContribution`
 constructor is unchanged and leaves `Tokenizers` empty. No language tokenizer
 ships with CrystalCode; repository implementations are test samples only.
+
+Existing tokenizer plugins must update the interface namespace to
+`CrystalCode.Plugins.Syntax.Interfaces` and rebuild against the current contract.
 
 `Languages` lists aliases owned by the plugin. Each alias is 1–64 ASCII
 characters, starts with a letter, and then uses letters, digits, `+`, `#`, `_`,
@@ -333,6 +336,7 @@ word for a made-up language. It is not a shipped language tokenizer:
 ```csharp
 using CrystalCode.Plugins;
 using CrystalCode.Plugins.Syntax;
+using CrystalCode.Plugins.Syntax.Interfaces;
 
 public sealed class SampleTokenizer : IPluginTokenizer
 {

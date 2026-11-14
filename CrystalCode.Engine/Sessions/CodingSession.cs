@@ -36,6 +36,7 @@ using CrystalCode.Engine.Sessions.Children;
 using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Sessions.Pursue;
+using CrystalCode.Engine.Sessions.Pursue.Interfaces;
 using CrystalCode.Engine.Sessions.Transcripts;
 using CrystalCode.Engine.Skills;
 using CrystalCode.Engine.Tools;

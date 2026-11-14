@@ -261,7 +261,7 @@ public sealed class PluginSessionRebindTests
                     .WithTokenizers([new Tokenizer()]);
             }
 
-            public sealed class Tokenizer : CrystalCode.Plugins.Syntax.IPluginTokenizer
+            public sealed class Tokenizer : CrystalCode.Plugins.Syntax.Interfaces.IPluginTokenizer
             {
                 public IReadOnlyList<string> Languages => ["cs"];
 

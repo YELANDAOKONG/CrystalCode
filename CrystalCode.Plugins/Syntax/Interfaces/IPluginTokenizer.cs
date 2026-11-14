@@ -1,4 +1,4 @@
-namespace CrystalCode.Plugins.Syntax;
+namespace CrystalCode.Plugins.Syntax.Interfaces;
 
 public interface IPluginTokenizer
 {

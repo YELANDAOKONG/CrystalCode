@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Plugins.Syntax;
+using CrystalCode.Plugins.Syntax.Interfaces;
 
 using Xunit;
 

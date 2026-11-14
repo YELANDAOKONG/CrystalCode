@@ -3,7 +3,7 @@ using Crystal.Chat;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Tools;
 
-namespace CrystalCode.Engine.Sessions.Pursue;
+namespace CrystalCode.Engine.Sessions.Pursue.Interfaces;
 
 /// <summary>What a pursue run needs from the session that hosts it.</summary>
 internal interface IPursueHost

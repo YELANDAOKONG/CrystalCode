@@ -500,7 +500,7 @@ public sealed class PluginCatalogTests
                 }
             }
 
-            public sealed class SampleTokenizer : CrystalCode.Plugins.Syntax.IPluginTokenizer
+            public sealed class SampleTokenizer : CrystalCode.Plugins.Syntax.Interfaces.IPluginTokenizer
             {
                 public IReadOnlyList<string> Languages => ["cs"];
 

@@ -692,7 +692,8 @@ generic tool boundary.
 
 `PursueRun` (`CrystalCode.Engine/Sessions/Pursue`) runs inside the one turn
 that `/pursue start` or `resume` opens. `CodingSession.ExecuteTurnAsync` hands
-it an `IPursueHost`; each segment is the ordinary `StreamingTurn` or
+it an `IPursueHost` from `Sessions/Pursue/Interfaces`. Each segment is the
+ordinary `StreamingTurn` or
 `MultimodalStreamingTurn`, and the run merges segment counts, usage, and the
 last transcript into one `TurnResult`. The turn uses a `SharedTurnBudget` built
 from `pursueLimits` instead of `executionBudget`, shared by every segment, the
@@ -3224,8 +3225,9 @@ sequential.
 
 ### Plugin syntax highlighting
 
-`CrystalCode.Plugins.Syntax` owns `IPluginTokenizer`, `PluginSyntaxToken`,
-and the eight `PluginSyntaxKind` values: Keyword, String, Number, Comment,
+`CrystalCode.Plugins.Syntax.Interfaces` owns `IPluginTokenizer`.
+`CrystalCode.Plugins.Syntax` owns `PluginSyntaxToken` and the eight
+`PluginSyntaxKind` values: Keyword, String, Number, Comment,
 Type, Function, Operator, and Punctuation. `PluginContribution.WithTokenizers`
 adds tokenizers without changing the original constructor. `PluginCatalog`
 admits aliases in plugin load order; the first registration wins each alias,

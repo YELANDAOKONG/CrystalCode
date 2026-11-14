@@ -1,4 +1,5 @@
 using CrystalCode.Plugins.Syntax;
+using CrystalCode.Plugins.Syntax.Interfaces;
 
 namespace CrystalCode.Engine.Plugins;
 

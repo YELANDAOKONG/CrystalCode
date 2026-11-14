@@ -13,6 +13,7 @@ using CrystalCode.Plugins.Placeholders.Interfaces;
 using CrystalCode.Plugins.Status;
 using CrystalCode.Plugins.Status.Interfaces;
 using CrystalCode.Plugins.Syntax;
+using CrystalCode.Plugins.Syntax.Interfaces;
 using CrystalCode.Plugins.Tools;
 using CrystalCode.Plugins.Tools.Interfaces;
 
