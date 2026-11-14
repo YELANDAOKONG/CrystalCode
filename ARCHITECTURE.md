@@ -1954,7 +1954,10 @@ title when a `ChromeChanged` topic differs from the last one it reported.
 `/topic` is `SessionVerb.Topic`; Server treats a bare `/topic` as operate and
 every other form as admin. The option catalog offers `topic`, `topic_model`
 (`session` plus catalog models), and `topic_thinking`, plus `topic_tier`,
-`topic_speed`, and `topic_context` for an own model. A fork starts without a
+`topic_speed`, and `topic_context` for an own model. `/clear`, `/resume`, and
+`/fork` publish `ChromeChanged` before `ConversationCleared` or `HistoryReplayed`.
+The snapshot chrome, including the session id and topic, updates only from
+`SessionStarted` and `ChromeChanged`. `/clear` and a fork start without a
 topic.
 
 `/fork` first persists the current conversation, copies its transcript,

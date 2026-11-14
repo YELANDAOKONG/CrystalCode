@@ -3048,6 +3048,9 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Clear:
                 await RebindPluginSessionAsync(BeginNewSession, cancellationToken);
+                // Snapshot chrome, including the new session id and topic, updates
+                // only from ChromeChanged. Resume and fork refresh before their redraw.
+                RefreshChrome();
                 Publish(new ConversationCleared());
                 ShowUsage(null, null);
                 Note("New conversation");

@@ -109,6 +109,58 @@ public sealed class CodingSessionTopicTests
         Assert.Null(headless.ReadSaved().Topic);
     }
 
+    [Theory]
+    [InlineData("/clear")]
+    [InlineData("/new")]
+    public async Task Clear_PublishesTheEmptyTopicBeforeTheConversationRedraw(string command)
+    {
+        var model = new ScriptedStreamingClient(Text("Done."));
+        using var headless = new HeadlessSession(model);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("First message");
+        await headless.Session.SubmitAsync("/title Keep this", CancellationToken.None);
+        var previous = headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome;
+        var previousId = headless.Session.SessionId;
+        headless.Observer.Clear();
+
+        await headless.Session.SubmitAsync(command, CancellationToken.None);
+
+        var events = headless.Observer.Events;
+        var chromeIndex = -1;
+        var clearedIndex = -1;
+        for (var index = 0; index < events.Count; index++)
+        {
+            if (events[index] is ChromeChanged)
+            {
+                chromeIndex = index;
+            }
+
+            if (events[index] is ConversationCleared && clearedIndex < 0)
+            {
+                clearedIndex = index;
+            }
+        }
+
+        Assert.True(chromeIndex >= 0 && chromeIndex < clearedIndex);
+        var changed = Assert.IsType<ChromeChanged>(events[chromeIndex]);
+        Assert.Equal(string.Empty, changed.Chrome.Topic);
+        Assert.NotEqual(previousId, changed.Chrome.SessionId);
+        Assert.Equal(headless.Session.SessionId, changed.Chrome.SessionId);
+        Assert.Null(headless.ReadSaved().Topic);
+
+        var state = new SessionState();
+        state.Apply(new SessionStarted(previous));
+        foreach (var value in events)
+        {
+            state.Apply(value);
+        }
+
+        var chrome = state.Snapshot().Chrome;
+        Assert.NotNull(chrome);
+        Assert.Equal(string.Empty, chrome.Topic);
+        Assert.Equal(headless.Session.SessionId, chrome.SessionId);
+    }
+
     [Fact]
     public async Task OperatorTopic_IsKeptAndRegenerateReplacesIt()
     {

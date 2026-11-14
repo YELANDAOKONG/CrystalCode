@@ -447,9 +447,11 @@ Anything that asks the operator becomes an interaction with an `id`, a
   new snapshot.
 - The stream sends a comment heartbeat every 15 seconds and `retry: 2000`. A
   slow client falls behind on its own cursor and never blocks the engine.
-- `/clear`, `/resume`, and `/fork` change the session id. Every later
-  envelope carries the new id, and `conversation.cleared` or
-  `conversation.replayed` tells the client to redraw.
+- `/clear`, `/resume`, and `/fork` change the session id. Each publishes
+  `chrome.changed` before `conversation.cleared` or `conversation.replayed`,
+  so the snapshot chrome carries the new session id and topic (`/clear` and
+  `/fork` start with an empty topic). Every later envelope carries the new
+  id, and the cleared or replayed event tells the client to redraw.
 
 ## Shutdown
 

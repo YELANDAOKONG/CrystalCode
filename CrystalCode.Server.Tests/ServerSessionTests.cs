@@ -179,6 +179,41 @@ public sealed class ServerSessionTests
         Assert.Equal("clear", sessions.GetProperty("sessions")[0].GetProperty("topic").GetString());
     }
 
+    [Theory]
+    [InlineData("/clear")]
+    [InlineData("/new")]
+    public async Task Clear_PublishesEmptyTopicBeforeRedrawAndSnapshotFollowsIt(string command)
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("done")));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "First message" });
+        await events.WaitForAsync("turn.finished");
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "/title Keep this" });
+        await events.WaitForAsync("chrome.changed", static value =>
+            value.GetProperty("data").GetProperty("chrome").GetProperty("topic").GetString() == "Keep this");
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = command });
+        var cleared = await events.WaitForAsync("conversation.cleared");
+        JsonElement changed;
+        lock (events.Seen)
+        {
+            changed = events.Seen.Last(static value =>
+                value.GetProperty("type").GetString() == "chrome.changed"
+                && value.GetProperty("data").GetProperty("chrome").GetProperty("topic").GetString() == "");
+        }
+
+        Assert.True(changed.GetProperty("seq").GetInt64() < cleared.GetProperty("seq").GetInt64());
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+        Assert.Equal(string.Empty, snapshot.GetProperty("chrome").GetProperty("topic").GetString());
+        Assert.Equal(
+            changed.GetProperty("data").GetProperty("chrome").GetProperty("sessionId").GetString(),
+            snapshot.GetProperty("chrome").GetProperty("sessionId").GetString());
+        Assert.Equal(
+            snapshot.GetProperty("sessionId").GetString(),
+            snapshot.GetProperty("chrome").GetProperty("sessionId").GetString());
+    }
+
     [Fact]
     public async Task Title_WhileBusyIsRefusedWithoutStoppingTheTurn()
     {
