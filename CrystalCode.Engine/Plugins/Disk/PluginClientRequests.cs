@@ -29,6 +29,7 @@ internal static class PluginClientRequests
             model.AudioInput,
             model.VideoInput,
             settings.ServiceTier,
-            settings.Speed);
+            settings.Speed,
+            fileInput: model.FileInput);
     }
 }

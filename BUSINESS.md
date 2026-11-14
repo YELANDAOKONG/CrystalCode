@@ -419,9 +419,9 @@ separate library with no terminal code. The product can:
   in JSON, and
   carry generic plugin-returned images into the next model round when a model
   explicitly declares image-input support;
-- record `audioInput` and `videoInput` on a model entry. Those flags are
-  declarations only: the host stores them and publishes them to plugins, and
-  it does not attach, persist, or send audio or video;
+- record `audioInput`, `videoInput`, and `fileInput` on a model entry. The
+  host stores these declarations in `providers.json` and publishes them to
+  plugins;
 - Session topic. A session can have a short topic that names what it is
   about. Topic naming is off by default. `topicModel` in `config.json`,
   `/topic`, launch flags, and session options configure it: `enabled`, and an

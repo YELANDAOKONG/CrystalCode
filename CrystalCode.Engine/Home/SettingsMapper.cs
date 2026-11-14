@@ -275,7 +275,8 @@ internal static class SettingsMapper
                     modelEntry.ContextWindows,
                     modelEntry.ServiceTiers,
                     modelEntry.Speeds,
-                    modelEntry.TextTools ?? false);
+                    modelEntry.TextTools ?? false,
+                    modelEntry.FileInput ?? false);
             }
         }
 
@@ -341,6 +342,7 @@ internal static class SettingsMapper
                 ThinkingCanDisable = settings.ThinkingCanDisable ? null : false,
                 AudioInput = settings.AudioInput ? true : null,
                 VideoInput = settings.VideoInput ? true : null,
+                FileInput = settings.FileInput ? true : null,
                 TextTools = settings.TextTools ? true : null,
                 ServiceTiers = settings.ServiceTiers.Count == 0
                     ? null

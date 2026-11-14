@@ -480,7 +480,7 @@ public sealed class DiskSettingsStoreTests
     }
 
     [Fact]
-    public void ProviderDocument_PreservesDeclaredAudioAndVideoInput()
+    public void ProviderDocument_PreservesDeclaredMediaInput()
     {
         var catalog = new ProviderCatalog([
             new ProviderDefinition(
@@ -491,7 +491,8 @@ public sealed class DiskSettingsStoreTests
                 {
                     ["heard"] = new(8192, audioInput: true),
                     ["seen"] = new(8192, imageInput: true),
-                    ["watched"] = new(8192, videoInput: true)
+                    ["watched"] = new(8192, videoInput: true),
+                    ["document"] = new(8192, fileInput: true)
                 })
         ]);
 
@@ -509,6 +510,8 @@ public sealed class DiskSettingsStoreTests
         Assert.True(watched.GetProperty("videoInput").GetBoolean());
         Assert.False(watched.TryGetProperty("audioInput", out _));
         Assert.False(watched.TryGetProperty("imageInput", out _));
+        Assert.False(seen.TryGetProperty("fileInput", out _));
+        Assert.True(models.GetProperty("document").GetProperty("fileInput").GetBoolean());
 
         var provider = SettingsMapper.ReadProviders(document).Single();
 
@@ -518,9 +521,12 @@ public sealed class DiskSettingsStoreTests
         Assert.False(provider.Models["seen"].AudioInput);
         Assert.False(provider.Models["seen"].VideoInput);
         Assert.True(provider.Models["seen"].ImageInput);
+        Assert.False(provider.Models["seen"].FileInput);
         Assert.False(provider.Models["watched"].AudioInput);
         Assert.True(provider.Models["watched"].VideoInput);
         Assert.False(provider.Models["watched"].ImageInput);
+        Assert.True(provider.Models["document"].FileInput);
+        Assert.False(provider.Models["document"].ImageInput);
 
         using var declared = JsonDocument.Parse(
             """
@@ -532,7 +538,8 @@ public sealed class DiskSettingsStoreTests
                   "both": {
                     "contextWindow": 8192,
                     "audioInput": true,
-                    "videoInput": true
+                    "videoInput": true,
+                    "fileInput": true
                   }
                 }
               }
@@ -541,6 +548,7 @@ public sealed class DiskSettingsStoreTests
         var both = SettingsMapper.ReadProviders(declared.RootElement).Single().Models["both"];
         Assert.True(both.AudioInput);
         Assert.True(both.VideoInput);
+        Assert.True(both.FileInput);
         Assert.False(both.ImageInput);
     }
 

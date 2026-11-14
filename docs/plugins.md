@@ -169,13 +169,13 @@ a letter, then letters, digits, `_`, or `-`. Put that token in
 `providers.json` as `protocol`.
 
 `PluginClientRequest` carries the endpoint, model sampling, and API key
-for that call. Do not log the key. It also carries declared `audioInput`
-and `videoInput`, plus `ServiceTier` and `Speed` when those slots are set.
+for that call. Do not log the key. It also carries the model's input
+declarations (`AudioInput`, `VideoInput`, and `FileInput`), plus `ServiceTier`
+and `Speed` when those slots are set.
 A factory that cannot write a non-null slot must throw
 `NotSupportedException` from `Create` or `CreateMultimodal`. The host
 surfaces that when it builds the client, including the first connection
-and a later `/tier` or `/speed`. Those flags do not make `Create` or
-`CreateMultimodal` accept audio or video. `CreateMultimodal` is used only when
+and a later `/tier` or `/speed`. `CreateMultimodal` is used only when
 the selected model accepts image input and no built-in factory owns the
 protocol.
 

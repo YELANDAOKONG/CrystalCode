@@ -671,10 +671,10 @@ image, and a reader failure have separate operator errors. Reader commands are
 optional at runtime, and their absence
 does not prevent the application from starting. A model must
 opt in with `imageInput: true`; unsupported combinations are rejected before
-sending a request. `audioInput` and `videoInput` are stored declarations.
-They are published on plugin model facts and on `PluginClientRequest`, and
-they do not change adapter capabilities, tool registration, attachment,
-persistence, or the outbound request. Selected service tiers and speeds are
+sending a request. `audioInput`, `videoInput`, and `fileInput` are stored
+declarations published on plugin model facts and on `PluginClientRequest`.
+The engine uses `imageInput` and adapter support to enable native attachments
+and multimodal tools. Selected service tiers and speeds are
 also published on both contracts; a custom protocol factory must apply a
 non-null slot or reject it when the client is created. Built-in adapters
 still accept only text and image input and emit only text, reasoning, and

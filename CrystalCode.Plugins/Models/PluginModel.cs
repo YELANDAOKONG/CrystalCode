@@ -27,7 +27,8 @@ public sealed record PluginModel
         bool videoInput = false,
         string? serviceTier = null,
         string? speed = null,
-        Uri? baseUri = null)
+        Uri? baseUri = null,
+        bool fileInput = false)
         : this(
             provider,
             protocol,
@@ -43,7 +44,8 @@ public sealed record PluginModel
             videoInput,
             serviceTier,
             speed,
-            baseUri)
+            baseUri,
+            fileInput)
     {
     }
 
@@ -63,7 +65,8 @@ public sealed record PluginModel
             videoInput: false,
             serviceTier: null,
             speed: null,
-            baseUri: null)
+            baseUri: null,
+            fileInput: false)
     {
     }
 
@@ -82,7 +85,8 @@ public sealed record PluginModel
         bool videoInput,
         string? serviceTier,
         string? speed,
-        Uri? baseUri)
+        Uri? baseUri,
+        bool fileInput)
     {
         if (!unavailable)
         {
@@ -138,6 +142,7 @@ public sealed record PluginModel
         ImageInput = imageInput;
         AudioInput = audioInput;
         VideoInput = videoInput;
+        FileInput = fileInput;
         Thinking = thinking;
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
@@ -181,6 +186,9 @@ public sealed record PluginModel
     /// accept or send video.
     /// </summary>
     public bool VideoInput { get; }
+
+    /// <summary>Whether the model entry declares file input.</summary>
+    public bool FileInput { get; }
 
     /// <summary>
     /// Host thinking gear. <c>default</c> and <c>off</c> are host sentinels.

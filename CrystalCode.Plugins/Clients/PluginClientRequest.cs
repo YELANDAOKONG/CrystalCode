@@ -24,7 +24,8 @@ public sealed record PluginClientRequest
         bool audioInput = false,
         bool videoInput = false,
         string? serviceTier = null,
-        string? speed = null)
+        string? speed = null,
+        bool fileInput = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -51,6 +52,7 @@ public sealed record PluginClientRequest
         ImageInput = imageInput;
         AudioInput = audioInput;
         VideoInput = videoInput;
+        FileInput = fileInput;
         RequiresApiKey = requiresApiKey;
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
@@ -93,6 +95,9 @@ public sealed record PluginClientRequest
     /// not accept or send video.
     /// </summary>
     public bool VideoInput { get; }
+
+    /// <summary>Whether the model entry declares file input.</summary>
+    public bool FileInput { get; }
 
     public bool RequiresApiKey { get; }
 

@@ -65,6 +65,7 @@ public sealed class PluginModelFactsTests
         Assert.Equal(settings.ActiveModel.ImageInput, session.ImageInput);
         Assert.Equal(settings.ActiveModel.AudioInput, session.AudioInput);
         Assert.Equal(settings.ActiveModel.VideoInput, session.VideoInput);
+        Assert.Equal(settings.ActiveModel.FileInput, session.FileInput);
         Assert.Equal("high", session.Thinking);
         Assert.True(review.Independent);
         Assert.NotNull(review.Model);
@@ -90,10 +91,10 @@ public sealed class PluginModelFactsTests
     }
 
     [Fact]
-    public void Describe_PublishesDeclaredAudioAndVideoWithoutImageInput()
+    public void Describe_PublishesDeclaredMediaWithoutImageInput()
     {
         var providerName = new ProviderName("local");
-        var model = new ModelSettings(8192, audioInput: true, videoInput: true);
+        var model = new ModelSettings(8192, audioInput: true, videoInput: true, fileInput: true);
         var provider = new ProviderDefinition(
             providerName,
             ProviderProtocol.OpenAI,
@@ -112,9 +113,11 @@ public sealed class PluginModelFactsTests
         Assert.False(described.ImageInput);
         Assert.True(described.AudioInput);
         Assert.True(described.VideoInput);
+        Assert.True(described.FileInput);
         Assert.False(request.ImageInput);
         Assert.True(request.AudioInput);
         Assert.True(request.VideoInput);
+        Assert.True(request.FileInput);
         Assert.Null(request.ServiceTier);
         Assert.Null(request.Speed);
 
@@ -137,6 +140,7 @@ public sealed class PluginModelFactsTests
         Assert.Equal("fast", slotted.Speed);
         Assert.False(PluginModel.Empty.AudioInput);
         Assert.False(PluginModel.Empty.VideoInput);
+        Assert.False(PluginModel.Empty.FileInput);
     }
 
     [Fact]

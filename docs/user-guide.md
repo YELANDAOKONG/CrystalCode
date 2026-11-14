@@ -824,12 +824,11 @@ are not supported by the current adapter.
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 | `audioInput` | Declared audio input (default `false`). Stored and visible to plugins. The host does not accept or send audio |
 | `videoInput` | Declared video input (default `false`). Stored and visible to plugins. The host does not accept or send video |
+| `fileInput` | Declared file input (default `false`). Stored and visible to plugins |
 | `textTools` | Offer `apply_patch` to this model as a free-form tool, so it writes the patch as plain text instead of JSON (default `false`). Only the `responses` protocol supports it, and any other protocol refuses the declaration when the file loads. Turn it on only for a model that accepts custom tools |
 
-`audioInput` and `videoInput` only record the claim. Crystal Code stores
-them and shows them to plugins. It does not attach, paste, persist, or send
-audio or video, and those flags do not register multimodal tools.
-`imageInput` is still the only flag that allows image input.
+`audioInput`, `videoInput`, and `fileInput` are configuration declarations
+visible to plugins. Native attachments and multimodal tools use `imageInput`.
 Service tier and speed are sent only when the active model lists the
 selected token. The host does not choose the JSON field and does not
 compare the response with the request. Chat Completions and OpenAI

@@ -3,8 +3,7 @@ namespace CrystalCode.Engine.Configuration;
 /// <summary>
 /// Per-model limits, sampling, and thinking capability. Context size is
 /// required. The current thinking gear is a host setting, not a model field.
-/// Audio and video input are stored declarations; the host does not
-/// accept or send them.
+/// Audio, video, and file input are stored declarations.
 /// </summary>
 public sealed record ModelSettings
 {
@@ -22,7 +21,8 @@ public sealed record ModelSettings
         IReadOnlyList<int>? contextWindows = null,
         IReadOnlyList<string>? serviceTiers = null,
         IReadOnlyList<string>? speeds = null,
-        bool textTools = false)
+        bool textTools = false,
+        bool fileInput = false)
     {
         if (contextWindow <= 0)
         {
@@ -77,6 +77,7 @@ public sealed record ModelSettings
         ThinkingCanDisable = thinkingCanDisable;
         AudioInput = audioInput;
         VideoInput = videoInput;
+        FileInput = fileInput;
         ServiceTiers = CatalogSlots.Normalize(serviceTiers, "Service tier");
         Speeds = CatalogSlots.Normalize(speeds, "Speed");
         TextTools = textTools;
@@ -123,6 +124,9 @@ public sealed record ModelSettings
     /// declaration and does not accept or send video.
     /// </summary>
     public bool VideoInput { get; }
+
+    /// <summary>Gets whether the operator declared file input.</summary>
+    public bool FileInput { get; }
 
     /// <summary>
     /// Service-tier tokens this model accepts. Empty means the slot is unsupported.
