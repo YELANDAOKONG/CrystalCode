@@ -120,7 +120,8 @@ public sealed record HarnessSettings
         string theme = ThemeCatalog.DefaultName,
         bool approvalColors = DefaultApprovalColors,
         PursueModelSettings? pursueModel = null,
-        PursueLimits? pursueLimits = null)
+        PursueLimits? pursueLimits = null,
+        IReadOnlyDictionary<string, string?>? httpHeaders = null)
     {
         ArgumentNullException.ThrowIfNull(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -230,6 +231,7 @@ public sealed record HarnessSettings
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
         MicroCompaction = microCompaction ?? MicroCompactionSettings.Default;
         ResourceTrim = resourceTrim ?? ResourceTrimSettings.Default;
+        HttpHeaders = HeaderSettings.Copy(httpHeaders);
         RuleFiles = ruleFiles ?? RuleFileSettings.Default;
         ProcessDisabledBuiltInTools = BuiltInToolDisablement.FromProcessNames(disabledBuiltInTools);
         PersistentDisabledBuiltInTools = persistentDisabledBuiltInTools ?? new BuiltInToolDisablement();
@@ -537,6 +539,11 @@ public sealed record HarnessSettings
     public MicroCompactionSettings MicroCompaction { get; }
 
     public ResourceTrimSettings ResourceTrim { get; }
+
+    public IReadOnlyDictionary<string, string?> HttpHeaders { get; }
+
+    public IReadOnlyDictionary<string, string> EffectiveHttpHeaders =>
+        HeaderSettings.Effective(HttpHeaders, ActiveProvider.HttpHeaders);
 
     /// <summary>The image, audio, video, and document resource description models.</summary>
     public ResourceModels ResourceModels { get; }
@@ -1079,7 +1086,8 @@ public sealed record HarnessSettings
             theme ?? Theme,
             approvalColors ?? ApprovalColors,
             pursueModel ?? PursueModel,
-            pursueLimits ?? PursueLimits);
+            pursueLimits ?? PursueLimits,
+            HttpHeaders);
 
     public override string ToString() => nameof(HarnessSettings);
 

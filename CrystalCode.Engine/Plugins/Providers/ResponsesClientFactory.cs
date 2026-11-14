@@ -43,7 +43,7 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
                 textTools: TextToolsFor(model),
-                modelOptions: model.Options));
+                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -67,6 +67,6 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
                 textTools: TextToolsFor(model),
-                modelOptions: model.Options));
+                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
     }
 }

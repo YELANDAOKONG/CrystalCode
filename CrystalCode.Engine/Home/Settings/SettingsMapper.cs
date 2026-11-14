@@ -303,7 +303,8 @@ internal static class SettingsMapper
             entry.RequiresApiKey,
             EndpointOptionsReader.Read(name, protocol, entry.Options),
             ReadResourceTrim(entry.ResourceTrim),
-            entry.RequireAssistantContent ?? false);
+            entry.RequireAssistantContent ?? false,
+            HeaderSettings.Read(entry.HttpHeaders, $"provider {name} httpHeaders", allowNull: true));
     }
 
     private static ResourceTrimOverride? ReadResourceTrim(ProviderResourceTrimDocument? document) =>
@@ -375,6 +376,7 @@ internal static class SettingsMapper
                     : provider.RequiresApiKey,
             Options = EndpointOptionsReader.Write(provider.ThinkingDisplay),
             ResourceTrim = WriteResourceTrim(provider.ResourceTrim),
+            HttpHeaders = HeaderSettings.Write(provider.HttpHeaders),
             Models = models
         };
     }

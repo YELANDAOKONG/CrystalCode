@@ -136,7 +136,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             server: ReadServer(document.Server),
             bridge: ReadBridge(document.Bridge),
             theme: theme.Name,
-            approvalColors: theme.ApprovalColors);
+            approvalColors: theme.ApprovalColors,
+            httpHeaders: HeaderSettings.Read(document.HttpHeaders, "config.json httpHeaders", allowNull: false));
     }
 
     public void Save(HarnessSettings settings)
@@ -221,6 +222,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             ResourceTrim = WriteResourceTrim(settings.ResourceTrim),
+            HttpHeaders = HeaderSettings.Write(settings.HttpHeaders),
             RuleFiles = WriteRuleFiles(settings.RuleFiles),
             ImageModel = WriteResourceModel(settings.ResourceModels.Image),
             AudioModel = WriteResourceModel(settings.ResourceModels.Audio),

@@ -8,12 +8,20 @@ public sealed class GeminiMultimodalProvider : IStreamingMultimodalChatClient, I
     private readonly ProtocolMultimodalChatClient _client;
 
     public GeminiMultimodalProvider(GeminiOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
+    public GeminiMultimodalProvider(
+        GeminiOptions options,
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolMultimodalChatClient(
             new GeminiMultimodalCodec(options.Model),
             options.ToProtocolOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public MultimodalChatCapabilities Capabilities => _client.Capabilities;

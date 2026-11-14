@@ -8,12 +8,20 @@ public sealed class AnthropicProvider : IStreamingChatClient, IDisposable
     private readonly ProtocolChatClient _client;
 
     public AnthropicProvider(AnthropicOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
+    public AnthropicProvider(
+        AnthropicOptions options,
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolChatClient(
             new AnthropicCodec(options.VendorName, options.SummarizeThinking),
             options.ToProtocolOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public Task<ChatResponse> CompleteAsync(ChatRequest request, CancellationToken cancellationToken = default) =>

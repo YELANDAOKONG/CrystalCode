@@ -27,6 +27,30 @@ public sealed record PluginClientRequest
         string? serviceTier = null,
         string? speed = null,
         JsonElement? modelOptions = null)
+        : this(protocol, provider, model, baseUri, apiKey, requiresApiKey, organization, project, maxTokens, tokenLimit, replayReasoningContent, imageInput, audioInput, videoInput, fileInput, serviceTier, speed, modelOptions, null)
+    {
+    }
+
+    public PluginClientRequest(
+        string protocol,
+        string provider,
+        string model,
+        Uri baseUri,
+        string apiKey,
+        bool requiresApiKey,
+        string? organization,
+        string? project,
+        int? maxTokens,
+        string tokenLimit,
+        bool replayReasoningContent,
+        bool imageInput,
+        bool audioInput,
+        bool videoInput,
+        bool fileInput,
+        string? serviceTier,
+        string? speed,
+        JsonElement? modelOptions,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(protocol);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -46,6 +70,8 @@ public sealed record PluginClientRequest
         Organization = organization;
         Project = project;
         ModelOptions = modelOptions?.Clone();
+        HttpHeaders = new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+            new Dictionary<string, string>(httpHeaders ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase));
         MaxTokens = maxTokens;
         ReplayReasoningContent = replayReasoningContent;
         TokenLimit = tokenLimit.Trim();
@@ -57,6 +83,8 @@ public sealed record PluginClientRequest
         ServiceTier = string.IsNullOrWhiteSpace(serviceTier) ? null : serviceTier.Trim();
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
     }
+
+    public IReadOnlyDictionary<string, string> HttpHeaders { get; }
 
     public string Protocol { get; }
 

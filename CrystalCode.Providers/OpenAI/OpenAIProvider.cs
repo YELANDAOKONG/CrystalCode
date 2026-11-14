@@ -21,10 +21,18 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
     /// disposes its own client.
     /// </param>
     public OpenAIProvider(OpenAIOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
+    public OpenAIProvider(
+        OpenAIOptions options,
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        _client = new CompatibleChatClient(CreateProfile(options), options.ToCompatibleOptions(), httpClient);
+        _client = new CompatibleChatClient(CreateProfile(options), options.ToCompatibleOptions(), httpClient, httpHeaders);
     }
 
     internal static CompatibleProfile CreateProfile(OpenAIOptions options)

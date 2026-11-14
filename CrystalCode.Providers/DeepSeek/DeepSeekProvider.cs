@@ -21,13 +21,21 @@ public sealed class DeepSeekProvider : IStreamingChatClient, IDisposable
     /// disposes its own client.
     /// </param>
     public DeepSeekProvider(DeepSeekOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
+    public DeepSeekProvider(
+        DeepSeekOptions options,
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         _client = new CompatibleChatClient(
             CreateProfile(),
             options.ToCompatibleOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     internal static CompatibleProfile CreateProfile() => new(

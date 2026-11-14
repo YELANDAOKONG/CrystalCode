@@ -29,6 +29,7 @@ internal static class PluginClientRequests
             fileInput: model.FileInput,
             serviceTier: settings.ServiceTier,
             speed: settings.Speed,
-            modelOptions: model.Options);
+            modelOptions: model.Options,
+            httpHeaders: settings.EffectiveHttpHeaders);
     }
 }

@@ -9,15 +9,21 @@ public sealed class OpenAIMultimodalProvider
 {
     private readonly CompatibleMultimodalChatClient _client;
 
+    public OpenAIMultimodalProvider(OpenAIOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
     public OpenAIMultimodalProvider(
         OpenAIOptions options,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new CompatibleMultimodalChatClient(
             OpenAIProvider.CreateProfile(options),
             options.ToCompatibleOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public MultimodalChatCapabilities Capabilities => _client.Capabilities;

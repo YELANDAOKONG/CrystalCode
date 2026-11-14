@@ -17,16 +17,21 @@ internal sealed class CompatibleMultimodalChatClient
     private readonly CompatibleOptions _options;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
+    private readonly IReadOnlyDictionary<string, string>? _httpHeaders;
 
     public CompatibleMultimodalChatClient(
         CompatibleProfile profile,
         CompatibleOptions options,
-        HttpClient? httpClient)
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(options);
         _profile = profile;
         _options = options;
+        _httpHeaders = httpHeaders is null
+            ? null
+            : new Dictionary<string, string>(httpHeaders, StringComparer.OrdinalIgnoreCase);
         if (httpClient is null)
         {
             _httpClient = new HttpClient { Timeout = options.RequestTimeout };
@@ -164,6 +169,14 @@ internal sealed class CompatibleMultimodalChatClient
         request.Headers.UserAgent.ParseAdd(CompatibleWire.UserAgent);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(
             stream ? "text/event-stream" : "application/json"));
+
+        if (_httpHeaders is not null)
+        {
+            foreach (var (name, value) in _httpHeaders)
+            {
+                request.Headers.TryAddWithoutValidation(name, value);
+            }
+        }
 
         HttpResponseMessage? response = null;
         try

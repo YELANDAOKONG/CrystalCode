@@ -34,7 +34,7 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
                 maxTokens: settings.MaxOutputTokens,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
-                modelOptions: model.Options));
+                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
@@ -56,6 +56,6 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
                 maxTokens: settings.MaxOutputTokens,
                 serviceTier: settings.ServiceTier,
                 speed: settings.Speed,
-                modelOptions: model.Options));
+                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
     }
 }

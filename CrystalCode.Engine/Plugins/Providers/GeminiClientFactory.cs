@@ -21,13 +21,13 @@ public sealed class GeminiClientFactory : IChatClientFactory
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
         }
-        return new GeminiProvider(CreateOptions(settings, apiKey));
+        return new GeminiProvider(CreateOptions(settings, apiKey), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
         HarnessSettings settings,
         string apiKey) =>
-        new GeminiMultimodalProvider(CreateOptions(settings, apiKey));
+        new GeminiMultimodalProvider(CreateOptions(settings, apiKey), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
 
     private static GeminiOptions CreateOptions(HarnessSettings settings, string apiKey)
     {

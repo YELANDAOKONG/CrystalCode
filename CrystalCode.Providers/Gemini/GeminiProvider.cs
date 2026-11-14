@@ -8,12 +8,20 @@ public sealed class GeminiProvider : IStreamingChatClient, IDisposable
     private readonly ProtocolChatClient _client;
 
     public GeminiProvider(GeminiOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
+    public GeminiProvider(
+        GeminiOptions options,
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolChatClient(
             new GeminiCodec(options.Model),
             options.ToProtocolOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public Task<ChatResponse> CompleteAsync(

@@ -3535,3 +3535,9 @@ Environment variables:
 - `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `CRYSTAL_API_KEY` override
   `credentials.json` for that process. A provider-specific variable wins over
   `CRYSTAL_API_KEY`. The persistent store is `credentials.json`.
+
+Provider HTTP headers are loaded with host settings and endpoint definitions.
+Engine validates and merges names case-insensitively, retaining endpoint nulls
+as removals. Built-in provider clients apply the effective headers to each
+request; disk plugin factories receive them in `PluginClientRequest`. Protocol
+headers remain adapter-owned. Header values must not appear in diagnostics.

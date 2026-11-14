@@ -8,12 +8,20 @@ public sealed class ResponsesProvider : IStreamingChatClient, IDisposable
     private readonly ProtocolChatClient _client;
 
     public ResponsesProvider(ResponsesOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
+    public ResponsesProvider(
+        ResponsesOptions options,
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolChatClient(
             new ResponsesCodec(options.VendorName, options.TextTools),
             options.ToProtocolOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public Task<ChatResponse> CompleteAsync(ChatRequest request, CancellationToken cancellationToken = default) =>

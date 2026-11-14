@@ -8,15 +8,21 @@ public sealed class ResponsesMultimodalProvider
 {
     private readonly ProtocolMultimodalChatClient _client;
 
+    public ResponsesMultimodalProvider(ResponsesOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
     public ResponsesMultimodalProvider(
         ResponsesOptions options,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolMultimodalChatClient(
             new ResponsesMultimodalCodec(options.VendorName, options.TextTools),
             options.ToProtocolOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public MultimodalChatCapabilities Capabilities => _client.Capabilities;

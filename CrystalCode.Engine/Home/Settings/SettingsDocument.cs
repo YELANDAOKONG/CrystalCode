@@ -4,6 +4,7 @@ namespace CrystalCode.Engine.Home.Settings;
 
 internal sealed class SettingsDocument
 {
+    public System.Text.Json.JsonElement? HttpHeaders { get; set; }
     public CrystalCode.Engine.Configuration.AgentSettings? Agents { get; set; }
 
     public string? Provider { get; set; }

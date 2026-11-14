@@ -9,15 +9,21 @@ public sealed class DeepSeekMultimodalProvider
 {
     private readonly CompatibleMultimodalChatClient _client;
 
+    public DeepSeekMultimodalProvider(DeepSeekOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
     public DeepSeekMultimodalProvider(
         DeepSeekOptions options,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new CompatibleMultimodalChatClient(
             DeepSeekProvider.CreateProfile(),
             options.ToCompatibleOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public MultimodalChatCapabilities Capabilities => _client.Capabilities;

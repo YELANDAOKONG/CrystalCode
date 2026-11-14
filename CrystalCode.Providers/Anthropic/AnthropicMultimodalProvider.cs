@@ -9,15 +9,21 @@ public sealed class AnthropicMultimodalProvider
 {
     private readonly ProtocolMultimodalChatClient _client;
 
+    public AnthropicMultimodalProvider(AnthropicOptions options, HttpClient? httpClient = null)
+        : this(options, httpClient, null)
+    {
+    }
+
     public AnthropicMultimodalProvider(
         AnthropicOptions options,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders)
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolMultimodalChatClient(
             new AnthropicMultimodalCodec(options.VendorName, options.SummarizeThinking),
             options.ToProtocolOptions(),
-            httpClient);
+            httpClient, httpHeaders);
     }
 
     public MultimodalChatCapabilities Capabilities => _client.Capabilities;

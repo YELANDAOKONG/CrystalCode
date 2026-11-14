@@ -430,6 +430,11 @@ separate library with no terminal code. The product can:
 - record `audioInput`, `videoInput`, and `fileInput` on a model entry. The
   host stores these declarations in `providers.json` and publishes them to
   plugins;
+- configure HTTP request headers globally in `config.json` and per provider
+  endpoint in the provider catalog. Endpoint headers override global names
+  without regard to case; `null` removes a global header for that endpoint.
+  Protocol-owned headers are reserved, and disk provider plugins receive the
+  effective headers for their requests;
 - configure provider-specific parameters per model through `options` in
   `providers.json`. The selected adapter interprets and validates the object;
 - Session topic. A session can have a short topic that names what it is

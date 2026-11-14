@@ -595,6 +595,41 @@ effect. Editing provider definitions in the TUI is deferred. A
 `<workspace>/.crystal/config.json` is not read; workspace-level configuration
 is deferred.
 
+### Provider HTTP headers
+
+Set `httpHeaders` in `~/.crystal/config.json` for headers sent to every model
+provider. Set `httpHeaders` inside a provider endpoint in `providers.json` or a
+split provider file for that endpoint. Header names are case-insensitive. Each
+endpoint value replaces the entire global value; an endpoint value of `null`
+omits that header, while an empty string remains an empty value. Global values
+must be strings. With multiple protocol endpoints under one provider name, each
+endpoint uses its own headers. A user endpoint overlaid on a built-in endpoint
+merges its headers by name.
+
+In `config.json`:
+
+```json
+{ "httpHeaders": { "X-Client": "CrystalCode", "X-Region": "global" } }
+```
+
+Inside a provider endpoint:
+
+```json
+"httpHeaders": { "X-Region": "local", "X-Client": null }
+```
+
+Do not put a provider-specific secret in global headers: they are sent to every
+selected model provider. Header values are not included in configuration error
+messages. Header names must be valid HTTP request header names, values must not
+contain control characters other than tab, and duplicate names differing only
+in case are invalid. `Authorization`, `Proxy-Authorization`, `Accept`,
+`User-Agent`, `Host`, `OpenAI-Organization`, `OpenAI-Project`, `x-api-key`,
+`x-goog-api-key`, `anthropic-version`, `Transfer-Encoding`, and `Connection`
+are reserved. Content headers are not supported. Configure API keys using the
+existing credential settings. Changes take effect after restart. Disk plugins
+receive the effective headers and must apply them to their own requests. MCP
+connections use their own header configuration.
+
 ### Split provider files
 
 You can spread providers across several files. The host reads these, in order:

@@ -21,7 +21,8 @@ public sealed record ProviderDefinition
         bool? requiresApiKey = null,
         ThinkingDisplay? thinkingDisplay = null,
         ResourceTrimOverride? resourceTrim = null,
-        bool requireAssistantContent = false)
+        bool requireAssistantContent = false,
+        IReadOnlyDictionary<string, string?>? httpHeaders = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(protocol);
@@ -64,6 +65,7 @@ public sealed record ProviderDefinition
         ApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey.Trim();
         RequiresApiKey = requiresApiKey ?? protocol != ProviderProtocol.Ollama;
         ResourceTrim = resourceTrim;
+        HttpHeaders = HeaderSettings.Copy(httpHeaders);
         ThinkingDisplay = thinkingDisplay == ThinkingDisplay.Omitted
             ? ThinkingDisplay.Omitted
             : null;
@@ -111,6 +113,8 @@ public sealed record ProviderDefinition
     /// Gets the resource trim limits this endpoint sets, or null to use the global ones.
     /// </summary>
     public ResourceTrimOverride? ResourceTrim { get; }
+
+    public IReadOnlyDictionary<string, string?> HttpHeaders { get; }
 
     public bool TryGetModel(string model, out ModelSettings settings)
     {

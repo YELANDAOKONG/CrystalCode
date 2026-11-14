@@ -15,16 +15,21 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
     private readonly ProtocolOptions _options;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
+    private readonly IReadOnlyDictionary<string, string>? _httpHeaders;
 
     public ProtocolChatClient(
         IProtocolCodec codec,
         ProtocolOptions options,
-        HttpClient? httpClient)
+        HttpClient? httpClient,
+        IReadOnlyDictionary<string, string>? httpHeaders = null)
     {
         ArgumentNullException.ThrowIfNull(codec);
         ArgumentNullException.ThrowIfNull(options);
         _codec = codec;
         _options = options;
+        _httpHeaders = httpHeaders is null
+            ? null
+            : new Dictionary<string, string>(httpHeaders, StringComparer.OrdinalIgnoreCase);
         if (httpClient is null)
         {
             _httpClient = new HttpClient { Timeout = options.RequestTimeout };
@@ -137,6 +142,14 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
                     ? "application/x-ndjson"
                     : stream ? "text/event-stream" : "application/json"));
         _codec.AddHeaders(request, _options.ApiKey);
+
+        if (_httpHeaders is not null)
+        {
+            foreach (var (name, value) in _httpHeaders)
+            {
+                request.Headers.TryAddWithoutValidation(name, value);
+            }
+        }
 
         HttpResponseMessage? response = null;
         try

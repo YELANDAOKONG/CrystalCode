@@ -4,6 +4,7 @@ namespace CrystalCode.Engine.Home.Providers;
 
 internal sealed class ProviderDocument
 {
+    public System.Text.Json.JsonElement? HttpHeaders { get; set; }
     public string? Protocol { get; set; }
 
     public string? BaseUri { get; set; }
