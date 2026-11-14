@@ -1184,8 +1184,8 @@ its own.
 | Ctrl+J or `\` then Enter | Insert a newline |
 | Backspace | Delete one character |
 | Ctrl+W or Alt/Option+Backspace | Delete a word (Windows: Ctrl+Backspace) |
-| Tab | Cycle Plan, Work, and custom modes, or complete a `/` command (and its argument after `/thinking`, `/context`, `/tier`, `/speed`, `/approval`, `/model`, `/tokens`, `/verbose`, `/agents`, or `/child`) |
-| Shift+Tab | Cycle modes |
+| Tab | Cycle forward from Work to Plan, then through enabled custom modes in name order, or complete a `/` command (and its argument after `/thinking`, `/context`, `/tier`, `/speed`, `/approval`, `/model`, `/tokens`, `/verbose`, `/agents`, or `/child`) |
+| Shift+Tab | Cycle modes backward |
 | `?` on an empty composer | Show shortcuts and commands |
 | F7 | Open the child picker when child Agents are enabled. F7 in the picker dismisses it |
 | F8 or `/edit` | Open the full-screen editor with the current draft. Enter inserts a newline and Tab inserts a tab. The mouse wheel and PageUp / PageDown scroll the text. F8 or Ctrl+S puts the text back in the composer without sending it. Esc discards the edit. Unavailable while a dialog, the side question, or a child view is open |
@@ -1300,9 +1300,12 @@ otherwise the same conversation.
 | **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, multi_edit, write, apply_patch, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
 | **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, multi_edit, write, apply_patch, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
-Tab and Shift+Tab cycle Plan, Work, and enabled custom modes. `/plan` toggles
-Plan and Work, and `/mode <name>` picks any mode. When child Agents are
-enabled, Plan and Work also offer `task`. See [Child Agents](#child-agents).
+New sessions start in Work by default. Tab cycles from Work to Plan, then
+through enabled custom modes in name order and back to Work. Shift+Tab
+follows the same order backward. With no enabled custom modes, either key
+switches between Work and Plan. `/plan` toggles Plan and Work, and
+`/mode <name>` picks any mode. When child Agents are enabled, Plan and Work
+also offer `task`. See [Child Agents](#child-agents).
 
 ### Custom modes
 

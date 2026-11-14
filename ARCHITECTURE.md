@@ -882,7 +882,7 @@ Two Ctrl+C presses on an empty composer exit.
 
 ### Next-turn settings
 
-Mode (`/plan`, `/mode <name>`, Tab, `CycleMode`, `TogglePlan`, and
+Mode (`/plan`, `/mode <name>`, Tab, Shift+Tab, `CycleMode`, `TogglePlan`, and
 `TrySetMode`), the approval level (`/approval` with no argument or a level),
 `/thinking`, `/tier`, `/speed`, `/context`, and `/model <selection>` are
 accepted while a turn or compaction runs and apply on the next turn. Every
@@ -897,7 +897,7 @@ extended-approval, and compaction-model forms.
   the usual one followed by `Applies next turn`, for example
   `Mode  Plan  Applies next turn`.
 - One pending value per setting, and the last command wins. A command that
-  names the active value drops that setting's pending value. A cycle (Tab,
+  names the active value drops that setting's pending value. A cycle (Tab, Shift+Tab,
   `/plan`, `/approval`, `/thinking`, `/tier`, `/speed`, `/context` without an
   argument) steps from the pending value when there is one.
 - Validation uses the settings the next turn will start with: `/thinking`,
@@ -1052,8 +1052,10 @@ failed result for that call, as a call to `bash` does in Plan.
 `SessionDocument.Mode` stores the mode name and `PlanMode` stays written as
 true only for Plan, so an older build reads a custom mode as Work. A session
 that names a missing or disabled mode resumes in Work and writes a note.
-`CodingSession.CycleMode` replaces Tab and Shift+Tab and walks Plan, Work, then
-enabled custom modes in name order. `/mode` lists modes and `/mode <name>`
+`CodingSession.CycleMode` walks Work, Plan, then enabled custom modes in
+ordinal name order and wraps. The terminal sends the forward direction for
+Tab and the backward direction for Shift+Tab. Server and Bridge cycle
+forward. `/mode` lists modes and `/mode <name>`
 switches while idle. `--mode <name>` applies for one process, is rejected when
 combined with `--plan` or `--work`, and is never written to `config.json`.
 Disabled-tool lists remain `plan` and `work`; a custom mode uses the Work list.
@@ -3170,7 +3172,9 @@ platform. Windows Ctrl+Backspace deletes a word. On Unix, ReadKey tags
 plain Backspace as Control; that is still one character. Ctrl+W or
 Alt/Option+Backspace deletes a word. Ctrl+C at idle clears the composer.
 Two Ctrl+C presses on an empty composer exit. Ctrl+J or `\`+Enter inserts a
-newline. Tab cycles Plan, Work, and enabled custom modes, or completes a `/` command. Shift+Tab also cycles modes. Chrome labels are Plan, Work, Review, Default, Edit, Audit, and Full.
+newline. Tab cycles Work, Plan, and enabled custom modes in name order, or
+completes a `/` command. Shift+Tab cycles modes backward. Chrome labels are
+Plan, Work, Review, Default, Edit, Audit, and Full.
 When the slash picker is open, plain Up/Down moves its selection without
 resetting it and scrolls the visible candidate window to keep that selection
 on screen. Tab accepts the selected completion. Enter accepts a partial

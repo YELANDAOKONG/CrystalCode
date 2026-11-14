@@ -65,8 +65,9 @@ separate library with no terminal code. The product can:
   disabled or invalid. Plan, Work, and `default` are reserved names. A mode
   does not change approval: every call still goes through the selected
   approval mode and the host classification floor, so listing `bash` in a
-  mode does not make shell calls pass. Tab and Shift+Tab cycle Plan, Work, and
-  each enabled custom mode in that order. `/mode` lists modes, `/mode <name>`
+  mode does not make shell calls pass. Tab cycles from Work to Plan, then
+  through enabled custom modes in name order and back to Work. Shift+Tab
+  cycles backward. `/mode` lists modes, `/mode <name>`
   switches, and `--mode <name>` on `crystal`, `crystal space`, and `crystal run`
   starts in one for that process only. The current mode is saved with the
   session. A resumed or forked session whose custom mode is missing or

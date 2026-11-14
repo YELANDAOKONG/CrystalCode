@@ -34,7 +34,7 @@ public sealed class ChildPickerTests
         renderer.SetChildSessions([child], null);
         Assert.Equal("parent draft", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false));
+            static _ => false, CancellationToken.None, checkSize: false));
     }
 
     [Fact]

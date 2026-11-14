@@ -701,7 +701,7 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 | `_crystal/session/fork` | Fork a saved session (see Sessions) |
 | `_crystal/recall` | `TryRecall`; returns `recalled`, and the draft follows as `_crystal/recalled` |
 | `_crystal/queue/release` | empty input release |
-| `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode`, `TogglePlan`; returns the active `mode` and `planMode`, and `pending`. During a turn the change applies on the next turn |
+| `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode` moves forward through Work, Plan, and enabled custom modes in name order. Both methods return the active `mode` and `planMode`, and `pending`. During a turn the change applies on the next turn |
 | `_crystal/verbose {target, enabled}` | `SetVerbose` |
 | `_crystal/draft {text}` | `NotifyDraftChanged` |
 | `_crystal/image/attach {data}`, `_crystal/image/get {number}` | `TryAttachImage`, `TryGetImage` |

@@ -83,7 +83,7 @@ public sealed class SessionRendererTests
         renderer.RestoreRecalledMessage(submittedText);
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         Assert.Equal(submittedText, submitted);
@@ -95,7 +95,7 @@ public sealed class SessionRendererTests
         renderer.RestoreRecalledMessage("other");
         var draft = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         Assert.Equal("other\n\ndraft", draft);
@@ -329,7 +329,7 @@ public sealed class SessionRendererTests
             Task.CompletedTask,
             onSubmit: null,
             planMode: false,
-            cycleMode: static () => false,
+            cycleMode: static _ => false,
             CancellationToken.None);
     }
 
@@ -345,7 +345,7 @@ public sealed class SessionRendererTests
                 new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true),
                 new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)
             ],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -364,7 +364,7 @@ public sealed class SessionRendererTests
                 new ConsoleKeyInfo('x', ConsoleKey.X, false, false, false),
                 new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)
             ],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -381,12 +381,12 @@ public sealed class SessionRendererTests
             ch => new ConsoleKeyInfo(ch, default, false, false, false)).ToArray();
         var wheelSubmission = await renderer.DispatchBurstAsync(
             wheel,
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -402,12 +402,12 @@ public sealed class SessionRendererTests
 
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -427,21 +427,77 @@ public sealed class SessionRendererTests
 
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
         Assert.Equal("older", submitted);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DispatchBurstAsync_TabCyclesForwardOrBackward(bool shift)
+    {
+        using var renderer = new SessionRenderer();
+        var directions = new List<bool>();
+
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\t', ConsoleKey.Tab, shift, false, false)],
+            CycleMode,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.Equal(shift, Assert.Single(directions));
+
+        bool CycleMode(bool backward)
+        {
+            directions.Add(backward);
+            return false;
+        }
+    }
+
+    [Fact]
+    public async Task DispatchBurstAsync_TabCompletesCommandsAndShiftTabStillCyclesBackward()
+    {
+        using var renderer = new SessionRenderer();
+        renderer.SetSlashCommands([new SlashOption("status", "Show status", ["status"])]);
+        renderer.SeedComposer("/st");
+        string? edited = null;
+        renderer.OnComposerEdited = text => edited = text;
+        var directions = new List<bool>();
+
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\t', ConsoleKey.Tab, true, false, false)],
+            CycleMode,
+            CancellationToken.None,
+            checkSize: false);
+        Assert.Null(edited);
+
+        await renderer.DispatchBurstAsync(
+            [new ConsoleKeyInfo('\t', ConsoleKey.Tab, false, false, false)],
+            CycleMode,
+            CancellationToken.None,
+            checkSize: false);
+
+        Assert.True(Assert.Single(directions));
+        Assert.Equal("/status ", edited);
+
+        bool CycleMode(bool backward)
+        {
+            directions.Add(backward);
+            return false;
+        }
     }
 
     [Fact]
@@ -457,17 +513,17 @@ public sealed class SessionRendererTests
 
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var accepted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -488,17 +544,17 @@ public sealed class SessionRendererTests
                 new ConsoleKeyInfo('h', ConsoleKey.H, false, false, false),
                 new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)
             ],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var closed = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('q', ConsoleKey.Q, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -520,7 +576,7 @@ public sealed class SessionRendererTests
 
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -544,22 +600,22 @@ public sealed class SessionRendererTests
 
         var quit = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('q', ConsoleKey.Q, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var typed = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('h', ConsoleKey.H, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var dismissed = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -587,7 +643,7 @@ public sealed class SessionRendererTests
 
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('x', ConsoleKey.X, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -614,7 +670,7 @@ public sealed class SessionRendererTests
 
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\u0003', ConsoleKey.C, false, false, true)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 
@@ -623,7 +679,7 @@ public sealed class SessionRendererTests
         Assert.False(renderer.SideQuestionOpen);
         var draft = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
         Assert.Equal("draft", draft);
@@ -659,7 +715,7 @@ public sealed class SessionRendererTests
         renderer.ShowSideQuestion(SampleSide());
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
-            static () => false,
+            static _ => false,
             CancellationToken.None,
             checkSize: false);
 

@@ -15,7 +15,7 @@ public sealed class QuickPromptTests
         await Press(renderer, ConsoleKey.LeftArrow);
         renderer.OnImagePasteAsync = _ => Task.FromResult<string?>("[Image #7]");
         await renderer.DispatchBurstAsync([new('\u0016', ConsoleKey.V, false, false, true)],
-            () => false, CancellationToken.None, checkSize: false);
+            _ => false, CancellationToken.None, checkSize: false);
         await Press(renderer, ConsoleKey.F6);
         Assert.Null(await Press(renderer, ConsoleKey.Enter));
         Assert.Equal("a\u2063[Image #7]中文\n第二行b", await Press(renderer, ConsoleKey.Enter));
@@ -41,7 +41,7 @@ public sealed class QuickPromptTests
         renderer.SeedComposer("draft");
         renderer.OnImagePasteAsync = _ => Task.FromResult<string?>("[Image #7]");
         await renderer.DispatchBurstAsync([new('\u0016', ConsoleKey.V, false, false, true)],
-            () => false, CancellationToken.None, checkSize: false);
+            _ => false, CancellationToken.None, checkSize: false);
         await Press(renderer, ConsoleKey.F6);
         await Press(renderer, ConsoleKey.Tab);
         Assert.Equal("中文\n第二行", await Press(renderer, ConsoleKey.Enter));
@@ -68,7 +68,7 @@ public sealed class QuickPromptTests
     {
         using var renderer = Create();
         var burst = "\u001b[17~".Select(ch => new ConsoleKeyInfo(ch, default, false, false, false)).ToArray();
-        await renderer.DispatchBurstAsync(burst, () => false, CancellationToken.None, checkSize: false);
+        await renderer.DispatchBurstAsync(burst, _ => false, CancellationToken.None, checkSize: false);
         await Press(renderer, ConsoleKey.Enter);
         Assert.Equal("中文\n第二行", await Press(renderer, ConsoleKey.Enter));
     }
@@ -81,5 +81,5 @@ public sealed class QuickPromptTests
 
     private static Task<string?> Press(SessionRenderer renderer, ConsoleKey key) =>
         renderer.DispatchBurstAsync([new('\0', key, false, false, false)],
-            () => false, CancellationToken.None, checkSize: false);
+            _ => false, CancellationToken.None, checkSize: false);
 }

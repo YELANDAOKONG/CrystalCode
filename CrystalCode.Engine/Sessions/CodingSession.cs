@@ -2311,17 +2311,23 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
-    /// Moves to the next mode in the order Plan, Work, then enabled custom
-    /// modes by name, and returns whether Plan is now active. While a turn or
-    /// compaction runs, it moves from the pending mode and records the result
-    /// for the next turn.
+    /// Moves forward through Work, Plan, and enabled custom modes by name.
+    /// Returns whether Plan is active.
     /// </summary>
-    public bool CycleMode()
+    public bool CycleMode() => CycleMode(backward: false);
+
+    /// <summary>
+    /// Moves through the mode order in the requested direction. During a turn
+    /// or compaction, starts from the pending selection and records the result
+    /// for the next turn. Returns whether Plan is active.
+    /// </summary>
+    public bool CycleMode(bool backward)
     {
         var order = ModeOrder();
         var current = ProspectiveModeName();
         var index = order.FindIndex(name => name.Equals(current, StringComparison.OrdinalIgnoreCase));
-        var next = order[(index + 1) % order.Count];
+        var step = backward ? -1 : 1;
+        var next = index < 0 ? order[0] : order[(index + step + order.Count) % order.Count];
         if (SettingsBusy)
         {
             DeferMode(next);
@@ -2552,7 +2558,7 @@ public sealed class CodingSession : ITurnObserver
     }
 
     private List<string> ModeOrder() =>
-        [ModeCatalog.Plan, ModeCatalog.Work, .. _modes.Definitions.Select(static mode => mode.Name)];
+        [ModeCatalog.Work, ModeCatalog.Plan, .. _modes.Definitions.Select(static mode => mode.Name)];
 
     private void ApplyMode(string name)
     {

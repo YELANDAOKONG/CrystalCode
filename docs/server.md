@@ -240,7 +240,7 @@ and the `server.state` event.
 | `POST /input` | operate | `{"text"}`: a prompt, a slash command, a follow-up, or empty text that releases the queue. Returns `accepted` (false when the engine refused the input), `pending` (a setting was recorded for the next turn), `error` (the refusal text or null), `turnActive`, and `quit` |
 | `POST /interrupt` | operate | `TryInterrupt` |
 | `POST /recall` | operate | `TryRecall`; the client states that its composer can take the message back |
-| `POST /mode` | operate | `cycle`, `toggle-plan`, or `set` with a name. Returns `mode`, `planMode`, and `pending`. During a turn the change applies on the next turn |
+| `POST /mode` | operate | `cycle` moves forward through Work, Plan, and enabled custom modes in name order. Also accepts `toggle-plan` or `set` with a name. Returns `mode`, `planMode`, and `pending`. During a turn the change applies on the next turn |
 | `POST /verbose` | operate | `{"target","enabled"}`: `SetVerbose` (Ctrl+O and Ctrl+G) |
 | `PUT /draft` | operate | `{"text"}`: `NotifyDraftChanged` for this client's draft images |
 | `POST /images` | operate | Raw image bytes: `TryAttachImage`; returns `number`, `mimeType`, `marker`, and `trustedMarker` to put in the submitted text |

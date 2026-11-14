@@ -98,8 +98,11 @@ public sealed class CustomModeSessionTests
             results.Single().Text);
     }
 
-    [Fact]
-    public async Task CycleMode_WalksPlanWorkThenCustomModesAndWraps()
+    [Theory]
+    [InlineData(false, "plan", "alpha", "beta")]
+    [InlineData(true, "beta", "alpha", "plan")]
+    public async Task CycleMode_WalksTheModeOrderAndWraps(
+        bool backward, string first, string second, string third)
     {
         using var headless = new HeadlessSession(
             new ScriptedStreamingClient(),
@@ -109,18 +112,18 @@ public sealed class CustomModeSessionTests
                 Prepare(home, workspace, "alpha", """["read"]""");
             });
         await headless.Session.StartAsync(CancellationToken.None);
-        Assert.False(headless.Session.PlanMode);
+        Assert.Equal("work", ModeName());
 
-        headless.Session.CycleMode();
-        Assert.Equal((false, "alpha"), (headless.Session.PlanMode, headless.Session.CustomMode));
-        headless.Session.CycleMode();
-        Assert.Equal("beta", headless.Session.CustomMode);
-        headless.Session.CycleMode();
-        Assert.True(headless.Session.PlanMode);
-        Assert.Null(headless.Session.CustomMode);
-        headless.Session.CycleMode();
-        Assert.False(headless.Session.PlanMode);
-        Assert.Null(headless.Session.CustomMode);
+        foreach (var expected in new[] { first, second, third, "work" })
+        {
+            var planMode = backward
+                ? headless.Session.CycleMode(backward: true)
+                : headless.Session.CycleMode();
+            Assert.Equal(expected, ModeName());
+            Assert.Equal(expected == "plan", planMode);
+        }
+
+        string ModeName() => headless.Session.CustomMode ?? (headless.Session.PlanMode ? "plan" : "work");
     }
 
     [Fact]

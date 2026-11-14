@@ -104,5 +104,5 @@ public sealed class LoadingHoldTests
     }
 
     private static Task<string?> Dispatch(SessionRenderer renderer, ConsoleKeyInfo key) =>
-        renderer.DispatchBurstAsync([key], static () => false, CancellationToken.None, checkSize: false);
+        renderer.DispatchBurstAsync([key], static _ => false, CancellationToken.None, checkSize: false);
 }

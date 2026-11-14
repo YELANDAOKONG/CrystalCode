@@ -67,7 +67,9 @@ public sealed class ComposerBuffer
         ArgumentNullException.ThrowIfNull(key);
         if (key.Key == ConsoleKey.Tab || key.KeyChar == '\t')
         {
-            return ComposerAction.CycleMode;
+            return key.Modifiers.HasFlag(ConsoleModifiers.Shift)
+                ? ComposerAction.CycleModeBackward
+                : ComposerAction.CycleMode;
         }
 
         if (IsNewline(key))

@@ -63,11 +63,11 @@ public sealed class FullScreenEditorTests
         foreach (var ch in text)
         {
             await renderer.DispatchBurstAsync([new(ch, default, false, false, false)],
-                () => false, CancellationToken.None, checkSize: false);
+                _ => false, CancellationToken.None, checkSize: false);
         }
     }
 
     private static Task<string?> Press(SessionRenderer renderer, ConsoleKey key) =>
         renderer.DispatchBurstAsync([new('\0', key, false, false, false)],
-            () => false, CancellationToken.None, checkSize: false);
+            _ => false, CancellationToken.None, checkSize: false);
 }

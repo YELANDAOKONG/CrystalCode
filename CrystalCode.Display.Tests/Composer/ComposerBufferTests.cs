@@ -9,7 +9,7 @@ namespace CrystalCode.Display.Tests.Composer;
 public sealed class ComposerBufferTests
 {
     [Fact]
-    public void Handle_TabCyclesMode()
+    public void Handle_TabCyclesModeInTheRequestedDirection()
     {
         var buffer = new ComposerBuffer();
         var tab = new ConsoleKeyInfo('\t', ConsoleKey.Tab, false, false, false);
@@ -17,7 +17,7 @@ public sealed class ComposerBufferTests
         var vtTab = new ConsoleKeyInfo('\t', default, false, false, false);
 
         Assert.Equal(ComposerAction.CycleMode, buffer.Handle(tab));
-        Assert.Equal(ComposerAction.CycleMode, buffer.Handle(shiftTab));
+        Assert.Equal(ComposerAction.CycleModeBackward, buffer.Handle(shiftTab));
         Assert.Equal(ComposerAction.CycleMode, buffer.Handle(vtTab));
     }
 

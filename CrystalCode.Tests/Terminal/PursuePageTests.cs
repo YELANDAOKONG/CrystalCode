@@ -281,5 +281,5 @@ public sealed class PursuePageTests(ITestOutputHelper output)
     private static InputKey Key(ConsoleKey key) => new(key, '\0', ConsoleModifiers.None);
     private static Task<string?> Dispatch(SessionRenderer renderer, ConsoleKey key) => renderer.DispatchBurstAsync(
         [new ConsoleKeyInfo(key == ConsoleKey.Enter ? '\r' : '\0', key, false, false, false)],
-        static () => false, CancellationToken.None, checkSize: false);
+        static _ => false, CancellationToken.None, checkSize: false);
 }

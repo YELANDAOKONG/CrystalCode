@@ -9,5 +9,6 @@ public enum ComposerAction
     Submit,
     PasteImage,
     CycleMode,
-    ShowHelp
+    ShowHelp,
+    CycleModeBackward
 }

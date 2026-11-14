@@ -982,7 +982,7 @@ public sealed class SessionRenderer : IDisposable
                 "ctrl+j       Newline",
                 "\\ enter      Newline",
                 "tab          Cycle modes, or complete / and arguments",
-                "shift+tab    Cycle modes",
+                "shift+tab    Cycle modes backward",
                 "?            Shortcuts when empty",
                 "ctrl+o       Toggle verbose tool results",
                 "ctrl+g       Toggle verbose command output",
@@ -1495,7 +1495,7 @@ public sealed class SessionRenderer : IDisposable
         Task wake,
         Func<string, CancellationToken, Task>? onSubmit,
         bool planMode,
-        Func<bool> cycleMode,
+        Func<bool, bool> cycleMode,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(wake);
@@ -1783,7 +1783,7 @@ public sealed class SessionRenderer : IDisposable
 
     public async Task<string> ReadInputAsync(
         bool planMode,
-        Func<bool> cycleMode,
+        Func<bool, bool> cycleMode,
         CancellationToken cancellationToken)
     {
         var read = await ReadPromptAsync(
@@ -1798,7 +1798,7 @@ public sealed class SessionRenderer : IDisposable
 
     public async Task<PromptRead> ReadPromptAsync(
         bool planMode,
-        Func<bool> cycleMode,
+        Func<bool, bool> cycleMode,
         Task? wake,
         bool preserveStream,
         bool ignorePause,
@@ -1840,7 +1840,7 @@ public sealed class SessionRenderer : IDisposable
 
     internal async Task<string?> DispatchBurstAsync(
         IReadOnlyList<ConsoleKeyInfo> burst,
-        Func<bool> cycleMode,
+        Func<bool, bool> cycleMode,
         CancellationToken cancellationToken,
         bool checkSize = true)
     {
@@ -2199,7 +2199,7 @@ public sealed class SessionRenderer : IDisposable
     private string? DispatchUnlocked(
         IInputEvent item,
         int pageRows,
-        Func<bool> cycleMode,
+        Func<bool, bool> cycleMode,
         bool checkSize = true)
     {
         if (checkSize && BelowUsableSize(out _, out _))
@@ -2387,7 +2387,7 @@ public sealed class SessionRenderer : IDisposable
         _modalOverlay.Clear();
     }
 
-    private string? HandleComposerKeyUnlocked(InputKey key, Func<bool> cycleMode)
+    private string? HandleComposerKeyUnlocked(InputKey key, Func<bool, bool> cycleMode)
     {
         if (_picker is not null
             && key.Key == ConsoleKey.Tab
@@ -2464,7 +2464,8 @@ public sealed class SessionRenderer : IDisposable
                 _imagePasteRequested = true;
                 break;
             case ComposerAction.CycleMode:
-                _composer.PlanMode = cycleMode();
+            case ComposerAction.CycleModeBackward:
+                _composer.PlanMode = cycleMode(action == ComposerAction.CycleModeBackward);
                 _chrome.PlanMode = _composer.PlanMode;
                 break;
             case ComposerAction.ShowHelp:
@@ -2516,7 +2517,7 @@ public sealed class SessionRenderer : IDisposable
             "ctrl+v       Paste clipboard image",
             "\\ enter      Newline",
             "tab          Cycle modes, or complete / and arguments",
-            "shift+tab    Cycle modes",
+            "shift+tab    Cycle modes backward",
             "?            Shortcuts when empty",
             "ctrl+o       Toggle verbose tool results",
             "ctrl+g       Toggle verbose command output",

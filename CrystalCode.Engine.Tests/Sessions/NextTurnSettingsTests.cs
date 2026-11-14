@@ -42,8 +42,10 @@ public sealed class NextTurnSettingsTests
         Assert.True(headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.Pending!.IsEmpty);
     }
 
-    [Fact]
-    public async Task CycleMode_MovesFromThePendingModeAndBackToTheActiveOneClearsIt()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CycleMode_MovesFromThePendingModeAndBackToTheActiveOneClearsIt(bool backward)
     {
         var client = new BlockingStreamingClient();
         using var headless = new HeadlessSession(client);
@@ -51,7 +53,7 @@ public sealed class NextTurnSettingsTests
 
         Assert.False(headless.Session.CycleMode());
         Assert.Equal(ModeCatalog.Plan, headless.Session.PendingSettings.Mode);
-        headless.Session.CycleMode();
+        headless.Session.CycleMode(backward);
 
         Assert.True(headless.Session.PendingSettings.IsEmpty);
         await EndTurnAsync(headless);

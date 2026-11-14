@@ -237,7 +237,8 @@ public sealed class InputDecoderTests
     public void Push_KittyAndCsiTabEnterBackspace()
     {
         AssertKey(new InputDecoder().Push(WindowsVt("\u001b[9u")), ConsoleKey.Tab, '\t');
-        AssertKey(new InputDecoder().Push(WindowsVt("\u001b[Z")), ConsoleKey.Tab, '\t');
+        var backTab = Assert.IsType<InputKey>(Assert.Single(new InputDecoder().Push(WindowsVt("\u001b[Z"))));
+        Assert.Equal(new InputKey(ConsoleKey.Tab, '\t', ConsoleModifiers.Shift), backTab);
         AssertKey(new InputDecoder().Push(WindowsVt("\u001b[13u")), ConsoleKey.Enter, '\r');
         AssertKey(new InputDecoder().Push(WindowsVt("\u001b[127u")), ConsoleKey.Backspace, '\b');
         AssertKey(new InputDecoder().Push(UnixCsi("\u001b[127u")), ConsoleKey.Backspace, '\b');

@@ -116,7 +116,7 @@ public sealed class ChildProjectionTests
         Assert.True(renderer.OverlayVisible);
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false);
+            static _ => false, CancellationToken.None, checkSize: false);
         Assert.False(renderer.OverlayVisible);
         var child = new ChildSessionDocument { Id = "child-one", Agent = "explore" };
         projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
@@ -195,7 +195,7 @@ public sealed class ChildProjectionTests
             new TodosChanged([new TodoItem("a", "live todo", TodoStatus.InProgress)])));
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\0', ConsoleKey.PageUp, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false);
+            static _ => false, CancellationToken.None, checkSize: false);
         var scrollField = typeof(SessionRenderer).GetField("_scrollBack", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var scroll = Assert.IsType<int>(scrollField.GetValue(renderer));
         Assert.True(scroll > 0);
@@ -271,7 +271,7 @@ public sealed class ChildProjectionTests
         renderer.SeedComposer("recent prompt");
         Assert.Equal("recent prompt", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false));
+            static _ => false, CancellationToken.None, checkSize: false));
         var child = new ChildSessionDocument { Id = "child-one", Agent = "explore" };
         projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
         projection.OnEvent(new ChildViewRequested(child.Id));
@@ -280,7 +280,7 @@ public sealed class ChildProjectionTests
         Assert.Equal("recent prompt", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\0', ConsoleKey.UpArrow, false, false, false),
                 new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false));
+            static _ => false, CancellationToken.None, checkSize: false));
     }
 
     [Fact]
@@ -294,7 +294,7 @@ public sealed class ChildProjectionTests
         renderer.OnImagePasteAsync = static _ => Task.FromResult<string?>("[Image #7]");
         await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true)],
-            static () => false, CancellationToken.None, checkSize: false);
+            static _ => false, CancellationToken.None, checkSize: false);
         var child = new ChildSessionDocument { Id = "child-one", Agent = "explore" };
         projection.OnEvent(new ChildSessionChanged(child, Guid.NewGuid()));
         projection.OnEvent(new ChildViewRequested(child.Id));
@@ -302,7 +302,7 @@ public sealed class ChildProjectionTests
 
         var submitted = await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false);
+            static _ => false, CancellationToken.None, checkSize: false);
         Assert.Contains(ImageMarkerText.Prefix + "[Image #7]", submitted, StringComparison.Ordinal);
     }
 
@@ -428,7 +428,7 @@ public sealed class ChildProjectionTests
         {
             Assert.Equal("/child parent", await renderer.DispatchBurstAsync(
                 [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
-                static () => false, CancellationToken.None, checkSize: false));
+                static _ => false, CancellationToken.None, checkSize: false));
             projection.OnEvent(new ChildViewRequested(null));
             var text = TranscriptText(renderer);
             Assert.Contains("parent question", text, StringComparison.Ordinal);
@@ -442,7 +442,7 @@ public sealed class ChildProjectionTests
         }
         Assert.Equal("keep this draft", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false));
+            static _ => false, CancellationToken.None, checkSize: false));
     }
 
     [Fact]
@@ -463,7 +463,7 @@ public sealed class ChildProjectionTests
         Assert.DoesNotContain("recalled question", TranscriptText(renderer), StringComparison.Ordinal);
         Assert.Equal("new draft", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false));
+            static _ => false, CancellationToken.None, checkSize: false));
     }
 
     [Fact]
@@ -528,7 +528,7 @@ public sealed class ChildProjectionTests
             new ConsoleKeyInfo('\u0016', ConsoleKey.V, false, false, true)
         })
         {
-            Assert.Null(await renderer.DispatchBurstAsync([key], () => toggled = true,
+            Assert.Null(await renderer.DispatchBurstAsync([key], _ => toggled = true,
                 CancellationToken.None, checkSize: false));
         }
         Assert.False(toggled);
@@ -541,12 +541,12 @@ public sealed class ChildProjectionTests
         }
         Assert.Equal("/child parent", await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\u001b', ConsoleKey.Escape, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false));
+            static _ => false, CancellationToken.None, checkSize: false));
         renderer.ChildViewActive = false;
         renderer.SetSlashCommands([]);
         Assert.Equal(draft, await renderer.DispatchBurstAsync(
             [new ConsoleKeyInfo('\r', ConsoleKey.Enter, false, false, false)],
-            static () => false, CancellationToken.None, checkSize: false));
+            static _ => false, CancellationToken.None, checkSize: false));
     }
 
     [Theory]
@@ -557,10 +557,10 @@ public sealed class ChildProjectionTests
         using var renderer = new SessionRenderer { ChildViewActive = childView };
         renderer.SeedComposer("keep this draft");
         var key = new ConsoleKeyInfo('\0', ConsoleKey.F7, false, false, false);
-        Assert.Equal("/child", await renderer.DispatchBurstAsync([key], static () => false,
+        Assert.Equal("/child", await renderer.DispatchBurstAsync([key], static _ => false,
             CancellationToken.None, checkSize: false));
         renderer.ChildSessionsEnabled = false;
-        Assert.Null(await renderer.DispatchBurstAsync([key], static () => false,
+        Assert.Null(await renderer.DispatchBurstAsync([key], static _ => false,
             CancellationToken.None, checkSize: false));
         renderer.PauseComposer();
     }
