@@ -3691,6 +3691,19 @@ public sealed class CodingSession : ITurnObserver
             : next.WithThinkingEffort(saved.ThinkingEffort);
     }
 
+    private static bool TakeSideModelSelectionFlag(ref string selection)
+    {
+        var flag = SessionOptionCatalog.SideModelSelectionFlag;
+        if (!selection.StartsWith(flag, StringComparison.OrdinalIgnoreCase)
+            || (selection.Length > flag.Length && !char.IsWhiteSpace(selection[flag.Length])))
+        {
+            return false;
+        }
+
+        selection = selection[flag.Length..].TrimStart();
+        return true;
+    }
+
     private void ChangeReviewerModel(bool extended, bool show, bool? enabled, string? selection)
     {
         if (show)
@@ -3706,6 +3719,9 @@ public sealed class CodingSession : ITurnObserver
         }
 
         var current = Reviewer(extended);
+        var saved = ReviewerOf(_persisted, extended);
+        var selectionText = selection ?? string.Empty;
+        var selectionOnly = TakeSideModelSelectionFlag(ref selectionText);
         ApprovalModelSettings next;
         if (enabled is bool on)
         {
@@ -3717,7 +3733,7 @@ public sealed class CodingSession : ITurnObserver
 
             next = on ? current.EnabledCopy() : current.DisabledCopy();
         }
-        else if (!TrySelectReviewerModel(extended, selection ?? string.Empty, out next, out var selectError))
+        else if (!TrySelectReviewerModel(extended, selectionText, !selectionOnly || current.Enabled, out next, out var selectError))
         {
             Error(selectError);
             return;
@@ -3731,7 +3747,12 @@ public sealed class CodingSession : ITurnObserver
 
         // A launch gear or slot is process-only. This command changes the
         // switch or the selection, so the saved tuning stays what config.json held.
-        var persistedNext = Retune(next, ReviewerOf(_persisted, extended));
+        var persistedNext = Retune(next, saved);
+        if (selectionOnly)
+        {
+            persistedNext = saved.Enabled ? persistedNext.EnabledCopy() : persistedNext.DisabledCopy();
+        }
+
         HarnessSettings updated;
         HarnessSettings persisted;
         try
@@ -3994,6 +4015,7 @@ public sealed class CodingSession : ITurnObserver
     private bool TrySelectReviewerModel(
         bool extended,
         string selectionText,
+        bool enabled,
         out ApprovalModelSettings settings,
         out string error)
     {
@@ -4020,7 +4042,7 @@ public sealed class CodingSession : ITurnObserver
         var sameModel = string.Equals(current.Provider, selection.Provider.Value, StringComparison.Ordinal)
             && string.Equals(current.Model, selection.Model, StringComparison.Ordinal);
         settings = new ApprovalModelSettings(
-            true,
+            enabled,
             selection.Provider.Value,
             selection.Model,
             current.ThinkingEffort,
@@ -8617,6 +8639,8 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        var selection = request.Selection ?? string.Empty;
+        var selectionOnly = TakeSideModelSelectionFlag(ref selection);
         CompactionModelSettings next;
         if (request.Enabled is bool enabled)
         {
@@ -8630,7 +8654,7 @@ public sealed class CodingSession : ITurnObserver
                 ? _settings.CompactionModel.EnabledCopy()
                 : _settings.CompactionModel.DisabledCopy();
         }
-        else if (!TrySelectCompactionModel(request.Selection ?? string.Empty, out next, out var selectError))
+        else if (!TrySelectCompactionModel(selection, !selectionOnly || _settings.CompactionModel.Enabled, out next, out var selectError))
         {
             Error(selectError);
             return;
@@ -8651,11 +8675,17 @@ public sealed class CodingSession : ITurnObserver
         var persistedNext = sameModel
             ? next.WithTuningFrom(saved)
             : next.WithThinkingEffort(saved.ThinkingEffort);
+        if (selectionOnly)
+        {
+            persistedNext = saved.Enabled ? persistedNext.EnabledCopy() : persistedNext.DisabledCopy();
+        }
+
         HarnessSettings updated;
+        HarnessSettings persisted;
         try
         {
             updated = _settings.WithCompactionModel(next);
-            _ = _persisted.WithCompactionModel(persistedNext);
+            persisted = _persisted.WithCompactionModel(persistedNext);
         }
         catch (InvalidOperationException exception)
         {
@@ -8669,7 +8699,7 @@ public sealed class CodingSession : ITurnObserver
         }
 
         _settings = updated;
-        _persisted = _persisted.WithCompactionModel(persistedNext);
+        _persisted = persisted;
         _settingsStore.Save(_persisted);
         ReplaceCompactionClient(next, client);
         RefreshSlashCommands();
@@ -8897,6 +8927,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        var selectionOnly = false;
         ResourceModelSettings next;
         switch (request.Action)
         {
@@ -8910,7 +8941,9 @@ public sealed class CodingSession : ITurnObserver
                 next = request.Enabled ? current.EnabledCopy() : current.DisabledCopy();
                 break;
             case ResourceModelArguments.Action.Model:
-                if (!TrySelectResourceModel(request.Kind, current, request.Value!, out next))
+                var selection = request.Value!;
+                selectionOnly = TakeSideModelSelectionFlag(ref selection);
+                if (!TrySelectResourceModel(request.Kind, current, selection, !selectionOnly || current.Enabled, out next))
                 {
                     return;
                 }
@@ -8948,10 +8981,30 @@ public sealed class CodingSession : ITurnObserver
                 break;
         }
 
+        var saved = _persisted.ResourceModels.For(request.Kind);
+        var sameModel = string.Equals(saved.Provider, next.Provider, StringComparison.Ordinal)
+            && string.Equals(saved.Model, next.Model, StringComparison.Ordinal);
+        var persisted = _persisted;
         HarnessSettings updated;
         try
         {
             updated = _settings.WithResourceModel(request.Kind, next);
+            if (request.Action is ResourceModelArguments.Action.Switch or ResourceModelArguments.Action.Model)
+            {
+                // A launch gear or slot stays process-only. Saved slots belong to the saved model.
+                var persistedNext = sameModel ? next.WithTuningFrom(saved) : next.WithThinkingEffort(saved.ThinkingEffort);
+                if (selectionOnly)
+                {
+                    persistedNext = saved.Enabled ? persistedNext.EnabledCopy() : persistedNext.DisabledCopy();
+                }
+
+                persisted = _persisted.WithResourceModel(request.Kind, persistedNext);
+            }
+            else if (sameModel)
+            {
+                // A launch selection of another model keeps this tuning process-only.
+                persisted = _persisted.WithResourceModel(request.Kind, saved.WithTuningFrom(next));
+            }
         }
         catch (InvalidOperationException exception)
         {
@@ -8960,22 +9013,9 @@ public sealed class CodingSession : ITurnObserver
         }
 
         _settings = updated;
-        var saved = _persisted.ResourceModels.For(request.Kind);
-        var sameModel = string.Equals(saved.Provider, next.Provider, StringComparison.Ordinal)
-            && string.Equals(saved.Model, next.Model, StringComparison.Ordinal);
-        if (request.Action is ResourceModelArguments.Action.Switch or ResourceModelArguments.Action.Model)
+        if (!ReferenceEquals(persisted, _persisted))
         {
-            // The switch or the selection is saved. A launch gear or slot stays
-            // process-only, so the saved tuning is kept while the model is the same.
-            _persisted = _persisted.WithResourceModel(
-                request.Kind,
-                sameModel ? next.WithTuningFrom(saved) : next.WithThinkingEffort(saved.ThinkingEffort));
-            _settingsStore.Save(_persisted);
-        }
-        else if (sameModel)
-        {
-            // A launch selection of another model keeps this tuning process-only.
-            _persisted = _persisted.WithResourceModel(request.Kind, saved.WithTuningFrom(next));
+            _persisted = persisted;
             _settingsStore.Save(_persisted);
         }
 
@@ -8999,6 +9039,7 @@ public sealed class CodingSession : ITurnObserver
         ResourceKind kind,
         ResourceModelSettings current,
         string selectionText,
+        bool enabled,
         out ResourceModelSettings next)
     {
         next = current;
@@ -9022,7 +9063,7 @@ public sealed class CodingSession : ITurnObserver
         var sameModel = string.Equals(current.Provider, selection.Provider.Value, StringComparison.Ordinal)
             && string.Equals(current.Model, selection.Model, StringComparison.Ordinal);
         next = new ResourceModelSettings(
-            true,
+            enabled,
             selection.Provider.Value,
             selection.Model,
             current.ThinkingEffort,
@@ -9571,9 +9612,33 @@ public sealed class CodingSession : ITurnObserver
                 break;
         }
 
+        var saved = _persisted.TopicModel;
+        var persistedNext = request.Action switch
+        {
+            TopicArguments.Action.Switch => saved.WithEnabled(next.Enabled),
+            TopicArguments.Action.Resume => saved.WithNameOnResume(next.NameOnResume),
+            TopicArguments.Action.Model => saved.WithModel(next.Provider, next.Model),
+            TopicArguments.Action.Thinking => saved.WithThinkingEffort(next.ThinkingEffort),
+            _ when saved.Provider != current.Provider || saved.Model != current.Model => saved,
+            _ => request.Slot.Slot switch
+            {
+                SideModelSlot.ServiceTier => saved.WithServiceTier(next.ServiceTier),
+                SideModelSlot.Speed => saved.WithSpeed(next.Speed),
+                _ => saved.WithContextWindow(next.ContextWindow)
+            }
+        };
+
         try
         {
-            SaveSettings(settings => settings.WithTopicModel(next));
+            var updated = _settings.WithTopicModel(next);
+            if (persistedNext != saved)
+            {
+                var persisted = _persisted.WithTopicModel(persistedNext);
+                _settingsStore.Save(persisted);
+                _persisted = persisted;
+            }
+
+            _settings = updated;
         }
         catch (InvalidOperationException exception)
         {
@@ -9670,6 +9735,7 @@ public sealed class CodingSession : ITurnObserver
 
     private bool TrySelectCompactionModel(
         string selectionText,
+        bool enabled,
         out CompactionModelSettings settings,
         out string error)
     {
@@ -9696,7 +9762,7 @@ public sealed class CodingSession : ITurnObserver
         var sameModel = string.Equals(current.Provider, selection.Provider.Value, StringComparison.Ordinal)
             && string.Equals(current.Model, selection.Model, StringComparison.Ordinal);
         settings = new CompactionModelSettings(
-            true,
+            enabled,
             selection.Provider.Value,
             selection.Model,
             current.ThinkingEffort,

@@ -23,6 +23,8 @@ internal static class SessionOptionCatalog
 
     public const string Unset = "unset";
 
+    internal const string SideModelSelectionFlag = "--select";
+
     public static IReadOnlyList<SessionOption> Build(
         HarnessSettings settings,
         string currentMode,
@@ -75,7 +77,11 @@ internal static class SessionOptionCatalog
             approval.Value,
             [.. new[] { ApprovalMode.Default, ApprovalMode.Edit, ApprovalMode.Review, ApprovalMode.Audit, ApprovalMode.Full }
                 .Select(mode => new SessionOptionValue(mode.Value, ApprovalLabel.For(mode), "/approval " + mode.Value))]));
-        options.Add(Reviewer("approval_model", "Approval model", "/approval model", settings, settings.ApprovalModel));
+        var approvalModel = settings.ApprovalModel;
+        options.Add(Switch("approval_model_enabled", "Use a separate approval model", "_crystal_approval",
+            approvalModel.Enabled, "/approval model"));
+        options.Add(ConfiguredModel("approval_model", "Approval model", "_crystal_approval",
+            "/approval model", settings, approvalModel.Provider, approvalModel.Model));
         AddTuning(
             options,
             settings,
@@ -83,15 +89,14 @@ internal static class SessionOptionCatalog
             "Approval",
             "_crystal_approval",
             "/approval",
-            settings.ApprovalModel is { Enabled: true } approvalModel
+            approvalModel.HasSelection
                 ? (approvalModel.Provider!, approvalModel.Model!, approvalModel.ThinkingEffort, approvalModel.ServiceTier, approvalModel.Speed, approvalModel.ContextWindow)
                 : null);
-        options.Add(Reviewer(
-            "extended_approval",
-            "Extended approval",
-            "/approval extended",
-            settings,
-            settings.ExtendedApproval.Reviewer));
+        var extended = settings.ExtendedApproval.Reviewer;
+        options.Add(Switch("extended_approval", "Extended approval", "_crystal_approval",
+            extended.Enabled, "/approval extended"));
+        options.Add(ConfiguredModel("extended_model", "Extended approval model", "_crystal_approval",
+            "/approval extended", settings, extended.Provider, extended.Model));
         AddTuning(
             options,
             settings,
@@ -99,7 +104,7 @@ internal static class SessionOptionCatalog
             "Extended approval",
             "_crystal_approval",
             "/approval extended",
-            settings.ExtendedApproval.Reviewer is { Enabled: true } extended
+            extended.HasSelection
                 ? (extended.Provider!, extended.Model!, extended.ThinkingEffort, extended.ServiceTier, extended.Speed, extended.ContextWindow)
                 : null);
         options.Add(new SessionOption(
@@ -109,15 +114,11 @@ internal static class SessionOptionCatalog
             promptSet,
             [.. promptSets.Select(name => new SessionOptionValue(name, DisplayCase.Token(name), "/promptset " + name))]));
         options.Add(Switch("agents", "Agents", "_crystal_agents", settings.Agents.Enabled, "/agents"));
-        options.Add(Picker(
-            "compaction_model",
-            "Compaction model",
-            "_crystal_compaction",
-            "/compact model",
-            settings,
-            settings.CompactionModel is { Enabled: true, HasSelection: true } compaction
-                ? compaction.Provider + "/" + compaction.Model
-                : Off));
+        var compactionModel = settings.CompactionModel;
+        options.Add(Switch("compaction_model_enabled", "Use a separate compaction model", "_crystal_compaction",
+            compactionModel.Enabled, "/compact model"));
+        options.Add(ConfiguredModel("compaction_model", "Compaction model", "_crystal_compaction",
+            "/compact model", settings, compactionModel.Provider, compactionModel.Model));
         AddTuning(
             options,
             settings,
@@ -125,51 +126,43 @@ internal static class SessionOptionCatalog
             "Compaction",
             "_crystal_compaction",
             "/compact",
-            settings.CompactionModel is { Enabled: true } compactionModel
+            compactionModel.HasSelection
                 ? (compactionModel.Provider!, compactionModel.Model!, compactionModel.ThinkingEffort, compactionModel.ServiceTier, compactionModel.Speed, compactionModel.ContextWindow)
                 : null);
         options.Add(Switch("topic", "Topic naming", "_crystal_topic", settings.TopicModel.Enabled, "/topic"));
         var topic = settings.TopicModel;
-        var sessionTopicValue = new SessionOptionValue(SessionModel, "Session model", "/topic model");
-        var topicPicker = Picker(
+        options.Add(Picker(
             "topic_model",
             "Topic model",
             "_crystal_topic",
             "/topic model",
             settings,
-            topic.UsesSessionModel ? SessionModel : topic.Provider + "/" + topic.Model);
-        // The first value is the session model, not off: the switch is the topic option.
-        options.Add(topicPicker with { Values = [sessionTopicValue, .. topicPicker.Values.Skip(1)] });
-        if (topic.Enabled)
+            topic.UsesSessionModel ? SessionModel : topic.Provider + "/" + topic.Model,
+            new SessionOptionValue(SessionModel, "Session model", "/topic model")));
+        if (topic.UsesSessionModel)
         {
-            if (topic.UsesSessionModel)
+            // Tier, speed, and context follow the session, so only the gear is the topic's own.
+            if (Thinking(settings.ActiveModel, topic.ThinkingEffort, "topic_thinking", "Topic thinking", "_crystal_topic", "/topic thinking") is { } gear)
             {
-                // Tier, speed, and context follow the session, so only the gear is the topic's own.
-                if (Thinking(settings.ActiveModel, topic.ThinkingEffort, "topic_thinking", "Topic thinking", "_crystal_topic", "/topic thinking") is { } gear)
-                {
-                    options.Add(gear);
-                }
+                options.Add(gear);
             }
-            else
-            {
-                AddTuning(
-                    options,
-                    settings,
-                    "topic",
-                    "Topic",
-                    "_crystal_topic",
-                    "/topic",
-                    (topic.Provider!, topic.Model!, topic.ThinkingEffort, topic.ServiceTier, topic.Speed, topic.ContextWindow));
-            }
+        }
+        else
+        {
+            AddTuning(
+                options,
+                settings,
+                "topic",
+                "Topic",
+                "_crystal_topic",
+                "/topic",
+                (topic.Provider!, topic.Model!, topic.ThinkingEffort, topic.ServiceTier, topic.Speed, topic.ContextWindow));
         }
 
         var pursue = settings.PursueModel;
-        var pursuePicker = Picker("pursue_model", "Pursue model", "_crystal_pursue", "/pursue model",
-            settings, pursue.UsesSessionModel ? SessionModel : pursue.Provider + "/" + pursue.Model);
-        options.Add(pursuePicker with
-        {
-            Values = [new SessionOptionValue(SessionModel, "Session model", "/pursue model"), .. pursuePicker.Values.Skip(1)]
-        });
+        options.Add(Picker("pursue_model", "Pursue model", "_crystal_pursue", "/pursue model",
+            settings, pursue.UsesSessionModel ? SessionModel : pursue.Provider + "/" + pursue.Model,
+            new SessionOptionValue(SessionModel, "Session model", "/pursue model")));
         if (pursue.UsesSessionModel)
         {
             if (Thinking(settings.ActiveModel, pursue.ThinkingEffort, "pursue_thinking", "Pursue thinking",
@@ -185,13 +178,10 @@ internal static class SessionOptionCatalog
         }
 
         var pursueCompaction = pursue.Compaction;
-        var compactionPicker = Picker("pursue_compaction_model", "Pursue compaction model", "_crystal_pursue",
+        options.Add(Picker("pursue_compaction_model", "Pursue compaction model", "_crystal_pursue",
             "/pursue compaction model", settings,
-            pursueCompaction.HasSelection ? pursueCompaction.Provider + "/" + pursueCompaction.Model : SessionModel);
-        options.Add(compactionPicker with
-        {
-            Values = [new SessionOptionValue(SessionModel, "Session setting", "/pursue compaction model"), .. compactionPicker.Values.Skip(1)]
-        });
+            pursueCompaction.HasSelection ? pursueCompaction.Provider + "/" + pursueCompaction.Model : SessionModel,
+            new SessionOptionValue(SessionModel, "Session setting", "/pursue compaction model")));
         AddTuning(options, settings, "pursue_compaction", "Pursue compaction", "_crystal_pursue", "/pursue compaction",
             pursueCompaction.HasSelection
                 ? (pursueCompaction.Provider!, pursueCompaction.Model!, pursueCompaction.ThinkingEffort,
@@ -203,23 +193,19 @@ internal static class SessionOptionCatalog
             var word = ResourceKinds.Word(kind);
             var title = ResourceKinds.Title(kind);
             var resource = settings.ResourceModels.For(kind);
-            // Only models that accept this input are offered.
-            options.Add(new SessionOption(
-                word + "_model",
-                title + " model",
-                "_crystal_describe",
-                resource is { Enabled: true, HasSelection: true }
-                    ? resource.Provider + "/" + resource.Model
-                    : Off,
-                [.. ResourceValues(word, settings, kind)]));
+            var command = "/describe " + word;
+            options.Add(Switch(word + "_model_enabled", title + " description", "_crystal_describe",
+                resource.Enabled, command));
+            options.Add(ConfiguredModel(word + "_model", title + " model", "_crystal_describe",
+                command + " model", settings, resource.Provider, resource.Model, kind));
             AddTuning(
                 options,
                 settings,
                 word,
                 title,
                 "_crystal_describe",
-                "/describe " + word,
-                resource.Enabled
+                command,
+                resource.HasSelection
                     ? (resource.Provider!, resource.Model!, resource.ThinkingEffort, resource.ServiceTier, resource.Speed, resource.ContextWindow)
                     : null);
         }
@@ -264,7 +250,7 @@ internal static class SessionOptionCatalog
     }
 
     /// <summary>
-    /// Thinking, tier, speed, and context of an enabled side model, each
+    /// Thinking, tier, speed, and context of a selected side model, each
     /// offered only when that model has a choice. Ids are
     /// <paramref name="prefix"/> plus <c>_thinking</c>, <c>_tier</c>,
     /// <c>_speed</c>, and <c>_context</c>. A side model's unset tier or speed
@@ -377,55 +363,41 @@ internal static class SessionOptionCatalog
                 .. tokens.Select(token => new SessionOptionValue(token, DisplayCase.Token(token), command + " " + token))
             ]);
 
-    private static SessionOption Reviewer(
+    private static SessionOption ConfiguredModel(
         string id,
         string name,
+        string category,
         string command,
         HarnessSettings settings,
-        ApprovalModelSettings reviewer) =>
-        Picker(
-            id,
-            name,
-            "_crystal_approval",
-            command,
-            settings,
-            reviewer is { Enabled: true, HasSelection: true }
-                ? reviewer.Provider + "/" + reviewer.Model
-                : Off);
-
-    private static IEnumerable<SessionOptionValue> ResourceValues(string word, HarnessSettings settings, ResourceKind kind)
+        string? provider,
+        string? model,
+        ResourceKind? kind = null)
     {
-        yield return new SessionOptionValue(Off, "Off", "/describe " + word + " off");
-        foreach (var provider in settings.Catalog.Providers.Keys)
-        {
-            foreach (var model in settings.Catalog.GetModelNames(new ProviderName(provider)))
-            {
-                if (ResourceKinds.Accepts(settings.Catalog.GetModel(new ProviderName(provider), model), kind))
-                {
-                    yield return new SessionOptionValue(
-                        provider + "/" + model,
-                        model,
-                        "/describe " + word + " model " + provider + " " + model,
-                        Group: provider);
-                }
-            }
-        }
+        var current = provider is not null && model is not null ? provider + "/" + model : Unset;
+        return Picker(id, name, category, command + " " + SideModelSelectionFlag, settings, current,
+            new SessionOptionValue(Unset, "Unset", string.Empty), kind);
     }
 
-    /// <summary>Off plus every catalog model, grouped by provider.</summary>
     private static SessionOption Picker(
         string id,
         string name,
         string category,
         string command,
         HarnessSettings settings,
-        string current)
+        string current,
+        SessionOptionValue initialValue,
+        ResourceKind? kind = null)
     {
-        var values = new List<SessionOptionValue> { new(Off, "Off", command + " " + Off) };
+        var values = new List<SessionOptionValue> { initialValue };
         foreach (var provider in settings.Catalog.Providers.Keys)
         {
-            foreach (var model in settings.Catalog.GetModelNames(new ProviderName(provider)))
+            var providerName = new ProviderName(provider);
+            foreach (var model in settings.Catalog.GetModelNames(providerName))
             {
+                if (kind is { } resourceKind && !ResourceKinds.Accepts(settings.Catalog.GetModel(providerName, model), resourceKind))
+                {
+                    continue;
+                }
 
                 values.Add(new SessionOptionValue(
                     provider + "/" + model,
@@ -433,6 +405,12 @@ internal static class SessionOptionCatalog
                     command + " " + provider + " " + model,
                     Group: provider));
             }
+        }
+
+        // A disabled model can still be stored after its catalog entry is removed.
+        if (!values.Any(value => value.Value == current))
+        {
+            values.Add(new SessionOptionValue(current, current, string.Empty));
         }
 
         return new SessionOption(id, name, category, current, values);

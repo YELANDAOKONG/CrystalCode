@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
@@ -13,7 +15,7 @@ namespace CrystalCode.Engine.Tests.Sessions;
 public sealed class SideModelOptionTests
 {
     [Fact]
-    public async Task Options_OfferSideModelTuningOnlyWhileThatModelIsOn()
+    public async Task Options_OfferTuningForTheConfiguredSideModel()
     {
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
         await headless.Session.StartAsync(CancellationToken.None);
@@ -30,7 +32,7 @@ public sealed class SideModelOptionTests
         var options = headless.Session.ListOptions();
         var compactionModel = options.Single(static option => option.Id == "compaction_model");
         Assert.Equal("scripted/rich", compactionModel.Current);
-        Assert.Contains(compactionModel.Values, static value => value.Command == "/compact model scripted plain");
+        Assert.Contains(compactionModel.Values, static value => value.Command == "/compact model --select scripted plain");
 
         var tier = options.Single(static option => option.Id == "compaction_tier");
         Assert.Equal("_crystal_compaction", tier.Category);
@@ -53,7 +55,7 @@ public sealed class SideModelOptionTests
         // plain has no thinking, tiers, or speeds, so extended approval offers none.
         Assert.Contains("extended_approval", options.Select(static option => option.Id));
         Assert.DoesNotContain(options, static option => option.Id.StartsWith("extended_", StringComparison.Ordinal)
-            && option.Id != "extended_approval");
+            && option.Id is not ("extended_approval" or "extended_model"));
 
         await headless.Session.SubmitAsync(tier.Values[1].Command, CancellationToken.None);
         Assert.Equal(
@@ -61,7 +63,49 @@ public sealed class SideModelOptionTests
             headless.Session.ListOptions().Single(static option => option.Id == "compaction_tier").Current);
 
         await headless.Session.SubmitAsync("/compact model off", CancellationToken.None);
-        Assert.DoesNotContain("compaction_tier", Ids(headless));
+        Assert.Equal("flex", headless.Session.ListOptions().Single(static option => option.Id == "compaction_tier").Current);
+    }
+
+    [Theory]
+    [InlineData("approval_model_enabled", "approval_model", "approvalModel")]
+    [InlineData("extended_approval", "extended_model", "extendedApproval")]
+    [InlineData("compaction_model_enabled", "compaction_model", "compactionModel")]
+    [InlineData("image_model_enabled", "image_model", "imageModel")]
+    [InlineData("audio_model_enabled", "audio_model", "audioModel")]
+    [InlineData("video_model_enabled", "video_model", "videoModel")]
+    [InlineData("document_model_enabled", "document_model", "documentModel")]
+    public async Task ModelSelectionAndSwitch_AreIndependent(string switchId, string modelId, string configKey)
+    {
+        var settings = Settings();
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        Assert.True(Option(switchId).IsSwitch);
+        Assert.Equal("off", Option(switchId).Current);
+        Assert.Equal("unset", Option(modelId).Current);
+        Assert.DoesNotContain(Option(modelId).Values, value => value.Value is "on" or "off");
+
+        await SetAsync(modelId, "scripted/rich");
+        Assert.Equal("scripted/rich", Option(modelId).Current);
+        Assert.Equal("off", Option(switchId).Current);
+
+        using var config = JsonDocument.Parse(File.ReadAllText(headless.Home.ConfigPath));
+        var saved = config.RootElement.GetProperty(configKey);
+        Assert.Equal("scripted", saved.GetProperty("provider").GetString());
+        Assert.Equal("rich", saved.GetProperty("model").GetString());
+        Assert.True(!saved.TryGetProperty("enabled", out var enabled) || enabled.ValueKind == JsonValueKind.False);
+
+        await SetAsync(switchId, "on");
+        Assert.Equal("on", Option(switchId).Current);
+        await SetAsync(switchId, "off");
+        Assert.Equal("off", Option(switchId).Current);
+        Assert.Equal("scripted/rich", Option(modelId).Current);
+        await SetAsync(switchId, "on");
+        Assert.Equal("on", Option(switchId).Current);
+        Assert.Empty(headless.Observer.Events.OfType<ErrorWritten>());
+
+        SessionOption Option(string id) => headless.Session.ListOptions().Single(option => option.Id == id);
+        Task SetAsync(string id, string value) => headless.RunTurnAsync(Option(id).Values.Single(entry => entry.Value == value).Command);
     }
 
     [Fact]
@@ -138,6 +182,9 @@ public sealed class SideModelOptionTests
                     thinking: true,
                     thinkingEfforts: ["low", "high"],
                     imageInput: true,
+                    audioInput: true,
+                    videoInput: true,
+                    fileInput: true,
                     contextWindows: [100_000, 200_000],
                     serviceTiers: ["flex", "priority"],
                     speeds: ["fast"]),

@@ -279,6 +279,26 @@ images consumed, and a busy send queues without interrupting the turn. The
 terminal still opens its picker for bare `/quick`. The dedicated quick-prompt
 routes above are unchanged; Fill stays in the client.
 
+## Dedicated model configuration
+
+| Switch id | Model picker id |
+| :--- | :--- |
+| `approval_model_enabled` | `approval_model` |
+| `extended_approval` | `extended_model` |
+| `compaction_model_enabled` | `compaction_model` |
+| `image_model_enabled` | `image_model` |
+| `audio_model_enabled` | `audio_model` |
+| `video_model_enabled` | `video_model` |
+| `document_model_enabled` | `document_model` |
+
+Set the model picker to a `provider/model` value and use the switch to
+enable it. A picker shows `unset` until a model has been configured. Turning
+the switch off retains the model and its tuning. Changing the model preserves
+the switch state. Enabling requires a configured model. These writes require
+admin scope. Clients that previously sent `off` to a model picker now use its
+switch, and clients that picked a model through `extended_approval` now use
+`extended_model`.
+
 ## Pursue configuration
 
 Pursue model settings are offered by `GET /options` and set with

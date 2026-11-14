@@ -3034,10 +3034,20 @@ the compaction model while it is on and the image model while it is set, with
 display labels for thinking, tier, and speed. `CodingSession` refreshes the
 chrome after every compaction model command. Server and Bridge write them as
 `compaction` and `image`; the terminal does not draw them.
-The engine option catalog adds `approval_*`, `extended_*`, and `compaction_*`
-thinking, tier, speed, and context options for an enabled side model that offers that
-choice, and a `compaction_model` picker. Each value names the same slash
-command the terminal uses.
+The engine option catalog publishes separate switches and model pickers for
+the dedicated approval and compaction models, extended approval, and the four
+resource description models. Model pickers show the configured provider and
+model with either switch state. A model with no selection shows `unset` as a
+display-only value. A stored selection missing from the eligible catalog can
+still be displayed and replaced. The catalog offers thinking, tier, speed,
+and context whenever the configured model supports them. Each option value
+names a slash command. The model pickers use the `--select` form, which
+preserves the live and saved switch states independently. The switch commands
+preserve the selection. Enabling a dedicated model still requires an eligible
+configured model. Topic naming exposes its model and supported tuning in
+both switch states. Topic commands persist the field they change and
+keep launch-only overrides of other fields in the process. Its inherited
+tier, speed, and context follow the session model.
 A disk plugin may register extra field names. Those names stay off the
 adaptive bar, the progress row, `/status`, and `/stats`. They appear on the
 custom line only when the operator lists them. The engine publishes the

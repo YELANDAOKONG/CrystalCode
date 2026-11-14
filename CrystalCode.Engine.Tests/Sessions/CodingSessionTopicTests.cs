@@ -207,6 +207,49 @@ public sealed class CodingSessionTopicTests
     }
 
     [Fact]
+    public async Task TopicOptions_KeepTheModelAndItsTuningEditableWhileOff()
+    {
+        var settings = Settings().WithTopicModel(new TopicModelSettings(false));
+        using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        var model = Option("topic_model");
+        Assert.Equal("session", model.Current);
+        Assert.DoesNotContain(model.Values, value => value.Value is "on" or "off");
+        await headless.RunTurnAsync(model.Values.Single(value => value.Value == "scripted/namer").Command);
+
+        Assert.Equal("off", Option("topic").Current);
+        Assert.Equal("scripted/namer", Option("topic_model").Current);
+        await headless.RunTurnAsync(Option("topic_speed").Values.Single(value => value.Value == "fast").Command);
+        await headless.RunTurnAsync(Option("topic").Values.Single(value => value.Value == "on").Command);
+
+        Assert.Equal("on", Option("topic").Current);
+        Assert.Equal("fast", Option("topic_speed").Current);
+        Assert.Empty(headless.Observer.Events.OfType<ErrorWritten>());
+
+        SessionOption Option(string id) => headless.Session.ListOptions().Single(option => option.Id == id);
+    }
+
+    [Fact]
+    public async Task TopicModelSelection_PreservesTheLaunchAndSavedSwitchStates()
+    {
+        var saved = Settings().WithTopicModel(new TopicModelSettings(true));
+        var launch = saved.WithTopicModel(saved.TopicModel.WithEnabled(false));
+        using var headless = new HeadlessSession(
+            new ScriptedStreamingClient(), settings: launch, persistedSettings: saved);
+        await headless.Session.StartAsync(CancellationToken.None);
+
+        await headless.RunTurnAsync("/topic model scripted namer");
+        await headless.RunTurnAsync("/topic speed fast");
+
+        Assert.Equal("off", headless.Session.ListOptions().Single(option => option.Id == "topic").Current);
+        var stored = Read(headless).TopicModel!;
+        Assert.True(stored.Enabled);
+        Assert.Equal("namer", stored.Model);
+        Assert.Equal("fast", stored.Speed);
+    }
+
+    [Fact]
     public async Task OwnModel_IsConfiguredOnItsOwnAndTheSessionModelFollowsTheSession()
     {
         var model = new ScriptedStreamingClient(Text("Done."), Text("Name it"));

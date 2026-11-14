@@ -537,9 +537,10 @@ engine refuses is `-32603`, `command_refused`. A value or option not offered
 is `-32602`. The response carries the complete list of offered options.
 `thinking`, `context`, `tier`, and `speed` appear only when the model offers a
 choice. The `*_thinking`, `*_tier`, `*_speed`, and `*_context` options of the
-approval, extended approval, compaction, and resource description models
-appear only while that model is on and offers a choice; their unset value sends no tier or speed,
-and an unset context is shown as the model's first declared budget. A select lists only values with a command plus the current value;
+approval, extended approval, compaction, topic, and resource description
+models appear whenever the configured model offers the choice. An unset tier or
+speed is omitted from requests. An unset context is shown as the model's
+first declared budget. A select lists only values with a command plus the current value;
 `tier` and `speed` can cycle back to unset but not name it, so unset is shown
 only while current. Values grouped by provider use ACP's grouped options.
 
@@ -593,19 +594,22 @@ its value: a hidden option keeps whatever the terminal or `config.json` set.
 | `tier` | `model_config` | declared tiers plus unset | `/tier` |
 | `speed` | `model_config` | declared speeds plus unset | `/speed` |
 | `approval` | `_crystal_approval` | default, edit, review, audit, full | `/approval` |
-| `approval_model` | `_crystal_approval` | off plus catalog | `/approval model` |
+| `approval_model_enabled` | `_crystal_approval` | switch | `/approval model on\|off` |
+| `approval_model` | `_crystal_approval` | catalog | `/approval model --select <provider> <model>` |
 | `approval_thinking` | `_crystal_approval` | the approval model's gears plus default and off when allowed | `/approval thinking` |
 | `approval_tier` | `_crystal_approval` | the approval model's tiers plus unset | `/approval tier` |
 | `approval_speed` | `_crystal_approval` | the approval model's speeds plus unset | `/approval speed` |
 | `approval_context` | `_crystal_approval` | the approval model's declared budgets | `/approval context` |
-| `extended_approval` | `_crystal_approval` | off plus catalog | `/approval extended` |
+| `extended_approval` | `_crystal_approval` | switch | `/approval extended on\|off` |
+| `extended_model` | `_crystal_approval` | catalog | `/approval extended --select <provider> <model>` |
 | `extended_thinking` | `_crystal_approval` | the extended reviewer's gears plus default and off when allowed | `/approval extended thinking` |
 | `extended_tier` | `_crystal_approval` | the extended reviewer's tiers plus unset | `/approval extended tier` |
 | `extended_speed` | `_crystal_approval` | the extended reviewer's speeds plus unset | `/approval extended speed` |
 | `extended_context` | `_crystal_approval` | the extended reviewer's declared budgets | `/approval extended context` |
 | `prompt_set` | `_crystal_prompt` | default plus sets | `/promptset` |
 | `agents` | `_crystal_agents` | switch | `/agents on\|off` |
-| `compaction_model` | `_crystal_compaction` | off plus catalog | `/compact model` |
+| `compaction_model_enabled` | `_crystal_compaction` | switch | `/compact model on\|off` |
+| `compaction_model` | `_crystal_compaction` | catalog | `/compact model --select <provider> <model>` |
 | `compaction_thinking` | `_crystal_compaction` | the compaction model's gears plus default and off when allowed | `/compact thinking` |
 | `compaction_tier` | `_crystal_compaction` | the compaction model's tiers plus unset | `/compact tier` |
 | `compaction_speed` | `_crystal_compaction` | the compaction model's speeds plus unset | `/compact speed` |
@@ -617,10 +621,18 @@ its value: a hidden option keeps whatever the terminal or `config.json` set.
 | `pursue_thinking`, `pursue_tier`, `pursue_speed`, `pursue_context` | `_crystal_pursue` | checker gears; tier, speed, and context only for its own model | `/pursue thinking\|tier\|speed\|context` |
 | `pursue_compaction_model` | `_crystal_pursue` | `session` (session setting, then checker model) plus catalog | `/pursue compaction model [provider model]` |
 | `pursue_compaction_thinking`, `pursue_compaction_tier`, `pursue_compaction_speed`, `pursue_compaction_context` | `_crystal_pursue` | tuning supported by the selected pursue compaction model | `/pursue compaction thinking\|tier\|speed\|context` |
-| `image_model`, `audio_model`, `video_model`, `document_model` | `_crystal_describe` | off plus catalog models that declare that input | `/describe <kind> model`, `/describe <kind> off` |
+| `image_model_enabled`, `audio_model_enabled`, `video_model_enabled`, `document_model_enabled` | `_crystal_describe` | switch | `/describe <kind> on\|off` |
+| `image_model`, `audio_model`, `video_model`, `document_model` | `_crystal_describe` | catalog models that declare that input | `/describe <kind> model --select <provider> <model>` |
 | `image_thinking`, `image_tier`, `image_speed`, `image_context`, and the same for `audio`, `video`, and `document` | `_crystal_describe` | that model's gears, tiers plus unset, speeds plus unset, and declared budgets | `/describe <kind> thinking\|tier\|speed\|context` |
 | `micro_compaction` | `_crystal_compaction` | switch | `/compact micro on\|off` |
 | `estimated_tokens` | `_crystal_display` | switch | `/tokens on\|off` |
+
+These dedicated model pickers display `unset` before selection. Choosing a
+model preserves the switch state. Turning a switch off keeps the selected
+model and its tuning available for editing. A custom option list that used
+`extended_approval` as a picker can add `extended_model` for the picker.
+For the other dedicated models, add the corresponding `*_model_enabled` id
+to expose the switch alongside the picker.
 
 Options a process flag locks (for example `--prompt-set`) are still listed
 with their value while they are offered; setting them returns the engine

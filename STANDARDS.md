@@ -47,6 +47,8 @@
   event; `SessionEventDataTests` enforces this.
 - Front ends prepare sessions through `CrystalCode.Engine.Launch` and do not
   copy override, trust, or resume logic.
+- Structured option values use the shared slash command path. A model picker
+  represents a configured selection independently of any enable switch.
 - Bridge slash input uses the shared engine command path. Refuse commands
   whose output or picker the client cannot display before model execution,
   and keep available-command descriptions consistent with client capabilities.

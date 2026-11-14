@@ -131,10 +131,10 @@ public sealed class CodingSessionResourceModelTests
         var options = headless.Session.ListOptions();
         var audio = options.Single(static option => option.Id == "audio_model");
 
-        Assert.Equal("off", audio.Current);
+        Assert.Equal("unset", audio.Current);
         Assert.Equal("_crystal_describe", audio.Category);
-        Assert.Equal(["off", "scripted/ears"], audio.Values.Select(static value => value.Value));
-        Assert.Equal("/describe audio model scripted ears", audio.Values[1].Command);
+        Assert.Equal(["unset", "scripted/ears"], audio.Values.Select(static value => value.Value));
+        Assert.Equal("/describe audio model --select scripted ears", audio.Values[1].Command);
         Assert.DoesNotContain(options, static option => option.Id == "audio_context");
 
         await headless.Session.SubmitAsync("/describe image model scripted eyes", CancellationToken.None);

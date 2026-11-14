@@ -116,7 +116,10 @@ public sealed class ServerSessionTests
         await fixture.WaitReadyAsync();
         using var events = await fixture.OpenEventsAsync(fixture.Http);
 
-        await PutAsync(fixture, fixture.Http, "/options/approval_model", new { value = "side/tuned" });
+        var model = await PutAsync(fixture, fixture.Http, "/options/approval_model", new { value = "side/tuned" });
+        Assert.Equal("off", Option(model, "approval_model_enabled").GetProperty("current").GetString());
+        Assert.Equal("side/tuned", Option(model, "approval_model").GetProperty("current").GetString());
+        await PutAsync(fixture, fixture.Http, "/options/approval_model_enabled", new { value = true });
         var speed = await PutAsync(fixture, fixture.Http, "/options/approval_speed", new { value = "fast" });
         var changed = await events.WaitForAsync(
             "chrome.changed",
@@ -130,6 +133,11 @@ public sealed class ServerSessionTests
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("audio").ValueKind);
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("video").ValueKind);
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("document").ValueKind);
+
+        var disabled = await PutAsync(fixture, fixture.Http, "/options/approval_model_enabled", new { value = false });
+        Assert.Equal("off", Option(disabled, "approval_model_enabled").GetProperty("current").GetString());
+        Assert.Equal("side/tuned", Option(disabled, "approval_model").GetProperty("current").GetString());
+        Assert.Equal("fast", Option(disabled, "approval_speed").GetProperty("current").GetString());
     }
 
     [Fact]

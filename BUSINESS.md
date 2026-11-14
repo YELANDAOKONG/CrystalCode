@@ -174,8 +174,13 @@ separate library with no terminal code. The product can:
   including approval and extended approval. What a slash command
   lists as text (saved sessions, models, options, Agents, skills, MCP
   servers, plugins, and background tasks) is also readable as structured
-  data, with no secret in it. Mode, approval, thinking, tier, speed,
-  context, and model chosen during a turn apply on the next turn. Approval, the question
+  data, with no secret in it. Structured settings offer separate switches and
+  model pickers for the dedicated approval and compaction models, extended
+  approval, and each resource description model. A stored model and its
+  supported tuning remain configurable while its switch is off, including
+  for topic naming. Mode,
+  approval, thinking, tier, speed, context, and model chosen during a turn
+  apply on the next turn. Approval, the question
   tool, trust, and session and child choices reach clients as interactions;
   approval, trust, the workspace fence, and `ToolInvocationPolicy` are
   unchanged. Clients refresh from a snapshot and reconnect by event sequence

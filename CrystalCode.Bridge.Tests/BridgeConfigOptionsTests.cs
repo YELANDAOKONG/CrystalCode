@@ -187,15 +187,21 @@ public sealed class BridgeConfigOptionsTests
             prepare: static (home, _) => File.WriteAllText(
                 Path.Combine(home.Root, "providers.json"),
                 """{"side":{"protocol":"ollama","baseUri":"http://127.0.0.1:9/","models":{"tuned":{"contextWindow":8192,"imageInput":true,"serviceTiers":["flex","priority"],"speeds":["fast"]}}}}"""),
-            configOptions: ["compaction_model", "compaction_tier", "compaction_speed"]);
+            configOptions: ["compaction_model_enabled", "compaction_model", "compaction_tier", "compaction_speed"]);
         var id = await fixture.OpenAsync();
 
         var model = await fixture.RequestAsync(
             "session/set_config_option",
             new { sessionId = id, configId = "compaction_model", value = "side/tuned" });
-        Assert.Equal(
-            ["compaction_model", "compaction_tier", "compaction_speed"],
-            Ids(model.GetProperty("result").GetProperty("configOptions")));
+        var options = model.GetProperty("result").GetProperty("configOptions");
+        Assert.Equal(["compaction_model_enabled", "compaction_model", "compaction_tier", "compaction_speed"], Ids(options));
+        Assert.Equal("off", options[0].GetProperty("currentValue").GetString());
+        Assert.Equal("side/tuned", options[1].GetProperty("currentValue").GetString());
+
+        var enabled = await fixture.RequestAsync(
+            "session/set_config_option",
+            new { sessionId = id, configId = "compaction_model_enabled", value = "on" });
+        Assert.Equal("on", enabled.GetProperty("result").GetProperty("configOptions")[0].GetProperty("currentValue").GetString());
 
         var tier = await fixture.RequestAsync(
             "session/set_config_option",
