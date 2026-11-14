@@ -299,6 +299,9 @@ These are under consideration or not decided. They are not a priority and
 are not part of parent/child Agents. Current behavior stands. Do not change
 it speculatively, and do not reserve types or configuration for it.
 
+- Model and provider favorites. Whether and how operators can mark models or
+  providers as favorites, where those choices appear, and how they are stored
+  are not defined.
 - Whether Plan may include bash. Not decided. Built-in Plan has no edit,
   write, or bash.
 - Whether built-in tool limits become operator configuration. Not decided.
