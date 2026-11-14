@@ -224,6 +224,7 @@ public static class WireWriter
         SideModel(writer, "image", chrome.Image);
         SideModel(writer, "audio", chrome.Audio);
         SideModel(writer, "video", chrome.Video);
+        SideModel(writer, "document", chrome.Document);
         writer.WriteString("topic", chrome.Topic);
         writer.WriteEndObject();
     }

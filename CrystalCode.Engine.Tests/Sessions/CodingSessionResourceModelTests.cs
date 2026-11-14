@@ -67,7 +67,7 @@ public sealed class CodingSessionResourceModelTests
     }
 
     [Fact]
-    public async Task DescribeAudioAndVideo_SaveTheSettingAndSayItIsNotConnected()
+    public async Task DescribeAudioVideoAndDocument_SaveTheSettingAndSayItIsNotConnected()
     {
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
         await headless.Session.StartAsync(CancellationToken.None);
@@ -76,12 +76,16 @@ public sealed class CodingSessionResourceModelTests
         await headless.Session.SubmitAsync("/describe video model scripted reel", CancellationToken.None);
         await headless.Session.SubmitAsync("/describe video context", CancellationToken.None);
 
+        await headless.Session.SubmitAsync("/describe document model scripted pages", CancellationToken.None);
+
         Assert.Empty(headless.Observer.Events.OfType<ErrorWritten>());
         var document = Read(headless);
         Assert.True(document.AudioModel!.Enabled);
         Assert.Equal("ears", document.AudioModel.Model);
         Assert.Equal("reel", document.VideoModel!.Model);
         Assert.Equal(200_000, document.VideoModel.ContextWindow);
+        Assert.True(document.DocumentModel!.Enabled);
+        Assert.Equal("pages", document.DocumentModel.Model);
         Assert.Contains(
             headless.Observer.Events.OfType<NoteWritten>(),
             static note => note.Text == "Audio description is not connected yet. The setting is saved for a later release.");
@@ -93,7 +97,8 @@ public sealed class CodingSessionResourceModelTests
             [
                 "Image model  Off",
                 "Audio model  On  scripted  ears  ·  Not connected yet",
-                "Video model  On  scripted  reel  ·  Context 200K  ·  Not connected yet"
+                "Video model  On  scripted  reel  ·  Context 200K  ·  Not connected yet",
+                "Document model  On  scripted  pages  ·  Not connected yet"
             ],
             notes);
     }
@@ -113,7 +118,7 @@ public sealed class CodingSessionResourceModelTests
         Assert.Equal("Set the video model before turning it on.", LastError(headless));
 
         await headless.Session.SubmitAsync("/describe sound", CancellationToken.None);
-        Assert.StartsWith("Use /describe <image|audio|video>", LastError(headless), StringComparison.Ordinal);
+        Assert.StartsWith("Use /describe <image|audio|video|document>", LastError(headless), StringComparison.Ordinal);
         Assert.False(File.Exists(headless.Home.ConfigPath) && Read(headless).AudioModel is not null);
     }
 
@@ -155,7 +160,8 @@ public sealed class CodingSessionResourceModelTests
                     serviceTiers: ["priority"],
                     speeds: ["fast"]),
                 ["ears"] = new(200_000, audioInput: true),
-                ["reel"] = new(200_000, videoInput: true, contextWindows: [100_000, 200_000])
+                ["reel"] = new(200_000, videoInput: true, contextWindows: [100_000, 200_000]),
+                ["pages"] = new(200_000, fileInput: true)
             },
             requiresApiKey: false);
         return new HarnessSettings(

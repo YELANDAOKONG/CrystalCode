@@ -110,6 +110,8 @@ internal sealed class SettingsDocument
 
     public ResourceModelDocument? VideoModel { get; set; }
 
+    public ResourceModelDocument? DocumentModel { get; set; }
+
     public TopicModelDocument? TopicModel { get; set; }
 
     public PursueModelDocument? PursueModel { get; set; }

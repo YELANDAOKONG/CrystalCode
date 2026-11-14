@@ -8852,7 +8852,7 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Shows or changes a resource description model. The image model backs
-    /// <c>describe_image</c>; audio and video are stored and checked only,
+    /// <c>describe_image</c>; audio, video, and document settings are stored and checked only,
     /// because no tool describes them yet.
     /// </summary>
     private void ChangeResourceModel(string? argument)
@@ -10248,7 +10248,7 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
-    /// <c>/describe image|audio|video</c> with switch, model, and that
+    /// <c>/describe image|audio|video|document</c> with switch, model, and that
     /// model's own thinking, tier, speed, and context completions.
     /// </summary>
     private IReadOnlyList<SlashCompletion> ResourceCompletions()
@@ -10420,7 +10420,8 @@ public sealed class CodingSession : ITurnObserver
             ResourceChromeOf(_settings.ResourceModels.Image),
             ResourceChromeOf(_settings.ResourceModels.Audio),
             ResourceChromeOf(_settings.ResourceModels.Video),
-            CurrentTopic() ?? string.Empty);
+            CurrentTopic() ?? string.Empty,
+            ResourceChromeOf(_settings.ResourceModels.Document));
 
     private static SideModelChrome? ResourceChromeOf(ResourceModelSettings resource) =>
         resource.Enabled

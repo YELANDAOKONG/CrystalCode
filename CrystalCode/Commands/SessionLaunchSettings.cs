@@ -221,6 +221,27 @@ public class SessionLaunchSettings : CommandSettings
     [CommandOption("--video-context <BUDGET>")]
     public string? VideoContext { get; init; }
 
+    [CommandOption("--document-model <on|off>")]
+    public string? DocumentModel { get; init; }
+
+    [CommandOption("--document-provider <PROVIDER>")]
+    public string? DocumentProvider { get; init; }
+
+    [CommandOption("--document-model-id <MODEL>")]
+    public string? DocumentModelId { get; init; }
+
+    [CommandOption("--document-thinking <EFFORT>")]
+    public string? DocumentThinking { get; init; }
+
+    [CommandOption("--document-tier <TOKEN>")]
+    public string? DocumentTier { get; init; }
+
+    [CommandOption("--document-speed <TOKEN>")]
+    public string? DocumentSpeed { get; init; }
+
+    [CommandOption("--document-context <BUDGET>")]
+    public string? DocumentContext { get; init; }
+
     [CommandOption("--plan")]
     public bool Plan { get; init; }
 
@@ -372,6 +393,13 @@ public class SessionLaunchSettings : CommandSettings
             VideoTier = VideoTier,
             VideoSpeed = VideoSpeed,
             VideoContext = VideoContext,
+            DocumentModel = DocumentModel,
+            DocumentProvider = DocumentProvider,
+            DocumentModelId = DocumentModelId,
+            DocumentThinking = DocumentThinking,
+            DocumentTier = DocumentTier,
+            DocumentSpeed = DocumentSpeed,
+            DocumentContext = DocumentContext,
             Plan = Plan,
             Work = Work,
             Mode = Mode,

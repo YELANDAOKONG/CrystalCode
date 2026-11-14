@@ -735,7 +735,7 @@ public static class SessionLaunchOverrides
         return next;
     }
 
-    /// <summary>The <c>--image-*</c>, <c>--audio-*</c>, or <c>--video-*</c> flags of one launch.</summary>
+    /// <summary>The <c>--image-*</c>, <c>--audio-*</c>, <c>--video-*</c>, or <c>--document-*</c> flags of one launch.</summary>
     private sealed record ResourceFlags(
         ResourceKind Kind,
         string? Switch,
@@ -754,6 +754,8 @@ public static class SessionLaunchOverrides
                 request.AudioThinking, request.AudioTier, request.AudioSpeed, request.AudioContext);
             yield return new(ResourceKind.Video, request.VideoModel, request.VideoProvider, request.VideoModelId,
                 request.VideoThinking, request.VideoTier, request.VideoSpeed, request.VideoContext);
+            yield return new(ResourceKind.Document, request.DocumentModel, request.DocumentProvider, request.DocumentModelId,
+                request.DocumentThinking, request.DocumentTier, request.DocumentSpeed, request.DocumentContext);
         }
     }
 

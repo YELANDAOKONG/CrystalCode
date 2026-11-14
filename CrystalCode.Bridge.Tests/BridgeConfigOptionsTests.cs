@@ -219,6 +219,7 @@ public sealed class BridgeConfigOptionsTests
         Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("image").ValueKind);
         Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("audio").ValueKind);
         Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("video").ValueKind);
+        Assert.Equal(JsonValueKind.Null, snapshot.GetProperty("chrome").GetProperty("document").ValueKind);
 
         var config = File.ReadAllText(Path.Combine(fixture.Home, "config.json")).Replace(" ", string.Empty);
         Assert.Contains("\"serviceTier\":\"priority\"", config, StringComparison.Ordinal);

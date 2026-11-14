@@ -1,7 +1,7 @@
 namespace CrystalCode.Engine.Configuration;
 
 /// <summary>
-/// A resource description model: the image, audio, or video model that
+/// A resource description model: the image, audio, video, or document model that
 /// describes that input for a session model that cannot read it. It has its
 /// own switch, thinking gear, service tier, speed, and context budget. While
 /// disabled, a stored provider, model, gear, and slots are kept unused. An

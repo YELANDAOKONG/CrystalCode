@@ -516,8 +516,8 @@ That update is sent again when only the pending list changes. The
 are `null` while that reviewer is off; otherwise each holds `provider`,
 `model`, and the display labels `thinking`, `serviceTier`, `speed`, and
 `context`, and `extendedApproval` adds `trigger` and `includePrimaryReview`. `compaction` is `null` while the compaction model is off, and `image`,
-`audio`, and `video` while that resource description model is off; audio and
-video are configuration only. `topic` is the session topic, or empty. Otherwise each holds that model's `provider`, `model`,
+`audio`, `video`, and `document` while the corresponding model is off. Audio,
+video, and document description are configuration only. `topic` is the session topic, or empty. Otherwise each holds that model's `provider`, `model`,
 and display labels `thinking`, `serviceTier`, `speed`, and `context` (blank
 when the model does not set its own). A command the
 engine refuses is `-32603`, `command_refused`. A value or option not offered
@@ -604,8 +604,8 @@ its value: a hidden option keeps whatever the terminal or `config.json` set.
 | `pursue_thinking`, `pursue_tier`, `pursue_speed`, `pursue_context` | `_crystal_pursue` | checker gears; tier, speed, and context only for its own model | `/pursue thinking\|tier\|speed\|context` |
 | `pursue_compaction_model` | `_crystal_pursue` | `session` (session setting, then checker model) plus catalog | `/pursue compaction model [provider model]` |
 | `pursue_compaction_thinking`, `pursue_compaction_tier`, `pursue_compaction_speed`, `pursue_compaction_context` | `_crystal_pursue` | tuning supported by the selected pursue compaction model | `/pursue compaction thinking\|tier\|speed\|context` |
-| `image_model`, `audio_model`, `video_model` | `_crystal_describe` | off plus catalog models that declare that input | `/describe <kind> model`, `/describe <kind> off` |
-| `image_thinking`, `image_tier`, `image_speed`, `image_context`, and the same for `audio` and `video` | `_crystal_describe` | that model's gears, tiers plus unset, speeds plus unset, and declared budgets | `/describe <kind> thinking\|tier\|speed\|context` |
+| `image_model`, `audio_model`, `video_model`, `document_model` | `_crystal_describe` | off plus catalog models that declare that input | `/describe <kind> model`, `/describe <kind> off` |
+| `image_thinking`, `image_tier`, `image_speed`, `image_context`, and the same for `audio`, `video`, and `document` | `_crystal_describe` | that model's gears, tiers plus unset, speeds plus unset, and declared budgets | `/describe <kind> thinking\|tier\|speed\|context` |
 | `micro_compaction` | `_crystal_compaction` | switch | `/compact micro on\|off` |
 | `estimated_tokens` | `_crystal_display` | switch | `/tokens on\|off` |
 

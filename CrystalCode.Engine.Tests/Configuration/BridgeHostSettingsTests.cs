@@ -56,6 +56,7 @@ public sealed class BridgeHostSettingsTests
                 "image_model", "image_thinking", "image_tier", "image_speed", "image_context",
                 "audio_model", "audio_thinking", "audio_tier", "audio_speed", "audio_context",
                 "video_model", "video_thinking", "video_tier", "video_speed", "video_context",
+                "document_model", "document_thinking", "document_tier", "document_speed", "document_context",
                 "micro_compaction", "estimated_tokens"],
             BridgeHostSettings.AvailableOptions);
         Assert.All(BridgeHostSettings.DefaultOptions, id => Assert.Contains(id, BridgeHostSettings.AvailableOptions));

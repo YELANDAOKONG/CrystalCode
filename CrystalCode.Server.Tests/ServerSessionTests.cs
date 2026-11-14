@@ -128,6 +128,7 @@ public sealed class ServerSessionTests
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("image").ValueKind);
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("audio").ValueKind);
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("video").ValueKind);
+        Assert.Equal(JsonValueKind.Null, chrome.GetProperty("document").ValueKind);
     }
 
     [Fact]

@@ -4,7 +4,7 @@ namespace CrystalCode.Engine.Sessions.Arguments;
 
 /// <summary>
 /// Parses <c>/describe</c> arguments. A bare command lists the resource
-/// description models. <c>image</c>, <c>audio</c>, or <c>video</c> shows that
+/// description models. <c>image</c>, <c>audio</c>, <c>video</c>, or <c>document</c> shows that
 /// model; then <c>on</c>, <c>off</c>, <c>model</c>, <c>thinking</c>,
 /// <c>tier</c>, <c>speed</c>, or <c>context</c> changes it.
 /// </summary>
@@ -28,7 +28,7 @@ internal static class ResourceModelArguments
         ApprovalSlotArguments.Request Slot = default);
 
     public const string Usage =
-        "Use /describe <image|audio|video> [on|off|model <provider model>|thinking|tier|speed|context [value]].";
+        "Use /describe <image|audio|video|document> [on|off|model <provider model>|thinking|tier|speed|context [value]].";
 
     public static bool TryParse(string? argument, out Request request, out string error)
     {

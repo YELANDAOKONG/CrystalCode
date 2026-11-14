@@ -538,7 +538,7 @@ public sealed record HarnessSettings
 
     public ResourceTrimSettings ResourceTrim { get; }
 
-    /// <summary>The image, audio, and video resource description models.</summary>
+    /// <summary>The image, audio, video, and document resource description models.</summary>
     public ResourceModels ResourceModels { get; }
 
     /// <summary>Session topic naming: its switch, model, and tuning.</summary>

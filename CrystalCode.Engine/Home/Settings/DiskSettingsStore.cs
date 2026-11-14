@@ -112,7 +112,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             resourceModels: new ResourceModels(
                 ReadResourceModel(document.ImageModel, "imageModel"),
                 ReadResourceModel(document.AudioModel, "audioModel"),
-                ReadResourceModel(document.VideoModel, "videoModel")),
+                ReadResourceModel(document.VideoModel, "videoModel"),
+                ReadResourceModel(document.DocumentModel, "documentModel")),
             topicModel: ReadTopicModel(document.TopicModel),
             pursueModel: ReadPursueModel(document.PursueModel),
             pursueLimits: PursueLimitsMapper.Read(document.PursueLimits),
@@ -224,6 +225,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             ImageModel = WriteResourceModel(settings.ResourceModels.Image),
             AudioModel = WriteResourceModel(settings.ResourceModels.Audio),
             VideoModel = WriteResourceModel(settings.ResourceModels.Video),
+            DocumentModel = WriteResourceModel(settings.ResourceModels.Document),
             TopicModel = WriteTopicModel(settings.TopicModel),
             PursueModel = WritePursueModel(settings.PursueModel),
             PursueLimits = PursueLimitsMapper.Write(settings.PursueLimits),

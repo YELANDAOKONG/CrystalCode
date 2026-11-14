@@ -72,6 +72,11 @@ public sealed record BridgeHostSettings
             "video_tier",
             "video_speed",
             "video_context",
+            "document_model",
+            "document_thinking",
+            "document_tier",
+            "document_speed",
+            "document_context",
             "micro_compaction",
             "estimated_tokens"
         ]);

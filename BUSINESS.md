@@ -461,9 +461,9 @@ separate library with no terminal code. The product can:
   picker, Server session lists, Bridge `session/list` and `session_info_update`
   titles, chrome, and the optional `topic` custom status-line field. Approval,
   trust, and `ToolInvocationPolicy` stay as they are;
-- configure an audio and a video description model (`audioModel`,
-  `videoModel`) alongside the image model. That configuration is reserved
-  for the deferred audio and video path and changes no behavior today;
+- configure an audio, a video, and a document description model (`audioModel`,
+  `videoModel`, `documentModel`) alongside the image model. That configuration is reserved
+  for the deferred audio, video, and document paths and changes no behavior today;
 - color pasted image markers and edit them as single composer units while
   identically spelled user text remains ordinary text; discard unsent images
   whose attached markers were deleted;
@@ -1077,14 +1077,14 @@ implement only Crystal's
 interfaces stay unchanged. Native
 multimodal entries are exposed only while the selected model and provider
 support image input. Declared `audioInput` or `videoInput` does not expose
-them. The resource description models are the image, audio, and video
-models (`imageModel`, `audioModel`, `videoModel`). Each has its own switch,
+them. The resource description models are the image, audio, video, and document
+models (`imageModel`, `audioModel`, `videoModel`, `documentModel`). Each has its own switch,
 provider and model, thinking gear, service tier, speed, and context budget,
 like the approval and compaction models, and `/describe` configures them.
 `describe_image` is available on Plan and Work while `imageModel` is on, and
-returns a text description from that model. Audio and video description are
+returns a text description from that model. Audio, video, and document description are
 not connected: their models can be configured and are validated against
-`audioInput` and `videoInput`, but no tool sends audio or video to them. Each side model, and each child Agent with
+`audioInput`, `videoInput`, and `fileInput` respectively, but no tool uses them. Each side model, and each child Agent with
 its own model, is configured on its own: an unset tier or speed is not sent,
 an unset context is that model's first declared budget, and the session
 `/tier`, `/speed`, and `/context` choice never applies to it. Optional `compactionModel` writes

@@ -1,7 +1,7 @@
 namespace CrystalCode.Engine.Home.Settings;
 
 /// <summary>
-/// The <c>imageModel</c>, <c>audioModel</c>, or <c>videoModel</c> object in <c>config.json</c>.
+/// The <c>imageModel</c>, <c>audioModel</c>, <c>videoModel</c>, or <c>documentModel</c> object in <c>config.json</c>.
 /// </summary>
 internal sealed class ResourceModelDocument
 {

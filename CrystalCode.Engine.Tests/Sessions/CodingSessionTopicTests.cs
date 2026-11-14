@@ -429,7 +429,7 @@ public sealed class CodingSessionTopicTests
         Assert.Equal(["100k", "200k"], topic.ArgumentOptions.Single(static item => item.Name == "context").ArgumentOptions.Select(static item => item.Name));
 
         var describe = Command(headless, "describe");
-        Assert.Equal(["image", "audio", "video"], describe.ArgumentOptions.Select(static item => item.Name));
+        Assert.Equal(["image", "audio", "video", "document"], describe.ArgumentOptions.Select(static item => item.Name));
         Assert.Equal(
             ["on", "off", "model"],
             describe.ArgumentOptions[0].ArgumentOptions.Select(static item => item.Name));

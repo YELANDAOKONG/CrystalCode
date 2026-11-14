@@ -149,6 +149,20 @@ public sealed record SessionLaunchOptions
 
     public string? VideoContext { get; init; }
 
+    public string? DocumentModel { get; init; }
+
+    public string? DocumentProvider { get; init; }
+
+    public string? DocumentModelId { get; init; }
+
+    public string? DocumentThinking { get; init; }
+
+    public string? DocumentTier { get; init; }
+
+    public string? DocumentSpeed { get; init; }
+
+    public string? DocumentContext { get; init; }
+
     public bool Plan { get; init; }
 
     public bool Work { get; init; }

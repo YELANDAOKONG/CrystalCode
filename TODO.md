@@ -78,6 +78,10 @@ The constraints are in `BUSINESS.md` under Deferred product work.
   there is no `describe_audio` or `describe_video` tool, no audio or video
   attachment, and no description prompt. Connecting them depends on the
   audio and video input item above.
+- Document description. `documentModel` can be configured through
+  `config.json`, `/describe`, launch flags, and session options. It is
+  validated against `fileInput`. Document attachment, the description tool,
+  and its prompt remain deferred.
 - Editing provider definitions in the TUI.
 - Workspace-level configuration at `<workspace>/.crystal/config.json`. Field
   scope, precedence, write policy, and trust semantics are not defined. A
