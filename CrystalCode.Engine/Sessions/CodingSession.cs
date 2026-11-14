@@ -10677,15 +10677,20 @@ public sealed class CodingSession : ITurnObserver
     {
         ArgumentNullException.ThrowIfNull(input);
         cancellationToken.ThrowIfCancellationRequested();
-        if (!OverriddenByPlugin(input.Trim())
-            && SessionCommand.TryParse(input.Trim(), out var quick)
+        var trimmed = input.Trim();
+        if (TryRunOverridingCommand(trimmed))
+        {
+            return;
+        }
+
+        if (SessionCommand.TryParse(trimmed, out var quick)
             && quick.Verb == SessionVerb.Quick)
         {
             await HandleQuickAsync(quick.Argument, queueOnly: true, cancellationToken);
             return;
         }
 
-        if (SessionCommand.TryParse(input.Trim(), out var command) && command.Verb == SessionVerb.Child)
+        if (SessionCommand.TryParse(trimmed, out var command) && command.Verb == SessionVerb.Child)
         {
             CloseRecallWindow();
             await HandleCommandAsync(command, cancellationToken);
