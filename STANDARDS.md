@@ -54,6 +54,9 @@
   background notes and retries still require notices. The client displays its
   submitted slash command; live updates do not duplicate expanded quick text,
   while replay preserves the actual expanded user message.
+- Bridge queue retract finishes the original prompt by submission origin.
+  A returned image marker regains one-time attachment authorization.
+  Server queue retract uses the same request-id ledger as input.
 
 ## C# conventions
 

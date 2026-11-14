@@ -98,18 +98,21 @@ public sealed class BridgeCommandTests
         wire.Apply(new ChromeChanged(Chrome("/workspace", "")));
         wire.Apply(new ChromeChanged(Chrome("/workspace", "")));
         fallback = string.Empty;
-        wire.EngineSessionId = "engine-2";
+        wire.Apply(new ChromeChanged(Chrome("/workspace", "", "engine-2")));
         wire.Apply(new ConversationCleared());
 
         var info = SessionInfo(sent);
-        Assert.Equal(3, info.Count);
+        Assert.Equal(4, info.Count);
         Assert.Equal("Keep this", info[0].GetProperty("title").GetString());
         Assert.Equal("ChromeChanged", Event(info[0]));
         Assert.Equal("remember me", info[1].GetProperty("title").GetString());
         Assert.Equal("ChromeChanged", Event(info[1]));
         Assert.Equal(string.Empty, info[2].GetProperty("title").GetString());
-        Assert.Equal("ConversationCleared", Event(info[2]));
+        Assert.Equal("ChromeChanged", Event(info[2]));
         Assert.Equal("engine-2", info[2].GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString());
+        Assert.Equal(string.Empty, info[3].GetProperty("title").GetString());
+        Assert.Equal("ConversationCleared", Event(info[3]));
+        Assert.Equal("engine-2", info[3].GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString());
     }
 
     [Fact]
@@ -122,11 +125,11 @@ public sealed class BridgeCommandTests
         wire.Apply(new ChromeChanged(Chrome("/further", "")));
 
         var info = SessionInfo(sent);
-        Assert.Equal(3, info.Count);
+        Assert.Equal(2, info.Count);
         Assert.False(info[0].TryGetProperty("title", out _));
         Assert.Equal("ChromeChanged", Event(info[0]));
         Assert.Equal("remember me", info[1].GetProperty("title").GetString());
-        Assert.False(info[2].TryGetProperty("title", out _));
+        Assert.Equal("/further", info[1].GetProperty("_meta").GetProperty("crystal").GetProperty("workspace").GetString());
     }
 
     [Fact]
@@ -406,10 +409,10 @@ public sealed class BridgeCommandTests
         {
             using var document = JsonDocument.Parse(JsonText.Write(write));
             sent.Add(document.RootElement.Clone());
-        }, static () => "/workspace", false, untitled: untitled);
+        }, static () => "/workspace", false, untitled: _ => untitled());
 
-    private static SessionChrome Chrome(string workspace, string topic) =>
-        new("model", workspace, false, ApprovalMode.Default, "", "", Topic: topic);
+    private static SessionChrome Chrome(string workspace, string topic, string sessionId = "engine-1") =>
+        new("model", workspace, false, ApprovalMode.Default, "", "", SessionId: sessionId, Topic: topic);
 
     private static List<JsonElement> SessionInfo(IReadOnlyList<JsonElement> sent) =>
         sent.Where(static update => update.GetProperty("sessionUpdate").GetString() == "session_info_update").ToList();

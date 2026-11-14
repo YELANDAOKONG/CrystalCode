@@ -100,12 +100,11 @@ internal static class Extensions
                 await SubmitAsync(bridge, string.Empty, origin);
                 return JsonRpcReply.Empty;
             case "_crystal/queue/retract":
-                // Ctrl+C semantics: a direct call, not queued behind the running turn.
-                var retracted = session.TryRetractQueued(out var queuedText);
+                var queuedText = await bridge.RetractQueuedAsync();
                 return Result(writer =>
                 {
-                    writer.WriteBoolean("retracted", retracted);
-                    CrystalWire.Optional(writer, "text", retracted ? queuedText : null);
+                    writer.WriteBoolean("retracted", queuedText is not null);
+                    CrystalWire.Optional(writer, "text", queuedText);
                 });
             case "_crystal/mode/cycle":
                 await runner.InvokeAsync(static value => value.CycleMode(), origin);

@@ -261,10 +261,11 @@ Client capabilities Bridge reads:
   save, with `title` (the topic, or the first user message without one) and
   `updatedAt`. Topic naming finishes after the prompt response, so a new or
   changed topic sends another `session_info_update` with event `ChromeChanged`.
-  Clearing the topic sends that update too. An empty topic uses the first
-  user message, or an empty string when the conversation has none.
-  `ConversationCleared` includes that title with the new engine id. A
-  workspace move omits `title` when the topic string did not change.
+  A change of engine session id also sends a title, even if the topic stays
+  the same. The title, engine id, and workspace describe the same session.
+  An empty topic uses the first user message, or an empty string when the
+  conversation has none. `ConversationCleared` includes that title with
+  the new engine id. Moving only the workspace omits `title`.
 
 ### Additional roots
 
@@ -379,9 +380,11 @@ link as its mention text or its image, not as the original block.
   response resolves when the turn that consumed it ends. `QueueChanged` is
   reported in `_meta`. `_crystal/queue/release` is the empty-Enter release.
   `_crystal/queue/retract` takes the newest queued follow-up back and returns
-  it. It does not interrupt, and a deferred `/clear`, `/resume`, or `/fork`
-  stays queued. A `session/prompt` that already queued still waits for the
-  follow-up turn. Retract does not answer that request.
+  it. The active turn continues and any deferred `/clear`, `/resume`, or
+  `/fork` stays queued. The corresponding `session/prompt` answers
+  `cancelled`. Resubmit the returned text in a prompt text block to send
+  its images with it. The returned markers are authorized for one submission
+  in the current conversation.
 - A cancelled turn always answers `cancelled`, never an error.
 
 ## Session updates
@@ -409,7 +412,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `SlashCommandsChanged` | `available_commands_update` |
 | `SessionOptionsChanged` | `config_option_update` with the complete list, and `current_mode_update` when the mode changed |
 | `SessionStarted`, `PreferencesChanged` | nothing of their own: the engine publishes `SessionOptionsChanged` for every value they change |
-| `ChromeChanged` | `SessionOptionsChanged` for values it changes, and `session_info_update` when the topic string changes, including to empty |
+| `ChromeChanged` | `SessionOptionsChanged` for values it changes, and `session_info_update` when the topic, engine session id, or workspace changes |
 | `SessionStarted`, `ChromeChanged` | also `_crystal/chrome` with the full plain chrome |
 | `PreferencesChanged` | also `_crystal/preferences` |
 | `StatusFieldsChanged` | `_crystal/statusFields` |
@@ -712,7 +715,7 @@ JSON with the server's field names. An unknown `_crystal/*` method is
 | `_crystal/session/fork` | Fork a saved session (see Sessions) |
 | `_crystal/recall` | `TryRecall`; returns `recalled`, and the draft follows as `_crystal/recalled` |
 | `_crystal/queue/release` | empty input release |
-| `_crystal/queue/retract` | `TryRetractQueued`; returns `retracted` and `text` (the raw newest follow-up, trusted image markers kept, or null). Does not interrupt. A deferred `/clear`, `/resume`, or `/fork` stays queued |
+| `_crystal/queue/retract` | `TryRetractQueued`. Returns `retracted` and `text` (the raw newest follow-up, with reusable image markers, or null). Completes its original `session/prompt` with `cancelled` while the active turn continues. Deferred commands stay queued |
 | `_crystal/mode/cycle`, `_crystal/mode/togglePlan` | `CycleMode` moves forward through Work, Plan, and enabled custom modes in name order. Both methods return the active `mode` and `planMode`, and `pending`. During a turn the change applies on the next turn |
 | `_crystal/verbose {target, enabled}` | `SetVerbose` |
 | `_crystal/draft {text}` | `NotifyDraftChanged` |

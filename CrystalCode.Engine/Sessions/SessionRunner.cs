@@ -11,8 +11,9 @@ namespace CrystalCode.Engine.Sessions;
 /// still running goes to <see cref="CodingSession.EnqueueAsync"/>, the same
 /// way the terminal pump forwards keys. Operations such as a mode change or
 /// a draft update also run here, in order with the input, even while a call
-/// is running. Interrupt, recall, and side-question cancellation stay direct
-/// calls on the session because Ctrl+C makes them from any thread.
+/// is running. Remote front ends also retract queued text here so the
+/// operation stays ordered with submissions and conversation changes.
+/// Interrupt, recall, and side-question cancellation stay direct calls.
 /// </summary>
 public sealed class SessionRunner
 {
@@ -314,7 +315,10 @@ public sealed class SessionRunner
                 quit = await runner.PumpAsync(session.SubmitAsync(text, cancellationToken), cancellationToken);
             }
 
-            Completion.TrySetResult(new SessionInputResult(session.TurnActive, quit, capture.Error, capture.Pending));
+            Completion.TrySetResult(new SessionInputResult(session.TurnActive, quit, capture.Error, capture.Pending)
+            {
+                Queued = capture.Queued
+            });
             return quit;
         }
 

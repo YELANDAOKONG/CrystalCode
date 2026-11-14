@@ -878,9 +878,13 @@ adjust the display run immediately. `/quit` cancels compaction and exits.
 With an empty composer and a queued follow-up, Ctrl+C takes the newest queued
 message out of the queue and puts it in the composer (`TryRetractQueued`); it
 does not interrupt. Server `POST /queue/retract` and Bridge
-`_crystal/queue/retract` make that same call and return the text to the
-caller. A deferred `/clear`, `/resume`, or `/fork` stays in the queue. With
-nothing queued, Ctrl+C interrupts.
+`_crystal/queue/retract` make that same call through `SessionRunner` and
+return the text to the caller. Server deduplicates retries by
+`clientRequestId`. The engine retains the origin of each queued item so
+Bridge can finish the matching ACP request with `cancelled`. Bridge
+restores one-time attachment authorization for the image markers in the
+returned draft. A deferred `/clear`, `/resume`, or `/fork` stays in the
+queue. With nothing queued, Ctrl+C interrupts.
 At an idle prompt, Ctrl+C clears the composer.
 Two Ctrl+C presses on an empty composer exit.
 
@@ -928,7 +932,8 @@ extended-approval, and compaction-model forms.
 - `SessionRunner` reports each input's result in `SessionInputResult`:
   `Error` is the first error the engine wrote for that input (not errors
   from a turn or side question it started), `Accepted` is true without one,
-  and `Pending` is true when it recorded a next-turn setting.
+  `Pending` is true when it recorded a next-turn setting, and `Queued` is
+  true when it added a follow-up, even if the item has since been removed.
 - A stricter approval level does not restrict the running turn either. The
   operator interrupts to get that effect at once.
 
@@ -1953,8 +1958,8 @@ saved and `ChromeChanged` carries `SessionChrome.Topic`. The session file
 stores `topic` and `topicSource` (`model` or `operator`); `SessionSummary`
 and `SavedSessionInfo` carry `Topic`, and `SessionSummary.Title` falls back
 to the first user message. Bridge sends `session_info_update` with the new
-title when a `ChromeChanged` topic differs from the last one it reported,
-including when the topic becomes empty. The title is the topic, or the first
+title when `ChromeChanged` changes the engine session id or topic. It uses
+the id and workspace from the same event. The title is the topic, or the first
 user message when the topic is empty, or an empty string when the conversation
 has neither. `ConversationCleared` carries that title with the new engine id.
 `/topic` is `SessionVerb.Topic`; Server treats a bare `/topic` as operate and
@@ -2631,15 +2636,18 @@ image attach, an export) in order with the inputs, also while a call is
 running. Text that was queued while a command ran, with no turn to collect, is
 started once that command returns. Cancellation interrupts and collects the
 turn without starting queued work. `crystal run` and `crystal server` use it;
-the terminal keeps its own pump. `TryInterrupt`, `TryRecall`,
-`TryRetractQueued`, and `TryCancelSideQuestion` stay direct calls because
-Ctrl+C makes them from any thread.
+the terminal keeps its own pump. Interrupt, recall, and side-question
+cancellation stay direct calls. The terminal also calls
+`TryRetractQueued` directly from Ctrl+C. Server and Bridge dispatch it
+through `InvokeAsync`.
 
 `SessionEvent.Origin` names the client whose request produced an event. A
 front end serving several clients wraps each request in
 `CodingSession.BeginOrigin`; `SessionRunner` does this per input. The turn
 task and child invocations start under no origin, so their events have none,
-and the engine never sets an origin for a single-operator front end. Draft
+and the engine never sets an origin for a single-operator front end. A
+queued follow-up retains its origin for retracting it. The turn that
+consumes the queue starts with no submission origin. Draft
 images from a paste or `TryAttachImage`, pending `/attach` images, and the
 recall window belong to the origin that made them: `NotifyDraftChanged`
 discards only that origin's draft images, a submission takes only that

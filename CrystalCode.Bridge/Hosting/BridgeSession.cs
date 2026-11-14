@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 using Crystal.Tools;
 
@@ -30,7 +32,7 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     private readonly object _gate = new();
     private readonly List<Action> _held = [];
     private readonly SessionState _state = new();
-    private readonly Dictionary<int, int> _waiting = [];
+    private readonly Dictionary<string, Waiting> _waiting = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
     private readonly HashSet<int> _attached = [];
     private readonly CancellationTokenSource _stop = new();
@@ -40,7 +42,6 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     private ReportCapture? _capture;
     private bool _ready;
     private int _cancelThrough;
-    private int _queued;
     private string? _questionCall;
     private bool _dropReplay;
 
@@ -111,9 +112,6 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     /// <summary>The live workspace root, from the launch and then from chrome.</summary>
     public string? Workspace => Volatile.Read(ref _workspace);
 
-    /// <summary>Follow-ups waiting for the next turn, from the last queue report.</summary>
-    public int Queued => Volatile.Read(ref _queued);
-
     public void Bind(CodingSession session, string workspace, CrystalHome home)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -127,7 +125,6 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             Id = session.SessionId;
         }
 
-        Updates.EngineSessionId = session.SessionId;
         Volatile.Write(ref _workspace, workspace);
     }
 
@@ -140,7 +137,7 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     {
         if (Session is { } session && _store is { } store && store.TrySummarize(session.SessionId, out var summary))
         {
-            Updates.Saved(summary.Title);
+            Updates.Saved(summary.Id, summary.Title);
         }
     }
 
@@ -150,9 +147,9 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     /// list placeholder, which would replace a cleared title with
     /// "compacted conversation".
     /// </summary>
-    private string Untitled()
+    private string Untitled(string sessionId)
     {
-        if (Session is not { } session || _store is not { } store || !store.TryLoad(session.SessionId, out var document))
+        if (sessionId.Length == 0 || _store is not { } store || !store.TryLoad(sessionId, out var document))
         {
             return string.Empty;
         }
@@ -203,6 +200,35 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             return _attached.Remove(number);
         }
     }
+
+    /// <summary>Returns the newest draft and ends the request that originally queued it.</summary>
+    public Task<string?> RetractQueuedAsync() => Runner!.InvokeAsync(session =>
+    {
+        if (!session.TryRetractQueued(out var text, out var origin))
+        {
+            return null;
+        }
+
+        lock (_gate)
+        {
+            foreach (Match marker in ImageMarkerText.Matches(text))
+            {
+                if (int.TryParse(marker.Groups[1].ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+                    && session.TryGetImage(number, out _))
+                {
+                    // Returning an unsent image to the draft lets the next prompt name it once again.
+                    _attached.Add(number);
+                }
+            }
+
+            if (origin is not null && _waiting.Remove(origin, out var waiting))
+            {
+                waiting.Retract();
+            }
+        }
+
+        return text;
+    });
 
     /// <summary>Captures the structured values of the next report of <paramref name="kind"/>.</summary>
     public ReportCapture CaptureReport(string kind)
@@ -258,14 +284,15 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     /// A prompt waits for turn <paramref name="number"/> until the returned
     /// scope is disposed, so a cancel that arrives first still reaches it.
     /// </summary>
-    public IDisposable Await(int number)
+    public Waiting Await(string origin, int number)
     {
+        var waiting = new Waiting(this, origin, number);
         lock (_gate)
         {
-            _waiting[number] = _waiting.GetValueOrDefault(number) + 1;
+            _waiting.Add(origin, waiting);
         }
 
-        return new Waiting(this, number);
+        return waiting;
     }
 
     /// <summary>
@@ -282,11 +309,18 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     /// waiting prompt was promised, as soon as it starts. A queued follow-up
     /// would otherwise start once the interrupted turn is collected.
     /// </summary>
-    public void Cancel()
+    public void Cancel() => Cancel(null);
+
+    private void Cancel(Waiting? prompt)
     {
         lock (_gate)
         {
-            var promised = _waiting.Count == 0 ? 0 : _waiting.Keys.Max();
+            if (prompt?.Retracted.IsCompleted == true)
+            {
+                return;
+            }
+
+            var promised = _waiting.Count == 0 ? 0 : _waiting.Values.Max(static waiting => waiting.Number);
             _cancelThrough = Math.Max(_cancelThrough, Math.Max(promised, Turns.Started));
         }
 
@@ -370,9 +404,6 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
                 }
 
                 break;
-            case QueueChanged queue:
-                Volatile.Write(ref _queued, queue.Items.Count);
-                break;
             case ConversationCleared or HistoryReplayed:
                 // /clear and /resume discard queued follow-ups.
                 Turns.OnCleared();
@@ -380,11 +411,6 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
                 {
                     // The engine drops its images with the conversation.
                     _attached.Clear();
-                }
-
-                if (Session is { } current)
-                {
-                    Updates.EngineSessionId = current.SessionId;
                 }
 
                 break;
@@ -642,32 +668,26 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         notify();
     }
 
-    private void Release(int number)
+    private void Release(string origin)
     {
         lock (_gate)
         {
-            var count = _waiting.GetValueOrDefault(number) - 1;
-            if (count <= 0)
-            {
-                _waiting.Remove(number);
-            }
-            else
-            {
-                _waiting[number] = count;
-            }
+            _waiting.Remove(origin);
         }
     }
 
-    private sealed class Waiting(BridgeSession session, int number) : IDisposable
+    public sealed class Waiting(BridgeSession session, string origin, int number) : IDisposable
     {
-        private int _disposed;
+        private readonly TaskCompletionSource _retracted = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-            {
-                session.Release(number);
-            }
-        }
+        public int Number { get; } = number;
+
+        public Task Retracted => _retracted.Task;
+
+        public void Retract() => _retracted.TrySetResult();
+
+        public void Cancel() => session.Cancel(this);
+
+        public void Dispose() => session.Release(origin);
     }
 }

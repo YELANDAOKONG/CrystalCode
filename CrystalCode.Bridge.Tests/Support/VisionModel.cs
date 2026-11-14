@@ -17,6 +17,8 @@ internal sealed class VisionModel : IStreamingMultimodalChatClient
 
     public List<MultimodalChatRequest> Requests { get; } = [];
 
+    public Func<CancellationToken, Task>? BeforeFirstResponse { get; init; }
+
     public Task<MultimodalChatResponse> CompleteAsync(MultimodalChatRequest request, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
@@ -24,9 +26,16 @@ internal sealed class VisionModel : IStreamingMultimodalChatClient
         MultimodalChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        bool first;
         lock (Requests)
         {
+            first = Requests.Count == 0;
             Requests.Add(request);
+        }
+
+        if (first && BeforeFirstResponse is { } beforeFirstResponse)
+        {
+            await beforeFirstResponse(cancellationToken);
         }
 
         await Task.Yield();

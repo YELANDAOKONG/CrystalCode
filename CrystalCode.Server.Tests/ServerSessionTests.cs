@@ -518,12 +518,15 @@ public sealed class ServerSessionTests
             "queue.changed",
             value => value.GetProperty("data").GetProperty("items").GetArrayLength() == 2);
 
-        var retracted = await fixture.PostAsync(fixture.Http, "/queue/retract", new { });
+        var retractRequest = new { clientRequestId = "retract-newest" };
+        var retracted = await fixture.PostAsync(fixture.Http, "/queue/retract", retractRequest);
+        var retry = await fixture.PostAsync(fixture.Http, "/queue/retract", retractRequest);
         var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
 
         Assert.Equal("see [Image #3]", queued.GetProperty("data").GetProperty("items")[1].GetString());
         Assert.True(retracted.GetProperty("retracted").GetBoolean());
         Assert.Equal(marked, retracted.GetProperty("text").GetString());
+        Assert.Equal(retracted.GetRawText(), retry.GetRawText());
         Assert.Equal("first", Assert.Single(snapshot.GetProperty("queue").EnumerateArray()).GetString());
         Assert.True(snapshot.GetProperty("turnActive").GetBoolean());
         Assert.DoesNotContain("turn.finished", events.Types());

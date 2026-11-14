@@ -7,7 +7,7 @@ namespace CrystalCode.Engine.Sessions;
 public sealed class MessageQueue
 {
     private readonly object _gate = new();
-    private readonly List<(string Text, bool Interrupts)> _items = [];
+    private readonly List<(string Text, bool Interrupts, string? Origin)> _items = [];
     private TaskCompletionSource? _inputAvailable;
 
     internal Task WhenNotEmpty()
@@ -50,7 +50,10 @@ public sealed class MessageQueue
         }
     }
 
-    public void Enqueue(string text, bool interruptAfterTools = true, bool preserveText = false)
+    public void Enqueue(string text, bool interruptAfterTools = true, bool preserveText = false) =>
+        Enqueue(text, null, interruptAfterTools, preserveText);
+
+    internal void Enqueue(string text, string? origin, bool interruptAfterTools = true, bool preserveText = false)
     {
         ArgumentNullException.ThrowIfNull(text);
         var trimmed = text.Trim();
@@ -61,7 +64,7 @@ public sealed class MessageQueue
 
         lock (_gate)
         {
-            _items.Add((preserveText ? text : trimmed, interruptAfterTools));
+            _items.Add((preserveText ? text : trimmed, interruptAfterTools, origin));
             _inputAvailable?.SetResult();
             _inputAvailable = null;
         }
@@ -86,7 +89,9 @@ public sealed class MessageQueue
     /// Removes the most recently queued message and returns it, or null when
     /// the queue is empty.
     /// </summary>
-    public string? RemoveLast()
+    public string? RemoveLast() => RetractLast()?.Text;
+
+    internal (string Text, string? Origin)? RetractLast()
     {
         lock (_gate)
         {
@@ -95,9 +100,9 @@ public sealed class MessageQueue
                 return null;
             }
 
-            var text = _items[^1].Text;
+            var item = _items[^1];
             _items.RemoveAt(_items.Count - 1);
-            return text;
+            return (item.Text, item.Origin);
         }
     }
 

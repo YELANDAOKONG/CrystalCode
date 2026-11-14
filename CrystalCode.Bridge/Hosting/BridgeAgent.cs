@@ -464,9 +464,6 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             bridge.Updates.Warn(warning);
         }
 
-        // A $/cancel_request for this prompt cancels its turn like session/cancel;
-        // the request still waits for the turn to end before it answers.
-        using var cancel = cancellationToken.Register(bridge.Cancel);
         var command = SessionCommand.TryParse(text.Trim(), out var parsed);
         var pluginCommand = command && bridge.IsPluginCommand(text);
         if (command && !pluginCommand && CommandUnavailable(bridge, parsed) is { } unavailable)
@@ -482,7 +479,10 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         var before = bridge.Turns.Started;
         var busy = bridge.Session!.TurnActive;
         var target = before + 1;
-        using var waiting = turnInput ? bridge.Await(target) : null;
+        using var waiting = turnInput ? bridge.Await(origin, target) : null;
+        // A $/cancel_request for this prompt cancels its turn like session/cancel.
+        // A retracted prompt already has an outcome, even before its reply is sent.
+        using var cancel = cancellationToken.Register(waiting is null ? bridge.Cancel : waiting.Cancel);
 
         SessionInputResult result;
         try
@@ -496,7 +496,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
 
         var refused = bridge.TakeError(origin);
         var startedTurn = bridge.Turns.Started > before;
-        var queued = turnInput && result.Accepted && bridge.Queued > 0;
+        var queued = turnInput && result.Accepted && result.Queued;
         if (command && refused is not null && !startedTurn)
         {
             throw JsonRpcException.Refused("command_refused", refused);
@@ -509,8 +509,18 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             return Reply(TurnWire.EndTurn, null);
         }
 
-        using var waitingTurn = bridge.Await(target);
-        var outcome = await bridge.Turns.Turn(target, clears);
+        using var commandWaiting = waiting is null ? bridge.Await(origin, target) : null;
+        var turn = bridge.Turns.Turn(target, clears);
+        if (waiting is not null)
+        {
+            await Task.WhenAny(turn, waiting.Retracted);
+            if (waiting.Retracted.IsCompleted)
+            {
+                return Reply(TurnWire.Cancelled, null);
+            }
+        }
+
+        var outcome = await turn;
         cancellationToken.ThrowIfCancellationRequested();
         var cancelled = bridge.CancelRequested(target);
         if (outcome.Abandoned)

@@ -1894,8 +1894,7 @@ public sealed class CodingSession : ITurnObserver
         ClearTurnNotice();
         if (_turnActive || queueOnly)
         {
-            _queue.Enqueue(text, interruptAfterTools: false, preserveText: true);
-            ShowQueue();
+            QueueFollowUp(text, quickPrompt: true);
             return;
         }
 
@@ -2030,7 +2029,8 @@ public sealed class CodingSession : ITurnObserver
     /// several clients, until the returned scope is disposed. Draft images
     /// attached in the scope belong to that origin, and only that origin's
     /// draft edits can discard them. A turn, a child invocation, and a queued
-    /// follow-up never inherit the origin; their events have none.
+    /// follow-up turn never inherit the origin; their events have none.
+    /// A queued item retains the origin for retracting its submitted text.
     /// </summary>
     public IDisposable BeginOrigin(string? origin)
     {
@@ -2150,10 +2150,17 @@ public sealed class CodingSession : ITurnObserver
     /// caller can return it to its composer. Returns false when nothing is
     /// queued. Ctrl+C tries this before it interrupts.
     /// </summary>
-    public bool TryRetractQueued(out string text)
+    public bool TryRetractQueued(out string text) => TryRetractQueued(out text, out _);
+
+    /// <summary>
+    /// Takes the newest queued follow-up and returns its submission origin
+    /// so a front end can end its pending request.
+    /// </summary>
+    public bool TryRetractQueued(out string text, out string? origin)
     {
-        var removed = _queue.RemoveLast();
-        text = removed ?? string.Empty;
+        var removed = _queue.RetractLast();
+        text = removed?.Text ?? string.Empty;
+        origin = removed?.Origin;
         if (removed is null)
         {
             return false;
@@ -10681,7 +10688,13 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        _queue.Enqueue(AttachPendingImages(trimmed));
+        QueueFollowUp(AttachPendingImages(trimmed));
+    }
+
+    private void QueueFollowUp(string text, bool quickPrompt = false)
+    {
+        _queue.Enqueue(text, CurrentOrigin, interruptAfterTools: !quickPrompt, preserveText: quickPrompt);
+        _inputCapture.Value?.MarkQueued();
         ShowQueue();
     }
 

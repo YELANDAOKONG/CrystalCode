@@ -117,13 +117,18 @@ public static class ServerEndpoints
             Direct(context, server, ServerScope.Operate, session => Json.Ok(writer =>
                 writer.WriteBoolean("recalled", session.TryRecall()))));
 
-        app.MapPost("/queue/retract", (HttpContext context) =>
-            Direct(context, server, ServerScope.Operate, session => Json.Ok(writer =>
+        app.MapPost("/queue/retract", (HttpContext context, CancellationToken token) =>
+            Mutate(context, server, ServerScope.Operate, token, async (_, runner, client) =>
             {
-                var retracted = session.TryRetractQueued(out var text);
-                writer.WriteBoolean("retracted", retracted);
-                WireWriter.Optional(writer, "text", retracted ? text : null);
-            })));
+                var text = await runner.InvokeAsync(
+                    static session => session.TryRetractQueued(out var value) ? value : null,
+                    client);
+                return RequestOutcome.Ok(Json.Write(writer =>
+                {
+                    writer.WriteBoolean("retracted", text is not null);
+                    WireWriter.Optional(writer, "text", text);
+                }));
+            }));
 
         app.MapPost("/mode", (HttpContext context, CancellationToken token) =>
             Mutate(context, server, ServerScope.Operate, token, async (body, runner, client) =>

@@ -2,6 +2,8 @@ using System.Text.Json;
 
 using Crystal;
 using Crystal.Chat;
+using Crystal.Multimodal;
+using Crystal.Multimodal.Chat;
 
 using CrystalCode.Bridge.Tests.Support;
 using CrystalCode.Engine.Home;
@@ -436,7 +438,7 @@ public sealed class BridgeExtensionTests
             new { sessionId = id, prompt = new[] { new { type = "text", text = "first" } } });
         await fixture.WaitForAsync(message => Method(message) == "_crystal/queue"
             && message.GetProperty("params").GetProperty("items").GetArrayLength() == 1);
-        var (_, newest) = await fixture.StartRequestAsync(
+        var (newestId, newest) = await fixture.StartRequestAsync(
             "session/prompt",
             new { sessionId = id, prompt = new[] { new { type = "text", text = "second" } } });
         var queue = await fixture.WaitForAsync(message => Method(message) == "_crystal/queue"
@@ -449,6 +451,9 @@ public sealed class BridgeExtensionTests
         Assert.True(retracted.GetProperty("retracted").GetBoolean());
         Assert.Equal("second", retracted.GetProperty("text").GetString());
         Assert.Equal("first", Assert.Single(snapshot.GetProperty("queue").EnumerateArray()).GetString());
+        await fixture.NotifyAsync("$/cancel_request", new { requestId = newestId });
+        Assert.Equal("cancelled", (await newest.WaitAsync(BridgeFixture.Wait)).GetProperty("result").GetProperty("stopReason").GetString());
+        Assert.False(older.IsCompleted);
         Assert.False(turn.IsCompleted);
 
         var again = (await fixture.RequestAsync("_crystal/queue/retract", new { sessionId = id })).GetProperty("result");
@@ -460,11 +465,67 @@ public sealed class BridgeExtensionTests
         Assert.Empty(empty.GetProperty("queue").EnumerateArray());
         Assert.False(done.GetProperty("retracted").GetBoolean());
         Assert.Equal(JsonValueKind.Null, done.GetProperty("text").ValueKind);
-        Assert.False(older.IsCompleted);
-        Assert.False(newest.IsCompleted);
+        Assert.Equal("cancelled", (await older.WaitAsync(BridgeFixture.Wait)).GetProperty("result").GetProperty("stopReason").GetString());
 
         await fixture.NotifyAsync("session/cancel", new { sessionId = id });
         await turn.WaitAsync(BridgeFixture.Wait);
+    }
+
+    [Fact]
+    public async Task QueueRetract_ResubmittingTheTextRestoresItsImageOnce()
+    {
+        const string Png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        var held = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var vision = new VisionModel
+        {
+            BeforeFirstResponse = token =>
+            {
+                held.SetResult();
+                return release.Task.WaitAsync(token);
+            }
+        };
+        await using var fixture = await BridgeFixture.StartAsync(
+            new ScriptedModel(false) { Vision = vision },
+            options: static launch => launch with { Provider = "seen", Model = "eyes" },
+            prepare: static (home, _) => File.WriteAllText(
+                Path.Combine(home.Root, "providers.json"),
+                """{"seen":{"protocol":"ollama","baseUri":"http://127.0.0.1:9/","models":{"eyes":{"contextWindow":8192,"imageInput":true}}}}"""));
+        var id = await fixture.OpenAsync(Notified);
+        var (_, running) = await fixture.StartRequestAsync("session/prompt", TextPrompt("first"));
+        await held.Task.WaitAsync(BridgeFixture.Wait);
+        var (_, queued) = await fixture.StartRequestAsync("session/prompt", new
+        {
+            sessionId = id,
+            prompt = new object[]
+            {
+                new { type = "text", text = "see image" },
+                new { type = "image", data = Png, mimeType = "image/png" }
+            }
+        });
+        await fixture.WaitForAsync(static message => Method(message) == "_crystal/queue"
+            && message.GetProperty("params").GetProperty("items").GetArrayLength() == 1);
+
+        var retracted = await fixture.RequestAsync("_crystal/queue/retract", new { sessionId = id });
+        var text = retracted.GetProperty("result").GetProperty("text").GetString()!;
+        Assert.Contains('\u2063', text);
+        Assert.Equal("cancelled", (await queued.WaitAsync(BridgeFixture.Wait)).GetProperty("result").GetProperty("stopReason").GetString());
+        release.SetResult();
+        Assert.Equal("end_turn", (await running.WaitAsync(BridgeFixture.Wait)).GetProperty("result").GetProperty("stopReason").GetString());
+        var resent = await fixture.RequestAsync("session/prompt", TextPrompt(text));
+        Assert.Equal("end_turn", resent.GetProperty("result").GetProperty("stopReason").GetString());
+        var repeated = await fixture.RequestAsync("session/prompt", TextPrompt(text));
+        Assert.Equal("end_turn", repeated.GetProperty("result").GetProperty("stopReason").GetString());
+
+        Assert.Equal(3, vision.Requests.Count);
+        Assert.Single(LastUser(vision.Requests[1]).Contents, static part => part is ImageContent);
+        Assert.DoesNotContain(LastUser(vision.Requests[2]).Contents, static part => part is ImageContent);
+
+        object TextPrompt(string message) => new { sessionId = id, prompt = new[] { new { type = "text", text = message } } };
+
+        static MultimodalMessage LastUser(MultimodalChatRequest request) =>
+            request.Items.OfType<MultimodalMessage>()
+                .Last(static message => message.Role == MultimodalChatRole.User);
     }
 
     [Fact]

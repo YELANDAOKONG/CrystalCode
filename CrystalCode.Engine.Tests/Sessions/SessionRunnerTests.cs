@@ -61,12 +61,22 @@ public sealed class SessionRunnerTests
         using var stop = new CancellationTokenSource();
         var running = runner.RunAsync(stop.Token);
 
-        await runner.SubmitAsync("long task").WaitAsync(Wait);
+        var prompt = await runner.SubmitAsync("long task").WaitAsync(Wait);
         await client.Started.WaitAsync(Wait);
-        var queued = await runner.SubmitAsync("follow up").WaitAsync(Wait);
+        var queued = await runner.SubmitAsync("follow up", "follow-up-request").WaitAsync(Wait);
 
+        Assert.False(prompt.Queued);
         Assert.True(queued.TurnActive);
+        Assert.True(queued.Queued);
         Assert.Equal("follow up", Assert.Single(headless.Observer.Events.OfType<QueueChanged>().Last().Items));
+        await runner.InvokeAsync(static session =>
+        {
+            Assert.True(session.TryRetractQueued(out var text, out var origin));
+            Assert.Equal("follow up", text);
+            Assert.Equal("follow-up-request", origin);
+            return true;
+        }).WaitAsync(Wait);
+        Assert.Empty(headless.Observer.Events.OfType<QueueChanged>().Last().Items);
         await stop.CancelAsync();
         Assert.False(await running.WaitAsync(Wait));
         Assert.Null(headless.Session.TurnTask);
@@ -130,6 +140,7 @@ public sealed class SessionRunnerTests
         await opened.Task.WaitAsync(Wait);
         var queued = await runner.SubmitAsync("/quick send review").WaitAsync(Wait);
         Assert.True(queued.Accepted);
+        Assert.True(queued.Queued);
         Assert.False(queued.TurnActive);
         Assert.Equal("  Review the diff\n", Assert.Single(headless.Observer.Events.OfType<QueueChanged>().Last().Items));
         release.SetResult(null);

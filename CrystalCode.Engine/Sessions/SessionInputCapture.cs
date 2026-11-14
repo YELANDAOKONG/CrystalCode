@@ -2,7 +2,8 @@ namespace CrystalCode.Engine.Sessions;
 
 /// <summary>
 /// What one submitted input did, collected on its own async flow: the first
-/// error the engine wrote for it and whether it recorded a next-turn setting.
+/// error the engine wrote for it, whether it recorded a next-turn setting,
+/// and whether it queued a follow-up.
 /// A turn or side question it starts does not report here.
 /// </summary>
 internal sealed class SessionInputCapture
@@ -10,6 +11,7 @@ internal sealed class SessionInputCapture
     private readonly object _gate = new();
     private string? _error;
     private bool _pending;
+    private bool _queued;
 
     public string? Error
     {
@@ -30,6 +32,25 @@ internal sealed class SessionInputCapture
             {
                 return _pending;
             }
+        }
+    }
+
+    public bool Queued
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _queued;
+            }
+        }
+    }
+
+    public void MarkQueued()
+    {
+        lock (_gate)
+        {
+            _queued = true;
         }
     }
 

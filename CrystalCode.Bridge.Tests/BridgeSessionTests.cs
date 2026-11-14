@@ -315,8 +315,37 @@ public sealed class BridgeSessionTests
             && update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ChromeChanged"
             && update.TryGetProperty("title", out var title)
             && title.GetString() == string.Empty
-            && update.GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString() == id);
+            && update.GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString()
+                == cleared.GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString());
         Assert.True(emptiedAt >= 0 && emptiedAt < clearedAt);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Fork_ReportsTheFallbackTitleWithTheNewId(bool namedParent)
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var id = await fixture.OpenAsync(new { _meta = new { crystal = new { extensions = new { } } } });
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "first message" } } });
+        if (namedParent)
+        {
+            await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "/title Named parent" } } });
+        }
+
+        var before = fixture.Updates().Count;
+        var fork = await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "/fork" } } });
+        var snapshot = await fixture.RequestAsync("_crystal/snapshot", new { sessionId = id });
+
+        Assert.Equal("end_turn", fork.GetProperty("result").GetProperty("stopReason").GetString());
+        var forkId = snapshot.GetProperty("result").GetProperty("chrome").GetProperty("sessionId").GetString();
+        Assert.NotEqual(id, forkId);
+        var updates = fixture.Updates().Skip(before).ToArray();
+        var info = Assert.Single(updates, static update => update.GetProperty("sessionUpdate").GetString() == "session_info_update");
+        Assert.Equal("first message", info.GetProperty("title").GetString());
+        Assert.Equal(forkId, info.GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString());
+        Assert.True(IndexOf(updates, static update => update.GetProperty("sessionUpdate").GetString() == "session_info_update")
+            < IndexOf(updates, static update => update.GetProperty("sessionUpdate").GetString() == "user_message_chunk"));
     }
 
     [Fact]

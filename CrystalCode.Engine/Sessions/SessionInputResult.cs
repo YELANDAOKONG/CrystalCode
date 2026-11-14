@@ -15,4 +15,7 @@ public sealed record SessionInputResult(bool TurnActive, bool Quit, string? Erro
 {
     /// <summary>The engine handled the input without refusing it.</summary>
     public bool Accepted => Error is null;
+
+    /// <summary>This input added a follow-up to the queue.</summary>
+    public bool Queued { get; init; }
 }

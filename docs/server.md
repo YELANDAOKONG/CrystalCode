@@ -240,7 +240,7 @@ and the `server.state` event.
 | `POST /input` | operate | `{"text"}`: a prompt, a slash command, a follow-up, or empty text that releases the queue. Returns `accepted` (false when the engine refused the input), `pending` (a setting was recorded for the next turn), `error` (the refusal text or null), `turnActive`, and `quit` |
 | `POST /interrupt` | operate | `TryInterrupt` |
 | `POST /recall` | operate | `TryRecall`; the client states that its composer can take the message back |
-| `POST /queue/retract` | operate | `TryRetractQueued`. Returns `retracted` and `text`: the raw newest follow-up, trusted image markers kept, or null when that queue is empty. Does not interrupt. A deferred `/clear`, `/resume`, or `/fork` stays queued. `queue.changed` follows for every client |
+| `POST /queue/retract` | operate | `TryRetractQueued`. Accepts an optional `clientRequestId` for safe retries. Returns `retracted` and `text` (the raw newest follow-up, trusted image markers kept, or null when the queue is empty). The active turn continues and deferred commands stay queued. `queue.changed` follows for every client |
 | `POST /mode` | operate | `cycle` moves forward through Work, Plan, and enabled custom modes in name order. Also accepts `toggle-plan` or `set` with a name. Returns `mode`, `planMode`, and `pending`. During a turn the change applies on the next turn |
 | `POST /verbose` | operate | `{"target","enabled"}`: `SetVerbose` (Ctrl+O and Ctrl+G) |
 | `PUT /draft` | operate | `{"text"}`: `NotifyDraftChanged` for this client's draft images |
