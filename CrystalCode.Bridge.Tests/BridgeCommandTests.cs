@@ -314,8 +314,11 @@ public sealed class BridgeCommandTests
         if (command is "/quick" or "/quick list")
         {
             Assert.Equal("end_turn", response.GetProperty("result").GetProperty("stopReason").GetString());
-            var report = Assert.Single(fixture.Updates(), update => Event(update) == "DocumentWritten");
-            Assert.Contains("No quick prompts found.", report.GetProperty("content").GetProperty("text").GetString(), StringComparison.Ordinal);
+            var report = await fixture.WaitForUpdateAsync(
+                "agent_message_chunk",
+                update => Event(update) == "DocumentWritten");
+            var update = report.GetProperty("params").GetProperty("update");
+            Assert.Contains("No quick prompts found.", update.GetProperty("content").GetProperty("text").GetString(), StringComparison.Ordinal);
         }
         else
         {
