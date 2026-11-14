@@ -66,7 +66,8 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             SendCrystal,
             offeredOptions,
             extensions: features.Extensions,
-            forms: features.Forms);
+            forms: features.Forms,
+            untitled: Untitled);
         Children = new ChildUpdates(
             SendTo,
             child => new SessionUpdates(
@@ -142,6 +143,33 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
             Updates.Saved(summary.Title);
         }
     }
+
+    /// <summary>
+    /// Title for an empty topic: the saved first user message, or empty when
+    /// the conversation has none. A session with no user text is not given the
+    /// list placeholder, which would replace a cleared title with
+    /// "compacted conversation".
+    /// </summary>
+    private string Untitled()
+    {
+        if (Session is not { } session || _store is not { } store || !store.TryLoad(session.SessionId, out var document))
+        {
+            return string.Empty;
+        }
+
+        var text = FirstUser(document.Archive) ?? FirstUser(document.Items);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private static string? FirstUser(IReadOnlyList<SessionItemDocument>? items) =>
+        items?.FirstOrDefault(static item =>
+            string.Equals(item.Kind, "message", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Role, "user", StringComparison.OrdinalIgnoreCase))?.Text;
 
     /// <summary>The F6 catalog in Home, for <c>_crystal/quickPrompts/*</c>.</summary>
     public QuickPromptStore QuickPrompts => _quickPrompts!;

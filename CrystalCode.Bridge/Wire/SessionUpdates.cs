@@ -113,6 +113,7 @@ internal sealed class SessionUpdates
     private SessionPendingSettings _pending = SessionPendingSettings.None;
     private string? _mode;
     private int _contextWindow;
+    private readonly Func<string> _untitled;
     private string? _reportedWorkspace;
     private string _reportedTopic = string.Empty;
     private string _engineSessionId = string.Empty;
@@ -125,6 +126,12 @@ internal sealed class SessionUpdates
     /// <param name="compaction">The client advertised <c>session.compaction</c>.</param>
     /// <param name="crystal">Sends one <c>_crystal/*</c> notification: method, then its fields after <c>sessionId</c>.</param>
     /// <param name="offered">The option ids the client sees, or null for every option.</param>
+    /// <param name="untitled">
+    /// Title used when the topic is empty: the saved first user message, or
+    /// an empty string when the conversation has none. A client that only
+    /// reads <c>session_info_update.title</c> keeps the previous title when
+    /// the field is omitted.
+    /// </param>
     public SessionUpdates(
         Action<Action<Utf8JsonWriter>> send,
         Func<string?> workspace,
@@ -135,7 +142,8 @@ internal sealed class SessionUpdates
         Action<string, Action<Utf8JsonWriter>>? crystal = null,
         IReadOnlySet<string>? offered = null,
         bool extensions = false,
-        bool forms = false)
+        bool forms = false,
+        Func<string>? untitled = null)
     {
         ArgumentNullException.ThrowIfNull(send);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -149,6 +157,7 @@ internal sealed class SessionUpdates
         _offered = offered;
         _crystal = crystal ?? (static (_, _) => { });
         _image = image ?? (static _ => null);
+        _untitled = untitled ?? (static () => string.Empty);
     }
 
     /// <summary>The last option catalog the engine published, whether or not the client sees it.</summary>
@@ -217,21 +226,14 @@ internal sealed class SessionUpdates
                     // /cd and /space move the session; ACP's cwd is otherwise fixed.
                     _reportedWorkspace = changed.Chrome.WorkspaceRoot;
                     RememberContextWindow(changed.Chrome.ContextWindow);
+                    ReportTopic(changed.Chrome.Topic);
                     SessionInfo("ChromeChanged", title: null);
                     Chrome(changed.Chrome);
                     break;
-                case ChromeChanged changed when changed.Chrome.Topic.Length > 0 && changed.Chrome.Topic != _reportedTopic:
-                    // Topic naming finishes after the prompt response, so the title follows here.
-                    _reportedTopic = changed.Chrome.Topic;
-                    RememberContextWindow(changed.Chrome.ContextWindow);
-                    SessionInfo("ChromeChanged", changed.Chrome.Topic);
-                    Chrome(changed.Chrome);
-                    PendingChanged(changed.Chrome.Pending);
-                    break;
                 case ChromeChanged changed:
                     // The option catalog carries the values; this keeps the plain chrome.
-                    _reportedTopic = changed.Chrome.Topic;
                     RememberContextWindow(changed.Chrome.ContextWindow);
+                    ReportTopic(changed.Chrome.Topic);
                     Chrome(changed.Chrome);
                     PendingChanged(changed.Chrome.Pending);
                     break;
@@ -370,7 +372,10 @@ internal sealed class SessionUpdates
                     break;
                 case ConversationCleared:
                     _announced.Clear();
-                    SessionInfo("ConversationCleared", title: null);
+                    // The new engine id and the title go out together. An omitted
+                    // title leaves the previous one on a client that merges session info.
+                    _reportedTopic = string.Empty;
+                    SessionInfo("ConversationCleared", _untitled());
                     break;
                 case HelpRequested help:
                     Report("help", "HelpRequested", HelpText.Format(help.PluginCommands),
@@ -602,6 +607,21 @@ internal sealed class SessionUpdates
         {
             _contextWindow = window;
         }
+    }
+
+    /// <summary>
+    /// Sends the ACP title when the topic changes, including to empty.
+    /// Omitting <c>title</c> would leave the previous one in place.
+    /// </summary>
+    private void ReportTopic(string topic)
+    {
+        if (topic == _reportedTopic)
+        {
+            return;
+        }
+
+        _reportedTopic = topic;
+        SessionInfo("ChromeChanged", topic.Length > 0 ? topic : _untitled());
     }
 
     private void SessionInfo(string eventName, string? title)

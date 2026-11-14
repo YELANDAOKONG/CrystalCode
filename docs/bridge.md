@@ -231,7 +231,8 @@ Client capabilities Bridge reads:
 - `sessionId` is the engine session id. `/clear` inside a session makes a
   new engine id. Bridge keeps the ACP id stable for the connection and
   reports the new engine id in `session_info_update._meta.crystal.engineSessionId`.
-  `session/load` accepts either id.
+  That update includes `title`, which is empty when the new conversation has
+  no user message. `session/load` accepts either id.
 - `cwd` must be absolute. A `cwd` on load or resume that differs from the
   saved workspace is a deviation from ACP (see Deviations): the session
   enters `cwd`, as `/resume <path>` does after trust.
@@ -260,6 +261,10 @@ Client capabilities Bridge reads:
   save, with `title` (the topic, or the first user message without one) and
   `updatedAt`. Topic naming finishes after the prompt response, so a new or
   changed topic sends another `session_info_update` with event `ChromeChanged`.
+  Clearing the topic sends that update too. An empty topic uses the first
+  user message, or an empty string when the conversation has none.
+  `ConversationCleared` includes that title with the new engine id. A
+  workspace move omits `title` when the topic string did not change.
 
 ### Additional roots
 
@@ -399,7 +404,8 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `TodosChanged` | `plan` |
 | `SlashCommandsChanged` | `available_commands_update` |
 | `SessionOptionsChanged` | `config_option_update` with the complete list, and `current_mode_update` when the mode changed |
-| `SessionStarted`, `ChromeChanged`, `PreferencesChanged` | nothing of their own: the engine publishes `SessionOptionsChanged` for every value they change |
+| `SessionStarted`, `PreferencesChanged` | nothing of their own: the engine publishes `SessionOptionsChanged` for every value they change |
+| `ChromeChanged` | `SessionOptionsChanged` for values it changes, and `session_info_update` when the topic string changes, including to empty |
 | `SessionStarted`, `ChromeChanged` | also `_crystal/chrome` with the full plain chrome |
 | `PreferencesChanged` | also `_crystal/preferences` |
 | `StatusFieldsChanged` | `_crystal/statusFields` |
@@ -411,7 +417,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed`, `DocumentWritten` | agent message text from the engine's plain-text report renderers (`HelpText`, `StatusText`, `StatsText`, `ToolListText`, `TodoList.Format`, `TranscriptDocument.ToText`), `_meta.crystal.report` with the kind (`help`, `status`, `stats`, `tools`, `todos`, `document`), and `_crystal/report` with the kind and the structured values |
 | `SideQuestionSnapshot` | `_crystal/side` notification; never conversation content |
 | `HistoryReplayed` | the replay sequence above |
-| `ConversationCleared` | `session_info_update` with the new `_meta.crystal.engineSessionId` |
+| `ConversationCleared` | `session_info_update` with `title` and the new `_meta.crystal.engineSessionId` |
 | `TurnFinished` (in the prompt response) | `session_info_update` with the saved `title` and `updatedAt` |
 | `PromptHistoryLoaded`, `ImageHistoryInvalidated` | `_crystal/promptHistory`, `_crystal/imagesInvalidated` |
 | `ChildSessionChanged`, `ChildEventReceived` | see Children |
@@ -649,7 +655,8 @@ own completions and execution; these restrictions apply only to built-in handler
 Bridge identifies plugin entries from the engine catalog's built-in-first,
 plugin-last ordering. `/quit` closes the session as
 `session/close` does. `/cd <path>` and `/space` move the session and are
-reported through `session_info_update._meta.crystal.workspace`.
+reported through `session_info_update._meta.crystal.workspace`. That update
+omits `title` when the topic did not change.
 
 ## Plans
 

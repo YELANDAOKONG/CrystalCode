@@ -3,7 +3,9 @@ using System.Text.Json;
 using Xunit;
 
 using CrystalCode.Bridge.Tests.Support;
+using CrystalCode.Bridge.Transport;
 using CrystalCode.Bridge.Wire;
+using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Events;
 
 namespace CrystalCode.Bridge.Tests;
@@ -83,6 +85,48 @@ public sealed class BridgeCommandTests
         Assert.Empty(updates);
         wire.Apply(new NoteWritten("Command result") { Origin = "prompt-1" });
         Assert.Single(updates);
+    }
+
+    [Fact]
+    public void EmptyTopic_SendsTheFallbackTitleOnce()
+    {
+        var fallback = "remember me";
+        var sent = new List<JsonElement>();
+        var wire = Capture(sent, () => fallback);
+        wire.Apply(new SessionStarted(Chrome("/workspace", "")));
+        wire.Apply(new ChromeChanged(Chrome("/workspace", "Keep this")));
+        wire.Apply(new ChromeChanged(Chrome("/workspace", "")));
+        wire.Apply(new ChromeChanged(Chrome("/workspace", "")));
+        fallback = string.Empty;
+        wire.EngineSessionId = "engine-2";
+        wire.Apply(new ConversationCleared());
+
+        var info = SessionInfo(sent);
+        Assert.Equal(3, info.Count);
+        Assert.Equal("Keep this", info[0].GetProperty("title").GetString());
+        Assert.Equal("ChromeChanged", Event(info[0]));
+        Assert.Equal("remember me", info[1].GetProperty("title").GetString());
+        Assert.Equal("ChromeChanged", Event(info[1]));
+        Assert.Equal(string.Empty, info[2].GetProperty("title").GetString());
+        Assert.Equal("ConversationCleared", Event(info[2]));
+        Assert.Equal("engine-2", info[2].GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString());
+    }
+
+    [Fact]
+    public void WorkspaceMove_OmitsTitleWhenTheTopicIsUnchangedAndSendsItWhenTheTopicChanges()
+    {
+        var sent = new List<JsonElement>();
+        var wire = Capture(sent, static () => "remember me");
+        wire.Apply(new SessionStarted(Chrome("/workspace", "Keep this")));
+        wire.Apply(new ChromeChanged(Chrome("/elsewhere", "Keep this")));
+        wire.Apply(new ChromeChanged(Chrome("/further", "")));
+
+        var info = SessionInfo(sent);
+        Assert.Equal(3, info.Count);
+        Assert.False(info[0].TryGetProperty("title", out _));
+        Assert.Equal("ChromeChanged", Event(info[0]));
+        Assert.Equal("remember me", info[1].GetProperty("title").GetString());
+        Assert.False(info[2].TryGetProperty("title", out _));
     }
 
     [Fact]
@@ -356,6 +400,19 @@ public sealed class BridgeCommandTests
         await first.WaitAsync(BridgeFixture.Wait);
         await queued.WaitAsync(BridgeFixture.Wait);
     }
+
+    private static SessionUpdates Capture(List<JsonElement> sent, Func<string> untitled) =>
+        new(write =>
+        {
+            using var document = JsonDocument.Parse(JsonText.Write(write));
+            sent.Add(document.RootElement.Clone());
+        }, static () => "/workspace", false, untitled: untitled);
+
+    private static SessionChrome Chrome(string workspace, string topic) =>
+        new("model", workspace, false, ApprovalMode.Default, "", "", Topic: topic);
+
+    private static List<JsonElement> SessionInfo(IReadOnlyList<JsonElement> sent) =>
+        sent.Where(static update => update.GetProperty("sessionUpdate").GetString() == "session_info_update").ToList();
 
     private static void PrepareCommandPlugin(CrystalCode.Engine.Home.CrystalHome home, string workspace)
     {

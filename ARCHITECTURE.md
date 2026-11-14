@@ -1950,7 +1950,10 @@ saved and `ChromeChanged` carries `SessionChrome.Topic`. The session file
 stores `topic` and `topicSource` (`model` or `operator`); `SessionSummary`
 and `SavedSessionInfo` carry `Topic`, and `SessionSummary.Title` falls back
 to the first user message. Bridge sends `session_info_update` with the new
-title when a `ChromeChanged` topic differs from the last one it reported.
+title when a `ChromeChanged` topic differs from the last one it reported,
+including when the topic becomes empty. The title is the topic, or the first
+user message when the topic is empty, or an empty string when the conversation
+has neither. `ConversationCleared` carries that title with the new engine id.
 `/topic` is `SessionVerb.Topic`; Server treats a bare `/topic` as operate and
 every other form as admin. The option catalog offers `topic`, `topic_model`
 (`session` plus catalog models), and `topic_thinking`, plus `topic_tier`,

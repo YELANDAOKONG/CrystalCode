@@ -282,8 +282,82 @@ public sealed class BridgeSessionTests
 
         Assert.Equal(id, info.GetProperty("params").GetProperty("sessionId").GetString());
         Assert.NotEqual(id, engineId);
+        Assert.Equal(string.Empty, info.GetProperty("params").GetProperty("update").GetProperty("title").GetString());
         Assert.True(byAcp.TryGetProperty("result", out _));
         Assert.True(byEngine.TryGetProperty("result", out _));
+    }
+
+    [Theory]
+    [InlineData("/clear")]
+    [InlineData("/new")]
+    public async Task Clear_ReplacesANamedTitleWithEmpty(string command)
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var id = await fixture.OpenAsync();
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "remember me" } } });
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "/title Keep this" } } });
+        await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.TryGetProperty("title", out var title) && title.GetString() == "Keep this");
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = command } } });
+
+        var info = await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ConversationCleared");
+        var cleared = info.GetProperty("params").GetProperty("update");
+        Assert.Equal(string.Empty, cleared.GetProperty("title").GetString());
+        Assert.NotEqual(id, cleared.GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString());
+        var updates = fixture.Updates();
+        var clearedAt = IndexOf(updates, static update =>
+            update.GetProperty("sessionUpdate").GetString() == "session_info_update"
+            && update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ConversationCleared");
+        var emptiedAt = IndexOf(updates, update =>
+            update.GetProperty("sessionUpdate").GetString() == "session_info_update"
+            && update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ChromeChanged"
+            && update.TryGetProperty("title", out var title)
+            && title.GetString() == string.Empty
+            && update.GetProperty("_meta").GetProperty("crystal").GetProperty("engineSessionId").GetString() == id);
+        Assert.True(emptiedAt >= 0 && emptiedAt < clearedAt);
+    }
+
+    [Fact]
+    public async Task Clear_ReplacesTheFirstUserMessageWhenTheTopicStaysEmpty()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var id = await fixture.OpenAsync();
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "remember me" } } });
+        await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.TryGetProperty("title", out var title) && title.GetString() == "remember me");
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "/clear" } } });
+
+        var info = await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ConversationCleared");
+        Assert.Equal(string.Empty, info.GetProperty("params").GetProperty("update").GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task TopicClear_UsesTheFirstUserMessageAsTheTitle()
+    {
+        await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
+        var id = await fixture.OpenAsync();
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "remember me" } } });
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "/title Keep this" } } });
+        await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.TryGetProperty("title", out var title) && title.GetString() == "Keep this");
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "/topic clear" } } });
+
+        var info = await fixture.WaitForUpdateAsync("session_info_update", static update =>
+            update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ChromeChanged"
+            && update.TryGetProperty("title", out var title)
+            && title.GetString() == "remember me");
+        Assert.Equal(
+            "remember me",
+            info.GetProperty("params").GetProperty("update").GetProperty("title").GetString());
+        var listed = await fixture.RequestAsync("session/list", new { cwd = fixture.Workspace });
+        Assert.Equal(
+            "remember me",
+            listed.GetProperty("result").GetProperty("sessions")[0].GetProperty("title").GetString());
     }
 
     [Fact]
@@ -298,8 +372,10 @@ public sealed class BridgeSessionTests
 
         var info = await fixture.WaitForUpdateAsync("session_info_update", static update =>
             update.GetProperty("_meta").GetProperty("crystal").GetProperty("event").GetString() == "ChromeChanged");
-        Assert.EndsWith("elsewhere", info.GetProperty("params").GetProperty("update").GetProperty("_meta").GetProperty("crystal")
+        var update = info.GetProperty("params").GetProperty("update");
+        Assert.EndsWith("elsewhere", update.GetProperty("_meta").GetProperty("crystal")
             .GetProperty("workspace").GetString(), StringComparison.Ordinal);
+        Assert.False(update.TryGetProperty("title", out _));
     }
 
     [Fact]
@@ -383,5 +459,18 @@ public sealed class BridgeSessionTests
         Assert.Equal(-32602, inWorkspace.GetProperty("error").GetProperty("code").GetInt32());
         var session = listed.GetProperty("result").GetProperty("sessions").EnumerateArray().Single(entry => entry.GetProperty("sessionId").GetString() == id);
         Assert.EndsWith("outside", session.GetProperty("additionalDirectories")[0].GetString(), StringComparison.Ordinal);
+    }
+
+    private static int IndexOf(IReadOnlyList<JsonElement> updates, Func<JsonElement, bool> match)
+    {
+        for (var i = 0; i < updates.Count; i++)
+        {
+            if (match(updates[i]))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }
