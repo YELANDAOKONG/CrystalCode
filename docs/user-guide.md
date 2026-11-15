@@ -1421,8 +1421,8 @@ otherwise the same conversation.
 
 | Mode | Tools | Side effects |
 | :--- | :--- | :--- |
-| **Plan** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, multi_edit, write, apply_patch, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
-| **Work** | Built-in read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, multi_edit, write, apply_patch, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
+| **Plan** | Built-in read, multi_read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus any external tools listed for Plan | No built-in edit, multi_edit, write, apply_patch, or bash. External Plan tools keep a Write + Workspace floor and still go through approval. |
+| **Work** | Built-in read, multi_read, list, tree, glob, grep, search, todowrite, todoread, question, and skill when enabled, plus edit, multi_edit, write, apply_patch, bash, `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`, plus any external tools listed for Work | After approval |
 
 New sessions start in Work by default. Tab cycles from Work to Plan, then
 through enabled custom modes in name order and back to Work. Shift+Tab
@@ -1941,7 +1941,7 @@ is unchanged.
 
 ## Built-in tools
 
-`read`, `list`, `tree`, `glob`, `grep`, `search`, `edit`, `multi_edit`, `write`, and `apply_patch` may use a path
+`read`, `multi_read`, `list`, `tree`, `glob`, `grep`, `search`, `edit`, `multi_edit`, `write`, and `apply_patch` may use a path
 outside the workspace after approval (you, or the Review model in Review or
 Audit). Workspace `write`, `edit`, `multi_edit`, and `apply_patch` still follow the approval mode.
 A patch is judged by its riskiest path: one path outside the workspace makes the whole
@@ -1967,12 +1967,13 @@ is the workspace root.
 | Tool | Catalog | Purpose |
 | :--- | :--- | :--- |
 | `read` | Plan, Work | Read a workspace text file (`path`, optional 1-based `offset` and `limit`) |
+| `multi_read` | Plan, Work | Read 1 to 20 text ranges in one call (`files`, an array of entries with `path`, optional 1-based `offset` and `limit`). Repeat a path to read disjoint ranges. Results or errors are returned in request order within the output budget |
 | `describe_image` | Plan, Work | Describe an image through `imageModel` (`path`, optional `question`). Omitted while `imageModel` is off |
 | `view_image` | Plan, Work | Show an image to the current model (`path`). Present only while that model accepts images |
 | `list` | Plan, Work | List a directory's immediate entries (`path` optional, 1-based `offset` and `limit` paging) |
 | `tree` | Plan, Work | List the directory structure under a path (`path` optional, `depth` default 2 capped at 4, `files` to include file entries). Depth-first; subdirectories before files; up to 1,000 entries and 20 files per directory |
 | `glob` | Plan, Work | List files matching a glob (`pattern`, optional `path`, 1-based `offset` and `limit` paging) |
-| `grep` | Plan, Work | Regular-expression search (`pattern`, optional `path` and file-name `glob`). `output_mode` is `content` (default), `files` for matching paths only, or `count` for matching lines per file. `context` adds 0 to 50 lines around each match in `content` mode. `limit` caps matches or files |
+| `grep` | Plan, Work | Regular-expression search (one `pattern` or an array of 1 to 8 `patterns`, optional `path` and file-name `glob`). Array matches include 1-based pattern numbers in content mode. Each matching line counts once. `output_mode` is `content` (default), `files` for matching paths only, or `count` for matching lines per file. `context` adds 0 to 50 lines around each match in `content` mode. `limit` caps matches or files |
 | `search` | Plan, Work | Ranked candidate files by name and content (`query`, optional `path`, `glob`, `caseSensitive`, 1-based `offset` and `limit` paging) |
 | `todowrite` | Plan, Work | Replace or merge the session todo list |
 | `todoread` | Plan, Work | Read the current session todo list |
@@ -1990,6 +1991,7 @@ is the workspace root.
 | `bash_stop` | Work | Stop a background task and its child processes after approval |
 
 Practical limits: read up to 1,000,000 characters or 20,000 lines;
+multi_read up to 20,000 characters per range within the common output limit;
 write up to 2 MiB; a patch up to 2 MiB; grep up to 10,000 matches (default 2,000)
 and 8 MiB per file; search
 up to 200 candidate files per page (default 50) with up to 2 preview

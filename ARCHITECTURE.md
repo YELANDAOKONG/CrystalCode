@@ -1085,10 +1085,10 @@ Operator-defined custom modes sit beside them (see Custom modes below).
 Prompt overlays, prompt sets, prompt attachments, and external tool catalogs
 do not add a mode.
 
-- Plan registers read, list, tree, glob, grep, search, todowrite, todoread, and
+- Plan registers read, multi_read, list, tree, glob, grep, search, todowrite, todoread, and
   question. When Skills is enabled, it also registers skill. External tools
   whose `catalogs` include `plan` are appended after the built-ins.
-- Work registers read, list, tree, glob, grep, search, todowrite, todoread,
+- Work registers read, multi_read, list, tree, glob, grep, search, todowrite, todoread,
   question, and skill when enabled, then edit, multi_edit, write, apply_patch, bash, and
   the session-local `bash_start`, `bash_status`, `bash_logs`, and `bash_stop`
   tools, then external tools whose `catalogs` include `work`.
@@ -1485,7 +1485,9 @@ canonical rule from the current session only. Other saved sessions are left
 alone. Mutations are refused during a turn or compaction.
 
 Built-in file reads in authorized directories use ordinary workspace read
-approval. Writes in writable directories follow the current approval mode.
+approval. `multi_read` classifies the whole batch before reading. Any unlisted
+outside path makes the batch an outside read. A credential path blocks the
+batch, including when the tool runs in Full mode. Writes in writable directories follow the current approval mode.
 Outside Full mode, `ApprovalPolicy` rejects explicit read-only writes before classification hooks,
 grants, or review; write, edit, multi_edit, and apply_patch recheck at path resolution
 before file I/O. A patch is rejected whole when any of its paths, including a
@@ -1536,7 +1538,16 @@ shows the first lines of the file. An excerpt that would be empty, as after
 emptying a file, is omitted. Excerpts are model-visible tool text, use LF
 separators, and are not stored anywhere else.
 
-`grep` prints `path:line:text` by default. `output_mode` `files` lists each
+`multi_read` accepts a `files` array of 1 to 20 requests with the same path
+and line range fields as `read`. The same path may appear more than once.
+Results appear in request order. Per-range failures are reported inline. The
+call succeeds if any processed range succeeds. Each range has a 20,000-character
+budget and the batch stops at the common tool output limit.
+
+`grep` accepts one `pattern` or 1 to 8 independent `patterns`. Multiple patterns
+share one scan and a line counts once even if several match. Single-pattern
+content prints `path:line:text`. Array input prints `path:line:[1,2] text`,
+with 1-based positions from the input array. `output_mode` `files` lists each
 matching path once and `count` prints `path:count`. `context` (0 to 50) adds
 neighboring lines as `path-line-text`, with `--` between separate groups; a
 context line that two matches share is printed once. `limit` defaults to 2,000
@@ -2367,7 +2378,7 @@ on demand through the `skill` tool. Available-skill guidance lists
 name and description only; it does not include absolute paths. The guidance,
 Work, and Plan tell the model to load a matching skill before starting the work
 and to follow it, ranked below the user and workspace instructions. When
-Skills is enabled, `read`, `list`, `tree`, `glob`, `grep`, and `search` of any path inside a Skills
+Skills is enabled, `read`, `multi_read`, `list`, `tree`, `glob`, `grep`, and `search` of paths inside a Skills
 search directory (`skill` / `skills` trees, including files that are
 not `SKILL.md`) auto-execute as workspace reads. The comparison uses
 the final target of each symbolic link. Other

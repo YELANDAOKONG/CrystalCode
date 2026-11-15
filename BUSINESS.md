@@ -251,6 +251,11 @@ separate library with no terminal code. The product can:
   command is its own switch, `--workspace-trust on|off`. Omitting it checks
   trust even when the interactive switch is off. `off` skips the check for
   that process and does not record the directory;
+- read source and search code in Plan and Work. `read` reads one file range;
+  `multi_read` returns several numbered ranges or per-range errors in one
+  bounded result. `grep` accepts a single expression or several independent
+  expressions sharing one scan and labels matching lines with their pattern
+  numbers. Both tools use the existing directory access and approval policy;
 - manage multiple accessible directories per session through `/access` and
   repeatable `--allow-read` / `--allow-write` launch options. `read` permits
   built-in file reads and searches; `write` includes reads and lets file changes

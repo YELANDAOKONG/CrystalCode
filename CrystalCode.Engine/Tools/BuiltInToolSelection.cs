@@ -14,6 +14,7 @@ public static class BuiltInToolSelection
     public static IReadOnlyList<string> Names { get; } =
     [
         ReadTool.ToolName,
+        MultiReadTool.ToolName,
         DescribeImageTool.ToolName,
         ViewImageTool.ToolName,
         ListTool.ToolName,

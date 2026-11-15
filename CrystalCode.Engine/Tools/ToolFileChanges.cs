@@ -45,7 +45,7 @@ public static class ToolFileChanges
 
     /// <summary>
     /// Absolute paths named by a call's <c>path</c> or <c>filePath</c>
-    /// argument, or by every section of a patch.
+    /// argument, each entry in a file batch, or each section of a patch.
     /// </summary>
     public static IReadOnlyList<string> Paths(string workspaceRoot, ToolCall call)
     {
@@ -65,6 +65,7 @@ public static class ToolFileChanges
         {
             ApplyPatchTool.ToolName => ApplyPatchTool.PathsOf(call.Arguments),
             MultiEditTool.ToolName => MultiEditTool.PathsOf(call.Arguments),
+            MultiReadTool.ToolName => MultiReadTool.PathsOf(call.Arguments),
             _ when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var path) => [path],
             _ when ToolArguments.TryReadRequiredString(call.Arguments, "filePath", out var filePath) => [filePath],
             _ => []

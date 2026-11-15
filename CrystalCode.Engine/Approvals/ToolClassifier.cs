@@ -90,6 +90,7 @@ public sealed class ToolClassifier
         call.Name switch
         {
             ReadTool.ToolName => ClassifyRead(call.Arguments, "Read", pathRequired: true),
+            MultiReadTool.ToolName => ClassifyReadBatch(call.Arguments),
             DescribeImageTool.ToolName => ClassifyRead(call.Arguments, "Describe image", pathRequired: true),
             ViewImageTool.ToolName => ClassifyRead(call.Arguments, "View image", pathRequired: true),
             ListTool.ToolName => ClassifyRead(call.Arguments, "List", pathRequired: false),
@@ -132,6 +133,25 @@ public sealed class ToolClassifier
         }
 
         return ClassifyReadPath(optionalPath, verb);
+    }
+
+    private ToolClassification ClassifyReadBatch(string arguments)
+    {
+        var outside = false;
+        foreach (var path in MultiReadTool.PathsOf(arguments))
+        {
+            var classification = ClassifyReadPath(path, "Read");
+            if (classification.Risk == Risk.Forbidden)
+            {
+                return classification;
+            }
+
+            outside |= classification.Authority == Authority.OutsideWorkspace;
+        }
+
+        return outside
+            ? new ToolClassification(Risk.Read, Authority.OutsideWorkspace, "Read outside workspace")
+            : new ToolClassification(Risk.Read, Authority.Workspace, "Read file ranges");
     }
 
     private ToolClassification ClassifyReadPath(string path, string verb)

@@ -30,6 +30,16 @@ public static class ToolCallSummary
             return title + "  " + OneLine(command);
         }
 
+        if (name == GrepTool.ToolName
+            && ToolArguments.TryReadOptionalStringArray(arguments, "patterns", out var patterns)
+            && patterns is { Count: > 0 })
+        {
+            var scope = ToolArguments.TryReadRequiredString(arguments, "path", out var grepPath)
+                ? "  " + grepPath
+                : "";
+            return title + scope + $"  ({patterns.Count} patterns)";
+        }
+
         if (ToolArguments.TryReadRequiredString(arguments, "path", out var path))
         {
             if (ToolArguments.TryReadRequiredString(arguments, "pattern", out var pattern))
@@ -75,12 +85,14 @@ public static class ToolCallSummary
             return title + "  " + OneLine(taskId);
         }
 
-        if (name is ApplyPatchTool.ToolName or MultiEditTool.ToolName)
+        if (name is ApplyPatchTool.ToolName or MultiEditTool.ToolName or MultiReadTool.ToolName)
         {
-            // The arguments contain file contents, so do not echo them as JSON.
-            var paths = name == ApplyPatchTool.ToolName
-                ? ApplyPatchTool.PathsOf(arguments)
-                : MultiEditTool.PathsOf(arguments);
+            var paths = name switch
+            {
+                ApplyPatchTool.ToolName => ApplyPatchTool.PathsOf(arguments),
+                MultiEditTool.ToolName => MultiEditTool.PathsOf(arguments),
+                _ => MultiReadTool.PathsOf(arguments)
+            };
             return paths.Count > 0 ? title + "  " + FormatPaths(paths) : title;
         }
 

@@ -95,7 +95,7 @@ public static class ProgressText
             BackgroundBashStatusTool.ToolName => "Checking Background Command",
             BackgroundBashLogsTool.ToolName => "Reading Background Logs",
             BackgroundBashStopTool.ToolName => "Stopping Background Command",
-            ReadTool.ToolName => "Reading",
+            ReadTool.ToolName or "multi_read" => "Reading",
             ListTool.ToolName => "Listing",
             TreeTool.ToolName => "Listing",
             WriteTool.ToolName => "Writing File",

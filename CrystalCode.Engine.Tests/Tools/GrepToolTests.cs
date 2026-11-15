@@ -184,6 +184,56 @@ public sealed class GrepToolTests
         Assert.Equal(expected, output.Text);
     }
 
+    [Theory]
+    [InlineData("content", "a.txt-1-before\na.txt:2:[1,2] alpha beta\na.txt:3:[2] beta\na.txt-4-after")]
+    [InlineData("files", "a.txt")]
+    [InlineData("count", "a.txt:2")]
+    public async Task InvokeAsync_MultiplePatternsReportEachLineOnce(string mode, string expected)
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "a.txt"), "before\nalpha beta\nbeta\nafter\n");
+        var tool = new GrepTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(JsonToolCall(
+            "1",
+            GrepTool.ToolName,
+            $$"""{"patterns":["alpha","beta"],"output_mode":"{{mode}}","context":1}"""));
+
+        Assert.Equal(ToolResultStatus.Success, output.Status);
+        Assert.Equal(expected, output.Text);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_MultiplePatternsCountOnlySelectedMatchesAtTheContextLimit()
+    {
+        using var root = new TemporaryWorkspace();
+        File.WriteAllText(Path.Combine(root.Path, "a.txt"), "alpha beta\nbeta\n");
+        var tool = new GrepTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(JsonToolCall(
+            "1",
+            GrepTool.ToolName,
+            """{"patterns":["alpha","beta"],"context":1,"limit":1}"""));
+
+        Assert.Equal("a.txt:1:[1,2] alpha beta\na.txt-2-beta\n[truncated to 1 matches]", output.Text);
+    }
+
+    [Theory]
+    [InlineData("""{"pattern":"alpha","patterns":["beta"]}""")]
+    [InlineData("""{"patterns":[]}""")]
+    [InlineData("""{"patterns":[" "]}""")]
+    [InlineData("""{"patterns":["a","b","c","d","e","f","g","h","i"]}""")]
+    [InlineData("""{"patterns":["alpha","["]}""")]
+    public async Task InvokeAsync_RejectsInvalidPatternArguments(string arguments)
+    {
+        using var root = new TemporaryWorkspace();
+        var tool = new GrepTool(new Workspace(root.Path));
+
+        var output = await tool.InvokeAsync(JsonToolCall("1", GrepTool.ToolName, arguments));
+
+        Assert.Equal(ToolResultStatus.Failure, output.Status);
+    }
+
     [Fact]
     public async Task InvokeAsync_SymlinkedFile_SearchesBothEntries()
     {

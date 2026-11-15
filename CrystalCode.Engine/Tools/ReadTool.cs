@@ -15,7 +15,7 @@ public sealed class ReadTool : ITool
         "Reads a text file. path may be workspace-relative or absolute. "
         + "Paths inside the workspace run without asking. "
         + "Paths outside the workspace may require approval unless covered by session read or write access. "
-        + "Use offset (1-based) and limit for large files. Call in parallel when you need several files. "
+        + "Use offset (1-based) and limit for large files. Use multi_read when you need several files or line ranges. "
         + "Do not read in tiny windows. Use glob when the path is uncertain.";
 
     private readonly Workspace _workspace;
@@ -35,7 +35,7 @@ public sealed class ReadTool : ITool
                       "type": "string",
                       "description": "Workspace-relative or absolute file path."
                     },
-                    "offset": {
+                "offset": {
                       "type": "integer",
                       "description": "1-based line to start from."
                     },
@@ -59,49 +59,53 @@ public sealed class ReadTool : ITool
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(call);
 
-        if (!ToolArguments.TryReadRequiredString(call.Arguments, "path", out var path)
-            || !ToolArguments.TryReadOptionalInt32(call.Arguments, "offset", out var offset)
-            || !ToolArguments.TryReadOptionalInt32(call.Arguments, "limit", out var limit))
+        return ValueTask.FromResult(Read(_workspace, call.Arguments, cancellationToken));
+    }
+
+    internal static ToolOutput Read(
+        Workspace workspace,
+        string arguments,
+        CancellationToken cancellationToken,
+        int maximumCharacters = WorkspaceLimits.MaximumReadCharacters)
+    {
+        if (!ToolArguments.TryReadRequiredString(arguments, "path", out var path)
+            || !ToolArguments.TryReadOptionalInt32(arguments, "offset", out var offset)
+            || !ToolArguments.TryReadOptionalInt32(arguments, "limit", out var limit))
         {
-            return ValueTask.FromResult(
-                new ToolOutput(
-                    "Arguments must include path, with optional offset and limit integers.",
-                    ToolResultStatus.Failure));
+            return new ToolOutput(
+                "Arguments must include path, with optional offset and limit integers.",
+                ToolResultStatus.Failure);
         }
 
         if (offset is <= 0 || limit is <= 0)
         {
-            return ValueTask.FromResult(
-                new ToolOutput(
-                    "offset and limit must be positive when supplied.",
-                    ToolResultStatus.Failure));
+            return new ToolOutput(
+                "offset and limit must be positive when supplied.",
+                ToolResultStatus.Failure);
         }
 
         if (Workspace.IsCredentialPath(path))
         {
-            return ValueTask.FromResult(
-                new ToolOutput(
-                    "Reading credential paths is not allowed.",
-                    ToolResultStatus.Failure));
+            return new ToolOutput(
+                "Reading credential paths is not allowed.",
+                ToolResultStatus.Failure);
         }
 
-        if (!_workspace.TryResolveReadableFile(path, out var fullPath, out var error))
+        if (!workspace.TryResolveReadableFile(path, out var fullPath, out var error))
         {
-            return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
+            return new ToolOutput(error, ToolResultStatus.Failure);
         }
 
         if (Workspace.IsCredentialPath(fullPath))
         {
-            return ValueTask.FromResult(
-                new ToolOutput(
-                    "Reading credential paths is not allowed.",
-                    ToolResultStatus.Failure));
+            return new ToolOutput(
+                "Reading credential paths is not allowed.",
+                ToolResultStatus.Failure);
         }
 
         if (Workspace.LooksBinary(fullPath))
         {
-            return ValueTask.FromResult(
-                new ToolOutput("File looks binary and will not be read.", ToolResultStatus.Failure));
+            return new ToolOutput("File looks binary and will not be read.", ToolResultStatus.Failure);
         }
 
         var startLine = offset ?? 1;
@@ -126,7 +130,7 @@ public sealed class ReadTool : ITool
                 break;
             }
 
-            if (builder.Length + line.Length > WorkspaceLimits.MaximumReadCharacters)
+            if (builder.Length + line.Length > maximumCharacters)
             {
                 truncated = true;
                 break;
@@ -140,15 +144,14 @@ public sealed class ReadTool : ITool
 
         if (lineNumber == 0)
         {
-            return ValueTask.FromResult(new ToolOutput("(empty file)"));
+            return new ToolOutput("(empty file)");
         }
 
-        if (written == 0)
+        if (written == 0 && !truncated)
         {
-            return ValueTask.FromResult(
-                new ToolOutput(
-                    $"File has {lineNumber} lines; offset {startLine} is past the end.",
-                    ToolResultStatus.Failure));
+            return new ToolOutput(
+                $"File has {lineNumber} lines; offset {startLine} is past the end.",
+                ToolResultStatus.Failure);
         }
 
         if (truncated)
@@ -158,6 +161,6 @@ public sealed class ReadTool : ITool
                 $"[truncated after {written} lines; file has at least {lineNumber} lines]");
         }
 
-        return ValueTask.FromResult(new ToolOutput(builder.ToString().TrimEnd()));
+        return new ToolOutput(builder.ToString().TrimEnd());
     }
 }

@@ -93,8 +93,9 @@
 
 ## Safety
 
-- Outside Full mode, write, edit, read, list, tree, glob, grep, and search of paths outside the
+- Outside Full mode, write, edit, read, multi_read, list, tree, glob, grep, and search of paths outside the
   workspace require approval unless session directory access covers the action.
+  Classify each path in a batch read before I/O and apply the strictest result.
   Session `read` permits file reads; `write` includes reads and retains normal
   action approval. Explicit read-only writes are rejected before grants, raw
   approval advice, or review and checked again by the built-in write/edit path

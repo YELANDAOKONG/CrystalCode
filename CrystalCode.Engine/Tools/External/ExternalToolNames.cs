@@ -25,6 +25,7 @@ public static class ExternalToolNames
     private static readonly HashSet<string> Reserved = new(StringComparer.Ordinal)
     {
         ReadTool.ToolName,
+        MultiReadTool.ToolName,
         DescribeImageTool.ToolName,
         ViewImageTool.ToolName,
         ListTool.ToolName,

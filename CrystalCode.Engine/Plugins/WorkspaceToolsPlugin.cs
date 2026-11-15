@@ -22,6 +22,10 @@ public sealed class WorkspaceToolsPlugin : IPlugin
                     HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new ReadTool(workspace)),
                 new FactoryToolContribution(
+                    MultiReadTool.ToolName,
+                    HostToolCatalogs.PlanAndWork,
+                    (workspace, _, _) => new MultiReadTool(workspace)),
+                new FactoryToolContribution(
                     ListTool.ToolName,
                     HostToolCatalogs.PlanAndWork,
                     (workspace, _, _) => new ListTool(workspace)),

@@ -23,7 +23,7 @@ internal static class ToolCallWire
         ArgumentNullException.ThrowIfNull(call);
         return call.Name switch
         {
-            ReadTool.ToolName or ListTool.ToolName or TreeTool.ToolName or SkillTool.ToolName
+            ReadTool.ToolName or "multi_read" or ListTool.ToolName or TreeTool.ToolName or SkillTool.ToolName
                 or ViewImageTool.ToolName or DescribeImageTool.ToolName
                 or "read_mcp_resource" or "list_mcp_resources" => "read",
             GlobTool.ToolName or GrepTool.ToolName or SearchTool.ToolName => "search",

@@ -12,6 +12,9 @@ public sealed class GrepTool : ITool
 {
     public const string ToolName = "grep";
 
+    // Store the matches for each line with one bit per pattern.
+    private const int MaximumPatterns = 8;
+
     private const string ContentMode = "content";
 
     private const string FilesMode = "files";
@@ -19,7 +22,9 @@ public sealed class GrepTool : ITool
     private const string CountMode = "count";
 
     private static readonly string ToolDescription =
-        "Searches text files under the requested path with a .NET regular expression. "
+        "Searches text files under the requested path. Supply either pattern for one .NET regular expression or "
+        + $"patterns for up to {MaximumPatterns} independent expressions in one scan. "
+        + "With patterns, each matching line shows its 1-based pattern numbers. Each line counts once. "
         + "Optional path may be workspace-relative or absolute and defaults to the workspace root; an optional file-name glob narrows the search. "
         + "output_mode content (the default) prints path:line:text. files lists only the paths that match. count prints path:count for each matching file. "
         + $"context adds up to {WorkspaceLimits.MaximumGrepContextLines} lines before and after each match in content mode, printed as path-line-text, with -- between separate groups. "
@@ -46,6 +51,13 @@ public sealed class GrepTool : ITool
                       "type": "string",
                       "description": ".NET regular expression searched line by line."
                     },
+                    "patterns": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": {{MaximumPatterns}},
+                      "items": { "type": "string" },
+                      "description": "Independent .NET regular expressions. Use instead of pattern."
+                    },
                     "path": {
                       "type": "string",
                       "description": "Optional workspace-relative or absolute file or directory. Defaults to the workspace root."
@@ -68,7 +80,10 @@ public sealed class GrepTool : ITool
                       "description": "Maximum matching lines in content mode, or files in files and count modes, up to {{WorkspaceLimits.MaximumGrepMatches}}; defaults to {{WorkspaceLimits.DefaultGrepMatches}}."
                     }
                   },
-                  "required": ["pattern"]
+                  "oneOf": [
+                    { "required": ["pattern"] },
+                    { "required": ["patterns"] }
+                  ]
                 }
                 """),
             ToolDescription);
@@ -83,16 +98,23 @@ public sealed class GrepTool : ITool
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(call);
 
-        if (!ToolArguments.TryReadRequiredString(call.Arguments, "pattern", out var pattern)
-            || !ToolArguments.TryReadOptionalString(call.Arguments, "path", out var relativePath)
+        if (!ToolArguments.IsObjectOrEmpty(call.Arguments)
+            || !ToolArguments.TryReadOptionalString(call.Arguments, "pattern", out var pattern)
+            || !ToolArguments.TryReadOptionalStringArray(call.Arguments, "patterns", out var patterns)
+            || (pattern is null) == (patterns is null)
+            || (pattern is not null && string.IsNullOrWhiteSpace(pattern))
+            || patterns?.Count is < 1 or > MaximumPatterns)
+        {
+            return Fail($"Supply either a nonblank pattern or patterns with 1 to {MaximumPatterns} nonblank expressions.");
+        }
+
+        if (!ToolArguments.TryReadOptionalString(call.Arguments, "path", out var relativePath)
             || !ToolArguments.TryReadOptionalString(call.Arguments, "glob", out var globText)
             || !ToolArguments.TryReadOptionalString(call.Arguments, "output_mode", out var modeText)
             || !ToolArguments.TryReadOptionalInt32(call.Arguments, "context", out var contextValue)
             || !ToolArguments.TryReadOptionalInt32(call.Arguments, "limit", out var limitValue))
         {
-            return Fail(
-                "Arguments must include pattern, with optional path, glob, and output_mode strings "
-                + "and context and limit integers.");
+            return Fail("path, glob, and output_mode must be strings, and context and limit must be integers.");
         }
 
         var mode = string.IsNullOrWhiteSpace(modeText) ? ContentMode : modeText.Trim();
@@ -114,13 +136,15 @@ public sealed class GrepTool : ITool
         var context = contextValue ?? 0;
         var limit = limitValue ?? WorkspaceLimits.DefaultGrepMatches;
 
-        Regex regex;
+        var labelMatches = patterns is not null;
+        patterns ??= [pattern!];
+        Regex[] expressions;
         try
         {
-            regex = new Regex(
-                pattern,
+            expressions = patterns.Select(static expression => new Regex(
+                expression,
                 RegexOptions.CultureInvariant,
-                TimeSpan.FromSeconds(1));
+                TimeSpan.FromSeconds(1))).ToArray();
         }
         catch (ArgumentException exception)
         {
@@ -165,9 +189,9 @@ public sealed class GrepTool : ITool
 
             stopped = mode switch
             {
-                FilesMode => AppendFile(file, relative, regex, limit, builder, ref emitted),
-                CountMode => AppendCount(file, relative, regex, limit, builder, ref emitted),
-                _ => AppendContent(file, relative, regex, context, limit, builder, ref emitted)
+                FilesMode => AppendFile(file, relative, expressions, limit, builder, ref emitted, cancellationToken),
+                CountMode => AppendCount(file, relative, expressions, limit, builder, ref emitted, cancellationToken),
+                _ => AppendContent(file, relative, expressions, labelMatches, context, limit, builder, ref emitted, cancellationToken)
             };
             if (stopped)
             {
@@ -205,36 +229,22 @@ public sealed class GrepTool : ITool
     private static bool AppendContent(
         string fullPath,
         string relative,
-        Regex regex,
+        Regex[] expressions,
+        bool labelMatches,
         int context,
         int limit,
         StringBuilder builder,
-        ref int emitted)
+        ref int emitted,
+        CancellationToken cancellationToken)
     {
         var lines = File.ReadAllLines(fullPath);
-        var matched = new List<int>();
-        for (var index = 0; index < lines.Length; index++)
-        {
-            if (!IsMatch(regex, lines[index], out var timedOut))
-            {
-                if (timedOut)
-                {
-                    break;
-                }
-
-                continue;
-            }
-
-            matched.Add(index);
-        }
-
-        var matchedSet = new HashSet<int>(matched);
+        var matches = FindMatchingLines(lines, expressions, limit - emitted, cancellationToken, out var hasMore);
         var printedThrough = -1;
-        foreach (var index in matched)
+        for (var index = 0; index < matches.Length; index++)
         {
-            if (emitted >= limit)
+            if (matches[index] == 0)
             {
-                return true;
+                continue;
             }
 
             var start = Math.Max(index - context, printedThrough + 1);
@@ -249,8 +259,14 @@ public sealed class GrepTool : ITool
 
             for (var line = start; line <= end; line++)
             {
-                var marker = matchedSet.Contains(line) ? ':' : '-';
+                var patternMask = matches[line];
+                var marker = patternMask != 0 ? ':' : '-';
                 builder.Append(relative).Append(marker).Append(line + 1).Append(marker);
+                if (patternMask != 0 && labelMatches)
+                {
+                    AppendPatternNumbers(builder, patternMask, expressions.Length);
+                }
+
                 ToolOutputText.AppendLine(builder, lines[line]);
             }
 
@@ -262,18 +278,78 @@ public sealed class GrepTool : ITool
             }
         }
 
-        return false;
+        return hasMore;
+    }
+
+    private static byte[] FindMatchingLines(
+        string[] lines,
+        Regex[] expressions,
+        int remaining,
+        CancellationToken cancellationToken,
+        out bool hasMore)
+    {
+        hasMore = false;
+        var matches = new byte[lines.Length];
+        for (var index = 0; index < lines.Length; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var mask = MatchPatterns(expressions, lines[index], stopAtFirst: false, out var timedOut);
+            if (timedOut)
+            {
+                break;
+            }
+
+            if (mask == 0)
+            {
+                continue;
+            }
+
+            if (remaining == 0)
+            {
+                hasMore = true;
+                break;
+            }
+
+            matches[index] = (byte)mask;
+            remaining--;
+        }
+
+        return matches;
+    }
+
+    private static void AppendPatternNumbers(StringBuilder builder, int mask, int patternCount)
+    {
+        builder.Append('[');
+        var first = true;
+        for (var index = 0; index < patternCount; index++)
+        {
+            if ((mask & (1 << index)) == 0)
+            {
+                continue;
+            }
+
+            if (!first)
+            {
+                builder.Append(',');
+            }
+
+            builder.Append(index + 1);
+            first = false;
+        }
+
+        builder.Append("] ");
     }
 
     private static bool AppendFile(
         string fullPath,
         string relative,
-        Regex regex,
+        Regex[] expressions,
         int limit,
         StringBuilder builder,
-        ref int emitted)
+        ref int emitted,
+        CancellationToken cancellationToken)
     {
-        if (CountMatchingLines(fullPath, regex, stopAtFirst: true) == 0)
+        if (CountMatchingLines(fullPath, expressions, stopAfterFirstLine: true, cancellationToken) == 0)
         {
             return false;
         }
@@ -291,12 +367,13 @@ public sealed class GrepTool : ITool
     private static bool AppendCount(
         string fullPath,
         string relative,
-        Regex regex,
+        Regex[] expressions,
         int limit,
         StringBuilder builder,
-        ref int emitted)
+        ref int emitted,
+        CancellationToken cancellationToken)
     {
-        var count = CountMatchingLines(fullPath, regex, stopAtFirst: false);
+        var count = CountMatchingLines(fullPath, expressions, stopAfterFirstLine: false, cancellationToken);
         if (count == 0)
         {
             return false;
@@ -313,23 +390,29 @@ public sealed class GrepTool : ITool
         return builder.Length > WorkspaceLimits.MaximumToolOutputCharacters;
     }
 
-    private static int CountMatchingLines(string fullPath, Regex regex, bool stopAtFirst)
+    private static int CountMatchingLines(
+        string fullPath,
+        Regex[] expressions,
+        bool stopAfterFirstLine,
+        CancellationToken cancellationToken)
     {
         var count = 0;
         foreach (var line in File.ReadLines(fullPath))
         {
-            if (!IsMatch(regex, line, out var timedOut))
+            cancellationToken.ThrowIfCancellationRequested();
+            var mask = MatchPatterns(expressions, line, stopAtFirst: true, out var timedOut);
+            if (timedOut)
             {
-                if (timedOut)
-                {
-                    break;
-                }
+                break;
+            }
 
+            if (mask == 0)
+            {
                 continue;
             }
 
             count++;
-            if (stopAtFirst)
+            if (stopAfterFirstLine)
             {
                 break;
             }
@@ -338,17 +421,31 @@ public sealed class GrepTool : ITool
         return count;
     }
 
-    private static bool IsMatch(Regex regex, string line, out bool timedOut)
+    private static int MatchPatterns(Regex[] expressions, string line, bool stopAtFirst, out bool timedOut)
     {
         timedOut = false;
+        var mask = 0;
         try
         {
-            return regex.IsMatch(line);
+            for (var index = 0; index < expressions.Length; index++)
+            {
+                if (!expressions[index].IsMatch(line))
+                {
+                    continue;
+                }
+
+                mask |= 1 << index;
+                if (stopAtFirst)
+                {
+                    break;
+                }
+            }
         }
         catch (RegexMatchTimeoutException)
         {
             timedOut = true;
-            return false;
         }
+
+        return mask;
     }
 }

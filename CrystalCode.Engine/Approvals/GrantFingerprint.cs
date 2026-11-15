@@ -23,6 +23,8 @@ internal static class GrantFingerprint
             ApplyPatchTool.ToolName when ApplyPatchTool.TryReadPaths(call.Arguments, out var patchPaths)
                 && patchPaths.Count > 0 =>
                 string.Join('\n', patchPaths.Select(static p => p.Replace('\\', '/')).Distinct().Order(StringComparer.Ordinal)),
+            MultiReadTool.ToolName => JsonSerializer.Serialize(
+                MultiReadTool.PathsOf(call.Arguments).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)),
             ReadTool.ToolName when ToolArguments.TryReadRequiredString(call.Arguments, "path", out var readPath) =>
                 readPath.Replace('\\', '/'),
             DescribeImageTool.ToolName or ViewImageTool.ToolName

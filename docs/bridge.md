@@ -447,7 +447,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 
 | Tools | Kind |
 | :--- | :--- |
-| `read`, `list`, `tree`, `skill`, `view_image`, `describe_image`, `read_mcp_resource`, `list_mcp_resources` | `read` |
+| `read`, `multi_read`, `list`, `tree`, `skill`, `view_image`, `describe_image`, `read_mcp_resource`, `list_mcp_resources` | `read` |
 | `glob`, `grep`, `search` | `search` |
 | `edit`, `multi_edit`, `write`, `apply_patch` | `edit`; a patch with only Delete File is `delete`, with only a Move is `move` |
 | `bash`, `bash_start`, `bash_status`, `bash_logs`, `bash_stop` | `execute` |

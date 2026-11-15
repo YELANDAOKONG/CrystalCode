@@ -32,7 +32,7 @@ internal sealed class AgentCatalog
         }
         result.Add(new("general", "Bounded general task; returns a concise report.", AgentPrompt.For("general"), settings.General));
         result.Add(new("explore", "Read-only codebase research and evidence gathering.", AgentPrompt.For("explore"), settings.Explore,
-            ["read", "list", "tree", "glob", "grep", "search", "view_image", "describe_image"]));
+            ["read", "multi_read", "list", "tree", "glob", "grep", "search", "view_image", "describe_image"]));
         result.Add(new("work", "Implement a bounded change in Work mode.", AgentPrompt.For("work"), settings.Work));
 
         var merged = new Dictionary<string, AgentDefinition>(StringComparer.OrdinalIgnoreCase);

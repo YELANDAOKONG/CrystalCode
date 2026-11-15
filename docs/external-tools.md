@@ -69,7 +69,7 @@ the directory name. A different model-facing name requires a
 one-element `tools` array. Shorthand therefore requires a directory
 name that is also a legal tool name (no `.` in the directory).
 
-Tool names must be unique in the process catalog. Built-ins (`read`,
+Tool names must be unique in the process catalog. Built-ins (`read`, `multi_read`,
 `list`, `tree`, `glob`, `grep`, `search`, `todowrite`, `todoread`, `question`, `edit`, `write`, `bash`,
 `skill`) win. An exec set whose tool name is reserved is skipped. A
 dotnet type whose `Definition.Name` is reserved is omitted. Two sets
