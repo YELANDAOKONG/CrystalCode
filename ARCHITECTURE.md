@@ -28,17 +28,23 @@ It does not reference Crystal, Crystal.Tools, CrystalCode.Tools, the
 engine, or the executable host. CrystalCode.Engine does not reference
 Spectre.Console, Terminal.Gui, CrystalCode.Display, or the executable
 host, and it never touches the console. CrystalCode.Providers
-references only Crystal. No project in this repository modifies Crystal.
+references only Crystal and CrystalCode.Plugins, which holds the neutral
+`ChatProviderException` and `ProviderFinishReason` the engine's retry logic
+reads. No project in this repository modifies Crystal.
 ```
 
 CrystalCode.Engine does not reference CrystalCode.Providers. Two contribution
-assemblies sit beside the front ends and reference CrystalCode.Engine and
-CrystalCode.Providers: `CrystalCode.Connections` (the built-in provider
-catalog, vendor defaults, and the client factories for the built-in protocols)
-and `CrystalCode.Authentication` (authentication integrations and their login
-flows). The executable references both and registers them in the plugin
-registry it hands to the shared launch path. The engine knows an integration
-only as a registered id and holds no vendor name.
+assemblies sit beside the front ends: `CrystalCode.Connections` (the built-in
+provider catalog, vendor defaults, and the client factories for the built-in
+protocols) references CrystalCode.Engine and CrystalCode.Providers, and
+`CrystalCode.Authentication` (authentication integrations and their login
+flows) references CrystalCode.Engine only. The executable references both and registers them in `Main` through
+`HostDefaults.Register` (a test registers what it needs); the engine builds
+its provider catalog, default selection, and built-in plugin registry from
+what was registered, and runs without any of it. The engine knows an
+integration only as a registered id and holds no vendor name. Protocol names
+(`responses`, `anthropic`, and so on) are configuration vocabulary and stay in
+the engine.
 
 A second front end (a desktop application, for example) references
 CrystalCode.Engine and supplies its own surface. It does not copy engine code.
@@ -288,12 +294,16 @@ layout.
 
 Binds engine settings to the Providers adapters. Owns the built-in provider
 catalog and vendor default values, and one client factory and plugin per
-built-in protocol. It holds no UI, no `~/.crystal` layout, and no login flow.
-The engine runs without it by using a test registry.
+built-in protocol (`ConnectionsHost` registers them). Only the Responses
+factory can send requests through an integration handler; the other
+factories refuse one. It holds no UI, no `~/.crystal` layout, and no login
+flow.
 
 ### CrystalCode.Authentication
 
-Authentication integrations. An integration implements the engine's
+Authentication integrations. It ships no provider definitions: an operator
+declares each account provider and its models in `providers.json`. An
+integration implements the engine's
 `IAuthenticationIntegration`: it validates a provider definition, runs its own
 login through `ILoginInteraction`, and returns a `DelegatingHandler` that
 attaches a valid token, refreshes it, and retries once after a 401. The first

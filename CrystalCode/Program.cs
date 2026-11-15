@@ -1,5 +1,6 @@
 using Spectre.Console.Cli;
 
+using CrystalCode.Authentication;
 using CrystalCode.Commands;
 using CrystalCode.Connections;
 using CrystalCode.Display.Shell;
@@ -12,6 +13,7 @@ public static class Program
     {
         using var outputEncoding = ConsoleTextEncoding.UseUtf8Output();
         ConnectionsHost.Register();
+        AuthenticationHost.Register();
         if (VersionCommand.IsVersionRequest(args))
         {
             VersionCommand.Write(Console.Out);

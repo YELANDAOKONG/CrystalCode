@@ -32,6 +32,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrystalCode.Connections", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrystalCode.Connections.Tests", "CrystalCode.Connections.Tests\CrystalCode.Connections.Tests.csproj", "{71F90FDF-771D-4756-91D8-7AF425BC83C7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrystalCode.Authentication", "CrystalCode.Authentication\CrystalCode.Authentication.csproj", "{3F814E24-AD5C-4FAF-B70F-2A0A32283599}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrystalCode.Authentication.Tests", "CrystalCode.Authentication.Tests\CrystalCode.Authentication.Tests.csproj", "{B3338A86-F683-4EFA-901D-C0C2B5E03780}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -234,6 +238,30 @@ Global
 		{71F90FDF-771D-4756-91D8-7AF425BC83C7}.Release|x64.Build.0 = Release|Any CPU
 		{71F90FDF-771D-4756-91D8-7AF425BC83C7}.Release|x86.ActiveCfg = Release|Any CPU
 		{71F90FDF-771D-4756-91D8-7AF425BC83C7}.Release|x86.Build.0 = Release|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Debug|x64.Build.0 = Debug|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Debug|x86.Build.0 = Debug|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Release|x64.ActiveCfg = Release|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Release|x64.Build.0 = Release|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Release|x86.ActiveCfg = Release|Any CPU
+		{3F814E24-AD5C-4FAF-B70F-2A0A32283599}.Release|x86.Build.0 = Release|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Debug|x64.Build.0 = Debug|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Debug|x86.Build.0 = Debug|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Release|x64.ActiveCfg = Release|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Release|x64.Build.0 = Release|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Release|x86.ActiveCfg = Release|Any CPU
+		{B3338A86-F683-4EFA-901D-C0C2B5E03780}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

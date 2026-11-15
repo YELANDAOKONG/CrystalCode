@@ -13,6 +13,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\CrystalCode.Engine\CrystalCode.Engine.csproj" />
+        <ProjectReference Include="..\CrystalCode.Authentication\CrystalCode.Authentication.csproj" />
         <ProjectReference Include="..\CrystalCode.Connections\CrystalCode.Connections.csproj" />
         <ProjectReference Include="..\CrystalCode.Display\CrystalCode.Display.csproj" />
         <ProjectReference Include="..\CrystalCode.Server\CrystalCode.Server.csproj" />
