@@ -296,7 +296,9 @@ Binds engine settings to the Providers adapters. Owns the built-in provider
 catalog and vendor default values, and one client factory and plugin per
 built-in protocol (`ConnectionsHost` registers them). Only the Responses
 factory can send requests through an integration handler; the other
-factories refuse one. It holds no UI, no `~/.crystal` layout, and no login
+factories refuse one. For a request that carries a handler, the Responses client sends
+system text in the `instructions` field instead of as system message items,
+because an account endpoint rejects those items. It holds no UI, no `~/.crystal` layout, and no login
 flow.
 
 ### CrystalCode.Authentication

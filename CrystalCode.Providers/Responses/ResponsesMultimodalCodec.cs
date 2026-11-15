@@ -21,11 +21,16 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
     private readonly string _vendorName;
 
     private readonly IReadOnlyList<TextToolBinding> _textTools;
+    private readonly bool _systemAsInstructions;
 
-    public ResponsesMultimodalCodec(string vendorName, IReadOnlyList<TextToolBinding>? textTools = null)
+    public ResponsesMultimodalCodec(
+        string vendorName,
+        IReadOnlyList<TextToolBinding>? textTools = null,
+        bool systemAsInstructions = false)
     {
         _vendorName = vendorName;
         _textTools = textTools ?? [];
+        _systemAsInstructions = systemAsInstructions;
         _textCodec = new ResponsesCodec(vendorName, _textTools);
     }
 
@@ -68,6 +73,20 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         {
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
+            if (_systemAsInstructions)
+            {
+                var instructions = string.Join(
+                    "\n\n",
+                    request.Items.OfType<MultimodalMessage>()
+                        .Where(static message => message.Role == MultimodalChatRole.System)
+                        .SelectMany(static message => message.Contents.OfType<TextContent>())
+                        .Select(static text => text.Text));
+                if (instructions.Length > 0)
+                {
+                    writer.WriteString("instructions", instructions);
+                }
+            }
+
             writer.WritePropertyName("input");
             writer.WriteStartArray();
             var folded = _textCodec.FoldedCalls(
@@ -76,6 +95,13 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 request.Tools);
             foreach (var item in request.Items)
             {
+                if (_systemAsInstructions
+                    && item is MultimodalMessage { Role: var role }
+                    && role == MultimodalChatRole.System)
+                {
+                    continue;
+                }
+
                 WriteItem(writer, item, folded);
             }
 

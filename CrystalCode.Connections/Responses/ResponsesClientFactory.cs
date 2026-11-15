@@ -78,6 +78,8 @@ public sealed class ResponsesClientFactory : IChatClientFactory
             serviceTier: settings.ServiceTier,
             speed: settings.Speed,
             textTools: TextToolsFor(model),
-            modelOptions: model.Options);
+            modelOptions: model.Options,
+            // An integration handler marks an account endpoint, which rejects system message items.
+            systemAsInstructions: credential.Handler is not null);
     }
 }

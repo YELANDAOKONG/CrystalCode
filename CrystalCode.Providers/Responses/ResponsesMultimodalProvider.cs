@@ -20,7 +20,7 @@ public sealed class ResponsesMultimodalProvider
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolMultimodalChatClient(
-            new ResponsesMultimodalCodec(options.VendorName, options.TextTools),
+            new ResponsesMultimodalCodec(options.VendorName, options.TextTools, options.SystemAsInstructions),
             options.ToProtocolOptions(),
             httpClient, httpHeaders);
     }

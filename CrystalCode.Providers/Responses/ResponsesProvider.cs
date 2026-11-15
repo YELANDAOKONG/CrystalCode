@@ -19,7 +19,7 @@ public sealed class ResponsesProvider : IStreamingChatClient, IDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
         _client = new ProtocolChatClient(
-            new ResponsesCodec(options.VendorName, options.TextTools),
+            new ResponsesCodec(options.VendorName, options.TextTools, options.SystemAsInstructions),
             options.ToProtocolOptions(),
             httpClient, httpHeaders);
     }

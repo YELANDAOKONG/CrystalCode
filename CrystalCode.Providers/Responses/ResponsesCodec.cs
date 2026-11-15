@@ -20,11 +20,16 @@ internal sealed class ResponsesCodec : IProtocolCodec
     private const int ReasoningTraceSegmentOffset = 1_000_000;
     private readonly string _vendorName;
     private readonly IReadOnlyList<TextToolBinding> _textTools;
+    private readonly bool _systemAsInstructions;
 
-    public ResponsesCodec(string vendorName, IReadOnlyList<TextToolBinding>? textTools = null)
+    public ResponsesCodec(
+        string vendorName,
+        IReadOnlyList<TextToolBinding>? textTools = null,
+        bool systemAsInstructions = false)
     {
         _vendorName = vendorName;
         _textTools = textTools ?? [];
+        _systemAsInstructions = systemAsInstructions;
     }
 
     public string Path => "responses";
@@ -50,11 +55,29 @@ internal sealed class ResponsesCodec : IProtocolCodec
         {
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
+            if (_systemAsInstructions)
+            {
+                var instructions = string.Join(
+                    "\n\n",
+                    request.Items.OfType<ChatMessage>()
+                        .Where(static message => message.Role == ChatRole.System)
+                        .Select(static message => message.Text));
+                if (instructions.Length > 0)
+                {
+                    writer.WriteString("instructions", instructions);
+                }
+            }
+
             writer.WritePropertyName("input");
             writer.WriteStartArray();
             var folded = FoldedCalls(request.Items.OfType<ToolCall>(), request.Tools);
             foreach (var item in request.Items)
             {
+                if (_systemAsInstructions && item is ChatMessage { Role: var role } && role == ChatRole.System)
+                {
+                    continue;
+                }
+
                 WriteItem(writer, item, folded);
             }
 

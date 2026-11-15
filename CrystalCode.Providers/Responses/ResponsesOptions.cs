@@ -21,7 +21,8 @@ public sealed record ResponsesOptions
         string? serviceTier = null,
         string? speed = null,
         IReadOnlyList<TextToolBinding>? textTools = null,
-        JsonElement? modelOptions = null)
+        JsonElement? modelOptions = null,
+        bool systemAsInstructions = false)
     {
         ArgumentNullException.ThrowIfNull(apiKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
@@ -68,7 +69,15 @@ public sealed record ResponsesOptions
         Speed = string.IsNullOrWhiteSpace(speed) ? null : speed.Trim();
         ProcessingSlots.RequireSharedOrEmpty(ServiceTier, Speed, VendorName);
         TextTools = textTools is { Count: > 0 } ? [.. textTools] : [];
+        SystemAsInstructions = systemAsInstructions;
     }
+
+    /// <summary>
+    /// Gets whether system messages are sent in the request's <c>instructions</c>
+    /// field instead of as system message items. Some endpoints reject system
+    /// items.
+    /// </summary>
+    public bool SystemAsInstructions { get; }
 
     public string ApiKey { get; }
     public string Model { get; }
