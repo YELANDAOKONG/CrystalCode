@@ -1,5 +1,6 @@
 using CrystalCode.Plugins.Approvals;
 using CrystalCode.Plugins.Approvals.Interfaces;
+using CrystalCode.Plugins.Authentication.Interfaces;
 using CrystalCode.Plugins.Cli;
 using CrystalCode.Plugins.Cli.Interfaces;
 using CrystalCode.Plugins.Clients;
@@ -21,7 +22,8 @@ namespace CrystalCode.Plugins;
 
 /// <summary>
 /// Tools, protocol factories, classifiers, slash commands, hooks, raw hooks,
-/// prompt placeholders, custom status fields, and process commands from one plugin.
+/// prompt placeholders, custom status fields, process commands, and account
+/// logins from one plugin.
 /// </summary>
 public sealed record PluginContribution
 {
@@ -72,6 +74,18 @@ public sealed record PluginContribution
     public IReadOnlyList<IPluginCliCommand> CliCommands { get; init; } = [];
 
     public IReadOnlyList<IPluginTokenizer> Tokenizers { get; init; } = [];
+
+    /// <summary>
+    /// Account logins added with <see cref="WithAuthentications"/>. Like
+    /// <see cref="Tokenizers"/>, the original constructor leaves this empty.
+    /// </summary>
+    public IReadOnlyList<IPluginAuthentication> Authentications { get; init; } = [];
+
+    public PluginContribution WithAuthentications(IEnumerable<IPluginAuthentication> authentications)
+    {
+        ArgumentNullException.ThrowIfNull(authentications);
+        return this with { Authentications = authentications.ToArray() };
+    }
 
     public PluginContribution WithTokenizers(IEnumerable<IPluginTokenizer> tokenizers)
     {

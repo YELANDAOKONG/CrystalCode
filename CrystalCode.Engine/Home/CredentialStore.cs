@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CrystalCode.Engine.Authentication;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins;
 
@@ -36,8 +37,22 @@ public sealed class CredentialStore
         out ProviderCredential credential,
         out string error)
     {
-        ArgumentNullException.ThrowIfNull(provider);
         ArgumentNullException.ThrowIfNull(plugins);
+        return TryOpen(provider, plugins.FindIntegration, out credential, out error);
+    }
+
+    /// <summary>
+    /// The same, finding the integration through <paramref name="find"/> so a
+    /// caller can look in the registry and then in loaded disk plugins.
+    /// </summary>
+    public bool TryOpen(
+        ProviderDefinition provider,
+        Func<string, IAuthenticationIntegration?> find,
+        out ProviderCredential credential,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(find);
         credential = new ProviderCredential(string.Empty);
         if (provider.Type != ProviderType.Authentication)
         {
@@ -55,7 +70,7 @@ public sealed class CredentialStore
             return false;
         }
 
-        var integration = plugins.FindIntegration(provider.Integration!);
+        var integration = find(provider.Integration!);
         if (integration is null)
         {
             error = $"Provider {provider.Name.Value} needs integration '{provider.Integration}', which is not registered.";

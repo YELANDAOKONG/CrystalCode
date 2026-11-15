@@ -13,14 +13,23 @@ namespace CrystalCode.Engine.Authentication;
 public sealed class AccountSignIn
 {
     private readonly CredentialStore _credentials;
-    private readonly PluginRegistry _plugins;
+    private readonly Func<string, IAuthenticationIntegration?> _find;
 
     public AccountSignIn(CredentialStore credentials, PluginRegistry plugins)
+        : this(credentials, plugins is null ? throw new ArgumentNullException(nameof(plugins)) : plugins.FindIntegration)
+    {
+    }
+
+    /// <summary>
+    /// Finds integrations through <paramref name="find"/>, so a caller can look
+    /// in the registry and then in loaded disk plugins.
+    /// </summary>
+    public AccountSignIn(CredentialStore credentials, Func<string, IAuthenticationIntegration?> find)
     {
         ArgumentNullException.ThrowIfNull(credentials);
-        ArgumentNullException.ThrowIfNull(plugins);
+        ArgumentNullException.ThrowIfNull(find);
         _credentials = credentials;
-        _plugins = plugins;
+        _find = find;
     }
 
     /// <summary>
@@ -104,7 +113,7 @@ public sealed class AccountSignIn
         }
 
         string? warning = null;
-        var integration = _plugins.FindIntegration(provider.Integration!);
+        var integration = _find(provider.Integration!);
         if (integration is not null)
         {
             try
@@ -126,7 +135,7 @@ public sealed class AccountSignIn
 
     private IAuthenticationIntegration Find(ProviderDefinition provider)
     {
-        var integration = _plugins.FindIntegration(provider.Integration!)
+        var integration = _find(provider.Integration!)
             ?? throw new AuthenticationFailedException(
                 $"Provider {provider.Name.Value} needs integration '{provider.Integration}', which is not registered.");
         var invalid = integration.Validate(provider);

@@ -6,6 +6,8 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Settings;
 using CrystalCode.Engine.Plugins;
+using CrystalCode.Engine.Plugins.Disk;
+using CrystalCode.Engine.Tools;
 using CrystalCode.Terminal;
 
 using Spectre.Console;
@@ -146,9 +148,10 @@ public static class AccountConsole
         try
         {
             var home = CrystalHome.Resolve(settings.Home);
-            var catalog = new DiskSettingsStore(home).LoadOrCreate().Catalog;
+            var loaded = new DiskSettingsStore(home).LoadOrCreate();
+            var catalog = loaded.Catalog;
             var credentials = new CredentialStore(home);
-            var signIn = new AccountSignIn(credentials, PluginRegistry.CreateBuiltIn());
+            var registry = PluginRegistry.CreateBuiltIn();
             var accounts = AccountSignIn.List(catalog);
             var name = settings.Provider?.Trim() ?? string.Empty;
             ProviderDefinition? provider = null;
@@ -158,6 +161,26 @@ public static class AccountConsole
                 return false;
             }
 
+            var find = registry.FindIntegration;
+            if (provider?.Integration is { } integration && registry.FindIntegration(integration) is null && loaded.Plugins)
+            {
+                // Only the operator's own plugins load here: nothing has asked to trust this directory.
+                var plugins = PluginCatalog.Load(
+                    home,
+                    new Workspace(Directory.GetCurrentDirectory()),
+                    enabled: true,
+                    homeOnly: true);
+                find = id => registry.FindIntegration(id) ?? plugins.FindIntegration(id);
+                if (find(integration) is null)
+                {
+                    foreach (var note in plugins.Notes)
+                    {
+                        error.WriteLine(note);
+                    }
+                }
+            }
+
+            var signIn = new AccountSignIn(credentials, find);
             context = new AccountContext(signIn, credentials, accounts, provider, plain);
             return true;
         }

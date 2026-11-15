@@ -5,6 +5,8 @@ using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Authentication;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Plugins;
@@ -12,6 +14,8 @@ using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
+using CrystalCode.Plugins.Authentication;
+using CrystalCode.Plugins.Authentication.Interfaces;
 using CrystalCode.Plugins.Cli;
 using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Clients.Interfaces;
@@ -54,6 +58,17 @@ public sealed class PluginCatalog
     private readonly IReadOnlyList<LoadedPlugin> _instances;
 
     internal IReadOnlyList<PluginTokenizerRegistration> Tokenizers { get; private init; } = [];
+
+    /// <summary>Gets the account logins that plugins contributed.</summary>
+    public IReadOnlyList<IAuthenticationIntegration> Integrations { get; private init; } = [];
+
+    /// <summary>Finds a plugin's account login by the id a provider entry names.</summary>
+    public IAuthenticationIntegration? FindIntegration(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        return Integrations.FirstOrDefault(
+            integration => string.Equals(integration.Id, id.Trim(), StringComparison.Ordinal));
+    }
 
     private PluginCatalog(
         IReadOnlyList<ITool> planTools,
@@ -174,13 +189,15 @@ public sealed class PluginCatalog
 
     /// <param name="loading">Receives each plugin directory name before that plugin activates.</param>
     /// <param name="cancellationToken">Checked before each plugin; a plugin that started activating finishes.</param>
+    /// <param name="homeOnly">Skips the workspace's own plugins. A command that runs outside a trusted session loads only the operator's.</param>
     public static PluginCatalog Load(
         CrystalHome home,
         Workspace workspace,
         bool enabled,
         SessionToolHost? host = null,
         Action<string>? loading = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool homeOnly = false)
     {
         ArgumentNullException.ThrowIfNull(home);
         ArgumentNullException.ThrowIfNull(workspace);
@@ -196,7 +213,7 @@ public sealed class PluginCatalog
             static () => string.Empty);
 
         var notes = new List<string>();
-        var discovered = new PluginDiscovery(home).Collect(workspace.Root, notes);
+        var discovered = new PluginDiscovery(home).Collect(workspace.Root, notes, homeOnly);
         var replacements = new PluginReplacements();
         var cliCommands = new List<PluginCliRegistration>();
         var plan = new List<ITool>();
@@ -213,6 +230,8 @@ public sealed class PluginCatalog
         var placeholders = new List<PluginPlaceholderRegistration>();
         var statusFields = new List<PluginStatusFieldRegistration>();
         var tokenizers = new List<PluginTokenizerRegistration>();
+        var integrations = new List<IAuthenticationIntegration>();
+        var integrationIds = new HashSet<string>(StringComparer.Ordinal);
         var failures = new List<PluginActivationFailure>();
         var toolNames = new HashSet<string>(StringComparer.Ordinal);
         var readOnlyNetworkTools = new HashSet<string>(StringComparer.Ordinal);
@@ -266,6 +285,7 @@ public sealed class PluginCatalog
             var hookCount = AddHooks(item.DirectoryName, contribution, notes, hooks);
             var rawHookCount = AddRawHooks(item.DirectoryName, contribution, notes, rawHooks);
             AddCliCommands(item.DirectoryName, contribution, notes, cliCommands);
+            AddAuthentications(item.DirectoryName, contribution, integrationIds, notes, integrations);
             PluginTokenizerAdmission.Add(item.DirectoryName, contribution.Tokenizers, tokenizers, notes);
             AddPlaceholders(
                 item.DirectoryName,
@@ -319,7 +339,8 @@ public sealed class PluginCatalog
             cliCommands,
             readOnlyNetworkTools)
         {
-            Tokenizers = tokenizers.ToArray()
+            Tokenizers = tokenizers.ToArray(),
+            Integrations = integrations
         };
 
         void Skip(DiscoveredPlugin item, string reason)
@@ -458,6 +479,12 @@ public sealed class PluginCatalog
     public bool TryCreateOverrideClient(
         HarnessSettings settings,
         string apiKey,
+        out IStreamingChatClient? client) =>
+        TryCreateOverrideClient(settings, new ProviderCredential(apiKey), out client);
+
+    public bool TryCreateOverrideClient(
+        HarnessSettings settings,
+        ProviderCredential credential,
         out IStreamingChatClient? client)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -470,7 +497,7 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            client = factory.Create(PluginClientRequests.From(settings, apiKey));
+            client = factory.Create(PluginClientRequests.From(settings, credential));
             return true;
         }
 
@@ -488,7 +515,10 @@ public sealed class PluginCatalog
         return _overrides.Any(factory => factory.CanCreate(protocol));
     }
 
-    public bool TryCreateClient(HarnessSettings settings, string apiKey, out IStreamingChatClient? client)
+    public bool TryCreateClient(HarnessSettings settings, string apiKey, out IStreamingChatClient? client) =>
+        TryCreateClient(settings, new ProviderCredential(apiKey), out client);
+
+    public bool TryCreateClient(HarnessSettings settings, ProviderCredential credential, out IStreamingChatClient? client)
     {
         ArgumentNullException.ThrowIfNull(settings);
         client = null;
@@ -500,14 +530,17 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            client = factory.Create(PluginClientRequests.From(settings, apiKey));
+            client = factory.Create(PluginClientRequests.From(settings, credential));
             return true;
         }
 
         return false;
     }
 
-    public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, string apiKey)
+    public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, string apiKey) =>
+        CreateMultimodal(settings, new ProviderCredential(apiKey));
+
+    public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.ActiveModel.ImageInput)
@@ -523,7 +556,7 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            return factory.CreateMultimodal(PluginClientRequests.From(settings, apiKey));
+            return factory.CreateMultimodal(PluginClientRequests.From(settings, credential));
         }
 
         return null;
@@ -923,6 +956,48 @@ public sealed class PluginCatalog
 
         return added;
     }
+
+    private static void AddAuthentications(
+        string directoryName,
+        DiskContribution contribution,
+        HashSet<string> ids,
+        IList<string> notes,
+        List<IAuthenticationIntegration> integrations)
+    {
+        foreach (var authentication in contribution.Authentications)
+        {
+            if (authentication is null)
+            {
+                notes.Add($"Plugin '{directoryName}' omitted a missing account login.");
+                continue;
+            }
+
+            string id;
+            try
+            {
+                id = authentication.Id;
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                notes.Add($"Plugin '{directoryName}' omitted an account login whose id could not be read.");
+                continue;
+            }
+
+            if (!IsIntegrationId(id) || !ids.Add(id))
+            {
+                notes.Add($"Plugin '{directoryName}' omitted an account login with a missing, invalid, or repeated id.");
+                continue;
+            }
+
+            integrations.Add(new DiskAuthenticationIntegration(directoryName, authentication));
+            notes.Add($"Plugin '{directoryName}' registered the account login '{id}'.");
+        }
+    }
+
+    private static bool IsIntegrationId(string? id) =>
+        id is { Length: >= 1 and <= 64 }
+        && char.IsAsciiLetter(id[0])
+        && id.All(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
 
     private static int AddClassifiers(
         string directoryName,

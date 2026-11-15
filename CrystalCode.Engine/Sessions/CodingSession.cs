@@ -18,6 +18,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Approvals.Interfaces;
 using CrystalCode.Engine.Authentication;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
@@ -6360,22 +6361,21 @@ public sealed class CodingSession : ITurnObserver
         return CreateClient(_settings.ForReviewer(approval));
     }
 
+    /// <summary>
+    /// Finds an account login by id: first-party integrations first, then the
+    /// ones loaded plugins contributed, so a plugin cannot replace a built-in one.
+    /// </summary>
+    private IAuthenticationIntegration? FindIntegration(string id) =>
+        _plugins.FindIntegration(id) ?? _loadedPlugins.FindIntegration(id);
+
     private IStreamingChatClient CreateClient(HarnessSettings settings)
     {
-        if (!_credentials.TryOpen(settings.ActiveProvider, _plugins, out var credential, out var error))
+        if (!_credentials.TryOpen(settings.ActiveProvider, FindIntegration, out var credential, out var error))
         {
             throw new InvalidOperationException(error);
         }
 
-        // A disk plugin cannot carry an account login, so an authentication
-        // provider is served only by the in-process registry.
-        if (credential.Handler is not null)
-        {
-            return ChatClientFactory.Create(settings, credential, _plugins);
-        }
-
-        var apiKey = credential.ApiKey;
-        if (_loadedPlugins.TryCreateOverrideClient(settings, apiKey, out var overridden)
+        if (_loadedPlugins.TryCreateOverrideClient(settings, credential, out var overridden)
             && overridden is not null)
         {
             return overridden;
@@ -6383,10 +6383,10 @@ public sealed class CodingSession : ITurnObserver
 
         try
         {
-            return ChatClientFactory.Create(settings, apiKey, _plugins);
+            return ChatClientFactory.Create(settings, credential, _plugins);
         }
         catch (NotSupportedException) when (
-            _loadedPlugins.TryCreateClient(settings, apiKey, out var client) && client is not null)
+            _loadedPlugins.TryCreateClient(settings, credential, out var client) && client is not null)
         {
             return client;
         }
@@ -6395,7 +6395,7 @@ public sealed class CodingSession : ITurnObserver
     private IStreamingMultimodalChatClient? CreateMultimodalClient(
         HarnessSettings settings)
     {
-        if (!_credentials.TryOpen(settings.ActiveProvider, _plugins, out var credential, out var error))
+        if (!_credentials.TryOpen(settings.ActiveProvider, FindIntegration, out var credential, out var error))
         {
             throw new InvalidOperationException(error);
         }
@@ -6405,21 +6405,16 @@ public sealed class CodingSession : ITurnObserver
             return null;
         }
 
-        var apiKey = credential.ApiKey;
         var protocol = settings.ActiveProvider.Protocol;
         IStreamingMultimodalChatClient? client;
-        if (credential.Handler is not null)
+        if (!_loadedPlugins.OverridesProtocol(settings)
+            && _plugins.Clients.Any(factory => factory.CanCreate(protocol)))
         {
             client = MultimodalChatClientFactory.Create(settings, credential, _plugins);
         }
-        else if (!_loadedPlugins.OverridesProtocol(settings)
-            && _plugins.Clients.Any(factory => factory.CanCreate(protocol)))
-        {
-            client = MultimodalChatClientFactory.Create(settings, apiKey, _plugins);
-        }
         else
         {
-            client = _loadedPlugins.CreateMultimodal(settings, apiKey);
+            client = _loadedPlugins.CreateMultimodal(settings, credential);
         }
         if (client is not null && !client.Capabilities.Inputs.Any(input => input.Modality == ContentModality.Image))
         {
@@ -6784,7 +6779,7 @@ public sealed class CodingSession : ITurnObserver
         Volatile.Write(ref _signInSource, cancelled);
         try
         {
-            await new AccountSignIn(_credentials, _plugins).LoginAsync(
+            await new AccountSignIn(_credentials, FindIntegration).LoginAsync(
                 provider,
                 _frontEnd.CreateLoginInteraction(provider.Name.Value, !words.NoBrowser),
                 both.Token);
@@ -6834,7 +6829,7 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var result = await new AccountSignIn(_credentials, _plugins).LogoutAsync(provider, cancellationToken);
+        var result = await new AccountSignIn(_credentials, FindIntegration).LogoutAsync(provider, cancellationToken);
         RefreshSlashCommands();
         if (!result.Removed)
         {

@@ -360,8 +360,15 @@ cancels a waiting sign-in before anything else; either ends with the note
 is not an http or https address is asked for again. The sign-in gives up
 after five minutes. Logout asks the integration to end
 the remote session, deletes the saved login, and reports when the service
-did not confirm. Disk plugins cannot supply an integration and cannot create a client
-for an `authentication` provider.
+did not confirm. A disk plugin supplies an integration with
+`IPluginAuthentication` (`CrystalCode.Plugins.Authentication`), which the
+engine serves through `DiskAuthenticationIntegration`: the plugin sees
+`PluginAccount` facts, an `IPluginVault` slot, and an `IPluginLogin` surface,
+never an engine type, and the integration it returns is found after the
+first-party ones, so it cannot replace one. The plugin's client factory
+receives the handler in `PluginClientRequest.Handler` with an empty key.
+`crystal login` and `crystal logout` load only home plugins, and only for an
+integration that is not first-party.
 
 ### CrystalCode.Tests
 

@@ -737,10 +737,10 @@ implemented in the current build.
 ### High priority
 
 - Provider sign-in beyond the first integration. The ChatGPT account
-  integration is implemented. A Grok account integration, login from
-  `crystal server` and `crystal bridge`, and integrations contributed by
-  disk plugins are not defined. Do not reserve a wire field, ACP method, or
-  plugin contract for them. A sign-in keeps the engine free of vendor names
+  integration is implemented, and `crystal server`, `crystal bridge`, and disk
+  plugins can sign in and supply integrations. A Grok account integration and
+  ACP-native `authMethods` are not defined. Do not reserve a wire field, ACP
+  method, or plugin contract for them. A sign-in keeps the engine free of vendor names
   and the console, never puts tokens in source, logs, diagnostics, or on a
   command line, and makes `crystal run` fail instead of asking the operator.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether

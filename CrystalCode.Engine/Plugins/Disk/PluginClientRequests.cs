@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Plugins.Clients;
 
@@ -6,9 +7,13 @@ namespace CrystalCode.Engine.Plugins.Disk;
 /// <summary>Copies host endpoint facts into the plugin client contract.</summary>
 internal static class PluginClientRequests
 {
-    public static PluginClientRequest From(HarnessSettings settings, string apiKey)
+    public static PluginClientRequest From(HarnessSettings settings, string apiKey) =>
+        From(settings, new ProviderCredential(apiKey));
+
+    public static PluginClientRequest From(HarnessSettings settings, ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
         return new PluginClientRequest(
@@ -16,7 +21,7 @@ internal static class PluginClientRequests
             provider: provider.Name.Value,
             model: settings.Model,
             baseUri: provider.BaseUri,
-            apiKey: apiKey,
+            apiKey: credential.ApiKey,
             requiresApiKey: provider.RequiresApiKey,
             organization: provider.Organization,
             project: provider.Project,
@@ -30,6 +35,9 @@ internal static class PluginClientRequests
             serviceTier: settings.ServiceTier,
             speed: settings.Speed,
             modelOptions: model.Options,
-            httpHeaders: settings.EffectiveHttpHeaders);
+            httpHeaders: settings.EffectiveHttpHeaders)
+        {
+            Handler = credential.Handler
+        };
     }
 }

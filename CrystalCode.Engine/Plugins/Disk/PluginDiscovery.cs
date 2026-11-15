@@ -17,17 +17,20 @@ internal sealed class PluginDiscovery
         _home = home;
     }
 
-    public IReadOnlyList<DiscoveredPlugin> Collect(string workspaceRoot, IList<string> notes)
+    public IReadOnlyList<DiscoveredPlugin> Collect(string workspaceRoot, IList<string> notes, bool homeOnly = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceRoot);
         ArgumentNullException.ThrowIfNull(notes);
         var found = new Dictionary<string, DiscoveredPlugin>(ExternalToolNames.OverlayComparer);
         Scan(_home.PluginsDirectory, PluginSource.Home, found, notes);
-        Scan(
-            Path.Combine(workspaceRoot, PluginFiles.CrystalDirectory, PluginFiles.DirectoryName),
-            PluginSource.Project,
-            found,
-            notes);
+        if (!homeOnly)
+        {
+            Scan(
+                Path.Combine(workspaceRoot, PluginFiles.CrystalDirectory, PluginFiles.DirectoryName),
+                PluginSource.Project,
+                found,
+                notes);
+        }
         return [.. found.Values
             .Where(static item => item.Manifest.Enabled)
             .OrderBy(static item => item.DirectoryName, ExternalToolNames.OverlayComparer)];

@@ -86,6 +86,30 @@ public sealed record PluginClientRequest
 
     public IReadOnlyDictionary<string, string> HttpHeaders { get; }
 
+    /// <summary>
+    /// Gets the handler of the account login this request belongs to, or null
+    /// for an API key provider. The factory must send every request through
+    /// it, because it attaches the credential; <see cref="ApiKey"/> is empty
+    /// then. Build the client with <see cref="CreateHttpClient"/>.
+    /// </summary>
+    public DelegatingHandler? Handler { get; init; }
+
+    /// <summary>
+    /// Builds an HTTP client that sends through <see cref="Handler"/>. The
+    /// client owns the handler and disposes it. Without a handler this is a
+    /// plain client.
+    /// </summary>
+    public HttpClient CreateHttpClient(TimeSpan timeout)
+    {
+        if (Handler is null)
+        {
+            return new HttpClient { Timeout = timeout };
+        }
+
+        Handler.InnerHandler ??= new SocketsHttpHandler();
+        return new HttpClient(Handler, disposeHandler: true) { Timeout = timeout };
+    }
+
     public string Protocol { get; }
 
     public string Provider { get; }

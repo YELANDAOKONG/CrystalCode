@@ -4,7 +4,7 @@ Operators add in-process extensions as **plugins**. A plugin is one
 directory, one `plugin.json`, and one assembly in its own load context.
 It can contribute tools, a protocol client, approval classifiers, slash
 commands, process commands (admitted, not yet run), hooks, raw hooks, prompt
-placeholders, and syntax tokenizers. A
+placeholders, syntax tokenizers, and account logins. A
 plugin is executable code the operator chose to install, so the contract does
 not fence what it replaces: it may take over built-in tools, slash verbs,
 and protocols. After the host has
@@ -101,8 +101,8 @@ a tool needs `ToolHostContext`. Do not reference `CrystalCode.Engine`,
 `CrystalCode`, `CrystalCode.Display`, or `CrystalCode.Providers`.
 
 `Contribute` returns tools, client factories, classifiers, commands,
-hooks, raw hooks, prompt placeholders, status fields, and syntax tokenizers.
-A null entry is omitted with a note. One bad plugin does not
+hooks, raw hooks, prompt placeholders, status fields, syntax tokenizers, and
+account logins. A null entry is omitted with a note. One bad plugin does not
 stop the others.
 
 `Attach` runs after `Contribute`, once plugins, external tools, and skills
@@ -189,6 +189,46 @@ protocol.
 responsibility. Plugins that construct either type with a previous signature
 must rebuild against the current contract. Update positional calls to the
 current parameter order or use named arguments.
+
+### Account logins
+
+A provider entry with `"type": "authentication"` names an `integration`. A
+plugin supplies one with `IPluginAuthentication`, added through
+`PluginContribution.WithAuthentications`. The original constructor is
+unchanged and leaves `Authentications` empty.
+
+| Member | Meaning |
+| :--- | :--- |
+| `Id` | The token a provider entry puts in `integration`: a letter, then letters, digits, `_`, or `-`, 1 to 64 characters. A missing, invalid, or repeated id is omitted with a note. A first-party integration with the same id wins |
+| `Validate(PluginAccount)` | Returns null, or a plain-English reason the entry is refused. Check that tokens go only to the address you issued them for |
+| `LoginAsync(account, vault, login, token)` | Runs the sign-in and saves the result through `IPluginVault` |
+| `CreateHandler(account, vault)` | The handler that attaches the credential, renews it, and retries once after a 401 |
+| `RevokeAsync(...)` | Optional. Ends the remote session before the host deletes the saved login and returns a warning when it was not confirmed |
+
+`PluginAccount` carries the provider name, protocol token, `BaseUri`, and
+model names, and no credential. `IPluginVault` is the plugin's slot in
+`~/.crystal/authentication-credentials.json`: opaque JSON text that the host
+writes atomically with owner-only access, and `RunExclusiveAsync`, a
+cross-process lock for a rotating refresh token. Never log what the vault
+holds. `IPluginLogin` shows text and a link, asks for pasted text, and tries
+to open a browser; the terminal draws it as a popup, Server as a `login`
+interaction, and Bridge as a form. When `OpenLinkAsync` returns false, call
+`ShowLinkAsync`.
+
+The host passes the handler to the plugin's client factory in
+`PluginClientRequest.Handler`, with `ApiKey` empty. The factory must send
+every request through it; build the client with
+`PluginClientRequest.CreateHttpClient`, which sets the inner handler and owns
+the handler. A factory that ignores `Handler` sends requests with no
+credential. A built-in factory other than the Responses one refuses a handler
+instead.
+
+Throw `PluginAuthenticationException` for a failure the operator can act on;
+the host shows its message as written. From `Validate`, `LoginAsync`, and
+`RevokeAsync` any other exception is shown as its type name only. `crystal
+login` and `crystal logout` load only the operator's plugins under
+`~/.crystal/plugins`, and only when the integration is not first-party,
+because nothing has asked to trust the current directory.
 
 ### Process commands
 
