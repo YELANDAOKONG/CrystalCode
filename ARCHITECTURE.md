@@ -2589,10 +2589,13 @@ An explicit `/thinking off` is refused.
 tier and speed. A token starts with a letter and then uses only letters,
 digits, underscores, and hyphens. The host stores every token in
 lowercase and does not interpret it. `default` is an ordinary token when
-the model lists it. An
+the model lists it. `unset` is reserved: it is the word that clears a slot, so
+a model cannot list it as a token and catalog loading rejects it. An
 unset slot is omitted from the request. `/tier` and `/speed` (alias
-`/fast`) cycle the current model's list, including the unset slot, or
-select a listed token. Each choice is stored per model in
+`/fast`) cycle the current model's list, including the unset slot, select a
+listed token, or clear the slot with `unset`. Every side-model `tier` and
+`speed` subcommand accepts `unset` the same way, and the option catalog gives
+the unset value that command so a front end can set it directly. Each choice is stored per model in
 `tierSelections` and `speedSelections`. A switch during a turn or
 compaction applies on the next turn. An empty list means that slot is not
 offered.

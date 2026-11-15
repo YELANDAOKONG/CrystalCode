@@ -342,9 +342,9 @@ internal static class SessionOptionCatalog
     }
 
     /// <summary>
-    /// Tier and speed tokens. Unset is listed so the current value is always
-    /// one of the values; the command can cycle back to it but not name it,
-    /// so its <see cref="SessionOptionValue.Command"/> is empty.
+    /// Tier and speed tokens. Unset is listed first and has its own command,
+    /// <c>unset</c> after the slot word. The word cannot be a catalog token,
+    /// so the value is never ambiguous.
     /// </summary>
     private static SessionOption Slot(
         string id,
@@ -359,7 +359,7 @@ internal static class SessionOptionCatalog
             category,
             current ?? Unset,
             [
-                new SessionOptionValue(Unset, "Unset", string.Empty),
+                new SessionOptionValue(Unset, "Unset", command + " " + CatalogToken.Unset),
                 .. tokens.Select(token => new SessionOptionValue(token, DisplayCase.Token(token), command + " " + token))
             ]);
 

@@ -292,7 +292,10 @@ routes above are unchanged; Fill stays in the client.
 | `document_model_enabled` | `document_model` |
 
 Set the model picker to a `provider/model` value and use the switch to
-enable it. A picker shows `unset` until a model has been configured. Turning
+enable it. Every tier and speed option lists `unset` first, and `PUT` with
+`unset` clears that slot; `unset` is not a catalog token, so it never names a
+model's own value. A value with no command, such as a stored model that left
+the catalog, appears only while current and is rejected by `PUT`. A picker shows `unset` until a model has been configured. Turning
 the switch off retains the model and its tuning. Changing the model preserves
 the switch state. Enabling requires a configured model. These writes require
 admin scope. Clients that previously sent `off` to a model picker now use its

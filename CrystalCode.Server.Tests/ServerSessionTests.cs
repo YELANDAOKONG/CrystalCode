@@ -127,6 +127,13 @@ public sealed class ServerSessionTests
                 && reviewer.GetProperty("speed").GetString() == "Speed Fast");
 
         Assert.Equal("fast", Option(speed, "approval_speed").GetProperty("current").GetString());
+        var cleared = await PutAsync(fixture, fixture.Http, "/options/approval_speed", new { value = "unset" });
+        Assert.Equal("unset", Option(cleared, "approval_speed").GetProperty("current").GetString());
+        await events.WaitForAsync(
+            "chrome.changed",
+            static value => value.GetProperty("data").GetProperty("chrome").GetProperty("reviewer") is { ValueKind: JsonValueKind.Object } reviewer
+                && reviewer.GetProperty("speed").GetString() == string.Empty);
+        await PutAsync(fixture, fixture.Http, "/options/approval_speed", new { value = "fast" });
         var chrome = changed.GetProperty("data").GetProperty("chrome");
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("compaction").ValueKind);
         Assert.Equal(JsonValueKind.Null, chrome.GetProperty("image").ValueKind);

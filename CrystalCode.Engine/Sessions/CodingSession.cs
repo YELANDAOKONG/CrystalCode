@@ -4076,9 +4076,14 @@ public sealed class CodingSession : ITurnObserver
             return true;
         }
 
+        if (CatalogToken.IsUnset(request.Token))
+        {
+            return true;
+        }
+
         if (!CatalogToken.TryNormalize(request.Token, out var token) || !CatalogSlots.Contains(tokens, token))
         {
-            Error(label + " is not available for the " + noun + ". Available: " + string.Join(", ", tokens));
+            Error(label + " is not available for the " + noun + ". Available: unset, " + string.Join(", ", tokens));
             return false;
         }
 
@@ -4287,10 +4292,14 @@ public sealed class CodingSession : ITurnObserver
             var current = serviceTier ? prospective.ServiceTier : prospective.Speed;
             selected = CatalogSlots.Next(current, tokens);
         }
+        else if (CatalogToken.IsUnset(argument))
+        {
+            selected = null;
+        }
         else if (!CatalogToken.TryNormalize(argument, out var token) || !CatalogSlots.Contains(tokens, token))
         {
             Error(
-                label + " is not available for this model. Available: " + string.Join(", ", tokens));
+                label + " is not available for this model. Available: unset, " + string.Join(", ", tokens));
             return;
         }
         else

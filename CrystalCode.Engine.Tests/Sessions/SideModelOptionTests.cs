@@ -39,6 +39,7 @@ public sealed class SideModelOptionTests
         Assert.Equal("_crystal_compaction", tier.Category);
         Assert.Equal("unset", tier.Current);
         Assert.Equal(["unset", "flex", "priority"], tier.Values.Select(static value => value.Value));
+        Assert.Equal("/compact tier unset", tier.Values[0].Command);
         Assert.Equal("/compact tier flex", tier.Values[1].Command);
 
         var thinking = options.Single(static option => option.Id == "compaction_thinking");
@@ -62,6 +63,12 @@ public sealed class SideModelOptionTests
         Assert.Equal(
             "flex",
             headless.Session.ListOptions().Single(static option => option.Id == "compaction_tier").Current);
+
+        await headless.Session.SubmitAsync(tier.Values[0].Command, CancellationToken.None);
+        Assert.Equal(
+            "unset",
+            headless.Session.ListOptions().Single(static option => option.Id == "compaction_tier").Current);
+        await headless.Session.SubmitAsync(tier.Values[1].Command, CancellationToken.None);
 
         await headless.Session.SubmitAsync("/compact model off", CancellationToken.None);
         Assert.Equal("flex", headless.Session.ListOptions().Single(static option => option.Id == "compaction_tier").Current);

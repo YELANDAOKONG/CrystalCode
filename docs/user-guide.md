@@ -864,7 +864,7 @@ are not supported by the current adapter.
 | `thinking` | Whether the model accepts reasoning hints |
 | `thinkingEfforts` | Effort tokens this endpoint accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. `max` and `maximum` are different tokens. The host stores each token in lowercase and sends it unchanged |
 | `thinkingCanDisable` | Whether `/thinking off` is accepted (default `true`). Built-in Gemini 3 models set this to `false` |
-| `serviceTiers` | Service-tier tokens this model accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. The host stores each token in lowercase and does not interpret it. `default` is sent when it is listed; it does not mean unset. An empty or omitted list means this model has no service tier |
+| `serviceTiers` | Service-tier tokens this model accepts. A token starts with a letter and then uses only letters, digits, underscores, and hyphens. The host stores each token in lowercase and does not interpret it. `default` is sent when it is listed; it does not mean unset. `unset` is reserved for clearing a slot and cannot be listed. An empty or omitted list means this model has no service tier |
 | `speeds` | Speed tokens this model accepts, using the same token rules. `fast` and `ultrafast` belong here when the endpoint accepts them. An empty or omitted list means this model has no speed |
 | `imageInput` | Whether this model may receive images (default `false`; supported by all built-in protocols) |
 | `audioInput` | Declared audio input (default `false`). Stored and visible to plugins. The host does not accept or send audio |
@@ -1622,7 +1622,8 @@ changing the approval model. `/status` adds Approval model and Approval
 thinking rows only while the switch is on, and `/status full` lists the
 effective `retry` and `approvalRetry` policies. The status bar does not.
 `/approval tier` and `/approval speed` cycle the approval model's service
-tier and speed, including the unset slot, or set a token that model lists,
+tier and speed, including the unset slot, or set a token that model lists
+(`unset` clears the slot),
 and write `config.json`. An unset slot sends no tier or speed; the session
 `/tier` and `/speed` choice does not apply to the approval model.
 `/approval context` cycles or sets the approval model's own context budget the

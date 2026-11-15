@@ -521,7 +521,7 @@ public sealed class CodingSessionTopicTests
         Assert.Equal(
             ["set", "clear", "regenerate", "on", "off", "resume", "model", "thinking", "tier", "speed", "context"],
             topic.ArgumentOptions.Select(static item => item.Name));
-        Assert.Equal(["flex"], topic.ArgumentOptions.Single(static item => item.Name == "tier").ArgumentOptions.Select(static item => item.Name));
+        Assert.Equal(["unset", "flex"], topic.ArgumentOptions.Single(static item => item.Name == "tier").ArgumentOptions.Select(static item => item.Name));
         Assert.Equal(["100k", "200k"], topic.ArgumentOptions.Single(static item => item.Name == "context").ArgumentOptions.Select(static item => item.Name));
 
         var describe = Command(headless, "describe");

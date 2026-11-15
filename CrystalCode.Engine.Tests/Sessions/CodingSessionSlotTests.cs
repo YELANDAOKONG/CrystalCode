@@ -20,9 +20,9 @@ public sealed class CodingSessionSlotTests
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: Settings());
         await headless.Session.StartAsync(CancellationToken.None);
         var menu = headless.Observer.Events.OfType<SlashCommandsChanged>().Last().Commands;
-        Assert.Equal(["flex", "default"], menu.Single(item => item.Name == "tier").Arguments!.Select(item => item.Name));
+        Assert.Equal(["unset", "flex", "default"], menu.Single(item => item.Name == "tier").Arguments!.Select(item => item.Name));
         Assert.Equal(
-            ["fast", "ultrafast"],
+            ["unset", "fast", "ultrafast"],
             menu.Single(item => item.Name == "speed").Arguments!.Select(item => item.Name));
 
         await headless.Session.SubmitAsync("/tier", CancellationToken.None);
@@ -37,6 +37,13 @@ public sealed class CodingSessionSlotTests
         Assert.Equal("Speed Ultrafast", headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.Speed);
         await headless.Session.SubmitAsync("/speed", CancellationToken.None);
         Assert.Equal(string.Empty, headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.Speed);
+
+        await headless.Session.SubmitAsync("/fast", CancellationToken.None);
+        await headless.Session.SubmitAsync("/speed unset", CancellationToken.None);
+        Assert.Equal(string.Empty, headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.Speed);
+        await headless.Session.SubmitAsync("/tier unset", CancellationToken.None);
+        Assert.Equal(string.Empty, headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome.ServiceTier);
+        await headless.Session.SubmitAsync("/tier default", CancellationToken.None);
 
         await headless.Session.SubmitAsync("/tier missing", CancellationToken.None);
         Assert.Contains(

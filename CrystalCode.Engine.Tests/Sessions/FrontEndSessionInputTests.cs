@@ -195,7 +195,7 @@ public sealed class FrontEndSessionInputTests
     }
 
     [Fact]
-    public void TierAndSpeed_ListUnsetWithoutACommand()
+    public void TierAndSpeed_ListUnsetWithItsOwnCommand()
     {
         var provider = new ProviderDefinition(
             new ProviderName("scripted"),
@@ -208,9 +208,11 @@ public sealed class FrontEndSessionInputTests
 
         var tier = options.Single(static option => option.Id == "tier");
         Assert.Equal("unset", tier.Current);
-        Assert.Equal(string.Empty, tier.Values[0].Command);
+        Assert.Equal("/tier unset", tier.Values[0].Command);
         Assert.Equal("/tier flex", tier.Values[1].Command);
-        Assert.Equal("/speed fast", options.Single(static option => option.Id == "speed").Values[1].Command);
+        var speed = options.Single(static option => option.Id == "speed");
+        Assert.Equal("/speed unset", speed.Values[0].Command);
+        Assert.Equal("/speed fast", speed.Values[1].Command);
         Assert.Equal("/model scripted model", options.Single(static option => option.Id == "model").Values.Single().Command);
     }
 

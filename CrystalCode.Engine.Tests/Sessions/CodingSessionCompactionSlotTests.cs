@@ -45,7 +45,7 @@ public sealed class CodingSessionCompactionSlotTests
         headless.Observer.Clear();
         await headless.Session.SubmitAsync("/compact speed warp", CancellationToken.None);
         Assert.Equal(
-            "Speed is not available for the compaction model. Available: fast",
+            "Speed is not available for the compaction model. Available: unset, fast",
             LastError(headless));
 
         await headless.Session.SubmitAsync("/compact model plain", CancellationToken.None);
@@ -102,8 +102,8 @@ public sealed class CodingSessionCompactionSlotTests
         var tier = compact.Arguments!.Single(argument => argument.Name == "tier");
         var speed = compact.Arguments!.Single(argument => argument.Name == "speed");
 
-        Assert.Equal(["flex", "priority"], tier.Arguments!.Select(item => item.Name));
-        Assert.Equal(["fast"], speed.Arguments!.Select(item => item.Name));
+        Assert.Equal(["unset", "flex", "priority"], tier.Arguments!.Select(item => item.Name));
+        Assert.Equal(["unset", "fast"], speed.Arguments!.Select(item => item.Name));
         var context = compact.Arguments!.Single(argument => argument.Name == "context");
         Assert.Equal(["100k", "200k"], context.Arguments!.Select(item => item.Name));
     }

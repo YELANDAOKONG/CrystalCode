@@ -26,6 +26,17 @@ public sealed class CatalogSlotTests
             () => new ModelSettings(1000, speeds: ["bad token"]));
     }
 
+    [Theory]
+    [InlineData("unset")]
+    [InlineData("Unset")]
+    public void Normalize_RejectsTheReservedUnsetWord(string token)
+    {
+        Assert.Throws<ArgumentException>(() => new ModelSettings(1000, serviceTiers: [token]));
+        Assert.Throws<ArgumentException>(() => new ModelSettings(1000, speeds: [token]));
+        Assert.False(CatalogToken.TryNormalize(token, out _));
+        Assert.True(CatalogToken.IsUnset(" " + token + " "));
+    }
+
     [Fact]
     public void Normalize_AcceptsUnderscoreInTokens()
     {

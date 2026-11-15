@@ -555,8 +555,9 @@ approval, extended approval, compaction, topic, and resource description
 models appear whenever the configured model offers the choice. An unset tier or
 speed is omitted from requests. An unset context is shown as the model's
 first declared budget. A select lists only values with a command plus the current value;
-`tier` and `speed` can cycle back to unset but not name it, so unset is shown
-only while current. Values grouped by provider use ACP's grouped options.
+`tier` and `speed` name unset with `unset`, which clears the slot (`/tier unset`).
+Only a value with no command, such as a stored model that left the catalog, is
+shown while current and cannot be chosen. Values grouped by provider use ACP's grouped options.
 
 ### Choosing which options are offered
 

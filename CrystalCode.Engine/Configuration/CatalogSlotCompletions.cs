@@ -10,7 +10,12 @@ public static class CatalogSlotCompletions
     public static IReadOnlyList<SlashCompletion> For(IReadOnlyList<string> tokens)
     {
         ArgumentNullException.ThrowIfNull(tokens);
-        var options = new List<SlashCompletion>(tokens.Count);
+        var options = new List<SlashCompletion>(tokens.Count + 1);
+        if (tokens.Count > 0)
+        {
+            options.Add(new SlashCompletion(CatalogToken.Unset, "Unset", [CatalogToken.Unset]));
+        }
+
         foreach (var token in tokens)
         {
             options.Add(new SlashCompletion(token, DisplayCase.Token(token), [token]));

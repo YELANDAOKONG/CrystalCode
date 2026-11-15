@@ -214,7 +214,13 @@ public sealed class BridgeConfigOptionsTests
         var unset = await fixture.RequestAsync(
             "session/set_config_option",
             new { sessionId = id, configId = "compaction_tier", value = "unset" });
-        Assert.Equal(-32602, unset.GetProperty("error").GetProperty("code").GetInt32());
+        var unsetOption = unset.GetProperty("result").GetProperty("configOptions").EnumerateArray()
+            .Single(static option => option.GetProperty("id").GetString() == "compaction_tier");
+        Assert.Equal("unset", unsetOption.GetProperty("currentValue").GetString());
+
+        await fixture.RequestAsync(
+            "session/set_config_option",
+            new { sessionId = id, configId = "compaction_tier", value = "priority" });
 
         var snapshot = (await fixture.RequestAsync("_crystal/snapshot", new { sessionId = id })).GetProperty("result");
         var compaction = snapshot.GetProperty("chrome").GetProperty("compaction");
