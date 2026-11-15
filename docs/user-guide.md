@@ -79,7 +79,7 @@ or `CrystalCode` on Windows.
 
 The full list is in [TODO.md](../TODO.md). Nothing there is scheduled.
 High priority, and not in this build: a NuGet package; MCP resources, prompts, elicitation, and roots
-(MCP tools are in this build); the Agent Client Protocol (ACP), named Bridge (`crystal bridge`); a refactor
+(MCP tools are in this build); a refactor
 of `crystal run`; image generation; and a built-in web search tool. Medium priority, and not in this build: automatically
 fetching model-list information from a provider, a full code review, child Agent configuration, and provider-specific
 custom-format tools such as OpenAI's `apply_patch`. Low priority, and not in
@@ -90,9 +90,7 @@ and switchable thinking-chain compression remain deferred. That last one
 would, after each thinking pass, ask a model to compress and summarize
 that thinking according to a requirement. Context compaction,
 microcompaction, `/verbose thinking`, and a provider's summarized
-thinking display are not that path. ACP would be an editor-facing front
-end, not an engine or provider protocol, and not a `crystal bridge`
-command yet. `--disable-tool` only omits a built-in for one process. The
+thinking display are not that path. `--disable-tool` only omits a built-in for one process. The
 product has two built-in modes, Plan and Work, plus operator-defined custom modes. Built-in provider
 protocols are DeepSeek, OpenAI-compatible Chat Completions, OpenAI
 Responses, Anthropic Messages, Gemini, and Ollama. A plugin may add

@@ -5,7 +5,7 @@
 Crystal Code works in a local repository through a streaming terminal UI. Ask it to inspect code, plan a change, or edit files. Plan, Work, and custom modes, tool approvals, and workspace boundaries keep you in control of what it can do.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![.NET](https://img.shields.io/badge/.NET-10%2B-512BD4.svg)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-11-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20linux--musl%20%7C%20macos%20%7C%20windows-informational.svg)](#get-started)
 [![Tests](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/test.yml)
 [![Release](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml/badge.svg)](https://github.com/YELANDAOKONG/CrystalCode/actions/workflows/release.yml)
@@ -22,7 +22,8 @@ Crystal Code works in a local repository through a streaming terminal UI. Ask it
 - **🎛️ Choose how work happens.** Plan mode offers built-in reading and planning tools; Work mode also enables file edits and shell commands. Tool calls follow a risk-aware approval policy.
 - **🧵 Keep a conversation going.** Resume or fork saved sessions, switch models with `/model`, and compact older context automatically or with `/compact`.
 - **🔌 Use the model endpoints you prefer.** Built-in DeepSeek, OpenAI, Gemini, and Ollama providers are available, and you can configure OpenAI-compatible Chat Completions, OpenAI Responses, and Anthropic Messages (Claude) endpoints.
-- **🧩 Extend the workflow.** Load skills and operator tool sets from your home directory or workspace. Image-capable models can receive workspace or clipboard images.
+- **🧩 Extend the workflow.** Load skills, plugins, operator tool sets, and MCP server tools from your home directory or workspace. Image-capable models can receive workspace or clipboard images.
+- **🔐 Sign in with an account.** A provider declared with `"type": "authentication"` (the ChatGPT account integration) signs in with `crystal login` or `/login` instead of an API key.
 - **👥 Delegate inside the session.** When child Agents are enabled, the model can hand a bounded task to `general`, read-only `explore`, or Work-only `work`. They are off by default. `/agents` configures them; `/child` or F7 inspects one.
 
 Crystal Code is the coding product built on the sibling [Crystal](https://github.com/YELANDAOKONG/Crystal) library. The terminal is its operator surface.
@@ -92,6 +93,9 @@ Type these inside a running session; `/help` lists them all.
 | `/resume` | Choose a saved session for this workspace, another directory, or every workspace |
 | `/fork` | Branch the current conversation into a new session |
 | `/compact` | Summarize older context now |
+| `/pursue` | Work toward an objective until a checker model finds it met |
+| `/login` | Sign in to an account provider; `/logout` removes the login |
+| `/stats` | Show session token and tool statistics |
 | `/agents` | List child Agents, or turn them on, set concurrency, or choose a model |
 | `/child` | Inspect one child session, or return to the parent |
 | `/help` | Show all commands and shortcuts |
@@ -113,6 +117,9 @@ Run these from your shell. The interactive terminal, `crystal server`, and `crys
 | `crystal version` | Print the build identity and exit |
 | `crystal plugins` | List, show, enable, or disable one operator plugin outside a session |
 | `crystal tools` | List, show, enable, or disable one operator tool set outside a session |
+| `crystal mcp` | List, show, enable, or disable one MCP server outside a session |
+| `crystal login [provider]` | Sign in to an account provider. Without a provider, list account providers and their login state. `--no-browser` prints the link instead of opening it |
+| `crystal logout [provider]` | Remove the saved login of an account provider |
 | `crystal skills` | List or show the skills found for the workspace outside a session. Skills have no enable or disable here |
 | `crystal promptsets` | List, show, enable, or disable one Home prompt set. Enabling one turns the others off |
 | `crystal prompt-attachments` | List, show, enable, or disable one prompt attachment in Home or the workspace |
