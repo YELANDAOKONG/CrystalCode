@@ -1,4 +1,5 @@
 using Crystal.Chat;
+using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Plugins;
 
 namespace CrystalCode.Engine.Configuration;
@@ -11,13 +12,20 @@ public static class ChatClientFactory
     public static IStreamingChatClient Create(
         HarnessSettings settings,
         string apiKey,
+        PluginRegistry? registry = null) =>
+        Create(settings, new ProviderCredential(apiKey), registry);
+
+    public static IStreamingChatClient Create(
+        HarnessSettings settings,
+        ProviderCredential credential,
         PluginRegistry? registry = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         if (settings.ActiveProvider.RequiresApiKey)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+            ArgumentException.ThrowIfNullOrWhiteSpace(credential.ApiKey);
         }
-        return (registry ?? PluginRegistry.CreateBuiltIn()).CreateClient(settings, apiKey);
+        return (registry ?? PluginRegistry.CreateBuiltIn()).CreateClient(settings, credential);
     }
 }

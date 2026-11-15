@@ -4,6 +4,8 @@ using Crystal.Chat;
 using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Tools;
+using CrystalCode.Engine.Authentication;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Plugins.Providers;
@@ -23,6 +25,7 @@ public sealed class PluginRegistry
     private readonly Dictionary<string, IToolContribution> _replacements = new(StringComparer.Ordinal);
     private readonly IReadOnlyDictionary<string, IToolContribution> _replacementView;
     private readonly List<IChatClientFactory> _clients = [];
+    private readonly List<IAuthenticationIntegration> _integrations = [];
     private readonly List<IApprovalClassifier> _classifiers = [];
     private readonly List<ISlashCommand> _commands = [];
     private readonly HashSet<string> _toolNames = new(StringComparer.Ordinal);
@@ -45,6 +48,18 @@ public sealed class PluginRegistry
     public IReadOnlyDictionary<string, IToolContribution> Replacements => _replacementView;
 
     public IReadOnlyList<IChatClientFactory> Clients => _clients;
+
+    /// <summary>
+    /// Gets the registered authentication integrations.
+    /// </summary>
+    public IReadOnlyList<IAuthenticationIntegration> Integrations => _integrations;
+
+    public IAuthenticationIntegration? FindIntegration(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        return _integrations.FirstOrDefault(
+            integration => string.Equals(integration.Id, id.Trim(), StringComparison.Ordinal));
+    }
 
     public IReadOnlyList<IApprovalClassifier> Classifiers => _classifiers;
 
@@ -108,6 +123,19 @@ public sealed class PluginRegistry
         {
             ArgumentNullException.ThrowIfNull(client);
             _clients.Add(client);
+        }
+
+        foreach (var integration in contribution.Integrations)
+        {
+            ArgumentNullException.ThrowIfNull(integration);
+            if (string.IsNullOrWhiteSpace(integration.Id)
+                || FindIntegration(integration.Id) is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Plugin '{name}' contributed a duplicate or empty integration id '{integration.Id}'.");
+            }
+
+            _integrations.Add(integration);
         }
 
         foreach (var classifier in contribution.Classifiers)
@@ -251,19 +279,23 @@ public sealed class PluginRegistry
         return tools;
     }
 
-    public IStreamingChatClient CreateClient(HarnessSettings settings, string apiKey)
+    public IStreamingChatClient CreateClient(HarnessSettings settings, string apiKey) =>
+        CreateClient(settings, new ProviderCredential(apiKey));
+
+    public IStreamingChatClient CreateClient(HarnessSettings settings, ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         if (settings.ActiveProvider.RequiresApiKey)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+            ArgumentException.ThrowIfNullOrWhiteSpace(credential.ApiKey);
         }
         var protocol = settings.ActiveProvider.Protocol;
         foreach (var factory in _clients)
         {
             if (factory.CanCreate(protocol))
             {
-                return factory.Create(settings, apiKey);
+                return factory.Create(settings, credential);
             }
         }
 
@@ -273,12 +305,18 @@ public sealed class PluginRegistry
 
     public IStreamingMultimodalChatClient? CreateMultimodalClient(
         HarnessSettings settings,
-        string apiKey)
+        string apiKey) =>
+        CreateMultimodalClient(settings, new ProviderCredential(apiKey));
+
+    public IStreamingMultimodalChatClient? CreateMultimodalClient(
+        HarnessSettings settings,
+        ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         if (settings.ActiveProvider.RequiresApiKey)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+            ArgumentException.ThrowIfNullOrWhiteSpace(credential.ApiKey);
         }
         if (!settings.ActiveModel.ImageInput)
         {
@@ -290,7 +328,7 @@ public sealed class PluginRegistry
         {
             if (factory.CanCreate(protocol))
             {
-                return factory.CreateMultimodal(settings, apiKey);
+                return factory.CreateMultimodal(settings, credential);
             }
         }
 

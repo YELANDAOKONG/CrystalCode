@@ -192,7 +192,7 @@ public sealed class Workspace
 
             if (index + 1 < segments.Length
                 && segments[index].Equals(".crystal", StringComparison.OrdinalIgnoreCase)
-                && segments[index + 1].Equals("credentials.json", StringComparison.OrdinalIgnoreCase))
+                && IsCredentialFileName(segments[index + 1]))
             {
                 return true;
             }
@@ -200,6 +200,10 @@ public sealed class Workspace
 
         return false;
     }
+
+    private static bool IsCredentialFileName(string name) =>
+        name.Equals("credentials.json", StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("authentication-credentials.", StringComparison.OrdinalIgnoreCase);
 
     public IEnumerable<string> EnumerateFiles(string directoryFullPath)
     {

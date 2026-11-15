@@ -29,6 +29,10 @@ public sealed class CrystalHome
 
     public string CredentialsPath => Path.Combine(Root, "credentials.json");
 
+    public string AuthenticationCredentialsPath => Path.Combine(Root, "authentication-credentials.json");
+
+    public string AuthenticationCredentialsLockPath => Path.Combine(Root, "authentication-credentials.lock");
+
     public string PermissionsPath => Path.Combine(Root, "permissions.json");
 
     public string TrustedPath => Path.Combine(Root, "trusted.json");

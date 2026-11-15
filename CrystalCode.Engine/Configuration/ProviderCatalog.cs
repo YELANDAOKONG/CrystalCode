@@ -216,6 +216,8 @@ public sealed class ProviderCatalog
             replacement.ThinkingDisplay ?? existing.ThinkingDisplay,
             replacement.ResourceTrim ?? existing.ResourceTrim,
             replacement.RequireAssistantContent,
-            HeaderSettings.Merge(existing.HttpHeaders, replacement.HttpHeaders));
+            HeaderSettings.Merge(existing.HttpHeaders, replacement.HttpHeaders),
+            replacement.Type,
+            replacement.Integration);
     }
 }

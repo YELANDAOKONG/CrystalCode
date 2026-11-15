@@ -287,6 +287,7 @@ internal static class SettingsMapper
         }
 
         var protocol = ProviderProtocol.Parse(entry.Protocol);
+        var type = ProviderTypeText.Parse(name, entry.Type);
         return new ProviderDefinition(
             ProviderName.Parse(name),
             protocol,
@@ -304,7 +305,9 @@ internal static class SettingsMapper
             EndpointOptionsReader.Read(name, protocol, entry.Options),
             ReadResourceTrim(entry.ResourceTrim),
             entry.RequireAssistantContent ?? false,
-            HeaderSettings.Read(entry.HttpHeaders, $"provider {name} httpHeaders", allowNull: true));
+            HeaderSettings.Read(entry.HttpHeaders, $"provider {name} httpHeaders", allowNull: true),
+            type,
+            entry.Integration);
     }
 
     private static ResourceTrimOverride? ReadResourceTrim(ProviderResourceTrimDocument? document) =>
@@ -361,6 +364,8 @@ internal static class SettingsMapper
 
         return new ProviderDocument
         {
+            Type = provider.Type == ProviderType.Authentication ? ProviderTypeText.Authentication : null,
+            Integration = provider.Integration,
             Protocol = provider.Protocol.Value,
             BaseUri = provider.BaseUri.AbsoluteUri,
             Organization = provider.Organization,
@@ -370,8 +375,8 @@ internal static class SettingsMapper
             TokenLimit = provider.TokenLimit.Value,
             ApiKeyEnvironment = provider.ApiKeyEnvironment,
             ApiKey = provider.ApiKey,
-            RequiresApiKey = provider.RequiresApiKey ==
-                (provider.Protocol != ProviderProtocol.Ollama)
+            RequiresApiKey = provider.Type == ProviderType.Authentication
+                || provider.RequiresApiKey == (provider.Protocol != ProviderProtocol.Ollama)
                     ? null
                     : provider.RequiresApiKey,
             Options = EndpointOptionsReader.Write(provider.ThinkingDisplay),

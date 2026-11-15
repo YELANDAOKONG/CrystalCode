@@ -22,7 +22,9 @@ public sealed record ProviderDefinition
         ThinkingDisplay? thinkingDisplay = null,
         ResourceTrimOverride? resourceTrim = null,
         bool requireAssistantContent = false,
-        IReadOnlyDictionary<string, string?>? httpHeaders = null)
+        IReadOnlyDictionary<string, string?>? httpHeaders = null,
+        ProviderType type = ProviderType.Key,
+        string? integration = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(protocol);
@@ -50,7 +52,37 @@ public sealed record ProviderDefinition
                 nameof(thinkingDisplay));
         }
 
+        if (!Enum.IsDefined(type))
+        {
+            throw new ArgumentOutOfRangeException(nameof(type));
+        }
+
+        if (type == ProviderType.Authentication)
+        {
+            if (string.IsNullOrWhiteSpace(integration))
+            {
+                throw new ArgumentException(
+                    $"Provider '{name.Value}' has type authentication and needs an integration.",
+                    nameof(integration));
+            }
+
+            if (models.Count == 0)
+            {
+                throw new ArgumentException(
+                    $"Provider '{name.Value}' has type authentication and must list its own models.",
+                    nameof(models));
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(integration))
+        {
+            throw new ArgumentException(
+                $"Provider '{name.Value}' names an integration but its type is not authentication.",
+                nameof(integration));
+        }
+
         Name = name;
+        Type = type;
+        Integration = type == ProviderType.Authentication ? integration!.Trim() : null;
         Protocol = protocol;
         BaseUri = baseUri;
         Models = new ReadOnlyDictionary<string, ModelSettings>(
@@ -63,7 +95,8 @@ public sealed record ProviderDefinition
         TokenLimit = tokenLimit ?? TokenLimitStyle.ForProtocol(protocol);
         ApiKeyEnvironment = apiKeyEnvironment;
         ApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey.Trim();
-        RequiresApiKey = requiresApiKey ?? protocol != ProviderProtocol.Ollama;
+        RequiresApiKey = type == ProviderType.Key
+            && (requiresApiKey ?? protocol != ProviderProtocol.Ollama);
         ResourceTrim = resourceTrim;
         HttpHeaders = HeaderSettings.Copy(httpHeaders);
         ThinkingDisplay = thinkingDisplay == ThinkingDisplay.Omitted
@@ -72,6 +105,13 @@ public sealed record ProviderDefinition
     }
 
     public ProviderName Name { get; }
+
+    public ProviderType Type { get; }
+
+    /// <summary>
+    /// Gets the registered authentication integration id, or null for a key provider.
+    /// </summary>
+    public string? Integration { get; }
 
     public ProviderProtocol Protocol { get; }
 

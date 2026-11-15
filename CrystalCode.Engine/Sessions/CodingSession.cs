@@ -6345,11 +6345,19 @@ public sealed class CodingSession : ITurnObserver
 
     private IStreamingChatClient CreateClient(HarnessSettings settings)
     {
-        if (!_credentials.TryResolve(settings.ActiveProvider, out var apiKey, out var error))
+        if (!_credentials.TryOpen(settings.ActiveProvider, _plugins, out var credential, out var error))
         {
             throw new InvalidOperationException(error);
         }
 
+        // A disk plugin cannot carry an account login, so an authentication
+        // provider is served only by the in-process registry.
+        if (credential.Handler is not null)
+        {
+            return ChatClientFactory.Create(settings, credential, _plugins);
+        }
+
+        var apiKey = credential.ApiKey;
         if (_loadedPlugins.TryCreateOverrideClient(settings, apiKey, out var overridden)
             && overridden is not null)
         {
@@ -6370,7 +6378,7 @@ public sealed class CodingSession : ITurnObserver
     private IStreamingMultimodalChatClient? CreateMultimodalClient(
         HarnessSettings settings)
     {
-        if (!_credentials.TryResolve(settings.ActiveProvider, out var apiKey, out var error))
+        if (!_credentials.TryOpen(settings.ActiveProvider, _plugins, out var credential, out var error))
         {
             throw new InvalidOperationException(error);
         }
@@ -6380,9 +6388,14 @@ public sealed class CodingSession : ITurnObserver
             return null;
         }
 
+        var apiKey = credential.ApiKey;
         var protocol = settings.ActiveProvider.Protocol;
         IStreamingMultimodalChatClient? client;
-        if (!_loadedPlugins.OverridesProtocol(settings)
+        if (credential.Handler is not null)
+        {
+            client = MultimodalChatClientFactory.Create(settings, credential, _plugins);
+        }
+        else if (!_loadedPlugins.OverridesProtocol(settings)
             && _plugins.Clients.Any(factory => factory.CanCreate(protocol)))
         {
             client = MultimodalChatClientFactory.Create(settings, apiKey, _plugins);

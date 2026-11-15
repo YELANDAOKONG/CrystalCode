@@ -1,5 +1,7 @@
 using System.Text.Json;
+using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Plugins;
 
 namespace CrystalCode.Engine.Home;
 
@@ -16,6 +18,62 @@ public sealed class CredentialStore
     {
         ArgumentNullException.ThrowIfNull(home);
         _home = home;
+        Authentication = new AuthenticationCredentialStore(home);
+    }
+
+    /// <summary>
+    /// Gets the saved account logins for authentication providers.
+    /// </summary>
+    public AuthenticationCredentialStore Authentication { get; }
+
+    /// <summary>
+    /// Resolves what a client needs. An authentication provider needs a saved
+    /// login and a registered integration; this never touches the network.
+    /// </summary>
+    public bool TryOpen(
+        ProviderDefinition provider,
+        PluginRegistry plugins,
+        out ProviderCredential credential,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(plugins);
+        credential = new ProviderCredential(string.Empty);
+        if (provider.Type != ProviderType.Authentication)
+        {
+            if (!TryResolve(provider, out var apiKey, out error))
+            {
+                return false;
+            }
+
+            credential = new ProviderCredential(apiKey);
+            return true;
+        }
+
+        if (!TryResolve(provider, out _, out error))
+        {
+            return false;
+        }
+
+        var integration = plugins.FindIntegration(provider.Integration!);
+        if (integration is null)
+        {
+            error = $"Provider {provider.Name.Value} needs integration '{provider.Integration}', which is not registered.";
+            return false;
+        }
+
+        var invalid = integration.Validate(provider);
+        if (invalid is not null)
+        {
+            error = $"Provider {provider.Name.Value}: {invalid}";
+            return false;
+        }
+
+        credential = new ProviderCredential(
+            string.Empty,
+            integration.CreateHandler(provider, Authentication.Open(provider)));
+        error = string.Empty;
+        return true;
     }
 
     public bool TryResolve(
@@ -24,6 +82,19 @@ public sealed class CredentialStore
         out string error)
     {
         ArgumentNullException.ThrowIfNull(provider);
+
+        if (provider.Type == ProviderType.Authentication)
+        {
+            apiKey = string.Empty;
+            if (Authentication.IsSignedIn(provider))
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            error = $"Provider {provider.Name.Value} is not signed in. Run crystal login {provider.Name.Value}.";
+            return false;
+        }
 
         var fromEnvironment = ReadEnvironment(provider);
         if (!string.IsNullOrWhiteSpace(fromEnvironment))
