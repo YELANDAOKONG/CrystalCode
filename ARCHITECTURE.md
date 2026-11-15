@@ -299,9 +299,12 @@ layout.
 
 Binds engine settings to the Providers adapters. Owns the built-in provider
 catalog and vendor default values, and one client factory and plugin per
-built-in protocol (`ConnectionsHost` registers them). Only the Responses
-factory can send requests through an integration handler; the other
-factories refuse one. A model's optional `responses` object (`ResponsesRequestSettings`)
+built-in protocol (`ConnectionsHost` registers them). Every built-in
+factory sends requests through an integration handler when it receives one:
+it builds its `HttpClient` around the handler (`CredentialHttp`) and the
+adapter skips its own key header because the key is empty. A factory that
+does not override the credential overloads refuses a handler instead of
+dropping it. A model's optional `responses` object (`ResponsesRequestSettings`)
 sets `systemAsInstructions`, `includeEncryptedReasoning`, and `omitSampling`
 for endpoints whose request shape differs. Omitted switches default to
 `false`, `true`, `false`, except that a request carrying an integration handler

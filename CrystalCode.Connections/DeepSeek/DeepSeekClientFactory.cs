@@ -1,5 +1,6 @@
 using Crystal.Chat;
 using Crystal.Multimodal.Chat;
+using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Providers.DeepSeek;
@@ -17,45 +18,55 @@ public sealed class DeepSeekClientFactory : IChatClientFactory
         return protocol == ProviderProtocol.DeepSeek;
     }
 
-    public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
+    public IStreamingChatClient Create(HarnessSettings settings, string apiKey) =>
+        Create(settings, new ProviderCredential(apiKey));
+
+    public IStreamingMultimodalChatClient CreateMultimodal(
+        HarnessSettings settings,
+        string apiKey) =>
+        CreateMultimodal(settings, new ProviderCredential(apiKey));
+
+    public IStreamingChatClient Create(HarnessSettings settings, ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         if (settings.ActiveProvider.RequiresApiKey)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+            ArgumentException.ThrowIfNullOrWhiteSpace(credential.ApiKey);
         }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
-        return new DeepSeekProvider(
-            new DeepSeekOptions(
-                apiKey,
-                settings.Model,
-                provider.BaseUri,
-                maxTokens: settings.MaxOutputTokens,
-                serviceTier: settings.ServiceTier,
-                speed: settings.Speed,
-                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
+        var options = new DeepSeekOptions(
+            credential.ApiKey,
+            settings.Model,
+            provider.BaseUri,
+            maxTokens: settings.MaxOutputTokens,
+            serviceTier: settings.ServiceTier,
+            speed: settings.Speed,
+            modelOptions: model.Options);
+        return new DeepSeekProvider(options, CredentialHttp.Client(credential, options.RequestTimeout), settings.EffectiveHttpHeaders);
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
         HarnessSettings settings,
-        string apiKey)
+        ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         if (settings.ActiveProvider.RequiresApiKey)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+            ArgumentException.ThrowIfNullOrWhiteSpace(credential.ApiKey);
         }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
-        return new DeepSeekMultimodalProvider(
-            new DeepSeekOptions(
-                apiKey,
-                settings.Model,
-                provider.BaseUri,
-                maxTokens: settings.MaxOutputTokens,
-                serviceTier: settings.ServiceTier,
-                speed: settings.Speed,
-                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
+        var options = new DeepSeekOptions(
+            credential.ApiKey,
+            settings.Model,
+            provider.BaseUri,
+            maxTokens: settings.MaxOutputTokens,
+            serviceTier: settings.ServiceTier,
+            speed: settings.Speed,
+            modelOptions: model.Options);
+        return new DeepSeekMultimodalProvider(options, CredentialHttp.Client(credential, options.RequestTimeout), settings.EffectiveHttpHeaders);
     }
 }

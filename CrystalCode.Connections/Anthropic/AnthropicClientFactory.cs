@@ -1,5 +1,6 @@
 using Crystal.Chat;
 using Crystal.Multimodal.Chat;
+using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Providers.Anthropic;
@@ -14,49 +15,59 @@ public sealed class AnthropicClientFactory : IChatClientFactory
         return protocol == ProviderProtocol.Anthropic;
     }
 
-    public IStreamingChatClient Create(HarnessSettings settings, string apiKey)
+    public IStreamingChatClient Create(HarnessSettings settings, string apiKey) =>
+        Create(settings, new ProviderCredential(apiKey));
+
+    public IStreamingMultimodalChatClient CreateMultimodal(
+        HarnessSettings settings,
+        string apiKey) =>
+        CreateMultimodal(settings, new ProviderCredential(apiKey));
+
+    public IStreamingChatClient Create(HarnessSettings settings, ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         if (settings.ActiveProvider.RequiresApiKey)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+            ArgumentException.ThrowIfNullOrWhiteSpace(credential.ApiKey);
         }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
-        return new AnthropicProvider(
-            new AnthropicOptions(
-                apiKey,
-                settings.Model,
-                provider.BaseUri,
-                maxTokens: settings.MaxOutputTokens,
-                vendorName: provider.Name.Value,
-                summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
-                serviceTier: settings.ServiceTier,
-                speed: settings.Speed,
-                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
+        var options = new AnthropicOptions(
+            credential.ApiKey,
+            settings.Model,
+            provider.BaseUri,
+            maxTokens: settings.MaxOutputTokens,
+            vendorName: provider.Name.Value,
+            summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
+            serviceTier: settings.ServiceTier,
+            speed: settings.Speed,
+            modelOptions: model.Options);
+        return new AnthropicProvider(options, CredentialHttp.Client(credential, options.RequestTimeout), settings.EffectiveHttpHeaders);
     }
 
     public IStreamingMultimodalChatClient CreateMultimodal(
         HarnessSettings settings,
-        string apiKey)
+        ProviderCredential credential)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credential);
         if (settings.ActiveProvider.RequiresApiKey)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+            ArgumentException.ThrowIfNullOrWhiteSpace(credential.ApiKey);
         }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
-        return new AnthropicMultimodalProvider(
-            new AnthropicOptions(
-                apiKey,
-                settings.Model,
-                provider.BaseUri,
-                maxTokens: settings.MaxOutputTokens,
-                vendorName: provider.Name.Value,
-                summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
-                serviceTier: settings.ServiceTier,
-                speed: settings.Speed,
-                modelOptions: model.Options), httpClient: null, httpHeaders: settings.EffectiveHttpHeaders);
+        var options = new AnthropicOptions(
+            credential.ApiKey,
+            settings.Model,
+            provider.BaseUri,
+            maxTokens: settings.MaxOutputTokens,
+            vendorName: provider.Name.Value,
+            summarizeThinking: provider.ThinkingDisplay != ThinkingDisplay.Omitted,
+            serviceTier: settings.ServiceTier,
+            speed: settings.Speed,
+            modelOptions: model.Options);
+        return new AnthropicMultimodalProvider(options, CredentialHttp.Client(credential, options.RequestTimeout), settings.EffectiveHttpHeaders);
     }
 }

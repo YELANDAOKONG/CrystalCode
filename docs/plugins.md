@@ -220,8 +220,8 @@ The host passes the handler to the plugin's client factory in
 every request through it; build the client with
 `PluginClientRequest.CreateHttpClient`, which sets the inner handler and owns
 the handler. A factory that ignores `Handler` sends requests with no
-credential. A built-in factory other than the Responses one refuses a handler
-instead.
+credential. Every built-in factory sends through the handler; a host factory
+that does not support one refuses it instead of dropping it.
 
 Throw `PluginAuthenticationException` for a failure the operator can act on;
 the host shows its message as written. From `Validate`, `LoginAsync`, and
