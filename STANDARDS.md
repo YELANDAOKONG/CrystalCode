@@ -33,7 +33,8 @@
   repository root, project folders beside it, tests as
   `{Project}.Tests` siblings (`CrystalCode.Tests`,
   `CrystalCode.Engine.Tests`, `CrystalCode.Display.Tests`,
-  `CrystalCode.Providers.Tests`). No `src/` or root `tests/` tree.
+  `CrystalCode.Providers.Tests`, `CrystalCode.Connections.Tests`,
+  `CrystalCode.Authentication.Tests`). No `src/` or root `tests/` tree.
 - Engine code never calls `Console`, never draws, and never reads keys.
   Report through a `SessionEvent` or a `SessionFrontEnd` contract. New
   events are sealed immutable records, one per file under
@@ -279,6 +280,11 @@ CrystalCode.Engine.Tests.
 Token resolution, `crystal server --help`, `crystal bridge --help`, and
 Bridge console rebinding are tested in CrystalCode.Tests. Frame,
 composer, and paint behavior is tested in CrystalCode.Display.Tests.
-Adapters are tested in CrystalCode.Providers.Tests.
+Adapters are tested in CrystalCode.Providers.Tests. The built-in factories and
+the starter catalog are tested in CrystalCode.Connections.Tests, and the
+ChatGPT integration (sign-in against a fake authorization server, token
+renewal, the 401 retry, cross-process refresh, and token-leak checks) in
+CrystalCode.Authentication.Tests. Test projects register the contribution they
+need through a module initializer, as the executable does in `Main`.
 `EngineAssemblyTests` and `DisplayAssemblyTests`
 guard the dependency direction and must not be weakened to make a change pass.
