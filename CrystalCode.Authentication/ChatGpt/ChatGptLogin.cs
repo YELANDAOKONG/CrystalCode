@@ -45,9 +45,8 @@ internal sealed class ChatGptLogin
             .ConfigureAwait(false);
         if (!await interaction.OpenLinkAsync(link, cancellationToken).ConfigureAwait(false))
         {
-            await interaction.ShowAsync(
-                "Open this address in a browser:" + Environment.NewLine + link,
-                cancellationToken).ConfigureAwait(false);
+            await interaction.ShowLinkAsync("Open this address in a browser:", link, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         var returned = await WaitForCallbackAsync(callback, interaction, cancellationToken)

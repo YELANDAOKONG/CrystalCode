@@ -340,16 +340,20 @@ the terminal supplies, so Server and Bridge refuse it (Server classifies both
 verbs as admin, Bridge lists neither and refuses both). `crystal server`,
 `crystal bridge`, and `crystal run` use a saved login, and a missing one is
 an error, never a prompt. `/login <provider> [--no-browser]` and `/logout <provider>` take one
-provider name; a bare command lists the account providers and their state as
-a note and never signs in or out. Completion lists every account provider for
-`/login` (with `--no-browser` nested under each) and only signed-in ones for
-`/logout`, with `Signed In` or `Signed Out` as the help; the menu is rebuilt
-after each sign-in and sign-out. The in-session sign-in (`SessionLoginInteraction`)
-takes a pasted callback address through an operator question with a free-form
-answer: at once when no browser was opened (`--no-browser` or the front end
-could not open one), and after ten seconds when one was, so a normal sign-in
-never flashes it. A pasted answer that is not an http or https address is
-asked for again, and Esc cancels the sign-in. The whole sign-in gives up
+provider name; a bare command shows the account providers and their state as
+a document card (`DocumentWritten`, a table) and never signs in or out.
+Completion lists every account provider for `/login` (with `--no-browser`
+nested under each) and only signed-in ones for `/logout`, with `Signed In` or
+`Signed Out` as the help; the menu is rebuilt after each sign-in and
+sign-out. The front end supplies the sign-in surface through
+`SessionFrontEnd.CreateLoginInteraction(provider, openBrowser)`; one that
+leaves it null (Server, Bridge) refuses `/login`. The terminal draws
+`LoginPopup`: one card with the steps, the link on its own line, and a paste
+field that is live at once. It closes by itself when the browser answers
+first. Esc cancels, and so does Ctrl+C, because `CodingSession.TryInterrupt`
+cancels a waiting sign-in before anything else; either ends with the note
+`Signing in was cancelled.` and frees the next `/login`. A pasted answer that
+is not an http or https address is asked for again. The sign-in gives up
 after five minutes. Logout asks the integration to end
 the remote session, deletes the saved login, and reports when the service
 did not confirm. Disk plugins cannot supply an integration and cannot create a client

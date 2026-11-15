@@ -65,7 +65,7 @@ internal sealed class TerminalHost
             SyntaxReady = syntaxCache.SetService,
             ChooseChildAsync = new ChildPicker(renderer).ChooseAsync,
             ChooseThemeAsync = new ThemePicker(renderer, launch.Home).ChooseAsync,
-            OpenLinkAsync = BrowserLauncher.OpenAsync
+            CreateLoginInteraction = (provider, openBrowser) => new LoginPopup(renderer, provider, openBrowser)
         };
         CodingSession session;
         try

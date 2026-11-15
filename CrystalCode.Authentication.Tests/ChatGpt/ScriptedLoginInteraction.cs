@@ -53,6 +53,12 @@ internal sealed class ScriptedLoginInteraction : ILoginInteraction
         return await _paste.Task;
     }
 
+    public Task ShowLinkAsync(string label, Uri link, CancellationToken cancellationToken)
+    {
+        Shown.Add(label + " " + link);
+        return Task.CompletedTask;
+    }
+
     public async Task<bool> OpenLinkAsync(Uri link, CancellationToken cancellationToken)
     {
         OpenedLink = link;

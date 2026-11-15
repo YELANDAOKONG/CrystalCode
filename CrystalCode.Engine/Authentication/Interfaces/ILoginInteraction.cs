@@ -12,6 +12,12 @@ public interface ILoginInteraction
     Task ShowAsync(string text, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Shows a link with a short label. A front end that draws shows it so it
+    /// can be copied whole, without wrapping it inside a frame.
+    /// </summary>
+    Task ShowLinkAsync(string label, Uri link, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Asks the operator for a line of text. Throws
     /// <see cref="OperationCanceledException"/> when the token is cancelled
     /// before an answer arrives.

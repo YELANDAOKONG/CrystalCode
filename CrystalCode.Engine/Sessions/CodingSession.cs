@@ -1276,6 +1276,7 @@ public sealed class CodingSession : ITurnObserver
     private CancellationTokenSource? _turnSource;
     private CancellationTokenSource? _compactSource;
     private CancellationTokenSource? _loadSource;
+    private CancellationTokenSource? _signInSource;
     private bool _compacting;
     private bool _turnActive;
     private string? _turnUserText;
@@ -2054,6 +2055,12 @@ public sealed class CodingSession : ITurnObserver
     /// </summary>
     public bool TryInterrupt()
     {
+        // A sign-in waiting on the operator or the browser is the topmost thing on screen.
+        if (CancelSignIn())
+        {
+            return true;
+        }
+
         if (_turnActive && _turnSource is not null)
         {
             _turnSource.Cancel();
@@ -6713,11 +6720,31 @@ public sealed class CodingSession : ITurnObserver
 
     private static readonly TimeSpan SignInTimeout = TimeSpan.FromMinutes(5);
 
+    private bool CancelSignIn()
+    {
+        var source = Volatile.Read(ref _signInSource);
+        if (source is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            source.Cancel();
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            // The sign-in ended between the read and the cancel.
+            return false;
+        }
+    }
+
     private async Task SignInAsync(string argument, CancellationToken cancellationToken)
     {
-        if (_frontEnd.OpenLinkAsync is null)
+        if (_frontEnd.CreateLoginInteraction is null)
         {
-            Error("Signing in needs a browser on this machine. Run crystal login <provider> in a terminal.");
+            Error("Signing in needs a screen on this machine. Run crystal login <provider> in a terminal.");
             return;
         }
 
@@ -6730,7 +6757,7 @@ public sealed class CodingSession : ITurnObserver
 
         if (words.Provider.Length == 0)
         {
-            Note(AccountCompletions.Describe(_settings.Catalog, _credentials, "login"));
+            Publish(new DocumentWritten(AccountCompletions.Document(_settings.Catalog, _credentials, "login")));
             return;
         }
 
@@ -6746,19 +6773,19 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        limit.CancelAfter(SignInTimeout);
+        // The operator's cancel and the time limit are separate so the message can say which ended it.
+        using var cancelled = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeout = new CancellationTokenSource(SignInTimeout);
+        using var both = CancellationTokenSource.CreateLinkedTokenSource(cancelled.Token, timeout.Token);
         await _operatorGate.WaitAsync(cancellationToken);
+        Volatile.Write(ref _signInSource, cancelled);
         try
         {
             await new AccountSignIn(_credentials, _plugins).LoginAsync(
                 provider,
-                new SessionLoginInteraction(
-                    Note,
-                    _frontEnd.OpenLinkAsync,
-                    _frontEnd.Questions,
-                    openBrowser: !words.NoBrowser),
-                limit.Token);
+                _frontEnd.CreateLoginInteraction(provider.Name.Value, !words.NoBrowser),
+                both.Token);
+            Note($"Signed in to {provider.Name.Value}.");
         }
         catch (AuthenticationFailedException exception)
         {
@@ -6766,10 +6793,18 @@ public sealed class CodingSession : ITurnObserver
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            Error("Signing in timed out.");
+            if (timeout.IsCancellationRequested)
+            {
+                Error("Signing in timed out.");
+            }
+            else
+            {
+                Note("Signing in was cancelled.");
+            }
         }
         finally
         {
+            Volatile.Write(ref _signInSource, null);
             _operatorGate.Release();
             RefreshSlashCommands();
         }
@@ -6786,7 +6821,7 @@ public sealed class CodingSession : ITurnObserver
 
         if (words.Provider.Length == 0)
         {
-            Note(AccountCompletions.Describe(_settings.Catalog, _credentials, "logout"));
+            Publish(new DocumentWritten(AccountCompletions.Document(_settings.Catalog, _credentials, "logout")));
             return;
         }
 

@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Authentication;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
@@ -81,7 +82,7 @@ public sealed class AccountSignInTests
     [Fact]
     public async Task SlashLogin_WithoutABrowserIsRefusedAndPointsToTheCommand()
     {
-        using var session = AccountSession(openLink: null, out _);
+        using var session = AccountSession(createLogin: null, out _);
         await session.Session.StartAsync(CancellationToken.None);
 
         await session.Session.SubmitAsync("/login", CancellationToken.None);
@@ -94,22 +95,17 @@ public sealed class AccountSignInTests
     [Fact]
     public async Task SlashLogin_RunsTheIntegrationThroughTheFrontEnd()
     {
-        Uri? opened = null;
-        using var session = AccountSession(
-            (link, _) =>
-            {
-                opened = link;
-                return Task.FromResult(true);
-            },
-            out var credentials);
+        var login = new ScriptedLogin();
+        using var session = AccountSession((_, _) => login, out var credentials);
         await session.Session.StartAsync(CancellationToken.None);
 
         await session.Session.SubmitAsync("/login account", CancellationToken.None);
 
-        Assert.Equal("https://example.test/login", opened?.ToString());
+        Assert.Equal(1, login.Opened);
+        Assert.Contains("Opening the sign-in page.", login.Shown);
         Assert.Contains(
             session.Observer.Events.OfType<NoteWritten>(),
-            note => note.Text == "Opening the sign-in page.");
+            note => note.Text == "Signed in to account.");
         Assert.True(credentials().Authentication.IsSignedIn(FakeIntegration.AccountProvider()));
 
         await session.Session.SubmitAsync("/logout account", CancellationToken.None);
@@ -121,7 +117,7 @@ public sealed class AccountSignInTests
     }
 
     private static HeadlessSession AccountSession(
-        Func<Uri, CancellationToken, Task<bool>>? openLink,
+        Func<string, bool, ILoginInteraction>? createLogin,
         out Func<CredentialStore> credentials)
     {
         var settings = HeadlessSession.ScriptedSettings();
@@ -134,14 +130,17 @@ public sealed class AccountSignInTests
         var session = new HeadlessSession(
             new ScriptedStreamingClient(),
             settings: withAccount,
-            openLink: openLink,
+            createLogin: createLogin,
             configurePlugins: registry => registry.Add(new FakeIntegration()));
         credentials = () => new CredentialStore(session.Home);
         return session;
     }
 
-    private sealed class NoInteraction : CrystalCode.Engine.Authentication.Interfaces.ILoginInteraction
+    private sealed class NoInteraction : ILoginInteraction
     {
+        public Task ShowLinkAsync(string label, Uri link, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
         public Task ShowAsync(string text, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task<string> ReadAsync(string prompt, CancellationToken cancellationToken) =>

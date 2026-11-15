@@ -1,6 +1,7 @@
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Engine.Sessions.Transcripts;
 
 namespace CrystalCode.Engine.Authentication;
 
@@ -40,19 +41,29 @@ public static class AccountCompletions
     ];
 
     /// <summary>
-    /// The text a bare <c>/login</c> or <c>/logout</c> shows.
+    /// The table a bare <c>/login</c> or <c>/logout</c> shows.
     /// </summary>
-    public static string Describe(ProviderCatalog catalog, CredentialStore credentials, string verb)
+    public static TranscriptDocument Document(ProviderCatalog catalog, CredentialStore credentials, string verb)
     {
         var accounts = Names(catalog);
         if (accounts.Count == 0)
         {
-            return "No account providers are configured. Add one with \"type\": \"authentication\" to providers.json.";
+            return new TranscriptDocument(
+                "Account providers",
+                [new("paragraph", [], [], ["No account providers are configured. Add one with \"type\": \"authentication\" to providers.json."], 0)]);
         }
 
-        var width = accounts.Max(account => account.Name.Value.Length);
-        var lines = accounts.Select(account => $"  {account.Name.Value.PadRight(width)}  {State(credentials, account)}");
-        return "Account providers\n" + string.Join('\n', lines) + $"\nRun /{verb} <provider>.";
+        return new TranscriptDocument(
+            $"Account providers  {accounts.Count}",
+            [
+                new(
+                    "table",
+                    ["Provider", "Integration", "State"],
+                    [.. accounts.Select(account => (IReadOnlyList<string>)[account.Name.Value, account.Integration!, State(credentials, account)])],
+                    [],
+                    0),
+                new("paragraph", [], [], [$"Run /{verb} <provider>."], 0)
+            ]);
     }
 
     private static IReadOnlyList<ProviderDefinition> Names(ProviderCatalog catalog) =>

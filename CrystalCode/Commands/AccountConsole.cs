@@ -44,7 +44,7 @@ public static class AccountConsole
         {
             await context.SignIn.LoginAsync(
                 context.Provider!,
-                new ConsoleLoginInteraction(output, input, openBrowser: !settings.NoBrowser),
+                new ConsoleLoginInteraction(output, input, openBrowser: !settings.NoBrowser, plain: context.Plain),
                 cancellationToken);
             return 0;
         }

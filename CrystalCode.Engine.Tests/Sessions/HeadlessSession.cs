@@ -36,7 +36,7 @@ internal sealed class HeadlessSession : IDisposable
         IReadOnlyList<CrystalCode.Engine.Mcp.McpServerDefinition>? mcpServers = null,
         IReadOnlyList<DirectoryAccess>? additionalRoots = null,
         Func<IReadOnlyList<string>, string, CancellationToken, Task<string?>>? chooseTheme = null,
-        Func<Uri, CancellationToken, Task<bool>>? openLink = null,
+        Func<string, bool, CrystalCode.Engine.Authentication.Interfaces.ILoginInteraction>? createLogin = null,
         Action<PluginRegistry>? configurePlugins = null)
     {
         ArgumentNullException.ThrowIfNull(client);
@@ -81,7 +81,7 @@ internal sealed class HeadlessSession : IDisposable
             {
                 ChooseChildAsync = chooseChild,
                 ChooseThemeAsync = chooseTheme,
-                OpenLinkAsync = openLink,
+                CreateLoginInteraction = createLogin,
                 McpServers = mcpServers ?? []
             },
             plugins,

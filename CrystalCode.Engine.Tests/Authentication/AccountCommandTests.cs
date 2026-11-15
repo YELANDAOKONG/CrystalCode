@@ -6,8 +6,6 @@ using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Sessions;
-using CrystalCode.Engine.Tools.Questions;
-using CrystalCode.Engine.Tools.Questions.Interfaces;
 
 using Xunit;
 
@@ -66,23 +64,25 @@ public sealed class AccountCommandTests
     }
 
     [Fact]
-    public void Describe_ListsStateOrExplainsHowToAddAProvider()
+    public void Document_IsATableOfStateOrExplainsHowToAddAProvider()
     {
         using var home = new TemporaryHome();
         var credentials = new CredentialStore(home.Home);
 
-        var text = AccountCompletions.Describe(
+        var document = AccountCompletions.Document(
             new ProviderCatalog([FakeIntegration.AccountProvider("one")]), credentials, "login");
+        var empty = AccountCompletions.Document(new ProviderCatalog([]), credentials, "login");
 
-        Assert.Equal("Account providers\n  one  Signed Out\nRun /login <provider>.", text);
-        Assert.Contains(
-            "providers.json",
-            AccountCompletions.Describe(new ProviderCatalog([]), credentials, "login"),
-            StringComparison.Ordinal);
+        Assert.Equal("Account providers  1", document.Title);
+        var table = document.Blocks[0];
+        Assert.Equal(["Provider", "Integration", "State"], table.Columns);
+        Assert.Equal(["one", "fake", "Signed Out"], Assert.Single(table.Rows));
+        Assert.Equal("Run /login <provider>.", Assert.Single(document.Blocks[1].Lines));
+        Assert.Contains("providers.json", Assert.Single(Assert.Single(empty.Blocks).Lines), StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task BareLoginAndLogout_ListAccountsWithoutSigningInOrOut()
+    public async Task BareLoginAndLogout_ShowACardWithoutSigningInOrOut()
     {
         using var session = AccountSession(out _);
         await session.Session.StartAsync(CancellationToken.None);
@@ -90,16 +90,17 @@ public sealed class AccountCommandTests
         await session.Session.SubmitAsync("/login", CancellationToken.None);
         await session.Session.SubmitAsync("/logout", CancellationToken.None);
 
-        var notes = session.Observer.Events.OfType<NoteWritten>().Select(note => note.Text).ToArray();
-        Assert.Contains("Account providers\n  account  Signed Out\nRun /login <provider>.", notes);
-        Assert.Contains("Account providers\n  account  Signed Out\nRun /logout <provider>.", notes);
+        var cards = session.Observer.Events.OfType<DocumentWritten>().Select(card => card.Document).ToArray();
+        Assert.Equal(2, cards.Length);
+        Assert.All(cards, card => Assert.Equal("Account providers  1", card.Title));
+        Assert.Equal("Run /logout <provider>.", cards[1].Blocks[1].Lines[0]);
         Assert.Empty(session.Observer.Events.OfType<ErrorWritten>());
     }
 
     [Fact]
     public async Task TheMenu_RefreshesLoginStateAfterSignInAndSignOut()
     {
-        using var session = AccountSession(out var credentials, openLink: (_, _) => Task.FromResult(true));
+        using var session = AccountSession(out var credentials, createLogin: (_, _) => new ScriptedLogin());
         await session.Session.StartAsync(CancellationToken.None);
         Assert.Equal("Signed Out", LatestHelp(session, "login"));
         Assert.Empty(LatestArguments(session, "logout"));
@@ -117,30 +118,80 @@ public sealed class AccountCommandTests
     }
 
     [Fact]
-    public async Task NoBrowser_NeverOpensTheLinkAndTheFlowShowsItInstead()
+    public async Task NoBrowser_IsPassedToTheFrontEndAndAFailedOpenReportsIt()
     {
-        var opened = 0;
+        string? name = null;
+        bool? openBrowser = null;
+        var login = new ScriptedLogin(opensBrowser: false);
         using var session = AccountSession(
             out _,
-            openLink: (_, _) =>
+            createLogin: (provider, open) =>
             {
-                opened++;
-                return Task.FromResult(true);
+                name = provider;
+                openBrowser = open;
+                return login;
             });
         await session.Session.StartAsync(CancellationToken.None);
 
         await session.Session.SubmitAsync("/login account --no-browser", CancellationToken.None);
 
-        Assert.Equal(0, opened);
+        Assert.Equal(("account", false), (name, openBrowser));
         Assert.Contains(
             session.Observer.Events.OfType<ErrorWritten>(),
             error => error.Text == "The page could not be opened.");
     }
 
     [Fact]
+    public async Task Esc_CancelsTheSignInWithANoteAndTheNextLoginRuns()
+    {
+        var attempts = 0;
+        using var session = AccountSession(
+            out var credentials,
+            createLogin: (_, _) => ++attempts == 1 ? new CancellingLogin() : new ScriptedLogin());
+        await session.Session.StartAsync(CancellationToken.None);
+
+        await session.Session.SubmitAsync("/login account", CancellationToken.None);
+
+        Assert.Contains(
+            session.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text == "Signing in was cancelled.");
+        Assert.Empty(session.Observer.Events.OfType<ErrorWritten>());
+        Assert.False(credentials().Authentication.IsSignedIn(FakeIntegration.AccountProvider()));
+
+        await session.Session.SubmitAsync("/login account", CancellationToken.None);
+
+        Assert.True(credentials().Authentication.IsSignedIn(FakeIntegration.AccountProvider()));
+    }
+
+    [Fact]
+    public async Task TryInterrupt_CancelsAWaitingSignInAndFreesTheNextOne()
+    {
+        var waiting = new WaitingLogin();
+        var attempts = 0;
+        using var session = AccountSession(
+            out var credentials,
+            createLogin: (_, _) => ++attempts == 1 ? waiting : new ScriptedLogin());
+        await session.Session.StartAsync(CancellationToken.None);
+
+        var first = session.Session.SubmitAsync("/login account", CancellationToken.None);
+        await waiting.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.True(session.Session.TryInterrupt());
+        await first.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Contains(
+            session.Observer.Events.OfType<NoteWritten>(),
+            note => note.Text == "Signing in was cancelled.");
+        Assert.False(session.Session.TryInterrupt());
+
+        await session.Session.SubmitAsync("/login account", CancellationToken.None);
+        Assert.True(credentials().Authentication.IsSignedIn(FakeIntegration.AccountProvider()));
+    }
+
+    [Fact]
     public async Task Login_RejectsABadOption()
     {
-        using var session = AccountSession(out _, openLink: (_, _) => Task.FromResult(true));
+        using var session = AccountSession(out _);
         await session.Session.StartAsync(CancellationToken.None);
 
         await session.Session.SubmitAsync("/logout account --no-browser", CancellationToken.None);
@@ -149,45 +200,6 @@ public sealed class AccountCommandTests
             session.Observer.Events.OfType<ErrorWritten>(),
             error => error.Text == "--no-browser applies only to /login.");
     }
-
-    [Fact]
-    public async Task Paste_AsksAtOnceWhenNoBrowserWasOpenedAndReasksOnABadAddress()
-    {
-        var prompt = new ScriptedPrompt("not an address", "https://example.test/auth/callback?code=x");
-        var notes = new List<string>();
-        var interaction = Interaction(notes, prompt, openBrowser: false);
-
-        Assert.False(await interaction.OpenLinkAsync(new Uri("https://example.test/"), CancellationToken.None));
-        var text = await interaction.ReadAsync("Paste it:", CancellationToken.None);
-
-        Assert.Equal("https://example.test/auth/callback?code=x", text);
-        Assert.Equal(2, prompt.Asked);
-        Assert.Contains(notes, note => note.StartsWith("That is not an address", StringComparison.Ordinal));
-        Assert.Equal("Paste it:", prompt.Questions[0].Text);
-        Assert.True(prompt.Questions[0].Custom);
-        Assert.Empty(prompt.Questions[0].Options);
-    }
-
-    [Fact]
-    public async Task Paste_WaitsBeforeAskingAfterABrowserOpenedAndEscCancelsTheSignIn()
-    {
-        var prompt = new ScriptedPrompt(rejected: true);
-        var interaction = Interaction([], prompt, openBrowser: true);
-        Assert.True(await interaction.OpenLinkAsync(new Uri("https://example.test/"), CancellationToken.None));
-
-        using var early = new CancellationTokenSource(TimeSpan.FromMilliseconds(30));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => interaction.ReadAsync("Paste it:", early.Token));
-        Assert.Equal(0, prompt.Asked);
-
-        var error = await Assert.ThrowsAsync<AuthenticationFailedException>(
-            () => interaction.ReadAsync("Paste it:", CancellationToken.None));
-        Assert.Equal("Signing in was cancelled.", error.Message);
-        Assert.Equal(1, prompt.Asked);
-    }
-
-    private static SessionLoginInteraction Interaction(List<string> notes, IUserPrompt prompt, bool openBrowser) =>
-        new(notes.Add, (_, _) => Task.FromResult(true), prompt, openBrowser, pasteDelay: TimeSpan.FromMilliseconds(200));
 
     private static string LatestHelp(HeadlessSession session, string name) =>
         session.Observer.Events.OfType<SlashCommandsChanged>().Last().Commands.Single(item => item.Name == name)
@@ -199,7 +211,7 @@ public sealed class AccountCommandTests
 
     private static HeadlessSession AccountSession(
         out Func<CredentialStore> credentials,
-        Func<Uri, CancellationToken, Task<bool>>? openLink = null)
+        Func<string, bool, ILoginInteraction>? createLogin = null)
     {
         var settings = HeadlessSession.ScriptedSettings();
         var withAccount = new HarnessSettings(
@@ -211,41 +223,42 @@ public sealed class AccountCommandTests
         var session = new HeadlessSession(
             new ScriptedStreamingClient(),
             settings: withAccount,
-            openLink: openLink ?? ((_, _) => Task.FromResult(true)),
+            createLogin: createLogin ?? ((_, _) => new ScriptedLogin()),
             configurePlugins: registry => registry.Add(new FakeIntegration()));
         credentials = () => new CredentialStore(session.Home);
         return session;
     }
 
-    private sealed class ScriptedPrompt : IUserPrompt
+    private sealed class CancellingLogin : ILoginInteraction
     {
-        private readonly Queue<string> _answers;
-        private readonly bool _rejected;
+        public Task ShowAsync(string text, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public ScriptedPrompt(params string[] answers)
+        public Task ShowLinkAsync(string label, Uri link, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<string> ReadAsync(string prompt, CancellationToken cancellationToken) =>
+            throw new OperationCanceledException();
+
+        // The fake integration opens the page first, so Esc is simulated there.
+        public Task<bool> OpenLinkAsync(Uri link, CancellationToken cancellationToken) =>
+            throw new OperationCanceledException();
+    }
+
+    private sealed class WaitingLogin : ILoginInteraction
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task ShowAsync(string text, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ShowLinkAsync(string label, Uri link, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<string> ReadAsync(string prompt, CancellationToken cancellationToken) =>
+            Task.FromResult(string.Empty);
+
+        public async Task<bool> OpenLinkAsync(Uri link, CancellationToken cancellationToken)
         {
-            _answers = new Queue<string>(answers);
-        }
-
-        public ScriptedPrompt(bool rejected)
-        {
-            _answers = new Queue<string>();
-            _rejected = rejected;
-        }
-
-        public int Asked { get; private set; }
-
-        public List<UserQuestion> Questions { get; } = [];
-
-        public ValueTask<QuestionResponse> AskAsync(
-            IReadOnlyList<UserQuestion> questions,
-            CancellationToken cancellationToken = default)
-        {
-            Asked++;
-            Questions.Add(questions[0]);
-            return ValueTask.FromResult(_rejected || _answers.Count == 0
-                ? new QuestionResponse([], IsRejected: true)
-                : new QuestionResponse([[_answers.Dequeue()]], IsRejected: false));
+            Started.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return true;
         }
     }
 }

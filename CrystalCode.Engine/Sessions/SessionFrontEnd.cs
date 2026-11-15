@@ -1,4 +1,5 @@
 using CrystalCode.Engine.Approvals.Interfaces;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Mcp;
@@ -36,11 +37,12 @@ public sealed record SessionFrontEnd(
         ChooseThemeAsync { get; init; }
 
     /// <summary>
-    /// Opens a link in the operator's browser and reports whether it could.
-    /// A front end with no browser on the operator's machine leaves this null,
-    /// and <c>/login</c> then refuses and points to <c>crystal login</c>.
+    /// Creates the sign-in surface for one account provider, given its name and
+    /// whether a browser may be opened. The terminal draws it as a popup. A
+    /// front end with no operator at a local screen leaves this null, and
+    /// <c>/login</c> then refuses and points to <c>crystal login</c>.
     /// </summary>
-    public Func<Uri, CancellationToken, Task<bool>>? OpenLinkAsync { get; init; }
+    public Func<string, bool, ILoginInteraction>? CreateLoginInteraction { get; init; }
 
     /// <summary>
     /// Servers with <see cref="McpServerSource.Session"/>, connected after
