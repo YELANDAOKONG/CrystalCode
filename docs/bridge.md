@@ -460,8 +460,10 @@ Crystal-aware client can tell sources apart. Child events also carry
   where the arguments name one), resolved by the same workspace resolver
   approval uses.
 - Content: `edit`, `multi_edit`, `write`, and `apply_patch` send `diff` entries (`path`,
-  `oldText`, `newText`) computed from disk before execution, one per file;
-  a Delete is a diff with empty `newText` and `_meta.crystal.delete`. Results
+  `oldText`, `newText`) computed from disk before execution, one per file.
+  With `multi_edit` and `continue_on_error`, diffs cover the files that pass
+  preflight, while `locations` still lists the resolved requested paths.
+  A Delete is a diff with empty `newText` and `_meta.crystal.delete`. Results
   send the tool text as `content`. Tool images send `image` blocks with the
   bytes from `TryGetImage`. `bash` results keep the full text; long output is
   bounded by the existing tool output limit.

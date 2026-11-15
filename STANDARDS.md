@@ -134,6 +134,8 @@
   reviewer Allow from executing without the operator. Path checks follow
   symbolic links to their final target. A link that leaves the workspace is outside
   the workspace.
+- `multi_edit` with `continue_on_error` still classifies the full requested
+  path set. Access denials and invalid batches reject the whole call.
 - When Skills is enabled, any path
   inside a Skills search directory (`skill` / `skills` trees)
   auto-passes as a workspace read. Credential paths stay Forbidden,

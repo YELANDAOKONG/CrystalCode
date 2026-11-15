@@ -107,7 +107,8 @@ public sealed class MultiEditTool : ITool
         if (failures.Count > 0)
         {
             var summary = $"Edited files: {results.Count}. Failed files: {failures.Count}.";
-            var report = string.Join(ToolOutputText.LineSeparator, new[] { summary }.Concat(failures).Concat(results));
+            var report = summary + ToolOutputText.LineSeparator
+                + string.Join(ToolOutputText.LineSeparator, failures.Concat(results));
             return ValueTask.FromResult(new ToolOutput(ToolOutputText.Truncate(report), ToolResultStatus.Failure));
         }
 

@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using Crystal.Tools;
+
 using CrystalCode.Bridge.Tests.Support;
 
 using Xunit;
@@ -164,6 +166,42 @@ public sealed class BridgeToolTests
             diff => Assert.Equal("gamma", diff.GetProperty("newText").GetString()));
         Assert.Equal("beta", File.ReadAllText(first));
         Assert.Equal("gamma", File.ReadAllText(second));
+    }
+
+    [Fact]
+    public async Task MultiEdit_ContinueOnError_PreviewsEligibleFilesAndReportsPartialResult()
+    {
+        var model = new ScriptedModel(false,
+            ScriptedModel.ToolRound("call-1", "multi_edit",
+                """
+                {"continue_on_error":true,"files":[
+                  {"path":"missing.txt","edits":[{"old_string":"alpha","new_string":"beta"}]},
+                  {"path":"notes.txt","edits":[{"old_string":"alpha","new_string":"gamma"}]}
+                ]}
+                """),
+            ScriptedModel.TextRound("edited"));
+        await using var fixture = await BridgeFixture.StartAsync(model, options: static launch => launch with { Approval = "edit" });
+        var path = Path.Combine(fixture.Workspace, "notes.txt");
+        File.WriteAllText(path, "alpha");
+        var id = await fixture.OpenAsync();
+
+        await fixture.RequestAsync("session/prompt", new { sessionId = id, prompt = new[] { new { type = "text", text = "edit" } } });
+
+        var updates = fixture.Updates().Where(static update => ToolCallId(update) == "call-1").ToArray();
+        var announced = updates.First(static update => update.GetProperty("_meta").GetProperty("crystal")
+            .GetProperty("event").GetString() == "ToolCallsIssued");
+        Assert.Equal(2, announced.GetProperty("locations").GetArrayLength());
+        var diff = Assert.Single(announced.GetProperty("content").EnumerateArray());
+        Assert.Equal("notes.txt", Path.GetFileName(diff.GetProperty("path").GetString()));
+        Assert.Equal("gamma", diff.GetProperty("newText").GetString());
+
+        var modelResult = Assert.Single(model.Requests[^1].Items.OfType<ToolResult>());
+        Assert.Equal(ToolResultStatus.Failure, modelResult.Status);
+        Assert.Contains("missing.txt: File not found", modelResult.Text, StringComparison.Ordinal);
+        Assert.Contains("Edited notes.txt. Replacements: 1.", modelResult.Text, StringComparison.Ordinal);
+        Assert.Equal("failed", updates[^1].GetProperty("status").GetString());
+        Assert.Equal(modelResult.Text, updates[^1].GetProperty("rawOutput").GetProperty("text").GetString());
+        Assert.Equal("gamma", File.ReadAllText(path));
     }
 
     [Fact]

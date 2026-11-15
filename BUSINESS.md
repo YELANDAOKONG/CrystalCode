@@ -57,6 +57,9 @@ separate library with no terminal code. The product can:
   (edit, multi_edit, write, multi-file patches, shell, and session-local background shell
   tasks); operator tool sets
   may add extra catalog entries to either;
+- let a `multi_edit` call opt into continuing after individual file errors
+  with `continue_on_error`. The option defaults to false. The model receives
+  the failed paths, their error messages, and the completed edits;
 - define custom modes as directories `modes/<name>/` under `~/.crystal` and
   `<workspace>/.crystal`, each with `mode.json` and `prompt.md`. A custom mode
   names the built-in tools it exposes, carries its own system prompt, and is

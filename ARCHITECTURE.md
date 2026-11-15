@@ -1582,21 +1582,31 @@ A reusable grant for a patch is keyed by its sorted set of paths, not by the
 patch body. Plan does not offer it. Edit and Review let a workspace patch pass
 without review, like `edit` and `write`.
 
-`multi_edit` takes a nonempty `files` array. Each entry names an existing
+`multi_edit` takes a nonempty `files` array and an optional boolean
+`continue_on_error` that defaults to false. Each entry names an existing
 UTF-8 file and a nonempty array of `edits`. Resolved paths must be unique in
 the batch. Each edit uses `edit`'s exact matching rules and sees the text from
-earlier edits to its file. The engine checks every entry and computes all
-results before writing anything. Files and intermediate results share the
-workspace write limit. Unchanged text, including line endings, is preserved,
-as is the UTF-8 byte order mark.
+earlier edits to its file. The engine preflights files before writing anything.
+When an edit fails preflight, the tool skips all replacements for that file.
+Files and intermediate results share the workspace write limit. Unchanged
+text and the UTF-8 byte order mark are preserved.
 
 Approval covers the riskiest target, and reusable grants are keyed by the
-sorted set of supplied paths. The tool compares each file with its original
-bytes under the write handle before committing that file. Files are committed
-in array order and each changed file is written once. A commit failure reports
-the failing file and any earlier completed files. The result reports per-file
-replacement counts. The terminal approval card shows the requested
-replacements, and ACP previews the computed before and after text.
+sorted set of supplied paths. Invalid arguments, duplicate resolved paths,
+and access denials reject the batch. Cancellation stops execution. The tool
+compares each file with its original bytes under the write handle before
+committing that file. Files are committed in array order and each changed file
+is written once.
+
+By default, the first preflight error prevents all writes and the first
+commit error stops later writes. With `continue_on_error` set to true,
+preflight and commit errors are recorded per file and processing continues.
+Any file error returns a failure status. The result lists failed paths and
+reasons first, then completed paths with their replacement counts, subject to
+the tool output limit. A write I/O error asks the model to reread the file
+before retrying because its contents may have changed. The terminal approval
+card shows the requested replacements, and ACP previews the computed before
+and after text for files that passed preflight in a batch eligible to proceed.
 
 ## Approval
 
