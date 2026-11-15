@@ -746,6 +746,11 @@ implemented in the current build.
   method, or plugin contract for them. A sign-in keeps the engine free of vendor names
   and the console, never puts tokens in source, logs, diagnostics, or on a
   command line, and makes `crystal run` fail instead of asking the operator.
+- Request-shape switches for protocols other than `responses`. Only a
+  `responses` model can adapt its request to an endpoint that differs from
+  the public API; the other built-in protocols cannot. Which fields, and
+  whether each protocol gets its own model object, are not defined. Do not
+  reserve a field or a model object for them.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
   a library is also published are not defined. Do not reserve a package id or
   add a project. This item is not permission to add or update a package

@@ -163,6 +163,16 @@ behavior stands until a specific change defines otherwise.
   has no way to hand a client the sign-in link, so Bridge signs in with
   `/login` and a form instead. Do not reserve a wire field, ACP
   method, or plugin contract for them. See MCP gaps for remote MCP server OAuth.
+- Request-shape switches for protocols other than `responses`. A model of a
+  `responses` provider may carry a `responses` object (`systemAsInstructions`,
+  `includeEncryptedReasoning`, `omitSampling`) so one codec fits endpoints
+  that differ from the public API, such as an account endpoint. The OpenAI
+  compatible, Anthropic, Gemini, DeepSeek, and Ollama protocols have no such
+  object, and an endpoint that rejects a field they always send cannot be
+  adapted from `providers.json`. Which fields, and whether each protocol
+  gets its own object like `responses`, are not defined; design it against a
+  real endpoint, not ahead of one. Do not reserve a field or a model object
+  for them.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.
