@@ -13,6 +13,8 @@ internal interface IProtocolCodec
 
     byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream);
 
+    IReadOnlyList<string> ReservedHeaders => [];
+
     void AddHeaders(HttpRequestMessage request, string apiKey);
 
     ChatResponse ReadResponse(JsonElement root);

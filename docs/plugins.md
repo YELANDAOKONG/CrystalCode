@@ -170,7 +170,8 @@ a letter, then letters, digits, `_`, or `-`. Put that token in
 
 `PluginClientRequest` carries the endpoint and API key for that call. Do not
 log the key. `HttpHeaders` contains the effective global and endpoint request
-headers; apply them to each provider request and do not log their values.
+headers. Apply them to each request, validate them for the protocol, and keep
+their values out of diagnostics.
 `ModelOptions` carries the model's JSON `options` object, or null
 when omitted. The factory interprets and validates the object. Read sampling
 settings there in place of the former `Temperature` and `TopP` properties.

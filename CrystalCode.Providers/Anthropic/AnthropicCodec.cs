@@ -14,6 +14,8 @@ namespace CrystalCode.Providers.Anthropic;
 
 internal sealed class AnthropicCodec : IProtocolCodec
 {
+    private const string ApiKeyHeader = "x-api-key";
+    private const string VersionHeader = "anthropic-version";
     internal const string ReasoningStateFormat = "anthropic.messages.thinking";
 
     // Blocks the provider ran for the model, such as web search calls and their
@@ -33,13 +35,15 @@ internal sealed class AnthropicCodec : IProtocolCodec
 
     public string Path => "messages";
 
+    public IReadOnlyList<string> ReservedHeaders => [ApiKeyHeader, VersionHeader];
+
     public void AddHeaders(HttpRequestMessage request, string apiKey)
     {
         if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+            request.Headers.TryAddWithoutValidation(ApiKeyHeader, apiKey);
         }
-        request.Headers.TryAddWithoutValidation("anthropic-version", AnthropicVersion);
+        request.Headers.TryAddWithoutValidation(VersionHeader, AnthropicVersion);
     }
 
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)

@@ -76,6 +76,8 @@ internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
         return JsonSerializer.SerializeToUtf8Bytes(root);
     }
 
+    public IReadOnlyList<string> ReservedHeaders => _textCodec.ReservedHeaders;
+
     public void AddHeaders(HttpRequestMessage request, string apiKey) =>
         _textCodec.AddHeaders(request, apiKey);
 

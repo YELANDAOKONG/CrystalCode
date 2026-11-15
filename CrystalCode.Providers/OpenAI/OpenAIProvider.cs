@@ -52,7 +52,10 @@ public sealed class OpenAIProvider : IStreamingChatClient, IDisposable
             faults: new CompatibleFaults(
                 typeof(OpenAIException),
                 static (message, statusCode, inner, errorCode, retryAfter) =>
-                    new OpenAIException(message, statusCode, inner, errorCode, retryAfter)));
+                    new OpenAIException(message, statusCode, inner, errorCode, retryAfter)))
+        {
+            ReservedHeaders = [CompatibleWire.OrganizationHeader, CompatibleWire.ProjectHeader]
+        };
     }
 
     /// <inheritdoc />

@@ -7,9 +7,7 @@ internal static class HeaderSettings
 {
     private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Authorization", "Proxy-Authorization", "Accept", "User-Agent", "Host",
-        "OpenAI-Organization", "OpenAI-Project", "x-api-key", "x-goog-api-key",
-        "anthropic-version", "Transfer-Encoding", "Connection"
+        "Proxy-Authorization", "Transfer-Encoding", "Connection"
     };
 
     public static IReadOnlyDictionary<string, string?> Read(JsonElement? json, string location, bool allowNull)

@@ -13,7 +13,7 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
     private readonly CompatibleOptions _options;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
-    private readonly IReadOnlyDictionary<string, string>? _httpHeaders;
+    private readonly IReadOnlyDictionary<string, string> _httpHeaders;
 
     public CompatibleChatClient(
         CompatibleProfile profile,
@@ -26,9 +26,7 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
 
         _profile = profile;
         _options = options;
-        _httpHeaders = httpHeaders is null
-            ? null
-            : new Dictionary<string, string>(httpHeaders, StringComparer.OrdinalIgnoreCase);
+        _httpHeaders = RequestHeaders.Validate(httpHeaders, profile.ReservedHeaders);
         if (httpClient is null)
         {
             _httpClient = new HttpClient
@@ -146,25 +144,19 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
             new MediaTypeWithQualityHeaderValue(stream ? "text/event-stream" : "application/json"));
         if (!string.IsNullOrWhiteSpace(_options.Organization))
         {
-            request.Headers.TryAddWithoutValidation("OpenAI-Organization", _options.Organization);
+            request.Headers.TryAddWithoutValidation(CompatibleWire.OrganizationHeader, _options.Organization);
         }
 
         if (!string.IsNullOrWhiteSpace(_options.Project))
         {
-            request.Headers.TryAddWithoutValidation("OpenAI-Project", _options.Project);
+            request.Headers.TryAddWithoutValidation(CompatibleWire.ProjectHeader, _options.Project);
         }
 
         var completionOption = stream
             ? HttpCompletionOption.ResponseHeadersRead
             : HttpCompletionOption.ResponseContentRead;
 
-        if (_httpHeaders is not null)
-        {
-            foreach (var (name, value) in _httpHeaders)
-            {
-                request.Headers.TryAddWithoutValidation(name, value);
-            }
-        }
+        RequestHeaders.Apply(request, _httpHeaders);
 
         HttpResponseMessage? response = null;
         try

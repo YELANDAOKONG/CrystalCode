@@ -17,11 +17,12 @@ public sealed class HttpHeaderSettingsTests
         store.LoadOrCreate();
         File.WriteAllText(root.Home.ConfigPath, """
             { "provider": "local", "model": "test", "httpHeaders": {
-              "X-Client": "client", "X-Region": "global", "X-Trace": "on" } }
+              "X-Client": "client", "X-Region": "global", "X-Trace": "on",
+              "User-Agent": "global/1.0", "Host": "gateway.example", "x-goog-api-key": "example" } }
             """);
         File.WriteAllText(root.Home.ProvidersPath, """
             { "local": { "protocol": "ollama", "baseUri": "http://localhost:11434/",
-              "httpHeaders": { "x-region": "local", "x-trace": null },
+              "httpHeaders": { "x-region": "local", "x-trace": null, "user-agent": null, "host": "local.example" },
               "models": { "test": { "contextWindow": 10000 } } } }
             """);
 
@@ -29,6 +30,9 @@ public sealed class HttpHeaderSettingsTests
         Assert.Equal("client", settings.EffectiveHttpHeaders["x-client"]);
         Assert.Equal("local", settings.EffectiveHttpHeaders["X-Region"]);
         Assert.False(settings.EffectiveHttpHeaders.ContainsKey("X-Trace"));
+        Assert.False(settings.EffectiveHttpHeaders.ContainsKey("User-Agent"));
+        Assert.Equal("local.example", settings.EffectiveHttpHeaders["Host"]);
+        Assert.Equal("example", settings.EffectiveHttpHeaders["x-goog-api-key"]);
         store.Save(settings.WithApproval(settings.Approval));
         Assert.Equal("local", store.Load().EffectiveHttpHeaders["X-REGION"]);
         var written = SettingsMapper.WriteProviders(settings.Catalog);
@@ -37,8 +41,25 @@ public sealed class HttpHeaderSettingsTests
         Assert.Null(provider.HttpHeaders["X-Trace"]);
     }
 
+    [Fact]
+    public void CreateClient_ValidatesGlobalHeadersForTheSelectedProtocol()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(root.Home.ConfigPath, """
+            { "httpHeaders": { "X-Goog-Api-Key": "example" } }
+            """);
+
+        var settings = store.Load();
+        using var client = Assert.IsAssignableFrom<IDisposable>(ChatClientFactory.Create(settings, "test-key"));
+        var geminiModel = settings.Catalog.GetModelNames(ProviderName.Gemini).First();
+        var gemini = settings.WithSelection(ProviderName.Gemini, geminiModel);
+        Assert.Throws<InvalidOperationException>(() => ChatClientFactory.Create(gemini, "test-key"));
+    }
+
     [Theory]
-    [InlineData("{\"Authorization\":\"secret\"}")]
+    [InlineData("{\"Proxy-Authorization\":\"secret\"}")]
     [InlineData("{\"Content-Type\":\"secret\"}")]
     [InlineData("{\"X-Test\":\"one\",\"x-test\":\"two\"}")]
     [InlineData("{\"X-Test\":\"secret\\r\\nvalue\"}")]

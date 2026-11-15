@@ -30,6 +30,8 @@ internal sealed class GeminiMultimodalCodec : IMultimodalProtocolCodec
         supportsTools: true,
         supportsReasoningOptions: true);
 
+    public IReadOnlyList<string> ReservedHeaders => _text.ReservedHeaders;
+
     public void AddHeaders(HttpRequestMessage request, string apiKey) =>
         _text.AddHeaders(request, apiKey);
 

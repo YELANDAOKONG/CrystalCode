@@ -13,6 +13,7 @@ namespace CrystalCode.Providers.Gemini;
 
 internal sealed class GeminiCodec : IProtocolCodec
 {
+    private const string ApiKeyHeader = "x-goog-api-key";
     internal const string PartStateFormat = "gemini.part";
     private const int Gemini25LowThinkingBudget = 1024;
     private const int Gemini25MediumThinkingBudget = 8192;
@@ -27,11 +28,13 @@ internal sealed class GeminiCodec : IProtocolCodec
         ? $"models/{Uri.EscapeDataString(_model)}:streamGenerateContent?alt=sse"
         : Path;
 
+    public IReadOnlyList<string> ReservedHeaders => [ApiKeyHeader];
+
     public void AddHeaders(HttpRequestMessage request, string apiKey)
     {
         if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            request.Headers.Add("x-goog-api-key", apiKey);
+            request.Headers.Add(ApiKeyHeader, apiKey);
         }
     }
 

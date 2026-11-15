@@ -18,6 +18,8 @@ internal interface IMultimodalProtocolCodec
         MultimodalChatRequest request,
         bool stream);
 
+    IReadOnlyList<string> ReservedHeaders => [];
+
     void AddHeaders(HttpRequestMessage request, string apiKey);
 
     MultimodalChatResponse ReadResponse(JsonElement root);

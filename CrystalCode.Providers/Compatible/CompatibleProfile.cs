@@ -52,4 +52,6 @@ internal sealed record CompatibleProfile
     public CompatibleProcessing Processing { get; }
 
     public bool RequireAssistantContent { get; }
+
+    public IReadOnlyList<string> ReservedHeaders { get; init; } = [];
 }

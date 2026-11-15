@@ -10,6 +10,9 @@ internal static class CompatibleWire
 {
     public const string ChatCompletionsPath = "chat/completions";
 
+    public const string OrganizationHeader = "OpenAI-Organization";
+    public const string ProjectHeader = "OpenAI-Project";
+
     public const string UserAgent = "Crystal Code";
 
     public static OpaqueReasoningState CreateReasoningState(string format, string reasoningContent)

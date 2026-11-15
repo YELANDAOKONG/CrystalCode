@@ -622,12 +622,23 @@ Do not put a provider-specific secret in global headers: they are sent to every
 selected model provider. Header values are not included in configuration error
 messages. Header names must be valid HTTP request header names, values must not
 contain control characters other than tab, and duplicate names differing only
-in case are invalid. `Authorization`, `Proxy-Authorization`, `Accept`,
-`User-Agent`, `Host`, `OpenAI-Organization`, `OpenAI-Project`, `x-api-key`,
-`x-goog-api-key`, `anthropic-version`, `Transfer-Encoding`, and `Connection`
-are reserved. Content headers are not supported. Configure API keys using the
-existing credential settings. Changes take effect after restart. Disk plugins
-receive the effective headers and must apply them to their own requests. MCP
+in case are invalid. Content headers and the transport headers
+`Proxy-Authorization`, `Transfer-Encoding`, and `Connection` are reserved.
+Built-in adapters also reserve `Authorization`, `Accept`, and the headers
+owned by their protocol. For example, Gemini reserves `x-goog-api-key`,
+Anthropic reserves `x-api-key` and `anthropic-version`, and OpenAI Chat
+Completions reserves `OpenAI-Organization` and `OpenAI-Project`. Conflicts
+are reported when a client for that protocol is created. Configure API keys
+using the existing credential settings.
+
+You can override `User-Agent` and `Host`. An endpoint value wins over a global
+value, and an endpoint `null` restores the client default. The request URI
+still determines where to connect. With the built-in .NET HTTP transport,
+a custom `Host` also affects TLS server name indication (SNI) and certificate
+validation. An empty `Host` uses the URI host.
+
+Changes take effect after restart. Disk plugins receive effective headers and
+are responsible for applying them and validating their protocol rules. MCP
 connections use their own header configuration.
 
 ### Split provider files

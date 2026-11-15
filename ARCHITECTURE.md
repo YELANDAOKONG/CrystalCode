@@ -3578,7 +3578,10 @@ Environment variables:
   `CRYSTAL_API_KEY`. The persistent store is `credentials.json`.
 
 Provider HTTP headers are loaded with host settings and endpoint definitions.
-Engine validates and merges names case-insensitively, retaining endpoint nulls
-as removals. Built-in provider clients apply the effective headers to each
-request; disk plugin factories receive them in `PluginClientRequest`. Protocol
-headers remain adapter-owned. Header values must not appear in diagnostics.
+Engine validates HTTP header syntax and merges names case-insensitively,
+retaining endpoint nulls as removals. Built-in provider clients validate their
+reserved headers when they are created and apply the effective headers to
+each request. Configured `User-Agent` and `Host` replace client defaults.
+Disk plugin factories receive effective headers in `PluginClientRequest` and
+validate them for their own protocol. Header values must not appear in
+diagnostics.
