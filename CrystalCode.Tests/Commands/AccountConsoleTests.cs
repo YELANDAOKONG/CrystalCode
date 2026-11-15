@@ -9,15 +9,40 @@ public sealed class AccountConsoleTests : IDisposable
     private readonly DirectoryInfo _home = Directory.CreateTempSubdirectory("crystal-account-");
 
     [Fact]
-    public async Task Login_ExplainsWhenNoAccountProviderIsConfigured()
+    public async Task Login_WithoutAProviderListsAccountsAndSignsInNothing()
+    {
+        WriteAccountProvider();
+        var output = new StringWriter();
+
+        var code = await AccountConsole.LoginAsync(
+            Settings(null, "text"), output, new StringReader(string.Empty), new StringWriter(), CancellationToken.None);
+
+        Assert.Equal(0, code);
+        Assert.Equal("account\tunregistered\tsigned out" + Environment.NewLine, output.ToString());
+    }
+
+    [Fact]
+    public async Task Login_WithoutAnyAccountProviderSaysSo()
+    {
+        var output = new StringWriter();
+
+        var code = await AccountConsole.LoginAsync(
+            Settings(null), output, new StringReader(string.Empty), new StringWriter(), CancellationToken.None);
+
+        Assert.Equal(0, code);
+        Assert.Contains("No account providers", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Format_RejectsAnythingButText()
     {
         var error = new StringWriter();
 
-        var code = await AccountConsole.LoginAsync(
-            Settings(null), new StringWriter(), new StringReader(string.Empty), error, CancellationToken.None);
+        var code = await AccountConsole.LogoutAsync(
+            Settings(null, "json"), new StringWriter(), error, CancellationToken.None);
 
         Assert.Equal(1, code);
-        Assert.Contains("No account providers", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Format must be text", error.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -48,8 +73,8 @@ public sealed class AccountConsoleTests : IDisposable
 
     public void Dispose() => _home.Delete(recursive: true);
 
-    private AccountSettings Settings(string? provider) =>
-        new() { Provider = provider, Home = _home.FullName };
+    private AccountSettings Settings(string? provider, string? format = null) =>
+        new() { Provider = provider, Home = _home.FullName, Format = format };
 
     private void WriteAccountProvider() =>
         File.WriteAllText(

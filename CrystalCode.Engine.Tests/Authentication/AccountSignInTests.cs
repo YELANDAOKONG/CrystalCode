@@ -13,13 +13,14 @@ namespace CrystalCode.Engine.Tests.Authentication;
 public sealed class AccountSignInTests
 {
     [Fact]
-    public void TryFind_SelectsTheOnlyAccountProviderWhenNoNameIsGiven()
+    public void TryFind_NeverPicksAProviderWhenNoNameIsGiven()
     {
         var catalog = new ProviderCatalog([FakeIntegration.AccountProvider()]);
 
-        Assert.True(AccountSignIn.TryFind(catalog, string.Empty, out var provider, out _));
+        Assert.False(AccountSignIn.TryFind(catalog, string.Empty, out _, out var error));
+        Assert.Contains("Name an account provider: account", error, StringComparison.Ordinal);
+        Assert.True(AccountSignIn.TryFind(catalog, "ACCOUNT", out var provider, out _));
         Assert.Equal("account", provider.Name.Value);
-        Assert.True(AccountSignIn.TryFind(catalog, "ACCOUNT", out _, out _));
     }
 
     [Fact]
@@ -31,7 +32,7 @@ public sealed class AccountSignInTests
             ProviderName.Parse("plain"), ProviderProtocol.OpenAI, new Uri("https://example.test/"),
             new Dictionary<string, ModelSettings> { ["m"] = new(1000) })]);
 
-        Assert.False(AccountSignIn.TryFind(empty, string.Empty, out _, out var none));
+        Assert.False(AccountSignIn.TryFind(empty, "x", out _, out var none));
         Assert.Contains("providers.json", none, StringComparison.Ordinal);
         Assert.False(AccountSignIn.TryFind(two, string.Empty, out _, out var ambiguous));
         Assert.Contains("one, two", ambiguous, StringComparison.Ordinal);

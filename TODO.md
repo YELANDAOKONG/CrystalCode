@@ -159,8 +159,11 @@ behavior stands until a specific change defines otherwise.
   from `crystal server` and `crystal bridge` (they reuse a login the terminal
   saved; the wire and ACP forms for a login are not defined), and integrations
   contributed by disk plugins (the load-context boundary for a token handler is
-  not defined). Do not reserve a wire field, ACP method, or plugin contract for
-  them. See MCP gaps for remote MCP server OAuth.
+  not defined). The in-session `/login` also reads no pasted callback address
+  and gives up after five minutes, so a machine without a local browser signs
+  in with `crystal login`. The product ships no ChatGPT provider entry; an
+  operator declares it and its models. Do not reserve a wire field, ACP
+  method, or plugin contract for them. See MCP gaps for remote MCP server OAuth.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.

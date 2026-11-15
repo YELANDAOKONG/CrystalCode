@@ -24,8 +24,16 @@ public sealed class AccountSignIn
     }
 
     /// <summary>
-    /// Finds one account provider. An empty name selects the only one.
+    /// Finds one account provider by name. An empty name is refused.
     /// </summary>
+    public static IReadOnlyList<ProviderDefinition> List(ProviderCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        return [.. catalog.Providers.Values
+            .SelectMany(static variants => variants)
+            .Where(static variant => variant.Type == ProviderType.Authentication)];
+    }
+
     public static bool TryFind(
         ProviderCatalog catalog,
         string name,
@@ -34,28 +42,17 @@ public sealed class AccountSignIn
     {
         ArgumentNullException.ThrowIfNull(catalog);
         provider = null!;
-        var accounts = catalog.Providers.Values
-            .SelectMany(static variants => variants)
-            .Where(static variant => variant.Type == ProviderType.Authentication)
-            .ToArray();
+        var accounts = List(catalog);
         var wanted = name.Trim();
         if (wanted.Length == 0)
         {
-            switch (accounts.Length)
-            {
-                case 1:
-                    provider = accounts[0];
-                    error = string.Empty;
-                    return true;
-                case 0:
-                    error = NoAccountProviders();
-                    return false;
-                default:
-                    error = "Name an account provider: "
-                        + string.Join(", ", accounts.Select(static account => account.Name.Value).Distinct())
-                        + ".";
-                    return false;
-            }
+            // Signing in always names its provider, so a bare command never opens a page by itself.
+            error = accounts.Count == 0
+                ? NoAccountProviders()
+                : "Name an account provider: "
+                    + string.Join(", ", accounts.Select(static account => account.Name.Value).Distinct())
+                    + ".";
+            return false;
         }
 
         var matches = accounts.Where(
@@ -69,7 +66,7 @@ public sealed class AccountSignIn
 
         error = matches.Length > 1
             ? $"Provider {wanted} lists more than one account endpoint."
-            : accounts.Length == 0
+            : accounts.Count == 0
                 ? NoAccountProviders()
                 : $"{wanted} is not an account provider. Account providers: "
                     + string.Join(", ", accounts.Select(static account => account.Name.Value).Distinct()) + ".";
