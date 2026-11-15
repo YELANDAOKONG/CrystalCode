@@ -158,7 +158,26 @@ internal static class CompatibleWire
             return true;
         }
 
-        return false;
+        // Some gateways answer {"detail": "..."} or {"message": "..."} with no error object.
+        message = ReadStringProperty(root, "detail") ?? ReadStringProperty(root, "message");
+        return message is not null;
+    }
+
+    /// <summary>
+    /// Describes a failed response whose body held no recognized error. The
+    /// body is the provider's own text, so a short single-line excerpt is
+    /// enough to show why the request was refused.
+    /// </summary>
+    public static string? DescribeBody(string body)
+    {
+        const int limit = 500;
+        var text = string.Join(' ', body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (text.Length == 0)
+        {
+            return null;
+        }
+
+        return text.Length <= limit ? text : text[..limit] + "...";
     }
 
     private static bool TryReadErrorElement(

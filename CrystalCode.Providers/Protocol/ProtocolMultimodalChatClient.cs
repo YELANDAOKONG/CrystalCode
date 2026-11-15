@@ -168,6 +168,11 @@ internal sealed class ProtocolMultimodalChatClient
             var message = code is null
                 ? $"{_options.VendorName} request failed (HTTP {status})."
                 : $"{_options.VendorName} request failed (HTTP {status}, code: {code}).";
+            if (string.IsNullOrWhiteSpace(providerMessage))
+            {
+                providerMessage = CompatibleWire.DescribeBody(bodyText);
+            }
+
             if (!string.IsNullOrWhiteSpace(providerMessage))
             {
                 message += $" {providerMessage}";
