@@ -37,4 +37,14 @@ public interface IAuthenticationIntegration
     /// The caller sets its inner handler.
     /// </summary>
     DelegatingHandler CreateHandler(ProviderDefinition provider, IAuthenticationVault vault);
+
+    /// <summary>
+    /// Ends the renewable session at the service before the engine deletes the
+    /// saved login. Returns a plain-English warning when the service could not
+    /// confirm it, or null. The default has nothing to end.
+    /// </summary>
+    Task<string?> RevokeAsync(
+        ProviderDefinition provider,
+        IAuthenticationVault vault,
+        CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 }

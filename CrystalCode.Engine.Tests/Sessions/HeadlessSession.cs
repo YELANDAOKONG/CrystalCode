@@ -35,7 +35,9 @@ internal sealed class HeadlessSession : IDisposable
         Func<IReadOnlyList<ChildSessionDocument>, CancellationToken, Task<string?>>? chooseChild = null,
         IReadOnlyList<CrystalCode.Engine.Mcp.McpServerDefinition>? mcpServers = null,
         IReadOnlyList<DirectoryAccess>? additionalRoots = null,
-        Func<IReadOnlyList<string>, string, CancellationToken, Task<string?>>? chooseTheme = null)
+        Func<IReadOnlyList<string>, string, CancellationToken, Task<string?>>? chooseTheme = null,
+        Func<Uri, CancellationToken, Task<bool>>? openLink = null,
+        Action<PluginRegistry>? configurePlugins = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -51,6 +53,7 @@ internal sealed class HeadlessSession : IDisposable
         plugins.Add(new WorkspaceToolsPlugin());
         ChatPlugin = new ScriptedChatPlugin(client, images);
         plugins.Add(ChatPlugin);
+        configurePlugins?.Invoke(plugins);
 
         if (resume is not null)
         {
@@ -78,6 +81,7 @@ internal sealed class HeadlessSession : IDisposable
             {
                 ChooseChildAsync = chooseChild,
                 ChooseThemeAsync = chooseTheme,
+                OpenLinkAsync = openLink,
                 McpServers = mcpServers ?? []
             },
             plugins,

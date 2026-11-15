@@ -1,0 +1,146 @@
+using CrystalCode.Engine.Authentication.Interfaces;
+using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Plugins;
+
+namespace CrystalCode.Engine.Authentication;
+
+/// <summary>
+/// Signs an account provider in or out. The terminal commands and the
+/// session's <c>/login</c> and <c>/logout</c> share it, so neither copies the
+/// provider lookup or the integration checks.
+/// </summary>
+public sealed class AccountSignIn
+{
+    private readonly CredentialStore _credentials;
+    private readonly PluginRegistry _plugins;
+
+    public AccountSignIn(CredentialStore credentials, PluginRegistry plugins)
+    {
+        ArgumentNullException.ThrowIfNull(credentials);
+        ArgumentNullException.ThrowIfNull(plugins);
+        _credentials = credentials;
+        _plugins = plugins;
+    }
+
+    /// <summary>
+    /// Finds one account provider. An empty name selects the only one.
+    /// </summary>
+    public static bool TryFind(
+        ProviderCatalog catalog,
+        string name,
+        out ProviderDefinition provider,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        provider = null!;
+        var accounts = catalog.Providers.Values
+            .SelectMany(static variants => variants)
+            .Where(static variant => variant.Type == ProviderType.Authentication)
+            .ToArray();
+        var wanted = name.Trim();
+        if (wanted.Length == 0)
+        {
+            switch (accounts.Length)
+            {
+                case 1:
+                    provider = accounts[0];
+                    error = string.Empty;
+                    return true;
+                case 0:
+                    error = NoAccountProviders();
+                    return false;
+                default:
+                    error = "Name an account provider: "
+                        + string.Join(", ", accounts.Select(static account => account.Name.Value).Distinct())
+                        + ".";
+                    return false;
+            }
+        }
+
+        var matches = accounts.Where(
+            account => string.Equals(account.Name.Value, wanted, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (matches.Length == 1)
+        {
+            provider = matches[0];
+            error = string.Empty;
+            return true;
+        }
+
+        error = matches.Length > 1
+            ? $"Provider {wanted} lists more than one account endpoint."
+            : accounts.Length == 0
+                ? NoAccountProviders()
+                : $"{wanted} is not an account provider. Account providers: "
+                    + string.Join(", ", accounts.Select(static account => account.Name.Value).Distinct()) + ".";
+        return false;
+    }
+
+    public async Task LoginAsync(
+        ProviderDefinition provider,
+        ILoginInteraction interaction,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(interaction);
+        var integration = Find(provider);
+        await integration.LoginAsync(
+            provider,
+            _credentials.Authentication.Open(provider),
+            interaction,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ends the remote session when the integration can, then deletes the
+    /// saved login. The result carries a warning when the service did not
+    /// confirm the end of the session.
+    /// </summary>
+    public async Task<LogoutResult> LogoutAsync(
+        ProviderDefinition provider,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        if (!_credentials.Authentication.IsSignedIn(provider))
+        {
+            return new LogoutResult(false, null);
+        }
+
+        string? warning = null;
+        var integration = _plugins.FindIntegration(provider.Integration!);
+        if (integration is not null)
+        {
+            try
+            {
+                warning = await integration.RevokeAsync(
+                    provider,
+                    _credentials.Authentication.Open(provider),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+            {
+                warning = "The service did not confirm that the session ended.";
+            }
+        }
+
+        await _credentials.Authentication.RemoveAsync(provider.Name, cancellationToken).ConfigureAwait(false);
+        return new LogoutResult(true, warning);
+    }
+
+    private IAuthenticationIntegration Find(ProviderDefinition provider)
+    {
+        var integration = _plugins.FindIntegration(provider.Integration!)
+            ?? throw new AuthenticationFailedException(
+                $"Provider {provider.Name.Value} needs integration '{provider.Integration}', which is not registered.");
+        var invalid = integration.Validate(provider);
+        if (invalid is not null)
+        {
+            throw new AuthenticationFailedException($"Provider {provider.Name.Value}: {invalid}");
+        }
+
+        return integration;
+    }
+
+    private static string NoAccountProviders() =>
+        "No account providers are configured. Add one with \"type\": \"authentication\" to providers.json.";
+}

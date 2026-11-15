@@ -51,6 +51,8 @@ public enum SessionVerb
     Edit,
     Export,
     Verbose,
+    Login,
+    Logout,
     Quit,
     Unknown
 }

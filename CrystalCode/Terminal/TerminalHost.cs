@@ -64,7 +64,8 @@ internal sealed class TerminalHost
         {
             SyntaxReady = syntaxCache.SetService,
             ChooseChildAsync = new ChildPicker(renderer).ChooseAsync,
-            ChooseThemeAsync = new ThemePicker(renderer, launch.Home).ChooseAsync
+            ChooseThemeAsync = new ThemePicker(renderer, launch.Home).ChooseAsync,
+            OpenLinkAsync = BrowserLauncher.OpenAsync
         };
         CodingSession session;
         try

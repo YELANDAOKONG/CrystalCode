@@ -17,6 +17,7 @@ using Crystal.Reasoning;
 using Crystal.Tools;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Approvals.Interfaces;
+using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
@@ -3081,6 +3082,12 @@ public sealed class CodingSession : ITurnObserver
                 return (true, false);
             case SessionVerb.Notify:
                 await ChangeNotifyAsync(command.Argument, cancellationToken);
+                return (true, false);
+            case SessionVerb.Login:
+                await SignInAsync(command.Argument, cancellationToken);
+                return (true, false);
+            case SessionVerb.Logout:
+                await SignOutAsync(command.Argument, cancellationToken);
                 return (true, false);
             case SessionVerb.Fork:
                 await ForkSessionAsync(command.Argument, cancellationToken);
@@ -6702,6 +6709,69 @@ public sealed class CodingSession : ITurnObserver
         SaveSettings(current => current.WithRuleFiles(change.Apply(current.RuleFiles)));
         ReloadPrompts();
         Note(RuleFileArguments.Format(_settings.RuleFiles));
+    }
+
+    private static readonly TimeSpan SignInTimeout = TimeSpan.FromMinutes(5);
+
+    private async Task SignInAsync(string argument, CancellationToken cancellationToken)
+    {
+        if (_frontEnd.OpenLinkAsync is null)
+        {
+            Error("Signing in needs a browser on this machine. Run crystal login <provider> in a terminal.");
+            return;
+        }
+
+        if (_turnActive || _compacting)
+        {
+            Error("Sign in when no turn is running.");
+            return;
+        }
+
+        if (!AccountSignIn.TryFind(_settings.Catalog, argument, out var provider, out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(SignInTimeout);
+        try
+        {
+            await new AccountSignIn(_credentials, _plugins).LoginAsync(
+                provider,
+                new SessionLoginInteraction(Note, _frontEnd.OpenLinkAsync),
+                limit.Token);
+        }
+        catch (AuthenticationFailedException exception)
+        {
+            Error(exception.Message);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Error("Signing in timed out.");
+        }
+    }
+
+    private async Task SignOutAsync(string argument, CancellationToken cancellationToken)
+    {
+        if (!AccountSignIn.TryFind(_settings.Catalog, argument, out var provider, out var error))
+        {
+            Error(error);
+            return;
+        }
+
+        var result = await new AccountSignIn(_credentials, _plugins).LogoutAsync(provider, cancellationToken);
+        if (!result.Removed)
+        {
+            Note($"{provider.Name.Value} had no saved login.");
+            return;
+        }
+
+        Note($"Signed out of {provider.Name.Value}. Requests to it fail until you sign in again.");
+        if (result.Warning is not null)
+        {
+            Note(result.Warning);
+        }
     }
 
     private async Task ChangeThemeAsync(string argument, CancellationToken cancellationToken)

@@ -46,6 +46,37 @@ internal sealed class ChatGptTokenClient
             ],
             cancellationToken);
 
+    /// <summary>
+    /// Ends the renewable session at the service. Returns false when the
+    /// service did not answer with success.
+    /// </summary>
+    public async Task<bool> RevokeAsync(
+        string clientId,
+        string refreshToken,
+        CancellationToken cancellationToken)
+    {
+        var discovery = await _http.GetStringAsync(ChatGptEndpoints.DiscoveryUrl, cancellationToken)
+            .ConfigureAwait(false);
+        using var document = JsonDocument.Parse(discovery);
+        var endpoint = ReadString(document.RootElement, "revocation_endpoint");
+        if (endpoint is null || !endpoint.StartsWith(ChatGptEndpoints.Issuer + "/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = new FormUrlEncodedContent(
+            [
+                new KeyValuePair<string, string>("token", refreshToken),
+                new KeyValuePair<string, string>("token_type_hint", "refresh_token"),
+                new KeyValuePair<string, string>("client_id", clientId)
+            ])
+        };
+        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return response.IsSuccessStatusCode;
+    }
+
     private async Task<ChatGptTokenResponse> PostAsync(
         IEnumerable<(string Name, string Value)> form,
         CancellationToken cancellationToken)

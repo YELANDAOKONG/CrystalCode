@@ -919,10 +919,37 @@ API key. It names an `integration`, an inference `protocol`, and its own
 `key` keep the API key path, and any other `type` is a configuration error.
 
 Run `crystal login <provider>` or `/login` to sign in, and
-`crystal logout <provider>` or `/logout` to remove the login. The login is
+`crystal logout <provider>` or `/logout` to remove the login. `/login` needs
+the terminal's browser; on a remote machine use `crystal login`, which also
+accepts the address the browser ended on when it cannot reach this machine. The login is
 stored in `~/.crystal/authentication-credentials.json` with owner-only
 access. `crystal server`, `crystal bridge`, and `crystal run` use a saved
 login and never start one.
+
+The `chatgpt` integration signs in with a ChatGPT account (the Sign in with
+ChatGPT plan-usage flow). Declare the provider and its models yourself; the
+product ships no model table and never fetches one. The integration sends the
+token only to `https://api.openai.com/v1/`, requires the `responses`
+protocol, and refuses a model that sets `maxTokens` or `temperature` or
+`topP`, which that endpoint does not accept. The model id and context size
+below only show the shape.
+
+```json
+{
+  "chatgpt-personal": {
+    "type": "authentication",
+    "integration": "chatgpt",
+    "protocol": "responses",
+    "baseUri": "https://api.openai.com/v1/",
+    "models": {
+      "example-model": { "contextWindow": 64000 }
+    }
+  }
+}
+```
+
+A personal and a work account use separate provider names, each with its own
+login. Then run `crystal login chatgpt-personal`.
 
 ### Example: add an OpenAI-compatible provider
 

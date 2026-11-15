@@ -100,6 +100,10 @@ public static class Program
                 attachments.AddCommand<PromptAttachmentsDisableCommand>("disable")
                     .WithDescription("Disable one prompt attachment.");
             });
+            config.AddCommand<LoginCommand>("login")
+                .WithDescription("Sign in to an account provider.");
+            config.AddCommand<LogoutCommand>("logout")
+                .WithDescription("Remove the saved login of an account provider.");
             config.AddCommand<VersionCommand>("version")
                 .WithDescription("Print the build identity and exit. --version prints the same text.");
         });

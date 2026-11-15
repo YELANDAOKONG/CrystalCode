@@ -508,7 +508,7 @@ internal sealed class SessionUpdates
             }
 
             var verb = SlashCatalog.BuiltIn[index].Verb;
-            if (verb == SessionVerb.Edit
+            if (verb is SessionVerb.Edit or SessionVerb.Login or SessionVerb.Logout
                 || (!_extensions && verb is SessionVerb.Btw or SessionVerb.Child))
             {
                 continue;

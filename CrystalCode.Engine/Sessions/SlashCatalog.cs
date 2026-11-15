@@ -76,6 +76,8 @@ public static class SlashCatalog
         new(SessionVerb.Quick, "quick", ["shortcuts"], "List quick prompts or send one by name", ["list", "send"]),
         new(SessionVerb.Edit, "edit", ["editor"], "Open the full-screen editor (F8 in the terminal)"),
         new(SessionVerb.Export, "export", [], "Export markdown, json, or show usage"),
+        new(SessionVerb.Login, "login", [], "Sign in to an account provider (terminal only)"),
+        new(SessionVerb.Logout, "logout", [], "Remove the saved login of an account provider"),
         new(SessionVerb.Quit, "quit", ["exit", "q"], "Exit")
     ];
 

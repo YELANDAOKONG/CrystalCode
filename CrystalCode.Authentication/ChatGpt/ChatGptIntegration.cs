@@ -93,6 +93,35 @@ public sealed class ChatGptIntegration : IAuthenticationIntegration
         return new ChatGptAuthHandler(provider.Name, vault, _tokens, _clock);
     }
 
+    public async Task<string?> RevokeAsync(
+        ProviderDefinition provider,
+        IAuthenticationVault vault,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        ArgumentNullException.ThrowIfNull(vault);
+        var json = await vault.ReadAsync(cancellationToken).ConfigureAwait(false);
+        if (json is null)
+        {
+            return null;
+        }
+
+        ChatGptCredentialRecord record;
+        try
+        {
+            record = ChatGptCredentialRecord.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return await _tokens.RevokeAsync(record.ClientId, record.RefreshToken, cancellationToken)
+            .ConfigureAwait(false)
+            ? null
+            : "ChatGPT did not confirm that the session ended. You can disconnect the app in ChatGPT settings.";
+    }
+
     private static bool IsRejectedOption(string name) =>
         name.Equals("temperature", StringComparison.OrdinalIgnoreCase)
         || name.Equals("topP", StringComparison.OrdinalIgnoreCase);

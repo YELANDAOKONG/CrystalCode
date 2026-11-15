@@ -36,6 +36,13 @@ public sealed record SessionFrontEnd(
         ChooseThemeAsync { get; init; }
 
     /// <summary>
+    /// Opens a link in the operator's browser and reports whether it could.
+    /// A front end with no browser on the operator's machine leaves this null,
+    /// and <c>/login</c> then refuses and points to <c>crystal login</c>.
+    /// </summary>
+    public Func<Uri, CancellationToken, Task<bool>>? OpenLinkAsync { get; init; }
+
+    /// <summary>
     /// Servers with <see cref="McpServerSource.Session"/>, connected after
     /// Home and Project and replacing a server of the same name. They are not
     /// saved with the session, and their values appear in no event or text.

@@ -108,6 +108,9 @@ public static class ServerScopes
             SessionVerb.Mcp => IsListing(argument) ? ServerScope.Operate : ServerScope.Admin,
             SessionVerb.Verbose => ServerScope.Admin,
             SessionVerb.Quit => ServerScope.Admin,
+            // The engine refuses both without a front-end browser, but a login write is admin.
+            SessionVerb.Login => ServerScope.Admin,
+            SessionVerb.Logout => ServerScope.Admin,
             // A verb added to the engine must be classified here first.
             _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "The command has no server scope.")
         };

@@ -329,9 +329,16 @@ Refresh is serialized across processes with a lock file beside it, because
 refresh tokens may rotate. Tokens never appear in logs, diagnostics, events,
 or command lines. An integration refuses to send a token to a `baseUri` it
 does not recognize as the authorized resource. `crystal login` and `/login`
-exist in the terminal only; `crystal server`, `crystal bridge`, and
-`crystal run` use a saved login, and a missing one is an error, never a
-prompt. Disk plugins cannot supply an integration and cannot create a client
+exist in the terminal only. `/login` and `/logout` are engine verbs that run
+`AccountSignIn`; `/login` needs `SessionFrontEnd.OpenLinkAsync`, which only
+the terminal supplies, so Server and Bridge refuse it (Server classifies both
+verbs as admin, Bridge lists neither and refuses both). `crystal server`,
+`crystal bridge`, and `crystal run` use a saved login, and a missing one is
+an error, never a prompt. The in-session sign-in never reads pasted text and
+gives up after five minutes; a remote machine uses `crystal login`, which
+also accepts the pasted callback address. Logout asks the integration to end
+the remote session, deletes the saved login, and reports when the service
+did not confirm. Disk plugins cannot supply an integration and cannot create a client
 for an `authentication` provider.
 
 ### CrystalCode.Tests
@@ -356,7 +363,7 @@ CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
-| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `bridge` captures the raw stdio streams, rebinds console output to stderr, registers signals, opens the optional `--debug` sink (stderr or an appended file), and starts `CrystalCode.Bridge`. `version` prints the build identity |
+| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `bridge` captures the raw stdio streams, rebinds console output to stderr, registers signals, opens the optional `--debug` sink (stderr or an appended file), and starts `CrystalCode.Bridge`. `version` prints the build identity. `login` and `logout` run `AccountSignIn` for one account provider with a console `ILoginInteraction` (`Terminal/ConsoleLoginInteraction`, `Terminal/BrowserLauncher`) |
 | `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, unsupported questions, and exit codes. Overrides and launch preparation come from `CrystalCode.Engine.Launch` |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text (`ToolCallText` reveals hidden characters in the engine's `ToolCallSummary`), transcript replay, session picker, question overlay, startup trust and resume prompts (`StartupPrompt`), slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |
