@@ -62,7 +62,8 @@ public sealed class BridgeCommandTests
     {
         await using var fixture = await BridgeFixture.StartAsync(new ScriptedModel(false));
         var id = await fixture.OpenAsync();
-        await PromptAsync(fixture, id, command);
+        var response = await PromptAsync(fixture, id, command);
+        Assert.Equal("end_turn", response.GetProperty("result").GetProperty("stopReason").GetString());
         var notes = fixture.Updates().Where(update => Event(update) == "NoteWritten").ToArray();
         Assert.NotEmpty(notes);
         Assert.All(notes, note => Assert.Equal("agent_message_chunk", note.GetProperty("sessionUpdate").GetString()));

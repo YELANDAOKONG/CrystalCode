@@ -56,11 +56,11 @@ internal sealed class BridgeAgent : IJsonRpcHandler
                 await OpenAsync(id, Setup(parameters, resume: true) with { Fork = true, Replay = true }, cancellationToken),
             "session/list" => List(parameters),
             "session/prompt" => await PromptAsync(parameters, cancellationToken),
-            "session/set_mode" => await SetModeAsync(parameters),
-            "session/set_config_option" => await SetOptionAsync(parameters),
-            "session/close" => await CloseAsync(parameters),
+            "session/set_mode" => await SetModeAsync(parameters, cancellationToken),
+            "session/set_config_option" => await SetOptionAsync(parameters, cancellationToken),
+            "session/close" => await CloseAsync(parameters, cancellationToken),
             _ when method.StartsWith("_crystal/", StringComparison.Ordinal) =>
-                await Extensions.HandleAsync(method, Active(parameters), parameters, _features, NextOrigin()),
+                await Extensions.HandleAsync(method, await ActiveAsync(parameters, cancellationToken), parameters, _features, NextOrigin()),
             _ => throw new JsonRpcException(JsonRpcErrorCode.MethodNotFound, "Method not found: " + PromptContent.OneLine(method))
         };
 
@@ -374,9 +374,9 @@ internal sealed class BridgeAgent : IJsonRpcHandler
             .Select(static rule => rule.SourcePath ?? rule.Path)];
     }
 
-    private async Task<JsonRpcReply> SetModeAsync(JsonElement parameters)
+    private async Task<JsonRpcReply> SetModeAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
-        var bridge = Active(parameters);
+        var bridge = await ActiveAsync(parameters, cancellationToken);
         var mode = JsonParams.RequiredString(parameters, "modeId");
         var options = bridge.Updates.OfferedOptions;
         var command = options.FirstOrDefault(static option => option.Id == "mode") is { } modeOption
@@ -395,9 +395,9 @@ internal sealed class BridgeAgent : IJsonRpcHandler
     /// Runs the option's slash command, so validation, refusal while busy,
     /// and <c>config.json</c> writes match the terminal. Returns every option.
     /// </summary>
-    private async Task<JsonRpcReply> SetOptionAsync(JsonElement parameters)
+    private async Task<JsonRpcReply> SetOptionAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
-        var bridge = Active(parameters);
+        var bridge = await ActiveAsync(parameters, cancellationToken);
         var id = JsonParams.RequiredString(parameters, "configId");
         if (!parameters.TryGetProperty("value", out var value))
         {
@@ -440,7 +440,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
 
     private async Task<JsonRpcReply> PromptAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
-        var bridge = Active(parameters);
+        var bridge = await ActiveAsync(parameters, cancellationToken);
         if (JsonParams.OptionalArray(parameters, "prompt") is not { } prompt || prompt.GetArrayLength() == 0)
         {
             throw JsonRpcException.InvalidParams("prompt must be a non-empty array of content blocks.");
@@ -570,10 +570,10 @@ internal sealed class BridgeAgent : IJsonRpcHandler
     private static JsonRpcReply Reply(string stopReason, Engine.Events.TurnFinished? finished) =>
         new(writer => TurnWire.Response(writer, stopReason, finished));
 
-    private async Task<JsonRpcReply> CloseAsync(JsonElement parameters)
+    private async Task<JsonRpcReply> CloseAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
-        var bridge = Active(parameters);
-        await _lifecycle.WaitAsync();
+        var bridge = await ActiveAsync(parameters, cancellationToken);
+        await _lifecycle.WaitAsync(cancellationToken);
         try
         {
             if (ReferenceEquals(Volatile.Read(ref _active), bridge))
@@ -590,12 +590,20 @@ internal sealed class BridgeAgent : IJsonRpcHandler
     }
 
     /// <summary>The session named by <c>sessionId</c>; any other id is <c>-32002</c>.</summary>
-    private BridgeSession Active(JsonElement parameters)
+    private async Task<BridgeSession> ActiveAsync(JsonElement parameters, CancellationToken cancellationToken)
     {
         var id = JsonParams.RequiredString(parameters, "sessionId");
-        return Volatile.Read(ref _active) is { } active && active.Answers(id)
-            ? active
-            : throw JsonRpcException.NotFound("The session is not active.");
+        if (Volatile.Read(ref _active) is { } active && active.Answers(id))
+        {
+            // The client can read the open response before its send callback releases the startup updates.
+            await active.StartupReleased.WaitAsync(cancellationToken);
+            if (ReferenceEquals(Volatile.Read(ref _active), active))
+            {
+                return active;
+            }
+        }
+
+        throw JsonRpcException.NotFound("The session is not active.");
     }
 
     /// <summary>The runner stopped on its own, after /quit: the session ends.</summary>

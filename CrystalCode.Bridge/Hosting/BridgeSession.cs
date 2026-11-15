@@ -37,6 +37,7 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     private readonly Dictionary<string, string> _errors = new(StringComparer.Ordinal);
     private readonly HashSet<int> _attached = [];
     private readonly CancellationTokenSource _stop = new();
+    private readonly TaskCompletionSource _startupReleased = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private string? _workspace;
     private SessionStore? _store;
     private QuickPromptStore? _quickPrompts;
@@ -109,6 +110,9 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
     }
 
     public Task Running { get; private set; } = Task.CompletedTask;
+
+    /// <summary>Completes when all held startup updates have been queued for output.</summary>
+    public Task StartupReleased => _startupReleased.Task;
 
     /// <summary>The live workspace root, from the launch and then from chrome.</summary>
     public string? Workspace => Volatile.Read(ref _workspace);
@@ -279,6 +283,8 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         {
             notify();
         }
+
+        _startupReleased.TrySetResult();
     }
 
     /// <summary>

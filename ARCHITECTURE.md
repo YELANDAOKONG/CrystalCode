@@ -209,6 +209,11 @@ Spectre console at stderr, maps SIGINT, SIGTERM, and SIGHUP to shutdown, and
 hands off to `CrystalBridge.RunAsync`. The protocol and its phases are in
 [docs/bridge.md](docs/bridge.md).
 
+For opens that defer startup updates until after the response, Bridge queues
+the held updates before handling requests against the new active session.
+This keeps command updates ahead of the response even when the client sends
+a prompt as soon as it receives the session id.
+
 Which session options a client sees as config options is operator
 configuration, not engine behavior. `BridgeHostSettings` (Engine
 `Configuration`, read and written by `DiskSettingsStore` as the `bridge`
