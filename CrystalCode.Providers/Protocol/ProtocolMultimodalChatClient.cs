@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 
 using Crystal.Multimodal.Chat;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol.Interfaces;
 

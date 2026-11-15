@@ -8,6 +8,7 @@
 
     <ItemGroup>
         <ProjectReference Include="../../Crystal/Crystal/Crystal.csproj" />
+        <ProjectReference Include="..\CrystalCode.Plugins\CrystalCode.Plugins.csproj" />
     </ItemGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="CrystalCode.Providers.Tests" />

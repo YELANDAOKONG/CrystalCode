@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Crystal.Reasoning;
 
+using CrystalCode.Connections;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
@@ -41,7 +42,7 @@ public sealed class DiskSettingsStoreTests
         var settings = store.Load();
 
         Assert.False(settings.Catalog.Get(new ProviderName("local"))[0].RequiresApiKey);
-        Assert.False(settings.Catalog.GetModelProvider(ProviderName.Ollama, "custom").RequiresApiKey);
+        Assert.False(settings.Catalog.GetModelProvider(ProviderNames.Ollama, "custom").RequiresApiKey);
     }
 
     [Fact]
@@ -283,7 +284,7 @@ public sealed class DiskSettingsStoreTests
     {
         var catalog = new ProviderCatalog([
             new ProviderDefinition(
-                ProviderName.Ollama,
+                ProviderNames.Ollama,
                 ProviderProtocol.Ollama,
                 new Uri("https://ollama.example/"),
                 new Dictionary<string, ModelSettings> { ["model"] = new(8192) },
@@ -561,7 +562,7 @@ public sealed class DiskSettingsStoreTests
 
         var settings = store.LoadOrCreate();
 
-        Assert.Equal(ProviderName.DeepSeek, settings.Provider);
+        Assert.Equal(ProviderNames.DeepSeek, settings.Provider);
         Assert.Equal("deepseek-flash", settings.Model);
         Assert.Equal(1_000_000, settings.ActiveModel.ContextWindow);
         Assert.True(settings.ActiveModel.Thinking);

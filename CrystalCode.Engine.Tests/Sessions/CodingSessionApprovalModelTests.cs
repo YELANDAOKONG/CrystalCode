@@ -151,7 +151,7 @@ public sealed class CodingSessionApprovalModelTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
         using var headless = new HeadlessSession(
             new ScriptedStreamingClient(),
             settings: settings);

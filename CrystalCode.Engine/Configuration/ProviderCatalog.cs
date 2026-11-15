@@ -24,69 +24,6 @@ public sealed class ProviderCatalog
     public IReadOnlyDictionary<string, IReadOnlyList<ProviderDefinition>> Providers =>
         _readOnlyProviders;
 
-    public static ProviderCatalog CreateStarter() => new(
-    [
-        new ProviderDefinition(
-            ProviderName.DeepSeek,
-            ProviderProtocol.DeepSeek,
-            new Uri("https://api.deepseek.com/"),
-            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
-            {
-                ["deepseek-flash"] = new(
-                    1_000_000,
-                    thinking: true,
-                    thinkingEfforts: ["low", "high", "max"],
-                    imageInput: true),
-                ["deepseek-v4-flash"] = new(
-                    1_000_000,
-                    thinking: true,
-                    thinkingEfforts: ["low", "high", "max"],
-                    imageInput: true),
-                ["deepseek-v4-pro"] = new(
-                    1_000_000,
-                    thinking: true,
-                    thinkingEfforts: ["low", "high", "max"])
-            }),
-        new ProviderDefinition(
-            ProviderName.OpenAI,
-            ProviderProtocol.OpenAI,
-            new Uri("https://api.openai.com/v1/"),
-            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
-            {
-                ["gpt-5.6-sol"] = new(400_000, imageInput: true),
-                ["gpt-5.6-terra"] = new(400_000, imageInput: true),
-                ["gpt-5.6-luna"] = new(400_000, imageInput: true)
-            }),
-        new ProviderDefinition(
-            ProviderName.Gemini,
-            ProviderProtocol.Gemini,
-            new Uri("https://generativelanguage.googleapis.com/v1beta/"),
-            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
-            {
-                ["gemini-3.8-flash"] = new(
-                    1_048_576,
-                    thinking: true,
-                    thinkingEfforts: ["low", "medium", "high"],
-                    imageInput: true,
-                    thinkingCanDisable: false),
-                ["gemini-3.1-pro-preview"] = new(
-                    1_048_576,
-                    thinking: true,
-                    thinkingEfforts: ["low", "medium", "high"],
-                    imageInput: true,
-                    thinkingCanDisable: false)
-            }),
-        new ProviderDefinition(
-            ProviderName.Ollama,
-            ProviderProtocol.Ollama,
-            new Uri("http://localhost:11434/"),
-            new Dictionary<string, ModelSettings>(StringComparer.Ordinal)
-            {
-                ["qwen3:8b"] = new(4_096, thinking: true)
-            },
-            requiresApiKey: false)
-    ]);
-
     public ProviderCatalog Overlay(IEnumerable<ProviderDefinition> replacements)
     {
         ArgumentNullException.ThrowIfNull(replacements);

@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Clients;
+
 namespace CrystalCode.Providers.Gemini;
 
 public sealed class GeminiException : ChatProviderException

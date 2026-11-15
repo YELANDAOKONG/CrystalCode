@@ -17,7 +17,6 @@
         <ProjectReference Include="..\CrystalCode.Plugins\CrystalCode.Plugins.csproj" />
         <ProjectReference Include="../../Crystal/Crystal.Agents/Crystal.Agents.csproj" />
         <ProjectReference Include="../../Crystal/Crystal.Harness/Crystal.Harness.csproj" />
-        <ProjectReference Include="..\CrystalCode.Providers\CrystalCode.Providers.csproj" />
     </ItemGroup>
 
     <ItemGroup>

@@ -9,7 +9,7 @@ using Crystal.Multimodal.Tools;
 using Crystal.Tools;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Interfaces;
-using CrystalCode.Providers;
+using CrystalCode.Plugins.Clients;
 
 using Xunit;
 

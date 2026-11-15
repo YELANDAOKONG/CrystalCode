@@ -99,7 +99,7 @@ public sealed class CodingSessionCompactionModelTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
         await headless.Session.StartAsync(CancellationToken.None);
         var started = headless.ChatPlugin.OutputCaps.Count;
@@ -369,7 +369,7 @@ public sealed class CodingSessionCompactionModelTests
             "work",
             CrystalCode.Engine.Approvals.ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]),
+            HostDefaults.CreateCatalog().Overlay([provider]),
             compactionModel: new CompactionModelSettings(
                 true,
                 "scripted",

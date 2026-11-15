@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Clients;
+
 namespace CrystalCode.Providers.Responses;
 
 public sealed class ResponsesException : ChatProviderException

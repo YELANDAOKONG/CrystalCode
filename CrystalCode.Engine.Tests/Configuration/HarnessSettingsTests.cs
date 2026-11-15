@@ -1,5 +1,6 @@
 using Crystal.Reasoning;
 
+using CrystalCode.Connections;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Sessions.Exports;
@@ -77,7 +78,7 @@ public sealed class HarnessSettingsTests
     {
         var catalog = ModelSelectionTests.Catalog();
         var settings = new HarnessSettings(
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "deepseek-v4-flash",
             ApprovalMode.Default,
             0.8,
@@ -88,7 +89,7 @@ public sealed class HarnessSettingsTests
         Assert.Equal("openrouter", next.Provider.Value);
         Assert.Equal("anthropic/claude-sonnet-4", next.Model);
         Assert.Equal(200000, next.ActiveModel.ContextWindow);
-        Assert.Equal(ProviderName.DeepSeek, settings.Provider);
+        Assert.Equal(ProviderNames.DeepSeek, settings.Provider);
     }
 
     [Fact]
@@ -96,7 +97,7 @@ public sealed class HarnessSettingsTests
     {
         var catalog = ModelSelectionTests.Catalog();
         var settings = new HarnessSettings(
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "deepseek-v4-flash",
             ApprovalMode.Default,
             0.8,

@@ -6,6 +6,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;

@@ -7,7 +7,7 @@ using CrystalCode.Engine.Compaction;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Interfaces;
 using CrystalCode.Engine.Tools;
-using CrystalCode.Providers;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.DeepSeek;
 
 using Xunit;

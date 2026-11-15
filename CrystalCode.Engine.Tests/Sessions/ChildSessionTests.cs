@@ -9,6 +9,7 @@ using Crystal.Tools;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
@@ -158,7 +159,7 @@ public sealed class ChildSessionTests
                     serviceTiers: ["flex", "priority"], speeds: ["fast", "slow"])
             }, requiresApiKey: false);
         var settings = new HarnessSettings(provider.Name, "model", CrystalCode.Engine.Approvals.ApprovalMode.Default, 0.8,
-                ProviderCatalog.CreateStarter().Overlay([provider]))
+                HostDefaults.CreateCatalog().Overlay([provider]))
             .WithTier(provider.Name, "child", "flex")
             .WithSpeed(provider.Name, "child", "slow")
             .WithContextWindow(provider.Name, "child", 200_000)

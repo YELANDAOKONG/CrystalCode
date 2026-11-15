@@ -3,7 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 
-using CrystalCode.Providers;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Engine.Sessions;
 

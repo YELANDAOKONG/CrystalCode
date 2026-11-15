@@ -4,7 +4,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Providers.Ollama;
 
-namespace CrystalCode.Engine.Plugins.Providers;
+namespace CrystalCode.Connections.Ollama;
 
 public sealed class OllamaClientFactory : IChatClientFactory
 {

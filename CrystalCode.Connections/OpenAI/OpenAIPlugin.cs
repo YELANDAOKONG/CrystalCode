@@ -1,6 +1,7 @@
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 
-namespace CrystalCode.Engine.Plugins.Providers;
+namespace CrystalCode.Connections.OpenAI;
 
 /// <summary>
 /// Registers the OpenAI-compatible chat-client factory.

@@ -3,6 +3,7 @@ using System.Text.Json;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
+using CrystalCode.Engine.Plugins;
 
 using Xunit;
 
@@ -196,6 +197,6 @@ public sealed class SideModelOptionTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([definition]));
+            HostDefaults.CreateCatalog().Overlay([definition]));
     }
 }

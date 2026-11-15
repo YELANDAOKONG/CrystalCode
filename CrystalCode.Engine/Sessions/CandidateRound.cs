@@ -1,7 +1,7 @@
 using Crystal;
 using Crystal.Chat;
 using Crystal.Tools;
-using CrystalCode.Providers;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Engine.Sessions;
 

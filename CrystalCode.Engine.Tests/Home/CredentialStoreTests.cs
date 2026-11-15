@@ -1,5 +1,7 @@
+using CrystalCode.Connections;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Plugins;
 
 using Xunit;
 
@@ -12,7 +14,7 @@ public sealed class CredentialStoreTests
     {
         using var root = new TemporaryHome();
         var store = new CredentialStore(root.Home);
-        var provider = ProviderCatalog.CreateStarter().Get(ProviderName.Ollama)[0];
+        var provider = HostDefaults.CreateCatalog().Get(ProviderNames.Ollama)[0];
 
         var resolved = store.TryResolve(provider, out var apiKey, out var error);
 

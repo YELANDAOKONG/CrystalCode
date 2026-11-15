@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Clients;
+
 namespace CrystalCode.Providers.Ollama;
 
 public sealed class OllamaException : ChatProviderException

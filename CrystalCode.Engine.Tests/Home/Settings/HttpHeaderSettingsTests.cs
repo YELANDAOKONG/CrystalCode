@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using CrystalCode.Connections;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home.Settings;
 
@@ -53,8 +54,8 @@ public sealed class HttpHeaderSettingsTests
 
         var settings = store.Load();
         using var client = Assert.IsAssignableFrom<IDisposable>(ChatClientFactory.Create(settings, "test-key"));
-        var geminiModel = settings.Catalog.GetModelNames(ProviderName.Gemini).First();
-        var gemini = settings.WithSelection(ProviderName.Gemini, geminiModel);
+        var geminiModel = settings.Catalog.GetModelNames(ProviderNames.Gemini).First();
+        var gemini = settings.WithSelection(ProviderNames.Gemini, geminiModel);
         Assert.Throws<InvalidOperationException>(() => ChatClientFactory.Create(gemini, "test-key"));
     }
 

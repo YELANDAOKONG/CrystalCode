@@ -7,6 +7,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Settings;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -78,7 +79,7 @@ public sealed class CodingSessionContextTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
         using var headless = new HeadlessSession(new ScriptedStreamingClient(), settings: settings);
         await headless.Session.StartAsync(CancellationToken.None);
         Assert.Equal(FittedOutput(272_000), headless.ChatPlugin.OutputCaps[^1]);
@@ -433,7 +434,7 @@ public sealed class CodingSessionContextTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
     }
 
     private sealed class ReportingClient(TokenUsage? usage, string reply) : IStreamingChatClient
@@ -563,6 +564,6 @@ public sealed class CodingSessionContextTests
             },
             requiresApiKey: false);
         return new HarnessSettings(provider.Name, "model", ApprovalMode.Default, 0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
     }
 }

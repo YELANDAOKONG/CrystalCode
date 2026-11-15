@@ -7,6 +7,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Settings;
+using CrystalCode.Engine.Plugins;
 
 using Xunit;
 
@@ -149,7 +150,7 @@ public sealed class LaunchOverridePersistenceTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
         using var headless = new HeadlessSession(
             new ScriptedStreamingClient(),
             settings: baseline.WithContextBudget("1m"),

@@ -1,3 +1,4 @@
+using CrystalCode.Connections;
 using CrystalCode.Engine.Configuration;
 
 using Xunit;
@@ -11,7 +12,7 @@ public sealed class ModelCompletionsTests
     {
         var catalog = ModelSelectionTests.Catalog();
 
-        var options = ModelCompletions.For(catalog, ProviderName.DeepSeek);
+        var options = ModelCompletions.For(catalog, ProviderNames.DeepSeek);
 
         Assert.Contains(options, option => option.Name == "deepseek-flash");
         Assert.Contains(options, option => option.Name == "deepseek-v4-pro");

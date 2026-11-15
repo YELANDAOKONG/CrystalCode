@@ -3,6 +3,7 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home.Providers;
 using CrystalCode.Engine.Home.Settings.Interfaces;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Engine.Tools;
@@ -42,7 +43,7 @@ public sealed class DiskSettingsStore : ISettingsStore
         using var parsed = JsonDocument.Parse(json);
         var document = JsonSerializer.Deserialize<SettingsDocument>(parsed.RootElement, HomeJson.Options)
             ?? new SettingsDocument();
-        var catalog = ProviderCatalog.CreateStarter()
+        var catalog = HostDefaults.CreateCatalog()
             .Overlay(ReadProviders(document));
         var defaults = HarnessSettings.CreateDefault();
         var provider = string.IsNullOrWhiteSpace(document.Provider)

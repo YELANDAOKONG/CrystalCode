@@ -5,6 +5,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Settings;
+using CrystalCode.Engine.Plugins;
 
 using Xunit;
 
@@ -130,7 +131,7 @@ public sealed class CodingSessionCompactionSlotTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([definition]));
+            HostDefaults.CreateCatalog().Overlay([definition]));
     }
 
     private static string LastNote(HeadlessSession headless) =>

@@ -1,6 +1,8 @@
+using CrystalCode.Connections;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Launch;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -180,7 +182,7 @@ public sealed class SessionLaunchOverridesTests
         Assert.True(selected.ApprovalModel.Enabled);
         Assert.Equal("openai", selected.ApprovalModel.Provider);
         Assert.Equal("gpt-5.6-terra", selected.ApprovalModel.Model);
-        Assert.Equal(ProviderName.DeepSeek, selected.Provider);
+        Assert.Equal(ProviderNames.DeepSeek, selected.Provider);
 
         var geared = AssertApplied(
             HarnessSettings.CreateDefault(),
@@ -252,7 +254,7 @@ public sealed class SessionLaunchOverridesTests
         Assert.True(selected.CompactionModel.Enabled);
         Assert.Equal("openai", selected.CompactionModel.Provider);
         Assert.Equal("gpt-5.6-terra", selected.CompactionModel.Model);
-        Assert.Equal(ProviderName.DeepSeek, selected.Provider);
+        Assert.Equal(ProviderNames.DeepSeek, selected.Provider);
 
         var geared = AssertApplied(
             HarnessSettings.CreateDefault(),
@@ -429,7 +431,7 @@ public sealed class SessionLaunchOverridesTests
             out _,
             out var modelError));
         Assert.Contains("nosuch-model", modelError, StringComparison.Ordinal);
-        Assert.Equal(ProviderName.DeepSeek, current.Provider);
+        Assert.Equal(ProviderNames.DeepSeek, current.Provider);
         Assert.Equal("deepseek-flash", current.Model);
     }
 
@@ -614,6 +616,6 @@ public sealed class SessionLaunchOverridesTests
             "large",
             ApprovalMode.Default,
             HarnessSettings.DefaultCompactionThreshold,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
     }
 }

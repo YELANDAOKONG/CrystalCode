@@ -5,6 +5,7 @@ using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Modes;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -253,7 +254,7 @@ public sealed class NextTurnSettingsTests
             },
             requiresApiKey: false);
         return new HarnessSettings(provider.Name, "model", ApprovalMode.Default, 0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
     }
 
     /// <summary>

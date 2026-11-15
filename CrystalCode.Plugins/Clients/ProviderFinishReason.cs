@@ -1,6 +1,6 @@
 using Crystal;
 
-namespace CrystalCode.Providers;
+namespace CrystalCode.Plugins.Clients;
 
 /// <summary>
 /// Finish reasons that originate in a provider rather than in Crystal's

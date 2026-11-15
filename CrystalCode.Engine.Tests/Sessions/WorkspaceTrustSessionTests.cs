@@ -265,7 +265,7 @@ public sealed class WorkspaceTrustSessionTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]),
+            HostDefaults.CreateCatalog().Overlay([provider]),
             workspaceTrust: workspaceTrust);
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());

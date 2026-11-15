@@ -229,7 +229,7 @@ public sealed class ResumeWorkspaceTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());
         plugins.Add(new ScriptedChatPlugin(new ScriptedStreamingClient()));

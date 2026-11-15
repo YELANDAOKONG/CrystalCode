@@ -1,4 +1,6 @@
+using CrystalCode.Connections;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Engine.Plugins;
 
 using Xunit;
 
@@ -13,14 +15,14 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "deepseek-v4-pro",
             out var selection,
             out var error);
 
         Assert.True(resolved);
         Assert.Equal(string.Empty, error);
-        Assert.Equal(ProviderName.DeepSeek, selection!.Provider);
+        Assert.Equal(ProviderNames.DeepSeek, selection!.Provider);
         Assert.Equal("deepseek-v4-pro", selection.Model);
     }
 
@@ -47,7 +49,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "anthropic/claude-sonnet-4",
             out var selection,
             out _);
@@ -64,7 +66,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "shared-model",
             out var selection,
             out var error);
@@ -81,7 +83,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "groq",
             out var selection,
             out _);
@@ -98,7 +100,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "openai",
             out var selection,
             out var error);
@@ -115,7 +117,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "openrouter anthropic/claude-sonnet-4",
             out var selection,
             out _);
@@ -132,13 +134,13 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "deepseek deepseek-v4-pro",
             out var selection,
             out _);
 
         Assert.True(resolved);
-        Assert.Equal(ProviderName.DeepSeek, selection!.Provider);
+        Assert.Equal(ProviderNames.DeepSeek, selection!.Provider);
         Assert.Equal("deepseek-v4-pro", selection.Model);
     }
 
@@ -149,7 +151,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "missing gpt",
             out var selection,
             out var error);
@@ -167,7 +169,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "openai missing",
             out var selection,
             out var error);
@@ -184,7 +186,7 @@ public sealed class ModelSelectionTests
 
         var resolved = ModelSelection.TryResolve(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "no-such-model",
             out var selection,
             out var error);
@@ -201,7 +203,7 @@ public sealed class ModelSelectionTests
 
         var text = ModelSelection.FormatCatalog(
             catalog,
-            ProviderName.DeepSeek,
+            ProviderNames.DeepSeek,
             "deepseek-v4-flash");
 
         Assert.Contains("deepseek-v4-flash  (current)", text, StringComparison.Ordinal);
@@ -212,7 +214,7 @@ public sealed class ModelSelectionTests
 
     internal static ProviderCatalog Catalog()
     {
-        return ProviderCatalog.CreateStarter().Overlay(
+        return HostDefaults.CreateCatalog().Overlay(
         [
             new ProviderDefinition(
                 new ProviderName("openrouter"),

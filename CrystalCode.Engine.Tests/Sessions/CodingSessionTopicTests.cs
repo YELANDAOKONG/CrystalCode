@@ -9,6 +9,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Settings;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 
 using Xunit;
@@ -564,7 +565,7 @@ public sealed class CodingSessionTopicTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([definition]));
+            HostDefaults.CreateCatalog().Overlay([definition]));
     }
 
     private static IReadOnlyList<ChatStreamEvent> Text(string text) =>

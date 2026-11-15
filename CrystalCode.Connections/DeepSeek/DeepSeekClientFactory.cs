@@ -4,7 +4,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Providers.DeepSeek;
 
-namespace CrystalCode.Engine.Plugins.Providers;
+namespace CrystalCode.Connections.DeepSeek;
 
 /// <summary>
 /// Builds the built-in DeepSeek streaming client.

@@ -102,7 +102,7 @@ internal sealed class HeadlessSession : IDisposable
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]));
+            HostDefaults.CreateCatalog().Overlay([provider]));
     }
 
     public SessionDocument ReadSaved()

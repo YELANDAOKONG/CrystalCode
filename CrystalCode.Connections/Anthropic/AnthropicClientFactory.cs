@@ -4,7 +4,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Providers.Anthropic;
 
-namespace CrystalCode.Engine.Plugins.Providers;
+namespace CrystalCode.Connections.Anthropic;
 
 public sealed class AnthropicClientFactory : IChatClientFactory
 {

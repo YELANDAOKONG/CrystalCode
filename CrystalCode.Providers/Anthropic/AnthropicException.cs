@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Clients;
+
 namespace CrystalCode.Providers.Anthropic;
 
 public sealed class AnthropicException : ChatProviderException

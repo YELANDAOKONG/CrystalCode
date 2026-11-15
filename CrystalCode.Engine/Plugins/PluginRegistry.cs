@@ -8,7 +8,6 @@ using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
-using CrystalCode.Engine.Plugins.Providers;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Engine.Tools.Questions.Interfaces;
@@ -69,12 +68,11 @@ public sealed class PluginRegistry
     {
         var registry = new PluginRegistry();
         registry.Add(new WorkspaceToolsPlugin());
-        registry.Add(new DeepSeekPlugin());
-        registry.Add(new OpenAIPlugin());
-        registry.Add(new ResponsesPlugin());
-        registry.Add(new AnthropicPlugin());
-        registry.Add(new GeminiPlugin());
-        registry.Add(new OllamaPlugin());
+        foreach (var plugin in HostDefaults.CreatePlugins())
+        {
+            registry.Add(plugin);
+        }
+
         return registry;
     }
 

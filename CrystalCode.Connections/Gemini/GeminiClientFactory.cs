@@ -4,7 +4,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Providers.Gemini;
 
-namespace CrystalCode.Engine.Plugins.Providers;
+namespace CrystalCode.Connections.Gemini;
 
 public sealed class GeminiClientFactory : IChatClientFactory
 {

@@ -162,7 +162,7 @@ public sealed class PluginSessionRebindTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([provider]),
+            HostDefaults.CreateCatalog().Overlay([provider]),
             workspaceTrust: false);
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());

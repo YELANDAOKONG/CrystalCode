@@ -7,9 +7,9 @@ using Xunit;
 namespace CrystalCode.Engine.Tests;
 
 /// <summary>
-/// Guards the dependency direction: the engine owns no terminal, and nothing
-/// that draws may leak into it. A second front end reuses the engine only if
-/// this stays true.
+/// Guards the dependency direction: the engine owns no terminal and no
+/// vendor adapter, and nothing that draws may leak into it. A second front end
+/// reuses the engine only if this stays true.
 /// </summary>
 public sealed class EngineAssemblyTests
 {
@@ -19,6 +19,9 @@ public sealed class EngineAssemblyTests
     [InlineData("Terminal.Gui")]
     [InlineData("CrystalCode.Display")]
     [InlineData("CrystalCode")]
+    [InlineData("CrystalCode.Providers")]
+    [InlineData("CrystalCode.Connections")]
+    [InlineData("CrystalCode.Authentication")]
     public void Engine_DoesNotReferenceFrontEndAssembly(string assemblyName)
     {
         var referenced = ReferencedAssemblyNames();
@@ -34,7 +37,6 @@ public sealed class EngineAssemblyTests
         var referenced = ReferencedAssemblyNames();
 
         Assert.Contains("Crystal", referenced);
-        Assert.Contains("CrystalCode.Providers", referenced);
         Assert.Contains("CrystalCode.Tools", referenced);
         Assert.Contains("CrystalCode.Plugins", referenced);
     }

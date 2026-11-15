@@ -1,19 +1,10 @@
 namespace CrystalCode.Engine.Configuration;
 
 /// <summary>
-/// Identifies one configured provider group. Names are open; built-in
-/// DeepSeek and OpenAI values are only well-known starters.
+/// Identifies one configured provider group. Names are open.
 /// </summary>
 public sealed record ProviderName
 {
-    public static ProviderName DeepSeek { get; } = new("deepseek");
-
-    public static ProviderName OpenAI { get; } = new("openai");
-
-    public static ProviderName Gemini { get; } = new("gemini");
-
-    public static ProviderName Ollama { get; } = new("ollama");
-
     public ProviderName(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);

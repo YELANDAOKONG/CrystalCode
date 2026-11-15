@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers;
 using CrystalCode.Providers.Anthropic;
 

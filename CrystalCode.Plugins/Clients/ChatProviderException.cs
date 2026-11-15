@@ -1,7 +1,7 @@
-namespace CrystalCode.Providers;
+namespace CrystalCode.Plugins.Clients;
 
 /// <summary>
-/// Base type for DeepSeek and OpenAI-compatible adapter failures.
+/// Base type for model client failures that carry HTTP facts.
 /// Session retry reads status, error code, and Retry-After from this type.
 /// </summary>
 public abstract class ChatProviderException : Exception

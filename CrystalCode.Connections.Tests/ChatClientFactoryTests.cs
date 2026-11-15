@@ -1,8 +1,10 @@
 using System.Text.Json;
 
+using CrystalCode.Connections;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Configuration;
-using CrystalCode.Engine.Plugins.Providers;
+using CrystalCode.Connections.Responses;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Providers.Anthropic;
 using CrystalCode.Providers.Gemini;
@@ -12,7 +14,7 @@ using CrystalCode.Providers.Responses;
 
 using Xunit;
 
-namespace CrystalCode.Engine.Tests.Configuration;
+namespace CrystalCode.Connections.Tests;
 
 public sealed class ChatClientFactoryTests
 {
@@ -34,8 +36,20 @@ public sealed class ChatClientFactoryTests
         // The binding is matched against the tool's own schema. If that schema
         // ever grew a second property, the binding would silently stop matching
         // and the model would be offered a function tool again.
-        using var root = new Tools.TemporaryWorkspace();
-        var tool = new ApplyPatchTool(new Workspace(root.Path));
+        var root = Directory.CreateTempSubdirectory("crystal-connections-");
+        try
+        {
+            await VerifyBindingAsync(root.FullName);
+        }
+        finally
+        {
+            root.Delete(recursive: true);
+        }
+    }
+
+    private static async Task VerifyBindingAsync(string workspaceRoot)
+    {
+        var tool = new ApplyPatchTool(new Workspace(workspaceRoot));
         var binding = Assert.Single(ResponsesClientFactory.TextToolsFor(new ModelSettings(8192, textTools: true)));
         var handler = new CapturingHandler(
             """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}]}""");
@@ -76,8 +90,8 @@ public sealed class ChatClientFactoryTests
     public void Create_UsesNativeAdaptersAndKeylessOllama()
     {
         var defaults = HarnessSettings.CreateDefault();
-        var gemini = defaults.WithSelection(ProviderName.Gemini, "gemini-3.8-flash");
-        var ollama = defaults.WithSelection(ProviderName.Ollama, "qwen3:8b");
+        var gemini = defaults.WithSelection(ProviderNames.Gemini, "gemini-3.8-flash");
+        var ollama = defaults.WithSelection(ProviderNames.Ollama, "qwen3:8b");
 
         using var geminiClient = Assert.IsType<GeminiProvider>(
             ChatClientFactory.Create(gemini, "test-key"));
@@ -93,7 +107,7 @@ public sealed class ChatClientFactoryTests
     public void CreateMultimodal_UsesConfiguredImageAdapter(string protocolText)
     {
         var protocol = ProviderProtocol.Parse(protocolText);
-        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        var catalog = HostDefaults.CreateCatalog().Overlay(
         [
             new ProviderDefinition(
                 new ProviderName("gateway"),
@@ -132,7 +146,7 @@ public sealed class ChatClientFactoryTests
     [Fact]
     public void Create_UsesOpenAIAdapterForCompatibleProtocol()
     {
-        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        var catalog = HostDefaults.CreateCatalog().Overlay(
         [
             new ProviderDefinition(
                 new ProviderName("groq"),
@@ -191,7 +205,7 @@ public sealed class ChatClientFactoryTests
     public void Create_UsesConfiguredWireAdapter(string protocolText)
     {
         var protocol = ProviderProtocol.Parse(protocolText);
-        var catalog = ProviderCatalog.CreateStarter().Overlay(
+        var catalog = HostDefaults.CreateCatalog().Overlay(
         [
             new ProviderDefinition(
                 new ProviderName("gateway"),

@@ -4,6 +4,7 @@ using Crystal.Reasoning;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Compaction;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Exports;
 using CrystalCode.Engine.Tools;
@@ -572,10 +573,11 @@ public sealed record HarnessSettings
 
     public static HarnessSettings CreateDefault()
     {
-        var catalog = ProviderCatalog.CreateStarter();
+        var catalog = HostDefaults.CreateCatalog();
+        var (provider, model) = HostDefaults.GetDefaultSelection();
         return new HarnessSettings(
-            ProviderName.DeepSeek,
-            "deepseek-flash",
+            provider,
+            model,
             ApprovalMode.Default,
             DefaultCompactionThreshold,
             catalog);

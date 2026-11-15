@@ -1,6 +1,7 @@
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Plugins.Interfaces;
 
-namespace CrystalCode.Engine.Plugins.Providers;
+namespace CrystalCode.Connections.Anthropic;
 
 public sealed class AnthropicPlugin : IPlugin
 {

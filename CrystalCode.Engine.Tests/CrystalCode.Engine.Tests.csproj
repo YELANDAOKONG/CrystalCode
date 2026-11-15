@@ -18,6 +18,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\CrystalCode.Engine\CrystalCode.Engine.csproj" />
+        <ProjectReference Include="..\CrystalCode.Connections\CrystalCode.Connections.csproj" />
     </ItemGroup>
 
 </Project>

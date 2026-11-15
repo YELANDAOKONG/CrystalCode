@@ -8,6 +8,7 @@ using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Home.Settings;
+using CrystalCode.Engine.Plugins;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Pursue;
 using CrystalCode.Engine.Tools;
@@ -326,7 +327,7 @@ public sealed class CodingSessionPursueTests
                 "model",
                 ApprovalMode.Default,
                 0.8,
-                ProviderCatalog.CreateStarter().Overlay([definition]))
+                HostDefaults.CreateCatalog().Overlay([definition]))
             .WithPursueModel(new PursueModelSettings("scripted", "checker", serviceTier: "flex"));
         using var headless = new HeadlessSession(model, settings: settings);
         await headless.Session.StartAsync(CancellationToken.None);
@@ -356,7 +357,7 @@ public sealed class CodingSessionPursueTests
             "model",
             ApprovalMode.Default,
             0.8,
-            ProviderCatalog.CreateStarter().Overlay([definition]));
+            HostDefaults.CreateCatalog().Overlay([definition]));
         using var headless = new HeadlessSession(
             new ScriptedStreamingClient(),
             settings: settings,
@@ -396,7 +397,7 @@ public sealed class CodingSessionPursueTests
             provider, ScriptedChatPlugin.Protocol, new Uri("http://localhost:11434/"),
             new Dictionary<string, ModelSettings> { ["model"] = new(200_000), ["checker"] = new(10_000) });
         var settings = new HarnessSettings(
-            provider, "model", ApprovalMode.Default, 0.8, ProviderCatalog.CreateStarter().Overlay([definition]))
+            provider, "model", ApprovalMode.Default, 0.8, HostDefaults.CreateCatalog().Overlay([definition]))
             .WithPursueModel(new PursueModelSettings("scripted", "checker"));
         using var headless = new HeadlessSession(client, resume: new SessionDocument
         {
