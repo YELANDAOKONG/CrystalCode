@@ -71,6 +71,60 @@ public sealed class ProviderTypeTests
     }
 
     [Fact]
+    public void Load_ReadsAndRoundTripsTheResponsesObject()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ProvidersPath,
+            """
+            {
+              "account": {
+                "protocol": "responses",
+                "baseUri": "https://example.test/v1/",
+                "models": {
+                  "model-a": {
+                    "contextWindow": 64000,
+                    "responses": { "systemAsInstructions": true, "omitSampling": false }
+                  }
+                }
+              }
+            }
+            """);
+
+        var catalog = store.Load().Catalog;
+        var shape = catalog.Get(ProviderName.Parse("account"))[0].Models["model-a"].Responses;
+
+        Assert.Equal(new ResponsesRequestSettings(true, null, false), shape);
+        var written = System.Text.Json.JsonSerializer.Serialize(SettingsMapper.WriteProviders(catalog));
+        Assert.Contains("\"responses\"", written, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("includeEncryptedReasoning", written, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_RejectsAResponsesObjectOnAnotherProtocol()
+    {
+        using var root = new TemporaryHome();
+        var store = new DiskSettingsStore(root.Home);
+        store.LoadOrCreate();
+        File.WriteAllText(
+            root.Home.ProvidersPath,
+            """
+            {
+              "other": {
+                "protocol": "openai",
+                "baseUri": "https://example.test/v1/",
+                "models": { "m": { "contextWindow": 1000, "responses": { "omitSampling": true } } }
+              }
+            }
+            """);
+
+        var error = Assert.Throws<InvalidOperationException>(() => store.Load());
+        Assert.Contains("only the responses protocol", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Load_RejectsUnknownType()
     {
         using var root = new TemporaryHome();

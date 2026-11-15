@@ -28,6 +28,8 @@ internal sealed class ModelDocument
 
     public bool? TextTools { get; set; }
 
+    public ResponsesRequestDocument? Responses { get; set; }
+
     public List<string>? ServiceTiers { get; set; }
 
     public List<string>? Speeds { get; set; }

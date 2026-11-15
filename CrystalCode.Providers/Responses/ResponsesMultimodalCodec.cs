@@ -21,17 +21,17 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
     private readonly string _vendorName;
 
     private readonly IReadOnlyList<TextToolBinding> _textTools;
-    private readonly bool _systemAsInstructions;
+    private readonly ResponsesRequestShape _shape;
 
     public ResponsesMultimodalCodec(
         string vendorName,
         IReadOnlyList<TextToolBinding>? textTools = null,
-        bool systemAsInstructions = false)
+        ResponsesRequestShape? shape = null)
     {
         _vendorName = vendorName;
         _textTools = textTools ?? [];
-        _systemAsInstructions = systemAsInstructions;
-        _textCodec = new ResponsesCodec(vendorName, _textTools);
+        _shape = shape ?? new ResponsesRequestShape();
+        _textCodec = new ResponsesCodec(vendorName, _textTools, _shape);
     }
 
     public string Path => _textCodec.Path;
@@ -73,7 +73,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         {
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
-            if (_systemAsInstructions)
+            if (_shape.SystemAsInstructions)
             {
                 var instructions = string.Join(
                     "\n\n",
@@ -95,7 +95,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 request.Tools);
             foreach (var item in request.Items)
             {
-                if (_systemAsInstructions
+                if (_shape.SystemAsInstructions
                     && item is MultimodalMessage { Role: var role }
                     && role == MultimodalChatRole.System)
                 {
@@ -108,28 +108,35 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             writer.WriteEndArray();
             WriteTools(writer, request.Tools);
             WriteReasoning(writer, request.Reasoning);
-            if (options.MaxTokens is { } maxTokens)
+            if (!_shape.OmitSampling)
             {
-                writer.WriteNumber("max_output_tokens", maxTokens);
-            }
+                if (options.MaxTokens is { } maxTokens)
+                {
+                    writer.WriteNumber("max_output_tokens", maxTokens);
+                }
 
-            if (options.Temperature is { } temperature)
-            {
-                writer.WriteNumber("temperature", temperature);
-            }
+                if (options.Temperature is { } temperature)
+                {
+                    writer.WriteNumber("temperature", temperature);
+                }
 
-            if (options.TopP is { } topP)
-            {
-                writer.WriteNumber("top_p", topP);
+                if (options.TopP is { } topP)
+                {
+                    writer.WriteNumber("top_p", topP);
+                }
             }
 
             ProcessingSlots.WriteShared(writer, options.ServiceTier, options.Speed, options.VendorName);
 
             writer.WriteBoolean("store", false);
-            writer.WritePropertyName("include");
-            writer.WriteStartArray();
-            writer.WriteStringValue("reasoning.encrypted_content");
-            writer.WriteEndArray();
+            if (_shape.IncludeEncryptedReasoning)
+            {
+                writer.WritePropertyName("include");
+                writer.WriteStartArray();
+                writer.WriteStringValue("reasoning.encrypted_content");
+                writer.WriteEndArray();
+            }
+
             writer.WriteBoolean("stream", stream);
             writer.WriteEndObject();
         }

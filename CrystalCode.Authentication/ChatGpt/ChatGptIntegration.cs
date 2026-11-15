@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Configuration;
 
@@ -55,21 +53,6 @@ public sealed class ChatGptIntegration : IAuthenticationIntegration
             return "the ChatGPT integration uses the responses protocol.";
         }
 
-        // The plan-usage endpoint rejects these request fields.
-        foreach (var (name, model) in provider.Models)
-        {
-            if (model.MaxTokens is not null)
-            {
-                return $"model {name} sets maxTokens, which ChatGPT plan usage does not accept.";
-            }
-
-            if (model.Options is { ValueKind: JsonValueKind.Object } options
-                && options.EnumerateObject().Any(static property => IsRejectedOption(property.Name)))
-            {
-                return $"model {name} sets temperature or topP, which ChatGPT plan usage does not accept.";
-            }
-        }
-
         return null;
     }
 
@@ -111,7 +94,7 @@ public sealed class ChatGptIntegration : IAuthenticationIntegration
         {
             record = ChatGptCredentialRecord.Parse(json);
         }
-        catch (JsonException)
+        catch (System.Text.Json.JsonException)
         {
             return null;
         }
@@ -121,8 +104,4 @@ public sealed class ChatGptIntegration : IAuthenticationIntegration
             ? null
             : "ChatGPT did not confirm that the session ended. You can disconnect the app in ChatGPT settings.";
     }
-
-    private static bool IsRejectedOption(string name) =>
-        name.Equals("temperature", StringComparison.OrdinalIgnoreCase)
-        || name.Equals("topP", StringComparison.OrdinalIgnoreCase);
 }

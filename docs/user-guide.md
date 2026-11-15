@@ -933,10 +933,11 @@ login and never start one.
 The `chatgpt` integration signs in with a ChatGPT account (the Sign in with
 ChatGPT plan-usage flow). Declare the provider and its models yourself; the
 product ships no model table and never fetches one. The integration sends the
-token only to `https://api.openai.com/v1/`, requires the `responses`
-protocol, and refuses a model that sets `maxTokens` or `temperature` or
-`topP`, which that endpoint does not accept. The model id and context size
-below only show the shape.
+token only to `https://api.openai.com/v1/` and requires the `responses`
+protocol. That endpoint rejects system message items and the sampling
+fields, so for an account provider the request puts system text in
+`instructions` and leaves out `temperature`, `topP`, and the output token
+cap. The model id and context size below only show the shape.
 
 ```json
 {
@@ -951,6 +952,29 @@ below only show the shape.
   }
 }
 ```
+
+A model of a `responses` provider may carry a `responses` object to change
+the request shape for an endpoint. Each switch is optional, and an omitted one
+keeps the default (shown here for an account provider; an API key provider
+defaults to `false`, `true`, `false`):
+
+```json
+"models": {
+  "example-model": {
+    "contextWindow": 64000,
+    "responses": {
+      "systemAsInstructions": true,
+      "includeEncryptedReasoning": true,
+      "omitSampling": true
+    }
+  }
+}
+```
+
+`systemAsInstructions` sends system text in `instructions` instead of as
+system message items. `includeEncryptedReasoning` asks for encrypted reasoning
+so it can be replayed. `omitSampling` leaves out `temperature`, `topP`, and
+`max_output_tokens`. Another protocol rejects a `responses` object.
 
 A personal and a work account use separate provider names, each with its own
 login. Then run `crystal login chatgpt-personal`.

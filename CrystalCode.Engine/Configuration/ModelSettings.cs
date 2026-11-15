@@ -23,7 +23,8 @@ public sealed record ModelSettings
         bool textTools = false,
         IReadOnlyList<string>? serviceTiers = null,
         IReadOnlyList<string>? speeds = null,
-        JsonElement? options = null)
+        JsonElement? options = null,
+        ResponsesRequestSettings? responses = null)
     {
         if (contextWindow <= 0)
         {
@@ -70,7 +71,14 @@ public sealed record ModelSettings
         ServiceTiers = CatalogSlots.Normalize(serviceTiers, "Service tier");
         Speeds = CatalogSlots.Normalize(speeds, "Speed");
         TextTools = textTools;
+        Responses = responses;
     }
+
+    /// <summary>
+    /// Gets the responses-protocol request switches the operator declared, or
+    /// null when none were.
+    /// </summary>
+    public ResponsesRequestSettings? Responses { get; }
 
     public int ContextWindow { get; }
 

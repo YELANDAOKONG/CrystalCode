@@ -262,6 +262,13 @@ internal static class SettingsMapper
                         $"Model '{model}' on provider '{name}' declares textTools, which only the responses protocol supports.");
                 }
 
+                if (modelEntry.Responses is not null
+                    && !string.Equals(entry.Protocol.Trim(), ProviderProtocol.Responses.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"Model '{model}' on provider '{name}' declares responses, which only the responses protocol supports.");
+                }
+
                 if (modelEntry.Options is { ValueKind: not JsonValueKind.Object })
                 {
                     throw new InvalidOperationException(
@@ -282,7 +289,13 @@ internal static class SettingsMapper
                     textTools: modelEntry.TextTools ?? false,
                     serviceTiers: modelEntry.ServiceTiers,
                     speeds: modelEntry.Speeds,
-                    options: modelEntry.Options);
+                    options: modelEntry.Options,
+                    responses: modelEntry.Responses is { } shape
+                        ? new ResponsesRequestSettings(
+                            shape.SystemAsInstructions,
+                            shape.IncludeEncryptedReasoning,
+                            shape.OmitSampling)
+                        : null);
             }
         }
 
@@ -353,6 +366,14 @@ internal static class SettingsMapper
                 VideoInput = settings.VideoInput ? true : null,
                 FileInput = settings.FileInput ? true : null,
                 TextTools = settings.TextTools ? true : null,
+                Responses = settings.Responses is { } responses
+                    ? new ResponsesRequestDocument
+                    {
+                        SystemAsInstructions = responses.SystemAsInstructions,
+                        IncludeEncryptedReasoning = responses.IncludeEncryptedReasoning,
+                        OmitSampling = responses.OmitSampling
+                    }
+                    : null,
                 ServiceTiers = settings.ServiceTiers.Count == 0
                     ? null
                     : [.. settings.ServiceTiers],

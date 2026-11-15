@@ -41,21 +41,6 @@ public sealed class ChatGptValidationTests
     }
 
     [Fact]
-    public void Validate_RejectsFieldsThePlanEndpointDoesNotAccept()
-    {
-        using var temperature = JsonDocument.Parse("""{"temperature":0.2}""");
-        var withTemperature = ChatGptFixture.CreateProvider(
-            "a",
-            models: new Dictionary<string, ModelSettings> { ["m"] = new(1000, options: temperature.RootElement) });
-        var withMaxTokens = ChatGptFixture.CreateProvider(
-            "b",
-            models: new Dictionary<string, ModelSettings> { ["m"] = new(1000, maxTokens: 100) });
-
-        Assert.Contains("temperature", Integration.Validate(withTemperature), StringComparison.Ordinal);
-        Assert.Contains("maxTokens", Integration.Validate(withMaxTokens), StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void HostIdentity_IsStableAndHidesTheNames()
     {
         var first = HostIdentity.Create("machine", "user");
