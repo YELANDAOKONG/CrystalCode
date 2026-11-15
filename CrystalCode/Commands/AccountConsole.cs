@@ -44,7 +44,7 @@ public static class AccountConsole
         {
             await context.SignIn.LoginAsync(
                 context.Provider!,
-                new ConsoleLoginInteraction(output, input),
+                new ConsoleLoginInteraction(output, input, openBrowser: !settings.NoBrowser),
                 cancellationToken);
             return 0;
         }
@@ -128,7 +128,7 @@ public static class AccountConsole
     }
 
     private static string State(AccountContext context, ProviderDefinition account) =>
-        context.Credentials.Authentication.IsSignedIn(account) ? "signed in" : "signed out";
+        context.Credentials.Authentication.IsSignedIn(account) ? "Signed In" : "Signed Out";
 
     private static bool TryOpen(
         AccountSettings settings,

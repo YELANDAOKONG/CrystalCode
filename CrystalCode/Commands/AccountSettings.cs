@@ -14,6 +14,9 @@ public sealed class AccountSettings : CommandSettings
     [CommandOption("--home <PATH>")]
     public string? Home { get; init; }
 
+    [CommandOption("--no-browser")]
+    public bool NoBrowser { get; init; }
+
     [CommandOption("--format <text>")]
     public string? Format { get; init; }
 }

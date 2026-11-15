@@ -921,7 +921,8 @@ API key. It names an `integration`, an inference `protocol`, and its own
 `crystal login` and `crystal logout` without a provider list the account
 providers and whether each is signed in, as a table or with `--format text`
 as tab-separated text. A sign-in always names its provider, so nothing opens
-a browser by itself. Run `crystal login <provider>` or `/login <provider>` to sign in, and
+a browser by itself. Run `crystal login <provider>` or `/login <provider>` to sign in (add
+`--no-browser` to `crystal login` to print the link instead of opening it), and
 `crystal logout <provider>` or `/logout` to remove the login. `/login` needs
 the terminal's browser; on a remote machine use `crystal login`, which also
 accepts the address the browser ended on when it cannot reach this machine. The login is

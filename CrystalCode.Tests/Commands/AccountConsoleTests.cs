@@ -18,7 +18,7 @@ public sealed class AccountConsoleTests : IDisposable
             Settings(null, "text"), output, new StringReader(string.Empty), new StringWriter(), CancellationToken.None);
 
         Assert.Equal(0, code);
-        Assert.Equal("account\tunregistered\tsigned out" + Environment.NewLine, output.ToString());
+        Assert.Equal("account\tunregistered\tSigned Out" + Environment.NewLine, output.ToString());
     }
 
     [Fact]

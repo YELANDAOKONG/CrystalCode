@@ -10,13 +10,15 @@ public sealed class ConsoleLoginInteraction : ILoginInteraction
 {
     private readonly TextWriter _output;
     private readonly TextReader _input;
+    private readonly bool _openBrowser;
 
-    public ConsoleLoginInteraction(TextWriter output, TextReader input)
+    public ConsoleLoginInteraction(TextWriter output, TextReader input, bool openBrowser = true)
     {
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(input);
         _output = output;
         _input = input;
+        _openBrowser = openBrowser;
     }
 
     public async Task ShowAsync(string text, CancellationToken cancellationToken)
@@ -39,6 +41,7 @@ public sealed class ConsoleLoginInteraction : ILoginInteraction
         return string.Empty;
     }
 
+    // With the browser off the flow shows the link instead, as it does when opening fails.
     public Task<bool> OpenLinkAsync(Uri link, CancellationToken cancellationToken) =>
-        BrowserLauncher.OpenAsync(link, cancellationToken);
+        _openBrowser ? BrowserLauncher.OpenAsync(link, cancellationToken) : Task.FromResult(false);
 }
