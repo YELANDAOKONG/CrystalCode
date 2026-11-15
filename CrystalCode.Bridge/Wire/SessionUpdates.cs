@@ -508,7 +508,7 @@ internal sealed class SessionUpdates
             }
 
             var verb = SlashCatalog.BuiltIn[index].Verb;
-            if (verb is SessionVerb.Edit or SessionVerb.Login or SessionVerb.Logout
+            if (verb is SessionVerb.Edit
                 || (!_extensions && verb is SessionVerb.Btw or SessionVerb.Child))
             {
                 continue;
@@ -645,6 +645,9 @@ internal sealed class SessionUpdates
             });
         }
     }
+
+    /// <summary>Plain agent text that is not conversation content, such as a sign-in link.</summary>
+    public void Text(string text) => Report("note", "LoginShown", text);
 
     private void Chrome(SessionChrome chrome) =>
         _crystal("_crystal/chrome", writer => CrystalWire.Chrome(writer, "chrome", chrome));

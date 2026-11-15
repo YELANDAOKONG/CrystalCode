@@ -503,8 +503,19 @@ With `elicitation.form`, these become `elicitation/create` with
 | `question` tool (`IUserPrompt`) | One property per question, keyed `q1..qN`. Single select: string `enum` with option labels, `description` from header, text, and option descriptions. Multiple: array of that enum. Custom allowed: an extra `qN_custom` string. | `accept` maps to `QuestionResponse` in question order; `decline` and `cancel` dismiss |
 | MCP elicitation | The server's schema passed through after the engine's validation | `accept`, `decline`, `cancel` as MCP |
 | Trust | One boolean `trust` with the directory in the message | `accept` with `true` trusts and is remembered |
+| `/login <provider>` | One string `loginAddress`; the message carries the steps and the sign-in link, because URL mode is not used | `accept` with the http or https address the browser ended on signs in; `decline` and `cancel` stop it |
 | `/resume` choice | A string enum of session ids with previews in `oneOf` titles | the id, or decline |
 | `/child` choice | A string enum of child ids | the id, or decline |
+
+`/login <provider>` signs an account provider in. Bridge never opens a
+browser: the link is in the form message, and the editor shows it. When the
+browser can reach this machine its callback finishes the sign-in on its own.
+The pasted address holds a one-time authorization code, so `loginAddress` is
+redacted in the `--debug` protocol log and never appears in an update.
+Without form support the link is sent as agent text, only the local callback
+can finish, and `session/cancel` stops it with the note `Signing in was
+cancelled.`. `/logout <provider>` and a bare `/login` work as in the terminal.
+`authMethods` and `authenticate` stay unadvertised (see TODO.md).
 
 URL mode is never used. Without form support, questions are dismissed (the
 model gets the existing dismissed result), MCP elicitation is cancelled,

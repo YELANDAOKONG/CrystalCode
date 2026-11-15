@@ -27,7 +27,8 @@ internal sealed class ProtocolLog
         "authorization",
         "password",
         "secret",
-        "credentials"
+        "credentials",
+        "loginAddress"
     };
 
     private readonly TextWriter _writer;

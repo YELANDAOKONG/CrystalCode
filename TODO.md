@@ -155,9 +155,7 @@ behavior stands until a specific change defines otherwise.
   and media boundaries.
 - Provider sign-in beyond the first integration. The ChatGPT account
   integration is in this build (see ARCHITECTURE.md, Provider authentication).
-  Not in it: a Grok account integration (its login flow is not confirmed), login
-  from `crystal server` and `crystal bridge` (they reuse a login the terminal
-  saved; the wire and ACP forms for a login are not defined), and integrations
+  Not in it: a Grok account integration (its login flow is not confirmed), integrations
   contributed by disk plugins (the load-context boundary for a token handler is
   not defined). The product ships no ChatGPT provider entry; an
   operator declares it and its models. Also not in it: ACP-native `authMethods`

@@ -22,6 +22,8 @@ internal static class FormWire
 
     public const string ChoiceField = "choice";
 
+    public const string LoginField = "loginAddress";
+
     public static void Questions(
         Utf8JsonWriter writer,
         string sessionId,
@@ -188,6 +190,50 @@ internal static class FormWire
         writer.WriteEndObject();
         End(writer, [TrustField]);
     }
+
+    /// <summary>
+    /// A sign-in. The message carries the steps and the link, because ACP has
+    /// no URL-mode form here; the one field takes the address the browser
+    /// ended on when it cannot reach this machine.
+    /// </summary>
+    public static void Login(
+        Utf8JsonWriter writer,
+        string sessionId,
+        string provider,
+        IReadOnlyList<string> steps,
+        (string Label, Uri Link)? link,
+        string prompt)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        var lines = new List<string> { "Sign in to " + provider + "." };
+        lines.AddRange(steps);
+        if (link is { } shown)
+        {
+            lines.Add(shown.Label);
+            lines.Add(shown.Link.AbsoluteUri);
+        }
+
+        lines.Add(prompt + " Decline or cancel to stop signing in.");
+        Start(writer, sessionId, null, string.Join('\n', lines));
+        writer.WriteStartObject("properties");
+        writer.WriteStartObject(LoginField);
+        writer.WriteString("type", "string");
+        writer.WriteString("title", "Address the browser ended on");
+        writer.WriteEndObject();
+        writer.WriteEndObject();
+        End(writer, [LoginField]);
+    }
+
+    /// <summary>The pasted http or https address, or null for a decline or anything else.</summary>
+    public static string? LoginAddress(JsonElement result) =>
+        TryAccepted(result, out var content)
+        && content.TryGetProperty(LoginField, out var value)
+        && value.ValueKind == JsonValueKind.String
+        && value.GetString()?.Trim() is { Length: > 0 } text
+        && Uri.TryCreate(text, UriKind.Absolute, out var address)
+        && (address.Scheme == Uri.UriSchemeHttp || address.Scheme == Uri.UriSchemeHttps)
+            ? text
+            : null;
 
     public static bool Trusted(JsonElement result) =>
         TryAccepted(result, out var content)

@@ -336,10 +336,14 @@ or command lines. An integration refuses to send a token to a `baseUri` it
 does not recognize as the authorized resource. `crystal login` and `/login`
 exist in the terminal only. `/login` and `/logout` are engine verbs that run
 `AccountSignIn`; `/login` needs `SessionFrontEnd.OpenLinkAsync`, which only
-the terminal supplies, so Server and Bridge refuse it (Server classifies both
-verbs as admin, Bridge lists neither and refuses both). `crystal server`,
-`crystal bridge`, and `crystal run` use a saved login, and a missing one is
-an error, never a prompt. `/login <provider> [--no-browser]` and `/logout <provider>` take one
+the terminal, Server, and Bridge supply (each through its own
+`CreateLoginInteraction`: a popup, a `login` interaction answered with the
+pasted address, and an `elicitation/create` form). Neither Server nor Bridge
+opens a browser, and the pasted address, which holds a one-time code, is
+never logged, replayed, or put in a snapshot. Server classifies both verbs
+as admin. `crystal run` uses a saved login, and a missing one is
+an error, never a prompt; a server or bridge session with no login reports
+it as a refusal until a client signs in. `/login <provider> [--no-browser]` and `/logout <provider>` take one
 provider name; a bare command shows the account providers and their state as
 a document card (`DocumentWritten`, a table) and never signs in or out.
 Completion lists every account provider for `/login` (with `--no-browser`

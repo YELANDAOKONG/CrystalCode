@@ -935,8 +935,10 @@ by itself when the browser answers first. Esc or Ctrl+C cancels the sign-in,
 and you can run `/login` again at once. Typing `/login ` completes the account providers and
 `/logout ` completes the signed-in ones. The login is
 stored in `~/.crystal/authentication-credentials.json` with owner-only
-access. `crystal server`, `crystal bridge`, and `crystal run` use a saved
-login and never start one.
+access. `crystal run` uses a saved login and never starts one. In
+`crystal server` and `crystal bridge`, `/login` asks the connected client to
+open the link and, when the browser is on another machine, to paste back the
+address it ended on; see docs/server.md and docs/bridge.md.
 
 The `chatgpt` integration signs in with a ChatGPT account (the Sign in with
 ChatGPT plan-usage flow). Declare the provider and its models yourself; the

@@ -277,6 +277,7 @@ internal sealed class BridgeAgent : IJsonRpcHandler
                 new SessionFrontEnd(bridge, bridge, bridge, bridge, bridge)
                 {
                     ChooseChildAsync = bridge.ChooseChildAsync,
+                    CreateLoginInteraction = bridge.CreateLogin,
                     McpServers = setup.McpServers
                 },
                 _options.Plugins);
@@ -557,8 +558,6 @@ internal sealed class BridgeAgent : IJsonRpcHandler
         SessionVerb.Resume when !_features.Forms && bridge.ResumeNeedsPicker(command.Argument) =>
             "The resume picker requires form support. Use /sessions and /resume <id>, or session/list and session/load.",
         SessionVerb.Edit => "The full-screen editor is terminal-only. Edit the prompt in your editor's composer before sending it.",
-        SessionVerb.Login or SessionVerb.Logout =>
-            "Signing in and out are terminal-only. Run crystal login <provider> or crystal logout <provider> in a terminal.",
         _ => null
     };
 

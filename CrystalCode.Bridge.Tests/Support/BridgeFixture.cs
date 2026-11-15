@@ -81,7 +81,8 @@ internal sealed class BridgeFixture : IAsyncDisposable
         Func<SessionLaunchOptions, SessionLaunchOptions>? options = null,
         Action<CrystalHome, string>? prepare = null,
         IReadOnlyList<string>? configOptions = null,
-        TextWriter? debug = null)
+        TextWriter? debug = null,
+        Action<PluginRegistry>? configurePlugins = null)
     {
         var fixture = new BridgeFixture(Directory.CreateTempSubdirectory("crystal-bridge-").FullName);
         var home = new CrystalHome(fixture.Home);
@@ -105,6 +106,7 @@ internal sealed class BridgeFixture : IAsyncDisposable
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());
         plugins.Add(model);
+        configurePlugins?.Invoke(plugins);
         var bridgeOptions = new BridgeOptions(
             options?.Invoke(launch) ?? launch,
             fixture.Workspace,

@@ -8,6 +8,7 @@ using CrystalCode.Bridge.Transport;
 using CrystalCode.Bridge.Wire;
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Approvals.Interfaces;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Events.Interfaces;
 using CrystalCode.Engine.Home;
@@ -571,6 +572,28 @@ internal sealed class BridgeSession : ISessionObserver, IApprovalPrompt, IUserPr
         var result = await AskFormAsync(writer => FormWire.Children(writer, Id, children), cancellationToken);
         return result is { } value ? FormWire.Chosen(value, children.Select(static child => child.Id)) : null;
     }
+
+    /// <summary>Creates the sign-in surface for one account provider.</summary>
+    public ILoginInteraction CreateLogin(string provider, bool openBrowser) =>
+        new BridgeLoginInteraction(this, provider);
+
+    /// <summary>The pasted sign-in address from a form, or null when it was declined.</summary>
+    internal async Task<string?> AskLoginAsync(
+        string provider,
+        IReadOnlyList<string> steps,
+        (string Label, Uri Link)? link,
+        string prompt,
+        CancellationToken cancellationToken)
+    {
+        var result = await AskFormAsync(
+            writer => FormWire.Login(writer, Id, provider, steps, link, prompt),
+            cancellationToken);
+        return result is { } value ? FormWire.LoginAddress(value) : null;
+    }
+
+    internal bool FormsAvailable => _features.Forms;
+
+    internal void ShowText(string text) => Updates.Text(text);
 
     /// <summary>
     /// Trust inside a running session (<c>/cd</c>, <c>/resume</c> of another
