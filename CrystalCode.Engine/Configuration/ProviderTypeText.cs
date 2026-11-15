@@ -7,6 +7,8 @@ public static class ProviderTypeText
 {
     public const string Authentication = "authentication";
 
+    public const string Default = "default";
+
     public static ProviderType Parse(string providerName, string? text)
     {
         if (string.IsNullOrWhiteSpace(text))

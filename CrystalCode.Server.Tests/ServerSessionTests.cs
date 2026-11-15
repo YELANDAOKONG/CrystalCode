@@ -312,6 +312,7 @@ public sealed class ServerSessionTests
 
         var current = Assert.Single(models.GetProperty("models").EnumerateArray(), static entry => entry.GetProperty("current").GetBoolean());
         Assert.False(current.TryGetProperty("baseUri", out _));
+        Assert.Equal("default", current.GetProperty("type").GetString());
         Assert.Contains(options.GetProperty("options").EnumerateArray(), static option => option.GetProperty("id").GetString() == "approval");
         Assert.Contains(sessions.GetProperty("sessions").EnumerateArray(), static saved =>
             saved.GetProperty("current").GetBoolean() && saved.GetProperty("open").GetBoolean());

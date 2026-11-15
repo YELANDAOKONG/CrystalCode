@@ -296,6 +296,7 @@ public sealed class BridgeExtensionTests
         var current = Assert.Single(models.GetProperty("models").EnumerateArray(), static model => model.GetProperty("current").GetBoolean());
         Assert.Equal("ollama", current.GetProperty("provider").GetString());
         Assert.False(current.TryGetProperty("baseUri", out _));
+        Assert.Equal("default", current.GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Object, models.GetProperty("pending").ValueKind);
         Assert.Contains(agents.GetProperty("agents").EnumerateArray(), static agent => agent.GetProperty("name").GetString() == "general");
         Assert.False(skills.GetProperty("enabled").GetBoolean());

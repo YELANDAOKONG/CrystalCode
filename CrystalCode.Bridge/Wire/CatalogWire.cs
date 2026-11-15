@@ -41,6 +41,7 @@ internal static class CatalogWire
             CrystalWire.Strings(writer, "speeds", model.Speeds);
             writer.WriteBoolean("imageInput", model.ImageInput);
             Number(writer, "maxTokens", model.MaxTokens);
+            writer.WriteString("type", model.Type);
             writer.WriteEndObject();
         }
 

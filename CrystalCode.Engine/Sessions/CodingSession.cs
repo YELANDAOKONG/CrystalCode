@@ -1547,7 +1547,10 @@ public sealed class CodingSession : ITurnObserver
                     model.ServiceTiers,
                     model.Speeds,
                     model.ImageInput,
-                    model.MaxTokens));
+                    model.MaxTokens,
+                    definition.Type == ProviderType.Authentication
+                        ? ProviderTypeText.Authentication
+                        : ProviderTypeText.Default));
             }
         }
 

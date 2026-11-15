@@ -86,10 +86,19 @@ public sealed class CredentialStore
         if (provider.Type == ProviderType.Authentication)
         {
             apiKey = string.Empty;
-            if (Authentication.IsSignedIn(provider))
+            try
             {
-                error = string.Empty;
-                return true;
+                if (Authentication.IsSignedIn(provider))
+                {
+                    error = string.Empty;
+                    return true;
+                }
+            }
+            catch (InvalidOperationException exception)
+            {
+                // A damaged login file names its path and nothing from inside it.
+                error = exception.Message;
+                return false;
             }
 
             error = $"Provider {provider.Name.Value} is not signed in. Run crystal login {provider.Name.Value}.";

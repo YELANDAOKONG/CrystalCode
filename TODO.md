@@ -160,7 +160,11 @@ behavior stands until a specific change defines otherwise.
   saved; the wire and ACP forms for a login are not defined), and integrations
   contributed by disk plugins (the load-context boundary for a token handler is
   not defined). The product ships no ChatGPT provider entry; an
-  operator declares it and its models. Do not reserve a wire field, ACP
+  operator declares it and its models. Also not in it: ACP-native `authMethods`
+  and `authenticate` for Bridge. Advertising them would reverse the decision in
+  docs/bridge.md that Bridge sends no `authMethods` and never `-32000`, and ACP
+  has no way to hand a client the sign-in link, so Bridge signs in with
+  `/login` and a form instead. Do not reserve a wire field, ACP
   method, or plugin contract for them. See MCP gaps for remote MCP server OAuth.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
