@@ -31,6 +31,9 @@ internal static class PromptManifestDirectory
         || PromptFiles.ReadNamed(directory, PromptNames.Plan) is not null
         || PromptFiles.ReadNamed(directory, PromptNames.Review) is not null
         || PromptFiles.ReadNamed(directory, PromptNames.PursueSystem) is not null
+        || ResourceDescriptionPrompt.BuiltIns.Any(prompt =>
+            PromptFiles.ReadNamed(directory, prompt.SystemName) is not null
+            || PromptFiles.ReadNamed(directory, prompt.UserName) is not null)
         || HasAgentPrompt(directory);
 
     public static bool HasNamedPrompt(string directory)

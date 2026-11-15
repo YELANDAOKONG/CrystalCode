@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins;
 using CrystalCode.Plugins.Environment;
 using CrystalCode.Plugins.Models;
@@ -55,6 +56,11 @@ public static partial class PromptBinder
             return imageValue;
         }
 
+        if (name == PromptPlaceholder.Question && binding.ResourceDescription is { } description)
+        {
+            return description.Question;
+        }
+
         if (binding.Pursue is not null && TryGetPursueValue(name, binding.Pursue, out var pursueValue))
         {
             return pursueValue;
@@ -84,6 +90,10 @@ public static partial class PromptBinder
         else if (mode.Length == 0 && binding.Image is not null)
         {
             mode = "image";
+        }
+        else if (mode.Length == 0 && binding.ResourceDescription is { } description)
+        {
+            mode = ResourceKinds.Word(description.Kind);
         }
         else if (mode.Length == 0 && binding.Pursue is not null)
         {

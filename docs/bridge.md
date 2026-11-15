@@ -530,7 +530,7 @@ are `null` while that reviewer is off; otherwise each holds `provider`,
 `model`, and the display labels `thinking`, `serviceTier`, `speed`, and
 `context`, and `extendedApproval` adds `trigger` and `includePrimaryReview`. `compaction` is `null` while the compaction model is off, and `image`,
 `audio`, `video`, and `document` while the corresponding model is off. Audio,
-video, and document description are configuration only. `topic` is the session topic, or empty. Otherwise each holds that model's `provider`, `model`,
+video, and document description models have no runtime tool integration. `topic` is the session topic, or empty. Otherwise each holds that model's `provider`, `model`,
 and display labels `thinking`, `serviceTier`, `speed`, and `context` (blank
 when the model does not set its own). A command the
 engine refuses is `-32603`, `command_refused`. A value or option not offered

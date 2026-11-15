@@ -205,7 +205,7 @@ CLI options:
 | `--topic-thinking`, `--topic-tier`, `--topic-speed`, `--topic-context` | Topic model gear and own slots for this process. Does not write the file |
 | `--image-model <on\|off>`, `--audio-model <on\|off>`, `--video-model <on\|off>`, `--document-model <on\|off>` | Use the saved resource description model, or turn it off for this process |
 | `--image-provider`, `--image-model-id`, and the same for `audio`, `video`, and `document` | Resource description model for this process. Turns that switch on |
-| `--image-thinking`, `--image-tier`, `--image-speed`, `--image-context`, and the same for `audio`, `video`, and `document` | That model's gear, tier, speed, and context budget for this process. Does not write the file. Audio, video, and document description are configuration only |
+| `--image-thinking`, `--image-tier`, `--image-speed`, `--image-context`, and the same for `audio`, `video`, and `document` | That model's gear, tier, speed, and context budget for this process. Does not write the file. Audio, video, and document description models have no runtime tool integration |
 | `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or a custom mode. Omit all to keep Work, or the mode saved on a resumed session. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking` |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context` (`272k`, `1m`, or an exact token count). A model with one budget, or a budget it does not declare, is rejected. Does not write `contextSelections` |
@@ -387,7 +387,7 @@ checks the directory. `unlimited` removes that one cap.
 | `--topic-thinking`, `--topic-tier`, `--topic-speed`, `--topic-context` | Topic model gear and own slots for this process. Does not write the file |
 | `--image-model <on\|off>`, `--audio-model <on\|off>`, `--video-model <on\|off>`, `--document-model <on\|off>` | Use the saved resource description model, or turn it off for this process |
 | `--image-provider`, `--image-model-id`, and the same for `audio`, `video`, and `document` | Resource description model for this process. Turns that switch on |
-| `--image-thinking`, `--image-tier`, `--image-speed`, `--image-context`, and the same for `audio`, `video`, and `document` | That model's gear, tier, speed, and context budget for this process. Does not write the file. Audio, video, and document description are configuration only |
+| `--image-thinking`, `--image-tier`, `--image-speed`, `--image-context`, and the same for `audio`, `video`, and `document` | That model's gear, tier, speed, and context budget for this process. Does not write the file. Audio, video, and document description models have no runtime tool integration |
 | `--plan` / `--work` / `--mode <name>` | Start in Plan, Work, or an enabled custom mode. The default is Work. An unknown or disabled mode name exits 1. Pass only one |
 | `--thinking <effort>` | Same values as `/thinking`. An unsupported gear is ignored, a note is printed, and the request uses the provider default. A value that is not an effort token exits 1 |
 | `--context <budget>` | Local context budget for the selected model when it declares more than one. Same text as `/context`. A model with one budget, or a budget it does not declare, exits 1. Does not write `contextSelections` |
@@ -1724,7 +1724,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/pursue` | | Work toward an objective until a checker model finds it met. `start <objective>`, `pause`, `resume`, `clear`, and `status` control it. `model [provider model]`, `thinking`, `tier`, `speed`, and `context` configure the checker like `/topic`; `compaction model [provider model]`, then `thinking`, `tier`, `speed`, `context`, sets the model that summarizes older entries for the checker (bare `compaction model` returns to the session compaction setting); `limit <name> <number|unlimited>` sets continuations, stalls, model-calls, tool-calls, duration (seconds), or wait (seconds). Settings write `config.json`. Approval and access rules still apply to every continuation |
 | `/title` | | Name the session; `/title <text>` is the same as `/topic set <text>`. Words such as `clear` and `on` are literal title text. Empty or invalid text shows a usage error. Refused during a turn or compaction; no topic subcommand completions |
 | `/topic` | | Show the session topic and naming settings. `/topic <text>` or `set <text>` names the session; `clear` removes the name; `regenerate` asks the topic model again. `on` and `off` switch naming. `resume on` or `resume off` sets whether a resumed session without a topic is named. `model [provider model]` selects its own model, and a bare `model` returns to the session model. `thinking` cycles or sets its gear; `tier`, `speed`, and `context` do the same for its own model. Settings write `config.json` |
-| `/describe` | | List the resource description models. `image`, `audio`, `video`, or `document` shows one; then `on`, `off`, `model <provider model>`, and `thinking`, `tier`, `speed`, or `context` with an optional value set it and write `config.json`. A bare `thinking`, `tier`, `speed`, or `context` cycles. Selecting another model clears its tier, speed, and context. Audio, video, and document description are configuration only and print a note that they are not connected yet |
+| `/describe` | | List the resource description models. `image`, `audio`, `video`, or `document` shows one; then `on`, `off`, `model <provider model>`, and `thinking`, `tier`, `speed`, or `context` with an optional value set it and write `config.json`. A bare `thinking`, `tier`, `speed`, or `context` cycles. Selecting another model clears its tier, speed, and context. Audio, video, and document description models are marked as disconnected from runtime tools |
 | `/thinking` | `/think`, `/effort` | Cycle or set the thinking gear |
 | `/context` | | Cycle the model's local context budget, or select one with `272k`, `1m`, or an exact token count. During a turn or compaction it applies on the next turn |
 | `/tier` | | Cycle the model's service-tier tokens, including not sending one, or select a listed token. `default` is sent when the model lists it. During a turn or compaction it applies on the next turn |
@@ -2025,7 +2025,7 @@ Server prompts appear as `/mcp__<server>__<prompt>` commands. Details are in
 
 Crystal is prompt-neutral. Every model-bound string this product
 sends is authored here. Operators may replace Work, Plan, Review, the Review
-user turn, topic naming, compaction, image description, and the
+user turn, topic naming, compaction, image, audio, video, and document descriptions, and the
 built-in child Agent prompts
 by placing files under `~/.crystal/prompts` and
 `<workspace>/.crystal/prompts`.
@@ -2033,8 +2033,9 @@ by placing files under `~/.crystal/prompts` and
 Named files (`work.md`, `plan.md`, `review.md`, `review.user.md`,
 `review.extended.md`, `review.extended.user.md`, `topic.md`, `pursue.system.md`,
 `pursue.user.md`, `pursue.continue.md`,
-`compaction.system.md`, `compaction.user.md`, `image.system.md`,
-`image.user.md`, and `agents/general.md`, `agents/work.md`, and
+`compaction.system.md`, `compaction.user.md`, `image.system.md`, `image.user.md`,
+`audio.system.md`, `audio.user.md`, `video.system.md`, `video.user.md`,
+`document.system.md`, `document.user.md`, and `agents/general.md`, `agents/work.md`, and
 `agents/plan.md`; `.txt` is also accepted):
 
 - Within direct overrides, the Home file is applied before the project file.
@@ -2081,12 +2082,12 @@ Older `promptSet` and `promptAttachments` values in `config.json` are ignored.
 The next preference save omits them. There is no migration tool. Add
 `prompt.json` to each directory you still want.
 
-Prompt attachments append after the resolved Work, Plan, Review, or built-in
-child prompt (`agents/general`, `agents/work`, `agents/plan`).
-An attachment does not replace topic, Review user, compaction, or image
-description. Each attachment is a directory
-with `prompt.json` and any of `work.md`, `plan.md`, `review.md`, and the
-`agents/` files (`.txt` is also accepted). A mode with no file gets nothing from that attachment.
+Prompt attachments append after the matching template is resolved and bound.
+Each attachment is a directory with `prompt.json` and any of `work.md`,
+`plan.md`, `review.md`, `pursue.system.md`, the built-in child Agent files in
+`agents/`, and the audio, video, and document `.system.md` and `.user.md` files.
+For example, `audio.system.md` adds system instructions and `audio.user.md`
+adds to the description request. The same stems accept `.txt`.
 Empty files are treated as missing. A trailing newline at the end of an
 attachment file is kept. Directory names are 1-64 lowercase
 alphanumeric words joined by single hyphens. `default` is allowed.
@@ -2138,7 +2139,7 @@ Enabled attachment text is added after the body is bound, and before an
 ordinary plugin prompt hook appends its own text.
 
 The built-in Work and Plan assistant name is Crystal Code. Work, Plan,
-Review, compaction, and image-description templates use host-owned placeholders (`{{name}}`).
+Review, compaction, and resource description templates use host-owned placeholders (`{{name}}`).
 Composite session slots are `{{env}}`, `{{clock}}`, `{{session}}`,
 `{{model_info}}`, `{{skills}}`, `{{directories}}`, and
 `{{instructions_section}}` or raw `{{instructions}}`. Atomic session slots
@@ -2155,13 +2156,14 @@ or empty when that walk finds none. `{{session_id}}` is the saved session
 id. `{{approval}}` is the approval mode (`plan`, `default`, `edit`,
 `review`, `audit`, or `full`). `{{mode}}` is `plan` or `work` for Work and
 Plan, the mode name for a custom mode, `review` for Review system text, `compaction` for compaction
-system text, and `image` for image-description system text. The `{{env}}` block holds only stable workspace
+system text, and `image`, `audio`, `video`, or `document` for the corresponding
+description system text. The `{{env}}` block holds only stable workspace
 facts: workspace, git, platform, operating system, and architecture, plus the
 git root when one is found. It carries no provider or model. `{{clock}}`
 holds the date and local time, and `{{session}}` holds the session id and
 approval mode; each is empty when the host has no value. Built-in Work, Plan,
 and child Agent templates place them last. Review, compaction, and
-image-description templates use only `{{env}}`. `{{model_info}}` holds the
+resource description templates use `{{env}}` for workspace facts. `{{model_info}}` holds the
 provider and model. No built-in template uses it and a custom mode does not
 get it appended, so add it to a template yourself when the model should know
 which model it is. `{{directories}}` is empty when the session
@@ -2174,8 +2176,11 @@ replaced. Review user templates add `{{conversation}}`,
 `{{tool_name}}`, `{{tool_arguments}}`, `{{host_risk}}`, `{{host_authority}}`,
 and `{{classification_summary}}`. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
-`{{output_template}}`, and `{{todos_section}}`. Image user templates add
-`{{question}}`, the description request or the model's question.
+`{{output_template}}`, and `{{todos_section}}`. Resource description user
+templates and their user attachments bind `{{question}}` to the default
+description request or the supplied question.
+Use `/export prompts` to write the built-in templates. Runtime description
+calls are currently available for images.
 Placeholder names are
 case-insensitive. Unknown names are left unchanged. A plugin may add
 further names. While resolving a name, the plugin can read the current
@@ -2478,6 +2483,12 @@ Override with `CRYSTAL_HOME` or `--home`.
     compaction.user.md
     image.system.md
     image.user.md
+    audio.system.md
+    audio.user.md
+    video.system.md
+    video.user.md
+    document.system.md
+    document.user.md
     agents/
       general.md
       work.md
@@ -2496,6 +2507,12 @@ Override with `CRYSTAL_HOME` or `--home`.
       compaction.user.md
       image.system.md
       image.user.md
+      audio.system.md
+      audio.user.md
+      video.system.md
+      video.user.md
+      document.system.md
+      document.user.md
       agents/
         general.md
         work.md
@@ -2506,6 +2523,12 @@ Override with `CRYSTAL_HOME` or `--home`.
       work.md
       plan.md
       review.md
+      audio.system.md
+      audio.user.md
+      video.system.md
+      video.user.md
+      document.system.md
+      document.user.md
       agents/
         general.md
         work.md
@@ -2546,6 +2569,12 @@ directory name win over home):
     compaction.user.md
     image.system.md
     image.user.md
+    audio.system.md
+    audio.user.md
+    video.system.md
+    video.user.md
+    document.system.md
+    document.user.md
     agents/
       general.md
       work.md
@@ -2556,6 +2585,12 @@ directory name win over home):
       work.md
       plan.md
       review.md
+      audio.system.md
+      audio.user.md
+      video.system.md
+      video.user.md
+      document.system.md
+      document.user.md
       agents/
         general.md
         work.md

@@ -1,4 +1,5 @@
 using System.Text;
+
 using CrystalCode.Engine.Prompts;
 
 namespace CrystalCode.Engine.Sessions.Exports;
@@ -12,8 +13,8 @@ public static class PromptTemplateExport
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         Directory.CreateDirectory(directory);
-        var files = new (string Name, string Text)[]
-        {
+        (string Name, string Text)[] files =
+        [
             ("work.md", WorkPrompt.Text),
             ("plan.md", PlanPrompt.Text),
             ("review.md", ApprovalReviewPrompt.SystemText),
@@ -25,6 +26,11 @@ public static class PromptTemplateExport
             ("compaction.user.md", CompactionPrompt.UserTemplate),
             ("image.system.md", ImageDescriptionPrompt.SystemText),
             ("image.user.md", ImageDescriptionPrompt.UserTemplate),
+            .. ResourceDescriptionPrompt.BuiltIns.SelectMany(prompt => new[]
+            {
+                (prompt.SystemName + ".md", prompt.SystemTemplate),
+                (prompt.UserName + ".md", prompt.UserTemplate)
+            }),
             ("pursue.system.md", PursuePrompt.SystemText),
             ("pursue.user.md", PursuePrompt.UserTemplate),
             ("pursue.continue.md", PursuePrompt.ContinueTemplate),
@@ -32,7 +38,7 @@ public static class PromptTemplateExport
             (Path.Combine(PromptNames.AgentsDirectory, "general.md"), AgentGeneralPrompt.Text),
             (Path.Combine(PromptNames.AgentsDirectory, "work.md"), AgentWorkPrompt.Text),
             (Path.Combine(PromptNames.AgentsDirectory, "plan.md"), AgentPlanPrompt.Text)
-        };
+        ];
 
         var written = new List<string>();
         foreach (var (name, text) in files)
@@ -120,7 +126,9 @@ public static class PromptTemplateExport
         - {{remaining_continuations}}
         - {{resumed}}
 
-        ## Image user
+        ## Resource description user
+
+        Image, audio, video, and document user templates use:
 
         - {{question}}
 

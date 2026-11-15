@@ -17,7 +17,16 @@ public sealed class PromptTemplateExportTests
 
         var written = PromptTemplateExport.Write(directory);
 
-        Assert.Equal(18, written.Count);
+        Assert.Equal(24, written.Count);
+        foreach (var name in new[] { "audio", "video", "document" })
+        {
+            var system = Path.Combine(directory, name + ".system.md");
+            var user = Path.Combine(directory, name + ".user.md");
+            Assert.Contains(system, written);
+            Assert.Contains(user, written);
+            Assert.Contains("{{env}}", File.ReadAllText(system), StringComparison.Ordinal);
+            Assert.Equal("{{question}}", File.ReadAllText(user));
+        }
         Assert.Equal(PursuePrompt.SystemText, File.ReadAllText(Path.Combine(directory, "pursue.system.md")));
         Assert.Equal(PursuePrompt.ContinueTemplate, File.ReadAllText(Path.Combine(directory, "pursue.continue.md")));
         Assert.Equal(

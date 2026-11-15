@@ -648,9 +648,9 @@ and Work while `imageModel` is on. It sends that file to a side multimodal
 client with the image-description prompt and returns the reply as text. The
 side request has no tools, is not written into the session transcript, and
 uses `imageModel.thinkingEffort` through the same gear mapping as the host.
-No tool, prompt, or client uses `audioModel`, `videoModel`, or `documentModel` yet; they are
-stored, validated, and shown so a later audio, video, or document path has its
-configuration in place. `ResourceKinds.IsConnected` marks that difference.
+Audio, video, and document description templates are resolved and exported by
+the prompt subsystem. The corresponding model settings are stored, validated,
+and shown. `ResourceKinds.IsConnected` reports whether a tool uses the model.
 `view_image` is registered only for an image-capable turn. It returns the
 file as `ImageContent` so the current model sees it on the next round.
 Both follow the `read` path fence. A missing image-model credential fails
@@ -1156,8 +1156,8 @@ found by walking parent directories, or empty when that walk finds none.
 `{{session_id}}` is the saved session id. `{{approval}}` is the approval
 mode (`plan`, `default`, `edit`, `review`, `audit`, or `full`). `{{mode}}`
 is `plan` or `work` for Work and Plan, the mode name for a custom mode, `review` for Review system text,
-`compaction` for compaction system text, and `image` for image-description
-system text. The `{{env}}` block holds only stable
+`compaction` for compaction system text, and `image`, `audio`, `video`, or
+`document` for the corresponding description system text. The `{{env}}` block holds only stable
 workspace facts: workspace, git, platform, operating system, and
 architecture, plus the git root when one is found. It carries no provider or
 model. `{{clock}}` is a `<clock>` block with the date and local time, and
@@ -1165,7 +1165,7 @@ model. `{{clock}}` is a `<clock>` block with the date and local time, and
 each is empty when the host has no value. The built-in Work, Plan, and child
 Agent templates place `{{clock}}` and `{{session}}` last, after the
 instructions, so the volatile text sits at the end of the system message. The
-built-in Review, compaction, and image-description templates declare only
+built-in Review, compaction, and resource description templates declare only
 `{{env}}`. `{{model_info}}` is a `<model>` block with the provider and model.
 No built-in template declares it and a custom mode never gets it appended, so
 the model-bound text names the model only when an operator template writes the
@@ -1179,15 +1179,16 @@ and `{{classification_summary}}`. Extended approval user templates add those
 names plus `{{primary_review}}`, the primary verdict as plain lines, or a
 short note that it is not shown. Compaction user templates add
 `{{conversation}}`, `{{prior_summary_section}}`, `{{summary_task}}`,
-`{{output_template}}`, and `{{todos_section}}`. Image user templates add
-`{{question}}`. A disk plugin may add further
+`{{output_template}}`, and `{{todos_section}}`. Resource description user
+templates and their user attachments bind `{{question}}` to the default
+description request or the supplied question. A disk plugin may add further
 names through `IPluginPlaceholder`. The host rejects a name it already owns,
 and the first loaded plugin keeps a duplicated name. Those values expand in
 the same binding pass as the host names, including attachments, Review,
-compaction, and image description. A returned value is inserted as text, so tokens inside it stay
+compaction, and resource descriptions. A returned value is inserted as text, so tokens inside it stay
 literal. A resolver that throws, or returns no text, leaves the token and
 records an English note. Built-in Work, Plan, Review, compaction, and
-image-description templates declare the slots they need explicitly. Topic
+resource description templates declare the slots they need explicitly. Topic
 naming uses `topic.md`. It is a named prompt, so a prompt set, Home, or
 project file can replace it. Its `{{mode}}` is `topic`, and its user turn is
 fixed in `TopicNamingPrompt.UserText`. Review
@@ -1205,8 +1206,10 @@ prompt set is a Home-only directory under `~/.crystal/promptsets/<name>` with
 `prompt.json` and any subset of the named prompt files (`work.md`,
 `plan.md`, `review.md`, `review.user.md`, `review.extended.md`,
 `review.extended.user.md`, `topic.md`,
-`compaction.system.md`, `compaction.user.md`, `image.system.md`,
-`image.user.md`, and `agents/general.md`, `agents/work.md`, and
+`pursue.system.md`, `pursue.user.md`, `pursue.continue.md`,
+`compaction.system.md`, `compaction.user.md`, `image.system.md`, `image.user.md`,
+`audio.system.md`, `audio.user.md`, `video.system.md`, `video.user.md`,
+`document.system.md`, `document.user.md`, and `agents/general.md`, `agents/work.md`, and
 `agents/plan.md`; `.txt` is also accepted). The host never scans a workspace for prompt sets.
 `default` is a virtual, reserved selection backed by the built-in prompts. A
 missing or empty file in a selected set falls back to the built-in prompt for
@@ -1230,7 +1233,7 @@ The complete named-prompt precedence is built-in, selected prompt set, direct
 `~/.crystal/prompts` override, then direct workspace `.crystal/prompts`
 override. That order covers Work, Plan, Review, the Review user turn, topic
 naming, extended approval system and user text, compaction system and user
-text, and image-description system and user text. Instructions, skill
+text, Pursue, and resource description system and user text. Instructions, skill
 guidance, and the environment block are not
 prompt-set members. Compaction's required output format stays inside
 `{{output_template}}`; replacing `compaction.user.md` can omit that slot.
@@ -1244,15 +1247,13 @@ list|show|enable|disable` edits the same Home manifests outside a session.
 `--home` and `--format text` match the plugin commands. There is no
 `--source` flag, because prompt sets are Home-only.
 
-Prompt attachments append after the resolved Work, Plan, or Review text has
-been bound. The resolved text stays in place. Attachments are not prompt-set
-members. An attachment only appends Work, Plan, Review, or one built-in child prompt
-(`agents/general`, `agents/work`, `agents/plan`). Topic, Review
-user, extended approval, compaction, and image description are replaced by
-named prompt files, not by attachments. Each attachment is a
-directory of `prompt.json` plus `work.md`, `plan.md`, `review.md`, and the
-`agents/` files (`.txt` is also accepted). A missing file contributes nothing for that
-mode. Empty files are missing. A trailing newline at the end of an
+Prompt attachments append after the resolved template has been bound.
+Each attachment is a directory with `prompt.json` and any of `work.md`,
+`plan.md`, `review.md`, `pursue.system.md`, the built-in child Agent files
+in `agents/`, and the audio, video, and document `.system.md` and `.user.md`
+files. A resource description attachment appends to its matching system or
+user message. The same stems accept `.txt`. A missing or empty file contributes
+nothing to that template. A trailing newline at the end of an
 attachment file is kept. Directory names use the same 1-64 character
 hyphenated form as prompt sets. `default` is a valid attachment name.
 
@@ -2018,6 +2019,12 @@ contents of `binaries/code/`.
   prompts/compaction.user.md
   prompts/image.system.md
   prompts/image.user.md
+  prompts/audio.system.md
+  prompts/audio.user.md
+  prompts/video.system.md
+  prompts/video.user.md
+  prompts/document.system.md
+  prompts/document.user.md
   prompts/agents/general.md
   prompts/agents/work.md
   prompts/agents/plan.md
@@ -2033,6 +2040,12 @@ contents of `binaries/code/`.
   promptsets/<name>/compaction.user.md
   promptsets/<name>/image.system.md
   promptsets/<name>/image.user.md
+  promptsets/<name>/audio.system.md
+  promptsets/<name>/audio.user.md
+  promptsets/<name>/video.system.md
+  promptsets/<name>/video.user.md
+  promptsets/<name>/document.system.md
+  promptsets/<name>/document.user.md
   promptsets/<name>/agents/general.md
   promptsets/<name>/agents/work.md
   promptsets/<name>/agents/plan.md
@@ -2040,6 +2053,12 @@ contents of `binaries/code/`.
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
   prompt-attachments/<name>/review.md
+  prompt-attachments/<name>/audio.system.md
+  prompt-attachments/<name>/audio.user.md
+  prompt-attachments/<name>/video.system.md
+  prompt-attachments/<name>/video.user.md
+  prompt-attachments/<name>/document.system.md
+  prompt-attachments/<name>/document.user.md
   prompt-attachments/<name>/agents/general.md
   prompt-attachments/<name>/agents/work.md
   prompt-attachments/<name>/agents/plan.md
@@ -2158,6 +2177,12 @@ Crystal skills, and tool sets of the same directory name):
   prompts/compaction.user.md
   prompts/image.system.md
   prompts/image.user.md
+  prompts/audio.system.md
+  prompts/audio.user.md
+  prompts/video.system.md
+  prompts/video.user.md
+  prompts/document.system.md
+  prompts/document.user.md
   prompts/agents/general.md
   prompts/agents/work.md
   prompts/agents/plan.md
@@ -2165,6 +2190,12 @@ Crystal skills, and tool sets of the same directory name):
   prompt-attachments/<name>/work.md
   prompt-attachments/<name>/plan.md
   prompt-attachments/<name>/review.md
+  prompt-attachments/<name>/audio.system.md
+  prompt-attachments/<name>/audio.user.md
+  prompt-attachments/<name>/video.system.md
+  prompt-attachments/<name>/video.user.md
+  prompt-attachments/<name>/document.system.md
+  prompt-attachments/<name>/document.user.md
   prompt-attachments/<name>/agents/general.md
   prompt-attachments/<name>/agents/work.md
   prompt-attachments/<name>/agents/plan.md
@@ -2201,7 +2232,7 @@ per-process environment variables `CRYSTAL_TOOL_DATA` (global) and
 Overlay is built-in default, then `~/.crystal`, then the project
 `.crystal`. A selected prompt set sits between the built-in text and the
 direct Home files. Named prompt files replace Work, Plan, Review, the Review
-user turn, topic naming, compaction, and image description.
+user turn, topic naming, compaction, and resource descriptions.
 
 Built-in Work and Plan identify the assistant as Crystal Code. Operators
 who replace those files choose their own identity.

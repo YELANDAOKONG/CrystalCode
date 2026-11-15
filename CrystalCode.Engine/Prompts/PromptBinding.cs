@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins;
 
 namespace CrystalCode.Engine.Prompts;
@@ -11,4 +12,7 @@ public sealed record PromptBinding(
     CompactionPromptContext? Compaction = null,
     PluginPlaceholderTable? Placeholders = null,
     ImagePromptContext? Image = null,
-    PursuePromptContext? Pursue = null);
+    PursuePromptContext? Pursue = null)
+{
+    internal (ResourceKind Kind, string Question)? ResourceDescription { get; init; }
+}

@@ -699,6 +699,62 @@ public sealed class PromptStoreTests
         Assert.Equal(WorkPrompt.Text, prompts.Work);
     }
 
+    [Theory]
+    [InlineData(ResourceKind.Audio, "audio")]
+    [InlineData(ResourceKind.Video, "video")]
+    [InlineData(ResourceKind.Document, "document")]
+    public void Resolve_ResourceDescriptionOverridesAndAttachments(ResourceKind kind, string name)
+    {
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var project = new CrystalHome(Path.Combine(workspace.Path, PromptStore.ProjectDirectoryName));
+        var store = CreateStore(home);
+        var context = PromptContext.InstructionsOnly(string.Empty);
+        var defaults = store.Load(workspace.Path).ResourceDescriptions.Single(prompt => prompt.Kind == kind);
+        Assert.Contains("Crystal Code", defaults.ComposeSystem(context), StringComparison.Ordinal);
+        Assert.Equal($"Describe this {name}.", defaults.ComposeUser(" "));
+
+        var set = Path.Combine(home.Home.PromptSetsDirectory, "resource");
+        WritePrompt(set, $"{name}.system.md", "Set {{mode}}");
+        WritePrompt(set, $"{name}.user.md", "Set {{question}}");
+        WriteManifest(set, enabled: true);
+        var selected = store.Load(workspace.Path).ResourceDescriptions.Single(prompt => prompt.Kind == kind);
+        Assert.Equal($"Set {name}", selected.ComposeSystem(context));
+        Assert.Equal($"Set Describe this {name}.", selected.ComposeUser(null));
+
+        WritePrompt(home.Home.PromptsDirectory, $"{name}.system.md", "Home {{mode}}");
+        var homeOverride = store.Load(workspace.Path).ResourceDescriptions.Single(prompt => prompt.Kind == kind);
+        Assert.Equal($"Home {name}", homeOverride.ComposeSystem(context));
+
+        WritePrompt(project.PromptsDirectory, $"{name}.system.md", "Project {{mode}}");
+        WritePrompt(project.PromptsDirectory, $"{name}.user.txt", "Project {{question}}");
+
+        var homeAttachment = AttachmentDirectory(home.Home, "earlier");
+        WritePrompt(homeAttachment, $"{name}.system.md", "Displaced home copy");
+        WriteManifest(homeAttachment, enabled: true, order: 0);
+        var earlier = AttachmentDirectory(project, "earlier");
+        WritePrompt(earlier, $"{name}.system.txt", "Earlier {{mode}}\n");
+        WriteManifest(earlier, enabled: true, order: 1);
+        var later = AttachmentDirectory(home.Home, "later");
+        WritePrompt(later, $"{name}.system.md", "Later {{mode}}");
+        WriteManifest(later, enabled: true, order: 2);
+        var forced = AttachmentDirectory(home.Home, "forced");
+        WritePrompt(forced, $"{name}.user.md", "Forced {{question}}");
+        WriteManifest(forced, enabled: false);
+
+        var resolution = store.Resolve(workspace.Path, forcedAttachments: ["forced"]);
+        var prompt = resolution.Prompts.ResourceDescriptions.Single(prompt => prompt.Kind == kind);
+        Assert.Equal($"Project {name}\n\n\nEarlier {name}\n\n\n\nLater {name}", prompt.ComposeSystem(context));
+        Assert.Equal(
+            "Project Question: exact {{question}}\n\n\nForced Question: exact {{question}}",
+            prompt.ComposeUser("  exact {{question}}  "));
+
+        var disabled = store.Resolve(workspace.Path, usePromptAttachments: false);
+        var withoutAttachments = disabled.Prompts.ResourceDescriptions.Single(prompt => prompt.Kind == kind);
+        Assert.Equal($"Project {name}", withoutAttachments.ComposeSystem(context));
+        Assert.Equal($"Project Describe this {name}.", withoutAttachments.ComposeUser(null));
+    }
+
     [Fact]
     public void Resolve_ExtendedReviewPromptsFollowSetThenHomeThenProject()
     {

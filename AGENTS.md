@@ -45,11 +45,14 @@ semantics. Do not copy its Demo UI into this product.
   is authored here: system prompts, compaction summaries, rejection text, and
   tool exception mapping. Operators may replace Work, Plan, Review, the Review
   user turn, extended approval system and user text, topic naming, compaction,
-  and image description via
+  and image, audio, video, and document description via
   `~/.crystal/prompts`, a selected prompt set, and `<workspace>/.crystal/prompts`.
   The file stems are `work`, `plan`, `review`, `review.user`,
   `review.extended`, `review.extended.user`, `topic`, `pursue.system`,
-  `pursue.user`, `pursue.continue`, `compaction.system`, `compaction.user`, `image.system`, and `image.user`.
+  `pursue.user`, `pursue.continue`, `compaction.system`, `compaction.user`,
+  `image.system`, `image.user`, `audio.system`, `audio.user`, `video.system`,
+  `video.user`, `document.system`, and `document.user`.
+  The audio, video, and document stems also accept prompt attachments.
   Built-in child Agents add `agents/general`, `agents/work`, and `agents/plan`
   under those same prompt, prompt-set, and prompt-attachment directories.
   `AGENTS.md` and

@@ -318,9 +318,10 @@ separate library with no terminal code. The product can:
 - select a reusable Home prompt set without changing the higher-priority direct
   prompt overrides in Home or the workspace; a set may replace Work, Plan,
   Review, the Review user turn, extended approval system and user text, topic
-  naming, compaction, and image description;
+  naming, compaction, and image, audio, video, and document description;
 - enable an ordered list of prompt attachments that append to the resolved
-  Work, Plan, and Review text; directories are discovered in Home and in the
+  Work, Plan, Review, Pursue system, built-in child Agent, and audio, video,
+  and document description templates. Directories are discovered in Home and in the
   current workspace, and the workspace copy wins when both exist. A repeated
   `--prompt-attachment <name>` flag appends those names for the process after
   the enabled set, even when a manifest says `enabled` false, and does not
@@ -476,8 +477,9 @@ separate library with no terminal code. The product can:
   titles, chrome, and the optional `topic` custom status-line field. Approval,
   trust, and `ToolInvocationPolicy` stay as they are;
 - configure an audio, a video, and a document description model (`audioModel`,
-  `videoModel`, `documentModel`) alongside the image model. That configuration is reserved
-  for the deferred audio, video, and document paths and changes no behavior today;
+  `videoModel`, `documentModel`) alongside the image model. Audio, video, and
+  document description templates can be replaced, extended, and exported.
+  Invoking their description models is deferred;
 - color pasted image markers and edit them as single composer units while
   identically spelled user text remains ordinary text; discard unsent images
   whose attached markers were deleted;

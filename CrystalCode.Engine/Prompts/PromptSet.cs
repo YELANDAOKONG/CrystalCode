@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 using CrystalCode.Engine.Plugins;
 
 namespace CrystalCode.Engine.Prompts;
@@ -110,6 +112,9 @@ public sealed record PromptSet
 
     public string ImageUser { get; }
 
+    internal ImmutableArray<ResourceDescriptionPrompt> ResourceDescriptions { get; init; } =
+        ResourceDescriptionPrompt.BuiltIns;
+
     public string AgentGeneral { get; }
 
     public string AgentWork { get; }
@@ -203,7 +208,19 @@ public sealed record PromptSet
         string body,
         IReadOnlyList<string> attachments,
         PromptContext context,
-        PluginPlaceholderTable? placeholders)
+        PluginPlaceholderTable? placeholders) =>
+        AppendBoundAttachments(body, attachments, new PromptBinding(context, Placeholders: placeholders));
+
+    internal static string ComposeWithAttachments(
+        string template,
+        IReadOnlyList<string> attachments,
+        PromptBinding binding) =>
+        AppendBoundAttachments(PromptBinder.Apply(template, binding), attachments, binding);
+
+    private static string AppendBoundAttachments(
+        string body,
+        IReadOnlyList<string> attachments,
+        PromptBinding binding)
     {
         if (attachments.Count == 0)
         {
@@ -214,7 +231,7 @@ public sealed record PromptSet
         foreach (var attachment in attachments)
         {
             var text = PromptFiles.TrimKeepingTrailingNewlines(
-                PromptBinder.Apply(attachment, context, placeholders));
+                PromptBinder.Apply(attachment, binding));
             if (text.Length > 0)
             {
                 parts.Add(text);

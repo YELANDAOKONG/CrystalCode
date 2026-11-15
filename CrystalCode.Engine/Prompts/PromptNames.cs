@@ -63,6 +63,7 @@ public static class PromptNames
         CompactionSystem,
         CompactionUser,
         ImageSystem,
-        ImageUser
+        ImageUser,
+        .. ResourceDescriptionPrompt.BuiltIns.SelectMany(prompt => new[] { prompt.SystemName, prompt.UserName })
     ];
 }

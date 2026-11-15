@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Home;
 
@@ -205,7 +207,10 @@ public sealed class PromptStore
                 pursueSystem.Text,
                 pursueUser.Text,
                 pursueContinue.Text,
-                enabled.Pursue),
+                enabled.Pursue)
+            {
+                ResourceDescriptions = ResolveResourceDescriptions(selection.Selected, project, enabled.Active)
+            },
             selection.Effective,
             catalog.Names,
             work.Source,
@@ -214,6 +219,37 @@ public sealed class PromptStore
             Dedupe(notes),
             enabled.Entries,
             selection.Entries);
+    }
+
+    private ImmutableArray<ResourceDescriptionPrompt> ResolveResourceDescriptions(
+        PromptSetDefinition? selected,
+        CrystalHome project,
+        IReadOnlyList<PromptAttachmentDefinition> active)
+    {
+        var descriptions = ImmutableArray.CreateBuilder<ResourceDescriptionPrompt>(
+            ResourceDescriptionPrompt.BuiltIns.Length);
+        foreach (var prompt in ResourceDescriptionPrompt.BuiltIns)
+        {
+            var system = ResolveNamed(prompt.SystemName, prompt.SystemTemplate, selected, project);
+            var user = ResolveNamed(prompt.UserName, prompt.UserTemplate, selected, project);
+            var systemAttachments = new List<string>();
+            var userAttachments = new List<string>();
+            foreach (var attachment in active)
+            {
+                AddNamed(systemAttachments, attachment.Directory, prompt.SystemName);
+                AddNamed(userAttachments, attachment.Directory, prompt.UserName);
+            }
+
+            descriptions.Add(prompt with
+            {
+                SystemTemplate = system.Text,
+                UserTemplate = user.Text,
+                SystemAttachments = [.. systemAttachments],
+                UserAttachments = [.. userAttachments]
+            });
+        }
+
+        return descriptions.MoveToImmutable();
     }
 
     private (string Text, PromptSource Source) ResolveNamed(
@@ -436,7 +472,7 @@ public sealed class PromptStore
             entries.Add(Entry(definition, effective: false));
         }
 
-        return new AttachmentSelection(work, plan, review, agentGeneral, agentWork, agentPlan, pursue, entries);
+        return new AttachmentSelection(work, plan, review, agentGeneral, agentWork, agentPlan, pursue, active, entries);
     }
 
     private static PromptAttachmentEntry Entry(PromptAttachmentDefinition definition, bool effective) =>
@@ -551,5 +587,6 @@ public sealed class PromptStore
         IReadOnlyList<string> AgentWork,
         IReadOnlyList<string> AgentPlan,
         IReadOnlyList<string> Pursue,
+        IReadOnlyList<PromptAttachmentDefinition> Active,
         IReadOnlyList<PromptAttachmentEntry> Entries);
 }
