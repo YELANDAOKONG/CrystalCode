@@ -153,11 +153,14 @@ behavior stands until a specific change defines otherwise.
   and URL-mode elicitation. MCP tool image results are forwarded on image-capable
   turns through the existing media boundary. Do not bypass the plugin, approval,
   and media boundaries.
-- OAuth sign-in for model providers, such as a ChatGPT account login for
-  OpenAI. Today a provider authenticates only with a static API key. The
-  supported providers, token storage, and refresh behavior are to be defined.
-  Do not reserve a command, configuration field, or public type. See MCP gaps
-  for remote MCP server OAuth.
+- Provider sign-in beyond the first integration. The ChatGPT account
+  integration is in this build (see ARCHITECTURE.md, Provider authentication).
+  Not in it: a Grok account integration (its login flow is not confirmed), login
+  from `crystal server` and `crystal bridge` (they reuse a login the terminal
+  saved; the wire and ACP forms for a login are not defined), and integrations
+  contributed by disk plugins (the load-context boundary for a token handler is
+  not defined). Do not reserve a wire field, ACP method, or plugin contract for
+  them. See MCP gaps for remote MCP server OAuth.
 - Refactoring and optimizing `crystal run`. It remains the headless entry
   for one task in this executable, not an operator surface and not a second
   assembly. This includes optimizing the JSON structure of its JSON output.

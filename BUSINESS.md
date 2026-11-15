@@ -425,6 +425,14 @@ separate library with no terminal code. The product can:
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
   Anthropic Messages, native Gemini GenerateContent, and native Ollama Chat
   adapters, including user-added gateways;
+- sign in to a provider with an account instead of an API key. A provider
+  definition with `type` `authentication` names an authentication integration
+  and lists its own models. `crystal login <provider>` and `/login` run the
+  integration's flow in the terminal, and `crystal logout <provider>` and
+  `/logout` remove it. Tokens live in `~/.crystal/authentication-credentials.json`
+  with owner-only access. Models are never fetched from a service; the
+  provider definition declares them. `crystal server`, `crystal bridge`, and
+  `crystal run` use a saved login and never start one;
 - group one gateway's protocol endpoints under a single provider name and route
   each uniquely named model through its configured protocol;
 - attach PNG, JPEG, GIF, or WebP images from the workspace, paste clipboard
@@ -728,15 +736,13 @@ implemented in the current build.
 
 ### High priority
 
-- OAuth sign-in for model providers, such as a ChatGPT account login for
-  OpenAI. A provider authenticates only with a static API key today. Which
-  providers, which endpoints and client identity, where tokens are stored,
-  refresh and concurrent-refresh behavior, how a front end shows the login,
-  and whether the terms of the service allow it are not defined. A sign-in
-  would have to keep adapters free of `~/.crystal` layout and prompts, keep
-  the engine off the console, never put tokens in source, logs, diagnostics,
-  or on a command line, and make `crystal run` fail instead of asking the
-  operator. Do not reserve a command, configuration field, or public type.
+- Provider sign-in beyond the first integration. The ChatGPT account
+  integration is implemented. A Grok account integration, login from
+  `crystal server` and `crystal bridge`, and integrations contributed by
+  disk plugins are not defined. Do not reserve a wire field, ACP method, or
+  plugin contract for them. A sign-in keeps the engine free of vendor names
+  and the console, never puts tokens in source, logs, diagnostics, or on a
+  command line, and makes `crystal run` fail instead of asking the operator.
 - Publishing a NuGet package. Package id, which assemblies ship, and whether
   a library is also published are not defined. Do not reserve a package id or
   add a project. This item is not permission to add or update a package

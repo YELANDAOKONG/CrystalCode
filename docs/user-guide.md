@@ -911,6 +911,19 @@ An empty `thinkingEfforts` list is on/off only. When
 Off choice uses the provider default and the status bar shows
 `Think Default`.
 
+### Sign in with an account
+
+A provider with `"type": "authentication"` uses an account login instead of an
+API key. It names an `integration`, an inference `protocol`, and its own
+`models`; models are never fetched from a service. Omitted, `default`, and
+`key` keep the API key path, and any other `type` is a configuration error.
+
+Run `crystal login <provider>` or `/login` to sign in, and
+`crystal logout <provider>` or `/logout` to remove the login. The login is
+stored in `~/.crystal/authentication-credentials.json` with owner-only
+access. `crystal server`, `crystal bridge`, and `crystal run` use a saved
+login and never start one.
+
 ### Example: add an OpenAI-compatible provider
 
 Add this entry to `~/.crystal/providers.json`. Keep the secret out of this

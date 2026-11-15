@@ -13,10 +13,10 @@ CrystalCode   (terminal host: the executable)
     ↓                    ↓
 CrystalCode.Display      CrystalCode.Engine
     ↓                        ↓
-Spectre.Console              CrystalCode.Providers
-(rasterization;                  ↓
-Terminal.Gui is              Crystal
-referenced, not called)
+Spectre.Console              Crystal
+(rasterization;              (Engine does not reference Providers;
+Terminal.Gui is              Connections and Authentication reference
+referenced, not called)      Engine and Providers, which reference Crystal)
 
 CrystalCode.Engine also references CrystalCode.Tools, CrystalCode.Plugins,
 Crystal.Tools, Crystal.Agents, and Crystal.Harness directly.
@@ -30,6 +30,15 @@ Spectre.Console, Terminal.Gui, CrystalCode.Display, or the executable
 host, and it never touches the console. CrystalCode.Providers
 references only Crystal. No project in this repository modifies Crystal.
 ```
+
+CrystalCode.Engine does not reference CrystalCode.Providers. Two contribution
+assemblies sit beside the front ends and reference CrystalCode.Engine and
+CrystalCode.Providers: `CrystalCode.Connections` (the built-in provider
+catalog, vendor defaults, and the client factories for the built-in protocols)
+and `CrystalCode.Authentication` (authentication integrations and their login
+flows). The executable references both and registers them in the plugin
+registry it hands to the shared launch path. The engine knows an integration
+only as a registered id and holds no vendor name.
 
 A second front end (a desktop application, for example) references
 CrystalCode.Engine and supplies its own surface. It does not copy engine code.
@@ -66,6 +75,8 @@ CrystalCode.Tests references CrystalCode.
 CrystalCode.Engine.Tests references CrystalCode.Engine.
 CrystalCode.Display.Tests references CrystalCode.Display.
 CrystalCode.Providers.Tests references CrystalCode.Providers.
+CrystalCode.Connections.Tests references CrystalCode.Connections.
+CrystalCode.Authentication.Tests references CrystalCode.Authentication.
 
 ## Assembly ownership
 
@@ -273,6 +284,46 @@ implement `IStreamingMultimodalChatClient`. Provider options, wire DTOs, and
 transport exceptions stay in this assembly. No tools, no UI, no home-directory
 layout.
 
+### CrystalCode.Connections
+
+Binds engine settings to the Providers adapters. Owns the built-in provider
+catalog and vendor default values, and one client factory and plugin per
+built-in protocol. It holds no UI, no `~/.crystal` layout, and no login flow.
+The engine runs without it by using a test registry.
+
+### CrystalCode.Authentication
+
+Authentication integrations. An integration implements the engine's
+`IAuthenticationIntegration`: it validates a provider definition, runs its own
+login through `ILoginInteraction`, and returns a `DelegatingHandler` that
+attaches a valid token, refreshes it, and retries once after a 401. The first
+integration is the ChatGPT account. It holds no console code and no storage
+layout; the engine hands it an `AuthenticationCredentialStore` view for its
+provider name.
+
+### Provider authentication
+
+A provider definition has `type`: omitted, `default`, or `key` use the API key
+path (environment, `apiKey`, then `credentials.json`); `authentication` names
+an `integration` and an inference `protocol`, and must list its own `models`.
+An unknown `type` is a configuration error. Engine resolves a provider to a
+`ProviderCredential`: an API key, or for `authentication` the saved login
+plus the integration's handler. Resolution at startup, `/model`, and launch
+only checks that a login exists and never touches the network. A client
+factory that receives a handler builds its `HttpClient` around it.
+
+Tokens live in `authentication-credentials.json` in Home, keyed by provider
+name, as opaque JSON owned by the integration, written atomically with
+owner-only access and listed as a credential path for the file tools.
+Refresh is serialized across processes with a lock file beside it, because
+refresh tokens may rotate. Tokens never appear in logs, diagnostics, events,
+or command lines. An integration refuses to send a token to a `baseUri` it
+does not recognize as the authorized resource. `crystal login` and `/login`
+exist in the terminal only; `crystal server`, `crystal bridge`, and
+`crystal run` use a saved login, and a missing one is an error, never a
+prompt. Disk plugins cannot supply an integration and cannot create a client
+for an `authentication` provider.
+
 ### CrystalCode.Tests
 
 Terminal host tests: session renderer, event-to-slash-option mapping, status
@@ -333,7 +384,7 @@ CrystalCode.Engine (namespaces below are relative to `CrystalCode.Engine`):
 | `Skills` | OpenCode-compatible `SKILL.md` discovery and catalog |
 | `Plugins` | In-process registry and built-in contributions |
 | `Plugins/Interfaces` | Contribution contracts |
-| `Plugins/Providers` | Built-in DeepSeek, OpenAI-compatible, Responses, Anthropic, Gemini, and Ollama client factories |
+| `Authentication` | Integration contract, login interaction, credential store, and the access resolver for `authentication` providers |
 | `Version` | Build identity for `crystal version`: product commit, Crystal commit, compiling SDK, compile configuration, host runtime, and host operating system. Two plain-text sections |
 
 CrystalCode.Display:
