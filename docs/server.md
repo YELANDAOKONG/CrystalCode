@@ -365,8 +365,10 @@ names the active `provider` and `model` along with the `sessionId`, workspace, m
 thinking, prompt set, context window, service tier, and speed. Its `pending`
 object lists settings chosen during a turn that apply on the next turn:
 `provider` and `model` together, `contextWindow`, `serviceTier`, `speed`
-(`unset` clears the slot), `thinking`, `mode`, and `approval`. A key appears
-only while that setting waits. `report.status` carries the same `pending`.
+(`unset` clears the slot), `thinking`, `mode`, `approval`, `approvalThinking`,
+`extendedApprovalThinking`, `extendedApprovalTrigger`, and the boolean
+`extendedApprovalPrimary`. A key appears only while that setting waits.
+`report.status` carries the same `pending`.
 `reviewer` and `extendedApproval` are `null` while that reviewer is off.
 Otherwise each holds the reviewer's `provider`, `model`, and display labels
 `thinking`, `serviceTier`, `speed`, and `context` (blank when unset); `extendedApproval`

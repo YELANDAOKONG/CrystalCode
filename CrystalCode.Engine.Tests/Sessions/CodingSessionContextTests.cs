@@ -249,6 +249,33 @@ public sealed class CodingSessionContextTests
     }
 
     [Fact]
+    public async Task Compaction_AppliesPendingExtendedApprovalAfterTheSummary()
+    {
+        var client = new GatedSummaryClient();
+        using var headless = await OpenReadyToCompactAsync(client);
+        var compacting = headless.Session.SubmitAsync("/compact", CancellationToken.None);
+        await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
+        try
+        {
+            await headless.Session.SubmitAsync("/approval extended trigger medium", CancellationToken.None);
+            await headless.Session.EnqueueAsync("/approval extended trigger high", CancellationToken.None);
+            await headless.Session.EnqueueAsync("/compact summary off", CancellationToken.None);
+
+            Assert.Equal("high", headless.Session.PendingSettings.ExtendedApprovalTrigger);
+            Assert.DoesNotContain("\"trigger\"", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
+        }
+        finally
+        {
+            client.Release();
+            await Finish(compacting);
+        }
+
+        Assert.True(headless.Session.PendingSettings.IsEmpty);
+        Assert.Contains("\"trigger\": \"high\"", File.ReadAllText(headless.Home.ConfigPath), StringComparison.Ordinal);
+        Assert.False(Assert.Single(headless.Observer.Events.OfType<CompactionFinished>()).Shown);
+    }
+
+    [Fact]
     public async Task Compaction_QuitCancelsAndExits()
     {
         var client = new GatedSummaryClient();

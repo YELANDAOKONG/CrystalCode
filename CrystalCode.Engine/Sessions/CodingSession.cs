@@ -1254,6 +1254,10 @@ public sealed class CodingSession : ITurnObserver
     private ThinkingSelection? _pendingThinking;
     private string? _pendingMode;
     private ApprovalMode? _pendingApproval;
+    private ThinkingSelection? _pendingApprovalThinking;
+    private ThinkingSelection? _pendingExtendedApprovalThinking;
+    private ReviewRiskLevel? _pendingExtendedApprovalTrigger;
+    private bool? _pendingExtendedApprovalPrimary;
     private readonly AsyncLocal<SessionInputCapture?> _inputCapture = new();
     private List<ChatItem> _transcript;
     private readonly object _archiveGate = new();
@@ -1783,8 +1787,8 @@ public sealed class CodingSession : ITurnObserver
     /// Handles one submitted prompt: a slash command, a follow-up while a turn
     /// runs, or the start of a turn. Empty text while a turn runs interrupts
     /// when a follow-up is queued, and is ignored otherwise.
-    /// A command that would change the session is refused while compaction
-    /// runs. Commands that only report state still run.
+    /// A running turn or compaction accepts only commands supported by the
+    /// busy input path.
     /// Returns true when the operator asked to quit.
     /// </summary>
     public async Task<bool> SubmitAsync(string text, CancellationToken cancellationToken)
@@ -1820,7 +1824,7 @@ public sealed class CodingSession : ITurnObserver
 
         await SavePromptHistoryAsync(text, cancellationToken);
         PruneDraftImages(input);
-        if (RefuseCompactionCommand(input))
+        if (RefuseBusyCommand(input))
         {
             return false;
         }
@@ -1841,11 +1845,11 @@ public sealed class CodingSession : ITurnObserver
             return true;
         }
 
-        if (_turnActive)
+        if (_turnActive || _compacting)
         {
             if (input.Length > 0)
             {
-                if (!OverriddenByPlugin(input) && StopsBusyTurn(input))
+                if (!_compacting && !OverriddenByPlugin(input) && StopsBusyTurn(input))
                 {
                     _turnSource?.Cancel();
                     await FinishTurnAsync(cancellationToken);
@@ -2473,7 +2477,11 @@ public sealed class CodingSession : ITurnObserver
             _pendingSpeedSet ? _pendingSpeed ?? SessionPendingSettings.Unset : null,
             _pendingThinking?.Value,
             _pendingMode,
-            _pendingApproval?.Value);
+            _pendingApproval?.Value,
+            _pendingApprovalThinking?.Value,
+            _pendingExtendedApprovalThinking?.Value,
+            _pendingExtendedApprovalTrigger?.Value,
+            _pendingExtendedApprovalPrimary);
 
     /// <summary>
     /// Applies the settings chosen during the turn or compaction that just
@@ -2496,11 +2504,19 @@ public sealed class CodingSession : ITurnObserver
         var thinking = _pendingThinking;
         var mode = _pendingMode;
         var approval = _pendingApproval;
+        var approvalThinking = _pendingApprovalThinking;
+        var extendedThinking = _pendingExtendedApprovalThinking;
+        var extendedTrigger = _pendingExtendedApprovalTrigger;
+        var extendedPrimary = _pendingExtendedApprovalPrimary;
         _pendingModel = null;
         ClearPendingModelSlots();
         _pendingThinking = null;
         _pendingMode = null;
         _pendingApproval = null;
+        _pendingApprovalThinking = null;
+        _pendingExtendedApprovalThinking = null;
+        _pendingExtendedApprovalTrigger = null;
+        _pendingExtendedApprovalPrimary = null;
 
         // The values were chosen earlier, perhaps by another client, so what
         // applying them writes goes to everyone and fails no current request.
@@ -2549,6 +2565,26 @@ public sealed class CodingSession : ITurnObserver
             if (approval is not null)
             {
                 ChangeApproval(approval.Value);
+            }
+
+            if (approvalThinking is not null)
+            {
+                ChangeReviewerThinking(extended: false, approvalThinking.Value);
+            }
+
+            if (extendedThinking is not null)
+            {
+                ChangeReviewerThinking(extended: true, extendedThinking.Value);
+            }
+
+            if (extendedTrigger is not null)
+            {
+                ChangeExtendedApprovalTrigger(extendedTrigger);
+            }
+
+            if (extendedPrimary is bool include)
+            {
+                ChangeExtendedApprovalPrimary(include);
             }
 
             RefreshChrome();
@@ -2920,19 +2956,7 @@ public sealed class CodingSession : ITurnObserver
                 else if (CompactionSummaryArguments.IsSummaryCommand(parsed.Argument)
                     || CompactionSummaryArguments.IsAutomaticCommand(parsed.Argument))
                 {
-                    var automatic = CompactionSummaryArguments.IsAutomaticCommand(parsed.Argument);
-                    if (!CompactionSummaryArguments.TryParse(
-                            parsed.Argument,
-                            automatic,
-                            out var request,
-                            out var parseError))
-                    {
-                        Error(parseError);
-                    }
-                    else
-                    {
-                        ChangeCompactionSummary(request);
-                    }
+                    ChangeCompactionSummary(parsed.Argument);
                 }
                 else if (CompactionMicroArguments.IsMicroCommand(parsed.Argument))
                 {
@@ -3655,22 +3679,58 @@ public sealed class CodingSession : ITurnObserver
                     return;
                 }
 
-                SaveSettings(current => current.WithExtendedApproval(current.ExtendedApproval.WithTrigger(trigger)));
-                RebuildExecutors();
-                RefreshChrome();
-                Note("Extended approval trigger  " + DisplayCase.Token(trigger.Value));
+                ChangeExtendedApprovalTrigger(trigger);
                 return;
             case ExtendedApprovalArguments.Kind.Primary:
-                var include = request.Enabled == true;
-                SaveSettings(current => current.WithExtendedApproval(
-                    current.ExtendedApproval.WithIncludePrimaryReview(include)));
-                RebuildExecutors();
-                RefreshChrome();
-                Note("Extended approval primary review  " + (include ? "On" : "Off"));
+                ChangeExtendedApprovalPrimary(request.Enabled == true);
                 return;
             default:
                 Error("Unknown extended approval command.");
                 return;
+        }
+    }
+
+    private void ChangeExtendedApprovalTrigger(ReviewRiskLevel trigger)
+    {
+        var note = "Extended approval trigger  " + DisplayCase.Token(trigger.Value);
+        if (SettingsBusy)
+        {
+            _pendingExtendedApprovalTrigger = trigger == _settings.ExtendedApproval.Trigger ? null : trigger;
+            ReportPendingReviewerSetting(_pendingExtendedApprovalTrigger is not null, note);
+            return;
+        }
+
+        SaveSettings(current => current.WithExtendedApproval(current.ExtendedApproval.WithTrigger(trigger)));
+        RebuildExecutors();
+        RefreshChrome();
+        Note(note);
+    }
+
+    private void ChangeExtendedApprovalPrimary(bool include)
+    {
+        var note = "Extended approval primary review  " + (include ? "On" : "Off");
+        if (SettingsBusy)
+        {
+            _pendingExtendedApprovalPrimary = include == _settings.ExtendedApproval.IncludePrimaryReview ? null : include;
+            ReportPendingReviewerSetting(_pendingExtendedApprovalPrimary.HasValue, note);
+            return;
+        }
+
+        SaveSettings(current => current.WithExtendedApproval(current.ExtendedApproval.WithIncludePrimaryReview(include)));
+        RebuildExecutors();
+        RefreshChrome();
+        Note(note);
+    }
+
+    private void ReportPendingReviewerSetting(bool pending, string note)
+    {
+        if (pending)
+        {
+            Deferred(note);
+        }
+        else
+        {
+            KeepActive(note);
         }
     }
 
@@ -3838,7 +3898,8 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
-        var selection = reviewer.ThinkingEffort;
+        ref var pending = ref (extended ? ref _pendingExtendedApprovalThinking : ref _pendingApprovalThinking);
+        var selection = pending ?? reviewer.ThinkingEffort;
         if (effort is null)
         {
             selection = ThinkingSelection.Next(selection, model);
@@ -3874,6 +3935,14 @@ public sealed class CodingSession : ITurnObserver
             selection = parsed;
         }
 
+        var note = ReviewerTitle(extended) + " thinking  " + ThinkingLabel.For(selection);
+        if (SettingsBusy)
+        {
+            pending = selection == reviewer.ThinkingEffort ? null : selection;
+            ReportPendingReviewerSetting(pending is not null, note);
+            return;
+        }
+
         SaveSettings(current => WithReviewer(
             current,
             extended,
@@ -3881,7 +3950,7 @@ public sealed class CodingSession : ITurnObserver
         RebuildExecutors();
         RefreshSlashCommands();
         RefreshChrome();
-        Note(ReviewerTitle(extended) + " thinking  " + ThinkingLabel.For(selection));
+        Note(note);
     }
 
     private void ChangeReviewerSlot(bool extended, ApprovalSlotArguments.Request request)
@@ -6568,12 +6637,9 @@ public sealed class CodingSession : ITurnObserver
     private async Task<bool> ChangeTrustAsync(string argument, CancellationToken cancellationToken)
     {
         var command = argument.Trim().ToLowerInvariant();
-        var trustRoot = _trust.TrustRoot(_workspace.Root);
         if (command.Length == 0)
         {
-            Note("Workspace trust  " + (_settings.WorkspaceTrust ? "on" : "off"));
-            Note("Trust root  " + trustRoot);
-            Note("Trusted  " + (_trust.Contains(_workspace.Root) ? "yes" : "no"));
+            ShowTrust();
             return false;
         }
 
@@ -6583,6 +6649,7 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
+        var trustRoot = _trust.TrustRoot(_workspace.Root);
         if (command == "forget")
         {
             if (OperatorSpace.Is(_home, trustRoot))
@@ -6615,6 +6682,13 @@ public sealed class CodingSession : ITurnObserver
         _trust.Remember(_workspace.Root);
         Note("Trusted  " + trustRoot);
         return false;
+    }
+
+    private void ShowTrust()
+    {
+        Note("Workspace trust  " + (_settings.WorkspaceTrust ? "on" : "off"));
+        Note("Trust root  " + _trust.TrustRoot(_workspace.Root));
+        Note("Trusted  " + (_trust.Contains(_workspace.Root) ? "yes" : "no"));
     }
 
     /// <summary>
@@ -6849,9 +6923,9 @@ public sealed class CodingSession : ITurnObserver
         var name = argument.Trim();
         if (name.Length == 0)
         {
-            if (_frontEnd.ChooseThemeAsync is null)
+            if (SettingsBusy || _frontEnd.ChooseThemeAsync is null)
             {
-                Note("Theme  " + _settings.Theme + "\nAvailable  " + string.Join(", ", ThemeCatalog.Names(_home)));
+                ShowTheme();
                 return;
             }
 
@@ -6872,6 +6946,14 @@ public sealed class CodingSession : ITurnObserver
             }
         }
 
+        ApplyTheme(name);
+    }
+
+    private void ShowTheme() =>
+        Note("Theme  " + _settings.Theme + "\nAvailable  " + string.Join(", ", ThemeCatalog.Names(_home)));
+
+    private void ApplyTheme(string name)
+    {
         if (!ThemeCatalog.Exists(_home, name))
         {
             Error("Theme not found  " + name + ". Use /theme to list the available themes.");
@@ -8860,8 +8942,15 @@ public sealed class CodingSession : ITurnObserver
         Note(next.Describe());
     }
 
-    private void ChangeCompactionSummary(CompactionSummaryArguments.Request request)
+    private void ChangeCompactionSummary(string argument)
     {
+        var automatic = CompactionSummaryArguments.IsAutomaticCommand(argument);
+        if (!CompactionSummaryArguments.TryParse(argument, automatic, out var request, out var error))
+        {
+            Error(error);
+            return;
+        }
+
         var enabled = request.Enabled ?? !(request.Automatic
             ? _settings.ShowAutomaticCompactionSummary
             : _settings.ShowCompactionSummary);
@@ -10885,7 +10974,7 @@ public sealed class CodingSession : ITurnObserver
                 return;
             }
 
-            if (RunsWhileBusy(command.Verb))
+            if (RunsWhileBusy(command))
             {
                 if (!TryRunWhileBusy(command))
                 {
@@ -10943,14 +11032,31 @@ public sealed class CodingSession : ITurnObserver
         return true;
     }
 
-    private bool RefuseCompactionCommand(string input)
+    private bool RefuseBusyCommand(string input)
     {
-        if (!_compacting || !SessionCommand.TryParse(input, out var command))
+        if (!SettingsBusy || !SessionCommand.TryParse(input, out var command))
         {
             return false;
         }
 
-        if (command.Verb == SessionVerb.Quit || RunsWhileBusy(command.Verb) || AppliesNextTurn(command))
+        if (command.Verb == SessionVerb.Quit || RunsWhileBusy(command) || AppliesNextTurn(command))
+        {
+            return false;
+        }
+
+        if (!_compacting && (OverriddenByPlugin(input) || command.Verb == SessionVerb.Unknown || StopsBusyTurn(input)))
+        {
+            return false;
+        }
+
+        if (!_compacting && command.Verb is SessionVerb.Cd or SessionVerb.Space)
+        {
+            return WorkspaceChangeBlocked();
+        }
+
+        if (command.Verb == SessionVerb.Pursue
+            && PursueArguments.TryParse(command.Argument, out var pursue, out _)
+            && pursue.Action == PursueArguments.Action.Show)
         {
             return false;
         }
@@ -10961,23 +11067,19 @@ public sealed class CodingSession : ITurnObserver
 
     /// <summary>
     /// Commands whose setting is recorded during a turn or compaction and
-    /// applied on the next turn. Approval qualifies only for the level form;
-    /// its reviewer forms keep their own busy rules.
+    /// applied on the next turn.
     /// </summary>
     internal static bool AppliesNextTurn(SessionCommand command) =>
         command.Verb switch
         {
             SessionVerb.Plan or SessionVerb.Mode or SessionVerb.Thinking or SessionVerb.Tier
                 or SessionVerb.Speed or SessionVerb.Context or SessionVerb.Model => true,
-            SessionVerb.Approval => IsApprovalLevel(command.Argument),
+            SessionVerb.Approval => ExtendedApprovalArguments.IsExtendedCommand(command.Argument)
+                ? ExtendedApprovalArguments.AppliesNextTurn(command.Argument)
+                : !ApprovalModelArguments.IsModelCommand(command.Argument)
+                    && !ApprovalSlotArguments.TryParse(command.Argument, out _),
             _ => false
         };
-
-    private static bool IsApprovalLevel(string argument) =>
-        !ExtendedApprovalArguments.IsExtendedCommand(argument)
-        && !ApprovalModelArguments.IsModelCommand(argument)
-        && !ApprovalThinkingArguments.IsThinkingCommand(argument)
-        && !ApprovalSlotArguments.TryParse(argument, out _);
 
     private void RunNextTurnSetting(SessionCommand command)
     {
@@ -11047,7 +11149,28 @@ public sealed class CodingSession : ITurnObserver
             or SessionVerb.Verbose
             or SessionVerb.StatusLine
             or SessionVerb.Btw
-            or SessionVerb.Attach;
+            or SessionVerb.Attach
+            or SessionVerb.Theme;
+
+    private static bool RunsWhileBusy(SessionCommand command) =>
+        RunsWhileBusy(command.Verb) || (command.Verb switch
+        {
+            SessionVerb.Cd or SessionVerb.Trust or SessionVerb.Notify or SessionVerb.Topic
+                or SessionVerb.Tools or SessionVerb.Skills or SessionVerb.Rules
+                or SessionVerb.PromptSet or SessionVerb.PromptAttachment => string.IsNullOrWhiteSpace(command.Argument),
+            SessionVerb.Access => string.IsNullOrWhiteSpace(command.Argument) || command.Argument.Trim() == "default",
+            SessionVerb.Describe => ResourceModelArguments.TryParse(command.Argument, out var resource, out _)
+                && resource.Action is ResourceModelArguments.Action.List or ResourceModelArguments.Action.Show,
+            SessionVerb.Compact => CompactionSummaryArguments.IsSummaryCommand(command.Argument)
+                || CompactionSummaryArguments.IsAutomaticCommand(command.Argument),
+            SessionVerb.Approval => (ApprovalModelArguments.IsModelCommand(command.Argument)
+                && ApprovalModelArguments.TryParse(command.Argument, out var model, out _)
+                && model.Show)
+                || (ExtendedApprovalArguments.IsExtendedCommand(command.Argument)
+                && ExtendedApprovalArguments.TryParse(command.Argument, out var extended, out _)
+                && extended.Kind == ExtendedApprovalArguments.Kind.Show),
+            _ => false
+        });
 
     internal bool TryRunWhileBusy(SessionCommand command)
     {
@@ -11094,6 +11217,57 @@ public sealed class CodingSession : ITurnObserver
                 return true;
             case SessionVerb.Attach:
                 AttachImage(command.Argument);
+                return true;
+            case SessionVerb.Cd:
+                Note(_workspace.Root);
+                return true;
+            case SessionVerb.Trust:
+                ShowTrust();
+                return true;
+            case SessionVerb.Notify:
+                Note(OperatorNotifyArguments.Format(_settings.OperatorNotify));
+                return true;
+            case SessionVerb.Topic:
+                ChangeTopic(command.Argument);
+                return true;
+            case SessionVerb.Tools:
+                ShowTools();
+                return true;
+            case SessionVerb.Skills:
+                ShowSkills();
+                return true;
+            case SessionVerb.Rules:
+                ChangeRules(command.Argument);
+                return true;
+            case SessionVerb.PromptSet:
+                ChangePromptSet(command.Argument);
+                return true;
+            case SessionVerb.PromptAttachment:
+                ChangePromptAttachments(command.Argument);
+                return true;
+            case SessionVerb.Access:
+                ChangeAccess(command.Argument);
+                return true;
+            case SessionVerb.Describe:
+                ChangeResourceModel(command.Argument);
+                return true;
+            case SessionVerb.Compact:
+                ChangeCompactionSummary(command.Argument);
+                return true;
+            case SessionVerb.Approval:
+                ChangeApproval(command.Argument);
+                return true;
+            case SessionVerb.Theme:
+                var name = command.Argument.Trim();
+                if (name.Length == 0)
+                {
+                    ShowTheme();
+                }
+                else
+                {
+                    ApplyTheme(name);
+                }
+
                 return true;
             default:
                 return false;

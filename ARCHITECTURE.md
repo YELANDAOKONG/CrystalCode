@@ -997,11 +997,15 @@ Two Ctrl+C presses on an empty composer exit.
 
 Mode (`/plan`, `/mode <name>`, Tab, Shift+Tab, `CycleMode`, `TogglePlan`, and
 `TrySetMode`), the approval level (`/approval` with no argument or a level),
-`/thinking`, `/tier`, `/speed`, `/context`, and `/model <selection>` are
-accepted while a turn or compaction runs and apply on the next turn. Every
-other command that changes the session stays refused with
-`Finish the current turn before ...`, including the approval-model,
-extended-approval, and compaction-model forms.
+`/thinking`, `/tier`, `/speed`, `/context`, `/model <selection>`,
+`/approval thinking`, and `/approval extended thinking`, `trigger`, and
+`primary` apply on the next turn when chosen during a turn or compaction.
+Direct submission and queued input use the same busy rules for these
+settings. Other mutations, including reviewer and compaction model selection
+and slots, logout, trust, topic, and notification commands, require an idle
+session. Built-in display preferences such as a named theme and compaction
+summary visibility apply immediately. A bare `/theme` lists available themes
+while busy and can open the picker when idle.
 
 - While busy, a covered command is validated and recorded as pending. It
   changes nothing live: no executor rebuild, no system message replacement,
@@ -1011,8 +1015,9 @@ extended-approval, and compaction-model forms.
   `Mode  Plan  Applies next turn`.
 - One pending value per setting, and the last command wins. A command that
   names the active value drops that setting's pending value. A cycle (Tab, Shift+Tab,
-  `/plan`, `/approval`, `/thinking`, `/tier`, `/speed`, `/context` without an
-  argument) steps from the pending value when there is one.
+  `/plan`, `/approval`, `/thinking`, `/tier`, `/speed`, `/context`, and the
+  reviewer thinking commands without a value) steps from the pending value
+  when there is one.
 - Validation uses the settings the next turn will start with: `/thinking`,
   `/tier`, `/speed`, and `/context` check the pending model. `/model` checks
   the credential and the image capability when typed, so a refusal reaches
@@ -1023,7 +1028,9 @@ extended-approval, and compaction-model forms.
   before `CompleteTurnAsync` starts a queued follow-up, and also for an
   interrupted turn and for `/clear`, `/resume`, and `/fork`, which stop the
   turn first. The order is model, context, tier, speed, thinking, mode,
-  approval. Each goes through the same path as an idle command and saves to
+  approval level, primary reviewer thinking, extended reviewer thinking,
+  extended trigger, and inclusion of the primary review. Each goes through
+  the same path as an idle command and saves to
   `config.json` then. A value that fails (for example, a credential removed
   in the meantime) writes an error and the others still apply. These notes
   and errors carry no origin. Pending values live in memory only; a crash

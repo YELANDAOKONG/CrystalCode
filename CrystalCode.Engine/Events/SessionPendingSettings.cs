@@ -14,7 +14,11 @@ public sealed record SessionPendingSettings(
     string? Speed = null,
     string? Thinking = null,
     string? Mode = null,
-    string? Approval = null)
+    string? Approval = null,
+    string? ApprovalThinking = null,
+    string? ExtendedApprovalThinking = null,
+    string? ExtendedApprovalTrigger = null,
+    bool? ExtendedApprovalPrimary = null)
 {
     public const string Unset = "unset";
 

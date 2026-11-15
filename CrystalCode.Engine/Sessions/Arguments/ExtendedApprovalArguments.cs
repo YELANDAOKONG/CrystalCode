@@ -40,6 +40,14 @@ internal static class ExtendedApprovalArguments
                 && char.IsWhiteSpace(trimmed[Word.Length]));
     }
 
+    public static bool AppliesNextTurn(string argument)
+    {
+        var (head, _) = Split(argument.Trim()[Word.Length..].TrimStart());
+        return head.Equals("thinking", StringComparison.OrdinalIgnoreCase)
+            || head.Equals("trigger", StringComparison.OrdinalIgnoreCase)
+            || head.Equals("primary", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static bool TryParse(string argument, out Request request, out string error)
     {
         request = default;

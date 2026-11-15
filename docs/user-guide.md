@@ -1382,8 +1382,9 @@ Other commands that change the session or workspace are refused for
 that same reason.
 
 Mode (`/plan`, `/mode`, Tab), the approval level, `/thinking`, `/tier`,
-`/speed`, `/context`, and `/model` work while a turn or compaction runs, but
-the running turn keeps its current settings. The note ends with
+`/speed`, `/context`, `/model`, `/approval thinking`, and `/approval extended
+thinking`, `trigger`, and `primary` work while a turn or compaction runs.
+The running turn keeps its current settings. The note ends with
 `Applies next turn`, and the status bar shows the waiting values, for example
 `Next: Plan, Approval Full`. They apply when the turn ends, including an
 interrupted one, before a queued follow-up is sent, and only then are they
@@ -1393,6 +1394,8 @@ stricter approval level chosen this way does not restrict the running turn;
 interrupt it if you need that now. `/status`, `/help`, `/todos`, `/child`, and other commands that only
 report state or adjust the display run immediately. `/agents` with no
 arguments lists; its other forms are refused during a turn. `/quit` still exits.
+A named `/theme` and `/compact summary` or `/compact auto` update display
+preferences immediately. A bare `/theme` lists themes while busy.
 
 ### One turn
 
@@ -1605,7 +1608,8 @@ missing credential or an unknown model is refused, and the previous
 setting stays. While the switch is on, Review and Audit call that
 model with its own credentials and its stored thinking gear.
 `/approval thinking` cycles that gear, or sets one by name, and
-persists it. It needs a stored or selected approval model and works
+persists it. During a turn or compaction it applies on the next turn.
+It needs a stored or selected approval model and works
 while the switch is off. A stored gear the model does
 not offer falls back to the provider default, and `/approval thinking`
 refuses `off` for a model that cannot disable thinking. Tab completes

@@ -53,6 +53,26 @@ public static class PendingSettingsText
             rows.Add(("Approval", ApprovalLabel.For(new ApprovalMode(approval))));
         }
 
+        if (pending.ApprovalThinking is { } approvalThinking)
+        {
+            rows.Add(("Approval thinking", DisplayCase.Token(approvalThinking)));
+        }
+
+        if (pending.ExtendedApprovalThinking is { } extendedThinking)
+        {
+            rows.Add(("Extended thinking", DisplayCase.Token(extendedThinking)));
+        }
+
+        if (pending.ExtendedApprovalTrigger is { } trigger)
+        {
+            rows.Add(("Extended trigger", DisplayCase.Token(trigger)));
+        }
+
+        if (pending.ExtendedApprovalPrimary is bool primary)
+        {
+            rows.Add(("Extended primary review", primary ? "On" : "Off"));
+        }
+
         return rows;
     }
 

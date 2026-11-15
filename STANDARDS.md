@@ -50,6 +50,9 @@
   copy override, trust, or resume logic.
 - Structured option values use the shared slash command path. A model picker
   represents a configured selection independently of any enable switch.
+- Direct and queued input share the busy rules for built-in settings.
+  A next-turn setting is validated when submitted and changes active state
+  and disk only when the Engine applies the pending value.
 - Bridge slash input uses the shared engine command path. Refuse commands
   whose output or picker the client cannot display before model execution,
   and keep available-command descriptions consistent with client capabilities.

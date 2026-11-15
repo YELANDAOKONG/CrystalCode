@@ -127,6 +127,66 @@ public sealed class NextTurnSettingsTests
     }
 
     [Fact]
+    public async Task ExtendedApproval_WhileBusyValidatesAndKeepsTheLastChoice()
+    {
+        var client = new BlockingStreamingClient();
+        var settings = HeadlessSession.ScriptedSettings(thinking: true)
+            .WithExtendedApproval(new ExtendedApprovalSettings(new ApprovalModelSettings(true, "scripted", "model")));
+        using var headless = new HeadlessSession(client, settings: settings);
+        await StartTurnAsync(headless, client);
+
+        await headless.Session.EnqueueAsync("/approval extended thinking low", CancellationToken.None);
+        await headless.Session.SubmitAsync("/approval extended thinking", CancellationToken.None);
+        await headless.Session.EnqueueAsync("/approval extended thinking medium", CancellationToken.None);
+        await headless.Session.SubmitAsync("/approval extended trigger medium", CancellationToken.None);
+        await headless.Session.EnqueueAsync("/approval extended trigger high", CancellationToken.None);
+        await headless.Session.SubmitAsync("/approval extended trigger low", CancellationToken.None);
+        await headless.Session.EnqueueAsync("/approval extended primary off", CancellationToken.None);
+
+        var chrome = headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome;
+        Assert.Empty(chrome.ExtendedApproval!.Reviewer.Thinking);
+        Assert.True(chrome.ExtendedApproval.IncludePrimaryReview);
+        Assert.Equal("high", chrome.Pending!.ExtendedApprovalThinking);
+        Assert.Null(chrome.Pending.ExtendedApprovalTrigger);
+        Assert.Equal(false, chrome.Pending.ExtendedApprovalPrimary);
+        Assert.Equal("Next: Extended thinking High, Extended primary review Off", PendingSettingsText.Summary(chrome.Pending));
+        Assert.Contains(headless.Observer.Events.OfType<ErrorWritten>(),
+            error => error.Text.Contains("Thinking effort 'medium'", StringComparison.Ordinal));
+        Assert.False(File.Exists(headless.Home.ConfigPath));
+
+        await EndTurnAsync(headless);
+
+        var applied = headless.Observer.Events.OfType<ChromeChanged>().Last().Chrome;
+        Assert.Equal("Think High", applied.ExtendedApproval!.Reviewer.Thinking);
+        Assert.False(applied.ExtendedApproval.IncludePrimaryReview);
+        Assert.True(applied.Pending!.IsEmpty);
+        Assert.True(SavedContains(headless, "\"thinkingEffort\": \"high\""));
+        Assert.True(SavedContains(headless, "\"includePrimaryReview\": false"));
+    }
+
+    [Theory]
+    [InlineData("/logout scripted")]
+    [InlineData("/trust off")]
+    [InlineData("/topic set Changed")]
+    [InlineData("/topic thinking high")]
+    [InlineData("/notify off")]
+    [InlineData("/approval extended off")]
+    public async Task BusyInput_RefusesMutationsThroughBothPaths(string command)
+    {
+        var client = new BlockingStreamingClient();
+        using var headless = new HeadlessSession(client);
+        await StartTurnAsync(headless, client);
+
+        await headless.Session.SubmitAsync(command, CancellationToken.None);
+        await headless.Session.EnqueueAsync(command, CancellationToken.None);
+
+        var expected = "Finish the current turn before using " + command.Split(' ')[0] + ".";
+        Assert.Equal([expected, expected], headless.Observer.Events.OfType<ErrorWritten>().Select(error => error.Text));
+        Assert.False(File.Exists(headless.Home.ConfigPath));
+        await EndTurnAsync(headless);
+    }
+
+    [Fact]
     public async Task Model_DuringATurnSwitchesWhenTheTurnEnds()
     {
         var client = new BlockingStreamingClient();

@@ -565,12 +565,15 @@ public sealed class ServerSessionTests
         await fixture.PostAsync(fixture.Http, "/input", new { text = "long task" });
         await model.Held.Task.WaitAsync(ServerFixture.Wait);
         var plan = await fixture.PostAsync(fixture.Http, "/input", new { text = "/approval edit" });
+        var primary = await fixture.PostAsync(fixture.Http, "/input", new { text = "/approval extended primary off" });
         var refused = await fixture.PostAsync(fixture.Http, "/input", new { text = "/cd .." });
         var mode = await fixture.PostAsync(fixture.Http, "/mode", new { action = "set", name = "plan" });
         var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
 
         Assert.True(plan.GetProperty("accepted").GetBoolean());
         Assert.True(plan.GetProperty("pending").GetBoolean());
+        Assert.True(primary.GetProperty("accepted").GetBoolean());
+        Assert.True(primary.GetProperty("pending").GetBoolean());
         Assert.Equal(JsonValueKind.Null, plan.GetProperty("error").ValueKind);
         Assert.False(refused.GetProperty("accepted").GetBoolean());
         Assert.Contains("Finish the current turn", refused.GetProperty("error").GetString(), StringComparison.Ordinal);
@@ -579,6 +582,7 @@ public sealed class ServerSessionTests
         var chrome = snapshot.GetProperty("chrome");
         Assert.Equal("default", chrome.GetProperty("approval").GetString());
         Assert.Equal("edit", chrome.GetProperty("pending").GetProperty("approval").GetString());
+        Assert.False(chrome.GetProperty("pending").GetProperty("extendedApprovalPrimary").GetBoolean());
         Assert.Equal("plan", chrome.GetProperty("pending").GetProperty("mode").GetString());
 
         await fixture.PostAsync(fixture.Http, "/interrupt", new { });

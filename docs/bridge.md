@@ -533,8 +533,9 @@ requires extension notifications.
 in this order. Each value names the slash command that selects it, and
 `session/set_config_option` and `session/set_mode` run that command, so
 validation and `config.json` writes match the terminal exactly. While a
-turn runs, a mode, approval, thinking, context, tier, speed, or model choice
-succeeds and applies on the next turn; options keep showing the active value,
+turn or compaction runs, a mode, approval level, work or reviewer thinking,
+context, tier, speed, model, extended trigger, or primary review inclusion
+choice applies on the next turn. Options keep showing the active value,
 and `config_option_update` lists the waiting values under
 `_meta.crystal.pending` (the same keys as `pending` in `_crystal/chrome`).
 That update is sent again when only the pending list changes. The

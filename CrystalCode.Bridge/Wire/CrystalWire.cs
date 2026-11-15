@@ -161,6 +161,13 @@ internal static class CrystalWire
             PendingValue(writer, "thinking", pending.Thinking);
             PendingValue(writer, "mode", pending.Mode);
             PendingValue(writer, "approval", pending.Approval);
+            PendingValue(writer, "approvalThinking", pending.ApprovalThinking);
+            PendingValue(writer, "extendedApprovalThinking", pending.ExtendedApprovalThinking);
+            PendingValue(writer, "extendedApprovalTrigger", pending.ExtendedApprovalTrigger);
+            if (pending.ExtendedApprovalPrimary is bool primary)
+            {
+                writer.WriteBoolean("extendedApprovalPrimary", primary);
+            }
         }
 
         writer.WriteEndObject();

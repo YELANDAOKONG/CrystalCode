@@ -368,6 +368,78 @@ public sealed class CodingSessionApprovalModelTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Review_ThinkingChangeAppliesBeforeTheQueuedTurn(bool pumpInput)
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var outside = new TemporaryWorkspace();
+        var path = Path.Combine(outside.Path, "sample.txt");
+        await File.WriteAllTextAsync(path, "outside-text");
+        var work = new CountingClient(ToolRound(path), TextRound("First."), ToolRound(path), TextRound("Second."))
+        {
+            FirstStreamGate = release.Task
+        };
+        var reviewer = new CountingClient();
+        using var home = new TemporaryHome();
+        using var workspace = new TemporaryWorkspace();
+        var observer = new RecordingSessionObserver();
+        var session = Open(
+            Settings(enabled: true),
+            new Dictionary<string, IStreamingChatClient>
+            {
+                ["work"] = work,
+                ["reviewer"] = reviewer
+            },
+            home,
+            workspace,
+            observer,
+            new RecordingApprovalPrompt(ApprovalChoice.Deny));
+        var timeout = TimeSpan.FromSeconds(10);
+        try
+        {
+            await session.StartAsync(CancellationToken.None);
+            await session.SubmitAsync("First prompt", CancellationToken.None);
+
+            const string command = "/approval thinking medium";
+            if (pumpInput)
+            {
+                await session.EnqueueAsync(command, CancellationToken.None);
+            }
+            else
+            {
+                await session.SubmitAsync(command, CancellationToken.None);
+            }
+
+            await session.SubmitAsync("/status", CancellationToken.None);
+            var status = observer.Events.OfType<StatusReported>().Last().Status;
+            Assert.Equal("Think Default", status.ApprovalThinking);
+            Assert.Equal("medium", status.Pending!.ApprovalThinking);
+            Assert.False(File.Exists(home.Home.ConfigPath));
+            await session.SubmitQuickPromptAsync("Second prompt", queueOnly: true, CancellationToken.None);
+
+            release.TrySetResult();
+            await session.TurnTask!.WaitAsync(timeout);
+            Assert.Equal(1, reviewer.CompleteCount);
+            Assert.Equal(ReasoningMode.Automatic, reviewer.LastComplete?.Reasoning?.Mode);
+
+            await session.CompleteTurnAsync(CancellationToken.None);
+            Assert.True(session.PendingSettings.IsEmpty);
+            Assert.Contains("\"thinkingEffort\": \"medium\"", File.ReadAllText(home.Home.ConfigPath), StringComparison.Ordinal);
+            await session.TurnTask!.WaitAsync(timeout);
+            Assert.Equal(2, reviewer.CompleteCount);
+            Assert.Equal(ReasoningMode.Enabled, reviewer.LastComplete?.Reasoning?.Mode);
+            Assert.Equal(ReasoningEffort.Medium, reviewer.LastComplete?.Reasoning?.Effort);
+            await session.CompleteTurnAsync(CancellationToken.None);
+        }
+        finally
+        {
+            release.TrySetResult();
+            session.Close();
+        }
+    }
+
     [Fact]
     public void Create_FailsWhenTheEnabledApprovalModelHasNoCredential()
     {
@@ -472,7 +544,7 @@ public sealed class CodingSessionApprovalModelTests
             });
 
     private static ModelSettings ThinkingModel() =>
-        new(200_000, thinking: true, thinkingEfforts: ["low", "high"]);
+        new(200_000, thinking: true, thinkingEfforts: ["low", "medium", "high"]);
 
     private static CodingSession Open(
         HarnessSettings settings,
@@ -567,6 +639,8 @@ public sealed class CodingSessionApprovalModelTests
 
         public ChatRequest? LastComplete { get; private set; }
 
+        public Task? FirstStreamGate { get; init; }
+
         public IAsyncEnumerable<ChatStreamEvent> StreamAsync(
             ChatRequest request,
             CancellationToken cancellationToken = default)
@@ -577,7 +651,7 @@ public sealed class CodingSessionApprovalModelTests
             var events = _rounds.Count == 0
                 ? Array.Empty<ChatStreamEvent>()
                 : _rounds.Dequeue();
-            return EnumerateAsync(events, cancellationToken);
+            return EnumerateAsync(events, StreamCount == 1 ? FirstStreamGate : null, cancellationToken);
         }
 
         public Task<ChatResponse> CompleteAsync(
@@ -598,9 +672,15 @@ public sealed class CodingSessionApprovalModelTests
 
         private static async IAsyncEnumerable<ChatStreamEvent> EnumerateAsync(
             IReadOnlyList<ChatStreamEvent> events,
+            Task? gate,
             [System.Runtime.CompilerServices.EnumeratorCancellation]
             CancellationToken cancellationToken)
         {
+            if (gate is not null)
+            {
+                await gate.WaitAsync(cancellationToken);
+            }
+
             foreach (var streamEvent in events)
             {
                 cancellationToken.ThrowIfCancellationRequested();

@@ -182,8 +182,9 @@ separate library with no terminal code. The product can:
   approval, and each resource description model. A stored model and its
   supported tuning remain configurable while its switch is off, including
   for topic naming. Mode,
-  approval, thinking, tier, speed, context, and model chosen during a turn
-  apply on the next turn. Approval, the question
+  approval level, work and reviewer thinking, tier, speed, context, model,
+  extended review trigger, and inclusion of the primary review apply on the
+  next turn when chosen during a turn or compaction. Approval, the question
   tool, trust, and session and child choices reach clients as interactions;
   approval, trust, the workspace fence, and `ToolInvocationPolicy` are
   unchanged. Clients refresh from a snapshot and reconnect by event sequence

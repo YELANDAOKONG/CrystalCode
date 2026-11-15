@@ -475,7 +475,8 @@ public sealed class CodingSessionHeadlessTests
             SessionVerb.Verbose,
             SessionVerb.StatusLine,
             SessionVerb.Btw,
-            SessionVerb.Attach
+            SessionVerb.Attach,
+            SessionVerb.Theme
         ];
 
         foreach (SessionVerb verb in Enum.GetValues<SessionVerb>())

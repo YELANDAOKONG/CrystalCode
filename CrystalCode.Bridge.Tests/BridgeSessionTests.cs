@@ -98,18 +98,26 @@ public sealed class BridgeSessionTests
         await held.WaitAsync(BridgeFixture.Wait);
 
         var set = await fixture.RequestAsync("session/set_config_option", new { sessionId = id, configId = "approval", value = "edit" });
+        var setPrimary = await fixture.RequestAsync("session/prompt", new
+        {
+            sessionId = id,
+            prompt = new[] { new { type = "text", text = "/approval extended primary off" } }
+        });
         var update = await fixture.WaitForUpdateAsync("config_option_update", static update =>
             update.TryGetProperty("_meta", out var meta)
             && meta.GetProperty("crystal").TryGetProperty("pending", out var pending)
-            && pending.TryGetProperty("approval", out _));
+            && pending.TryGetProperty("extendedApprovalPrimary", out _));
         await fixture.NotifyAsync("session/cancel", new { sessionId = id });
         await prompt.WaitAsync(BridgeFixture.Wait);
 
         Assert.False(set.TryGetProperty("error", out _));
+        Assert.False(setPrimary.TryGetProperty("error", out _));
         var approval = set.GetProperty("result").GetProperty("configOptions").EnumerateArray()
             .Single(static option => option.GetProperty("id").GetString() == "approval");
         Assert.Equal("default", approval.GetProperty("currentValue").GetString());
-        Assert.Equal("edit", update.GetProperty("params").GetProperty("update").GetProperty("_meta").GetProperty("crystal").GetProperty("pending").GetProperty("approval").GetString());
+        var pending = update.GetProperty("params").GetProperty("update").GetProperty("_meta").GetProperty("crystal").GetProperty("pending");
+        Assert.Equal("edit", pending.GetProperty("approval").GetString());
+        Assert.False(pending.GetProperty("extendedApprovalPrimary").GetBoolean());
         await fixture.WaitForUpdateAsync("config_option_update", static update =>
             update.TryGetProperty("configOptions", out var options)
             && options.EnumerateArray().Any(static option =>
