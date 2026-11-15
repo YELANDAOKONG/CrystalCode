@@ -6721,13 +6721,26 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        var words = AccountCommandArguments.Parse(argument, allowNoBrowser: true);
+        if (words.Error is not null)
+        {
+            Error(words.Error);
+            return;
+        }
+
+        if (words.Provider.Length == 0)
+        {
+            Note(AccountCompletions.Describe(_settings.Catalog, _credentials, "login"));
+            return;
+        }
+
         if (_turnActive || _compacting)
         {
             Error("Sign in when no turn is running.");
             return;
         }
 
-        if (!AccountSignIn.TryFind(_settings.Catalog, argument, out var provider, out var error))
+        if (!AccountSignIn.TryFind(_settings.Catalog, words.Provider, out var provider, out var error))
         {
             Error(error);
             return;
@@ -6735,11 +6748,16 @@ public sealed class CodingSession : ITurnObserver
 
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         limit.CancelAfter(SignInTimeout);
+        await _operatorGate.WaitAsync(cancellationToken);
         try
         {
             await new AccountSignIn(_credentials, _plugins).LoginAsync(
                 provider,
-                new SessionLoginInteraction(Note, _frontEnd.OpenLinkAsync),
+                new SessionLoginInteraction(
+                    Note,
+                    _frontEnd.OpenLinkAsync,
+                    _frontEnd.Questions,
+                    openBrowser: !words.NoBrowser),
                 limit.Token);
         }
         catch (AuthenticationFailedException exception)
@@ -6750,17 +6768,36 @@ public sealed class CodingSession : ITurnObserver
         {
             Error("Signing in timed out.");
         }
+        finally
+        {
+            _operatorGate.Release();
+            RefreshSlashCommands();
+        }
     }
 
     private async Task SignOutAsync(string argument, CancellationToken cancellationToken)
     {
-        if (!AccountSignIn.TryFind(_settings.Catalog, argument, out var provider, out var error))
+        var words = AccountCommandArguments.Parse(argument, allowNoBrowser: false);
+        if (words.Error is not null)
+        {
+            Error(words.Error);
+            return;
+        }
+
+        if (words.Provider.Length == 0)
+        {
+            Note(AccountCompletions.Describe(_settings.Catalog, _credentials, "logout"));
+            return;
+        }
+
+        if (!AccountSignIn.TryFind(_settings.Catalog, words.Provider, out var provider, out var error))
         {
             Error(error);
             return;
         }
 
         var result = await new AccountSignIn(_credentials, _plugins).LogoutAsync(provider, cancellationToken);
+        RefreshSlashCommands();
         if (!result.Removed)
         {
             Note($"{provider.Name.Value} had no saved login.");
@@ -10191,6 +10228,8 @@ public sealed class CodingSession : ITurnObserver
             "agents" => command with { Arguments = AgentCompletions() },
             "mode" => command with { Arguments = ModeCompletions() },
             "theme" => command with { Arguments = ThemeCompletions() },
+            "login" => command with { Arguments = AccountCompletions.ForLogin(_settings.Catalog, _credentials) },
+            "logout" => command with { Arguments = AccountCompletions.ForLogout(_settings.Catalog, _credentials) },
             _ => command
         }).ToArray();
         menu = [.. menu, .. _mcp.Prompts.Select(PromptCompletion)];

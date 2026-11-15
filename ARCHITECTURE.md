@@ -339,9 +339,18 @@ exist in the terminal only. `/login` and `/logout` are engine verbs that run
 the terminal supplies, so Server and Bridge refuse it (Server classifies both
 verbs as admin, Bridge lists neither and refuses both). `crystal server`,
 `crystal bridge`, and `crystal run` use a saved login, and a missing one is
-an error, never a prompt. The in-session sign-in never reads pasted text and
-gives up after five minutes; a remote machine uses `crystal login`, which
-also accepts the pasted callback address. Logout asks the integration to end
+an error, never a prompt. `/login <provider> [--no-browser]` and `/logout <provider>` take one
+provider name; a bare command lists the account providers and their state as
+a note and never signs in or out. Completion lists every account provider for
+`/login` (with `--no-browser` nested under each) and only signed-in ones for
+`/logout`, with `Signed In` or `Signed Out` as the help; the menu is rebuilt
+after each sign-in and sign-out. The in-session sign-in (`SessionLoginInteraction`)
+takes a pasted callback address through an operator question with a free-form
+answer: at once when no browser was opened (`--no-browser` or the front end
+could not open one), and after ten seconds when one was, so a normal sign-in
+never flashes it. A pasted answer that is not an http or https address is
+asked for again, and Esc cancels the sign-in. The whole sign-in gives up
+after five minutes. Logout asks the integration to end
 the remote session, deletes the saved login, and reports when the service
 did not confirm. Disk plugins cannot supply an integration and cannot create a client
 for an `authentication` provider.

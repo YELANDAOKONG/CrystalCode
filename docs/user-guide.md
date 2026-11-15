@@ -924,8 +924,13 @@ as tab-separated text. A sign-in always names its provider, so nothing opens
 a browser by itself. Run `crystal login <provider>` or `/login <provider>` to sign in (add
 `--no-browser` to `crystal login` to print the link instead of opening it), and
 `crystal logout <provider>` or `/logout` to remove the login. `/login` needs
-the terminal's browser; on a remote machine use `crystal login`, which also
-accepts the address the browser ended on when it cannot reach this machine. The login is
+the terminal's browser support. A bare `/login` or `/logout` lists the account
+providers and whether each is `Signed In`; it signs nothing in or out.
+`/login <provider> --no-browser` shows the link instead of opening it. When the
+browser cannot reach this machine, paste the address it ended on into the
+prompt that appears (at once with `--no-browser`, after ten seconds
+otherwise); Esc cancels. Typing `/login ` completes the account providers and
+`/logout ` completes the signed-in ones. The login is
 stored in `~/.crystal/authentication-credentials.json` with owner-only
 access. `crystal server`, `crystal bridge`, and `crystal run` use a saved
 login and never start one.
