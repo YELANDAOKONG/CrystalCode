@@ -378,3 +378,6 @@ it speculatively, and do not reserve types or configuration for it.
   Server, Bridge, and `crystal run` present the queue. Current behavior
   stands. Do not reserve a command, configuration field, public type, event,
   or wire field.
+- Whether Crystal's Decisions API (`IDecisionClient`) joins Review, and whether
+  Review grows beyond approving or rejecting a call. Not decided.
+- An embeddings feature built on Crystal's Embeddings API. Not decided.

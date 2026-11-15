@@ -1079,6 +1079,12 @@ Server, Bridge, and `crystal run` present the queue. No change is
 scheduled. Do not reserve a command, configuration field, public type,
 event, or wire field.
 
+Whether Crystal's Decisions API joins Review, and whether Review grows beyond
+approving or rejecting a call, is under consideration and is not decided. An
+embeddings feature built on Crystal's Embeddings API is likewise not decided.
+No change is scheduled. Do not reserve a configuration field, public type, or
+wire field for either.
+
 ## Relationship to Crystal
 
 Crystal is provider-neutral, prompt-neutral, and tool-neutral. It does not
