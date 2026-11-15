@@ -54,7 +54,8 @@ public sealed class ServerLoginTests
             .Single(static model => model.GetProperty("provider").GetString() == "account");
         Assert.True(after.GetProperty("credentialReady").GetBoolean());
         await events.WaitForAsync("interaction.resolved");
-        Assert.Contains("Signed in to account.", string.Join('\n', events.Seen.Select(static seen => seen.GetRawText())), StringComparison.Ordinal);
+        await events.WaitForAsync("note", static value =>
+            value.GetProperty("data").GetProperty("text").GetString() == "Signed in to account.");
     }
 
     [Fact]
@@ -69,6 +70,8 @@ public sealed class ServerLoginTests
         await fixture.PostAsync(fixture.Http, "/interactions/" + interaction.GetProperty("id").GetString(), new { address = Address });
         await login;
         await events.WaitForAsync("interaction.resolved");
+        await events.WaitForAsync("note", static value =>
+            value.GetProperty("data").GetProperty("text").GetString() == "Signed in to account.");
 
         string seen;
         lock (events.Seen)
@@ -99,9 +102,8 @@ public sealed class ServerLoginTests
         var models = (await fixture.GetAsync(fixture.Http, "/models")).GetProperty("models").EnumerateArray()
             .Single(static model => model.GetProperty("provider").GetString() == "account");
         Assert.False(models.GetProperty("credentialReady").GetBoolean());
-        Assert.Contains(
-            events.Seen.Select(static seen => seen.GetRawText()),
-            text => text.Contains("Signing in was cancelled.", StringComparison.Ordinal));
+        await events.WaitForAsync("note", static value =>
+            value.GetProperty("data").GetProperty("text").GetString() == "Signing in was cancelled.");
     }
 
     [Fact]
