@@ -120,7 +120,8 @@ public sealed class ServerSession
 
             var frontEnd = new SessionFrontEnd(Hub, Broker, Broker, Broker, Broker)
             {
-                ChooseChildAsync = Broker.ChooseChildAsync
+                ChooseChildAsync = Broker.ChooseChildAsync,
+                CreateLoginInteraction = (provider, _) => Broker.CreateLogin(provider)
             };
             var session = launch.CreateSession(frontEnd, _runtime.Plugins);
             Broker.BindOrigin(() => session.CurrentOrigin);

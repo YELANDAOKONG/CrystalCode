@@ -164,13 +164,13 @@ and the `server.state` event.
     `/shortcuts`, including `list` and `send <name>`), `/export`, `/tools`,
     `/plugins`, `/skills`, `/notify`, and `/mcp` without arguments, `/mcp list|show`,
     `/cd` without a path, `/plan`, `/mode`, and plugin or MCP prompt commands.
-  - `admin`: shutdown, token management, answering a `trust` interaction,
+  - `admin`: shutdown, token management, answering a `trust` or `login` interaction,
     and slash commands that change trust, directory access, approval, the
     model or its slots, prompt sets, rules, agents, the workspace, saved
     configuration, or quit the session (`/approval`, `/thinking`, `/context`,
     `/tier`, `/speed`, `/tokens`, `/model`, `/promptset`, `/promptattach`,
     `/statusline`, `/title <text>`, `/cd <path>`, `/space`, `/trust`, `/rules`, `/access`,
-    `/resume`, `/agents`, `/verbose`, `/quit`, and the argument forms of
+    `/resume`, `/agents`, `/verbose`, `/login`, `/logout`, `/quit`, and the argument forms of
     `/compact`, `/todos`, `/tools`, `/skills`, `/plugins`, `/notify`, and `/mcp`, and `/pursue model|thinking|tier|speed|context|limit`, which write `config.json`).
     `/notify test` runs the operator's `operatorNotify` command on the server
     host, so it needs `admin`.
@@ -441,11 +441,26 @@ Anything that asks the operator becomes an interaction with an `id`, a
 | `trust` | `IWorkspaceTrustPrompt.ConfirmAsync` | `{"trust":true\|false}`; needs admin |
 | `choose_session` | `ISessionChooser.ChooseAsync` | `{"sessionId":"…"}` or `{"sessionId":null}` to decline |
 | `choose_child` | `SessionFrontEnd.ChooseChildAsync` | `{"childId":"…"}` or `{"childId":null}` to decline |
+| `login` | `SessionFrontEnd.CreateLoginInteraction` | `{"address":"…"}`, the http or https address the browser ended on, or `{"cancelled":true}`; needs admin |
 
 - An approval payload carries the call, the classification (a child's call
   has a summary prefixed with the child), the primary review verdict and the
   extended review verdict when they ran, and the allowed `choices`. The
   answer is `{"choice":"once|session|always|deny"}`.
+- A `login` payload carries `provider`, `steps` (text the flow showed),
+  `linkLabel` and `link` (the sign-in address, when the flow shows one), and
+  `prompt`. `/login <provider>` (`POST /input`, admin) opens it. The server
+  never opens a browser, because it may run on another machine: the client
+  opens `link` on the operator's machine. When the browser can reach the
+  server host, its callback finishes the sign-in and the interaction ends with
+  `interaction.cancelled`; otherwise the client answers with the address the
+  browser ended on. That address holds a one-time authorization code, so it is
+  never written to an event, the snapshot, a log, or a diagnostic, and
+  `interaction.resolved` carries only the id, kind, and client. `POST
+  /interrupt` cancels a waiting sign-in, as does a `cancelled` answer, and
+  either frees the next `/login`. A `GET /models` entry has `type`
+  `authentication` for an account provider, with `credentialReady` true only
+  while signed in.
 - An answer the engine did not offer is rejected with 400 and the
   interaction stays open. An answer to an interaction that is gone or
   belongs to another client returns 409.

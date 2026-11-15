@@ -163,6 +163,13 @@ internal static class SessionEndpoints
             }
 
             if (server.Session.Broker.TryGet(id, out var pending)
+                && pending.Kind == Interactions.InteractionKind.Login
+                && AccessGuard.Scope(context) < ServerScope.Admin)
+            {
+                return Json.Problem(403, "Answering a sign-in needs the admin scope.");
+            }
+
+            if (server.Session.Broker.TryGet(id, out pending)
                 && pending.Kind == Interactions.InteractionKind.Trust
                 && AccessGuard.Scope(context) < ServerScope.Admin)
             {

@@ -59,7 +59,8 @@ internal sealed class ServerFixture : IAsyncDisposable
         Action<CrystalHome, string>? prepare = null,
         IReadOnlyList<string>? origins = null,
         IReadOnlyList<string>? exposedHeaders = null,
-        bool allowPrivateNetwork = false)
+        bool allowPrivateNetwork = false,
+        Action<PluginRegistry>? configurePlugins = null)
     {
         var fixture = new ServerFixture(Directory.CreateTempSubdirectory("crystal-server-").FullName);
         var home = new CrystalHome(fixture.Home);
@@ -83,6 +84,7 @@ internal sealed class ServerFixture : IAsyncDisposable
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());
         plugins.Add(model);
+        configurePlugins?.Invoke(plugins);
         var serverOptions = new ServerOptions
         {
             Launch = new SessionLaunchRequest(options?.Invoke(launch) ?? launch, fixture.Workspace, fixture.Workspace),

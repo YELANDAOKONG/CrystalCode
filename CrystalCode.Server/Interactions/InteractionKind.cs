@@ -13,5 +13,7 @@ public static class InteractionKind
 
     public const string ChooseChild = "choose_child";
 
-    public static IReadOnlyList<string> All { get; } = [Approval, Question, Trust, ChooseSession, ChooseChild];
+    public const string Login = "login";
+
+    public static IReadOnlyList<string> All { get; } = [Approval, Question, Trust, ChooseSession, ChooseChild, Login];
 }

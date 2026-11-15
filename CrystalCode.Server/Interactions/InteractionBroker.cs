@@ -6,6 +6,7 @@ using Crystal.Tools;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Approvals.Interfaces;
+using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Sessions.Interfaces;
@@ -257,6 +258,39 @@ public sealed class InteractionBroker : IApprovalPrompt, IUserPrompt, ISessionCh
                 writer.WriteEndArray();
             },
             answer => Choose(answer, "childId", ids),
+            null,
+            cancellationToken);
+    }
+
+    /// <summary>Creates the sign-in surface for one account provider.</summary>
+    public ILoginInteraction CreateLogin(string provider) => new ServerLoginInteraction(this, provider);
+
+    /// <summary>
+    /// Opens a <c>login</c> interaction. Returns the address the client pasted,
+    /// or null when the client cancelled or the server is stopping.
+    /// </summary>
+    internal async Task<string?> AskLoginAsync(
+        string provider,
+        IReadOnlyList<string> steps,
+        (string Label, Uri Link)? link,
+        string prompt,
+        CancellationToken cancellationToken)
+    {
+        return await OpenAsync<string?>(
+            InteractionKind.Login,
+            writer =>
+            {
+                writer.WriteString("provider", provider);
+                WireWriter.Strings(writer, "steps", steps);
+                if (link is { } shown)
+                {
+                    writer.WriteString("linkLabel", shown.Label);
+                    writer.WriteString("link", shown.Link.AbsoluteUri);
+                }
+
+                writer.WriteString("prompt", prompt);
+            },
+            ServerLoginInteraction.ParseAnswer,
             null,
             cancellationToken);
     }
