@@ -225,7 +225,9 @@ instead.
 
 Throw `PluginAuthenticationException` for a failure the operator can act on;
 the host shows its message as written. From `Validate`, `LoginAsync`, and
-`RevokeAsync` any other exception is shown as its type name only. `crystal
+`RevokeAsync` any other exception is shown with the plugin name and its type,
+followed by its message. Keep tokens and authorization codes out of every
+message. `crystal
 login` and `crystal logout` load only the operator's plugins under
 `~/.crystal/plugins`, and only when the integration is not first-party,
 because nothing has asked to trust the current directory.

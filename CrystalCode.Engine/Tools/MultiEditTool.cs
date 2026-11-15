@@ -29,6 +29,11 @@ public sealed class MultiEditTool : ITool
                 {
                   "type": "object",
                   "properties": {
+                    "continue_on_error": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Skip files with preflight or write errors and continue editing other files."
+                    },
                     "files": {
                       "type": "array",
                       "minItems": 1,
@@ -60,7 +65,8 @@ public sealed class MultiEditTool : ITool
             "Applies multiple exact text replacements to one or more existing UTF-8 files. "
             + "Read each file first and list it once. Edits run in order within each file. "
             + "Each old_string must match exactly once unless replace_all is true. "
-            + "All edits are checked before the tool writes any file. "
+            + "By default, a file error stops the batch. With continue_on_error, file errors are reported and other files still run. "
+            + "Batch validation and access checks still apply before writing. "
             + "Unlisted outside paths may require approval. Credential paths are refused.");
     }
 
@@ -71,45 +77,58 @@ public sealed class MultiEditTool : ITool
         ArgumentNullException.ThrowIfNull(call);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!TryPrepare(_workspace, call.Arguments, cancellationToken, out var files, out var error))
+        if (!TryPrepare(_workspace, call.Arguments, cancellationToken, out var preparation, out var error))
         {
             return ValueTask.FromResult(new ToolOutput(error, ToolResultStatus.Failure));
         }
 
-        var results = new List<string>(files.Count);
-        foreach (var file in files)
+        var failures = new List<string>(preparation.Failures);
+        var results = new List<string>(preparation.Files.Count);
+        foreach (var file in preparation.Files)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var path = file.Change.Path;
             var shown = _workspace.Contains(path) ? _workspace.ToRelative(path) : path;
-            try
+            var writeError = WriteError(file);
+            if (writeError is not null)
             {
-                if (!TryWrite(file))
+                if (!preparation.ContinueOnError)
                 {
-                    return ValueTask.FromResult(PartialFailure(shown, "The file changed after preflight.", results));
+                    return ValueTask.FromResult(PartialFailure(shown, writeError, results));
                 }
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                return ValueTask.FromResult(PartialFailure(
-                    shown, "The write could not be completed. Read the file again before retrying.", results));
+
+                failures.Add($"{shown}: {writeError}");
+                continue;
             }
 
             results.Add($"Edited {shown}. Replacements: {file.ReplacementCount}.");
         }
 
-        return ValueTask.FromResult(new ToolOutput(ToolOutputText.Truncate(string.Join('\n', results))));
+        if (failures.Count > 0)
+        {
+            var summary = $"Edited files: {results.Count}. Failed files: {failures.Count}.";
+            var report = string.Join(ToolOutputText.LineSeparator, new[] { summary }.Concat(failures).Concat(results));
+            return ValueTask.FromResult(new ToolOutput(ToolOutputText.Truncate(report), ToolResultStatus.Failure));
+        }
+
+        return ValueTask.FromResult(new ToolOutput(
+            ToolOutputText.Truncate(string.Join(ToolOutputText.LineSeparator, results))));
     }
 
     internal static IReadOnlyList<string> PathsOf(string arguments) =>
-        TryRead(arguments, out var files, out _) ? files.Select(static file => file.Path).ToArray() : [];
+        TryRead(arguments, out var files, out _, out _) ? files.Select(static file => file.Path).ToArray() : [];
+
+    internal static IReadOnlyList<ToolFileChange> PreviewChanges(Workspace workspace, string arguments) =>
+        TryPrepare(workspace, arguments, default, out var preparation, out _)
+            ? [.. preparation.Files.Select(static file => file.Change)]
+            : [];
 
     /// <summary>
     /// Lists the requested replacements for a front end that shows an approval preview.
     /// </summary>
     public static IEnumerable<(string Path, string OldText, string NewText, bool ReplaceAll)> PreviewEdits(string arguments)
     {
-        if (!TryRead(arguments, out var files, out _))
+        if (!TryRead(arguments, out var files, out _, out _))
         {
             yield break;
         }
@@ -123,15 +142,15 @@ public sealed class MultiEditTool : ITool
         }
     }
 
-    internal static bool TryPrepare(
+    private static bool TryPrepare(
         Workspace workspace,
         string arguments,
         CancellationToken cancellationToken,
-        out List<PreparedMultiEdit> prepared,
+        out MultiEditPreparation preparation,
         out string error)
     {
-        prepared = [];
-        if (!TryRead(arguments, out var files, out error))
+        preparation = null!;
+        if (!TryRead(arguments, out var files, out var continueOnError, out error))
         {
             return false;
         }
@@ -140,11 +159,38 @@ public sealed class MultiEditTool : ITool
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
         var seen = new HashSet<string>(pathComparer);
+        var prepared = new List<PreparedMultiEdit>();
+        var failures = new List<string>();
         foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!TryResolve(workspace, file.Path, out var fullPath, out error))
+            if (Workspace.IsCredentialPath(file.Path))
             {
+                error = "Editing credential paths is not allowed.";
+                return false;
+            }
+
+            if (!workspace.TryGetFullPath(file.Path, out var fullPath, out var problem))
+            {
+                error = $"{file.Path}: {problem}";
+                if (!continueOnError)
+                {
+                    return false;
+                }
+
+                failures.Add(error);
+                continue;
+            }
+
+            if (Workspace.IsCredentialPath(fullPath))
+            {
+                error = "Editing credential paths is not allowed.";
+                return false;
+            }
+
+            if (workspace.IsReadOnly(fullPath))
+            {
+                error = $"{file.Path}: Writing to a read-only session directory is not allowed. Change its access with /access.";
                 return false;
             }
 
@@ -154,20 +200,30 @@ public sealed class MultiEditTool : ITool
                 return false;
             }
 
-            if (!TryPrepareFile(file, fullPath, cancellationToken, out var change, out error))
+            if (!TryPrepareFile(workspace, file, fullPath, cancellationToken, out var change, out error))
             {
-                return false;
+                if (!continueOnError)
+                {
+                    return false;
+                }
+
+                failures.Add(error);
+                continue;
             }
 
             prepared.Add(change);
         }
 
+        preparation = new MultiEditPreparation(continueOnError, prepared, failures);
+        error = string.Empty;
         return true;
     }
 
-    private static bool TryRead(string arguments, out List<MultiEditFile> files, out string error)
+    private static bool TryRead(
+        string arguments, out List<MultiEditFile> files, out bool continueOnError, out string error)
     {
         files = [];
+        continueOnError = false;
         error = "Arguments must include a nonempty files array.";
         if (!ToolArguments.TryOpen(arguments, out var document))
         {
@@ -176,6 +232,17 @@ public sealed class MultiEditTool : ITool
 
         using (document)
         {
+            if (document.RootElement.TryGetProperty("continue_on_error", out var flag))
+            {
+                if (flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                {
+                    error = "continue_on_error must be a boolean.";
+                    return false;
+                }
+
+                continueOnError = flag.GetBoolean();
+            }
+
             if (!TryReadArray(document.RootElement, "files", out var fileEntries))
             {
                 return false;
@@ -275,32 +342,8 @@ public sealed class MultiEditTool : ITool
         }
     }
 
-    private static bool TryResolve(Workspace workspace, string path, out string fullPath, out string error)
-    {
-        fullPath = string.Empty;
-        if (Workspace.IsCredentialPath(path))
-        {
-            error = "Editing credential paths is not allowed.";
-            return false;
-        }
-
-        if (!workspace.TryResolveEditableFile(path, out fullPath, out var problem))
-        {
-            error = $"{path}: {problem}";
-            return false;
-        }
-
-        if (Workspace.IsCredentialPath(fullPath))
-        {
-            error = "Editing credential paths is not allowed.";
-            return false;
-        }
-
-        error = string.Empty;
-        return true;
-    }
-
     private static bool TryPrepareFile(
+        Workspace workspace,
         MultiEditFile file,
         string fullPath,
         CancellationToken cancellationToken,
@@ -308,6 +351,12 @@ public sealed class MultiEditTool : ITool
         out string error)
     {
         prepared = null!;
+        if (!workspace.TryRequireExistingFile(fullPath, out var pathError))
+        {
+            error = $"{file.Path}: {pathError}";
+            return false;
+        }
+
         byte[] bytes;
         string original;
         bool hasByteOrderMark;
@@ -360,6 +409,18 @@ public sealed class MultiEditTool : ITool
         return true;
     }
 
+    private static string? WriteError(PreparedMultiEdit file)
+    {
+        try
+        {
+            return TryWrite(file) ? null : "The file changed after preflight.";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return "The write could not be completed. Read the file again before retrying.";
+        }
+    }
+
     private static bool TryWrite(PreparedMultiEdit file)
     {
         var bytes = StrictUtf8.GetBytes(file.Change.NewText);
@@ -397,6 +458,6 @@ public sealed class MultiEditTool : ITool
     private static ToolOutput PartialFailure(string path, string error, List<string> results) =>
         new(ToolOutputText.Truncate(
             $"Stopped at {path}. {error}\n"
-            + (results.Count == 0 ? "No earlier file was edited." : string.Join('\n', results))),
+            + (results.Count == 0 ? "No earlier file was edited." : string.Join(ToolOutputText.LineSeparator, results))),
             ToolResultStatus.Failure);
 }

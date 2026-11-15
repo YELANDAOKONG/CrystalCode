@@ -9,7 +9,8 @@ namespace CrystalCode.Engine.Plugins.Disk;
 /// <summary>
 /// Serves a plugin's account login to the engine. The plugin sees facts and a
 /// vault slot, never an engine type. What a check, a sign-in, or a revoke
-/// throws is reduced to text the operator can read without a token in it.
+/// throws is shown with the plugin name, so a plugin must keep tokens out of
+/// its exception messages.
 /// </summary>
 internal sealed class DiskAuthenticationIntegration : IAuthenticationIntegration
 {
@@ -80,8 +81,11 @@ internal sealed class DiskAuthenticationIntegration : IAuthenticationIntegration
     private static PluginAccount Account(ProviderDefinition provider) =>
         new(provider.Name.Value, provider.Protocol.Value, provider.BaseUri, provider.Models.Keys);
 
+    // A plugin is code the operator installed, and the message is what they need to fix it.
     private string Failed(string action, Exception exception) =>
-        exception is PluginAuthenticationException
-            ? exception.Message
-            : $"Plugin sign-in '{_plugin}' could not {action} ({exception.GetType().Name}).";
+        exception is PluginAuthenticationException || string.IsNullOrWhiteSpace(exception.Message)
+            ? exception is PluginAuthenticationException
+                ? exception.Message
+                : $"Plugin sign-in '{_plugin}' could not {action} ({exception.GetType().Name})."
+            : $"Plugin sign-in '{_plugin}' could not {action} ({exception.GetType().Name}): {exception.Message}";
 }

@@ -79,7 +79,7 @@ public sealed class PluginAuthenticationTests : IClassFixture<PluginAuthenticati
     }
 
     [Fact]
-    public async Task APluginFailure_ShowsItsOwnTextOrOnlyTheExceptionType()
+    public async Task APluginFailure_ShowsItsOwnTextOrThePluginTypeAndMessage()
     {
         using var home = new TemporaryHome();
         using var workspace = new TemporaryWorkspace();
@@ -93,8 +93,9 @@ public sealed class PluginAuthenticationTests : IClassFixture<PluginAuthenticati
             () => signIn.LoginAsync(Account("boom", "plug-proto"), new ScriptedLogin(), CancellationToken.None));
 
         Assert.Equal("Polite failure.", polite.Message);
-        Assert.Contains("InvalidOperationException", boom.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("secret-token-xyz", boom.Message, StringComparison.Ordinal);
+        Assert.Equal(
+            "Plugin sign-in 'AuthFixture' could not sign in (InvalidOperationException): secret-token-xyz",
+            boom.Message);
     }
 
     [Fact]

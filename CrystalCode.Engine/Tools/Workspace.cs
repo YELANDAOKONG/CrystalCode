@@ -456,11 +456,8 @@ public sealed class Workspace
 
         if (mustExistAsFile)
         {
-            if (!File.Exists(candidate))
+            if (!TryRequireExistingFile(candidate, out error))
             {
-                error = Directory.Exists(candidate)
-                    ? $"Path is a directory: {ToRelative(candidate)}"
-                    : $"File not found: {ToRelative(candidate)}";
                 return false;
             }
         }
@@ -472,6 +469,20 @@ public sealed class Workspace
 
         fullPath = candidate;
         return true;
+    }
+
+    internal bool TryRequireExistingFile(string fullPath, out string error)
+    {
+        if (File.Exists(fullPath))
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        error = Directory.Exists(fullPath)
+            ? $"Path is a directory: {ToRelative(fullPath)}"
+            : $"File not found: {ToRelative(fullPath)}";
+        return false;
     }
 
     private bool TryNormalize(string path, bool allowOutside, out string fullPath, out string error, bool resolveLinks = true)
