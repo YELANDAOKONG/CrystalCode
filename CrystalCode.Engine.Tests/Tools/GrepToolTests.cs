@@ -9,6 +9,21 @@ namespace CrystalCode.Engine.Tests.Tools;
 public sealed class GrepToolTests
 {
     [Fact]
+    public void Definition_UsesProviderCompatiblePatternSchema()
+    {
+        var tool = new GrepTool(new Workspace(Path.GetTempPath()));
+        var schema = tool.Definition.Input is JsonToolInput input
+            ? input.Schema
+            : throw new InvalidOperationException("Grep must use JSON input.");
+
+        Assert.False(schema.TryGetProperty("oneOf", out _));
+        Assert.False(schema.TryGetProperty("anyOf", out _));
+        Assert.False(schema.TryGetProperty("allOf", out _));
+        Assert.True(schema.GetProperty("properties").TryGetProperty("pattern", out _));
+        Assert.True(schema.GetProperty("properties").TryGetProperty("patterns", out _));
+    }
+
+    [Fact]
     public async Task InvokeAsync_FindsLineAndSkipsIgnoredDirectory()
     {
         using var root = new TemporaryWorkspace();

@@ -79,11 +79,7 @@ public sealed class GrepTool : ITool
                       "type": "integer",
                       "description": "Maximum matching lines in content mode, or files in files and count modes, up to {{WorkspaceLimits.MaximumGrepMatches}}; defaults to {{WorkspaceLimits.DefaultGrepMatches}}."
                     }
-                  },
-                  "oneOf": [
-                    { "required": ["pattern"] },
-                    { "required": ["patterns"] }
-                  ]
+                  }
                 }
                 """),
             ToolDescription);
