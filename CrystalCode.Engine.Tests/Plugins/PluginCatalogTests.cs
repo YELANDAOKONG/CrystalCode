@@ -174,10 +174,11 @@ public sealed class PluginCatalogTests
         Assert.Equal("sample_token", Assert.Single(catalog.Placeholders).Name);
         Assert.Equal("branch", Assert.Single(catalog.StatusFields).Name);
         using var syntaxLimiter = new SemaphoreSlim(2, 2);
-        var syntax = new SyntaxService(catalog.Tokenizers, syntaxLimiter, static _ => { });
+        var syntax = new SyntaxService(catalog.Tokenizers, syntaxLimiter, static _ => { }, new SyntaxTestTimeProvider());
         Assert.True(syntax.Supports("CS"));
-        Assert.Equal(new SyntaxToken(0, 3, "keyword"),
-            Assert.Single((await syntax.TokenizeAsync("cs", "var", CancellationToken.None))!));
+        var tokens = await syntax.TokenizeAsync("cs", "var", CancellationToken.None);
+        Assert.NotNull(tokens);
+        Assert.Equal(new SyntaxToken(0, 3, "keyword"), Assert.Single(tokens));
         var published = new List<IReadOnlyList<StatusFieldValue>>();
         var board = new PluginStatusBoard(
             fields => published.Add(fields),

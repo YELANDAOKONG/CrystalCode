@@ -14,14 +14,19 @@ public sealed class SyntaxService
     private readonly object _gate = new();
     private readonly SemaphoreSlim _limiter;
     private readonly Action<string> _note;
+    private readonly TimeProvider _timeProvider;
     private readonly CancellationTokenSource _retirement = new();
     private int _retired;
 
     internal SyntaxService(
-        IReadOnlyList<PluginTokenizerRegistration> registrations, SemaphoreSlim limiter, Action<string> note)
+        IReadOnlyList<PluginTokenizerRegistration> registrations,
+        SemaphoreSlim limiter,
+        Action<string> note,
+        TimeProvider? timeProvider = null)
     {
         _limiter = limiter;
         _note = note;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         foreach (var registration in registrations)
         {
             foreach (var language in registration.Languages)
@@ -81,7 +86,7 @@ public sealed class SyntaxService
         });
         try
         {
-            var result = await work.WaitAsync(Budget, waiting.Token);
+            var result = await work.WaitAsync(Budget, _timeProvider, waiting.Token);
             cancellationToken.ThrowIfCancellationRequested();
             return Volatile.Read(ref _retired) == 0 && Supports(language) ? result : null;
         }

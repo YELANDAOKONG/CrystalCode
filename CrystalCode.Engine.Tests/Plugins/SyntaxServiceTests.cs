@@ -21,8 +21,9 @@ public sealed class SyntaxServiceTests
         Assert.True(service.Supports("C#"));
         var result = await service.TokenizeAsync("C#", "abcdefgh", CancellationToken.None);
 
+        Assert.NotNull(result);
         Assert.Equal(["keyword", "string", "number", "comment", "type", "function", "operator", "punctuation"],
-            result!.Select(token => token.Kind));
+            result.Select(token => token.Kind));
     }
 
     [Theory]
@@ -75,7 +76,9 @@ public sealed class SyntaxServiceTests
         }));
         Assert.Null(await service.TokenizeAsync("c#", new string('a', 65537), CancellationToken.None));
         Assert.Equal(0, calls);
-        Assert.Equal(16384, (await service.TokenizeAsync("c#", new string('a', 65536), CancellationToken.None))!.Count);
+        var result = await service.TokenizeAsync("c#", new string('a', 65536), CancellationToken.None);
+        Assert.NotNull(result);
+        Assert.Equal(16384, result.Count);
         Assert.Equal(1, calls);
     }
 
@@ -83,27 +86,31 @@ public sealed class SyntaxServiceTests
     public async Task TokenizeAsync_BlockingEntryTimesOutAndKeepsPermitAcrossReplacement()
     {
         using var release = new ManualResetEventSlim();
+        using var entered = new SemaphoreSlim(0, 2);
         using var limiter = new SemaphoreSlim(2, 2);
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timeProvider = new SyntaxTestTimeProvider();
         var notes = new List<string>();
         var tokenizer = new Tokenizer((_, _) =>
         {
-            entered.TrySetResult();
-            release.Wait(TimeSpan.FromSeconds(10));
+            entered.Release();
+            release.Wait();
             throw new InvalidOperationException("private source code");
         });
         try
         {
-            var first = Create(tokenizer, limiter, notes);
-            var clock = Stopwatch.StartNew();
+            var first = Create(tokenizer, limiter, notes, timeProvider);
             var pending = first.TokenizeAsync("c#", "abc", CancellationToken.None);
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(await entered.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Equal(TimeSpan.FromMilliseconds(200), timeProvider.DueTime);
+            timeProvider.Expire();
             Assert.Null(await pending.WaitAsync(TimeSpan.FromSeconds(3)));
-            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3));
             Assert.False(first.Supports("c#"));
             first.Retire();
-            var second = Create(tokenizer, limiter, notes);
-            Assert.Null(await second.TokenizeAsync("c#", "abc", CancellationToken.None));
+            var second = Create(tokenizer, limiter, notes, timeProvider);
+            pending = second.TokenizeAsync("c#", "abc", CancellationToken.None);
+            Assert.True(await entered.WaitAsync(TimeSpan.FromSeconds(5)));
+            timeProvider.Expire();
+            Assert.Null(await pending.WaitAsync(TimeSpan.FromSeconds(3)));
             Assert.Equal(0, limiter.CurrentCount);
             second.Retire();
             var calls = 0;
@@ -192,11 +199,19 @@ public sealed class SyntaxServiceTests
         Assert.Single(registrations);
     }
 
-    private static SyntaxService Create(Tokenizer tokenizer, SemaphoreSlim? limiter = null, List<string>? notes = null)
+    private static SyntaxService Create(
+        Tokenizer tokenizer,
+        SemaphoreSlim? limiter = null,
+        List<string>? notes = null,
+        SyntaxTestTimeProvider? timeProvider = null)
     {
         var registrations = new List<PluginTokenizerRegistration>();
         PluginTokenizerAdmission.Add("Fixture", [tokenizer], registrations, notes ?? []);
-        return new SyntaxService(registrations, limiter ?? new SemaphoreSlim(2, 2), note => notes?.Add(note));
+        return new SyntaxService(
+            registrations,
+            limiter ?? new SemaphoreSlim(2, 2),
+            note => notes?.Add(note),
+            timeProvider ?? new SyntaxTestTimeProvider());
     }
 
     private sealed class Tokenizer(Func<string, CancellationToken, Task<IReadOnlyList<PluginSyntaxToken>>> tokenize) : IPluginTokenizer

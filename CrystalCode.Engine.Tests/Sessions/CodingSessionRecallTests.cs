@@ -18,14 +18,14 @@ public sealed class CodingSessionRecallTests
         await headless.Session.StartAsync(CancellationToken.None);
         await headless.RunTurnAsync("keep");
 
-        var running = headless.Session.SubmitAsync("take back", CancellationToken.None);
+        // The stream can signal entry before SubmitAsync publishes the turn task.
+        Assert.False(await headless.Session.SubmitAsync("take back", CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.False(headless.Session.RecallPending);
         Assert.True(headless.Session.TryRecall());
         Assert.True(headless.Session.RecallPending);
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
-        Assert.False(await running);
 
         var recalled = Assert.Single(headless.Observer.Events.OfType<UserMessageRecalled>());
         Assert.Equal("take back", recalled.Text);
@@ -48,14 +48,13 @@ public sealed class CodingSessionRecallTests
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
 
-        var running = headless.Session.SubmitAsync("stay", CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync("stay", CancellationToken.None));
         await client.Started.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.False(headless.Session.TryRecall());
         Assert.False(headless.Session.RecallPending);
         Assert.True(headless.Session.TryInterrupt());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
-        Assert.False(await running);
 
         Assert.Empty(headless.Observer.Events.OfType<UserMessageRecalled>());
         var saved = headless.ReadSaved();
@@ -70,14 +69,13 @@ public sealed class CodingSessionRecallTests
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
 
-        var running = headless.Session.SubmitAsync("original", CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync("original", CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
         await headless.Session.SubmitAsync("follow", CancellationToken.None);
 
         Assert.False(headless.Session.TryRecall());
         Assert.True(headless.Session.TryInterrupt());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
-        Assert.False(await running);
         Assert.True(headless.Session.TurnActive);
         Assert.True(headless.Session.TryInterrupt());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
@@ -96,13 +94,12 @@ public sealed class CodingSessionRecallTests
         await headless.Session.StartAsync(CancellationToken.None);
         var text = "see " + ImageMarkerText.Tag(4);
 
-        var running = headless.Session.SubmitAsync(text, CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync(text, CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.False(headless.Session.TryRecall());
         Assert.True(headless.Session.TryInterrupt());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
-        Assert.False(await running);
 
         Assert.Empty(headless.Observer.Events.OfType<UserMessageRecalled>());
         var saved = headless.ReadSaved();
@@ -116,14 +113,13 @@ public sealed class CodingSessionRecallTests
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
 
-        var running = headless.Session.SubmitAsync("stay", CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync("stay", CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
         await headless.Session.SubmitAsync("/status", CancellationToken.None);
 
         Assert.False(headless.Session.TryRecall());
         Assert.True(headless.Session.TryInterrupt());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
-        Assert.False(await running);
 
         Assert.Empty(headless.Observer.Events.OfType<UserMessageRecalled>());
         var saved = headless.ReadSaved();
